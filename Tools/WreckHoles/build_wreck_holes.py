@@ -116,21 +116,40 @@ def register_all():
     return count
 
 
-def build_debris():
-    """Shard meshes in burnt metal; returns them in DebrisMeshes order."""
+# Debris sets: the same bent plates and chunks, re-skinned per material family.
+DEBRIS_SETS = {
+    'Wreck': {'prefix': 'SM_WreckHoleShard', 'material': 'MI_WreckHoleShard', 'texture': None, 'darkening': 1.0},
+    'Wood': {'prefix': 'SM_WoodHoleSplinter', 'material': 'MI_WoodHoleSplinter',
+             'texture': '/Game/RTS_Survival/Blueprints/GroundVehicles/BaseAndNomadic/ChildBlueprints/GerT1/'
+                        'OpelBlitz_Barracks/TempTentBarracks/Wood026_2K_Color', 'darkening': 0.0},
+}
+
+
+def _debris_material(debris_set):
     EAL = unreal.EditorAssetLibrary
-    if EAL.does_asset_exist(SHARD_MATERIAL):
-        shard_material = unreal.load_asset(SHARD_MATERIAL)
-    else:
-        shard_material = unreal.AssetToolsHelpers.get_asset_tools().create_asset(
-            'MI_WreckHoleShard', DEBRIS_FOLDER, unreal.MaterialInstanceConstant,
-            unreal.MaterialInstanceConstantFactoryNew())
-        MEL.set_material_instance_parent(shard_material, unreal.load_asset(SHARD_MATERIAL_PARENT))
-        MEL.set_material_instance_scalar_parameter_value(shard_material, 'BurntDarkening', 1.0)
-        EAL.save_loaded_asset(shard_material, False)
+    path = f"{DEBRIS_FOLDER}/{debris_set['material']}"
+    if EAL.does_asset_exist(path):
+        return unreal.load_asset(path)
+    material = unreal.AssetToolsHelpers.get_asset_tools().create_asset(
+        debris_set['material'], DEBRIS_FOLDER, unreal.MaterialInstanceConstant,
+        unreal.MaterialInstanceConstantFactoryNew())
+    MEL.set_material_instance_parent(material, unreal.load_asset(SHARD_MATERIAL_PARENT))
+    MEL.set_material_instance_scalar_parameter_value(material, 'BurntDarkening', debris_set['darkening'])
+    if debris_set['texture']:
+        MEL.set_material_instance_texture_parameter_value(material, 'HullBaseColor',
+                                                          unreal.load_asset(debris_set['texture']))
+    EAL.save_loaded_asset(material, False)
+    return material
+
+
+def build_debris(style_name='Wreck'):
+    """Debris meshes for a style (burnt metal shards, wood splinters); returns them in DebrisMeshes order."""
+    EAL = unreal.EditorAssetLibrary
+    debris_set = DEBRIS_SETS[style_name]
+    shard_material = _debris_material(debris_set)
     shards = []
     for index, source in enumerate(DEBRIS_SOURCES):
-        target = f'{DEBRIS_FOLDER}/SM_WreckHoleShard_{index}'
+        target = f"{DEBRIS_FOLDER}/{debris_set['prefix']}_{index}"
         mesh = unreal.load_asset(target) if EAL.does_asset_exist(target) else EAL.duplicate_asset(source, target)
         for slot in range(len(mesh.get_editor_property('static_materials'))):
             mesh.set_material(slot, shard_material)
@@ -152,8 +171,9 @@ def _component_template(blueprint):
     return None
 
 
-def setup_blueprint(blueprint_path, shards):
-    """Adds the WreckHoleDamage component (once per hierarchy) and sets its map and shards. Returns a status."""
+def setup_blueprint(blueprint_path, shards, hole_zones=None):
+    """Adds the WreckHoleDamage component (once per hierarchy) and sets its map, shards and optional mesh-space
+    hole zones (unreal.Box list). Returns a status."""
     blueprint = unreal.load_asset(blueprint_path)
     component = _component_template(blueprint)
     status = 'existing'
@@ -171,6 +191,8 @@ def setup_blueprint(blueprint_path, shards):
         status = 'added'
     component.set_editor_property('material_map', material_map())
     component.set_editor_property('debris_meshes', shards)
+    if hole_zones is not None:
+        component.set_editor_property('mesh_space_hole_zones', hole_zones)
     unreal.BlueprintEditorLibrary.compile_blueprint(blueprint)
     unreal.EditorAssetLibrary.save_loaded_asset(blueprint, False)
     return status
@@ -179,3 +201,55 @@ def setup_blueprint(blueprint_path, shards):
 def setup_parent_blueprints():
     shards = build_debris()
     return {path: setup_blueprint(path, shards) for path in PARENT_BLUEPRINTS}
+
+
+# Other destructibles on the same system, with their own style, slot materials and hole zones.
+BRIDGE_FOLDER = '/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/Industrial/RustedRefinery'
+LOG_FOLDER = '/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/NaturalCover/Logs'
+# Timber trestle bridges: the wood slot gets holes, the rail slot (M_RustedRefinery_Atlas) never does.
+BRIDGE_WOOD_MATERIAL = ('/Game/RTS_Survival/Blueprints/GroundVehicles/BaseAndNomadic/ChildBlueprints/GerT1/'
+                        'OpelBlitz_Barracks/TempTentBarracks/M_WeaponRack')
+# The deck beams and rails start around 1265 cm; holes stay on the pillars below this height (mesh space).
+BRIDGE_PILLAR_TOP_Z = 1150.0
+LOG_MATERIAL = '/Game/RTS_Survival/Meshes/Nature/Trees/DeadTrees/Materials/MI_Env_DeadTree_1'
+EXTRA_TARGETS = {
+    'Wood': {
+        'materials': [BRIDGE_WOOD_MATERIAL, LOG_MATERIAL],
+        'blueprints': [f'{BRIDGE_FOLDER}/BP_Industrial_RailRoadBride90Deg', f'{BRIDGE_FOLDER}/BP_Industrial_RailRoadBridge']
+                      + [f'{LOG_FOLDER}/BP_Cover_DeadTreeLog_{index:02d}' for index in range(1, 11)],
+    },
+}
+
+
+def _bridge_zone(blueprint_path):
+    """Mesh-space box over the whole bridge footprint, from below the ground up to the pillar tops."""
+    blueprint = unreal.load_asset(blueprint_path)
+    subsystem = unreal.get_engine_subsystem(unreal.SubobjectDataSubsystem)
+    for handle in subsystem.k2_gather_subobject_data_for_blueprint(blueprint):
+        data = unreal.SubobjectDataBlueprintFunctionLibrary.get_data(handle)
+        component = unreal.SubobjectDataBlueprintFunctionLibrary.get_object_for_blueprint(data, blueprint)
+        if isinstance(component, unreal.StaticMeshComponent) and component.get_editor_property('static_mesh'):
+            box = component.get_editor_property('static_mesh').get_bounding_box()
+            margin = 500.0
+            return [unreal.Box(unreal.Vector(box.min.x - margin, box.min.y - margin, box.min.z - margin),
+                               unreal.Vector(box.max.x + margin, box.max.y + margin, BRIDGE_PILLAR_TOP_Z))]
+    return None
+
+
+def build_extra_targets():
+    """Bridges and logs: Wood-style materials for their slot materials, registered; component on each Blueprint."""
+    _allow_bulk_loads()
+    results = {}
+    for style_name, target in EXTRA_TARGETS.items():
+        pairs = []
+        for path in target['materials']:
+            source = unreal.load_asset(path)
+            damaged = make_damaged_material(source, style_name)
+            results[path.split('/')[-1]] = damaged.get_path_name() if damaged else 'skipped'
+            pairs.append((source, damaged))
+        register(pairs)
+        shards = build_debris(style_name)
+        for blueprint_path in target['blueprints']:
+            zones = _bridge_zone(blueprint_path) if blueprint_path.startswith(BRIDGE_FOLDER) else None
+            results[blueprint_path.split('/')[-1]] = setup_blueprint(blueprint_path, shards, zones)
+    return results

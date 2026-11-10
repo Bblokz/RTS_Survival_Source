@@ -30,7 +30,7 @@ NOISE = '/Engine/Functions/Engine_MaterialFunctions02/ExampleContent/Textures/Lo
 FIRST_HOLE = 11
 HOLES = 6
 FLOATS_PER_HOLE = 4
-SUFFIX = '_WreckHoles'
+SUFFIX = '_WreckHoles'  # the default style's suffix
 MAP_PATH = '/Game/RTS_Survival/SpecialEffects/AllExplosions/WreckHoles/DA_WreckHoleMaterials'
 CHAR_OVERLAY = '/Game/RTS_Survival/SpecialEffects/AllExplosions/Mesh/EngineDeck/M_WreckChar_Overlay'
 OVERLAY_TAG = 'WreckHoles'
@@ -43,6 +43,15 @@ RIM_DARKEN = 0.12
 RIM_ROUGHNESS = 0.95
 # The inside of the hull seen through a hole.
 INTERIOR_COLOUR = (0.012, 0.010, 0.009)
+# Looks per material family. Each style builds its own masked copies (its own suffix), so one source material can
+# serve both a wreck and, say, a bridge without one look overwriting the other.
+STYLES = {
+    # Burnt steel: dark scorched rim, charred-black inside.
+    'Wreck': {'suffix': SUFFIX, 'rim_darken': RIM_DARKEN, 'rim_roughness': RIM_ROUGHNESS,
+              'interior': INTERIOR_COLOUR},
+    # Shot wood (logs, timber bridges): a lightly scorched rim and a dark-wood inside.
+    'Wood': {'suffix': '_WoodHoles', 'rim_darken': 0.45, 'rim_roughness': 0.9, 'interior': (0.045, 0.028, 0.014)},
+}
 
 
 def _hole_code():
@@ -135,7 +144,7 @@ def _hole_nodes(material, links, x=-1400, y=900):
     return visible, rim
 
 
-def _inject(material, darken_back_faces):
+def _inject(material, darken_back_faces, style):
     """Adds the hole subgraph to a fresh masked copy. Returns the number of failed links.
     darken_back_faces: only for masters that were single-sided; a two-sided master's back faces are real surfaces
     (open-topped hull walls, thin plates) and keep their look."""
@@ -159,10 +168,10 @@ def _inject(material, darken_back_faces):
         back_offset = MEL.create_material_expression(material, unreal.MaterialExpressionConstant, 700, -700)
         back_offset.set_editor_property('r', 0.0)
     scorch = MEL.create_material_expression(material, unreal.MaterialExpressionMultiply, 400, -500)
-    scorch.set_editor_property('const_b', RIM_DARKEN)
+    scorch.set_editor_property('const_b', style['rim_darken'])
     tinted = MEL.create_material_expression(material, unreal.MaterialExpressionLinearInterpolate, 650, -450)
     interior = MEL.create_material_expression(material, unreal.MaterialExpressionConstant3Vector, 650, -600)
-    interior.set_editor_property('constant', unreal.LinearColor(*INTERIOR_COLOUR, 1.0))
+    interior.set_editor_property('constant', unreal.LinearColor(*style['interior'], 1.0))
     inside = MEL.create_material_expression(material, unreal.MaterialExpressionLinearInterpolate, 900, -450)
     links += [MEL.connect_material_expressions(base, '', scorch, 'A'),
               MEL.connect_material_expressions(base, '', tinted, 'A'),
@@ -177,7 +186,7 @@ def _inject(material, darken_back_faces):
               MEL.connect_material_expressions(back_offset, '', rim_or_back, 'B')]
     rough_rim = MEL.create_material_expression(material, unreal.MaterialExpressionLinearInterpolate, 900, -150)
     rough_rim.set_editor_property('const_a', 0.6)
-    rough_rim.set_editor_property('const_b', RIM_ROUGHNESS)
+    rough_rim.set_editor_property('const_b', style['rim_roughness'])
     if rough is not None:
         links.append(MEL.connect_material_expressions(rough, '', rough_rim, 'A'))
     links += [MEL.connect_material_expressions(rim_or_back, '', rough_rim, 'Alpha'),
@@ -210,15 +219,20 @@ def _package(asset):
     return asset.get_path_name().split('.')[0]
 
 
-def masked_master_for(source_master):
-    """The `<Master>_WreckHoles` masked, two-sided copy of an opaque master; built on first use."""
+def _is_holes_copy(path):
+    return any(path.endswith(style['suffix']) for style in STYLES.values())
+
+
+def masked_master_for(source_master, style_name='Wreck'):
+    """The `<Master><suffix>` masked, two-sided copy of an opaque master for a style; built on first use."""
+    style = STYLES[style_name]
     if isinstance(source_master, str):
         source_master = unreal.load_asset(source_master)
     if not isinstance(source_master, unreal.Material):
         raise RuntimeError(str(source_master) + ' is not a Material')
-    if _package(source_master).endswith(SUFFIX):
+    if _is_holes_copy(_package(source_master)):
         return source_master
-    target = _package(source_master) + SUFFIX
+    target = _package(source_master) + style['suffix']
     if EAL.does_asset_exist(target):
         return unreal.load_asset(target)
     was_two_sided = source_master.get_editor_property('two_sided')
@@ -226,7 +240,7 @@ def masked_master_for(source_master):
     material.set_editor_property('blend_mode', unreal.BlendMode.BLEND_MASKED)
     material.set_editor_property('opacity_mask_clip_value', 0.5)
     material.set_editor_property('two_sided', True)
-    failed = _inject(material, darken_back_faces=not was_two_sided)
+    failed = _inject(material, darken_back_faces=not was_two_sided, style=style)
     unreal.SystemLibrary.execute_console_command(None, 'RTS.WallChunks.FinishMaskedMaster Material=' + target)
     material = unreal.load_asset(target)
     material.set_editor_property('two_sided', True)
@@ -244,8 +258,10 @@ def _force_two_sided(instance):
     instance.set_editor_property('base_property_overrides', overrides)
 
 
-def make_damaged_material(source):
-    """Masked holes material for one slot material (instance or master); builds what is missing. None if skipped."""
+def make_damaged_material(source, style_name='Wreck'):
+    """Masked holes material for one slot material (instance or master) in a style; builds what is missing.
+    None if skipped."""
+    style = STYLES[style_name]
     if isinstance(source, str):
         source = unreal.load_asset(source)
     ok, reason = can_take_holes(source)
@@ -253,14 +269,14 @@ def make_damaged_material(source):
         unreal.log_warning(f'WRECK_HOLES skip {source.get_path_name() if source else source}: {reason}')
         return None
     if isinstance(source, unreal.Material):
-        return masked_master_for(source)
-    target = _package(source) + SUFFIX
+        return masked_master_for(source, style_name)
+    target = _package(source) + style['suffix']
     if EAL.does_asset_exist(target):
         return unreal.load_asset(target)
     parent = source.get_editor_property('parent')
     # An instance of an instance hangs under the parent's own holes copy, so the parent's overrides stay.
-    damaged_parent = make_damaged_material(parent) if isinstance(parent, unreal.MaterialInstance) \
-        else masked_master_for(source.get_base_material())
+    damaged_parent = make_damaged_material(parent, style_name) if isinstance(parent, unreal.MaterialInstance) \
+        else masked_master_for(source.get_base_material(), style_name)
     if damaged_parent is None:
         return None
     instance = EAL.duplicate_asset(_package(source), target)
@@ -274,7 +290,9 @@ def make_damaged_material(source):
 def check_mask_live(damaged):
     """(masked PS, opaque PS) of a holes master against its source; the mask adds ~60+, under 10 means it compiled away."""
     master = damaged.get_base_material()
-    source = unreal.load_asset(_package(master)[:-len(SUFFIX)])
+    path = _package(master)
+    suffix = next(style['suffix'] for style in STYLES.values() if path.endswith(style['suffix']))
+    source = unreal.load_asset(path[:-len(suffix)])
     return (MEL.get_statistics(master).num_pixel_shader_instructions,
             MEL.get_statistics(source).num_pixel_shader_instructions)
 
