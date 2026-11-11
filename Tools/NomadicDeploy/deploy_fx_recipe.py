@@ -15,11 +15,14 @@ FOLDER = '/Game/RTS_Survival/Blueprints/GroundVehicles/BaseAndNomadic/NomadicDep
 # desert dust, dark and saturated on purpose (the puff sheet is light grey under strong sun, see make_recipe.py)
 DUST = (0.46, 0.29, 0.14)
 ROLL = (0.33, 0.21, 0.11)
+# translucent copy of the pack's M_Smoke without its DitherTemporalAA opacity mask (dither grain looked bad) and with a
+# depth fade where the sprites meet the ground; made by hand 2026-11-11 in NomadicDeploy/FX
+DEPLOY_DUST = FOLDER + '/MI_Deploy_Dust.MI_Deploy_Dust'
 
 
 def layer(name, spawn, lifetime, size, tint, velocity, drag, size_curve, alpha_curve, sphere, offset_z, shadows=True,
           bounds_half_width=500, bounds_above=700):
-    return mr.stateless_layer(name, mr.SMOKE_PUFF, (6, 5), 30, spawn, lifetime, size, mr.scaled(tint, 0.85),
+    return mr.stateless_layer(name, DEPLOY_DUST, (6, 5), 30, spawn, lifetime, size, mr.scaled(tint, 0.85),
                               mr.scaled(tint, 1.0), velocity, drag, size_curve, alpha_curve, sphere=sphere,
                               offset_z=offset_z, shadows=shadows, bounds_half_width=bounds_half_width,
                               bounds_above=bounds_above)

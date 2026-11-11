@@ -59,7 +59,7 @@
             }
           },
           "renderer": {
-            "Material": "/Game/MsvFx_Niagara_Explosion_Pack_01/Resources/Materials/InstanceMTL/MI_Smoke_01.MI_Smoke_01",
+            "Material": "/Game/RTS_Survival/Blueprints/GroundVehicles/BaseAndNomadic/NomadicDeploy/FX/MI_Deploy_Dust.MI_Deploy_Dust",
             "SubImageSize": "(X=6,Y=5)",
             "bSubImageBlend": "True",
             "Alignment": "Unaligned",
@@ -119,7 +119,7 @@
             }
           },
           "renderer": {
-            "Material": "/Game/MsvFx_Niagara_Explosion_Pack_01/Resources/Materials/InstanceMTL/MI_Smoke_01.MI_Smoke_01",
+            "Material": "/Game/RTS_Survival/Blueprints/GroundVehicles/BaseAndNomadic/NomadicDeploy/FX/MI_Deploy_Dust.MI_Deploy_Dust",
             "SubImageSize": "(X=6,Y=5)",
             "bSubImageBlend": "True",
             "Alignment": "Unaligned",
@@ -190,7 +190,7 @@
             }
           },
           "renderer": {
-            "Material": "/Game/MsvFx_Niagara_Explosion_Pack_01/Resources/Materials/InstanceMTL/MI_Smoke_01.MI_Smoke_01",
+            "Material": "/Game/RTS_Survival/Blueprints/GroundVehicles/BaseAndNomadic/NomadicDeploy/FX/MI_Deploy_Dust.MI_Deploy_Dust",
             "SubImageSize": "(X=6,Y=5)",
             "bSubImageBlend": "True",
             "Alignment": "Unaligned",
@@ -250,7 +250,7 @@
             }
           },
           "renderer": {
-            "Material": "/Game/MsvFx_Niagara_Explosion_Pack_01/Resources/Materials/InstanceMTL/MI_Smoke_01.MI_Smoke_01",
+            "Material": "/Game/RTS_Survival/Blueprints/GroundVehicles/BaseAndNomadic/NomadicDeploy/FX/MI_Deploy_Dust.MI_Deploy_Dust",
             "SubImageSize": "(X=6,Y=5)",
             "bSubImageBlend": "True",
             "Alignment": "Unaligned",
@@ -311,7 +311,7 @@
             }
           },
           "renderer": {
-            "Material": "/Game/MsvFx_Niagara_Explosion_Pack_01/Resources/Materials/InstanceMTL/MI_Smoke_01.MI_Smoke_01",
+            "Material": "/Game/RTS_Survival/Blueprints/GroundVehicles/BaseAndNomadic/NomadicDeploy/FX/MI_Deploy_Dust.MI_Deploy_Dust",
             "SubImageSize": "(X=6,Y=5)",
             "bSubImageBlend": "True",
             "Alignment": "Unaligned",
