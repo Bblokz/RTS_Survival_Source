@@ -407,9 +407,13 @@ private:
 	UPROPERTY()
 	TArray<UMaterialInterface*> M_RoofMaterials;
 
-	/** @brief Swap roof materials to construction style during pack-up. */
+	// True while the roof is hidden for a pack-up whose baked deploy animation carries the roof itself.
+	bool bM_RoofHiddenForPackUp = false;
+
+	/** @brief Swap roof materials to construction style during pack-up, or hide the roof when no material is given
+	 * (the nomadic VAT deploy mesh then shows the roof packing up). */
 	void OnPackUp_SetRoofToConstruction(UMaterialInstance* NomadicConstructionMaterial);
 
-	/** @brief Restore original roof materials when pack-up is cancelled. */
+	/** @brief Restore original roof materials (or show the hidden roof) when pack-up is cancelled. */
 	void OnPackupCancelled_RestoreRoofMaterials();
 };

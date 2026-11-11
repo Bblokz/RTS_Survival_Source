@@ -365,6 +365,7 @@ void UAircraftOwnerComp::OnPackUpAirbaseComplete()
 	M_RoofMeshComp->DestroyComponent();
 	M_RoofMeshComp = nullptr;
 	M_RoofAnimInst = nullptr;
+	bM_RoofHiddenForPackUp = false;
 	M_PackingState = EAirbasePackingState::PackedUp_Vehicle;
 	// Clear any packing records as now the airbase is fully packed up and this process can no longer be cancelled.
 	M_PackingRecords.Empty();
@@ -1121,7 +1122,16 @@ void UAircraftOwnerComp::DebugTick(const float DeltaTime)
 void UAircraftOwnerComp::OnPackUp_SetRoofToConstruction(UMaterialInstance* NomadicConstructionMaterial)
 {
 	M_RoofMaterials.Empty();
-	if (NomadicConstructionMaterial && GetIsValidRoofSkelMesh())
+	if (not NomadicConstructionMaterial)
+	{
+		if (GetIsValidRoofSkelMesh())
+		{
+			M_RoofMeshComp->SetVisibility(false);
+			bM_RoofHiddenForPackUp = true;
+		}
+		return;
+	}
+	if (GetIsValidRoofSkelMesh())
 	{
 		M_RoofMaterials = M_RoofMeshComp->GetMaterials();
 		const int32 NumMats = M_RoofMaterials.Num();
@@ -1134,6 +1144,14 @@ void UAircraftOwnerComp::OnPackUp_SetRoofToConstruction(UMaterialInstance* Nomad
 
 void UAircraftOwnerComp::OnPackupCancelled_RestoreRoofMaterials()
 {
+	if (bM_RoofHiddenForPackUp)
+	{
+		bM_RoofHiddenForPackUp = false;
+		if (GetIsValidRoofSkelMesh())
+		{
+			M_RoofMeshComp->SetVisibility(true);
+		}
+	}
 	const int32 NumMats = M_RoofMaterials.Num();
 	if (NumMats > 0 && GetIsValidRoofSkelMesh())
 	{
