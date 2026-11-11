@@ -27,6 +27,8 @@
 #include "RTS_Survival/RTSComponents/TimeProgressBarWidget.h"
 #include "RTS_Survival/RTSComponents/CargoMechanic/Cargo/Cargo.h"
 #include "RTS_Survival/UnitData/BuildingExpansionData.h"
+#include "RTS_Survival/Units/Tanks/WheeledTank/BaseTruck/NomadicDeployAnimation/NomadicDeployAnimationComponent.h"
+#include "RTS_Survival/Units/Tanks/WheeledTank/BaseTruck/NomadicDeployAnimation/NomadicDeployAnimationData.h"
 #include "RTS_Survival/Utils/RTSBlueprintFunctionLibrary.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/CollisionSetup/FRTS_CollisionSetup.h"
@@ -148,6 +150,13 @@ void ABuildingExpansion::StartExpansionConstructionAtLocation(
 	// Set the construction mesh on the building expansion.
 	BuildingMeshComponent->SetStaticMesh(M_ConstructionMesh);
 
+	if (GetUsesDeployAnimation())
+	{
+		constexpr float NewConstructionProgress = 0.f;
+		StartDeployAnimationConstruction(NewConstructionProgress);
+		BP_OnStartBxpConstruction();
+		return;
+	}
 	// Caches the original materials and applies the construction materials to all slots.
 	// Starts the progress bar and timer to reapply the original materials.
 	StartConstructionAnimation(M_BuildingTime);
@@ -245,6 +254,11 @@ void ABuildingExpansion::RevealCachedMaterialsUpTo(const int32 MaterialCount)
 
 void ABuildingExpansion::StartPackUpBuildingExpansion(const float TotalTime)
 {
+	if (GetUsesDeployAnimation())
+	{
+		StartDeployAnimationPackUp(TotalTime);
+		return;
+	}
 	DestroyBuildingAttachments();
 	SetAllTurretsDisabled();
 	SetMeshToConstructionMesh();
@@ -283,6 +297,11 @@ void ABuildingExpansion::CancelPackUpBuildingExpansion()
 	const UWorld* World = GetWorld();
 	if (not EnsureWorldIsValid(World, "ABuildingExpansion::CancelPackUpBuildingExpansion"))
 	{
+		return;
+	}
+	if (GetUsesDeployAnimation())
+	{
+		CancelDeployAnimationPackUp();
 		return;
 	}
 	SpawnBuildingAttachments();
@@ -494,6 +513,7 @@ void ABuildingExpansion::PostInitializeComponents()
 {
 	Super::PostInitializeComponents();
 	PostInit_GetCargoComponent();
+	PostInit_CreateDeployAnimation();
 
 	UBehaviourComp* BehaviourComp = FindComponentByClass<UBehaviourComp>();
 	BehaviourComponent = BehaviourComp;
@@ -508,6 +528,10 @@ void ABuildingExpansion::PostInitializeComponents()
 
 void ABuildingExpansion::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	if (const UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(M_PackUpAttachmentRemovalTimerHandle);
+	}
 	Super::EndPlay(EndPlayReason);
 	if (EndPlayReason == EEndPlayReason::Destroyed)
 	{
@@ -544,6 +568,7 @@ void ABuildingExpansion::UnitDies(const ERTSDeathType DeathType)
 	RemoveGlobalAbilityCooldownBonus();
 
 	SetUnitDying();
+	StopDeployAnimationForDeath();
 	// Before bp event as the bp event may destroy the actor immediately.
 	OnUnitDies.Broadcast();
 	if (UPitDefenseComponent* PitDefenseComponent = FindComponentByClass<UPitDefenseComponent>())
@@ -1852,4 +1877,194 @@ void ABuildingExpansion::AttemptAttachSpawnSystem(const FSwapToDestroyedMesh& Co
 	                                    FAttachmentTransformRules::KeepRelativeTransform);
 	// Start system
 	NiagaraComponent->Activate();
+}
+
+void ABuildingExpansion::PostInit_CreateDeployAnimation()
+{
+	const UWorld* World = GetWorld();
+	if (not IsValid(DeployAnimationData) || not IsValid(World) || not World->IsGameWorld())
+	{
+		return;
+	}
+	if (not GetIsValidBuildingMeshComponent())
+	{
+		return;
+	}
+	M_DeployMeshComponent = NewObject<UStaticMeshComponent>(this, TEXT("DeployAnimationMesh"), RF_Transient);
+	M_DeployMeshComponent->SetupAttachment(BuildingMeshComponent);
+	M_DeployMeshComponent->RegisterComponent();
+	M_DeployAnimationComponent = NewObject<UNomadicDeployAnimationComponent>(this, TEXT("DeployAnimation"),
+	                                                                         RF_Transient);
+	M_DeployAnimationComponent->RegisterComponent();
+	M_DeployAnimationComponent->InitDeployAnimation(BuildingMeshComponent, M_DeployMeshComponent,
+	                                                DeployAnimationData);
+}
+
+bool ABuildingExpansion::GetUsesDeployAnimation() const
+{
+	return not bM_IsFieldDefense && IsValid(M_DeployAnimationComponent) &&
+		M_DeployAnimationComponent->GetHasDeployAnimation();
+}
+
+void ABuildingExpansion::StartDeployAnimationConstruction(const float StartProgress)
+{
+	if (not GetIsValidBuildingMeshComponent())
+	{
+		return;
+	}
+	bM_DeployPackUpInterruptedConstruction = false;
+	if (GetIsValidProgressBarWidget())
+	{
+		M_ProgressBarWidget->SyncProgressBar(M_BuildingTime, StartProgress * M_BuildingTime, false);
+	}
+	// The building mesh keeps its collision but is not drawn while the deploy mesh animates.
+	BuildingMeshComponent->SetVisibility(false);
+	constexpr bool bTowardBuilt = true;
+	M_DeployAnimationComponent->PlayFromProgress(
+		StartProgress, bTowardBuilt, M_BuildingTime,
+		FOnNomadicDeployAnimationFinished::CreateUObject(this,
+		                                                 &ABuildingExpansion::OnDeployAnimationConstructionFinished));
+}
+
+void ABuildingExpansion::StartDeployAnimationPackUp(const float TotalTime)
+{
+	if (not GetIsValidBuildingMeshComponent())
+	{
+		return;
+	}
+	SetAllTurretsDisabled();
+	float StartProgress = 1.f;
+	if (M_StatusBuildingExpansion == EBuildingExpansionStatus::BXS_Built)
+	{
+		ScheduleAttachmentRemovalForPackUp(TotalTime);
+	}
+	else
+	{
+		// Packed during its construction: the deploy reverses from where it is and a cancelled pack-up resumes it.
+		bM_DeployPackUpInterruptedConstruction = true;
+		StartProgress = M_DeployAnimationComponent->GetProgress();
+		if (GetIsValidProgressBarWidget())
+		{
+			M_ProgressBarWidget->StopProgressBar();
+		}
+	}
+	SetMeshToConstructionMesh();
+	BuildingMeshComponent->SetVisibility(false);
+	SetStatusAndPropagateToOwner(EBuildingExpansionStatus::BXS_BeingPackedUp);
+	constexpr bool bTowardBuilt = false;
+	M_DeployAnimationComponent->PlayFromProgress(
+		StartProgress, bTowardBuilt, TotalTime,
+		FOnNomadicDeployAnimationFinished::CreateUObject(this, &ABuildingExpansion::OnDeployAnimationPackUpFinished));
+	OnBxpPackingUp.Broadcast();
+	if (bM_DeployPackUpInterruptedConstruction)
+	{
+		// Nothing the blueprint shows at the end of construction stands yet.
+		BP_OnStartPackUpBxp();
+	}
+}
+
+void ABuildingExpansion::CancelDeployAnimationPackUp()
+{
+	if (bM_DeployPackUpInterruptedConstruction)
+	{
+		// This bxp was packed while being built: continue the construction from the progress the pack-up left.
+		SetStatusAndPropagateToOwner(EBuildingExpansionStatus::BXS_BeingBuild);
+		StartDeployAnimationConstruction(M_DeployAnimationComponent->GetProgress());
+		OnBxpCancelPackingUp.Broadcast();
+		// Not the cancelled-pack-up event: blueprints show their turrets / extra meshes there, which must stay hidden
+		// until the resumed construction finishes.
+		BP_OnStartBxpConstruction();
+		return;
+	}
+	const bool bAttachmentsStillStand = CancelPendingAttachmentRemoval();
+	M_DeployAnimationComponent->StopAndHide();
+	SetMeshToBuildingMesh();
+	if (GetIsValidBuildingMeshComponent())
+	{
+		BuildingMeshComponent->SetVisibility(true);
+	}
+	if (not bAttachmentsStillStand)
+	{
+		SpawnBuildingAttachments();
+	}
+	SetStatusAndPropagateToOwner(EBuildingExpansionStatus::BXS_Built);
+	OnBxpCancelPackingUp.Broadcast();
+	BP_OnCancelledPackUpBxp();
+	SetTurretsToAutoEngage();
+}
+
+void ABuildingExpansion::OnDeployAnimationConstructionFinished()
+{
+	if (M_StatusBuildingExpansion != EBuildingExpansionStatus::BXS_BeingBuild &&
+		M_StatusBuildingExpansion != EBuildingExpansionStatus::BXS_BeingUnpacked)
+	{
+		return;
+	}
+	OnFinishedExpansionConstruction();
+	if (GetIsValidBuildingMeshComponent())
+	{
+		BuildingMeshComponent->SetVisibility(true);
+	}
+}
+
+void ABuildingExpansion::OnDeployAnimationPackUpFinished()
+{
+	// The deploy mesh hides itself at the end; the owner destroys this bxp in FinishPackUpExpansion.
+	bM_DeployPackUpInterruptedConstruction = false;
+}
+
+void ABuildingExpansion::StopDeployAnimationForDeath()
+{
+	if (not IsValid(M_DeployAnimationComponent))
+	{
+		return;
+	}
+	if (const UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(M_PackUpAttachmentRemovalTimerHandle);
+	}
+	M_DeployAnimationComponent->StopAndHide();
+	if (IsValid(BuildingMeshComponent))
+	{
+		BuildingMeshComponent->SetVisibility(true);
+	}
+}
+
+void ABuildingExpansion::ScheduleAttachmentRemovalForPackUp(const float TotalTime)
+{
+	// As on the nomadic buildings: the deploy's cover smoke at progress 1 fires when the pack-up starts and needs a
+	// moment to build up; only then do the attachments go and the blueprint hides its turrets / extra meshes.
+	constexpr float AttachmentRemovalPackUpFraction = 0.03f;
+	constexpr float MinCoverSmokeBuildUpSeconds = 0.35f;
+	constexpr float MaxPackUpFractionForRemoval = 0.5f;
+	UWorld* World = GetWorld();
+	const float RemovalDelaySeconds = FMath::Min(
+		FMath::Max(TotalTime * AttachmentRemovalPackUpFraction, MinCoverSmokeBuildUpSeconds),
+		TotalTime * MaxPackUpFractionForRemoval);
+	if (not IsValid(World) || RemovalDelaySeconds <= 0.f)
+	{
+		OnPackUpCoverSmokeStands();
+		return;
+	}
+	World->GetTimerManager().SetTimer(M_PackUpAttachmentRemovalTimerHandle, this,
+	                                  &ABuildingExpansion::OnPackUpCoverSmokeStands, RemovalDelaySeconds, false);
+}
+
+void ABuildingExpansion::OnPackUpCoverSmokeStands()
+{
+	DestroyBuildingAttachments();
+	BP_OnStartPackUpBxp();
+}
+
+bool ABuildingExpansion::CancelPendingAttachmentRemoval()
+{
+	const UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		return false;
+	}
+	FTimerManager& TimerManager = World->GetTimerManager();
+	const bool bWasPending = TimerManager.IsTimerActive(M_PackUpAttachmentRemovalTimerHandle);
+	TimerManager.ClearTimer(M_PackUpAttachmentRemovalTimerHandle);
+	return bWasPending;
 }

@@ -32,7 +32,9 @@ build.generate_lightmap_u_vs = False
 build.recompute_normals = False
 build.recompute_tangents = False
 SMS.set_lod_build_settings(mesh, 0, build)
-mesh.set_editor_property('light_map_coordinate_index', unreal.load_asset(SOURCE_MESH).get_editor_property('light_map_coordinate_index'))
+# UV4-5 hold the VAT piece data: a source lightmap channel there (meshes with 6 UV sets) falls back to UV3
+mesh.set_editor_property('light_map_coordinate_index',
+                         min(unreal.load_asset(SOURCE_MESH).get_editor_property('light_map_coordinate_index'), 3))
 print(name, 'verts', SMS.get_number_verts(mesh, 0), 'uv channels', SMS.get_num_uv_channels(mesh, 0),
       'nanite', mesh.get_editor_property('nanite_settings').enabled, 'bounds', mesh.get_bounds().box_extent)
 print('slots', [str(s.get_editor_property('material_slot_name')) for s in mesh.get_editor_property('static_materials')])

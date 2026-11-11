@@ -96,8 +96,16 @@ me = obj.data
 piece_of_part = data['piece_of_part']
 vert_piece = [piece_of_part[p] for p in data['vert_part']]
 # the shader reads TexCoord 4 / 5: pad meshes with fewer UV sets so the VAT layers land exactly there
+CONFIG = json.load(open(os.path.join(out_dir, 'config.json')))
+if len(me.uv_layers) > 4 and CONFIG.get('drop_extra_uvs'):
+    # config "drop_extra_uvs": only when no material of the mesh reads TexCoord 4+ (check the masters first);
+    # the building mesh itself keeps them, only the deploy mesh loses them
+    while len(me.uv_layers) > 4:
+        print('dropping UV set', me.uv_layers[-1].name)
+        me.uv_layers.remove(me.uv_layers[-1])
 if len(me.uv_layers) > 4:
-    raise SystemExit('source mesh has %d UV sets; VAT needs them at 4 and 5' % len(me.uv_layers))
+    raise SystemExit('source mesh has %d UV sets; VAT needs them at 4 and 5 (see config drop_extra_uvs)'
+                     % len(me.uv_layers))
 while len(me.uv_layers) < 4:
     me.uv_layers.new(name='VatPad%d' % len(me.uv_layers))
 uv4 = me.uv_layers.new(name='VatPiece')

@@ -67,6 +67,14 @@ void UNomadicDeployAnimationComponent::PlayPackUp(const float DurationSeconds,
 	StartPlaying(DeployedBuildingProgress, PackUpDirection, DurationSeconds, OnFinished);
 }
 
+void UNomadicDeployAnimationComponent::PlayFromProgress(const float StartProgress, const bool bTowardBuilt,
+                                                        const float FullRangeDurationSeconds,
+                                                        const FOnNomadicDeployAnimationFinished& OnFinished)
+{
+	const float Direction = bTowardBuilt ? 1.f : -1.f;
+	StartPlaying(FMath::Clamp(StartProgress, 0.f, 1.f), Direction, FullRangeDurationSeconds, OnFinished);
+}
+
 void UNomadicDeployAnimationComponent::StopAndHide()
 {
 	M_Direction = 0.f;

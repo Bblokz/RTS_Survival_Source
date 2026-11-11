@@ -7,6 +7,8 @@
 #include "Materials/MaterialInstance.h"
 #include "Materials/MaterialExpressionAdd.h"
 #include "Materials/MaterialExpressionStaticSwitchParameter.h"
+#include "RTS_Survival/Buildings/BuildingExpansion/BuildingExpansion.h"
+#include "RTS_Survival/Buildings/BuildingExpansion/BuildingExpansionEnums.h"
 
 #if WITH_EDITOR
 #include "MaterialEditingLibrary.h"
@@ -171,4 +173,56 @@ void UNomadicDeployEditorLibrary::RefreshMaterial(UMaterial* Material)
 	Material->UpdateCachedExpressionData();
 	UMaterialEditingLibrary::RecompileMaterial(Material);
 #endif
+}
+
+void UNomadicDeployEditorLibrary::TestStartBxpConstruction(ABuildingExpansion* Expansion, const FVector Location,
+                                                           const FRotator Rotation)
+{
+#if WITH_EDITOR
+	if (IsValid(Expansion))
+	{
+		Expansion->StartExpansionConstructionAtLocation(Location, Rotation, NAME_None);
+	}
+#endif
+}
+
+void UNomadicDeployEditorLibrary::TestStartBxpPackUp(ABuildingExpansion* Expansion, const float TotalTime)
+{
+#if WITH_EDITOR
+	if (IsValid(Expansion))
+	{
+		Expansion->StartPackUpBuildingExpansion(TotalTime);
+	}
+#endif
+}
+
+void UNomadicDeployEditorLibrary::TestCancelBxpPackUp(ABuildingExpansion* Expansion)
+{
+#if WITH_EDITOR
+	if (IsValid(Expansion))
+	{
+		Expansion->CancelPackUpBuildingExpansion();
+	}
+#endif
+}
+
+void UNomadicDeployEditorLibrary::TestFinishBxpPackUp(ABuildingExpansion* Expansion)
+{
+#if WITH_EDITOR
+	if (IsValid(Expansion))
+	{
+		Expansion->FinishPackUpExpansion();
+	}
+#endif
+}
+
+FString UNomadicDeployEditorLibrary::TestGetBxpStatus(ABuildingExpansion* Expansion)
+{
+#if WITH_EDITOR
+	if (IsValid(Expansion))
+	{
+		return Global_GetBxpStatusString(Expansion->GetStatus());
+	}
+#endif
+	return FString();
 }

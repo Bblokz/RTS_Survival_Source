@@ -24,7 +24,8 @@ namespace NomadicDeployPrimitiveData
  * component and fires the building's smoke screen / landing dust bursts as the progress crosses them.
  * The real building mesh stays hidden while the deploy mesh animates; the owner shows it again in OnFinished.
  * CPU cost while playing: one custom primitive data write and a burst check at 30 Hz; idle it does not tick.
- * @note InitDeployAnimation: called by ANomadicVehicle::InitNomadicVehicle.
+ * @note InitDeployAnimation: called by ANomadicVehicle::InitNomadicVehicle, and by building expansions that opt in
+ * (ABuildingExpansion::DeployAnimationData), which play their construction / pack-up with it.
  */
 UCLASS(ClassGroup = (Custom))
 class RTS_SURVIVAL_API UNomadicDeployAnimationComponent : public UActorComponent
@@ -50,6 +51,20 @@ public:
 
 	// Plays the pack-up from the building (progress 1) back into the truck over DurationSeconds.
 	void PlayPackUp(const float DurationSeconds, const FOnNomadicDeployAnimationFinished& OnFinished);
+
+	/**
+	 * @brief Plays on from a progress the deploy mesh already showed, e.g. a building expansion that packs up during
+	 * its construction, or resumes its construction after a cancelled pack-up.
+	 * @param StartProgress Progress to continue from (0 = packed, 1 = built).
+	 * @param bTowardBuilt Plays toward 1 when true, toward 0 otherwise.
+	 * @param FullRangeDurationSeconds Time a full 0 -> 1 run takes; the remaining part plays at that rate.
+	 * @param OnFinished Called once the end (1 or 0) is reached.
+	 */
+	void PlayFromProgress(const float StartProgress, const bool bTowardBuilt, const float FullRangeDurationSeconds,
+	                      const FOnNomadicDeployAnimationFinished& OnFinished);
+
+	// The progress last written to the deploy mesh (0 = packed, 1 = built).
+	float GetProgress() const { return M_Progress; }
 
 	// Stops without calling OnFinished and hides the deploy mesh (cancelled conversions).
 	void StopAndHide();

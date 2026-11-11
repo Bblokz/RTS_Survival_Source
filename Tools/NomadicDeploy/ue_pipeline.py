@@ -3,10 +3,12 @@
   textures  vat_offset.exr / vat_rot.exr -> T_<B>_DeployVat*
   masters   NomadicDeploy static switch into the building mesh's master materials (shared, idempotent)
   mis       per-slot deploy material instances on the deploy mesh
-  data      DA_<B>_Deploy (smoke screen + heavy dust bursts) set on the truck blueprint
+  data      DA_<B>_Deploy (smoke screen + heavy dust bursts) set on the truck blueprint (expansions: config
+            "mode": "bxp" sets it on "bxp_bp" instead)
 Usage: python ue_pipeline.py <building work dir> [step ...]     (no steps = all; also: export, probe)
 Holds Saved/NomadicDeploy/editor.lock (a directory) for the whole run so parallel building agents take turns on the
-shared editor. Content goes to /Game/RTS_Survival/Blueprints/GroundVehicles/BaseAndNomadic/NomadicDeploy/<Building>/.
+shared editor. Content goes to /Game/RTS_Survival/Blueprints/GroundVehicles/BaseAndNomadic/NomadicDeploy/<Building>/
+(building expansions, config "mode": "bxp": /Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/BxpDeploy/<B>/).
 """
 import json
 import re
@@ -21,6 +23,17 @@ import uecp_call  # noqa: E402
 
 LOCK = 'D:/UE5Projects/RTS_Survival/Saved/NomadicDeploy/editor.lock'
 ROOT = '/Game/RTS_Survival/Blueprints/GroundVehicles/BaseAndNomadic/NomadicDeploy/'
+ROOT_BXP = '/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/BxpDeploy/'
+
+
+def content_folder(cfg):
+    """Content folder of one building (nomadic) or building expansion (config "mode": "bxp")."""
+    return (ROOT_BXP if cfg.get('mode') == 'bxp' else ROOT) + cfg['building']
+
+
+def owner_blueprint(cfg):
+    """The blueprint that gets DeployAnimationData: the nomadic truck, or the expansion itself."""
+    return cfg['bxp_bp'] if cfg.get('mode') == 'bxp' else cfg['truck_bp']
 ALL = ['import', 'textures', 'masters', 'mis', 'data', 'verify']
 SAVING = ('import', 'textures', 'masters', 'mis', 'data')
 
@@ -54,7 +67,7 @@ def main(argv):
     steps = argv[2:] or ALL
     cfg = json.load(open(work + '/config.json'))
     b = cfg['building']
-    folder = ROOT + b
+    folder = content_folder(cfg)
     mesh = f'{folder}/SM_{b}_Deploy'
     acquire()
     # saving steps also hold headless.lock: a running throwaway editor keeps shared files (masters, truck BPs) open
@@ -81,7 +94,7 @@ def main(argv):
                 run('ue_deploy_mis.py', BUILDING=b, SOURCE_MESH=cfg['source_mesh'], DEPLOY_MESH=mesh,
                     OFFSET_TEX=f'{folder}/T_{b}_DeployVatOffset', ROT_TEX=f'{folder}/T_{b}_DeployVatRot')
             elif step == 'data':
-                run('ue_data_asset.py', BUILDING=b, WORK=work, FOLDER=folder, DEPLOY_MESH=mesh, TRUCK_BP=cfg['truck_bp'])
+                run('ue_data_asset.py', BUILDING=b, WORK=work, FOLDER=folder, DEPLOY_MESH=mesh, TRUCK_BP=owner_blueprint(cfg))
             elif step in ('verify', 'probe'):
                 # wait for shader compiles (another agent's masters step may have left shared masters compiling)
                 for attempt in range(120):

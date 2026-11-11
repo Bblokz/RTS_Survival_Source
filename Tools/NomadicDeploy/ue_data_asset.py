@@ -19,8 +19,10 @@ events = json.load(open(WORK + '/deploy_events.json'))['events']
 mesh = unreal.load_asset(DEPLOY_MESH)
 bounds = mesh.get_bounds()
 centre, ext = bounds.origin, bounds.box_extent
-size_factor = max(0.55, min(1.6, max(ext.x, ext.y) / HQ_FOOTPRINT_RADIUS))
 smoke = config.get('smoke_screen', {})
+# building expansions (config "mode": "bxp") are a few metres across: their smoke may shrink further than a building's
+MIN_SIZE_FACTOR = smoke.get('min_size_factor', 0.25 if config.get('mode') == 'bxp' else 0.55)
+size_factor = max(MIN_SIZE_FACTOR, min(1.6, max(ext.x, ext.y) / HQ_FOOTPRINT_RADIUS))
 ring = smoke.get('ring', 0.7)  # fraction of the footprint half-extent where the ring of smoke stands
 
 

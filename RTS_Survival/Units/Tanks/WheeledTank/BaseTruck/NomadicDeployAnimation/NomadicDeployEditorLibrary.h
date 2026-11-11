@@ -6,6 +6,7 @@
 
 #include "NomadicDeployEditorLibrary.generated.h"
 
+class ABuildingExpansion;
 class UMaterial;
 class UMaterialExpression;
 
@@ -52,4 +53,25 @@ public:
 	// Rebuilds the cached expression data and recompiles (after editing a master from script).
 	UFUNCTION(BlueprintCallable, Category = "NomadicDeploy|Editor")
 	static void RefreshMaterial(UMaterial* Material);
+
+	// ---- Expansion deploy test hooks (Source/Tools/NomadicDeploy bxp_deploy_test.py, PIE in a throwaway editor) ----
+	// They drive one expansion without an owner; no-ops outside the editor.
+
+	// Starts the expansion's construction at Location / Rotation (unhides it), as its owner would.
+	UFUNCTION(BlueprintCallable, Category = "NomadicDeploy|Test")
+	static void TestStartBxpConstruction(ABuildingExpansion* Expansion, const FVector Location, const FRotator Rotation);
+
+	UFUNCTION(BlueprintCallable, Category = "NomadicDeploy|Test")
+	static void TestStartBxpPackUp(ABuildingExpansion* Expansion, const float TotalTime);
+
+	UFUNCTION(BlueprintCallable, Category = "NomadicDeploy|Test")
+	static void TestCancelBxpPackUp(ABuildingExpansion* Expansion);
+
+	// Ends the pack-up the way the owner does (status packed, actor destroyed).
+	UFUNCTION(BlueprintCallable, Category = "NomadicDeploy|Test")
+	static void TestFinishBxpPackUp(ABuildingExpansion* Expansion);
+
+	// @return The expansion status as text ("" without an expansion).
+	UFUNCTION(BlueprintCallable, Category = "NomadicDeploy|Test")
+	static FString TestGetBxpStatus(ABuildingExpansion* Expansion);
 };

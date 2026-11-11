@@ -22,6 +22,8 @@
 
 
 class UBuildingExpansionEnergyComponent;
+class UNomadicDeployAnimationComponent;
+class UNomadicDeployAnimationData;
 class UResourceDropOff;
 class UGlobalAbilitiesManager;
 class UPitAdditionalTurretComponent;
@@ -80,6 +82,14 @@ public:
 	FOnBxpPackingUp OnBxpPackingUp;
 	// Called when the Bxp starts packing up.
 	FOnBxpCancelledPackingUp OnBxpCancelPackingUp;
+
+	/**
+	 * Opt-in baked VAT construction (built by Source/Tools/NomadicDeploy in its expansion mode): when set, construction,
+	 * unpacking and pack-up play this deploy with its smoke screen instead of the construction material animation.
+	 * Leave empty to keep the construction material animation. Field defenses always use the material animation.
+	 */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "DeployAnimation")
+	TObjectPtr<UNomadicDeployAnimationData> DeployAnimationData;
 
 	/**
 	 * @brief Initializes the building expansion with necessary status. 
@@ -585,4 +595,47 @@ private:
 	void DebugDisplayMessage(const FString& Message) const;
 
 	void AttemptAttachSpawnSystem(const FSwapToDestroyedMesh& CollapseParameters, UNiagaraSystem* AttachSystem);
+
+	// ---------------- VAT deploy (DeployAnimationData) ----------------
+	// Created in game worlds only when DeployAnimationData is set, so expansions without it carry no extra components.
+	UPROPERTY()
+	TObjectPtr<UNomadicDeployAnimationComponent> M_DeployAnimationComponent;
+
+	// Shows the VAT deploy mesh while the expansion builds or packs up; the building mesh is hidden meanwhile.
+	UPROPERTY()
+	TObjectPtr<UStaticMeshComponent> M_DeployMeshComponent;
+
+	// Removes the building attachments shortly after a pack-up starts, under the deploy's cover smoke.
+	FTimerHandle M_PackUpAttachmentRemovalTimerHandle;
+
+	// Set when a pack-up interrupted the construction; a cancelled pack-up then resumes the construction.
+	bool bM_DeployPackUpInterruptedConstruction = false;
+
+	void PostInit_CreateDeployAnimation();
+
+	// Whether construction and pack-up play the VAT deploy instead of the construction material animation.
+	bool GetUsesDeployAnimation() const;
+
+	/**
+	 * @brief Plays the deploy toward the built expansion and runs the progress bar along with it.
+	 * @param StartProgress 0 for a new construction; the shown progress when a cancelled pack-up resumes it.
+	 */
+	void StartDeployAnimationConstruction(const float StartProgress);
+
+	void StartDeployAnimationPackUp(const float TotalTime);
+	void CancelDeployAnimationPackUp();
+	void OnDeployAnimationConstructionFinished();
+	void OnDeployAnimationPackUpFinished();
+
+	// Death mid-animation: the collapse needs the real (building) mesh component visible.
+	void StopDeployAnimationForDeath();
+
+	// Built expansions: delays the attachment removal and BP_OnStartPackUpBxp (which hides turrets / extra meshes)
+	// until the deploy's cover smoke at progress 1 has built up.
+	void ScheduleAttachmentRemovalForPackUp(const float TotalTime);
+
+	void OnPackUpCoverSmokeStands();
+
+	// @return Whether a removal was still pending (the attachments still stand).
+	bool CancelPendingAttachmentRemoval();
 };

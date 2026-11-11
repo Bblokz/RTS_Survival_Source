@@ -80,3 +80,38 @@ Content per building: `/Game/RTS_Survival/Blueprints/GroundVehicles/BaseAndNomad
 - `locks.py`: a lock whose owner process is gone is broken automatically. Never delete a lock dir by hand.
 
 Blender steps run in parallel freely.
+
+## Building expansions (BXP mode)
+
+The same VAT construction exists for building expansions, opt-in per expansion blueprint: `ABuildingExpansion` has
+`DeployAnimationData` (EditDefaultsOnly, default empty). Empty keeps the old construction-material animation (every
+expansion that has not been converted, and field defenses always). When set, the expansion creates a deploy mesh
+component in game worlds and:
+
+- construction / unpacking plays progress 0 -> 1 over the construction time, with the progress bar synced to it;
+- pack-up plays down from the current progress over the owner's pack-up time. Building attachments go 3 % in, as on
+  the nomadic buildings. In BXP mode `BP_OnStartPackUpBxp` (which hides turrets and the radar dish) fires at the same moment
+  (at least 0.35 s in), after the cover smoke at progress 1.0 has built up;
+- a cancelled pack-up of a built expansion snaps back to the building (BP_OnCancelledPackUpBxp), and a cancelled pack-up that interrupted the
+  construction resumes the construction from the shown progress (raising BP_OnStartBxpConstruction again, so turrets stay hidden);
+- dying mid-animation shows the real mesh again for the collapse.
+
+Config (`Saved/NomadicDeploy/<Bxp>/config.json`):
+
+- `"mode": "bxp"` and `bxp_bp` (the expansion blueprint) instead of `truck_bp`;
+- content goes to `/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/BxpDeploy/<Bxp>/`;
+- no truck: `truck_materials: []` and a zero truck box. `truck_bed` / `truck_centre` are only where pieces come from;
+- every piece is hidden at progress 0, because nothing exists before construction;
+- `drop_extra_uvs: true` drops UV sets 4+ from the deploy mesh only, for 6-UV source meshes whose materials do not
+  read them;
+- smoke may shrink to `smoke_screen.min_size_factor`, default 0.25 in BXP mode;
+- test settings: `host_truck_bp` (default the SD HQ truck), `host_socket` (empty means the host origin, for
+  origin expansions), `pack_up_seconds`, `construction_seconds` (informational).
+
+Test: `python run_deploy_test.py <work> [max_seconds] [--states]` runs `bxp_deploy_test.py`. The host deploys,
+then the expansion is built where its owner would place it through the `UNomadicDeployEditorLibrary` test hooks,
+without an owner. It holds, then packs up. `--states` adds a pack-up during construction with a cancel, and a
+cancelled pack-up of the built expansion.
+
+The expansions' child actors and extra components (turrets, radar dish) are hidden and shown by blueprint events:
+they appear when construction finishes and vanish when pack-up starts. Cover them with `extra_bursts` near 0.985 / 1.0.
