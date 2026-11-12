@@ -29,6 +29,7 @@
 #include "TrainingDescription/W_TrainingDescription.h"
 #include "TrainingRequirementWidget/W_TrainingRequirement.h"
 #include "TrainingUIWidget/TrainingItemState/TrainingWidgetState.h"
+#include "RTS_Survival/Missions/TrainingRestriction/MissionTrainingRestrictionSubsystem.h"
 
 class UTrainerComponent;
 
@@ -3083,6 +3084,11 @@ void UTrainingMenuManager::OnLeftClickTrainingItem(const FTrainingWidgetState& T
 	{
 		return;
 	}
+	if (GetIsOptionLockedByMission(TrainingItem.ItemID))
+	{
+		// The mission has not unlocked this yet (tutorial step); the item already shows as locked.
+		return;
+	}
 	// Queue items remember their option by its index over all sub sections.
 	const int32 FlatOptionIndex = SubSections[M_ShownSubSectionIndex].FirstFlatOptionIndex + Index;
 	const bool bIsQueueEmpty = M_PrimarySelectedTrainer->GetIsQueueEmpty();
@@ -3318,8 +3324,55 @@ FTrainingWidgetState UTrainingMenuManager::CreateWidgetStateForOption(const FTra
 		WidgetState.TrainingStatusSecondRequirement,
 		WidgetState.bIsSecondRequirementMet,
 		WidgetState.bIsFirstRequirementMet);
+	if (GetIsOptionLockedByMission(Option))
+	{
+		// Shown as one plain requirement: the mission's lock, nothing to build or research for it.
+		WidgetState.TrainingStatus = ETrainingItemStatus::TS_LockedByMission;
+		WidgetState.RequirementCount = ERequirementCount::SingleRequirement;
+		WidgetState.RequiredUnit = FTrainingOption();
+		WidgetState.RequiredTech = ETechnology::Tech_NONE;
+	}
 	WidgetState.VariantPresentation = GetVariantPresentationForOption(Option);
 	return WidgetState;
+}
+
+#if RTS_WITH_MAP_TESTS
+bool UTrainingMenuManager::MapTest_ClickTrainingOption(UTrainerComponent* Trainer, const FTrainingOption& Option,
+                                                       bool& bOutLockedByMission)
+{
+	bOutLockedByMission = false;
+	if (not IsValid(Trainer))
+	{
+		return false;
+	}
+	SetupTrainingOptionsForTrainer(Trainer, true);
+	const TArray<FTrainingSubSectionState>& SubSections = Trainer->GetTrainingSubSections();
+	for (int32 SubSectionIndex = 0; SubSectionIndex < SubSections.Num(); ++SubSectionIndex)
+	{
+		const int32 SlotIndex = SubSections[SubSectionIndex].Options.IndexOfByKey(Option);
+		if (SlotIndex == INDEX_NONE)
+		{
+			continue;
+		}
+		OnSubSectionTabClicked(SubSectionIndex);
+		const FTrainingWidgetState ItemState = CreateWidgetStateForOption(Option, 0);
+		bOutLockedByMission = ItemState.TrainingStatus == ETrainingItemStatus::TS_LockedByMission;
+		const bool bWasQueueEmpty = Trainer->GetIsQueueEmpty();
+		OnTrainingItemClicked(ItemState, SlotIndex, true);
+		return bWasQueueEmpty && not Trainer->GetIsQueueEmpty();
+	}
+	return false;
+}
+#endif
+
+bool UTrainingMenuManager::GetIsOptionLockedByMission(const FTrainingOption& Option) const
+{
+	const UWorld* World = IsValid(M_TrainingMenu) ? M_TrainingMenu->GetWorld() : nullptr;
+	const UMissionTrainingRestrictionSubsystem* Restriction = IsValid(World)
+		                                                          ? World->GetSubsystem<
+			                                                          UMissionTrainingRestrictionSubsystem>()
+		                                                          : nullptr;
+	return IsValid(Restriction) && not Restriction->GetIsOptionAllowed(Option);
 }
 
 FUnitVariantTrainingPresentation UTrainingMenuManager::GetVariantPresentationForOption(

@@ -1536,6 +1536,15 @@ bool ATankMaster::GetIsValidOptimizationComponent() const
 	return false;
 }
 
+void ATankMaster::SetUnitOptimizationEnabled(const bool bEnable)
+{
+	if (not GetIsValidOptimizationComponent())
+	{
+		return;
+	}
+	M_OptimizationComponent->SetOptimizationEnabled(bEnable);
+}
+
 bool ATankMaster::GetCanThrowCrewOnDeath() const
 {
 	return true;

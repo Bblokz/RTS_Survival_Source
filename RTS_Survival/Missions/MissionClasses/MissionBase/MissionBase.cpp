@@ -38,6 +38,7 @@
 #include "RTS_Survival/Utils/RTSRichTextConverters/FRTSRichTextConverter.h"
 #include "RTS_Survival/Utils/RTSBlueprintFunctionLibrary.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
+#include "RTS_Survival/GameUI/InfoTakeover/InfoTakeoverSubsystem.h"
 
 namespace
 {
@@ -988,6 +989,33 @@ void UMissionBase::PlayPlayerAnnouncerLine(const EAnnouncerVoiceLineType Announc
 		return;
 	}
 	PlayerAudioController->PlayAnnouncerVoiceLine(AnnouncerLineType, true, true);
+}
+
+bool UMissionBase::ShowVehicleInfoTakeover(ATankMaster* Vehicle, const FName LibraryEntry)
+{
+	UInfoTakeoverSubsystem* const InfoTakeovers = GetInfoTakeoverSubsystem();
+	return InfoTakeovers != nullptr && InfoTakeovers->QueueVehicleTakeoverFromLibrary(Vehicle, LibraryEntry);
+}
+
+bool UMissionBase::ShowCustomVehicleInfoTakeover(ATankMaster* Vehicle, const FVehicleInfoTakeoverEntry& Info)
+{
+	UInfoTakeoverSubsystem* const InfoTakeovers = GetInfoTakeoverSubsystem();
+	return InfoTakeovers != nullptr && InfoTakeovers->QueueVehicleTakeover(Vehicle, Info);
+}
+
+TArray<FName> UMissionBase::GetVehicleInfoTakeoverNames()
+{
+	return UInfoTakeoverSubsystem::GetVehicleLibraryEntryNames();
+}
+
+UInfoTakeoverSubsystem* UMissionBase::GetInfoTakeoverSubsystem() const
+{
+	if (not GetIsValidMissionManager())
+	{
+		return nullptr;
+	}
+	UWorld* const World = M_MissionManager->GetWorld();
+	return World != nullptr ? World->GetSubsystem<UInfoTakeoverSubsystem>() : nullptr;
 }
 
 bool UMissionBase::OnCinematicTakeOverFromMission(const bool bCinematicStarted) const

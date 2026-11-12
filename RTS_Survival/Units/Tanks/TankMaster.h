@@ -537,6 +537,12 @@ public:
 
 protected:
 
+	/**
+	 * @brief Lets a subclass keep animating while off screen (a nomadic truck that deploys or packs up): disabled,
+	 * every optimised component is set as if in view and stays so until enabled again.
+	 */
+	void SetUnitOptimizationEnabled(const bool bEnable);
+
 	/** @return False for vehicles with no crew to throw out, such as a nomadic vehicle deployed as a building. */
 	virtual bool GetCanThrowCrewOnDeath() const;
 

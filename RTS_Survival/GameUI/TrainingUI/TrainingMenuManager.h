@@ -10,6 +10,7 @@
 #include "UObject/Object.h"
 #include "TrainingOptions/TrainingOptions.h"
 #include "TrainingUIWidget/TrainingItemState/TrainingWidgetState.h"
+#include "RTS_Survival/Utils/RTSMapTests/RTSMapTests.h"
 #include "TrainingMenuManager.generated.h"
 
 class UW_TrainingBuildingColumn;
@@ -108,6 +109,19 @@ public:
 
 	void HideTrainingRequirement() const;
 
+#if RTS_WITH_MAP_TESTS
+	/**
+	 * @brief Map tests: does what a player's left click on this option in the trainer's menu does (selects the trainer,
+	 * shows the option's tab, clicks the item), so mission locks, requirements and costs all apply.
+	 * @param Trainer The player's trainer, e.g. the HQ's.
+	 * @param Option The option to click.
+	 * @param bOutLockedByMission Whether the item showed as locked by a mission when it was clicked.
+	 * @return True when the click added the option to the trainer's queue.
+	 */
+	bool MapTest_ClickTrainingOption(UTrainerComponent* Trainer, const FTrainingOption& Option,
+	                                 bool& bOutLockedByMission);
+#endif
+
 private:
 	UPROPERTY()
 	UTrainerComponent* M_PrimarySelectedTrainer;
@@ -132,6 +146,8 @@ private:
 	void UpdateSubSectionTabsWithPrimaryTrainer() const;
 	void UpdateWidgetsWithShownSubSection(const TMap<FTrainingOption, int32>& QueueState);
 	FTrainingWidgetState CreateWidgetStateForOption(const FTrainingOption& Option, const int32 QueuedCount) const;
+	// A mission (tutorial) can hold back options; see UMissionTrainingRestrictionSubsystem.
+	bool GetIsOptionLockedByMission(const FTrainingOption& Option) const;
 	// Base presentation (all overrides off) outside a mission, where no player variant manager exists.
 	FUnitVariantTrainingPresentation GetVariantPresentationForOption(const FTrainingOption& Option) const;
 

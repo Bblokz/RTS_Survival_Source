@@ -9,13 +9,15 @@
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 
 void UMissionBase::DeliverPlayerNomadicByCargoPlane(const ENomadicSubtype NomadicSubtype, const FVector BuildLocation,
-                                                    const FRotator BuildRotation, const int32 ID)
+                                                    const FRotator BuildRotation, const int32 ID,
+                                                    const bool bBuildOnLanding)
 {
 	FNomadicAirDeliveryOrder Order;
 	Order.Method = ENomadicAirDeliveryMethod::CargoPlaneRopes;
 	Order.NomadicSubtype = NomadicSubtype;
 	Order.BuildLocation = BuildLocation;
 	Order.BuildRotation = BuildRotation;
+	Order.bBuildOnLanding = bBuildOnLanding;
 	Order.Settings = AirDeliverySettings;
 	AirDelivery_Start(Order, ID);
 }

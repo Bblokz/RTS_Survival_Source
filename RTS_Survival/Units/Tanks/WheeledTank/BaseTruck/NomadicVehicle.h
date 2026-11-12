@@ -439,6 +439,16 @@ protected:
 	UPROPERTY()
 	int32 M_BuildingMoveFailureCount = 0;
 
+	// True while a deploy or pack-up runs with the unit optimiser paused (see SetConversionKeepsAnimating).
+	bool bM_IsConversionOptimizationPaused = false;
+
+	/**
+	 * @brief The off-screen optimiser stops skeletal mesh ticks, which froze the truck montage of a deploy the
+	 * player is not looking at (an air-delivered HQ never unfolded): pause it for the conversion.
+	 * @param bIsConverting True when a deploy or pack-up starts, false once the vehicle is a truck or building again.
+	 */
+	void SetConversionKeepsAnimating(const bool bIsConverting);
+
 	// True from the create building order until the truck reaches the building location or the order ends.
 	bool bM_IsMovingToBuildingLocation = false;
 

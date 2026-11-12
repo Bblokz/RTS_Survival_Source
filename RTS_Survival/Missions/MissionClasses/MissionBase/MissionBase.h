@@ -21,6 +21,7 @@
 #include "RTS_Survival/Game/Difficulty/GameDifficulty.h"
 #include "RTS_Survival/Game/UserSettings/RTSGameUserSettings.h"
 #include "RTS_Survival/Missions/NomadicAirDelivery/NomadicAirDeliveryTypes.h"
+#include "RTS_Survival/GameUI/InfoTakeover/InfoTakeoverTypes.h"
 #include "MissionBase.generated.h"
 
 enum class ERTSFaction : uint8;
@@ -43,6 +44,7 @@ struct FTrainingOption;
 class ARTSAsyncSpawner;
 class UMissionTrigger;
 class UMissionCinematicTakeOverSession;
+class UInfoTakeoverSubsystem;
 class UMovieSceneSequencePlayer;
 class UW_Mission;
 class UW_MissionTimer;
@@ -538,6 +540,43 @@ protected:
 	int32 DoesPlayerHaveAnyAircraftMastersOfType(const TArray<EAircraftSubtype>& AircraftTypes) const;
 
 	/**
+	 * @brief Tutorials: from now on the player can only train these options; every other option shows as locked by
+	 * the mission until AllowPlayerTrainingOptions adds it or ClearPlayerTrainingRestriction ends the restriction.
+	 * @param AllowedOptions Options that stay trainable (also field defenses, they train from the same menu).
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|Training")
+	void RestrictPlayerTrainingTo(const TArray<FTrainingOption>& AllowedOptions);
+
+	// Adds options to an active restriction (RestrictPlayerTrainingTo); does nothing without one.
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|Training")
+	void AllowPlayerTrainingOptions(const TArray<FTrainingOption>& OptionsToAllow);
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|Training")
+	void ClearPlayerTrainingRestriction();
+
+	/**
+	 * @brief Multi-step missions (tutorials) change their objective while they run: sets the widget title and
+	 * description and refreshes the mission widget when it is shown.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|Widget")
+	void SetMissionObjectiveText(const FText& Title, const FText& Description);
+
+	/** @return The player's nomadics of this subtype, trucks and buildings alike (trained ones included). */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|Units")
+	TArray<ANomadicVehicle*> GetPlayerNomadicsOfType(const ENomadicSubtype NomadicSubtype) const;
+
+	/** @return True once the nomadic stands as a finished building (not a truck, not still unfolding). */
+	UFUNCTION(BlueprintPure, NotBlueprintable, Category = "Mission|Units")
+	bool GetIsNomadicDeployedAsBuilding(const ANomadicVehicle* NomadicVehicle) const;
+
+	/**
+	 * @return Player building expansions of these types that are fully built; unlike
+	 * DoesPlayerHaveAnyBuildingExpansionsOfType it skips ones still being placed or constructed.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|Units")
+	int32 GetPlayerBuiltBuildingExpansionCountOfTypes(const TArray<EBuildingExpansionType>& BuildingExpansionTypes) const;
+
+	/**
 	 * @brief Uses the mission manager as world context so mission blueprints can register fixed minimap icons safely.
 	 * @param IconId Stable ID used to remove or swap this icon later.
 	 * @param IconType Data asset key deciding which custom texture and size to draw.
@@ -631,6 +670,31 @@ protected:
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Sounds")
 	void PlayPlayerAnnouncerLine(EAnnouncerVoiceLineType AnnouncerLineType) const;
+
+	/**
+	 * @brief Pauses the game with the vehicle info takeover of a prefab from the vehicle library
+	 * (GameUI/InfoTakeover/DT_VehicleInfoTakeovers), so one write-up can be reused in any mission.
+	 * @param Vehicle The vehicle to introduce; its weapons and armour are read off it.
+	 * @param LibraryEntry Row of the library to show.
+	 * @return False when the player turned info takeovers off or the vehicle or row is missing. Waits in a queue
+	 * while another takeover or a cinematic holds the screen.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|Info Takeover")
+	bool ShowVehicleInfoTakeover(ATankMaster* Vehicle,
+	                             UPARAM(meta = (GetOptions = "GetVehicleInfoTakeoverNames")) FName LibraryEntry);
+
+	/**
+	 * @brief As ShowVehicleInfoTakeover with the text written on the node instead of in the library.
+	 * @param Vehicle The vehicle to introduce; its weapons and armour are read off it.
+	 * @param Info Description, production year ("????" when fictional), and optional name and picture.
+	 * @return False when the player turned info takeovers off or the vehicle is missing.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|Info Takeover")
+	bool ShowCustomVehicleInfoTakeover(ATankMaster* Vehicle, const FVehicleInfoTakeoverEntry& Info);
+
+	// Options of the LibraryEntry dropdown of ShowVehicleInfoTakeover; static so a graph pin can call it without a mission.
+	UFUNCTION()
+	static TArray<FName> GetVehicleInfoTakeoverNames();
 
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Cinematics")
@@ -1023,10 +1087,12 @@ protected:
 	 * @param BuildLocation Where the building goes; the ground below it is used. Pick open, flat ground.
 	 * @param BuildRotation Only the yaw is used.
 	 * @param ID Handed back in BP_OnAirDeliveredNomadicLanded.
+	 * @param bBuildOnLanding False only sets the truck down there, so the player deploys it (tutorials).
 	 */
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|AirDelivery")
 	void DeliverPlayerNomadicByCargoPlane(const ENomadicSubtype NomadicSubtype, const FVector BuildLocation,
-	                                      const FRotator BuildRotation, const int32 ID = 0);
+	                                      const FRotator BuildRotation, const int32 ID = 0,
+	                                      const bool bBuildOnLanding = true);
 
 	/**
 	 * @brief Brings the player HQ in by the Mammut glider of the super heavy drops: it lands, the HQ drives out to
@@ -1041,7 +1107,8 @@ protected:
 	void DeliverPlayerHQByMammutGlider(const FVector BuildLocation, const FRotator BuildRotation,
 	                                   const FVector GliderTouchdownLocation, const int32 ID = 0);
 
-	// The truck is on the ground and has just been ordered to build; null when the delivery failed.
+	// The truck is on the ground and has just been ordered to build (unless bBuildOnLanding was false); null when
+	// the delivery failed.
 	UFUNCTION(BlueprintImplementableEvent, Category = "Mission|AirDelivery")
 	void BP_OnAirDeliveredNomadicLanded(ANomadicVehicle* NomadicVehicle, const ENomadicSubtype NomadicSubtype,
 	                                    const int32 ID);
@@ -1249,6 +1316,7 @@ private:
 	void PruneInactiveScheduledTaskIDs();
 	int32 GetNextAsyncSpawnId();
 	void ClearActiveCinematicTakeOverSession(const UMissionCinematicTakeOverSession* CinematicSession);
+	UInfoTakeoverSubsystem* GetInfoTakeoverSubsystem() const;
 
 	UPROPERTY()
 	FTimerHandle M_TextOnlyDurationHandle;

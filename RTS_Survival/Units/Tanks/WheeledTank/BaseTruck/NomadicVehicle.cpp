@@ -256,12 +256,15 @@ void ANomadicVehicle::InitNomadicVehicle(
 	}
 
 
-	if (GetIsValidDeployAnimationComponent() && IsValid(BuildingMeshComponent))
+	// Never on the class defaults or a template: a deploy mesh saved into the Blueprint became the root of every
+	// spawned truck (Ger_HQ_Truck, 2026-11-12), so the chassis physics could no longer move the actor.
+	const bool bIsTemplate = HasAnyFlags(RF_ClassDefaultObject | RF_ArchetypeObject);
+	if (not bIsTemplate && GetIsValidDeployAnimationComponent() && IsValid(BuildingMeshComponent))
 	{
 		if (not IsValid(M_DeployMeshComponent))
 		{
 			// One component per truck for its whole life; hidden and collision-free until a deploy plays.
-			M_DeployMeshComponent = NewObject<UStaticMeshComponent>(this, TEXT("DeployAnimationMesh"));
+			M_DeployMeshComponent = NewObject<UStaticMeshComponent>(this, TEXT("DeployAnimationMesh"), RF_Transient);
 			M_DeployMeshComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 			M_DeployMeshComponent->SetCanEverAffectNavigation(false);
 			M_DeployMeshComponent->SetVisibility(false);
@@ -593,6 +596,7 @@ void ANomadicVehicle::StartBuildingConstruction()
 	}
 
 	OnNomadConvertToBuilding.Broadcast();
+	SetConversionKeepsAnimating(true);
 	M_NomadStatus = ENomadStatus::CreatingBuildingRotating;
 	// Save the preview transform.
 	M_BuildingTransform = IsValid(M_StaticPreviewMesh)
@@ -716,6 +720,7 @@ void ANomadicVehicle::OnFinishedConvertingToBuilding()
 	if (IsValid(M_ConversionProgressBar) && IsValid(PlayerController))
 	{
 		M_NomadStatus = ENomadStatus::Building;
+		SetConversionKeepsAnimating(false);
 		// Stop before the training component uses the same progress bar.
 		M_ConversionProgressBar->StopProgressBar();
 		PlayerController->TruckConverted(this, true);
@@ -845,11 +850,13 @@ void ANomadicVehicle::TerminateCreateBuildingCommand()
 			StopRotating();
 			RTSFunctionLibrary::PrintString("terminate building command as ROTATING creating building");
 			M_NomadStatus = ENomadStatus::Truck;
+			SetConversionKeepsAnimating(false);
 			break;
 		case ENomadStatus::CreatingBuildingTruckAnim:
 			BPStopTruckAnimationMontage();
 			RTSFunctionLibrary::PrintString("terminate building command as MONTAGE");
 			M_NomadStatus = ENomadStatus::Truck;
+			SetConversionKeepsAnimating(false);
 			break;
 		case ENomadStatus::CreatingBuildingMeshAnim:
 			RTSFunctionLibrary::PrintString("terminate building command as MESH ANIMATION");
@@ -857,6 +864,7 @@ void ANomadicVehicle::TerminateCreateBuildingCommand()
 		// Set decal to truck mode
 			AdjustSelectionDecalToConversion(false);
 			M_NomadStatus = ENomadStatus::Truck;
+			SetConversionKeepsAnimating(false);
 			break;
 		case ENomadStatus::Building:
 			break;
@@ -890,6 +898,7 @@ void ANomadicVehicle::ExecuteConvertToVehicleCommand()
 		return;
 	}
 	M_NomadStatus = ENomadStatus::CreatingTruck;
+	SetConversionKeepsAnimating(true);
 	FResourceConversionHelper::OnNomadicExpanded(this, false);
 	OnStartConvertToVehicle_HandleInstanceSpecificComponents();
 
@@ -949,6 +958,7 @@ void ANomadicVehicle::TerminateConvertToVehicleCommand()
 	}
 
 	M_NomadStatus = ENomadStatus::Building;
+	SetConversionKeepsAnimating(false);
 	M_ConversionProgressBar->StopProgressBar();
 	if (GetIsValidDeployAnimationComponent())
 	{
@@ -1143,6 +1153,7 @@ void ANomadicVehicle::OnFinishedConvertingToVehicle()
 	}
 
 	M_NomadStatus = ENomadStatus::Truck;
+	SetConversionKeepsAnimating(false);
 	// Pack up all building expansions.
 	FinishPackUpAllExpansions();
 	OnFinishedConvertingToVehicle_HandleInstanceSpecificComponents();
@@ -1533,6 +1544,16 @@ void ANomadicVehicle::MoveToBuildingLocationForConstruction()
 		false,
 		EAbilityID::IdCreateBuilding,
 		AINomadicVehicle->GetConstructionAcceptanceRad());
+}
+
+void ANomadicVehicle::SetConversionKeepsAnimating(const bool bIsConverting)
+{
+	if (bM_IsConversionOptimizationPaused == bIsConverting)
+	{
+		return;
+	}
+	bM_IsConversionOptimizationPaused = bIsConverting;
+	SetUnitOptimizationEnabled(not bIsConverting);
 }
 
 void ANomadicVehicle::OnMoveToBuildingLocationSucceeded()
