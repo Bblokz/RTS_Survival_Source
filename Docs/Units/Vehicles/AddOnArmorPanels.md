@@ -128,6 +128,22 @@ front panel to `Plate_FrontUpperGlacis`. Only the middle two panels sit over the
 hull boxes reach over the sides, so a side shell there meets 15 armour and can damage the engine. Such hits do not
 reach the add-on zone.
 
+## Panzer II Luchs (spaced armour)
+
+`Ger_Vehicle_PanzerII_Luchs_SpacedArmor` converted 2026-11-11 with `RTS.AddOnArmor.ConvertBlueprint`
+(`Hull=SM_Luchs_SpacedArmor_Hull_AddOnPanels Armor=Plate_SideLeft:30|Plate_SideRight:30|Plate_SideLowerLeft:20|Plate_SideLowerRight:20`),
+run in the shared editor. 5 plates per side; debris panel `SM_Luchs_SpacedArmor_Hull_AddOnPanels_Debris`.
+
+- Before the conversion its SetupArmor had the base Luchs values x1.35 (sides 40.5 upper / 27 lower). The structural
+  sides are now the base Luchs's 30 / 20, and both zones carry **10.5** add-on armour (set on the component's
+  `M_ZoneSettings`, which `ConvertBlueprint` leaves at the default 15). Intact 40.5 / 30.5 (the lower side gained 3.5),
+  yellow 35.25 / 25.25, stripped 30 / 20 = a plain Luchs.
+- Same finding as the Pz II F: only panels 2 and 3 sit over `Plate_SideLowerLeft`. Panels 0 and 1 resolve to
+  `Plate_Rear` (20.25) and panel 4 to `Plate_FrontUpperGlacis` (25), so hits there never reach the add-on zone.
+- Validation `TAG=Luchs_Converted` on `UT_B4Howitzer` (DebugGame-Cmd, no injection): PASS, 0 failures (88 checks), with
+  15 hits to red, crew repair, full service and the death blast (9 pieces, 2 bursts). On `RTS_ToCopySmall` the Luchs
+  spawns at Z 1112 and falls through the ground after the third hit.
+
 ## Panzer II F base and Radixite (Strike Division fences)
 
 `Ger_Vehicle_PanzerII_F` (the base, trained by the Strike Division) and its children `_RadixiteAutocannon` and `_Strike`
@@ -389,7 +405,7 @@ without injection; the Pz II F does not.
 |---|---|---|---|---|---|
 | PanzerII_F_SpacedArmor | SM_PZIIF_SpacedArmor_Hull | 5 | plates | MI_Hull_PZII_DesertCamo | full, **converted** |
 | PanzerII_F, _RadixiteAutocannon, _Strike | SM_PZIIF_Fenced_Hull | 5 | wire-mesh fences (sections) | MI_Hull_PZII_DesertCamo | full on base + Radixite (Strike not run), **converted** |
-| PanzerII_Luchs_SpacedArmor | SM_Luchs_SpacedArmor_Hull | 5 | plates | MI_Hull_LuchsSpacedArmor_Camo | full |
+| PanzerII_Luchs_SpacedArmor | SM_Luchs_SpacedArmor_Hull | 5 | plates | MI_Hull_LuchsSpacedArmor_Camo | full, **converted** |
 | PanzerIII_M_SpacedArmor | SM_PanzerIIIM_SpacedArmor_Hull | 4 | plates | MI_PZIII_Hull_DesertAPO | pictures |
 | PanzerIV_H_StandardPlus | SM_Hull_PzIVH_StandardPlus | 5 | Schürzen slabs | M_Brumbar_Sides | pictures |
 | PanzerIV_Commander | SM_PzIV_Commander_Hull | 5 | Schürzen slabs | MI_PZIV_Hull_DesertAPO, M_Brumbar_Sides | pictures |

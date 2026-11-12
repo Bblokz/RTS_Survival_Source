@@ -13,6 +13,7 @@
 #include "Components/SceneCaptureComponent2D.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/BlueprintGeneratedClass.h"
+#include "Engine/DirectionalLight.h"
 #include "Engine/InheritableComponentHandler.h"
 #include "Engine/SCS_Node.h"
 #include "Engine/SceneCapture2D.h"
@@ -70,6 +71,14 @@ namespace AddOnArmorPanelsValidateConstants
 	const TCHAR* const RevealTankSwitch = TEXT("AddOnArmorPanelsRevealTank");
 	// Layout index of the left panel the first shell hits (default: the middle left panel).
 	const TCHAR* const FirstHitPanelSwitch = TEXT("AddOnArmorPanelsFirstHitPanel=");
+	// A full HD three-quarter camera plus pictures at HeroFlightFrameSeconds after the first shell.
+	const TCHAR* const HeroCameraSwitch = TEXT("AddOnArmorPanelsHeroCamera");
+	const TCHAR* const SpawnYawSwitch = TEXT("AddOnArmorPanelsSpawnYaw=");
+	const TCHAR* const FaceSunSwitch = TEXT("AddOnArmorPanelsFaceSun");
+	// Game seconds after the first shell.
+	constexpr float HeroFlightFrameSeconds[] = {0.05f, 0.1f, 0.15f, 0.2f, 0.27f, 0.35f, 0.45f, 0.6f, 0.8f};
+	constexpr int32 HeroPictureWidth = 1920;
+	constexpr int32 HeroPictureHeight = 1080;
 	const FName StartModuleSetupFunctionName(TEXT("BeginPlay_OnModulesComplete_FinalizeVehicleModules"));
 	constexpr float AllPanelBits = 1048575.f;
 	const TCHAR* const DefaultVehicleClass = TEXT("/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Light/"
@@ -140,6 +149,9 @@ void UAddOnArmorPanelsValidateSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 	bM_StartModuleSetup = FParse::Param(FCommandLine::Get(), StartModuleSetupSwitch);
 	bM_RevealTank = FParse::Param(FCommandLine::Get(), RevealTankSwitch);
 	FParse::Value(FCommandLine::Get(), FirstHitPanelSwitch, M_RequestedFirstHitPanel);
+	bM_HeroCamera = FParse::Param(FCommandLine::Get(), HeroCameraSwitch);
+	FParse::Value(FCommandLine::Get(), SpawnYawSwitch, M_SpawnYawOffset);
+	bM_FaceSun = FParse::Param(FCommandLine::Get(), FaceSunSwitch);
 	// Error dialogs are answered automatically in unattended runs; log them instead.
 	RTSFunctionLibrary::PushModalDialogSuppression();
 	bM_IsSuppressingErrorDialogs = true;
@@ -381,7 +393,7 @@ bool UAddOnArmorPanelsValidateSubsystem::SpawnTank()
 		Expect(false, TEXT("the vehicle class loads: ") + M_VehicleClassPath);
 		return false;
 	}
-	const FTransform SpawnTransform(FRotator::ZeroRotator, M_BaseLocation + FVector(0.f, 0.f, SpawnHeight));
+	const FTransform SpawnTransform(FRotator(0.f, GetSpawnYaw(), 0.f), M_BaseLocation + FVector(0.f, 0.f, SpawnHeight));
 	ATankMaster* const Tank = World->SpawnActorDeferred<ATankMaster>(TankClass, SpawnTransform, nullptr, nullptr,
 	                                                                 ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
 	if (not IsValid(Tank))
@@ -515,18 +527,25 @@ void UAddOnArmorPanelsValidateSubsystem::CreateCameras()
 {
 	using namespace AddOnArmorPanelsValidateConstants;
 	// The tank faces +X; its left side looks towards -Y, so the cameras stand on -Y looking at +Y (yaw 90).
-	const TArray<TTuple<FString, float, float, float, float>> CameraSettings = {
+	TArray<TTuple<FString, float, float, float, float>> CameraSettings = {
 		MakeTuple(FString(TEXT("LeftClose")), 90.f, -12.f, 750.f, 55.f),
 		MakeTuple(FString(TEXT("LeftRts")), 60.f, -55.f, 1900.f, 55.f)
 	};
+	if (bM_HeroCamera)
+	{
+		// Yaw past 90 stands front-left of the tank and looks back along its left side.
+		CameraSettings.Add(MakeTuple(FString(TEXT("Hero")), 128.f, -14.f, 820.f, 38.f));
+	}
 	for (const TTuple<FString, float, float, float, float>& Settings : CameraSettings)
 	{
 		FActorSpawnParameters SpawnParameters;
 		SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 		ASceneCapture2D* const Capture = GetWorld()->SpawnActor<ASceneCapture2D>(ASceneCapture2D::StaticClass(),
 		                                                                         FTransform::Identity, SpawnParameters);
+		const bool bIsHeroCamera = Settings.Get<0>() == TEXT("Hero");
 		UTextureRenderTarget2D* const RenderTarget = UKismetRenderingLibrary::CreateRenderTarget2D(
-			GetWorld(), PictureWidth, PictureHeight, RTF_RGBA8_SRGB);
+			GetWorld(), bIsHeroCamera ? HeroPictureWidth : PictureWidth,
+			bIsHeroCamera ? HeroPictureHeight : PictureHeight, RTF_RGBA8_SRGB);
 		if (not IsValid(Capture) || not IsValid(RenderTarget))
 		{
 			continue;
@@ -548,6 +567,47 @@ void UAddOnArmorPanelsValidateSubsystem::CreateCameras()
 		Camera.Capture = Capture;
 		Camera.RenderTarget.Reset(RenderTarget);
 	}
+}
+
+float UAddOnArmorPanelsValidateSubsystem::GetSpawnYaw() const
+{
+	if (not bM_FaceSun)
+	{
+		return M_SpawnYawOffset;
+	}
+	const ADirectionalLight* SunLight = nullptr;
+	for (TActorIterator<ADirectionalLight> It(GetWorld()); It; ++It)
+	{
+		SunLight = *It;
+		break;
+	}
+	if (SunLight == nullptr)
+	{
+		UE_LOG(LogRTSAddOnArmorPanelsValidate, Warning, TEXT("RTS_ADDON_PANELS no directional light to face"));
+		return M_SpawnYawOffset;
+	}
+	// The light shines along its forward vector; the left side (local -Y, world (sin yaw, -cos yaw)) faces the sun when
+	// it points back along that vector.
+	const FVector2D TowardsSun = FVector2D(-SunLight->GetActorForwardVector()).GetSafeNormal();
+	const float FaceSunYaw = FMath::RadiansToDegrees(FMath::Atan2(TowardsSun.X, -TowardsSun.Y));
+	UE_LOG(LogRTSAddOnArmorPanelsValidate, Display, TEXT("RTS_ADDON_PANELS sun %s forward %s -> spawn yaw %.1f + %.1f"),
+	       *SunLight->GetName(), *SunLight->GetActorForwardVector().ToCompactString(), FaceSunYaw, M_SpawnYawOffset);
+	return FaceSunYaw + M_SpawnYawOffset;
+}
+
+void UAddOnArmorPanelsValidateSubsystem::TickHeroFlightFrames(const float SecondsSinceShot)
+{
+	using namespace AddOnArmorPanelsValidateConstants;
+	if (not bM_HeroCamera || M_NextHeroFlightFrame >= static_cast<int32>(UE_ARRAY_COUNT(HeroFlightFrameSeconds)))
+	{
+		return;
+	}
+	if (SecondsSinceShot < HeroFlightFrameSeconds[M_NextHeroFlightFrame])
+	{
+		return;
+	}
+	ExportPictures(FString::Printf(TEXT("1_FirstHit_Flight_%03dms"), FMath::RoundToInt(SecondsSinceShot * 1000.f)));
+	++M_NextHeroFlightFrame;
 }
 
 void UAddOnArmorPanelsValidateSubsystem::AimCameras() const
@@ -1089,6 +1149,7 @@ void UAddOnArmorPanelsValidateSubsystem::TickFirstShotDebris()
 		return;
 	}
 	const float SecondsSinceShot = GetWorld()->GetTimeSeconds() - M_FirstShotGameSeconds;
+	TickHeroFlightFrames(SecondsSinceShot);
 	if (M_FirstDebrisBurst.IsValid() && not bM_DidDebrisSettleCheck
 		&& FParse::Param(FCommandLine::Get(), TEXT("AddOnArmorPanelsTraceDebris")))
 	{

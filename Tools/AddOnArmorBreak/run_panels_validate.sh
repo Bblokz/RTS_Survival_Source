@@ -16,6 +16,11 @@
 #                                       checks its burst throws that panel's debris mesh, e.g. an end plate's own mesh
 #   -AddOnArmorPanelsStartModuleSetup   the test starts the vehicle module setup on Blueprints that never do
 #                                       (RTS_BP_AssaultTank children); logged as a NOTE
+#   -AddOnArmorPanelsHeroCamera         adds a 1920x1080 three-quarter front-left camera (Hero_*.png) and pictures at
+#                                       0.05-0.8 s after the first shell (1_FirstHit_Flight_<ms>ms), for screenshots of
+#                                       a plate being shot off (the spaced armour info takeover's render)
+#   -AddOnArmorPanelsFaceSun            turns the tank so its left side faces the map's directional light
+#   -AddOnArmorPanelsSpawnYaw=<deg>     spawn yaw (added to the sun yaw with -AddOnArmorPanelsFaceSun)
 set -u
 PROJECT="${PROJECT:-D:/UE5Projects/RTS_Survival/RTS_Survival.uproject}"
 ENGINE="${ENGINE:-D:/UnrealEngine/UE5.5_ReleaseBranch/UnrealEngine/Engine/Binaries/Win64/UnrealEditor-Cmd.exe}"
