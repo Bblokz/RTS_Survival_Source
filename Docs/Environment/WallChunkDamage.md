@@ -558,6 +558,92 @@ paint) keeps its material and gets no holes. One agent per Blueprint (`Tools/Wal
   - Refinery1, 2 and 4 keep the C++ default aim points (around the centre, 1 m up); proposed points are in the agents'
     reports. Refinery4: when all 6 slots are used, a merged hole can sit between posts and make a severed post whole.
 
+## PostApo ruins (A + B, deaths kept, 2026-11-11)
+
+Seven `ADestructableEnvActor` ruins in `DestructableEnvActor/PostApo/`: `BP_Dest_PostApo_Nuclear`, `_Construction`,
+`_HighRise1`, `_HighRise2`, `_DestroyedChimney`, `_Crane` and `_Crane2_Damaged`. Hits arrive through
+`ADestructableEnvActor::TakeDamage`; no C++ change. Agent brief for the modelling work:
+`Tools/WallChunks/POSTAPO_AGENT_BRIEF.md`.
+
+- **Component** `WallHoleDamage` on each Blueprint (no shared parent): `StaticMesh`, `NoGrid`, `AreaPerDebrisPiece`
+  3600 / max 5, `bCollapseIntoChunksOnDeath = false`, collapse cue / attenuation / concurrency as the PostApo fences.
+  - Concrete ruins (Nuclear, Construction, HighRise1/2, Chimney): 1.1 cm per mm (the tower value; these are 10-20 m
+    tall), max 220 cm, outset 0.
+  - `Crane`: 0.5 cm per mm, max 60 cm, outset 0. The mast is a 40 cm lattice, so a hit cuts it through and the part
+    above hangs in the air. Shallow near-face bites (outset 0.5, max 40) were tried and barely showed; the user chose
+    cutting through.
+  - `Crane2_Damaged`: 0.85 cm per mm; holes on the scorch slot and the container slot, glass (slot 2) untouched.
+- **Materials** in `PostApo/Holes/`, NoGrid and two-sided, so one instance serves every mesh:
+  `MI_PostApo_ScorchAtlas_WallHoles` on the existing `M_ScorchAtlas_WallHoles` (PS 421 vs 303) and
+  `MI_PostApo_ContainerBlue_WallHoles` on `M_container_blue_WallHoles` (423 vs 304).
+- **Death:** each `BP_OnUnitDies` now starts with `CollapseIntoPieces(false)`, then runs its own `VerticalDestruction`,
+  explosions and smoke unchanged. What is left of the surface flies off while the ruin sinks.
+- **Aim points** were the C++ default cluster 1 m up at the centre, so every shell hit the base. Each construction script
+  now sets them right after the parent construction script. They come from `Saved/PostApoHoles/aim.py`: the middle of
+  complex-trace entry hits at 1.5 / 3.5 / 6 / 9 m, plus two side points on the wide ruins. Example: HighRise1 (47,0,150),
+  (47,0,400), (2,0,700), (±200,0,300).
+- **Collision.** Shells trace simple collision, and most of these meshes had one auto convex hull wrapped round the
+  whole ruin. Measured with `Saved/PostApoHoles/gap.py` (horizontal rays, simple vs complex hit), share within 30 cm of
+  the visible surface, 1 hull -> 64 auto hulls (`set_convex_decomposition_collisions(mesh, 64, 32, 1000000)`):
+  Nuclear 10 -> 96 %, Chimney 43 -> 96 %, Crane 81 -> 95 %, HighRise1 84 -> 94 %, HighRise2 78 -> 86 %,
+  Construction 36 -> 42 %, `SM_Scorch_Crane_Destroyed` 30 -> 70 %. Those two now use agent-fitted boxes, built in
+  Blender from the render triangles and applied with `Saved/PostApoHoles/apply_collision.py`:
+  - Construction: 35 axis-aligned boxes, one per slab, column and cross wall. 100 % within 30 cm, no rays blocked
+    on air.
+  - Scorch crane: 58 oriented boxes. 98 % on the gap.py rays, and 87 % on a denser sample the fit never saw. The
+    cables and the flat plates on the ground have no collision.
+  Units now also collide closer to the visible ruins; maps with a baked navmesh around them may want a rebuild.
+- **Debris:** 8 pieces per ruin in `PostApo/Holes/Debris/`, cut in Blender from each mesh's own geometry by two agents
+  (`D:/Blender/BlenderProjects/BlenderTanks/PostApoDebris/build_concrete_debris.py` and `build_crane_debris.py`).
+  Imported at scale 1 with `Saved/PostApoHoles/debris_import.py`, using the hole instances (they carry the Niagara flag).
+  - Concrete: facade, slab and shell chunks, 20-84 tris each; two pieces per set have a re-bar stub. Cut faces use
+    the atlas rubble tile at at least 0.12 UV/m, because the buildings' own density smeared to grey.
+  - Highrise crane: lattice chords, X straps, a cab shard.
+  - Scorch crane: boom chords, joints and a track chunk, plus 2 container shards that use the container instance.
+- **Headless check** (`Tools/WallChunks/PostApo/postapo_headless_test.py`, throwaway DebugGame editor on
+  `RTS_ToCopySmall`): collision-hit debug shots at every aim point cut 3-5 holes per ruin and swapped the slots. A forced
+  death of HighRise2 threw the pieces while it sank. Pictures are in `Saved/WallChunks/PostApo/`. Test notes: the map has
+  no owner to reveal the ruins, so the script runs `ShowFlag.PostProcessMaterial 0` (fog of war). Shoot and view from +Y,
+  the sunlit side. Frames taken more than about 40 s into PIE went black on this map.
+
+## Garrison PostApo highrises (A + B, death kept, 2026-11-11)
+
+`Garrison_PostApo_HighriseLarge1` / `_HighriseLarge2` / `_LargeHorizontal` (`GarrisonableBuildings/PostApoNuclear/`).
+Hits arrive through `AGarrisonableBuilding::ForwardDamageToWallHoles` (see "A + B on the garrison bunkers"); no C++.
+
+| Blueprint | Mesh (`Meshes/Civilian/AbandonnedNuclear/`) | BP mesh scale | Debris |
+|---|---|---|---|
+| HighriseLarge1 | `SM_DestroyedHighrise_Large_2` | 1.4 | `SM_GarrisonHighrise_Debris_0..7` |
+| HighriseLarge2 | `SM_DestroyedHighrise_Large_1` | 1.4 | same |
+| LargeHorizontal | `SM_DestroyedHighrise_HorizontalLarge_1` | 2.5 | `SM_GarrisonHorizontal_Debris_0..7` |
+
+- **Mesh scale.** Every hole length and area setting is in mesh units, so a uniformly scaled `StaticMesh` makes holes
+  and debris S times bigger in the world. Settings are the world targets divided by S (areas by S²). World targets:
+  1.2 cm radius per mm calibre (75 mm -> 90 cm), max 3 m, min 15 cm, 5.5 per sqrt damage, one piece per 0.36 m², at
+  most 5. So `HoleRadiusPerCalibreMm` 0.857 / 0.48, `MaxHoleRadius` 214 / 120, `AreaPerDebrisPiece` 1837 / 576.
+  Level instances scaled further get bigger holes too.
+- **Component** `WallHoleDamage`: `StaticMesh`, `NoGrid`, `HoleCentreOutsetShare` 0, `bCollapseIntoChunksOnDeath`
+  false; the death stays the Blueprint's `VerticalDestruction` sink. No graph removals were needed (no geometry
+  collection, mesh or material swaps).
+- **Material:** one slot, `M_ScorchAtlas`. `PostApoNuclear/Holes/MI_GarrisonPostApo_ScorchAtlas_WallHoles` on the
+  existing `M_ScorchAtlas_WallHoles`, NoGrid, two-sided (the ruins are open shells). PS 421 vs 303.
+- **Collision.** Shells trace simple collision, and each mesh had one convex hull standing 0.7-3 m in front of most
+  facades (balconies, wings, open floors), so holes would have centred in air. Now 64 auto hulls
+  (`set_convex_decomposition_collisions(mesh, 64, 32, 1000000)`); rays landing within 30 mesh-cm of the render surface:
+  Large_2 59 -> 77 %, Large_1 28 -> 68 %, Horizontal 43 -> 77 % (`Saved/PostApoGarrisonHoles/gap.py`; 128 hulls
+  only added ~5 points). The concave hulls can change the navmesh around placed instances: rebuild nav on maps that
+  use them.
+- **Debris:** cut in Blender from the meshes' own facades (window corners, slabs, slab edges with re-bar, corner
+  chunks), original UVs on outer faces, broken concrete from the atlas on cut faces. Scripts:
+  `D:/Blender/BlenderProjects/BlenderTanks/PostApoGarrisonDebris/build_setA_garrison_highrise_debris.py` and
+  `build_setB_horizontal_debris.py`; FBX in `Saved/PostApoGarrisonHoles/debris_out/`, imported at scale 1 with the
+  holes MI. The horizontal block is a thin open shell (8 cm facade), so its pieces were thickened to 9-15 cm.
+- **Aim points** (construction script, after the parent call): highrises (0,0,200), (200,-150,600), (-200,150,1000),
+  (0,0,1400); horizontal (0,0,250), (-1200,0,500), (1200,0,750), (0,0,1000). The C++ default of 1 m put every shell on
+  the ground floor of a 23 m block.
+- **Scripts:** `Saved/PostApoGarrisonHoles/` (`add_components.py`, `aim_points.py`, `import_debris.py`, `gap.py`).
+- **Not tested in PIE** yet (the user tests).
+
 ## Open points
 
 - The collapse reads as a blast, not a falling wall. Tune `CollapseSettings.DeathSpeedScale`, or add a slumping
