@@ -8,6 +8,8 @@ namespace RTSHotkeyTypesPrivate
 {
 	const TCHAR* ActionButtonPrefix = TEXT("IA_ActionButton");
 	const TCHAR* ControlGroupPrefix = TEXT("IA_ControlGroup");
+	const TCHAR* GlobalAbilityPrefix = TEXT("IA_GlobalAbility");
+	const TCHAR* BuildingExpansionPrefix = TEXT("IA_BuildingExpansion");
 }
 
 bool FRTSModifierHotkey::GetIsValid() const
@@ -132,4 +134,74 @@ FString RTSHotkeyTypes::GetActionDisplayName(const FName& ActionName)
 	}
 
 	return ActionLabel;
+}
+
+namespace RTSHotkeyTypesPrivate
+{
+	FName GetSlotActionName(const TCHAR* Prefix, const int32 SlotIndex, const int32 SlotCount)
+	{
+		if (SlotIndex < 0 || SlotIndex >= SlotCount)
+		{
+			return NAME_None;
+		}
+
+		return FName(*FString::Printf(TEXT("%s%d"), Prefix, SlotIndex + 1));
+	}
+
+	int32 GetSlotFromActionName(const TCHAR* Prefix, const FName& ActionName, const int32 SlotCount)
+	{
+		const FString ActionLabel = ActionName.ToString();
+		const FString PrefixString = Prefix;
+		if (not ActionLabel.StartsWith(PrefixString))
+		{
+			return INDEX_NONE;
+		}
+
+		const FString NumberPart = ActionLabel.RightChop(PrefixString.Len());
+		if (NumberPart.IsEmpty() || not NumberPart.IsNumeric())
+		{
+			return INDEX_NONE;
+		}
+
+		const int32 SlotIndex = FCString::Atoi(*NumberPart) - 1;
+		return SlotIndex >= 0 && SlotIndex < SlotCount ? SlotIndex : INDEX_NONE;
+	}
+}
+
+FName RTSHotkeyTypes::GetGlobalAbilityActionName(const int32 SlotIndex)
+{
+	return RTSHotkeyTypesPrivate::GetSlotActionName(
+		RTSHotkeyTypesPrivate::GlobalAbilityPrefix, SlotIndex, GlobalAbilityHotkeySlotCount);
+}
+
+int32 RTSHotkeyTypes::GetGlobalAbilitySlotFromActionName(const FName& ActionName)
+{
+	return RTSHotkeyTypesPrivate::GetSlotFromActionName(
+		RTSHotkeyTypesPrivate::GlobalAbilityPrefix, ActionName, GlobalAbilityHotkeySlotCount);
+}
+
+FName RTSHotkeyTypes::GetBuildingExpansionActionName(const int32 SlotIndex)
+{
+	return RTSHotkeyTypesPrivate::GetSlotActionName(
+		RTSHotkeyTypesPrivate::BuildingExpansionPrefix, SlotIndex, BuildingExpansionHotkeySlotCount);
+}
+
+int32 RTSHotkeyTypes::GetBuildingExpansionSlotFromActionName(const FName& ActionName)
+{
+	return RTSHotkeyTypesPrivate::GetSlotFromActionName(
+		RTSHotkeyTypesPrivate::BuildingExpansionPrefix, ActionName, BuildingExpansionHotkeySlotCount);
+}
+
+FText RTSHotkeyTypes::GetChordedHotkeyRichText(
+	const FRTSModifierHotkey& Hotkey, const FString& ModifierStyle, const FString& KeyStyle)
+{
+	if (not Hotkey.GetIsValid())
+	{
+		return FText::GetEmpty();
+	}
+
+	const FString ModifierText = GetModifierDisplayString(Hotkey.Modifier).ToUpper();
+	const FString KeyText = Hotkey.Key.GetDisplayName().ToString().ToUpper();
+	return FText::FromString(FString::Printf(
+		TEXT("<%s>%s</> <%s>%s</>"), *ModifierStyle, *ModifierText, *KeyStyle, *KeyText));
 }

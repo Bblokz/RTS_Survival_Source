@@ -11,6 +11,7 @@
 
 #include "Abilities.h"
 #include "InputAction.h"
+#include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "EnhancedInputSubsystemInterface.h"
 #include "InputMappingContext.h"
@@ -63,6 +64,7 @@
 #include "RTS_Survival/GlobalAbilitySystem/GlobalAbilities/GlobalAbilityCostState.h"
 #include "RTS_Survival/GlobalAbilitySystem/GlobalAbilities/GlobalAbilityHelpers.h"
 #include "RTS_Survival/GlobalAbilitySystem/GlobalAbilitiesManager/GlobalAbilitiesManager.h"
+#include "RTS_Survival/GlobalAbilitySystem/UI/GlobalAbilityPanel/W_GlobalAbilityPanel.h"
 #include "RTS_Survival/LandscapeDeformSystem/LandscapeDeformManager/LandscapeDeformManager.h"
 #include "RTS_Survival/MasterObjects/HealthBase/HpCharacterObjectsMaster.h"
 #include "RTS_Survival/Missions/MissionManager/MissionManager.h"
@@ -970,11 +972,115 @@ void ACPPController::OnNomadicExpansionShortCut()
 
 void ACPPController::OnBxpShortCut(const int32 BxpIndex)
 {
+	if (bM_IsMainMenuController || not IsValid(M_MainGameUI) || not M_MainGameUI->IsVisible())
+	{
+		// No bxp panel to click: main menu, HUD not created yet, or hidden by a cinematic take-over.
+		return;
+	}
 	if (not EnsureIsValidBuildingUI_ItemPanel())
 	{
 		return;
 	}
-	M_BuildingUI_ItemPanel->SimulateClickBuildingExpansion(BxpIndex);
+	M_BuildingUI_ItemPanel->TryActivateBuildingExpansionFromHotkey(BxpIndex);
+}
+
+void ACPPController::OnGlobalAbilityShortCut(const int32 GlobalAbilitySlotIndex)
+{
+	if (bM_IsMainMenuController || not IsValid(M_MainGameUI) || not M_MainGameUI->IsVisible())
+	{
+		// No sidebar to fire from: main menu, HUD not created yet, or hidden by a cinematic take-over.
+		return;
+	}
+
+	UW_GlobalAbilityPanel* GlobalAbilityPanel = M_MainGameUI->GetGlobalAbilityPanel();
+	if (not IsValid(GlobalAbilityPanel))
+	{
+		return;
+	}
+
+	GlobalAbilityPanel->TryActivateAbilityFromHotkey(GlobalAbilitySlotIndex);
+}
+
+void ACPPController::SetupInput_BindChordedSlotHotkeys()
+{
+	if (bM_IsMainMenuController || not IsValid(M_ChordedActionInputMappingContext))
+	{
+		return;
+	}
+
+	UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(InputComponent);
+	if (not IsValid(EnhancedInputComponent))
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Chorded slot hotkeys need an EnhancedInputComponent on the controller."));
+		return;
+	}
+
+	BindChordedSlotHotkeys(
+		EnhancedInputComponent,
+		RTSHotkeyTypes::GlobalAbilityHotkeySlotCount,
+		&RTSHotkeyTypes::GetGlobalAbilityActionName,
+		&ACPPController::OnGlobalAbilityHotkeyStarted);
+	BindChordedSlotHotkeys(
+		EnhancedInputComponent,
+		RTSHotkeyTypes::BuildingExpansionHotkeySlotCount,
+		&RTSHotkeyTypes::GetBuildingExpansionActionName,
+		&ACPPController::OnBuildingExpansionHotkeyStarted);
+}
+
+void ACPPController::BindChordedSlotHotkeys(
+	UEnhancedInputComponent* EnhancedInputComponent,
+	const int32 SlotCount,
+	FName (*GetSlotActionName)(int32),
+	void (ACPPController::*OnSlotHotkeyStarted)(const FInputActionInstance&))
+{
+	for (int32 SlotIndex = 0; SlotIndex < SlotCount; ++SlotIndex)
+	{
+		const FName ActionName = GetSlotActionName(SlotIndex);
+		const UInputAction* SlotAction = FindInputActionByName(M_ChordedActionInputMappingContext, ActionName);
+		if (not IsValid(SlotAction))
+		{
+			RTSFunctionLibrary::ReportError(
+				TEXT("Chorded mapping context has no slot hotkey action: ") + ActionName.ToString());
+			continue;
+		}
+
+		// Started fires once per press; the chord trigger reports Triggered on every frame the keys are held.
+		EnhancedInputComponent->BindAction(SlotAction, ETriggerEvent::Started, this, OnSlotHotkeyStarted);
+	}
+}
+
+void ACPPController::OnGlobalAbilityHotkeyStarted(const FInputActionInstance& ActionInstance)
+{
+	const UInputAction* SourceAction = ActionInstance.GetSourceAction();
+	if (not IsValid(SourceAction))
+	{
+		return;
+	}
+
+	const int32 SlotIndex = RTSHotkeyTypes::GetGlobalAbilitySlotFromActionName(SourceAction->GetFName());
+	if (SlotIndex == INDEX_NONE)
+	{
+		return;
+	}
+
+	OnGlobalAbilityShortCut(SlotIndex);
+}
+
+void ACPPController::OnBuildingExpansionHotkeyStarted(const FInputActionInstance& ActionInstance)
+{
+	const UInputAction* SourceAction = ActionInstance.GetSourceAction();
+	if (not IsValid(SourceAction))
+	{
+		return;
+	}
+
+	const int32 SlotIndex = RTSHotkeyTypes::GetBuildingExpansionSlotFromActionName(SourceAction->GetFName());
+	if (SlotIndex == INDEX_NONE)
+	{
+		return;
+	}
+
+	OnBxpShortCut(SlotIndex);
 }
 
 UPlayerPortraitManager* ACPPController::GetPlayerPortraitManager() const
@@ -1309,6 +1415,7 @@ bool ACPPController::GetIsFormationArrowDragReady() const
 void ACPPController::SetupInputComponent()
 {
 	Super::SetupInputComponent();
+	SetupInput_BindChordedSlotHotkeys();
 }
 
 void ACPPController::DisplayErrorMessage(const EPlayerError Error)
@@ -7345,6 +7452,14 @@ void ACPPController::InitMiniMapWithFowDataOnMainMenu(const EMiniMapStartDirecti
 		return;
 	}
 	M_MainGameUI->InitMiniMap(M_FowManager, StartDirection);
+}
+
+bool ACPPController::GetCanStartScreenTakeover() const
+{
+	return not M_PauseGameState.bM_IsGameLocked
+		&& not bM_IsCinematicTakeOverActive
+		&& not bM_IsInTechTree
+		&& not bM_IsInArchive;
 }
 
 bool ACPPController::PauseGame_GetIsGameLocked() const

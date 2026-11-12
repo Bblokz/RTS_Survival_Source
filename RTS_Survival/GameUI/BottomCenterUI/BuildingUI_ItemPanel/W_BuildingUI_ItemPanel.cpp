@@ -4,9 +4,7 @@
 #include "W_BuildingUI_ItemPanel.h"
 
 #include "Components/Button.h"
-#include "Engine/LocalPlayer.h"
 #include "RTS_Survival/GameUI/Hotkey/W_HotKey.h"
-#include "RTS_Survival/Subsystems/HotkeyProviderSubsystem/RTSHotkeyProviderSubsystem.h"
 #include "RTS_Survival/Subsystems/HotkeyProviderSubsystem/RTSHotkeyTypes.h"
 #include "RTS_Survival/GameUI/BottomCenterUI/BottomCenterUIPanel/W_BottomCenterUI.h"
 #include "RTS_Survival/GameUI/BuildingExpansion/W_ItemBuildingExpansion.h"
@@ -104,6 +102,23 @@ void UW_BuildingUI_ItemPanel::SimulateClickBuildingExpansion(const int32 Index)
 	Item->SimulatedClickedBxpItem();
 }
 
+bool UW_BuildingUI_ItemPanel::TryActivateBuildingExpansionFromHotkey(const int32 Index) const
+{
+	// Hidden while no building (or nomadic vehicle) is the primary selection: the items then hold stale data.
+	if (not IsVisible())
+	{
+		return false;
+	}
+
+	// More hotkeys than item slots is fine: the extra hotkeys wait for a wider panel.
+	if (not M_BxpItems.IsValidIndex(Index) || not IsValid(M_BxpItems[Index]))
+	{
+		return false;
+	}
+
+	return M_BxpItems[Index]->TryActivateFromHotkey();
+}
+
 TArray<UW_ItemBuildingExpansion*> UW_BuildingUI_ItemPanel::GetBxpItems() const
 {
 	if (M_BxpItems.Num() == 0)
@@ -191,87 +206,16 @@ bool UW_BuildingUI_ItemPanel::GetIsValidCancelVehicleConversionButton() const
 void UW_BuildingUI_ItemPanel::NativeConstruct()
 {
 	Super::NativeConstruct();
-	CacheHotkeyProviderSubsystem();
-	UpdateNomadicExpansionHotkey();
-	BindHotkeyUpdateDelegate();
-}
-
-void UW_BuildingUI_ItemPanel::NativeDestruct()
-{
-	UnbindHotkeyUpdateDelegate();
-	Super::NativeDestruct();
-}
-
-void UW_BuildingUI_ItemPanel::CacheHotkeyProviderSubsystem()
-{
-	ULocalPlayer* OwningLocalPlayer = GetOwningLocalPlayer();
-	if (not IsValid(OwningLocalPlayer))
-	{
-		RTSFunctionLibrary::ReportError(TEXT("UW_BuildingUI_ItemPanel could not resolve owning local player."));
-		return;
-	}
-
-	URTSHotkeyProviderSubsystem* HotkeyProviderSubsystem = OwningLocalPlayer->GetSubsystem<URTSHotkeyProviderSubsystem>();
-	if (not IsValid(HotkeyProviderSubsystem))
-	{
-		RTSFunctionLibrary::ReportError(TEXT("UW_BuildingUI_ItemPanel could not resolve hotkey provider subsystem."));
-		return;
-	}
-
-	M_HotkeyProviderSubsystem = HotkeyProviderSubsystem;
-}
-
-void UW_BuildingUI_ItemPanel::BindHotkeyUpdateDelegate()
-{
-	if (not GetIsValidHotkeyProviderSubsystem())
-	{
-		return;
-	}
-
-	M_ChordedActionHotkeyHandle = M_HotkeyProviderSubsystem->OnChordedActionHotkeyUpdated().AddUObject(
-		this,
-		&UW_BuildingUI_ItemPanel::HandleChordedActionHotkeyUpdated);
-}
-
-void UW_BuildingUI_ItemPanel::UnbindHotkeyUpdateDelegate()
-{
-	if (not GetIsValidHotkeyProviderSubsystem())
-	{
-		return;
-	}
-
-	if (M_ChordedActionHotkeyHandle.IsValid())
-	{
-		M_HotkeyProviderSubsystem->OnChordedActionHotkeyUpdated().Remove(M_ChordedActionHotkeyHandle);
-		M_ChordedActionHotkeyHandle.Reset();
-	}
-}
-
-void UW_BuildingUI_ItemPanel::UpdateNomadicExpansionHotkey()
-{
-	if (not GetIsValidHotkeyProviderSubsystem() || not GetIsValidNomadicExpansionHotkey())
-	{
-		return;
-	}
-
-	const FText HotkeyText = M_HotkeyProviderSubsystem->GetDisplayKeyForChordedAction(
-		RTSHotkeyTypes::NomadicExpansionActionName);
-	M_Hotkey_NomadicExpansion->SetKeyText(HotkeyText);
-}
-
-void UW_BuildingUI_ItemPanel::HandleChordedActionHotkeyUpdated(const FName ActionName, const FText& HotkeyText)
-{
-	if (ActionName != RTSHotkeyTypes::NomadicExpansionActionName)
-	{
-		return;
-	}
-
 	if (not GetIsValidNomadicExpansionHotkey())
 	{
 		return;
 	}
 
-	M_Hotkey_NomadicExpansion->SetKeyText(HotkeyText);
+	// Same badge rows as the bxp items next to it.
+	M_Hotkey_NomadicExpansion->ShowChordedAction(
+		RTSHotkeyTypes::NomadicExpansionActionName,
+		TEXT("Text_BxpHotkeyMod"),
+		TEXT("Text_BxpHotkeyKey"));
 }
 
 bool UW_BuildingUI_ItemPanel::GetIsValidNomadicExpansionHotkey() const
@@ -285,22 +229,6 @@ bool UW_BuildingUI_ItemPanel::GetIsValidNomadicExpansionHotkey() const
 		this,
 		TEXT("M_Hotkey_NomadicExpansion"),
 		TEXT("UW_BuildingUI_ItemPanel::GetIsValidNomadicExpansionHotkey"),
-		this
-	);
-	return false;
-}
-
-bool UW_BuildingUI_ItemPanel::GetIsValidHotkeyProviderSubsystem() const
-{
-	if (M_HotkeyProviderSubsystem.IsValid())
-	{
-		return true;
-	}
-
-	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
-		this,
-		TEXT("M_HotkeyProviderSubsystem"),
-		TEXT("UW_BuildingUI_ItemPanel::GetIsValidHotkeyProviderSubsystem"),
 		this
 	);
 	return false;

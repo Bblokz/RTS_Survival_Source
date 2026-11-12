@@ -14,6 +14,7 @@ class UGlobalAbility;
 
 /**
  * @brief Item widget used by the global ability panel to route ability button interactions.
+ * Shows the slot's chorded hotkey (Ctrl+A ... Ctrl+V by default) and is clicked by it through the panel.
  */
 UCLASS()
 class RTS_SURVIVAL_API UW_GA_Item : public UUserWidget
@@ -28,7 +29,13 @@ class RTS_SURVIVAL_API UW_GA_Item : public UUserWidget
 	void SetAbilityAvailable(const bool bIsGaEnabled, const bool bUseGreyTint) const;
 	void RefreshCooldownFromLoadedAbility() const;
 	UGlobalAbility* GetLoadedAbility() const { return M_GlobalAbility.Get(); }
-	
+
+	/** Set by the panel: picks the IA_GlobalAbility<SlotIndex + 1> chorded hotkey this item shows and answers to. */
+	void SetHotkeySlotIndex(const int32 SlotIndex);
+
+	/** @return True when the ability was clicked; false for an empty, hidden or unavailable (greyed out) slot. */
+	bool TryActivateFromHotkey();
+
 	protected:
 	virtual void NativeDestruct() override;
 	
@@ -67,4 +74,6 @@ private:
 	void UnbindAbilityButtonCallbacks();
 	UButton* GetCooldownButton() const;
 	[[nodiscard]] bool EnsureIsValidAbilityButton() const;
+
+	[[nodiscard]] bool GetIsValidHotkeyWidget() const;
 };

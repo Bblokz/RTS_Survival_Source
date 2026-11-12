@@ -56,11 +56,37 @@ TArray<UW_GA_Item*> UW_GlobalAbilityPanel::GetAbilityItems() const
 	return AbilityItems;
 }
 
+bool UW_GlobalAbilityPanel::TryActivateAbilityFromHotkey(const int32 SlotIndex) const
+{
+	// Collapsed for missions without global abilities: the hotkeys must not reach a panel the player cannot see.
+	if (not IsVisible())
+	{
+		return false;
+	}
+
+	const TArray<UW_GA_Item*> AbilityItems = GetAbilityItems();
+	if (not AbilityItems.IsValidIndex(SlotIndex) || not IsValid(AbilityItems[SlotIndex]))
+	{
+		return false;
+	}
+
+	return AbilityItems[SlotIndex]->TryActivateFromHotkey();
+}
+
 void UW_GlobalAbilityPanel::NativeOnInitialized()
 {
 	Super::NativeOnInitialized();
 	if (IsValid(Description))
 	{
 		Description->HideDescription();
+	}
+
+	const TArray<UW_GA_Item*> AbilityItems = GetAbilityItems();
+	for (int32 ItemIndex = 0; ItemIndex < AbilityItems.Num(); ++ItemIndex)
+	{
+		if (IsValid(AbilityItems[ItemIndex]))
+		{
+			AbilityItems[ItemIndex]->SetHotkeySlotIndex(ItemIndex);
+		}
 	}
 }

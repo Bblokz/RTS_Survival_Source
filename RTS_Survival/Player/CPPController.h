@@ -67,6 +67,8 @@ enum class EGlobalAbility : uint8;
 struct FGlobalAbilitySoundSettings;
 struct FGlobalAbilityAimSettings;
 class UGlobalAbilitiesManager;
+struct FInputActionInstance;
+class UEnhancedInputComponent;
 class UW_BuildingUI_ItemPanel;
 class UTowedActorComponent;
 class AAircraftMaster;
@@ -401,6 +403,13 @@ public:
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void PauseAndLockGame(const bool bLock);
 
+	/**
+	 * @brief Info takeovers wait on this before PauseAndLockGame: a cinematic blocks the pause, and the tech tree,
+	 * archive or another locked takeover already own the screen.
+	 * @return True when a new pause-and-lock takeover can start now.
+	 */
+	bool GetCanStartScreenTakeover() const;
+
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "EscapeMenu")
 	void OpenEscapeMenu();
 
@@ -449,6 +458,9 @@ public:
 	void OnNomadicExpansionShortCut();
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Input")
 	void OnBxpShortCut(int32 BxpIndex);
+	/** Fires the global ability in this zero-based sidebar slot as if its button was clicked. */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Input")
+	void OnGlobalAbilityShortCut(int32 GlobalAbilitySlotIndex);
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	UPlayerPortraitManager* GetPlayerPortraitManager() const;
@@ -2048,6 +2060,22 @@ private:
 	void NotifyHotkeyProviderSingleActionChanged(UInputAction* Action) const;
 	void NotifyHotkeyProviderChordedActionChanged(UInputAction* Action) const;
 	void RequestEnhancedInputMappingsRebuild() const;
+	// Binds the chorded IA_GlobalAbility1..8 and IA_BuildingExpansion1..10 actions in C++ (no Blueprint input events).
+	void SetupInput_BindChordedSlotHotkeys();
+	/**
+	 * @brief Binds one numbered range of chorded slot actions to a single handler that reads the slot from the action.
+	 * @param EnhancedInputComponent The controller's input component.
+	 * @param SlotCount Number of slots in the range.
+	 * @param GetSlotActionName Maps a zero-based slot to its action name (IA_<Prefix><Slot + 1>).
+	 * @param OnSlotHotkeyStarted Handler bound on ETriggerEvent::Started.
+	 */
+	void BindChordedSlotHotkeys(
+		UEnhancedInputComponent* EnhancedInputComponent,
+		const int32 SlotCount,
+		FName (*GetSlotActionName)(int32),
+		void (ACPPController::*OnSlotHotkeyStarted)(const FInputActionInstance&));
+	void OnGlobalAbilityHotkeyStarted(const FInputActionInstance& ActionInstance);
+	void OnBuildingExpansionHotkeyStarted(const FInputActionInstance& ActionInstance);
 
 	void InitFowManager();
 

@@ -7,6 +7,15 @@
 #include "RTS_Survival/GlobalAbilitySystem/GlobalAbilities/GlobalAbility.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/GlobalAbilitySystem/GlobalAbilitiesManager/GlobalAbilitiesManager.h"
+#include "RTS_Survival/GameUI/Hotkey/W_HotKey.h"
+#include "RTS_Survival/Subsystems/HotkeyProviderSubsystem/RTSHotkeyTypes.h"
+
+namespace GA_ItemHotkeyLabel
+{
+	// Rows in DT_RichText: a small dimmed modifier next to the bright key, like a key cap legend.
+	const TCHAR* ModifierStyle = TEXT("Text_GAHotkeyMod");
+	const TCHAR* KeyStyle = TEXT("Text_GAHotkeyKey");
+}
 
 void UW_GA_Item::SetupGa_Item(const TWeakObjectPtr<UGlobalAbility> GlobalAbility, UGlobalAbilitiesManager* GlobalAbilityManager)
 {
@@ -90,10 +99,58 @@ void UW_GA_Item::RefreshCooldownFromLoadedAbility() const
 		static_cast<float>(AbilityCosts.CoolDownRemaining));
 }
 
+void UW_GA_Item::SetHotkeySlotIndex(const int32 SlotIndex)
+{
+	if (not GetIsValidHotkeyWidget())
+	{
+		return;
+	}
+
+	HotkeyWidget->ShowChordedAction(
+		RTSHotkeyTypes::GetGlobalAbilityActionName(SlotIndex),
+		GA_ItemHotkeyLabel::ModifierStyle,
+		GA_ItemHotkeyLabel::KeyStyle);
+}
+
+bool UW_GA_Item::TryActivateFromHotkey()
+{
+	// Unused slots are collapsed and hold no ability; neither is an error for a hotkey press.
+	if (not IsVisible() || not M_GlobalAbility.IsValid())
+	{
+		return false;
+	}
+
+	// The button is disabled while the ability is unaffordable, on cooldown or locked: same gate as a mouse click.
+	const UButton* const CooldownButton = GetCooldownButton();
+	if (not IsValid(CooldownButton) || not CooldownButton->GetIsEnabled())
+	{
+		return false;
+	}
+
+	OnClickedAbilityButton();
+	return true;
+}
+
 void UW_GA_Item::NativeDestruct()
 {
 	UnbindAbilityButtonCallbacks();
 	Super::NativeDestruct();
+}
+
+bool UW_GA_Item::GetIsValidHotkeyWidget() const
+{
+	if (IsValid(HotkeyWidget.Get()))
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+		this,
+		TEXT("HotkeyWidget"),
+		TEXT("UW_GA_Item::GetIsValidHotkeyWidget"),
+		this
+	);
+	return false;
 }
 
 void UW_GA_Item::OnClickedAbilityButton()
