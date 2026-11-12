@@ -193,6 +193,16 @@ public:
 	void AddNewArchiveItem(const ERTSArchiveItem ItemType, const FTrainingOption OptionalUnit = FTrainingOption(),
 	                       const int32 SortingPriority = 0, const float NotificationTime = 0);
 
+	/**
+	 * @brief Archives an entry that brings its own text and picture and shows its pop-up; waits for the archive
+	 * widgets when they are not built yet.
+	 * @param Content The entry; ignored (no pop-up) when its Key is already archived.
+	 * @param SortingPriority Higher sorts first within its category.
+	 * @param NotificationTime Seconds the pop-up stays.
+	 */
+	void AddNewCustomArchiveItem(const FArchiveCustomContent& Content, const int32 SortingPriority,
+	                             const float NotificationTime);
+
 	void OnOpenArchive();
 	void OnCloseArchive();
 

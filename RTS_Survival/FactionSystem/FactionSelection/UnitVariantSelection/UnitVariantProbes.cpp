@@ -114,15 +114,22 @@ FUnitVariantProbeResult UUnitVariantProbes::ReadProbe(const AActor& Probe)
 	{
 		Result.MaxSpeedMultiplier = Tank->VariantMobilityMultipliers.MaxSpeedMultiplier;
 	}
-	for (const UWeaponState* const Weapon : GetProbeWeapons(Probe))
+	Result.Weapons = ReadWeaponStats(Probe);
+	ReadAddOnArmor(Probe, Result);
+	return Result;
+}
+
+TArray<FUnitVariantWeaponStats> UUnitVariantProbes::ReadWeaponStats(const AActor& Unit)
+{
+	TArray<FUnitVariantWeaponStats> Weapons;
+	for (const UWeaponState* const Weapon : GetProbeWeapons(Unit))
 	{
 		if (IsValid(Weapon))
 		{
-			AddWeapon(Result.Weapons, *Weapon);
+			AddWeapon(Weapons, *Weapon);
 		}
 	}
-	ReadAddOnArmor(Probe, Result);
-	return Result;
+	return Weapons;
 }
 
 void UUnitVariantProbes::ReadAddOnArmor(const AActor& Probe, FUnitVariantProbeResult& Result)

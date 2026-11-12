@@ -16,6 +16,12 @@ void UW_Archive::AddArchiveItem(const ERTSArchiveItem NewItem, const FTrainingOp
 		OnItemInvalid();
 		return;
 	}
+	if (ERTSArchiveItem::CustomContent == NewItem)
+	{
+		RTSFunctionLibrary::ReportError(TEXT("CustomContent archive items carry their own text: use "
+			"AddCustomArchiveItem."));
+		return;
+	}
 	bool bIsUnique = false;
 	if (NewItem != ERTSArchiveItem::Unit)
 	{
@@ -210,8 +216,14 @@ ERTSArchiveType UW_Archive::AddArchiveWidgetToScrollBox(
 	}
 
 	const ERTSArchiveType ArchiveSortingType = ArchiveItemWidget->SetupArchiveItem(ItemType, UnitType);
+	AddSetupItemToScrollBox(ArchiveItemWidget, ArchiveSortingType, SortingPriority);
+	return ArchiveSortingType;
+}
 
-	const FArchiveItemData NewData = {ArchiveItemWidget, ArchiveSortingType, SortingPriority};
+void UW_Archive::AddSetupItemToScrollBox(UW_ArchiveItem* ArchiveItemWidget, const ERTSArchiveType SortingType,
+                                         const int32 SortingPriority)
+{
+	const FArchiveItemData NewData = {ArchiveItemWidget, SortingType, SortingPriority};
 	M_ArchiveItems.Add(NewData);
 
 	// Add to scroll box
@@ -224,8 +236,49 @@ ERTSArchiveType UW_Archive::AddArchiveWidgetToScrollBox(
 		ScrollSlot->SetVerticalAlignment(VAlign_Center);
 		ScrollSlot->SetPadding(FMargin(0.0f, 25.0f, 0.0f, 0.0f));
 	}
+}
 
-	return ArchiveSortingType;
+bool UW_Archive::AddCustomArchiveItem(const FArchiveCustomContent& Content, const int32 SortingPriority)
+{
+	if (Content.Key.IsNone())
+	{
+		OnItemInvalid();
+		return false;
+	}
+	// Expected, not an error: the same vehicle can be introduced again in a later mission.
+	if (IsCustomArchiveItemAlreadyInList(Content.Key))
+	{
+		return false;
+	}
+	if (not GetIsValidArchiveScrollBox())
+	{
+		return false;
+	}
+	UW_ArchiveItem* const NewArchiveItem = CreateNewArchiveItem();
+	if (not IsValid(NewArchiveItem))
+	{
+		OnFailedToCreateArchiveItem();
+		return false;
+	}
+	const ERTSArchiveType SortingType = NewArchiveItem->SetupCustomArchiveItem(Content);
+	if (SortingType == ERTSArchiveType::None)
+	{
+		OnFailedToCreateArchiveItem();
+		return false;
+	}
+	AddSetupItemToScrollBox(NewArchiveItem, SortingType, SortingPriority);
+	// Ensure the type of the new item is at the top of the list.
+	SortForType(SortingType);
+	return true;
+}
+
+bool UW_Archive::IsCustomArchiveItemAlreadyInList(const FName CustomContentKey) const
+{
+	return M_ArchiveItems.ContainsByPredicate([CustomContentKey](const FArchiveItemData& Data)
+	{
+		return Data.IsValid() && Data.ItemWidget->GetArchiveItem() == ERTSArchiveItem::CustomContent
+			&& Data.ItemWidget->GetCustomContentKey() == CustomContentKey;
+	});
 }
 
 

@@ -168,6 +168,24 @@ namespace SquadMovePreviewTestPrivate
 		return NearestDistanceSquared < TNumericLimits<float>::Max();
 	}
 
+	/** @return The free prone point nearest to SquadLocation; null when the map has none. */
+	const FRTSCoverPoint* FindNearestFreePronePoint(
+		const URTSCoverFinderWorldSubsystem& CoverSubsystem,
+		const FVector& SquadLocation)
+	{
+		const FRTSCoverPoint* NearestPronePoint = nullptr;
+		for (const FRTSCoverPoint& CoverPoint : CoverSubsystem.GetCoverPointsView())
+		{
+			const bool bIsFreePronePoint = CoverPoint.CoverType == ERTSCoverType::Prone &&
+				not IsValid(CoverSubsystem.GetCoverReservationOwner(CoverPoint.PointId));
+			const bool bIsNearer = NearestPronePoint == nullptr ||
+				FVector::DistSquared2D(SquadLocation, CoverPoint.Location) <
+				FVector::DistSquared2D(SquadLocation, NearestPronePoint->Location);
+			NearestPronePoint = bIsFreePronePoint && bIsNearer ? &CoverPoint : NearestPronePoint;
+		}
+		return NearestPronePoint;
+	}
+
 	/** Walks outward from the squad until it finds navigable ground with no cover anywhere near it. */
 	bool FindOpenGroundLocation(
 		UWorld& World,
@@ -329,14 +347,6 @@ void FSquadMovePreviewTestScenario::RunPlanChecksAndIssueMove(
 	CheckPronePlan(PreviewComponent, CoverSubsystem, TestSquad);
 	CheckStanceMeshes(PreviewComponent, TestSquad, CrouchPoint.Location);
 	CheckStanceMeshes(PreviewComponent, TestSquad, StandingPoint.Location);
-	if (FParse::Param(FCommandLine::Get(), TEXT("SquadMovePreviewCaptureStances")))
-	{
-		M_StanceCaptureSquads.Reset();
-		M_StanceCaptureSquads.Append(TestSquad);
-		M_StanceCaptureLocations[0] = CrouchPoint.Location;
-		M_StanceCaptureLocations[1] = StandingPoint.Location;
-		M_StanceCaptureFramesLeft = SquadMovePreviewTestPrivate::StanceCaptureFramesPerLocation * 2;
-	}
 	CheckChosenFacing(PreviewComponent, TestSquad, CrouchPoint);
 	FVector OpenGroundLocation = FVector::ZeroVector;
 	const bool bFoundOpenGround = SquadMovePreviewTestPrivate::FindOpenGroundLocation(
@@ -348,6 +358,23 @@ void FSquadMovePreviewTestScenario::RunPlanChecksAndIssueMove(
 	if (bFoundOpenGround)
 	{
 		CheckOpenGroundPlan(PreviewComponent, TestSquad, OpenGroundLocation);
+	}
+	if (FParse::Param(FCommandLine::Get(), TEXT("SquadMovePreviewCaptureStances")))
+	{
+		M_StanceCaptureSquads.Reset();
+		M_StanceCaptureSquads.Append(TestSquad);
+		M_StanceCaptureLocations = {CrouchPoint.Location, StandingPoint.Location};
+		if (bFoundOpenGround)
+		{
+			M_StanceCaptureLocations.Add(OpenGroundLocation);
+		}
+		if (const FRTSCoverPoint* PronePoint = SquadMovePreviewTestPrivate::FindNearestFreePronePoint(
+			CoverSubsystem, TestSquad[0]->GetActorLocation()))
+		{
+			M_StanceCaptureLocations.Add(PronePoint->Location);
+		}
+		M_StanceCaptureFramesLeft = SquadMovePreviewTestPrivate::StanceCaptureFramesPerLocation *
+			M_StanceCaptureLocations.Num();
 	}
 	CheckSeveralSquads(PreviewComponent, PlayerSquads, StandingPoint.Location);
 	CheckPlanningCost(PreviewComponent, PlayerSquads, StandingPoint.Location);
@@ -428,7 +455,11 @@ void FSquadMovePreviewTestScenario::TickStanceCapture(USquadMovePreviewComponent
 		return;
 	}
 	--M_StanceCaptureFramesLeft;
-	const int32 LocationIndex = M_StanceCaptureFramesLeft >= StanceCaptureFramesPerLocation ? 0 : 1;
+	// Frames count down through the locations in order, StanceCaptureFramesPerLocation frames each.
+	const int32 LocationIndex = FMath::Clamp(
+		M_StanceCaptureLocations.Num() - 1 - M_StanceCaptureFramesLeft / StanceCaptureFramesPerLocation,
+		0,
+		M_StanceCaptureLocations.Num() - 1);
 	const int32 FramesLeftAtLocation = M_StanceCaptureFramesLeft % StanceCaptureFramesPerLocation;
 	TArray<ASquadController*> CaptureSquads;
 	for (const TWeakObjectPtr<ASquadController>& CaptureSquad : M_StanceCaptureSquads)
@@ -483,17 +514,8 @@ void FSquadMovePreviewTestScenario::CheckPronePlan(
 	const TArray<ASquadController*>& TestSquad)
 {
 	// A map without prone cover, or with prone cover switched off, has nothing to plan onto.
-	const FVector SquadLocation = TestSquad[0]->GetActorLocation();
-	const FRTSCoverPoint* NearestPronePoint = nullptr;
-	for (const FRTSCoverPoint& CoverPoint : CoverSubsystem.GetCoverPointsView())
-	{
-		const bool bIsFreePronePoint = CoverPoint.CoverType == ERTSCoverType::Prone &&
-			not IsValid(CoverSubsystem.GetCoverReservationOwner(CoverPoint.PointId));
-		const bool bIsNearer = NearestPronePoint == nullptr ||
-			FVector::DistSquared2D(SquadLocation, CoverPoint.Location) <
-			FVector::DistSquared2D(SquadLocation, NearestPronePoint->Location);
-		NearestPronePoint = bIsFreePronePoint && bIsNearer ? &CoverPoint : NearestPronePoint;
-	}
+	const FRTSCoverPoint* NearestPronePoint = SquadMovePreviewTestPrivate::FindNearestFreePronePoint(
+		CoverSubsystem, TestSquad[0]->GetActorLocation());
 	if (NearestPronePoint == nullptr)
 	{
 		return;

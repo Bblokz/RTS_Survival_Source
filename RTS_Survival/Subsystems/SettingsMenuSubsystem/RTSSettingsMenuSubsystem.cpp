@@ -28,6 +28,7 @@ namespace RTSSettingsMenuSubsystemPrivate
 	constexpr bool bDefaultInvertYAxis = false;
 	constexpr bool bDefaultHideActionButtonHotkeys = false;
 	constexpr bool bDefaultCheckUnitRangeOnHover = true;
+	constexpr bool bDefaultShowInfoTakeovers = true;
 
 	// Landscape grass types follow grass.DensityScale; HISMs that opt into density scaling (the ground stones
 	// spawned by PCG_GroundStones) follow foliage.DensityScale.
@@ -456,6 +457,25 @@ void URTSSettingsMenuSubsystem::SetPendingCheckUnitRangeOnHover(const bool bNewC
 	M_PendingSettings.M_GameplaySettings.bM_CheckUnitRangeOnHover = bNewCheckUnitRangeOnHover;
 }
 
+void URTSSettingsMenuSubsystem::SetPendingShowInfoTakeovers(const bool bNewShowInfoTakeovers)
+{
+	M_PendingSettings.M_GameplaySettings.bM_ShowInfoTakeovers = bNewShowInfoTakeovers;
+}
+
+void URTSSettingsMenuSubsystem::SetShowInfoTakeoversImmediately(const bool bNewShowInfoTakeovers)
+{
+	URTSGameUserSettings* const GameUserSettings = GetGameUserSettingsChecked();
+	if (GameUserSettings == nullptr)
+	{
+		return;
+	}
+
+	GameUserSettings->SetShowInfoTakeovers(bNewShowInfoTakeovers);
+	GameUserSettings->SaveSettings();
+	M_CurrentSettings.M_GameplaySettings.bM_ShowInfoTakeovers = bNewShowInfoTakeovers;
+	M_PendingSettings.M_GameplaySettings.bM_ShowInfoTakeovers = bNewShowInfoTakeovers;
+}
+
 void URTSSettingsMenuSubsystem::SetPendingOverwriteAllPlayerHpBarStrat(const ERTSPlayerHealthBarVisibilityStrategy NewStrategy)
 {
 	M_PendingSettings.M_GameplaySettings.M_OverwriteAllPlayerHpBarStrat = NewStrategy;
@@ -614,6 +634,7 @@ void URTSSettingsMenuSubsystem::SetPendingSettingsToDefaults()
 
 	DefaultSettings.M_GameplaySettings.bM_HideActionButtonHotkeys = RTSSettingsMenuSubsystemPrivate::bDefaultHideActionButtonHotkeys;
 	DefaultSettings.M_GameplaySettings.bM_CheckUnitRangeOnHover = RTSSettingsMenuSubsystemPrivate::bDefaultCheckUnitRangeOnHover;
+	DefaultSettings.M_GameplaySettings.bM_ShowInfoTakeovers = RTSSettingsMenuSubsystemPrivate::bDefaultShowInfoTakeovers;
 	DefaultSettings.M_GameplaySettings.M_OverwriteAllPlayerHpBarStrat = ERTSPlayerHealthBarVisibilityStrategy::AwaysVisible;
 	DefaultSettings.M_GameplaySettings.M_PlayerTankHpBarStrat = ERTSPlayerHealthBarVisibilityStrategy::AwaysVisible;
 	DefaultSettings.M_GameplaySettings.M_PlayerSquadHpBarStrat = ERTSPlayerHealthBarVisibilityStrategy::AwaysVisible;
@@ -1160,6 +1181,7 @@ FRTSSettingsSnapshot URTSSettingsMenuSubsystem::BuildSnapshotFromSettings(const 
 	Snapshot.M_ControlSettings.M_CameraShakeMultiplier = GameUserSettings.GetCameraShakeMultiplier();
 	Snapshot.M_GameplaySettings.bM_HideActionButtonHotkeys = GameUserSettings.GetHideActionButtonHotkeys();
 	Snapshot.M_GameplaySettings.bM_CheckUnitRangeOnHover = GameUserSettings.GetCheckUnitRangeOnHover();
+	Snapshot.M_GameplaySettings.bM_ShowInfoTakeovers = GameUserSettings.GetShowInfoTakeovers();
 	Snapshot.M_GameplaySettings.M_OverwriteAllPlayerHpBarStrat = GameUserSettings.GetOverwriteAllPlayerHpBarStrat();
 	Snapshot.M_GameplaySettings.M_PlayerTankHpBarStrat = GameUserSettings.GetPlayerTankHpBarStrat();
 	Snapshot.M_GameplaySettings.M_PlayerSquadHpBarStrat = GameUserSettings.GetPlayerSquadHpBarStrat();
@@ -1213,6 +1235,7 @@ void URTSSettingsMenuSubsystem::ApplySnapshotToSettings(
 	GameUserSettingsToApply.SetCameraShakeMultiplier(SnapshotToApply.M_ControlSettings.M_CameraShakeMultiplier);
 	GameUserSettingsToApply.SetHideActionButtonHotkeys(SnapshotToApply.M_GameplaySettings.bM_HideActionButtonHotkeys);
 	GameUserSettingsToApply.SetCheckUnitRangeOnHover(SnapshotToApply.M_GameplaySettings.bM_CheckUnitRangeOnHover);
+	GameUserSettingsToApply.SetShowInfoTakeovers(SnapshotToApply.M_GameplaySettings.bM_ShowInfoTakeovers);
 	GameUserSettingsToApply.SetOverwriteAllPlayerHpBarStrat(SnapshotToApply.M_GameplaySettings.M_OverwriteAllPlayerHpBarStrat);
 	GameUserSettingsToApply.SetPlayerTankHpBarStrat(SnapshotToApply.M_GameplaySettings.M_PlayerTankHpBarStrat);
 	GameUserSettingsToApply.SetPlayerSquadHpBarStrat(SnapshotToApply.M_GameplaySettings.M_PlayerSquadHpBarStrat);

@@ -47,10 +47,11 @@ private:
 	float M_PhaseElapsedSeconds = 0.0f;
 	int32 M_FailedCheckCount = 0;
 
-	// -SquadMovePreviewCaptureStances: keeps the preview on screen for a moment at two places and saves a
-	// picture of each, so the stance meshes can be looked at after a rendered run.
+	// -SquadMovePreviewCaptureStances: keeps the preview on screen for a moment at each place and saves a picture
+	// of each (SquadPreviewStances_<index>: crouch cover, standing cover, open ground, prone cover when the map has
+	// them), so the stance meshes and their cover colours can be looked at after a rendered run.
 	TArray<TWeakObjectPtr<ASquadController>> M_StanceCaptureSquads;
-	FVector M_StanceCaptureLocations[2] = {FVector::ZeroVector, FVector::ZeroVector};
+	TArray<FVector> M_StanceCaptureLocations;
 	int32 M_StanceCaptureFramesLeft = 0;
 	void TickStanceCapture(USquadMovePreviewComponent& PreviewComponent, UWorld& World);
 

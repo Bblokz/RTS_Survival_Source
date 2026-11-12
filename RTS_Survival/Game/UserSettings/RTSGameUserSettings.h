@@ -129,6 +129,9 @@ public:
 	/** @brief Returns whether hovering long enough over an actor should show its weapon range. */
 	bool GetCheckUnitRangeOnHover() const;
 
+	/** @brief Returns whether vehicle, building and squad info takeovers may pause the game to introduce a unit. */
+	bool GetShowInfoTakeovers() const;
+
 	/** @brief Writes the master volume value before clamping and saving. */
 	void SetMasterVolume(const float NewMasterVolume);
 
@@ -173,6 +176,9 @@ public:
 
 	/** @brief Writes the unit hover range indicator setting. */
 	void SetCheckUnitRangeOnHover(const bool bNewCheckUnitRangeOnHover);
+
+	/** @brief Writes whether info takeovers are shown; their "never show again" box and the settings menu share it. */
+	void SetShowInfoTakeovers(const bool bNewShowInfoTakeovers);
 
 	/** @brief Returns the overall environment detail density the menu shows as the main slider. */
 	float GetEnvironmentDetailDensity() const;
@@ -376,6 +382,10 @@ private:
 
 	UPROPERTY(config)
 	bool bM_CheckUnitRangeOnHover = true;
+
+	// One switch for every info takeover kind (vehicles now, buildings and squads later).
+	UPROPERTY(config)
+	bool bM_ShowInfoTakeovers = true;
 
 	UPROPERTY(config)
 	float M_EnvironmentDetailDensity = RTSGameUserSettingsRanges::DefaultEnvironmentDensity;

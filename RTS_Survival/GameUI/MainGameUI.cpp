@@ -4,6 +4,7 @@
 #include "MainGameUI.h"
 
 #include "Blueprint/WidgetTree.h"
+#include "UObject/StrongObjectPtr.h"
 #include "Components/CanvasPanelSlot.h"
 #include "Components/HorizontalBox.h"
 #include "Layout/WidgetPath.h"
@@ -248,6 +249,33 @@ void UMainGameUI::AddNewArchiveItem(const ERTSArchiveItem ItemType, const FTrain
 	}
 	M_Archive->AddArchiveItem(ItemType, OptionalUnit, SortingPriority);
 	M_ArchiveNotificationHolder->AddNewArchiveNotification(ItemType, OptionalUnit, NotificationTime);
+}
+
+void UMainGameUI::AddNewCustomArchiveItem(const FArchiveCustomContent& Content, const int32 SortingPriority,
+                                          const float NotificationTime)
+{
+	if (not GetIsValidArchive() || not GetIsValidArchiveNotificationHolder())
+	{
+		TWeakObjectPtr<UMainGameUI> WeakThis(this);
+		// The lambda is invisible to GC: pin the picture until the archive is ready.
+		const TStrongObjectPtr<UObject> PinnedTexture(Content.ImageTexture.Get());
+		const TStrongObjectPtr<UObject> PinnedBrushResource(Content.ImageBrush.GetResourceObject());
+		auto CallbackItem = [WeakThis, Content, SortingPriority, NotificationTime, PinnedTexture, PinnedBrushResource]()
+		{
+			if (not WeakThis.IsValid())
+			{
+				return;
+			}
+			WeakThis->AddNewCustomArchiveItem(Content, SortingPriority, NotificationTime);
+		};
+		OnArchiveLoadedCallbacks.CallbackOnArchiveReady(CallbackItem, WeakThis);
+		return;
+	}
+	// Only a new entry pops up; the same vehicle in a later mission is already archived.
+	if (M_Archive->AddCustomArchiveItem(Content, SortingPriority))
+	{
+		M_ArchiveNotificationHolder->AddNewCustomArchiveNotification(Content, NotificationTime);
+	}
 }
 
 TObjectPtr<UW_MiniMap> UMainGameUI::GetIsValidMiniMap() const
