@@ -81,6 +81,31 @@ namespace SurvivalStartContentDefaults
 	constexpr float YardContainerFootprint = 650.f;
 	constexpr float YardOilTankFootprint = 400.f;
 	constexpr float YardTankHulkFootprint = 350.f;
+	// Cacti (2026-11-12): estimates, not measured from the meshes; the cover bush sizes follow survival_map_dress.py's
+	// cover clusters (small bushes 420-480 cm from a large one).
+	const FString DesertPropFolder = TEXT("/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/Desert/");
+	const FString CactusCoverFolder = TEXT("/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/NaturalCover/Cactus/");
+	constexpr float DestructibleCactusFootprint = 150.f;
+	constexpr float LargeCactusBushFootprint = 280.f;
+	constexpr float MediumCactusBushFootprint = 200.f;
+	constexpr float SmallCactusBushFootprint = 140.f;
+	// About half the picks are the destructible cactus, the rest cover bushes (green twice as common as blue).
+	constexpr float DestructibleCactusWeight = 3.f;
+	constexpr float GreenCactusBushWeight = 0.22f;
+	constexpr float BlueCactusBushWeight = 0.11f;
+	constexpr int32 CactusBushVariants = 3;
+
+	/** @brief Adds the numbered variants (_01.._03) of one cover bush size and colour. */
+	void AddCactusBushVariants(const TCHAR* SizeName, const float Footprint, const TCHAR* ColourName, const float Weight,
+	                           TArray<FSurvivalWeightedActorClass>& OutEntries)
+	{
+		for (int32 Variant = 1; Variant <= CactusBushVariants; ++Variant)
+		{
+			const FString BushPath = FString::Printf(TEXT("%sBP_Cover_CactusBush_%s_%s_%02d"), *CactusCoverFolder,
+			                                         SizeName, ColourName, Variant);
+			OutEntries.Add(MakeEntry(BushPath, Weight, Footprint));
+		}
+	}
 }
 
 USurvivalStartContentSettings::USurvivalStartContentSettings()
@@ -90,6 +115,7 @@ USurvivalStartContentSettings::USurvivalStartContentSettings()
 	InitDefaultWreckGroups();
 	InitDefaultPits();
 	InitDefaultClutter();
+	InitDefaultCacti();
 	InitDefaultDifficultyScaling();
 	InitDefaultCloseResources();
 	InitDefaultSpecials();
@@ -138,6 +164,7 @@ float USurvivalStartContentSettings::GetOuterContentDistanceFromBuildEdge() cons
 	{
 		OuterDistance = FMath::Max(OuterDistance, Group.MaxDistanceFromBuildEdge);
 	}
+	OuterDistance = FMath::Max(OuterDistance, Cacti.MaxDistanceFromBuildEdge);
 	return FMath::Max(OuterDistance, Clutter.MaxDistanceFromBuildEdge);
 }
 
@@ -265,6 +292,44 @@ void USurvivalStartContentSettings::InitDefaultClutter()
 		MakeMesh(DeadShrubFolder + TEXT("S_Deadshrub-01_vdknafgha_Var9_lod0"), 0.7f),
 		MakeMesh(DeadShrubFolder + TEXT("S_Deadshrub-01_vdknafgha_Var11_lod0"), 0.7f)
 	};
+}
+
+void USurvivalStartContentSettings::InitDefaultCacti()
+{
+	using namespace SurvivalStartContentDefaults;
+	Cacti.ClusterCount = 12;
+	Cacti.MinCactiPerCluster = 2;
+	Cacti.MaxCactiPerCluster = 5;
+	Cacti.ClusterRadius = 1000.f;
+	Cacti.MinDistanceFromBuildEdge = 500.f;
+	Cacti.MaxDistanceFromBuildEdge = 9000.f;
+	Cacti.MinSpacing = 450.f;
+	Cacti.MaxGroundSlopeDegrees = 25.f;
+	Cacti.CactusActors.Reset();
+	Cacti.CactusActors.Add(MakeEntry(DesertPropFolder + TEXT("BP_Desert_Dest_Cactus"), DestructibleCactusWeight,
+	                                 DestructibleCactusFootprint));
+	// Name part of the asset and the value it brings (footprint for a size, weight for a colour).
+	struct FCactusBushOption
+	{
+		const TCHAR* Name;
+		float Value;
+	};
+	const FCactusBushOption BushSizes[] = {
+		{TEXT("Large"), LargeCactusBushFootprint},
+		{TEXT("Medium"), MediumCactusBushFootprint},
+		{TEXT("Small"), SmallCactusBushFootprint}
+	};
+	const FCactusBushOption BushColours[] = {
+		{TEXT("Green"), GreenCactusBushWeight},
+		{TEXT("Blue"), BlueCactusBushWeight}
+	};
+	for (const FCactusBushOption& Size : BushSizes)
+	{
+		for (const FCactusBushOption& Colour : BushColours)
+		{
+			AddCactusBushVariants(Size.Name, Size.Value, Colour.Name, Colour.Value, Cacti.CactusActors);
+		}
+	}
 }
 
 void USurvivalStartContentSettings::InitDefaultDifficultyScaling()

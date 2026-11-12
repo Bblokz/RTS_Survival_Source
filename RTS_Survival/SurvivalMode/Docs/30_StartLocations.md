@@ -30,7 +30,7 @@ heads" needs.
   reach of wrecks / clutter.
 - Button **Preview Start Content**: runs the real planner with `PreviewContentSettings` + `PreviewDifficulty`
   and draws every planned field (circles), actor footprint and facing arrow (radixite green, metal grey,
-  wreck orange, pit red, crater brown). Nothing is spawned. Re-plans with the same seed on every move/edit;
+  wreck orange, pit red, crater / detail / cactus brown). Nothing is spawned. Re-plans with the same seed on every move/edit;
   **Clear Start Content Preview** removes it.
 - Button **Refresh Editor Preview**: re-scan after landscape sculpting (the actor does not see landscape edits).
 - Button **Bake Defense Points Into Designer Points**: copies the resolved points (hill tops included) into the
@@ -42,8 +42,11 @@ the landscape is only sampled when something changed (throttled to 0.3 s while d
 
 ## What happens when the player picks a location
 
-`ASurvivalModeDirector::GenerateStartLocationContent` (Deploying phase) calls
-`GeneratePlayerStartContent(Settings->StartContent)` on the chosen location only; the others get Soviet bases.
+Since 2026-11-12 `ASurvivalModeDirector::ShowStartLocationPicker` calls `GeneratePlayerStartContent` on **every**
+start location when the picker opens, so the player sees each start's resources and special while choosing (the picker
+reveal radius grows to the content's outer radius). On confirm, `GenerateStartLocationContent` keeps the chosen
+location's content as generated (no re-plan) and calls `ClearPlayerStartContent` on the others (cancels a pending load,
+destroys the spawned actors, including radixite growth nodes, and the foliage) before their Soviet bases are planned.
 
 1. Defense points are re-resolved.
 2. `FSurvivalStartContentPlanner` builds a plan synchronously (landscape height queries/traces only):
@@ -56,7 +59,8 @@ the landscape is only sampled when something changed (throttled to 0.3 s while d
       a free disc whose centre and 8 ring samples are on landscape, not steeper than the field's max slope and
       without a cliff inside. Field = one centre actor + N field actors spread in the disc.
    4. **Wrecks** per wreck group, random in their band, ≥ `MinSpacing` apart, outside fields/protected areas.
-   5. **Craters** (decal actors) and **foliage** (instanced meshes, no collision, no navigation) in the clutter
+   5. **Cacti** (`PlanCacti`, category `Cactus`): `Cacti.ClusterCount` clusters, see "Cactus pass" below.
+   6. **Craters** (decal actors) and **foliage** (instanced meshes, no collision, no navigation) in the clutter
       band, outside everything else.
 3. All soft classes/meshes of the plan are loaded in one `UAssetManager::GetStreamableManager().RequestAsyncLoad`
    (high priority); on completion every actor is spawned with `AlwaysSpawn` and tracked in
@@ -121,6 +125,8 @@ The constructor fills all lists, so a new asset works immediately.
 | `Pits.PitCount` / `MinPitSpacing` / max slope / face outward | 3 / 2000 / 30° / yes |
 | `Clutter` band | 0 – 9000 from build edge |
 | `Clutter.CraterCount` / `FoliageInstanceCount` / foliage max slope / cull | 12 / 80 / 40° / 20000 |
+| `Cacti` clusters / cacti per cluster / cluster radius | 12 / 2 – 5 / 1000 |
+| `Cacti` band / `MinSpacing` / max slope | 500 – 9000 from build edge / 450 / 25° |
 | `DefensePointReserveRadius` | 900 |
 | `OtherStartLocationClearance` | 3000 (added to the other location's build radius) |
 | `FieldClearance` (between fields) | 400 |
@@ -160,6 +166,31 @@ Footprints were measured from the Blueprints' static-mesh bounds where possible.
 
 `ACaptureActor` is the only `ICaptureInterface` implementer; all 13 capture Blueprints in the project derive
 from it (`BP_CaptureBrummbar` and the base classes are excluded on purpose).
+
+## Cactus pass (2026-11-12)
+
+The owner wanted more cacti, most of them round the start locations. `USurvivalStartContentSettings::Cacti`
+(`FSurvivalCactusSettings`) plans them as start content, so the director's per-start generation shows them round every
+start in the picker and clears them with the rest of the content where a Soviet base is built.
+
+- Order: after the wrecks, before craters and foliage. Each of `ClusterCount` (12) clusters picks a centre in the band
+  (`BuildAreaRadius` + 500 … + 9000, the clutter band's outer edge) that is free in the planner's occupancy, then
+  plants `MinCactiPerCluster`–`MaxCactiPerCluster` (2–5) cacti within `ClusterRadius` (1000) of it, each still inside
+  the band. A cluster that gets no cactus retries other centres (`PlacementAttemptsPerItem`).
+- Every cactus reserves max(footprint, `MinSpacing` / 2) in the occupancy, so cacti stay ≥ 450 cm apart and never land
+  in the build disc, on fields, pits, wrecks, defense-point discs, `ReservedContentSpots` (ramps) or the other starts'
+  areas; the craters and foliage planned later keep off them. Ground: landscape slope ≤ 25° at the spot and on a ring
+  of footprint + 250 cm (`GetIsFootprintGroundValid`). No reachability (navmesh path) test: cacti are decoration.
+- Not scaled by difficulty. Expect about 40 cacti per start (12 × 3.5), fewer on broken ground.
+- `CactusActors` default: `/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/Desert/BP_Desert_Dest_Cactus`
+  (weight 3, footprint 150) and all 18 `.../NaturalCover/Cactus/BP_Cover_CactusBush_{Large,Medium,Small}_{Green,Blue}_0{1..3}`
+  (green 0.22, blue 0.11 each; footprint 280 / 200 / 140): about half destructible cacti, half cover bushes. Footprints
+  are estimates, not measured.
+- Assets created before this pass get the constructor defaults for the new property; `LevelTools/survival_cacti_setup.py`
+  (`ensure_cacti_defaults()`) fills an empty `CactusActors` list on `DA_SurvivalStartContent` and saves it.
+  `DA_SurvivalStartContent_Kessel` gets the same constructor defaults; `disable_cacti(KESSEL_ASSET)` empties it.
+- Static map cacti outside the start islands (start build radius + 12 000 cm and further) are placed once by
+  `LevelTools/survival_map_cacti.py` (`SMD_CactusExtra_*`).
 
 ## How a designer sets up start locations in a new map
 
@@ -225,7 +256,7 @@ Map tests (only with `RTS_WITH_MAP_TESTS`, not in Shipping):
 |---|---|
 | `StartLocations/SurvivalStartLocation.h/.cpp` | The actor: contract API, defense points, generation, async load + spawn, editor debug view and preview. |
 | `StartLocations/SurvivalStartContentSettings.h/.cpp` | The data asset and its structs, with verified defaults. |
-| `StartLocations/SurvivalStartContentPlanner.h/.cpp` | Plan building (pits → protected areas → fields → wrecks → craters → foliage). |
+| `StartLocations/SurvivalStartContentPlanner.h/.cpp` | Plan building (pits → protected areas → fields → wrecks → cacti → craters → foliage). |
 | `StartLocations/SurvivalDefensePointFinder.h/.cpp` | Designer points, hill-top scan, build-edge fallback. |
 | `StartLocations/SurvivalStartPlacementHelpers.h/.cpp` | Landscape-only projection, occupancy circles, weighted picks, annulus sampling, ground rotation. |
 

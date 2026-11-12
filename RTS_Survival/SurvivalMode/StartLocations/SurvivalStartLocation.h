@@ -45,8 +45,17 @@ public:
 	/** @return World locations suited for defenses (hill tops, ramp heads). */
 	const TArray<FVector>& GetDefensePoints() const { return M_DefensePoints; }
 
-	/** @brief Generates resource fields, wrecks and capturable pits for the player around this location. */
+	/**
+	 * @brief Generates resource fields, wrecks and capturable pits for the player around this location.
+	 * The director runs it for every location before the picker opens, so the player sees what each start offers.
+	 */
 	void GeneratePlayerStartContent(const USurvivalStartContentSettings* ContentSettings);
+
+	/**
+	 * @brief Removes everything GeneratePlayerStartContent spawned (or is still loading) so a Soviet base can be built
+	 * here instead; a location the player did not pick.
+	 */
+	void ClearPlayerStartContent();
 
 	/** @return Defense points with how they were found (designer / hill top / build-edge fallback), same order. */
 	const TArray<FSurvivalDefensePoint>& GetDefensePointDetails() const { return M_DefensePointDetails; }
@@ -102,7 +111,7 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Survival|Start Location")
 	FText DisplayName;
 
-	// This location's fixed special (round 10): spawned with the start content only when the player picks it.
+	// This location's fixed special (round 10): spawned with the start content (shown in the picker, kept when picked).
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Survival|Start Location")
 	ESurvivalStartSpecial StartSpecial = ESurvivalStartSpecial::None;
 
@@ -185,6 +194,10 @@ private:
 
 	bool bM_HasGeneratedPlayerContent = false;
 
+	// While the picker reveals this location the vision also covers the generated content (its outer radius).
+	float M_ContentRevealRadius = 0.f;
+	bool bM_IsRevealingFogOfWar = false;
+
 	// Last plan drawn by the debug view (editor preview or the generated runtime layout).
 	FSurvivalStartContentPlan M_DebugPlan;
 	bool bM_HasDebugPlan = false;
@@ -225,6 +238,9 @@ private:
 	void RequestStartContentLoad();
 	void OnStartContentLoaded();
 	void SpawnPendingContent();
+	void CancelPendingContentLoad();
+	static void DestroyStartContentActor(AActor* ContentActor);
+	float GetRevealVisionRadius() const;
 	AActor* SpawnPlannedActor(const FSurvivalPlannedActor& PlannedActor, TSet<FSoftObjectPath>& OutMissingClasses);
 	void SpawnFoliageInstances(const TArray<FSurvivalPlannedMeshInstance>& Instances, const float CullDistance);
 	UInstancedStaticMeshComponent* CreateFoliageComponent(UStaticMesh* Mesh, const float CullDistance);

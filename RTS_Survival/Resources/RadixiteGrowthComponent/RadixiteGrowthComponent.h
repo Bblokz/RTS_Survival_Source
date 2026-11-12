@@ -159,6 +159,12 @@ class RTS_SURVIVAL_API URadixiteGrowthComponent : public UActorComponent
 public:
 	URadixiteGrowthComponent();
 
+	/**
+	 * @brief Removes every grown decal and node at once; for owners destroyed by game logic (a survival start location
+	 * handed to a Soviet base) where the timed destruction sequence would never run.
+	 */
+	void DestroyAllGrowthContentImmediately();
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
@@ -221,7 +227,6 @@ private:
 		const FVector& SpawnLocation);
 
 	void DestroyBranchDecals(FRadixiteGrowthBranchRecord& BranchRecord) const;
-	void DestroyAllGrowthContentImmediately();
 	void StartOwnerDestructionSequence();
 	void StopOwnerDestructionSequence();
 	bool TryPopNextDestructionBranch(FRadixiteGrowthBranchRecord& OutBranchRecord);

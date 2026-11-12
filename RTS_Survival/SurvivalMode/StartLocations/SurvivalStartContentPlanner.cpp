@@ -55,6 +55,8 @@ namespace SurvivalStartContentPlannerConstants
 	constexpr float YardPropMinRadiusFraction = 0.8f;
 	constexpr float YardPropMaxRadiusFraction = 1.35f;
 	constexpr float YardPropSlopeFactor = 1.6f;
+	// Cactus clusters: every cluster member gets this many tries round its cluster centre.
+	constexpr int32 CactusAttemptsPerMember = 12;
 }
 
 int32 FSurvivalStartContentPlan::GetPlannedFieldCount(const ESurvivalStartContentCategory Category) const
@@ -132,6 +134,7 @@ FSurvivalStartContentPlan FSurvivalStartContentPlanner::BuildPlan()
 	ReserveProtectedAreas();
 	PlanResourceFields();
 	PlanWrecks();
+	PlanCacti();
 	PlanCraters();
 	PlanFoliage();
 	return M_Plan;
@@ -431,6 +434,90 @@ void FSurvivalStartContentPlanner::PlanWreckGroup(const FSurvivalWreckGroup& Gro
 			break;
 		}
 	}
+}
+
+void FSurvivalStartContentPlanner::PlanCacti()
+{
+	const FSurvivalCactusSettings& Cacti = M_Settings.Cacti;
+	if (Cacti.ClusterCount <= 0 or Cacti.CactusActors.IsEmpty())
+	{
+		return;
+	}
+	// Decoration: fixed counts, no difficulty scaling.
+	const float MinBandRadius = M_Input.BuildAreaRadius + Cacti.MinDistanceFromBuildEdge;
+	const float MaxBandRadius = M_Input.BuildAreaRadius
+		+ FMath::Max(Cacti.MinDistanceFromBuildEdge, Cacti.MaxDistanceFromBuildEdge);
+	for (int32 ClusterIndex = 0; ClusterIndex < Cacti.ClusterCount; ++ClusterIndex)
+	{
+		TryPlanCactusCluster(MinBandRadius, MaxBandRadius);
+	}
+}
+
+int32 FSurvivalStartContentPlanner::TryPlanCactusCluster(const float MinBandRadius, const float MaxBandRadius)
+{
+	const FSurvivalCactusSettings& Cacti = M_Settings.Cacti;
+	const int32 MinMembers = FMath::Min(Cacti.MinCactiPerCluster, Cacti.MaxCactiPerCluster);
+	const int32 MaxMembers = FMath::Max(Cacti.MinCactiPerCluster, Cacti.MaxCactiPerCluster);
+	const int32 MemberCount = M_Random.RandRange(MinMembers, MaxMembers);
+	if (MemberCount <= 0)
+	{
+		return 0;
+	}
+	const float CenterClearance = Cacti.MinSpacing * 0.5f;
+	for (int32 Attempt = 0; Attempt < M_Settings.PlacementAttemptsPerItem; ++Attempt)
+	{
+		const FVector2D ClusterCenter = SurvivalStartPlacement::RandomPointInAnnulus(
+			GetDeployCenter2D(), MinBandRadius, MaxBandRadius, M_Random);
+		FSurvivalGroundHit CenterGround;
+		if (not M_Occupancy.IsFree(ClusterCenter, CenterClearance)
+			or not TryFindGround(ClusterCenter, Cacti.MaxGroundSlopeDegrees, CenterGround))
+		{
+			continue;
+		}
+		int32 PlannedMembers = 0;
+		for (int32 MemberIndex = 0; MemberIndex < MemberCount; ++MemberIndex)
+		{
+			PlannedMembers += TryPlanCactus(ClusterCenter, MinBandRadius, MaxBandRadius) ? 1 : 0;
+		}
+		if (PlannedMembers > 0)
+		{
+			return PlannedMembers;
+		}
+	}
+	return 0;
+}
+
+bool FSurvivalStartContentPlanner::TryPlanCactus(const FVector2D& ClusterCenter, const float MinBandRadius,
+                                                 const float MaxBandRadius)
+{
+	using namespace SurvivalStartContentPlannerConstants;
+	const FSurvivalCactusSettings& Cacti = M_Settings.Cacti;
+	const int32 EntryIndex = SurvivalStartPlacement::PickWeightedActorIndex(Cacti.CactusActors, M_Random);
+	if (not Cacti.CactusActors.IsValidIndex(EntryIndex))
+	{
+		return false;
+	}
+	const FSurvivalWeightedActorClass& Entry = Cacti.CactusActors[EntryIndex];
+	// Half the spacing on both cacti keeps every pair at least MinSpacing apart.
+	const float SpacingRadius = FMath::Max(Entry.FootprintRadius, Cacti.MinSpacing * 0.5f);
+	for (int32 Attempt = 0; Attempt < CactusAttemptsPerMember; ++Attempt)
+	{
+		const FVector2D Position = SurvivalStartPlacement::RandomPointInAnnulus(
+			ClusterCenter, 0.f, Cacti.ClusterRadius, M_Random);
+		const float DistanceFromDeploy = FVector2D::Distance(Position, GetDeployCenter2D());
+		FSurvivalGroundHit Ground;
+		if (DistanceFromDeploy < MinBandRadius or DistanceFromDeploy > MaxBandRadius
+			or not M_Occupancy.IsFree(Position, SpacingRadius)
+			or not TryFindGround(Position, Cacti.MaxGroundSlopeDegrees, Ground)
+			or not GetIsFootprintGroundValid(Position, Ground, Entry.FootprintRadius, Cacti.MaxGroundSlopeDegrees))
+		{
+			continue;
+		}
+		AddPlannedActor(Entry, Ground, GetRandomYaw(), ESurvivalStartContentCategory::Cactus);
+		M_Occupancy.Add(Position, SpacingRadius);
+		return true;
+	}
+	return false;
 }
 
 void FSurvivalStartContentPlanner::PlanCraters()
@@ -932,6 +1019,19 @@ bool FSurvivalStartContentPlanner::GetIsActorSpotValid(
 	const float FootprintRadius,
 	const float MaxSlopeDegrees) const
 {
+	if (not GetIsFootprintGroundValid(Position, Ground, FootprintRadius, MaxSlopeDegrees))
+	{
+		return false;
+	}
+	return GetIsReachable(Ground.Location);
+}
+
+bool FSurvivalStartContentPlanner::GetIsFootprintGroundValid(
+	const FVector2D& Position,
+	const FSurvivalGroundHit& Ground,
+	const float FootprintRadius,
+	const float MaxSlopeDegrees) const
+{
 	using namespace SurvivalStartContentPlannerConstants;
 	// Gentle ground over the whole footprint plus an access ring: nothing straddles a cliff edge or sits on a ledge.
 	const float RingRadius = FootprintRadius + ActorAccessMargin;
@@ -946,7 +1046,7 @@ bool FSurvivalStartContentPlanner::GetIsActorSpotValid(
 			return false;
 		}
 	}
-	return GetIsReachable(Ground.Location);
+	return true;
 }
 
 bool FSurvivalStartContentPlanner::TryFindGround(

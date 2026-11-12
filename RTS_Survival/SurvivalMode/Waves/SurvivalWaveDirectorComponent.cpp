@@ -21,6 +21,7 @@
 #include "RTS_Survival/Units/Tanks/TankMaster.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
+#include "RTS_Survival/Utils/RTSMapTests/RTSMapTests.h"
 
 #define LOCTEXT_NAMESPACE "SurvivalWaveDirector"
 
@@ -87,6 +88,7 @@ void USurvivalWaveDirectorComponent::StartWaves()
 	M_Schedule.NextGroupUpdateWorldTime = M_Schedule.WavesStartWorldTime;
 	UpdateTechStage(0.f);
 	RegisterUnitListeners();
+	EnableUnitAttackMoveForWaves();
 	M_RoundNumber = 0;
 	M_RoundsSurvived = 0;
 	BeginRound();
@@ -161,7 +163,7 @@ float USurvivalWaveDirectorComponent::GetAliveEnemyLoad() const
 			Load += EachGroup.PlannedLoad;
 		}
 	}
-	return Load;
+	return Load + GetPendingAirliftLoad();
 }
 
 float USurvivalWaveDirectorComponent::GetAliveEnemyLoadCap() const
@@ -178,6 +180,11 @@ float USurvivalWaveDirectorComponent::GetAliveEnemyLoadCap() const
 void USurvivalWaveDirectorComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	StopSchedulerTimer();
+	if (M_AirliftAircraftLoadHandle.IsValid())
+	{
+		M_AirliftAircraftLoadHandle->CancelHandle();
+		M_AirliftAircraftLoadHandle.Reset();
+	}
 	if (M_Director.IsValid() and M_PhaseChangedHandle.IsValid())
 	{
 		M_Director->OnPhaseChanged.Remove(M_PhaseChangedHandle);
@@ -324,7 +331,10 @@ void USurvivalWaveDirectorComponent::OnSchedulerTick()
 		M_Schedule.NextGroupUpdateWorldTime = Now + WaveSettings->RetargetCheckIntervalSeconds;
 		UpdateTrackedGroups();
 	}
+	UpdateAirliftRuns();
 	UpdateRound();
+	LogWaveProbeIfRequested();
+	UpdateDecoyTest();
 }
 
 void USurvivalWaveDirectorComponent::UpdateTechStage(const float Minute)
@@ -385,8 +395,8 @@ void USurvivalWaveDirectorComponent::TryLaunchWave()
 	M_Schedule.bWaitingForUnitCap = false;
 	bM_LoggedCapWait = false;
 
-	const int32 LaunchedUnits = LaunchWavePlan(Plan);
-	if (LaunchedUnits <= 0 and Plan.GlobalAbilitiesCast <= 0)
+	const int32 GroundUnits = LaunchWavePlan(Plan);
+	if (GroundUnits <= 0 and Plan.GlobalAbilitiesCast <= 0)
 	{
 		RTSFunctionLibrary::ReportError(
 			"Survival wave could not launch a single unit (no edge spawn points or no enemy controller); "
@@ -394,6 +404,9 @@ void USurvivalWaveDirectorComponent::TryLaunchWave()
 		M_Schedule.NextWaveWorldTime = GetWorldTime() + WaveSettings->CapRetrySeconds;
 		return;
 	}
+	// The far side's share comes by air: a few heavy tanks to the map centre, when one is due.
+	TryLaunchAirlift(Plan);
+	const int32 LaunchedUnits = GroundUnits + Plan.AirliftTanks;
 
 	M_WavesLaunched++;
 	if (Plan.KindDefinition == &WaveSettings->MilestoneWave)
@@ -404,9 +417,10 @@ void USurvivalWaveDirectorComponent::TryLaunchWave()
 		and Plan.KindDefinition->Kind != ESurvivalWaveKind::Milestone;
 	M_Schedule.WavesSinceSpecial = bIsSpecial ? 0 : M_Schedule.WavesSinceSpecial + 1;
 	RememberEdges(Plan.Edges);
-	UE_LOG(LogTemp, Log, TEXT("Survival wave %d group: %d units over %d edges, budget %d, minute %.1f, load %.1f/%.1f."),
-	       M_RoundNumber, LaunchedUnits, Plan.Edges.Num(), Plan.Budget, Plan.Minute, GetAliveEnemyLoad(),
-	       GetAliveEnemyLoadCap());
+	UE_LOG(LogTemp, Log, TEXT("Survival wave %d group: %d units over %d edges (+%d airlifted), budget %d, minute %.1f, "
+		       "load %.1f/%.1f."),
+	       M_RoundNumber, GroundUnits, Plan.Edges.Num(), Plan.AirliftTanks, Plan.Budget, Plan.Minute,
+	       GetAliveEnemyLoad(), GetAliveEnemyLoadCap());
 	BroadcastAnnouncement(Plan, LaunchedUnits);
 	ScheduleNextWave(Plan.Minute);
 }
@@ -615,7 +629,8 @@ TArray<ASurvivalEdgeSpawnZone*> USurvivalWaveDirectorComponent::GetEligibleEdges
 	for (const TWeakObjectPtr<ASurvivalEdgeSpawnZone>& EachWeakZone : M_Director->GetEdgeSpawnZones())
 	{
 		ASurvivalEdgeSpawnZone* Zone = EachWeakZone.Get();
-		if (not IsValid(Zone) or not Zone->GetIsEnabled())
+		// The far side sends its share by air (heavy airlift), never on foot across the whole map.
+		if (not IsValid(Zone) or not Zone->GetIsEnabled() or Zone == M_AirliftOriginZone.Get())
 		{
 			continue;
 		}
@@ -1045,6 +1060,13 @@ bool USurvivalWaveDirectorComponent::GetIsFinalWaypointInUse(const FVector& Cand
 			return true;
 		}
 	}
+	for (const FSurvivalAirliftRun& EachRun : M_AirliftRuns)
+	{
+		if (not EachRun.bFormed and FVector::Dist(EachRun.FinalWaypoint, Candidate) < FinalWaypointMinSeparation)
+		{
+			return true;
+		}
+	}
 	return false;
 }
 
@@ -1145,6 +1167,15 @@ void USurvivalWaveDirectorComponent::UpdateTrackedGroups()
 		Group.bFormationSeen = true;
 		Group.FormationID = Formations[FormationIndex].FormationID;
 
+		if (UpdateGroupProgress(Group, Formations[FormationIndex], Now))
+		{
+			if (not RecoverStalledGroup(Group, Formations[FormationIndex], BaseLocation))
+			{
+				M_TrackedGroups.RemoveAtSwap(GroupIndex);
+			}
+			continue;
+		}
+
 		const bool bBaseMoved = FVector::Dist2D(BaseLocation, Group.AimedBaseLocation) >= WaveSettings->RetargetDistance;
 		const bool bCooledDown = Now - Group.LastRetargetTime >= WaveSettings->RetargetCooldownSeconds;
 		if (not bBaseMoved or not bCooledDown)
@@ -1206,13 +1237,7 @@ bool USurvivalWaveDirectorComponent::RetargetGroup(FSurvivalTrackedWaveGroup& Gr
 	const FVector PreviousWaypoint = Waypoints.Num() > 1 ? Waypoints[Waypoints.Num() - 2] : Centroid;
 	const FRotator FinalDirection(0.f, (FinalWaypoint - PreviousWaypoint).GetSafeNormal2D().Rotation().Yaw, 0.f);
 
-	FAttackMoveWaveSettings AttackMoveSettings;
-	AttackMoveSettings.HelpOffsetRadiusMltMax = WaveSettings->HelpOffsetRadiusMltMax;
-	AttackMoveSettings.HelpOffsetRadiusMltMin = WaveSettings->HelpOffsetRadiusMltMin;
-	AttackMoveSettings.MaxAttackTimeBeforeAdvancingToNextWayPoint =
-		WaveSettings->MaxAttackTimeBeforeAdvancingToNextWayPoint;
-	AttackMoveSettings.MaxTriesFindNavPointForHelpOffset = WaveSettings->MaxTriesFindNavPointForHelpOffset;
-	AttackMoveSettings.ProjectionScale = WaveSettings->HelpProjectionScale;
+	const FAttackMoveWaveSettings AttackMoveSettings = MakeAttackMoveSettings();
 
 	// Remove and re-create back to back: the units are never outside a formation, so supply refunds stay exact.
 	FormationController->RemoveActiveFormationsByID({Formation.FormationID});
@@ -1231,6 +1256,44 @@ bool USurvivalWaveDirectorComponent::RetargetGroup(FSurvivalTrackedWaveGroup& Gr
 	Group.LastRetargetTime = GetWorldTime();
 	Group.FormationID = INDEX_NONE;
 	return true;
+}
+
+FAttackMoveWaveSettings USurvivalWaveDirectorComponent::MakeAttackMoveSettings() const
+{
+	FAttackMoveWaveSettings AttackMoveSettings;
+	const USurvivalWaveSettings* WaveSettings = GetWaveSettings();
+	if (not WaveSettings)
+	{
+		return AttackMoveSettings;
+	}
+	AttackMoveSettings.HelpOffsetRadiusMltMax = WaveSettings->HelpOffsetRadiusMltMax;
+	AttackMoveSettings.HelpOffsetRadiusMltMin = WaveSettings->HelpOffsetRadiusMltMin;
+	AttackMoveSettings.MaxAttackTimeBeforeAdvancingToNextWayPoint =
+		WaveSettings->MaxAttackTimeBeforeAdvancingToNextWayPoint;
+	AttackMoveSettings.MaxTriesFindNavPointForHelpOffset = WaveSettings->MaxTriesFindNavPointForHelpOffset;
+	AttackMoveSettings.ProjectionScale = WaveSettings->HelpProjectionScale;
+	return AttackMoveSettings;
+}
+
+void USurvivalWaveDirectorComponent::EnableUnitAttackMoveForWaves()
+{
+	const USurvivalWaveSettings* WaveSettings = GetWaveSettings();
+	AEnemyController* EnemyController = GetEnemyController();
+	if (not WaveSettings or not EnemyController)
+	{
+		return;
+	}
+	UEnemyFormationController* FormationController = EnemyController->GetEnemyFormationController();
+	if (not IsValid(FormationController))
+	{
+		return;
+	}
+	bool bUseUnitAttackMove = WaveSettings->bWavesUseUnitAttackMove;
+#if RTS_WITH_MAP_TESTS
+	// A/B test runs: -SurvivalNoUnitAttackMove sends wave units with plain moves as before.
+	bUseUnitAttackMove = bUseUnitAttackMove and not FParse::Param(FCommandLine::Get(), TEXT("SurvivalNoUnitAttackMove"));
+#endif
+	FormationController->SetUseUnitAttackMoveOrders(bUseUnitAttackMove);
 }
 
 void USurvivalWaveDirectorComponent::GetFormationUnits(const FFormationData& Formation,
@@ -1289,6 +1352,12 @@ void USurvivalWaveDirectorComponent::BroadcastAnnouncement(const FSurvivalWavePl
 		Announcement.EdgeNames.Add(EachEdge->GetEdgeDisplayName(Plan.BaseLocation));
 		Announcement.EdgeLocations.Add(EachEdge->GetSpawnCenter());
 		Announcement.EdgeDirectionsFromBase.Add((EachEdge->GetSpawnCenter() - Plan.BaseLocation).GetSafeNormal2D());
+	}
+	if (Plan.AirliftTanks > 0)
+	{
+		Announcement.EdgeNames.Add(LOCTEXT("AirliftEdge", "centre (heavy airlift)"));
+		Announcement.EdgeLocations.Add(Plan.AirliftDropCenter);
+		Announcement.EdgeDirectionsFromBase.Add((Plan.AirliftDropCenter - Plan.BaseLocation).GetSafeNormal2D());
 	}
 	Announcement.Message = BuildAnnouncementMessage(Announcement);
 	M_LastAnnouncement = Announcement;

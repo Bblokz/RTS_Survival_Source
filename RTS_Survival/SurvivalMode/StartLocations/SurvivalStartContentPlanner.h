@@ -90,7 +90,7 @@ struct FSurvivalStartContentPlanInput
 /**
  * @brief Plans the player's start content in a fixed order so the important things get the best spots:
  * pits on defense points → protected areas (build area, hill tops, other starts) → radixite/metal fields
- * interleaved around the base → wrecks further out → craters → foliage.
+ * interleaved around the base → wrecks further out → cactus clusters → craters → foliage.
  * @note Stack-only helper: create, call BuildPlan once, discard. Landscape-only ground tests.
  */
 class FSurvivalStartContentPlanner
@@ -145,6 +145,28 @@ private:
 	void PlanResourceFields();
 	void PlanWrecks();
 	void PlanWreckGroup(const FSurvivalWreckGroup& Group);
+	// Decoration after the wrecks: cactus clusters keep out of every reserved area and of all content planned so far.
+	void PlanCacti();
+
+	/**
+	 * @brief Finds a free centre for one cactus cluster in the band and plants its cacti round it; tries further
+	 * centres while a cluster gets no cactus at all.
+	 * @param MinBandRadius Band inner radius from the deploy centre.
+	 * @param MaxBandRadius Band outer radius from the deploy centre; cluster members never go beyond it.
+	 * @return Cacti planned for this cluster (0 when no centre had room).
+	 */
+	int32 TryPlanCactusCluster(const float MinBandRadius, const float MaxBandRadius);
+
+	/**
+	 * @brief Each cactus reserves max(footprint, MinSpacing / 2) in M_Occupancy, so cacti keep MinSpacing apart and
+	 * the craters planned later keep off them.
+	 * @param ClusterCenter Centre the cactus is scattered round (within the cluster radius).
+	 * @param MinBandRadius Band inner radius from the deploy centre.
+	 * @param MaxBandRadius Band outer radius from the deploy centre.
+	 * @return True when one cactus found room and was planned.
+	 */
+	bool TryPlanCactus(const FVector2D& ClusterCenter, const float MinBandRadius, const float MaxBandRadius);
+
 	void PlanCraters();
 	void PlanFoliage();
 
@@ -189,6 +211,13 @@ private:
 
 	/** @return True when Location lies on the navmesh with a full path from the deploy centre (true without navmesh). */
 	bool GetIsReachable(const FVector& Location) const;
+
+	/**
+	 * @return True when the ground round a footprint (plus an access margin) keeps the slope limit, so nothing straddles
+	 * a cliff edge or sits on a ledge. Ground only: no reachability test (decoration uses this directly).
+	 */
+	bool GetIsFootprintGroundValid(const FVector2D& Position, const FSurvivalGroundHit& Ground, const float FootprintRadius,
+	                               const float MaxSlopeDegrees) const;
 
 	/**
 	 * @return True when the ground round a field actor or wreck (its footprint plus an access margin) keeps the slope

@@ -87,6 +87,12 @@ void ASurvivalModeDirector::BeginPlay()
 		bDebugAutoStart = true;
 	}
 	FParse::Value(FCommandLine::Get(), TEXT("SurvivalGrace="), DebugGraceSecondsOverride);
+	// -SurvivalStartMinute=N starts the survival clock at minute N (tech stages, airlifts) for test runs.
+	float DebugStartMinute = 0.f;
+	if (FParse::Value(FCommandLine::Get(), TEXT("SurvivalStartMinute="), DebugStartMinute))
+	{
+		M_DebugSurvivalSecondsOffset = FMath::Max(0.f, DebugStartMinute) * 60.f;
+	}
 	if ((FParse::Param(FCommandLine::Get(), TEXT("SurvivalDriveSetup"))
 			or FParse::Param(FCommandLine::Get(), TEXT("SurvivalLoadoutTest"))) and DebugGraceSecondsOverride >= 0.f)
 	{
@@ -203,7 +209,7 @@ float ASurvivalModeDirector::GetElapsedSurvivalSeconds() const
 		return 0.f;
 	}
 	const double EndTime = M_DefeatTime >= 0.0 ? M_DefeatTime : GetWorld()->GetTimeSeconds();
-	return static_cast<float>(EndTime - M_WavesStartTime);
+	return static_cast<float>(EndTime - M_WavesStartTime) + M_DebugSurvivalSecondsOffset;
 }
 
 float ASurvivalModeDirector::GetGraceSecondsRemaining() const
@@ -348,7 +354,11 @@ void ASurvivalModeDirector::PreviewStartLocation(const ASurvivalStartLocation* S
 	{
 		return;
 	}
+	// The setup screens lock the camera, which also blocks the overview zoom; unlock just for the focus so the
+	// location's resources and special are in frame.
+	PlayerController->SetCameraMovementDisabled(false);
 	PlayerController->FocusCameraOnStartLocation(StartLocation->GetDeployCenter());
+	PlayerController->SetCameraMovementDisabled(M_Phase == ESurvivalPhase::StartLocationSelection);
 }
 
 void ASurvivalModeDirector::ShowArmySelection()
@@ -412,6 +422,8 @@ void ASurvivalModeDirector::ShowArmySelection()
 void ASurvivalModeDirector::ShowStartLocationPicker()
 {
 	SetPhase(ESurvivalPhase::StartLocationSelection);
+	// The player sees the resources and specials of every start while choosing; the unpicked ones are cleared later.
+	GenerateStartContentAtEveryLocation();
 	// A map with one start location always starts there: there is nothing to pick.
 	if (M_StartLocations.Num() == 1 and M_StartLocations[0].IsValid())
 	{
@@ -513,6 +525,8 @@ void ASurvivalModeDirector::BeginDeployment()
 	// Applies technologies, resource cards and the saved variants without spawning profile units or an HQ.
 	PlayerController->bM_IsHQDeliveredAfterStart = true;
 	PlayerController->StartGameAtLocation(DeployCenter, true);
+	// Before the events and points of interest start: they read the (slid) edge zones.
+	M_WaveDirector->ConfigureEdgesForStart(DeployCenter);
 	GenerateStartLocationContent();
 	ShowHud();
 	if (IsValid(Settings->Deployment.DeploymentStartedSound))
@@ -535,6 +549,18 @@ void ASurvivalModeDirector::BeginDeployment()
 	M_Deployment->StartDeployment(M_ConfirmedArmy, DeployCenter, ApproachDirection);
 }
 
+void ASurvivalModeDirector::GenerateStartContentAtEveryLocation()
+{
+	for (const TWeakObjectPtr<ASurvivalStartLocation>& StartLocation : M_StartLocations)
+	{
+		if (not StartLocation.IsValid() or StartLocation->GetHasGeneratedPlayerContent())
+		{
+			continue;
+		}
+		StartLocation->GeneratePlayerStartContent(Settings->StartContent);
+	}
+}
+
 void ASurvivalModeDirector::GenerateStartLocationContent()
 {
 	ASurvivalStartLocation* ChosenLocation = M_ChosenStartLocation.Get();
@@ -547,9 +573,15 @@ void ASurvivalModeDirector::GenerateStartLocationContent()
 		}
 		if (StartLocation.Get() == ChosenLocation)
 		{
-			StartLocation->GeneratePlayerStartContent(Settings->StartContent);
+			// Already generated for the picker: keep exactly what the player chose (the seed is time based).
+			if (not StartLocation->GetHasGeneratedPlayerContent())
+			{
+				StartLocation->GeneratePlayerStartContent(Settings->StartContent);
+			}
 			continue;
 		}
+		// Make room for the Soviet base before it plans its layout.
+		StartLocation->ClearPlayerStartContent();
 		M_SovietBases->GenerateSovietBaseAt(StartLocation.Get(), BaseIndex++);
 	}
 	// A map with its own content graph brings its own sites and animals; the others get the generic points of interest.

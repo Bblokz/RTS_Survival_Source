@@ -28,8 +28,21 @@ public:
 	/** @return Normalised forward on the XY plane: the direction waves walk into the map. */
 	FVector GetInwardDirection() const;
 
-	/** @return Centre of the spawn box. */
+	/** @return Centre of the spawn box, or the runtime centre the wave director slid it to for this match. */
 	FVector GetSpawnCenter() const;
+
+	/** @return Centre of the spawn box as placed in the level, ignoring any runtime slide. */
+	FVector GetPlacedSpawnCenter() const;
+
+	/**
+	 * @brief Moves where this zone spawns for the rest of the match (the wave director slides rim zones toward the
+	 * player's start so waves do not cross the whole map from a corner). The point is projected to the navmesh.
+	 * @param DesiredCenter New spawn centre; only XY matters.
+	 * @return False (and nothing changes) when the point cannot be projected to the navmesh.
+	 */
+	bool TrySetRuntimeSpawnCenter(const FVector& DesiredCenter);
+
+	bool GetHasRuntimeSpawnCenter() const { return bM_HasRuntimeSpawnCenter; }
 
 	float GetEdgeLength() const;
 	float GetSelectionWeight() const { return SelectionWeight; }
@@ -104,6 +117,10 @@ private:
 	UPROPERTY()
 	TObjectPtr<UTextRenderComponent> M_Label = nullptr;
 #endif
+
+	// Set by TrySetRuntimeSpawnCenter; replaces the box centre as the spawn centre for this match.
+	FVector M_RuntimeSpawnCenter = FVector::ZeroVector;
+	bool bM_HasRuntimeSpawnCenter = false;
 
 	bool GetIsValidSpawnArea() const;
 	bool TryProjectToNavigation(const FVector& Location, const float HorizontalExtent, FVector& OutLocation) const;

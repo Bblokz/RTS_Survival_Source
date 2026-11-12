@@ -10,8 +10,11 @@
 
 #include "SurvivalWaveDirectorComponent.generated.h"
 
+class AAircraftMaster;
 class AEnemyController;
 class ASquadController;
+struct FAttackMoveWaveSettings;
+struct FStreamableHandle;
 class ASurvivalEdgeSpawnZone;
 class ASurvivalModeDirector;
 class ASquadUnit;
@@ -45,6 +48,9 @@ struct FSurvivalTrackedWaveGroup
 	float PlannedLoad = 0.f;
 	int32 FormationID = INDEX_NONE;
 	bool bFormationSeen = false;
+	// Waypoint progress: a formation waits for every unit, so one stuck unit can park the whole group.
+	int32 LastWaypointIndex = INDEX_NONE;
+	double LastProgressTime = 0.0;
 };
 
 USTRUCT()
@@ -56,6 +62,50 @@ struct FSurvivalRecentEdgeUse
 	TWeakObjectPtr<ASurvivalEdgeSpawnZone> Zone;
 
 	int32 WaveNumber = 0;
+};
+
+/**
+ * @brief One transport of a heavy airlift and the tank it carries.
+ */
+USTRUCT()
+struct FSurvivalAirliftSlot
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	TWeakObjectPtr<AAircraftMaster> Aircraft;
+
+	UPROPERTY()
+	TWeakObjectPtr<ATankMaster> Tank;
+
+	FVector DropLocation = FVector::ZeroVector;
+	bool bReleased = false;
+	// Shot down, failed to spawn or died before it was released: no longer waited for.
+	bool bLost = false;
+};
+
+/**
+ * @brief Heavy tanks flown from the zone across the map to its centre. Once they landed they become one tracked
+ * attack-move group like the ground waves (retargeting, minimap marker, round attribution).
+ */
+USTRUCT()
+struct FSurvivalAirliftRun
+{
+	GENERATED_BODY()
+
+	int32 RunId = 0;
+
+	UPROPERTY()
+	TArray<FSurvivalAirliftSlot> Slots;
+
+	FVector DropCenter = FVector::ZeroVector;
+	// Chosen at launch so the minimap marker can bind to the formation the run becomes.
+	FVector FinalWaypoint = FVector::ZeroVector;
+	FVector AimedBaseLocation = FVector::ZeroVector;
+	double LaunchTime = 0.0;
+	double FirstReleaseTime = -1.0;
+	double LastReleaseTime = -1.0;
+	bool bFormed = false;
 };
 
 /**
@@ -88,6 +138,9 @@ struct FSurvivalWavePlan
 	float Minute = 0.f;
 	int32 Budget = 0;
 	int32 GlobalAbilitiesCast = 0;
+	// Heavy tanks flown in from the far side with this wave group (0 = none) and where they land.
+	int32 AirliftTanks = 0;
+	FVector AirliftDropCenter = FVector::ZeroVector;
 };
 
 /**
@@ -112,6 +165,16 @@ public:
 
 	/** @brief Called when the grace period ends. */
 	void StartWaves();
+
+	/**
+	 * @brief Called by the director once the player picked a start: the zone across the map becomes the heavy
+	 * airlift origin (no ground waves) and the other zones slide along their rim toward the start.
+	 * @param StartLocation Deploy centre of the chosen start.
+	 */
+	void ConfigureEdgesForStart(const FVector& StartLocation);
+
+	/** @return The zone whose share of the waves arrives by air; null when the airlift is off. */
+	ASurvivalEdgeSpawnZone* GetAirliftOriginZone() const { return M_AirliftOriginZone.Get(); }
 
 	/** @brief Called on defeat. */
 	void StopWaves();
@@ -368,6 +431,20 @@ private:
 	 */
 	bool RetargetGroup(FSurvivalTrackedWaveGroup& Group, const FFormationData& Formation, const FVector& BaseLocation);
 
+	/** @return True when the group's formation has not reached a new waypoint for StalledGroupSeconds. */
+	bool UpdateGroupProgress(FSurvivalTrackedWaveGroup& Group, const FFormationData& Formation, const double Now) const;
+
+	/**
+	 * @brief Unparks a stalled group: the units that reached the current waypoint continue on a fresh path (a new
+	 * formation), the stragglers that hold it back are handed to the strategic AI.
+	 * @param Group The stalled group; re-aimed like a retarget.
+	 * @param Formation Copy of its formation.
+	 * @param BaseLocation The base's current location.
+	 * @return False when the formation had no valid units left.
+	 */
+	bool RecoverStalledGroup(FSurvivalTrackedWaveGroup& Group, const FFormationData& Formation,
+	                         const FVector& BaseLocation);
+
 	/**
 	 * @brief Extracts the valid squads and tanks of a formation copy.
 	 * @param Formation Formation copy from the formation controller.
@@ -377,6 +454,130 @@ private:
 	 */
 	void GetFormationUnits(const FFormationData& Formation, TArray<ASquadController*>& OutSquads,
 	                       TArray<ATankMaster*>& OutTanks, FVector& OutCentroid) const;
+
+	FAttackMoveWaveSettings MakeAttackMoveSettings() const;
+	// Survival waves attack-move between waypoints (enemy formation controller switch).
+	void EnableUnitAttackMoveForWaves();
+
+	// ---------------- Edge layout (SurvivalWaveDirectorAirlift.cpp)
+
+	// The zone across the map from the start: sends heavy tanks by air instead of ground waves.
+	UPROPERTY()
+	TWeakObjectPtr<ASurvivalEdgeSpawnZone> M_AirliftOriginZone;
+
+	// Centre of the area the edge zones enclose; the airlift lands around it.
+	FVector M_MapCentre = FVector::ZeroVector;
+
+	/**
+	 * @brief The enabled zone whose direction from the map centre is most opposite to the start's.
+	 * @param Zones Enabled edge zones.
+	 * @param StartLocation Deploy centre of the chosen start.
+	 * @return Null when there are fewer than two zones.
+	 */
+	ASurvivalEdgeSpawnZone* FindOppositeZone(const TArray<ASurvivalEdgeSpawnZone*>& Zones,
+	                                         const FVector& StartLocation) const;
+
+	/**
+	 * @brief Slides a zone along its rim (the axis across its inward direction) toward the start's coordinate on
+	 * that axis; shrinks the slide until the spot is on navmesh, far enough from the start and clear of other starts.
+	 * @param Zone Zone to move.
+	 * @param StartLocation Deploy centre of the chosen start.
+	 */
+	void SlideZoneTowardStart(ASurvivalEdgeSpawnZone& Zone, const FVector& StartLocation) const;
+	bool GetIsSlidCenterAllowed(const FVector& Candidate, const FVector& StartLocation) const;
+
+	// ---------------- Heavy airlift (SurvivalWaveDirectorAirlift.cpp)
+
+	UPROPERTY()
+	TArray<FSurvivalAirliftRun> M_AirliftRuns;
+
+	int32 M_NextAirliftRunId = 1;
+	double M_LastAirliftTime = -1.0e9;
+
+	// Loaded asynchronously when the start is configured; an airlift is skipped until it is in memory.
+	UPROPERTY()
+	TObjectPtr<UClass> M_AirliftAircraftClass = nullptr;
+
+	TSharedPtr<FStreamableHandle> M_AirliftAircraftLoadHandle;
+
+	void RequestAirliftAircraftClass();
+	void OnAirliftAircraftClassLoaded();
+	bool GetIsAirliftReady() const;
+
+	/**
+	 * @brief Flies heavy tanks from the far-side zone to the map centre with this wave group when one is due.
+	 * @param InOutPlan The launched plan; receives the airlift tank count and drop centre.
+	 */
+	void TryLaunchAirlift(FSurvivalWavePlan& InOutPlan);
+
+	int32 GetAirliftTankCount(const float Minute) const;
+
+	/**
+	 * @brief Weighted picks among the unlocked pool entries with an airlift role.
+	 * @param Minute Survival minute (unlock, ramp and fade).
+	 * @param Count Tanks wanted.
+	 * @param OutUnits Picked units; empty when no airlift role is unlocked yet.
+	 */
+	void PickAirliftUnits(const float Minute, const int32 Count, TArray<FSurvivalPlannedWaveUnit>& OutUnits);
+
+	/**
+	 * @brief A navmesh point at (or on rings around) the map centre with a vehicle path to the base.
+	 * @param BaseLocation Where the tanks will go.
+	 * @param OutDropCenter The chosen point.
+	 * @return False when no candidate projects to the navmesh.
+	 */
+	bool FindAirliftDropCenter(const FVector& BaseLocation, FVector& OutDropCenter) const;
+	bool GetHasVehiclePath(const FVector& From, const FVector& To) const;
+	TArray<FVector> BuildAirliftDropLocations(const FVector& DropCenter, const int32 Count) const;
+
+	/**
+	 * @brief Spawns one transport over the origin zone and its tank; the drop is ordered once the tank exists.
+	 * @param Run The airlift (its slot array is already sized).
+	 * @param SlotIndex Slot of this transport.
+	 * @param Unit Tank to carry.
+	 * @param AircraftSpawnLocation Where the transport appears.
+	 * @param RetreatLocation Where it flies after the drop.
+	 * @return True when the tank spawn was requested.
+	 */
+	bool LaunchAirliftSlot(FSurvivalAirliftRun& Run, const int32 SlotIndex, const FSurvivalPlannedWaveUnit& Unit,
+	                       const FVector& AircraftSpawnLocation, const FVector& RetreatLocation);
+	void OnAirliftTankSpawned(const int32 RunId, const int32 SlotIndex, AActor* SpawnedActor,
+	                          const FVector& RetreatLocation);
+	void OnAirliftPayloadReleased(AAircraftMaster* Aircraft, ATankMaster* ReleasedTank);
+
+	void UpdateAirliftRuns();
+	void UpdateAirliftSlotStates(FSurvivalAirliftRun& Run) const;
+	bool GetShouldFormAirliftGroup(const FSurvivalAirliftRun& Run, const double Now) const;
+	void FormAirliftGroup(FSurvivalAirliftRun& Run);
+	FSurvivalAirliftRun* FindAirliftRun(const int32 RunId);
+	// Load of airlift tanks that do not exist yet; the alive cap counts them like unspawned ground groups.
+	float GetPendingAirliftLoad() const;
+
+	// Map-test runs (-SurvivalWaveProbe): logs how wave units are ordered (attack move, plain move, attacking).
+	void LogWaveProbeIfRequested();
+	double M_NextWaveProbeTime = 0.0;
+
+	// Map-test runs (-SurvivalDecoyTest): one player tank put on a wave group's path proves the group stops to fight.
+	void UpdateDecoyTest();
+	struct FSurvivalDecoyStats
+	{
+		TArray<TWeakObjectPtr<AActor>> NearAtSpawn;
+		double SpawnTime = 0.0;
+		double KilledAfterSeconds = -1.0;
+		int32 MaxAttacking = 0;
+		int32 StillNearAt20s = -1;
+		int32 AliveSamples = 0;
+		float SumAttacking = 0.f;
+		float SumNear = 0.f;
+		bool bSpawned = false;
+	};
+	FSurvivalDecoyStats M_DecoyStats;
+	TArray<int32> M_DecoyFormationIDs;
+	int32 M_DecoyCount = 0;
+	UPROPERTY()
+	TWeakObjectPtr<AActor> M_DecoyTank;
+	FVector M_DecoyLocation = FVector::ZeroVector;
+	bool bM_DecoyRequested = false;
 
 	// ---------------- Announcement
 	void BroadcastAnnouncement(const FSurvivalWavePlan& Plan, const int32 LaunchedUnits);
