@@ -55,11 +55,65 @@ So: drag the voice line in, move it, trim it, and the subtitles follow. Sub-sequ
 The portrait box and the overlay share `TranscriptReveal::BuildVisibleText` (the reveal and wipe),
 `UCinematicTranscriptSubsystem` (the table lookup) and `SubtitleStyleDefaults` (the font and panel).
 
+## Adding a new voice line (subtitles included)
+
+1. Save the line from the Voice Changer app (Save, or Batch) into a subfolder of
+   `D:\Blender\BlenderProjects\BlenderTanks\VoiceLines\Announcer\AAAGerMissions`. Next to `<name>.wav` the app also
+   writes `<name>_Old.wav` (the dry take) and `<name>.timing.json` (where the dry take sits in the final line). Keep
+   both. Whisper hears the dry take far better than the radio-filtered line.
+2. Import `<name>.wav` into Unreal from that folder as a **SoundWave**. The table finds the asset by its import
+   source file, so it must be that file. Play it with `PlayPortrait` as usual.
+3. Run `VoiceLines/VoiceChanger/NewVoiceLines.bat` (or `python new_voice_lines.py`). It:
+   - runs `cinematic_transcripts.py update` on the lines that are new or whose audio changed, keeping every other
+     entry and every hand edit;
+   - rebuilds `DT_CinematicTranscripts` in a DebugGame commandlet. The table is always rebuilt whole, because UE's
+     fill-from-JSON empties it first, and it is not saved if the read-back finds a problem;
+   - lists rows added or removed, lines that still have no SoundWave, and lines worth a listen.
+4. If an editor is open, restart it, or right-click `DT_CinematicTranscripts` > Asset Actions > Reload, before PIE.
+   An editor that has the table loaded can keep its `.uasset` locked; the commandlet's save then fails
+   ("SAVE FAILED"). Either close the editor and run it again, or run the import inside that editor: in the Output
+   Log's Cmd box, `py "D:/UE5Projects/RTS_Survival/VoiceLines/VoiceChanger/ue_import_transcripts.py"`. That fills
+   the table in place, so no reload is needed; save the table there afterwards if the editor doesn't.
+
+### Exact words from a script (ElevenLabs text)
+
+If you have the text the line was spoken from, run `VoiceLines/VoiceChanger/LineScripts.bat`:
+1. Pick the line.
+2. Paste the text and press **Save script + re-time** (Ctrl+S). ElevenLabs tags like `[whispers]` and
+   `<break time="1s"/>` are ignored.
+3. **Play with subtitle** shows the words lighting up in time with the audio.
+4. **Send to Unreal** runs `NewVoiceLines`.
+
+The text is saved as `<name>.script.txt` beside the line. How it is used:
+- **The words come from the script; whisper only gives the timing.** `cinematic_transcripts.align_script` lines the
+  script up against whisper's words:
+  - a matched word takes the heard word's times;
+  - a misheard run ("Eurasia's" heard as "your religious") shares the span of what was heard;
+  - a skipped word gets the gap between its neighbours.
+
+  In a test with whisper's real mistakes put back in, the skipped "Commandant," landed 10 ms from its true time.
+- **Wrong scripts are flagged.** If fewer than 60% of the script's words were heard, the line gets a review flag.
+- **A script beats a hand edit in the JSON.** Changing the script alone re-times from cached whisper output in
+  under a second.
+
+A line with no `.timing.json` (saved before 2026-11-11, or dropped in by hand) is transcribed from the final file.
+That works, but on a test line it misheard words and was 0.25-0.35 s early, so the entry is flagged for review.
+Re-saving the line from the app fixes it.
+
 ## Where the transcripts come from
 
 All scripts are in `VoiceLines/VoiceChanger/`.
 
-1. `cinematic_transcripts.py all` builds the transcripts:
+1. `cinematic_transcripts.py all` builds the transcripts for every line. That is slow; `update` does only the new
+   and changed lines. Each line is timed in one of four ways (`"timing"` in the JSON):
+   - `sidecar`: saved by the app. Whisper runs on `_Old` (the dry take), and each word time becomes
+     `t / tempo + shift_s + 0.030 s` from `<name>.timing.json`. Measured against the audio at tempo 1.0 and 0.9:
+     +15 to +30 ms, the same chain latency as below.
+   - `render`: processed by `replace_announcer_lines.py`, as described below.
+   - `own`: an mp3 that was never processed, at shift 0.
+   - `final`: a processed wav with neither, at shift 0 and flagged.
+
+   The `render` lines are built like this:
    - It runs whisper.cpp (`D:\Tools\whisper`, model large-v3-turbo, `-nfa`) on the unprocessed `_Old` backups of
      every line under `VoiceLines/Announcer/AAAGerMissions`. The mp3 lines are their own source.
    - It shifts each word time onto the processed in-game file: `t + prefix_s - trim_start_s + 0.030 s`. The
@@ -75,8 +129,10 @@ All scripts are in `VoiceLines/VoiceChanger/`.
        -script="D:/UE5Projects/RTS_Survival/VoiceLines/VoiceChanger/ue_import_transcripts.py"
    ```
 
-   It creates one row per SoundWave, using the asset-to-source map from `ue_announcer_reimport.py`, reads every
-   row back and saves the table. The auto-committer then commits the `.uasset`.
+   It creates one row per SoundWave, finding each line's assets live by their import source
+   (`ue_announcer_assets.find`, shared with `ue_announcer_reimport.py`). It then reads every row back and saves the
+   table only if the read-back is clean. The auto-committer then commits the `.uasset`. Don't filter it to one line:
+   the table would end up holding only that line.
 
 Measured accuracy: whisper's token times hit speech onsets to about 0.1 s. DTW timestamps were about 0.7 s late,
 and flash attention made the words after a pause bunch together.
