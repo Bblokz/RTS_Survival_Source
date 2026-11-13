@@ -27,7 +27,9 @@ TEXTURE_DIR = ROOT + '/Textures'
 MATERIAL_DIR = ROOT + '/Materials'
 WOOD_MATERIAL = MATERIAL_DIR + '/M_SovFieldTrench_Wood'
 SANDBAG_MATERIAL = '/Game/SandBagPack/Materials/MI_Rus_SandBag_01'
-MATERIALS = {'SovTrench_Wood': WOOD_MATERIAL, 'RL_Sandbag': SANDBAG_MATERIAL}
+# 2026-11-12: the earth bank slot shares the German kit's material (landscape RVT colour).
+BANK_MATERIAL = '/Game/RTS_Survival/Blueprints/Environment/Trenches/FieldTrench/Materials/M_FieldTrench_Bank'
+MATERIALS = {'SovTrench_Wood': WOOD_MATERIAL, 'RL_Sandbag': SANDBAG_MATERIAL, 'FieldTrench_Bank': BANK_MATERIAL}
 WOOD_ROUGHNESS = 0.85
 WOOD_BRIGHTNESS = 1.25
 asset_tools = unreal.AssetToolsHelpers.get_asset_tools()
@@ -102,6 +104,8 @@ def _static_options():
     data.set_editor_property('auto_generate_collision', False)
     data.set_editor_property('generate_lightmap_u_vs', True)
     data.set_editor_property('normal_import_method', unreal.FBXNormalImportMethod.FBXNIM_IMPORT_NORMALS)
+    # The bank's fresh-spoil (R) and foot-blend (G) masks are vertex colours.
+    data.set_editor_property('vertex_color_import_option', unreal.VertexColorImportOption.REPLACE)
     return options
 
 
@@ -146,6 +150,10 @@ def import_meshes():
         body.set_editor_property('collision_trace_flag', unreal.CollisionTraceFlag.CTF_USE_COMPLEX_AS_SIMPLE)
         mesh.set_editor_property('lod_group', 'LargeProp')
         fix_sockets(mesh, record)
+        import sys
+        sys.path.append('D:/UE5Projects/RTS_Survival/Source/Tools/FieldTrenches')
+        import ue_field_trench_ramps
+        ue_field_trench_ramps.disable_bank_collision(mesh)
         unreal.get_editor_subsystem(unreal.StaticMeshEditorSubsystem).set_nanite_settings(
             mesh, unreal.MeshNaniteSettings(enabled=False), apply_changes=True)
         print('SOVTRENCH_IMPORT', name, 'tris', mesh.get_num_triangles(0), 'manifest', record['triangles'],
@@ -164,6 +172,14 @@ def report():
               '/', len(record['sockets']), slots)
 
 
-STEP_FUNCTIONS = {'textures': import_textures, 'material': make_material, 'meshes': import_meshes, 'report': report}
+def import_ramps():
+    import sys
+    sys.path.append('D:/UE5Projects/RTS_Survival/Source/Tools/FieldTrenches')
+    import ue_field_trench_ramps
+    ue_field_trench_ramps.import_ramps(BLENDER_EXPORTS, MANIFEST, MESH_DIR)
+
+
+STEP_FUNCTIONS = {'textures': import_textures, 'material': make_material, 'meshes': import_meshes, 'ramps': import_ramps,
+                  'report': report}
 for step in STEPS:
     STEP_FUNCTIONS[step]()

@@ -697,6 +697,10 @@ void URTSCoverFinderWorldSubsystem::StartCommandLineMapTests()
 	{
 		M_AlliedVehiclePassageScenario.Start();
 	}
+	if (FParse::Param(FCommandLine::Get(), TEXT("TrenchRampValidate")))
+	{
+		M_TrenchRampCrossingScenario.Start();
+	}
 	if (FParse::Param(FCommandLine::Get(), TEXT("TraceImpactVfxMeasure")))
 	{
 		M_TraceImpactVfxPerfScenario.Start();
@@ -747,6 +751,7 @@ void URTSCoverFinderWorldSubsystem::TickMapTests(const float DeltaTime)
 	M_SquadMarchScenario.Tick(*this);
 	M_VehicleAvoidanceScenario.Tick(*this, DeltaTime);
 	M_AlliedVehiclePassageScenario.Tick(*this, DeltaTime);
+	M_TrenchRampCrossingScenario.Tick(*this, DeltaTime);
 	M_TraceImpactVfxPerfScenario.Tick(*this);
 	M_B4HowitzerScenario.Tick(*this);
 	M_GunPitScenario.Tick(*this);

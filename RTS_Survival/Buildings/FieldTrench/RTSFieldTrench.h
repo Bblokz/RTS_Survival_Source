@@ -49,6 +49,11 @@ struct FFieldTrenchPieceRuntime
 	UPROPERTY()
 	TObjectPtr<UStaticMeshComponent> Component;
 
+	// Invisible vehicle ramp over the piece's earth bank and bag walls (<mesh>_Ramp), attached to Component so it
+	// follows the piece while it is dug; physics only, see FRTS_CollisionSetup::SetupVehicleRampCollision.
+	UPROPERTY()
+	TObjectPtr<UStaticMeshComponent> RampComponent;
+
 	UPROPERTY()
 	EFieldTrenchPieceState State = EFieldTrenchPieceState::Planned;
 
@@ -258,7 +263,14 @@ private:
 	bool bM_CoverRefreshScheduled = false;
 
 	UStaticMeshComponent* CreatePieceComponent(const EFieldTrenchPiece Piece);
+	UStaticMeshComponent* CreateRampComponent(UStaticMeshComponent& PieceComponent, const EFieldTrenchPiece Piece);
+	// Gives the piece its mesh and ramp components, made new or switched to another piece's meshes.
+	void EnsurePieceComponents(FFieldTrenchPieceRuntime& Piece, const EFieldTrenchPiece PieceType);
+	// Registers a piece or ramp component as an instance or a construction script component.
+	void RegisterPieceComponent(UStaticMeshComponent& Component);
+	void DestroyPieceComponents(const FFieldTrenchPieceRuntime& Piece) const;
 	void SetPieceMesh(UStaticMeshComponent& PieceComponent, const EFieldTrenchPiece Piece) const;
+	void SetRampMesh(UStaticMeshComponent& RampComponent, const EFieldTrenchPiece Piece) const;
 	// Lays the piece onto the ground: its origin on the ground, its length and width along the slope.
 	void FitPieceToGround(FFieldTrenchPieceRuntime& Piece) const;
 	// Straights whose ground strays further from them than this are replaced by shorter ones.

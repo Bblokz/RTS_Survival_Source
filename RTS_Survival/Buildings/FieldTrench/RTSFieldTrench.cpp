@@ -3,6 +3,7 @@
 #include "RTSFieldTrench.h"
 
 #include "Components/StaticMeshComponent.h"
+#include "RTS_Survival/Utils/CollisionSetup/FRTS_CollisionSetup.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/World.h"
 #include "Materials/MaterialInstanceDynamic.h"
@@ -87,14 +88,7 @@ void ARTSFieldTrench::SetPlannedPieces(const TArray<FFieldTrenchPiecePlacement>&
 		{
 			RefundPiece(Piece);
 		}
-		if (not IsValid(Piece.Component))
-		{
-			Piece.Component = CreatePieceComponent(Pieces[PlanIndex].Piece);
-		}
-		else if (Piece.Placement.Piece != Pieces[PlanIndex].Piece)
-		{
-			SetPieceMesh(*Piece.Component, Pieces[PlanIndex].Piece);
-		}
+		EnsurePieceComponents(Piece, Pieces[PlanIndex].Piece);
 		Piece.Placement = Pieces[PlanIndex];
 		Piece.State = EFieldTrenchPieceState::Planned;
 		Piece.DigProgress = 0.0f;
@@ -204,8 +198,8 @@ void ARTSFieldTrench::StartConstruction(
 int32 ARTSFieldTrench::AddBuiltPiece(const FFieldTrenchPiecePlacement& Placement)
 {
 	FFieldTrenchPieceRuntime& Piece = M_Pieces.AddDefaulted_GetRef();
+	EnsurePieceComponents(Piece, Placement.Piece);
 	Piece.Placement = Placement;
-	Piece.Component = CreatePieceComponent(Placement.Piece);
 	Piece.State = EFieldTrenchPieceState::Built;
 	Piece.DigProgress = 1.0f;
 	FitPieceToGround(Piece);
@@ -230,10 +224,7 @@ void ARTSFieldTrench::RemovePiece(const int32 PieceIndex)
 	{
 		RefundPiece(RemovedPiece);
 	}
-	if (IsValid(RemovedPiece.Component))
-	{
-		RemovedPiece.Component->DestroyComponent();
-	}
+	DestroyPieceComponents(RemovedPiece);
 	if (RemovedPiece.State == EFieldTrenchPieceState::Built)
 	{
 		ScheduleCoverRefresh();
@@ -250,11 +241,7 @@ void ARTSFieldTrench::ClearAllPieces()
 		{
 			RefundPiece(Piece);
 		}
-		// A copied or duplicated trench can come with references to the pieces of the trench it was copied from.
-		if (IsValid(Piece.Component) && Piece.Component->GetOwner() == this)
-		{
-			Piece.Component->DestroyComponent();
-		}
+		DestroyPieceComponents(Piece);
 	}
 	M_Pieces.Reset();
 	bM_IsWaitingForResources = false;
@@ -359,18 +346,75 @@ UStaticMeshComponent* ARTSFieldTrench::CreatePieceComponent(const EFieldTrenchPi
 	PieceComponent->SetGenerateOverlapEvents(PieceCollisionTemplate->GetGenerateOverlapEvents());
 	SetPieceMesh(*PieceComponent, Piece);
 	PieceComponent->SetupAttachment(RootComponent);
+	RegisterPieceComponent(*PieceComponent);
+	return PieceComponent;
+}
+
+UStaticMeshComponent* ARTSFieldTrench::CreateRampComponent(UStaticMeshComponent& PieceComponent,
+                                                           const EFieldTrenchPiece Piece)
+{
+	UStaticMeshComponent* RampComponent = NewObject<UStaticMeshComponent>(this);
+	RampComponent->SetMobility(EComponentMobility::Movable);
+	// Never drawn: only its collision hulls matter.
+	RampComponent->SetVisibility(false);
+	RampComponent->SetHiddenInGame(true);
+	RampComponent->SetCastShadow(false);
+	FRTS_CollisionSetup::SetupVehicleRampCollision(RampComponent);
+	// No collision until the piece is dug (ShowPieceState).
+	RampComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	SetRampMesh(*RampComponent, Piece);
+	RampComponent->SetupAttachment(&PieceComponent);
+	RegisterPieceComponent(*RampComponent);
+	return RampComponent;
+}
+
+void ARTSFieldTrench::EnsurePieceComponents(FFieldTrenchPieceRuntime& Piece, const EFieldTrenchPiece PieceType)
+{
+	const bool bPieceTypeChanged = Piece.Placement.Piece != PieceType;
+	if (not IsValid(Piece.Component))
+	{
+		Piece.Component = CreatePieceComponent(PieceType);
+	}
+	else if (bPieceTypeChanged)
+	{
+		SetPieceMesh(*Piece.Component, PieceType);
+	}
+	if (not IsValid(Piece.RampComponent))
+	{
+		Piece.RampComponent = CreateRampComponent(*Piece.Component, PieceType);
+	}
+	else if (bPieceTypeChanged)
+	{
+		SetRampMesh(*Piece.RampComponent, PieceType);
+	}
+}
+
+void ARTSFieldTrench::RegisterPieceComponent(UStaticMeshComponent& Component)
+{
 	if (bM_CreatePiecesAsConstructionScriptComponents)
 	{
 		// Set before registering; the component was filed under the actor as native when it was made, so it is
 		// added to the construction script components by hand, which is what saves it with the level.
-		PieceComponent->CreationMethod = EComponentCreationMethod::UserConstructionScript;
-		BlueprintCreatedComponents.AddUnique(PieceComponent);
-		PieceComponent->RegisterComponent();
-		return PieceComponent;
+		Component.CreationMethod = EComponentCreationMethod::UserConstructionScript;
+		BlueprintCreatedComponents.AddUnique(&Component);
+		Component.RegisterComponent();
+		return;
 	}
-	PieceComponent->RegisterComponent();
-	AddInstanceComponent(PieceComponent);
-	return PieceComponent;
+	Component.RegisterComponent();
+	AddInstanceComponent(&Component);
+}
+
+void ARTSFieldTrench::DestroyPieceComponents(const FFieldTrenchPieceRuntime& Piece) const
+{
+	// A copied or duplicated trench can come with references to the pieces of the trench it was copied from.
+	if (IsValid(Piece.RampComponent) && Piece.RampComponent->GetOwner() == this)
+	{
+		Piece.RampComponent->DestroyComponent();
+	}
+	if (IsValid(Piece.Component) && Piece.Component->GetOwner() == this)
+	{
+		Piece.Component->DestroyComponent();
+	}
 }
 
 void ARTSFieldTrench::SetKit(const EFieldTrenchKit NewKit)
@@ -386,6 +430,10 @@ void ARTSFieldTrench::SetKit(const EFieldTrenchKit NewKit)
 		{
 			SetPieceMesh(*Piece.Component, Piece.Placement.Piece);
 		}
+		if (IsValid(Piece.RampComponent))
+		{
+			SetRampMesh(*Piece.RampComponent, Piece.Placement.Piece);
+		}
 	}
 }
 
@@ -399,6 +447,18 @@ void ARTSFieldTrench::SetPieceMesh(UStaticMeshComponent& PieceComponent, const E
 			" in kit " + UEnum::GetValueAsString(Kit) + ".");
 	}
 	PieceComponent.SetStaticMesh(PieceMesh);
+}
+
+void ARTSFieldTrench::SetRampMesh(UStaticMeshComponent& RampComponent, const EFieldTrenchPiece Piece) const
+{
+	UStaticMesh* RampMesh = Cast<UStaticMesh>(FieldTrenchLayout::GetPieceRampMeshPath(Piece, Kit).TryLoad());
+	if (not IsValid(RampMesh))
+	{
+		RTSFunctionLibrary::ReportError(
+			"Field trench " + GetName() + ": could not load the vehicle ramp of piece " + UEnum::GetValueAsString(Piece) +
+			" in kit " + UEnum::GetValueAsString(Kit) + "; vehicles drive through that piece.");
+	}
+	RampComponent.SetStaticMesh(RampMesh);
 }
 
 void ARTSFieldTrench::FitPieceToGround(FFieldTrenchPieceRuntime& Piece) const
@@ -575,6 +635,13 @@ void ARTSFieldTrench::ShowPieceState(FFieldTrenchPieceRuntime& Piece)
 		? ECollisionEnabled::NoCollision
 		: PieceCollisionTemplate->GetCollisionEnabled());
 	PieceComponent->SetVisibility(not (bIsPlanned && bM_HidePlannedPieces));
+	if (IsValid(Piece.RampComponent))
+	{
+		// Rises with the piece while it is dug, so a vehicle parked on the spot is lifted instead of popped up.
+		Piece.RampComponent->SetCollisionEnabled(bIsPlanned
+			? ECollisionEnabled::NoCollision
+			: ECollisionEnabled::PhysicsOnly);
+	}
 	UMaterialInterface* PlannedMaterial = bIsPlanned ? GetPlannedMaterial() : nullptr;
 	const int32 MaterialCount = PieceComponent->GetNumMaterials();
 	for (int32 MaterialIndex = 0; MaterialIndex < MaterialCount; ++MaterialIndex)

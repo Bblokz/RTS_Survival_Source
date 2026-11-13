@@ -18,6 +18,7 @@
 #include "RTS_Survival/Units/Squads/Tests/SquadMarchTestScenario.h"
 #include "RTS_Survival/Units/Tanks/Tests/VehicleAvoidanceScenario.h"
 #include "RTS_Survival/Units/Tanks/Tests/AlliedVehiclePassageScenario.h"
+#include "RTS_Survival/Buildings/FieldTrench/Tests/TrenchRampCrossingScenario.h"
 #include "RTS_Survival/Weapons/SmallArmsProjectileManager/Tests/TraceImpactVfxPerfScenario.h"
 #include "RTS_Survival/Buildings/BuildingExpansion/B4HowitzerPit/Tests/B4HowitzerTestScenario.h"
 #include "RTS_Survival/Buildings/BuildingExpansion/GunPit/Tests/GunPitTestScenario.h"
@@ -495,6 +496,7 @@ private:
 	FSquadMarchTestScenario M_SquadMarchScenario;
 	FVehicleAvoidanceScenario M_VehicleAvoidanceScenario;
 	FAlliedVehiclePassageScenario M_AlliedVehiclePassageScenario;
+	FTrenchRampCrossingScenario M_TrenchRampCrossingScenario;
 	FTraceImpactVfxPerfScenario M_TraceImpactVfxPerfScenario;
 	FB4HowitzerTestScenario M_B4HowitzerScenario;
 	FGunPitTestScenario M_GunPitScenario;
