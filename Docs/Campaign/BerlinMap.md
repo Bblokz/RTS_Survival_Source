@@ -135,6 +135,21 @@ alone. Applying in the shared editor through the bridge crashed it once during a
   skirt, a collapse heap on about half, chunks): 83 walls. The other lone walls already have another ruin's footprint
   on that ground.
 
+## Update 2026-11-13 (night): crushable cover, furniture, furniture debris decals
+
+- **Crushable cover (vertical death):** breastwork, toppled slab, facade panels, wall run and corner L are crushed by
+  medium and heavy tanks; heap chunk, cellar lip, masonry block, fallen chimney and doorway by heavy tanks only. The
+  rubble heaps stay uncrushable. Setup and tests: `Docs/Environment/BerlinRubbleCover.md`, section "Crushing".
+- **Furniture:** 16 pieces `BP_BerlinFurn_<NN>_<Name>` on one atlas and one material, shell holes, crushed by any tank
+  with vertical death; infantry walk round them (`Docs/Environment/BerlinFurniture.md`). `Dress.furniture()` places
+  182: 113 on collapsed plots (tall pieces only there) and 69 in groups of two to four along lane kerbs, never within
+  6.5 m of a cover piece or 15 m of an opening. `step_furniture()` spawns them (labels `FURN_*`). Own random stream.
+- **Furniture debris decals:** `M_BerlinFurnitureDebris_Decal` takes colour, normal and roughness from the furniture
+  atlas; `T_BerlinFurniture_DebrisMap` (RGBA16, built by `furniture/debris_mask_gen.py` after `debris_uv_coverage.py`)
+  says which atlas texel each decal texel shows. 16 variants, one per piece, chosen through the decal colour
+  (R = (variant + 0.5) / 16). 377 on the map: beside about 70 % of the furniture, the rest loose on ruin footprints.
+  Build: `furniture/debris_decal_build.py` (headless).
+
 ## Known gaps
 
 - The track-smoke surface map is not baked, and the Berlin layer names are not in `URTSGroundSurfaceSettings`, so a bake

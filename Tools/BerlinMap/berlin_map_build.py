@@ -653,10 +653,10 @@ def step_lighting():
             comp.recapture_sky()
             report.append("sky")
         elif name == "ExponentialHeightFog":
-            comp = actor.component
-            comp.set_fog_inscattering_color(unreal.LinearColor(0.36, 0.39, 0.43, 1.0))
-            comp.set_fog_density(0.0035)
-            report.append("fog")
+            # owner's rule (2026-11-13): no engine height fog on this map; the atmosphere is built from the map's own
+            # light function and effects (step_sun_light_function, Source/Docs/Lighting/BerlinLighting.md)
+            actors_sub().destroy_actor(actor)
+            report.append("fog removed")
         elif name == "PostProcessVolume":
             settings = actor.settings
             settings.set_editor_property("override_color_saturation", True)
@@ -666,6 +666,30 @@ def step_lighting():
             actor.set_editor_property("settings", settings)
             report.append("post")
     log("lighting %s" % report)
+    return report
+
+
+def step_sun_light_function():
+    """The sun's light function: soft drifting cloud and smoke shadows plus a fixed term per district
+    (lighting/berlin_light_function_build.py). Removes the engine height fog, which this map does not use."""
+    require_map()
+    report = []
+    material = unreal.load_asset("/Game/RTS_Survival/Materials/Sky/M_LF_BerlinSmokePall")
+    if material is None:
+        raise RuntimeError("M_LF_BerlinSmokePall missing: run lighting/berlin_light_function_build.py first")
+    for actor in all_actors():
+        name = actor.get_class().get_name()
+        if name == "DirectionalLight":
+            comp = actor.light_component
+            comp.set_light_function_material(material)
+            # the pattern must hold at RTS camera heights and beyond; outside the fade distance the sun stays at full
+            comp.set_light_function_fade_distance(150000.0)
+            comp.set_editor_property("disabled_brightness", 1.0)
+            report.append("sun")
+        elif name == "ExponentialHeightFog":
+            actors_sub().destroy_actor(actor)
+            report.append("fog removed")
+    log("sun light function %s" % report)
     return report
 
 
@@ -859,3 +883,20 @@ def step_decals():
         actor.set_folder_path("Berlin/Decals/" + entry["kind"])
     log("decals: removed %d, placed %d, missing %s" % (removed, len(decals) - len(missing), sorted(missing)))
     return len(decals)
+
+
+# ---- ambient motion: street litter, hanging wires and curtains, crows (Docs/Environment/BerlinAmbientMotion.md) ---------
+def step_ambient():
+    """Paper and ash along the lanes, dressing and perched crows hung on the RUIN_ actors, circling crows: everything
+    labelled or named AMB_. Run after step_ruins(); needs no navmesh rebuild. The work is in ambient/ambient_place.py."""
+    require_map()
+    import importlib
+    import sys
+    folder = "D:/UE5Projects/RTS_Survival/Source/Tools/BerlinMap/ambient"
+    if folder not in sys.path:
+        sys.path.insert(0, folder)
+    import ambient_gen
+    import ambient_place
+    importlib.reload(ambient_gen)
+    importlib.reload(ambient_place)
+    return ambient_place.run()

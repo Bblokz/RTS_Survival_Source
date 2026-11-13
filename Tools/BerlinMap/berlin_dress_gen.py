@@ -1661,6 +1661,13 @@ class Dress:
         rng = np.random.default_rng(4711)
         heaps = [(f[1], f[2], 520.0 if f[0].endswith("_L") else 380.0) for f in self.feet if "CollapseHeap" in f[0]]
         spots = []
+        # cover the furniture must stay clear of: its infantry nav block would cut cover sockets off the navmesh
+        covers = [(e["x"], e["y"]) for e in self.actors if "Cover" in e["label"]]
+        for mesh, items in self.ism.items():
+            if mesh.rsplit("/", 1)[1] in ("DBK_Brick_Rubble_A", "DBK_Cinderblock_Rubble_A", "DBK_Concrete_Rubble_Mid_A",
+                                          "DBK_Concrete_Rubble_Mid_B", "DBK_Concrete_Rubble_Mid_C"):
+                covers += [(i[0], i[1]) for i in items if i[6] >= 0.8]
+        covers = np.asarray(covers) if covers else np.zeros((0, 2))
 
         def put(name, x, y, yaw):
             if not (abs(x) < self.spec.xmax - 200.0 and abs(y) < self.spec.ymax - 200.0):
@@ -1669,6 +1676,8 @@ class Dress:
             if self.hard[r, c] or any(math.hypot(x - hx, y - hy) < rad for hx, hy, rad in heaps):
                 return False
             if any(math.hypot(x - px, y - py) < 230.0 for px, py in spots):
+                return False
+            if len(covers) and float(np.hypot(covers[:, 0] - x, covers[:, 1] - y).min()) < 650.0:
                 return False
             if any(math.hypot(x - o[0], y - o[1]) < 1500.0 for o in self.openings_at):
                 return False
