@@ -31,14 +31,19 @@ COPIES = [(SKY + 'MPC_FirstMissionSunbreaks', SKY + 'MPC_BerlinSmokePall'),
           (SKY + 'MF_FirstMissionSunbreakField', SKY + 'MF_BerlinSmokePallField'),
           (SKY + 'M_LF_FirstMissionSunbreaks', SKY + 'M_LF_BerlinSmokePall')]
 DEFAULTS = {
-    'SunbreakWorldSize': 9000.0, 'CloudCoverPower': 0.54, 'SunbreakContrast': 1.0,
-    'ShadeTransmission': 0.5, 'SunTransmission': 1.0,
-    'CloudDriftScale': 1.0, 'RayDetailDrift': 60.0,
-    'RayDetailWorldSize': 3500.0, 'RayDetailStrength': 0.3, 'RayDetailFloor': 0.85,
+    # sized so that a game-height view (about 70 m of ground) always holds a cloud edge or two
+    'SunbreakWorldSize': 5200.0, 'CloudCoverPower': 0.5, 'SunbreakContrast': 1.35,
+    'ShadeTransmission': 0.38, 'SunTransmission': 1.0,
+    'CloudDriftScale': 1.0, 'RayDetailDrift': 140.0,
+    'RayDetailWorldSize': 3500.0, 'RayDetailStrength': 0.25, 'RayDetailFloor': 0.88,
     'LegacyWeight': 1.0,
 }
-import os
-if os.environ.get('BERLIN_LF_DEBUG'):
+try:                                    # the shared editor's script sandbox refuses 'os': no debug build there
+    import os
+    _DEBUG = bool(os.environ.get('BERLIN_LF_DEBUG'))
+except ImportError:
+    _DEBUG = False
+if _DEBUG:
     # exaggerated, for looking at the pattern only: black smoke shadows, a gale
     DEFAULTS.update({'ShadeTransmission': 0.0, 'CloudDriftScale': 25.0})
 # World axes of Ger_Berlin: +X north, +Y east. The wind blows from the west along the lanes, a little to the north.
@@ -81,7 +86,8 @@ float2 Ground = P - Time * Speed * WindDir;
 float2 BankUV = float2(dot(Ground, WindDir), dot(Ground, Across) * 1.3) / WorldSize;
 float Cloud = CloudNoise.Soft3(BankUV);
 // CloudCoverPower is the cover threshold here: lower = more of the city in shade. A standing pall lowers it locally.
-float Threshold = CloudCoverPower - 0.10 * Pall + 0.08 * Clear;
+// (only a slight shift: with a strong one the east and the crater sat in near-uniform shade and showed no clouds)
+float Threshold = CloudCoverPower - 0.03 * Pall + 0.04 * Clear;
 float Soft = 0.17 / max(SunbreakContrast, 0.1);
 float Opening = 1.0 - smoothstep(Threshold - Soft, Threshold + Soft, Cloud);
 
@@ -93,7 +99,7 @@ float Fine = lerp(1.0, smoothstep(0.3, 0.7, CloudNoise.Soft3(WispUV + 73.1)), sa
 float Pools = Opening * lerp(RayDetailFloor, 1.0, Fine);
 float Transmission = lerp(ShadeTransmission, SunTransmission, Pools);
 // under a standing pall even the openings are dimmer
-Transmission *= 1.0 - 0.22 * Pall;
+Transmission *= 1.0 - 0.14 * Pall;
 return float3(saturate(Transmission), Opening, Fine);
 '''
 
