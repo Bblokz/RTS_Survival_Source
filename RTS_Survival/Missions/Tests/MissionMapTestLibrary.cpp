@@ -111,6 +111,23 @@ bool UMissionMapTestLibrary::MapTest_PlaceLoadedBxp(const UObject* WorldContextO
 #endif
 }
 
+int32 UMissionMapTestLibrary::MapTest_ConvertNomadicAt(ANomadicVehicle* NomadicTruck, const FVector Location)
+{
+#if RTS_WITH_MAP_TESTS
+	constexpr int32 NeededBuildRadiusFlag = 10;
+	ACPPController* PlayerController = FRTS_Statics::GetRTSController(NomadicTruck);
+	if (not IsValid(PlayerController))
+	{
+		return 0;
+	}
+	bool bNeededBuildRadius = false;
+	const int32 Result = PlayerController->MapTest_ConvertNomadicAt(NomadicTruck, Location, bNeededBuildRadius);
+	return bNeededBuildRadius ? Result + NeededBuildRadiusFlag : Result;
+#else
+	return 0;
+#endif
+}
+
 bool UMissionMapTestLibrary::MapTest_HasAbility(AActor* Unit, const EAbilityID Ability)
 {
 	ICommands* Commands = Cast<ICommands>(Unit);

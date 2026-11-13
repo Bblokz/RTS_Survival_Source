@@ -106,6 +106,7 @@ void UMissionBase::OnMissionComplete()
 	Tracking_ClearState();
 	EnemyInBuilding_ClearTracking();
 	TeamWeaponSquadTracking_Clear();
+	UnitGroupMarkers_Clear();
 	DebugMission("Completed mission " + GetName());
 	if (GetMissionManagerChecked())
 	{
@@ -149,6 +150,7 @@ void UMissionBase::OnMissionFailed()
 	Tracking_ClearState();
 	EnemyInBuilding_ClearTracking();
 	TeamWeaponSquadTracking_Clear();
+	UnitGroupMarkers_Clear();
 	DebugMission("Failed mission " + GetName());
 	if (GetMissionManagerChecked())
 	{
@@ -613,6 +615,7 @@ void UMissionBase::OnCleanUpMission()
 	Tracking_ClearState();
 	EnemyInBuilding_ClearTracking();
 	TeamWeaponSquadTracking_Clear();
+	UnitGroupMarkers_Clear();
 	M_AbilityCooldownCommands = nullptr;
 	if (GetIsValidMissionManager())
 	{
@@ -633,6 +636,7 @@ void UMissionBase::OnCleanUpMission()
 	GetWorld()->GetTimerManager().ClearTimer(M_TextOnlyDurationHandle);
 	GetWorld()->GetTimerManager().ClearTimer(M_TrackingValidityTimerHandle);
 	GetWorld()->GetTimerManager().ClearTimer(M_AbilityCooldownPollingTimerHandle);
+	AirDelivery_ClearHQExitPoll();
 	CleanUp_TimerHandles(GetWorld());
 	BP_OnMissionCleanUp();
 }
@@ -654,6 +658,7 @@ void UMissionBase::BeginDestroy()
 		GetWorld()->GetTimerManager().ClearTimer(M_LoadToStartTimerHandle);
 		GetWorld()->GetTimerManager().ClearTimer(M_TrackingValidityTimerHandle);
 		GetWorld()->GetTimerManager().ClearTimer(M_AbilityCooldownPollingTimerHandle);
+		GetWorld()->GetTimerManager().ClearTimer(M_HQLeavingGliderPollHandle);
 	}
 }
 

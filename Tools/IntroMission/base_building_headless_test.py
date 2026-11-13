@@ -9,7 +9,9 @@
 
 The mission chain is cut in the editor world before PIE (not saved): Missions[0] = the Mission_Intro_BaseBuilding
 instance of the saved chain, so the run starts at the HQ drop. The test plays the player's part:
-  HQ glider lands + deploys -> resources + Stage 1 -> a player harvester is spawned -> hints + Stage 2 -> 10 s ->
+  HQ glider lands (glider line) -> the truck drives out -> nomadic conversion takeover (closed by the test) -> convert
+  line + "Deploy HQ" marker -> the test converts the HQ as the player (select, convert button, placement click; the
+  preview must not ask for a build radius, which proves the glider HQ is the registered player HQ) -> resources + Stage 1 -> a player harvester is spawned -> hints + Stage 2 -> 10 s ->
   Stage 3 (gamma unlocked) -> a gamma truck is delivered by the mission's own cargo plane call (counts as trained,
   builds on landing) -> Stages 4, 5 -> same for the refinery -> Stages 6, 7 -> the converter step is driven by calling
   Step_ConverterBuilt (placing a BXP is not reachable from python; GetPlayerBuiltBuildingExpansionCountOfTypes stays
@@ -129,9 +131,32 @@ def deliver(world, subtype, spot, delivery_id):
 
 
 TRAIN_SECONDS = 5
-VOICE_LINES = ['IntroMission_HQOperational', 'IntroMission_TrainGamma', 'IntroMission_ExpandGamma',
+VOICE_LINES = ['IntroMission_HQGliderInbound', 'IntroMission_ConvertHQ', 'IntroMission_HQOperational', 'IntroMission_TrainGamma', 'IntroMission_ExpandGamma',
                'IntroMission_TrainRefinery', 'IntroMission_BuildConverter', 'IntroMission_ConversionToggle',
                'IntroMission_BarracksForgeDrop']
+
+
+HQ_TRUCKS = ('Ger_HQ_Truck_C', 'Ger_HQ_Truck_Breakthrough_C')
+# Placement clicks tried in turn when the HQ spot itself is blocked (a player would click next to it).
+CONVERT_OFFSETS = [(0, 0), (600, 0), (0, 600), (0, -600), (1000, 0)]
+
+
+def open_takeovers(world):
+    # WidgetBlueprintLibrary is not exposed to this editor's Python; walk the live user widgets instead.
+    return [w for w in unreal.ObjectIterator(unreal.UserWidget)
+            if w.get_world() == world and w.is_in_viewport() and w.get_class().get_name().startswith('WBP_')
+            and w.get_class().get_name().endswith('Takeover_C')]
+
+
+def hint_texts(hint):
+    widget_comp = hint.get_component_by_class(unreal.WidgetComponent)
+    widget = widget_comp.get_widget() if widget_comp else None
+    return [str(w.get_text()) for w in unreal.ObjectIterator(unreal.RichTextBlock)
+            if widget and w.get_outer() and w.get_typed_outer(unreal.UserWidget) == widget]
+
+
+def dist2d(a, b):
+    return ((a.x - b.x) ** 2 + (a.y - b.y) ** 2) ** 0.5
 
 
 def opt(unit_type, subtype):
@@ -198,13 +223,20 @@ def tick(delta):
         if phase == 'wait_load' and S['t'] > 15.0:
             editor_world = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_editor_world()
             manager = actors_of(editor_world, 'BP_MissionManager_C')[0]
-            node = manager.get_editor_property('missions')[0]
-            while node is not None and node.get_class().get_name() != MISSION:
-                node = node.get_editor_property('next_mission')
+            # Since the ridge missions (2026-11-12) the base mission is Missions[2], started by a "Mission Class
+            # Completed" trigger on Mission_Intro_ClearSovietRig; search every manager entry and its NextMission chain.
+            node = None
+            for top in manager.get_editor_property('missions'):
+                while top is not None and node is None:
+                    if top.get_class().get_name() == MISSION:
+                        node = top
+                    top = top.get_editor_property('next_mission')
             check('base_mission_in_saved_chain', node is not None)
             if node is None:
                 finish()
                 return
+            # Run it first and at once: drop the trigger that waits for ClearSovietRig (editor world only, not saved).
+            node.set_editor_property('mission_trigger', None)
             manager.set_editor_property('missions', [node])
             if os.environ.get('BASE_TEST_HQ'):
                 build, touch = [unreal.Vector(*[float(v) for v in part.split(',')])
@@ -229,61 +261,84 @@ def tick(delta):
                 log('pie never started')
                 finish()
         elif phase == 'wait_hq':
-            if S['t'] - S.get('hq_sample_t', -99.0) >= 2.0:
-                S['hq_sample_t'] = S['t']
-                trucks = [a for a in actors_of(world, 'Ger_HQ_Truck_C') + actors_of(world, 'Ger_HQ_Truck_Breakthrough_C')]
-                gliders = [a for a in unreal.GameplayStatics.get_all_actors_of_class(world, unreal.Actor)
-                           if 'Glider' in a.get_class().get_name()]
-                for truck in trucks:
-                    meshes = truck.get_components_by_class(unreal.SkeletalMeshComponent)
-                    sim = [(m.get_name(), m.is_simulating_physics(), str(m.get_collision_enabled())[-14:]) for m in meshes]
-                    parent = truck.get_attach_parent_actor()
-                    log(f'hq truck physics {sim} attached_to={parent.get_name() if parent else None} '
-                        f'root={truck.root_component.get_name()}')
-                for truck in trucks:
-                    m = mission(world)
-                    spot = m.get_editor_property('HQBuildLocation')
-                    near = (truck.get_actor_location() - spot).size2d() < 400 if hasattr(unreal.Vector, 'size2d') else                         ((truck.get_actor_location().x - spot.x) ** 2 + (truck.get_actor_location().y - spot.y) ** 2) ** 0.5 < 400
-                    if near and truck.get_velocity().length() < 5:
-                        S['hq_still'] = S.get('hq_still', 0) + 1
-                    else:
-                        S['hq_still'] = 0
-                    chassis = [c for c in truck.get_components_by_class(unreal.SkeletalMeshComponent)
-                               if c.get_name() == 'Chasis']
-                    anim = chassis[0].get_anim_instance() if chassis else None
-                    montage = anim.get_current_active_montage() if anim else None
-                    building = truck.call_method('GetBuildingMeshComponent')
-                    log(f'hq state yaw={round(truck.get_actor_rotation().yaw)} building_visible='
-                        f'{building.is_visible() if building else None} montage={montage.get_name() if montage else None} '
-                        f'pos={round(anim.montage_get_position(montage), 2) if montage else None} '
-                        f'rendered={truck.was_recently_rendered(0.2)} mission_hq={m.get_editor_property("HQ") is not None} '
-                        f'deployed={m.call_method("GetIsNomadicDeployedAsBuilding", (truck,))} still={S["hq_still"]}')
-                    if os.environ.get('BASE_TEST_CAMERA') and S['hq_still'] == 10 and not S.get('camera_moved'):
-                        S['camera_moved'] = True
-                        pawn = unreal.GameplayStatics.get_player_pawn(world, 0)
-                        pawn.set_actor_location(unreal.Vector(spot.x - 1500, spot.y, spot.z + 2500), False, True)
-                        log(f'CAMERA: moved the player camera pawn over the HQ spot ({pawn.get_name()})')
-                    if os.environ.get('BASE_TEST_KICK') and S['hq_still'] == 3 and not S.get('hq_kicked'):
-                        S['hq_kicked'] = True
-                        result = truck.call_method('CreateBuildingAtLocation', (spot, unreal.Rotator(0, 0, 0), True))
-                        log(f'KICK: re-ordered the idle HQ truck to build: {result}')
-                if trucks or gliders:
-                    S.setdefault('hq_samples', []).append(
-                        [round(elapsed), [(a.get_class().get_name(), [round(v) for v in (a.get_actor_location().x,
-                          a.get_actor_location().y, a.get_actor_location().z)], round(a.get_velocity().length()))
-                                          for a in trucks + gliders]])
-                    log(f'hq sample {S["hq_samples"][-1]}')
             if elapsed > 3.0 and 'res_before' not in S:
                 S['res_before'] = resources(world)
                 log(f'resources before HQ {S["res_before"]}')
+            panels = open_takeovers(world)
+            if panels:
+                m = mission(world)
+                trucks = [t for c in HQ_TRUCKS for t in actors_of(world, c)]
+                hq = m.get_editor_property('HQ')
+                heard = S.get('voice', {})
+                check('glider_line_before_takeover', 'IntroMission_HQGliderInbound' in heard,
+                      f'heard {sorted(heard)}')
+                check('conversion_takeover_shown', unreal.GameplayStatics.is_game_paused(world),
+                      f'{panels[0].get_class().get_name()} {elapsed:.0f} s after start, '
+                      f'paused={unreal.GameplayStatics.is_game_paused(world)}')
+                # GetIsInTruckMode is not Blueprint-exposed; the building mesh stays hidden while it is a truck.
+                building = hq.call_method('GetBuildingMeshComponent') if hq is not None else None
+                check('hq_out_of_glider_as_truck', hq is not None and hq in trucks and not m.call_method(
+                    'GetIsNomadicDeployedAsBuilding', (hq,)) and not (building and building.is_visible()),
+                      f'HQ {hq.get_name() if hq else None} at {hq.get_actor_location() if hq else None}')
+                S['takeover_presses'], S['takeover_press_t'] = 0, -99.0
+                S['phase'], S['mark'] = 'close_takeover', S['t']
+            elif elapsed > 240.0:
+                check('conversion_takeover_shown', False, 'no takeover 240 s after start')
+                finish()
+        elif phase == 'close_takeover':
+            panels = open_takeovers(world)
+            if panels and S['t'] - S['takeover_press_t'] > 1.5 and S['takeover_presses'] < 4:
+                panels[0].call_method('HandleUnderstoodClicked')
+                S['takeover_presses'] += 1
+                S['takeover_press_t'] = S['t']
+                log(f'pressed the takeover button ({S["takeover_presses"]})')
+            elif not panels and S['t'] - S['takeover_press_t'] > 0.5:
+                S['takeover_closed_t'] = S['t']
+                check('conversion_takeover_closed', not unreal.GameplayStatics.is_game_paused(world),
+                      f'{S["takeover_presses"]} press(es)')
+                S['phase'], S['mark'] = 'after_takeover', S['t']
+            elif elapsed > 20.0:
+                check('conversion_takeover_closed', False, f'still open after {S["takeover_presses"]} presses')
+                finish()
+        elif phase == 'after_takeover' and elapsed > 4.0:
+            m = mission(world)
+            heard = S.get('voice', {})
+            convert = heard.get('IntroMission_ConvertHQ')
+            # The line starts from On Closed, i.e. on the closing press (the panel is seen gone a frame later).
+            check('convert_line_after_takeover', convert is not None and convert[0] >= S['takeover_press_t'],
+                  f'convert line at {convert}, closing press at {S["takeover_press_t"]:.1f}')
+            spot = m.get_editor_property('HQBuildLocation')
+            hints = actors_of(world, 'BP_Hint_ExpandHQ_C')
+            near = [h for h in hints if dist2d(h.get_actor_location(), spot) < 300]
+            texts = [hint_texts(h) for h in near]
+            check('deploy_hq_marker', len(near) == 1 and any('Deploy HQ' in t for t in texts[0]),
+                  f'{len(hints)} marker(s), {len(near)} at the HQ spot, texts {texts}')
+            hq = m.get_editor_property('HQ')
+            for dx, dy in CONVERT_OFFSETS:
+                click = unreal.Vector(spot.x + dx, spot.y + dy, spot.z)
+                # 1 ordered, 2 not a truck, 3 no preview, 4 spot rejected, 5 click not taken; +10 = build radius asked.
+                code = unreal.MissionMapTestLibrary.map_test_convert_nomadic_at(hq, click)
+                ok, needed_radius = code % 10 == 1, code >= 10
+                log(f'convert click at {click}: code {code} ordered={ok} needed_build_radius={needed_radius}')
+                S.setdefault('convert_tries', []).append([dx, dy, ok, needed_radius, code])
+                if ok:
+                    break
+            tries = S['convert_tries']
+            check('hq_registered_converts_without_radius', all(t[3] is False for t in tries),
+                  f'needed_build_radius per click {tries}')
+            check('hq_conversion_ordered', any(t[2] for t in tries), f'{tries}')
+            S['phase'], S['mark'] = 'wait_hq_deployed', S['t']
+        elif phase == 'wait_hq_deployed':
             if wait_stage(world, 1, 240.0, 'hq_ready', 'hq_deployed'):
                 m = mission(world)
                 hq = m.get_editor_property('HQ')
                 loc = hq.get_actor_location() if hq else None
                 check('hq_deployed', hq is not None and m.call_method('GetIsNomadicDeployedAsBuilding', (hq,)),
                       f'HQ at {loc} (wanted near 1450, 300) after {elapsed:.0f} s')
-                check('hq_on_concrete', loc is not None and abs(loc.x - 1450) < 800 and abs(loc.y - 300) < 800,
+                check('hq_on_concrete', loc is not None and abs(loc.x - 1450) < 1200 and abs(loc.y - 300) < 1200,
                       f'{loc}')
+                check('deploy_hq_marker_removed', not actors_of(world, 'BP_Hint_ExpandHQ_C'),
+                      f'{len(actors_of(world, "BP_Hint_ExpandHQ_C"))} left')
         elif phase == 'hq_ready' and elapsed > 3.0:
             radixite, metal = resources(world)
             before = S.get('res_before', (0, 0))
@@ -340,6 +395,30 @@ def tick(delta):
             if wait_stage(world, 7, 240.0, 'converter', 'refinery_deployed'):
                 check('refinery_deployed', True)
         elif phase == 'converter' and elapsed > 2.0:
+            # The refinery deploy opens the building expansion pack-up takeover (paused); the converter line plays
+            # from its On Closed. Close it like a player before building the converter.
+            panels = open_takeovers(world)
+            if panels:
+                if 'bxp_takeover' not in S:
+                    S['bxp_takeover'] = [panels[0].get_class().get_name(), unreal.GameplayStatics.is_game_paused(world)]
+                    check('bxp_packup_takeover_shown', S['bxp_takeover'][0] == 'WBP_BxpPackUpTakeover_C'
+                          and S['bxp_takeover'][1], f'{S["bxp_takeover"]} {elapsed:.1f} s after the refinery deployed')
+                if S['t'] - S.get('bxp_press_t', -99.0) > 1.5:
+                    S['bxp_press_t'] = S['t']
+                    panels[0].call_method('HandleUnderstoodClicked')
+                    log('closed the building expansion pack-up takeover')
+                return
+            if 'bxp_takeover' not in S:
+                check('bxp_packup_takeover_shown', False, 'no takeover after the refinery deployed')
+                S['bxp_takeover'] = None
+            if 'bxp_line_checked' not in S and S.get('bxp_press_t') is not None:
+                line = S.get('voice', {}).get('IntroMission_BuildConverter')
+                if line is None and S['t'] - S['bxp_press_t'] < 4.0:
+                    return
+                S['bxp_line_checked'] = True
+                # Voice times are rounded to 0.1 s; the line starts in the same frame as the closing press.
+                check('converter_line_after_bxp_takeover', line is not None and line[0] >= S['bxp_press_t'] - 0.1,
+                      f'converter line at {line}, takeover closed at {S["bxp_press_t"]:.1f}')
             refinery = mission(world).get_editor_property('RefineryNomadic')
             if 'bxp_clicked' not in S:
                 S['bxp_clicked'] = unreal.MissionMapTestLibrary.map_test_start_bxp_placement(

@@ -52,6 +52,16 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Mission|MapTests", meta = (WorldContext = "WorldContextObject"))
 	static bool MapTest_PlaceLoadedBxp(const UObject* WorldContextObject, FVector ClickLocation);
 
+	/**
+	 * @brief The player converts a nomadic truck: selects it, presses convert and clicks the preview at Location.
+	 * @param NomadicTruck A player nomadic in truck mode.
+	 * @param Location Ground location of the placement click.
+	 * @return 1 ordered, 2 not a truck, 3 no nomadic preview started, 4 the spot was rejected, 5 the click was not
+	 * taken, 0 invalid input; +10 when the preview demanded a build radius (never for the registered player HQ).
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Mission|MapTests")
+	static int32 MapTest_ConvertNomadicAt(ANomadicVehicle* NomadicTruck, FVector Location);
+
 	/** @return True when the unit's command card holds the ability. */
 	UFUNCTION(BlueprintCallable, Category = "Mission|MapTests")
 	static bool MapTest_HasAbility(AActor* Unit, EAbilityID Ability);

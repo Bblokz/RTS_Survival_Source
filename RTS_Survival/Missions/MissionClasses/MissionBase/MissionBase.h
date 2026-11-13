@@ -181,6 +181,29 @@ struct FMissionTrackingMiniMapRuntimeState
 	TArray<FName> M_TextIds;
 };
 
+/** One unit group a mission shows on the minimap with the survival wave chevron and badge. */
+USTRUCT()
+struct FMissionUnitGroupMarker
+{
+	GENERATED_BODY()
+
+	// Mission-chosen ID; BP_OnUnitGroupDefeated reports it.
+	FName GroupId = NAME_None;
+
+	// Base ID of the chevron and badge icons.
+	FName IconId = NAME_None;
+
+	FVector Location = FVector::ZeroVector;
+
+	// Where the heading was last measured from; the heading follows the group's progress, not its jitter.
+	FVector HeadingAnchor = FVector::ZeroVector;
+
+	float HeadingYaw = 0.f;
+
+	UPROPERTY()
+	TArray<TWeakObjectPtr<AActor>> Units;
+};
+
 USTRUCT()
 struct FMissionCinematicAudioRuntimeState
 {
@@ -776,6 +799,32 @@ protected:
 	                                    const float MiniMapTextSizePixels = 14.0f,
 	                                    const FLinearColor MiniMapTextColor = FLinearColor::White);
 
+	/**
+	 * @brief Shows the units on the minimap as one group, like a survival wave: a chevron along the group's heading
+	 * plus a badge at the centroid of its living units. When the last unit is gone the icons go and
+	 * BP_OnUnitGroupDefeated fires with GroupId, so a mission can complete on it without any objective text.
+	 * @param GroupId Mission-chosen ID of the group; tracking the same ID again replaces that group.
+	 * @param Units The group's units (invalid entries are skipped; with none valid the group is defeated at once).
+	 * @param HeadingTarget Where the group heads; its first heading points there until it has moved.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|MiniMap")
+	void TrackUnitGroupOnMiniMap(const FName GroupId, const TArray<AActor*>& Units, const FVector HeadingTarget);
+
+	/** @return How many unit groups (TrackUnitGroupOnMiniMap) still have living units. */
+	UFUNCTION(BlueprintPure, NotBlueprintable, Category = "Mission|MiniMap")
+	int32 GetTrackedUnitGroupCount() const { return M_UnitGroupMarkers.Num(); }
+
+	/**
+	 * @return The group's minimap marker location (the centroid of its living units); ZeroVector when the group is
+	 * not tracked (never was, or its last unit is gone).
+	 */
+	UFUNCTION(BlueprintPure, NotBlueprintable, Category = "Mission|MiniMap")
+	FVector GetUnitGroupMarkerLocation(const FName GroupId) const;
+
+	// The last unit of a group from TrackUnitGroupOnMiniMap is gone; its minimap marker was removed.
+	UFUNCTION(BlueprintImplementableEvent, Category = "Mission|MiniMap")
+	void BP_OnUnitGroupDefeated(const FName GroupId);
+
 	UFUNCTION(BlueprintImplementableEvent)
 	void BP_OnCallBackDestructibleCollapse(ADestructableEnvActor* ActorCollapsed);
 
@@ -1101,17 +1150,26 @@ protected:
 	 * @param BuildRotation Only the yaw is used.
 	 * @param GliderTouchdownLocation Where the glider touches down; it skids toward BuildLocation, so leave a long
 	 * flat run between them. Zero: it comes in from the aircraft spawn side.
-	 * @param ID Handed back in BP_OnAirDeliveredNomadicLanded.
+	 * @param ID Handed back in BP_OnAirDeliveredNomadicLanded and BP_OnAirDeliveredHQOutOfGlider.
+	 * @param bBuildOnLanding False leaves the HQ truck where it drove out of the glider, so the player converts it
+	 * (tutorials); BP_OnAirDeliveredHQOutOfGlider then fires once it stands there.
+	 * @note Either way the HQ is registered as the player HQ the moment the glider releases it.
 	 */
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|AirDelivery")
 	void DeliverPlayerHQByMammutGlider(const FVector BuildLocation, const FRotator BuildRotation,
-	                                   const FVector GliderTouchdownLocation, const int32 ID = 0);
+	                                   const FVector GliderTouchdownLocation, const int32 ID = 0,
+	                                   const bool bBuildOnLanding = true);
 
 	// The truck is on the ground and has just been ordered to build (unless bBuildOnLanding was false); null when
-	// the delivery failed.
+	// the delivery failed. A glider HQ is still in the glider's nose at this point.
 	UFUNCTION(BlueprintImplementableEvent, Category = "Mission|AirDelivery")
 	void BP_OnAirDeliveredNomadicLanded(ANomadicVehicle* NomadicVehicle, const ENomadicSubtype NomadicSubtype,
 	                                    const int32 ID);
+
+	// Glider HQ delivered with bBuildOnLanding false: the truck has driven out of the glider and stands idle (at most
+	// 30 s after the release). Not fired when the HQ died on the way out.
+	UFUNCTION(BlueprintImplementableEvent, Category = "Mission|AirDelivery")
+	void BP_OnAirDeliveredHQOutOfGlider(ANomadicVehicle* NomadicVehicle, const int32 ID);
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void MoveCamera(FMovePlayerCamera CameraMove);
@@ -1484,5 +1542,29 @@ private:
 	void ActivateNextMissionIfConfigured();
 	void AirDelivery_Start(const FNomadicAirDeliveryOrder& Order, const int32 ID);
 	void AirDelivery_OnLanded(ANomadicVehicle* NomadicVehicle, const ENomadicSubtype NomadicSubtype,
-	                          const bool bIsHQDelivery, const int32 ID);
+	                          const bool bIsHQDelivery, const bool bWaitForGliderExit, const int32 ID);
+	void AirDelivery_RegisterPlayerHQ(ANomadicVehicle* NomadicVehicle) const;
+	void AirDelivery_StartHQExitPoll(ANomadicVehicle* NomadicVehicle, const int32 ID);
+	void AirDelivery_PollHQExit();
+	void AirDelivery_ClearHQExitPoll();
+
+	// Glider HQ (bBuildOnLanding false) that is still driving out of the glider; BP_OnAirDeliveredHQOutOfGlider
+	// fires once it is idle.
+	TWeakObjectPtr<ANomadicVehicle> M_HQLeavingGlider;
+	int32 M_HQLeavingGliderID = 0;
+	float M_HQLeavingGliderSeconds = 0.f;
+	FTimerHandle M_HQLeavingGliderPollHandle;
+
+	// Unit groups shown on the minimap (TrackUnitGroupOnMiniMap) until their last unit is gone.
+	UPROPERTY()
+	TArray<FMissionUnitGroupMarker> M_UnitGroupMarkers;
+
+	FTimerHandle M_UnitGroupMarkerTimerHandle;
+	int32 M_NextUnitGroupMarkerIndex = 0;
+
+	void UnitGroupMarkers_EnsureUpdateTimer();
+	void UnitGroupMarkers_Update();
+	void UnitGroupMarkers_RemoveGroup(const FName GroupId);
+	// Removes every group's icons without reporting defeats (mission end or clean-up).
+	void UnitGroupMarkers_Clear();
 };
