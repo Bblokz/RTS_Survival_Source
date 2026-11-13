@@ -7,6 +7,7 @@
 
 #include "RTSAudioDeveloperSettings.generated.h"
 
+class UBulletFlyByDataAsset;
 class USoundClass;
 class USoundMix;
 
@@ -33,4 +34,9 @@ public:
 	/** Sound classes mapped by channel type so the settings menu can target each class. */
 	UPROPERTY(Config, EditAnywhere, Category="Audio")
 	TMap<ERTSAudioType, TSoftObjectPtr<USoundClass>> SoundClassesByType;
+
+	/** Bullet fly-by sounds (picked at random) and their tuning, played by UBulletFlyByAudioSubsystem when a
+	 * small-arms tracer passes close to the point the camera looks at. Keep the asset in an always-cooked folder. */
+	UPROPERTY(Config, EditAnywhere, Category="Bullet Fly By")
+	TSoftObjectPtr<UBulletFlyByDataAsset> BulletFlyByData;
 };
