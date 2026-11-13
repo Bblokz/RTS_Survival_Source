@@ -1,0 +1,275 @@
+{
+ "key": "C_LiftPortal",
+ "title": "C  Lift portal: slab hoisted between two towers",
+ "notes": [
+  "Two tall concrete towers joined by a lintel; the concrete leaf lifts straight up in steel guide channels (sluice style).",
+  "Counterweights hang on the back of the towers, sheaves on top. Open, the leaf parks under the lintel at 5.0-9.8 m.",
+  "Holes: towers, lintel and leaf are flat concrete: same hole material and debris as the wall. The leaf moves: own component.",
+  "A landmark: at 11 m it is the tallest piece of a Soviet wall line and reads as the base entrance from anywhere.",
+  "Tall casts long shadows and blocks sight lines; a lower variant would be 8.5 m towers with a 4 m leaf."
+ ],
+ "subtitle": "Gate module 10.9 m  |  clear opening 7.5 m, 5.0 m under the raised leaf  |  towers 11 m  |  wall stubs = SM_Wall_14  |  Pz IV for scale",
+ "footprint": [
+  28.7,
+  3.2
+ ],
+ "height": 12.4,
+ "mast_height": 12.4,
+ "views": {
+  "rts": {
+   "file": "C_LiftPortal_rts.png",
+   "size": [
+    1600,
+    1100
+   ],
+   "px_per_m": 47.27272727272727,
+   "caption": null,
+   "labels": [
+    {
+     "text": "Concrete tower 11 m",
+     "kind": "gate",
+     "xy": [
+      952.3,
+      334.5
+     ]
+    },
+    {
+     "text": "Counterweight (back of tower)",
+     "kind": "gate",
+     "xy": [
+      1057.2,
+      390.0
+     ]
+    },
+    {
+     "text": "Leaf lifts to 5.0 m clear",
+     "kind": "gate",
+     "xy": [
+      717.8,
+      428.7
+     ]
+    },
+    {
+     "text": "Lintel, sheaves",
+     "kind": "gate",
+     "xy": [
+      684.8,
+      188.1
+     ]
+    }
+   ]
+  },
+  "rear": {
+   "file": "C_LiftPortal_rear.png",
+   "size": [
+    800,
+    550
+   ],
+   "px_per_m": 29.09090909090909,
+   "caption": "Front elevation (enemy side)",
+   "labels": []
+  },
+  "top": {
+   "file": "C_LiftPortal_top.png",
+   "size": [
+    800,
+    800
+   ],
+   "px_per_m": 30.58823529411765,
+   "caption": null,
+   "labels": [
+    {
+     "text": "Concrete tower 11 m",
+     "kind": "gate",
+     "xy": [
+      539.2,
+      424.5
+     ]
+    },
+    {
+     "text": "Counterweight (back of tower)",
+     "kind": "gate",
+     "xy": [
+      554.5,
+      329.6
+     ]
+    },
+    {
+     "text": "Leaf lifts to 5.0 m clear",
+     "kind": "gate",
+     "xy": [
+      338.8,
+      406.1
+     ]
+    },
+    {
+     "text": "Lintel, sheaves",
+     "kind": "gate",
+     "xy": [
+      323.5,
+      421.4
+     ]
+    }
+   ],
+   "grid": [
+    [
+     -517.6,
+     1317.6,
+     -517.6,
+     -517.6
+    ],
+    [
+     -364.7,
+     1317.6,
+     -364.7,
+     -517.6
+    ],
+    [
+     -211.8,
+     1317.6,
+     -211.8,
+     -517.6
+    ],
+    [
+     -58.8,
+     1317.6,
+     -58.8,
+     -517.6
+    ],
+    [
+     94.1,
+     1317.6,
+     94.1,
+     -517.6
+    ],
+    [
+     247.1,
+     1317.6,
+     247.1,
+     -517.6
+    ],
+    [
+     400.0,
+     1317.6,
+     400.0,
+     -517.6
+    ],
+    [
+     552.9,
+     1317.6,
+     552.9,
+     -517.6
+    ],
+    [
+     705.9,
+     1317.6,
+     705.9,
+     -517.6
+    ],
+    [
+     858.8,
+     1317.6,
+     858.8,
+     -517.6
+    ],
+    [
+     1011.8,
+     1317.6,
+     1011.8,
+     -517.6
+    ],
+    [
+     1164.7,
+     1317.6,
+     1164.7,
+     -517.6
+    ],
+    [
+     1317.6,
+     1317.6,
+     1317.6,
+     -517.6
+    ],
+    [
+     -517.6,
+     1317.6,
+     1317.6,
+     1317.6
+    ],
+    [
+     -517.6,
+     1164.7,
+     1317.6,
+     1164.7
+    ],
+    [
+     -517.6,
+     1011.8,
+     1317.6,
+     1011.8
+    ],
+    [
+     -517.6,
+     858.8,
+     1317.6,
+     858.8
+    ],
+    [
+     -517.6,
+     705.9,
+     1317.6,
+     705.9
+    ],
+    [
+     -517.6,
+     552.9,
+     1317.6,
+     552.9
+    ],
+    [
+     -517.6,
+     400.0,
+     1317.6,
+     400.0
+    ],
+    [
+     -517.6,
+     247.1,
+     1317.6,
+     247.1
+    ],
+    [
+     -517.6,
+     94.1,
+     1317.6,
+     94.1
+    ],
+    [
+     -517.6,
+     -58.8,
+     1317.6,
+     -58.8
+    ],
+    [
+     -517.6,
+     -211.8,
+     1317.6,
+     -211.8
+    ],
+    [
+     -517.6,
+     -364.7,
+     1317.6,
+     -364.7
+    ],
+    [
+     -517.6,
+     -517.6,
+     1317.6,
+     -517.6
+    ]
+   ]
+  }
+ },
+ "main_view": "rts"
+}
