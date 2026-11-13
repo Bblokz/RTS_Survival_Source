@@ -262,6 +262,11 @@ Run3 (all six lanes passed; run2 gave the same behaviour):
 - death by damage: `RTS_WALL_HOLES collapse ... threw=11-19 hide=1` for seven pieces (three died under fire, four
   were killed); mesh hidden, no collision, life span 4.5 s; 9 s later actor gone, 0 socket points, nav boxes free.
 
+The heaps inherit the base graph with `Crushable` off. `heap_cover_run.sh run_crushbase` after the change
+(`Saved/Berlin/heap_cover_test/run_crushbase.log`): all seven still natural cover, sockets published 8/8, 4/4, 8/8,
+4/8 (Collapse_L), 5/5, 7/7, 6/6 as before; six heaps died by damage with `collapse ... threw=7-44 hide=1`; the killed
+Brick, Collapse_S and Block were gone with 0 cover points and free nav boxes.
+
 ## Scattering on Ger_Berlin
 
 - **Rebuild navigation** after placing; the boxes are cut in at build time, as for the ruin kit.
