@@ -136,12 +136,14 @@ public:
 
 	/**
 	 * @brief A special bxp data update that is only called once a new construction location for a bxp is determined.
-	 * In this case we change the rotation and socket name of the bxp which need to be saved if a bxp is later unpacked
+	 * In this case we save the socket name of the bxp, which is needed if a bxp is later unpacked
 	 * and of the type that it can be placed at a socket.
 	 *
-	 * @note If the bxp is of attach to origin then the socket name is None but the rotation will be used when unpacked.
+	 * @note The rotation is not saved: on redeploy a Socket bxp takes the socket's rotation on the building and an
+	 * AtBuildingOrigin bxp the building's yaw, both the same as its first placement
+	 * (see ACPPController::OnBxpSpawnedAsync_InstantPlacement).
 	 * @param BuildingExpansion BuldingExpansion that is being constructed.
-	 * @param BxpRotation The rotation of the building expansion that is being constructed.
+	 * @param BxpRotation The rotation of the building expansion that is being constructed; currently unused.
 	 * @param AttachedToSocketName The name of the socket that the building expansion is attached to.
 	 */
 	void OnBxpConstructionStartUpdateExpansionData(

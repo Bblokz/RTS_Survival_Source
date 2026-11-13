@@ -571,13 +571,26 @@ void ABuildingExpansion::UnitDies(const ERTSDeathType DeathType)
 	StopDeployAnimationForDeath();
 	// Before bp event as the bp event may destroy the actor immediately.
 	OnUnitDies.Broadcast();
-	if (UPitDefenseComponent* PitDefenseComponent = FindComponentByClass<UPitDefenseComponent>())
+	UPitDefenseComponent* PitDefenseComponent = FindComponentByClass<UPitDefenseComponent>();
+	if (not IsValid(PitDefenseComponent))
 	{
-		DisableAllWeapons();
+		BP_OnUnitDies();
+		return;
+	}
+	DisableAllWeapons();
+	// A pit with its own Blueprint death swaps itself for a wreck there; sinking would bury the pit the wreck replaces.
+	if (not GetHasBlueprintDeath())
+	{
 		PitDefenseComponent->HandlePitDeath();
 		return;
 	}
+	PitDefenseComponent->HandlePitDeathWithoutSink();
 	BP_OnUnitDies();
+}
+
+bool ABuildingExpansion::GetHasBlueprintDeath() const
+{
+	return GetClass()->IsFunctionImplementedInScript(GET_FUNCTION_NAME_CHECKED(ABuildingExpansion, BP_OnUnitDies));
 }
 
 void ABuildingExpansion::DestroyAndSpawnActors(const FDestroySpawnActorsParameters& SpawnParams, FCollapseFX CollapseFX)

@@ -230,6 +230,9 @@ protected:
 	UFUNCTION(BlueprintImplementableEvent)
 	void BP_OnUnitDies();
 
+	/** @return True when the Blueprint implements BP_OnUnitDies; pits then die by it instead of the PitDefense sink. */
+	bool GetHasBlueprintDeath() const;
+
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void DisableAllWeapons();
 
