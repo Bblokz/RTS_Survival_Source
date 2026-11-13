@@ -156,11 +156,11 @@ UWidget* UW_VehicleInfoTakeover::BuildPicture()
 		Picture->SetBrush(M_Content.ImageBrush);
 	}
 	PictureScale->SetContent(Picture);
-	PictureWell->SetContent(PictureScale);
+	PictureWell->SetContent(MakePictureWithGlass(PictureScale));
 	return PictureBox;
 }
 
-UWidget* UW_VehicleInfoTakeover::BuildGlassPane(UWidget* Content) const
+UWidget* UW_VehicleInfoTakeover::BuildGlassPane(UWidget* Content)
 {
 	using namespace VehicleInfoTakeoverLayout;
 	UBackgroundBlur* const GlassBlur = WidgetTree->ConstructWidget<UBackgroundBlur>(UBackgroundBlur::StaticClass());
@@ -173,6 +173,7 @@ UWidget* UW_VehicleInfoTakeover::BuildGlassPane(UWidget* Content) const
 	GlassPane->SetBrush(M_Style.Skin.VariantSectionGlass);
 	GlassPane->SetPadding(GlassPanePadding);
 	GlassPane->SetContent(Content);
+	RegisterGlassPane(*GlassPane);
 	GlassBlur->SetContent(GlassPane);
 	return GlassBlur;
 }

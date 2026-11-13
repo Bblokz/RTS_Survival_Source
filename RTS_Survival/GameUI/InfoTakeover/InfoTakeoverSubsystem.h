@@ -99,6 +99,20 @@ public:
 	 */
 	int32 QueueSpacedArmourTakeover();
 
+	/**
+	 * @brief Queues the nomadic conversion field manual (a truck deploys into a building and packs up again), waited on
+	 * like the camera controls takeover.
+	 * @return The request id that OnTakeoverRequestFinished reports exactly once; INDEX_NONE when takeovers are off.
+	 */
+	int32 QueueNomadicConversionTakeover();
+
+	/**
+	 * @brief Queues the building expansion pack-up field manual (expansions pack up with their nomadic building and come
+	 * back after it deploys), waited on like the camera controls takeover.
+	 * @return The request id that OnTakeoverRequestFinished reports exactly once; INDEX_NONE when takeovers are off.
+	 */
+	int32 QueueBxpPackUpTakeover();
+
 	// Fires once per queued request id: closed, skipped (turned off while waiting, broken widget) or cancelled.
 	FOnInfoTakeoverRequestFinished OnTakeoverRequestFinished;
 
@@ -148,6 +162,8 @@ private:
 	UW_InfoTakeover* CreateCameraControlsTakeoverWidget() const;
 	UW_InfoTakeover* CreateCoverTakeoverWidget() const;
 	UW_InfoTakeover* CreateSpacedArmourTakeoverWidget() const;
+	UW_InfoTakeover* CreateNomadicConversionTakeoverWidget() const;
+	UW_InfoTakeover* CreateBxpPackUpTakeoverWidget() const;
 
 	/**
 	 * @brief Queues a field manual takeover that a mission node waits on; shared by every tutorial kind.
@@ -168,5 +184,7 @@ private:
 	static FArchiveCustomContent MakeCameraControlsArchiveContent();
 	static FArchiveCustomContent MakeCoverArchiveContent();
 	static FArchiveCustomContent MakeSpacedArmourArchiveContent();
+	static FArchiveCustomContent MakeNomadicConversionArchiveContent();
+	static FArchiveCustomContent MakeBxpPackUpArchiveContent();
 	const UDataTable* GetTrainingOptionsTable();
 };

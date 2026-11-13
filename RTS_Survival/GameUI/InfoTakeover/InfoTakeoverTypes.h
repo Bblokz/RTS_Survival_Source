@@ -28,7 +28,13 @@ enum class EInfoTakeoverKind : uint8
 	Cover,
 	// How spaced armour plates protect a tank's sides and come off under fire; opened by the Show Spaced Armour
 	// Takeover node.
-	SpacedArmour
+	SpacedArmour,
+	// How a nomadic truck converts into a building and packs up again; opened by the Show Nomadic Conversion Takeover
+	// node.
+	NomadicConversion,
+	// How building expansions pack up with their nomadic building and come back after it deploys; opened by the Show
+	// Building Expansion Pack Up Takeover node.
+	BxpPackUp
 };
 
 /**

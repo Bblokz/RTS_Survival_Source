@@ -146,3 +146,54 @@ protected:
 	virtual int32 QueueTakeover(UInfoTakeoverSubsystem& InfoTakeoverSubsystem) const override;
 	virtual FString GetNodeName() const override { return TEXT("Show Spaced Armour Takeover"); }
 };
+
+/**
+ * @brief Mission node that pauses the game with the nomadic conversion field manual (select a truck, convert it into a
+ * building, place it, pack it up again) and continues from On Closed once the player pressed UNDERSTOOD.
+ */
+UCLASS()
+class RTS_SURVIVAL_API UAsyncShowNomadicConversionTakeover : public UAsyncShowInfoTakeoverBase
+{
+	GENERATED_BODY()
+
+public:
+	/**
+	 * @brief Shows the nomadic conversion takeover and waits for it to close.
+	 * @param WorldContextObject The mission (or any object in the game world); filled in as self.
+	 * @return The node; On Closed fires later, or in the same frame when the takeovers are turned off.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Mission|Info Takeover",
+		meta = (BlueprintInternalUseOnly = "true", DefaultToSelf = "WorldContextObject",
+			HidePin = "WorldContextObject", DisplayName = "Show Nomadic Conversion Takeover"))
+	static UAsyncShowNomadicConversionTakeover* ShowNomadicConversionTakeover(UObject* WorldContextObject);
+
+protected:
+	virtual int32 QueueTakeover(UInfoTakeoverSubsystem& InfoTakeoverSubsystem) const override;
+	virtual FString GetNodeName() const override { return TEXT("Show Nomadic Conversion Takeover"); }
+};
+
+/**
+ * @brief Mission node that pauses the game with the building expansion pack-up field manual (expansions pack up with
+ * their nomadic building, attached ones come back by themselves after it deploys, free-standing ones are placed again
+ * from their slot) and continues from On Closed once the player pressed UNDERSTOOD.
+ */
+UCLASS()
+class RTS_SURVIVAL_API UAsyncShowBxpPackUpTakeover : public UAsyncShowInfoTakeoverBase
+{
+	GENERATED_BODY()
+
+public:
+	/**
+	 * @brief Shows the building expansion pack-up takeover and waits for it to close.
+	 * @param WorldContextObject The mission (or any object in the game world); filled in as self.
+	 * @return The node; On Closed fires later, or in the same frame when the takeovers are turned off.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Mission|Info Takeover",
+		meta = (BlueprintInternalUseOnly = "true", DefaultToSelf = "WorldContextObject",
+			HidePin = "WorldContextObject", DisplayName = "Show Building Expansion Pack Up Takeover"))
+	static UAsyncShowBxpPackUpTakeover* ShowBxpPackUpTakeover(UObject* WorldContextObject);
+
+protected:
+	virtual int32 QueueTakeover(UInfoTakeoverSubsystem& InfoTakeoverSubsystem) const override;
+	virtual FString GetNodeName() const override { return TEXT("Show Building Expansion Pack Up Takeover"); }
+};

@@ -120,3 +120,24 @@ int32 UAsyncShowSpacedArmourTakeover::QueueTakeover(UInfoTakeoverSubsystem& Info
 {
 	return InfoTakeoverSubsystem.QueueSpacedArmourTakeover();
 }
+
+UAsyncShowNomadicConversionTakeover* UAsyncShowNomadicConversionTakeover::ShowNomadicConversionTakeover(
+	UObject* WorldContextObject)
+{
+	return CreateNode<UAsyncShowNomadicConversionTakeover>(WorldContextObject);
+}
+
+int32 UAsyncShowNomadicConversionTakeover::QueueTakeover(UInfoTakeoverSubsystem& InfoTakeoverSubsystem) const
+{
+	return InfoTakeoverSubsystem.QueueNomadicConversionTakeover();
+}
+
+UAsyncShowBxpPackUpTakeover* UAsyncShowBxpPackUpTakeover::ShowBxpPackUpTakeover(UObject* WorldContextObject)
+{
+	return CreateNode<UAsyncShowBxpPackUpTakeover>(WorldContextObject);
+}
+
+int32 UAsyncShowBxpPackUpTakeover::QueueTakeover(UInfoTakeoverSubsystem& InfoTakeoverSubsystem) const
+{
+	return InfoTakeoverSubsystem.QueueBxpPackUpTakeover();
+}

@@ -10,6 +10,8 @@
 class UDataTable;
 class UW_CameraControlsTakeover;
 class UW_CoverTakeover;
+class UW_NomadicConversionTakeover;
+class UW_BxpPackUpTakeover;
 class UW_SpacedArmourTakeover;
 class UW_VehicleInfoTakeover;
 
@@ -49,4 +51,12 @@ public:
 	// WBP_SpacedArmourTakeover: the Blueprint child that carries the style for the spaced armour field manual.
 	UPROPERTY(EditAnywhere, Config, Category = "Tutorials")
 	TSoftClassPtr<UW_SpacedArmourTakeover> SpacedArmourTakeoverWidgetClass;
+
+	// WBP_NomadicConversionTakeover: the Blueprint child that carries the style for the nomadic conversion field manual.
+	UPROPERTY(EditAnywhere, Config, Category = "Tutorials")
+	TSoftClassPtr<UW_NomadicConversionTakeover> NomadicConversionTakeoverWidgetClass;
+
+	// WBP_BxpPackUpTakeover: the Blueprint child that carries the style for the building expansion pack-up field manual.
+	UPROPERTY(EditAnywhere, Config, Category = "Tutorials")
+	TSoftClassPtr<UW_BxpPackUpTakeover> BxpPackUpTakeoverWidgetClass;
 };

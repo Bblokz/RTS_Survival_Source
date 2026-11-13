@@ -47,7 +47,7 @@ private:
 	UWidget* BuildDescriptionColumn();
 	UWidget* BuildFactsColumn();
 	UWidget* BuildPicture();
-	UWidget* BuildGlassPane(UWidget* Content) const;
+	UWidget* BuildGlassPane(UWidget* Content);
 
 	void AddSectionLabel(UVerticalBox& Column, const FText& Label, const bool bIsFirstInColumn);
 	void AddSpecRow(const FText& Label, const FText& Value);

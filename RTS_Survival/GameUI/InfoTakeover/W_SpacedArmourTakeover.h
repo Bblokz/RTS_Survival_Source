@@ -70,6 +70,6 @@ private:
 	void BuildBody();
 	UWidget* BuildRenderCard();
 	UWidget* BuildStatesCard();
-	UWidget* WrapInGlassPane(UWidget* Content) const;
+	UWidget* WrapInGlassPane(UWidget* Content);
 	void AddStateText(UVerticalBox& StatesColumn, const FSpacedArmourTakeoverState& State, const bool bIsFirst) const;
 };

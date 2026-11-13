@@ -10,8 +10,12 @@
 #include "W_InfoTakeover.generated.h"
 
 class UAudioComponent;
+class UBorder;
 class UButton;
 class UCheckBox;
+class UHorizontalBox;
+class UImage;
+class UMaterialInstanceDynamic;
 class UPauseSafeProtoRichTextBlock;
 class UTextBlock;
 class UVerticalBox;
@@ -48,6 +52,40 @@ struct FInfoTakeoverTypingSoundState
 };
 
 /**
+ * One glass element of a takeover (a body pane, the gauge glass over a picture, a footer button) with the main UI's
+ * glass hover: its own dynamic materials, so only the element under the mouse lights up.
+ */
+USTRUCT()
+struct FInfoTakeoverGlassElement
+{
+	GENERATED_BODY()
+
+	// For the validation log, e.g. Pane_0, Picture_1, Button_Confirm.
+	UPROPERTY()
+	FName Name;
+
+	// The widget whose hover lights the glass.
+	UPROPERTY()
+	TWeakObjectPtr<UWidget> HoverSource;
+
+	// Picture glass inside a body pane: hovering anywhere on the pane (the card) lights the picture glass too.
+	UPROPERTY()
+	TWeakObjectPtr<UWidget> ParentHoverSource;
+
+	// Buttons only: pressing darkens the glass.
+	UPROPERTY()
+	TWeakObjectPtr<UButton> PressSource;
+
+	UPROPERTY()
+	TArray<TObjectPtr<UMaterialInstanceDynamic>> Materials;
+
+	FGlassHoverAnimator Animator;
+
+	// Tests and captures hover the element without a mouse.
+	bool bIsForcedHover = false;
+};
+
+/**
  * @brief Base of the info takeovers (vehicles now, buildings and squads later): a paused, full-screen panel whose
  * title and description type in with the mission text sounds, with "never show these info widgets again" and
  * Understood. UInfoTakeoverSubsystem creates, queues and opens them; subclasses fill the body.
@@ -77,6 +115,39 @@ public:
 	/** @return The typing sound playing now, empty when none; for the headless validation log. */
 	FString GetActiveTypingSoundName() const;
 
+	/** @return How many pages the takeover has; one-page takeovers keep the default 1. */
+	virtual int32 GetPageCount() const { return 1; }
+
+	/** @return The page that shows now, 0 based. */
+	virtual int32 GetCurrentPageIndex() const { return 0; }
+
+	// For tests and tools: the same as the player clicking PREVIOUS (does nothing on the first page).
+	void PressPreviousButton();
+
+	bool GetIsPreviousButtonVisible() const;
+
+	int32 GetPageLampCount() const { return M_PageLamps.Num(); }
+
+	/** @return The index of the one lit page lamp; INDEX_NONE when none or more than one is lit. */
+	int32 GetLitPageLampIndex() const;
+
+	int32 GetGlassElementCount() const { return M_GlassElements.Num(); }
+
+	/** @return The element's name for logs, NAME_None for an invalid index. */
+	FName GetGlassElementName(const int32 ElementIndex) const;
+
+	/** @return The Hover value the element's first glass material has now; -1 for an invalid index. */
+	float GetGlassElementHover(const int32 ElementIndex) const;
+
+	/**
+	 * @brief Tests and captures hover a glass element without a mouse; it ramps like a real hover.
+	 * @param ElementIndex Index into the takeover's glass elements.
+	 * @param bIsHovered Whether the element counts as hovered.
+	 * @param FrozenSweepProgress Holds the light band at this progress (0..1); negative lets it run.
+	 */
+	void SetGlassElementForcedHover(const int32 ElementIndex, const bool bIsHovered,
+	                                const float FrozenSweepProgress = -1.f);
+
 protected:
 	virtual void NativeOnInitialized() override;
 	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
@@ -90,11 +161,22 @@ protected:
 	void SetDescriptionText(const FText& Description);
 
 	/**
-	 * @brief Multi-page takeovers (like the tutorial overtakes' Continue button) show their next page here; the game
-	 * stays paused and locked between pages.
-	 * @return True when another page was shown, so the button press must not close the takeover.
+	 * @brief Multi-page takeovers show a page here (switcher, texts, button label, illustrations, typing); CONTINUE
+	 * and PREVIOUS call it and then update the page lamps and PREVIOUS. The game stays paused between pages.
+	 * @param PageIndex The page to show, 0 based and within GetPageCount.
+	 * @return True when the page was shown.
 	 */
-	virtual bool TryShowNextPage() { return false; }
+	virtual bool TryShowPage(const int32 PageIndex) { return false; }
+
+	/** Updates the page lamps and PREVIOUS to GetCurrentPageIndex; call after a page change outside TryShowPage. */
+	void RefreshPageControls();
+
+	/**
+	 * @brief Gives a body pane the glass hover: its own dynamic material (quieter than on buttons, the pane carries
+	 * text), and the picture glass inside it lights up with it. Call after the pane's content is set.
+	 * @param GlassPane The border drawn with M_Style.Skin.VariantSectionGlass.
+	 */
+	void RegisterGlassPane(UBorder& GlassPane);
 
 	// The footer button's text, e.g. "CONTINUE" while more pages follow; UNDERSTOOD by default.
 	void SetConfirmButtonLabel(const FText& Label) const;
@@ -104,6 +186,14 @@ protected:
 
 	/** @return The column the subclass builds its body in, between the title and the footer; fills the height. */
 	UVerticalBox* GetBodyColumn() const { return M_BodyColumn; }
+
+	/**
+	 * @brief Every takeover picture sits behind the same gauge glass (M_Style.PictureGlass), so subclasses put their
+	 * picture in through here instead of placing it directly.
+	 * @param Picture The picture widget (image, scale box or illustration) to cover.
+	 * @return An overlay of the picture with the glass on top, or the picture itself when the style has no glass.
+	 */
+	UWidget* MakePictureWithGlass(UWidget* Picture);
 
 	/** @return The typewritten description; the subclass places it in its body. */
 	UPauseSafeProtoRichTextBlock* GetDescriptionBlock() const { return M_DescriptionText; }
@@ -129,6 +219,24 @@ private:
 
 	UPROPERTY()
 	TObjectPtr<UButton> M_UnderstoodButton;
+
+	// PREVIOUS left of the footer button; collapsed on the first page.
+	UPROPERTY()
+	TObjectPtr<UButton> M_PreviousButton;
+
+	// The sized box around PREVIOUS that is shown and collapsed.
+	UPROPERTY()
+	TObjectPtr<UWidget> M_PreviousButtonBox;
+
+	// Top right of the title placard; one lamp per page.
+	UPROPERTY()
+	TObjectPtr<UHorizontalBox> M_PageLampRow;
+
+	UPROPERTY()
+	TArray<TObjectPtr<UImage>> M_PageLamps;
+
+	UPROPERTY()
+	TArray<FInfoTakeoverGlassElement> M_GlassElements;
 
 	UPROPERTY()
 	EInfoTakeoverTypingPhase M_TypingPhase = EInfoTakeoverTypingPhase::NotStarted;
@@ -166,6 +274,24 @@ private:
 
 	UFUNCTION()
 	void HandleUnderstoodClicked();
+
+	UFUNCTION()
+	void HandlePreviousClicked();
+
+	/** @return True when the next page showed, so the footer button must not close the takeover. */
+	bool TryShowNextPage();
+	bool TryShowPreviousPage();
+	UWidget* BuildPageLampRow();
+	void RebuildPageLamps(const int32 LampCount);
+
+	/** Gives a footer button the glass hover on its own dynamic instances of its n / h / p materials. */
+	void RegisterGlassButton(UButton& Button, const FName ElementName);
+
+	/** @return A dynamic instance of the brush's material put back into the brush; null for a non-material brush. */
+	UMaterialInstanceDynamic* MakeDynamicGlassBrush(FSlateBrush& Brush);
+	void LinkPicturesToPane(UBorder& GlassPane);
+	void TickGlassHover(const float DeltaSeconds);
+	static bool GetIsWidgetInside(const UWidget* Widget, const UWidget* Ancestor);
 
 	void TickTypingSound(const float RealDeltaSeconds);
 	void PlayTypingSound(USoundBase* Sound, const bool bIsOngoing);

@@ -6,6 +6,8 @@
 #include "Engine/DataTable.h"
 #include "Sound/SoundBase.h"
 #include "Styling/SlateTypes.h"
+#include "Brushes/SlateRoundedBoxBrush.h"
+#include "RTS_Survival/GameUI/GlassButtons/GlassHoverAnimator.h"
 #include "RTS_Survival/FactionSystem/FactionSelection/UnitVariantSelection/UnitVariantSelectionStyle.h"
 
 #include "InfoTakeoverStyle.generated.h"
@@ -29,6 +31,35 @@ struct FInfoTakeoverStyle
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skin")
 	FCheckBoxStyle NeverShowAgainCheckBox;
+
+	// Gauge glass laid over every picture (portrait, illustration, screenshot, render), above the picture and under
+	// nothing else; normally an instance of the shared M_UI_GlassPane. No resource (the default) draws no glass.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skin")
+	FSlateBrush PictureGlass = FSlateNoResource();
+
+	// One lamp per page in the title placard; the lamp of the page that shows is lit.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skin|Pages")
+	FSlateBrush PageLampLit = FSlateRoundedBoxBrush(FLinearColor(0.25f, 0.94f, 1.f), 11.f,
+	                                                FLinearColor(0.79f, 0.64f, 0.34f), 2.f);
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skin|Pages")
+	FSlateBrush PageLampUnlit = FSlateRoundedBoxBrush(FLinearColor(0.03f, 0.03f, 0.025f), 11.f,
+	                                                  FLinearColor(0.79f, 0.64f, 0.34f), 2.f);
+
+	// The main UI's glass hover (M_UI_GlassPane Hover / HoverSweep / Pressed) on panes, picture glass and buttons.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skin|Glass Hover")
+	FGlassHoverTimings GlassHoverTimings;
+
+	// The body panes carry text, so their hover is quieter than on a button: these replace the pane material's
+	// light band strength, scratch boost and edge tint deepening.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skin|Glass Hover", meta = (ClampMin = "0.0"))
+	float PaneHoverSweepIntensity = 0.07f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skin|Glass Hover", meta = (ClampMin = "0.0"))
+	float PaneHoverScratchBoost = 0.25f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skin|Glass Hover", meta = (ClampMin = "0.0"))
+	float PaneHoverEdgeTint = 0.04f;
 
 	// Darkens the paused game behind the panel.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Skin")

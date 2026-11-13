@@ -29,6 +29,14 @@ namespace CameraControlsValidateConstants
 {
 	const TCHAR* const CommandLineSwitch = TEXT("CameraControlsTakeoverValidate");
 	constexpr double HudBuildSeconds = 5.0;
+	// Glass hover check (real seconds after it starts).
+	constexpr float HoverMidSweepProgress = 0.45f;
+	constexpr double HoverMidSweepShotSeconds = 0.15;
+	constexpr double HoverReleaseFreezeSeconds = 0.3;
+	constexpr double HoverCheckOnSeconds = 0.8;
+	constexpr double HoverCheckOffSeconds = 1.6;
+	constexpr float HoverOnMinimum = 0.9f;
+	constexpr float HoverOffMaximum = 0.05f;
 	constexpr double StartGameSeconds = 3.0;
 	constexpr double OpenTimeoutSeconds = 10.0;
 	// Real seconds after the takeover opened.
@@ -215,10 +223,146 @@ void UCameraControlsTakeoverValidateSubsystem::TickWatchingTakeover()
 	{
 		return;
 	}
-	if (TickPageShots(*Takeover))
+	if (TickPageShots(*Takeover) && TickHoverCheck(*Takeover))
 	{
 		PressContinueToNextPage(*Takeover);
 	}
+}
+
+void UCameraControlsTakeoverValidateSubsystem::CheckPageControls(const UW_CameraControlsTakeover& Takeover,
+                                                                 const TCHAR* Context)
+{
+	const int32 PageIndex = Takeover.GetCurrentPageIndex();
+	const int32 LampCount = Takeover.GetPageLampCount();
+	const int32 LitLamp = Takeover.GetLitPageLampIndex();
+	const bool bPreviousVisible = Takeover.GetIsPreviousButtonVisible();
+	UE_LOG(LogTemp, Display, TEXT("CAMERA_TAKEOVER page controls (%s): page %d/%d, lamps %d, lit lamp %d, "
+		       "PREVIOUS visible=%d"), Context, PageIndex + 1, Takeover.GetPageCount(), LampCount, LitLamp + 1,
+	       bPreviousVisible ? 1 : 0);
+	if (LampCount != Takeover.GetPageCount() || LitLamp != PageIndex)
+	{
+		Fail(FString::Printf(TEXT("the page lamps do not show page %d of %d (%s)"), PageIndex + 1,
+		                     Takeover.GetPageCount(), Context));
+	}
+	if (bPreviousVisible != (PageIndex > 0))
+	{
+		Fail(FString::Printf(TEXT("PREVIOUS must show only from page two on (%s)"), Context));
+	}
+}
+
+void UCameraControlsTakeoverValidateSubsystem::PressPreviousOnLastPage(UW_CameraControlsTakeover& Takeover)
+{
+	bM_HasPressedPrevious = true;
+	const int32 ExpectedPageIndex = Takeover.GetCurrentPageIndex() - 1;
+	Takeover.PressPreviousButton();
+	const bool bStillOpen = GetActiveCameraTakeover() == &Takeover && Takeover.IsInViewport();
+	const bool bStillPaused = UGameplayStatics::IsGamePaused(this);
+	UE_LOG(LogTemp, Display, TEXT("CAMERA_TAKEOVER previous: page %d (expected %d), still open=%d, paused=%d, "
+		       "On Closed count=%d"), Takeover.GetCurrentPageIndex() + 1, ExpectedPageIndex + 1, bStillOpen ? 1 : 0,
+	       bStillPaused ? 1 : 0, M_MainRequest.ClosedCount);
+	if (Takeover.GetCurrentPageIndex() != ExpectedPageIndex || not bStillOpen || not bStillPaused)
+	{
+		Fail(TEXT("PREVIOUS did not show the page before on the still paused takeover"));
+	}
+	if (M_MainRequest.ClosedCount != 0)
+	{
+		Fail(TEXT("On Closed fired after PREVIOUS"));
+	}
+	CheckPageControls(Takeover, TEXT("previous"));
+	Capture(TEXT("CameraControls_previous_back_to_page2"));
+	// Watch the page again (shots, then CONTINUE back to the last page).
+	StartWatchingPage(Takeover);
+}
+
+int32 UCameraControlsTakeoverValidateSubsystem::FindGlassElement(const UW_CameraControlsTakeover& Takeover,
+                                                                 const FString& NamePrefix)
+{
+	for (int32 ElementIndex = 0; ElementIndex < Takeover.GetGlassElementCount(); ++ElementIndex)
+	{
+		if (Takeover.GetGlassElementName(ElementIndex).ToString().StartsWith(NamePrefix))
+		{
+			return ElementIndex;
+		}
+	}
+	return INDEX_NONE;
+}
+
+void UCameraControlsTakeoverValidateSubsystem::StartHoverCheck(UW_CameraControlsTakeover& Takeover)
+{
+	using namespace CameraControlsValidateConstants;
+	bM_HasStartedHoverCheck = true;
+	M_HoverCheckStartSeconds = FPlatformTime::Seconds();
+	M_HoverPaneIndex = FindGlassElement(Takeover, TEXT("Pane"));
+	M_HoverButtonIndex = FindGlassElement(Takeover, TEXT("Button_Confirm"));
+	UE_LOG(LogTemp, Display, TEXT("CAMERA_TAKEOVER glass elements: %d, hovering %s and %s"),
+	       Takeover.GetGlassElementCount(), *Takeover.GetGlassElementName(M_HoverPaneIndex).ToString(),
+	       *Takeover.GetGlassElementName(M_HoverButtonIndex).ToString());
+	if (M_HoverPaneIndex == INDEX_NONE || M_HoverButtonIndex == INDEX_NONE)
+	{
+		Fail(TEXT("no glass hover on the card panes or the footer button"));
+		bM_HasFinishedHoverCheck = true;
+		return;
+	}
+	Takeover.SetGlassElementForcedHover(M_HoverPaneIndex, true, HoverMidSweepProgress);
+	Takeover.SetGlassElementForcedHover(M_HoverButtonIndex, true);
+}
+
+void UCameraControlsTakeoverValidateSubsystem::CheckHoverValues(const UW_CameraControlsTakeover& Takeover,
+                                                                const bool bExpectHovered)
+{
+	using namespace CameraControlsValidateConstants;
+	const float PaneHover = Takeover.GetGlassElementHover(M_HoverPaneIndex);
+	const float ButtonHover = Takeover.GetGlassElementHover(M_HoverButtonIndex);
+	UE_LOG(LogTemp, Display, TEXT("CAMERA_TAKEOVER glass hover %s: pane %.3f, button %.3f"),
+	       bExpectHovered ? TEXT("on") : TEXT("off"), PaneHover, ButtonHover);
+	const bool bOk = bExpectHovered
+		                 ? PaneHover >= HoverOnMinimum && ButtonHover >= HoverOnMinimum
+		                 : PaneHover >= 0.f && PaneHover <= HoverOffMaximum && ButtonHover >= 0.f
+		                 && ButtonHover <= HoverOffMaximum;
+	if (not bOk)
+	{
+		Fail(bExpectHovered ? TEXT("the glass Hover did not ramp up") : TEXT("the glass Hover did not ramp back"));
+	}
+}
+
+bool UCameraControlsTakeoverValidateSubsystem::TickHoverCheck(UW_CameraControlsTakeover& Takeover)
+{
+	using namespace CameraControlsValidateConstants;
+	if (bM_HasFinishedHoverCheck)
+	{
+		return true;
+	}
+	if (not bM_HasStartedHoverCheck)
+	{
+		StartHoverCheck(Takeover);
+		return bM_HasFinishedHoverCheck;
+	}
+	const double Seconds = FPlatformTime::Seconds() - M_HoverCheckStartSeconds;
+	if (not bM_HasHoverMidSweepShot && Seconds >= HoverMidSweepShotSeconds)
+	{
+		bM_HasHoverMidSweepShot = true;
+		Capture(TEXT("CameraControls_hover_midsweep"));
+	}
+	if (not bM_HasReleasedSweepFreeze && Seconds >= HoverReleaseFreezeSeconds)
+	{
+		bM_HasReleasedSweepFreeze = true;
+		Takeover.SetGlassElementForcedHover(M_HoverPaneIndex, true);
+	}
+	if (not bM_HasCheckedHoverOn && Seconds >= HoverCheckOnSeconds)
+	{
+		bM_HasCheckedHoverOn = true;
+		CheckHoverValues(Takeover, true);
+		Capture(TEXT("CameraControls_hover"));
+		Takeover.SetGlassElementForcedHover(M_HoverPaneIndex, false);
+		Takeover.SetGlassElementForcedHover(M_HoverButtonIndex, false);
+	}
+	if (Seconds < HoverCheckOffSeconds)
+	{
+		return false;
+	}
+	CheckHoverValues(Takeover, false);
+	bM_HasFinishedHoverCheck = true;
+	return true;
 }
 
 void UCameraControlsTakeoverValidateSubsystem::StartWatchingMainTakeover(UW_CameraControlsTakeover& Takeover)
@@ -240,6 +384,7 @@ void UCameraControlsTakeoverValidateSubsystem::StartWatchingMainTakeover(UW_Came
 	{
 		Fail(TEXT("the takeover did not open on page one"));
 	}
+	CheckPageControls(Takeover, TEXT("open"));
 	StartWatchingPage(Takeover);
 }
 
@@ -294,6 +439,7 @@ void UCameraControlsTakeoverValidateSubsystem::PressContinueToNextPage(UW_Camera
 	{
 		Fail(TEXT("On Closed fired before the last page"));
 	}
+	CheckPageControls(Takeover, TEXT("continue"));
 	StartWatchingPage(Takeover);
 	EnterPhase(ECameraControlsValidatePhase::WatchingLaterPage);
 }
@@ -322,6 +468,12 @@ void UCameraControlsTakeoverValidateSubsystem::TickWatchingLaterPage()
 		return;
 	}
 	CheckIllustrationsAnimated();
+	if (not bM_HasPressedPrevious)
+	{
+		// Back to page two once, then CONTINUE returns here and UNDERSTOOD closes.
+		PressPreviousOnLastPage(*Takeover);
+		return;
+	}
 	if (M_MainRequest.ClosedCount != 0)
 	{
 		Fail(TEXT("On Closed fired before UNDERSTOOD on the last page"));

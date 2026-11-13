@@ -68,6 +68,19 @@ public:
 
 private:
 	ECameraControlsValidatePhase M_Phase = ECameraControlsValidatePhase::WaitingForHud;
+
+	// PREVIOUS is pressed once, on the last page, before UNDERSTOOD.
+	bool bM_HasPressedPrevious = false;
+
+	// The glass hover check on page one: a card pane and the footer button hovered without a mouse.
+	bool bM_HasStartedHoverCheck = false;
+	bool bM_HasFinishedHoverCheck = false;
+	bool bM_HasHoverMidSweepShot = false;
+	bool bM_HasReleasedSweepFreeze = false;
+	bool bM_HasCheckedHoverOn = false;
+	double M_HoverCheckStartSeconds = 0.0;
+	int32 M_HoverPaneIndex = INDEX_NONE;
+	int32 M_HoverButtonIndex = INDEX_NONE;
 	double M_PhaseStartSeconds = 0.0;
 
 	TWeakObjectPtr<ACPPController> M_PlayerController;
@@ -122,6 +135,21 @@ private:
 	void TickWatchingTakeover();
 	void TickWatchingLaterPage();
 	void PressContinueToNextPage(UW_CameraControlsTakeover& Takeover);
+
+	/** Checks the page lamps (one per page, the shown one lit) and that PREVIOUS shows from page two on. */
+	void CheckPageControls(const UW_CameraControlsTakeover& Takeover, const TCHAR* Context);
+	void PressPreviousOnLastPage(UW_CameraControlsTakeover& Takeover);
+
+	/**
+	 * @brief Hovers a card pane (with the light band held mid-way for one shot) and the footer button, checks that
+	 * their Hover ramps up and back to 0, and captures the hovered page.
+	 * @param Takeover The open takeover on page one.
+	 * @return True once the check is done.
+	 */
+	bool TickHoverCheck(UW_CameraControlsTakeover& Takeover);
+	void StartHoverCheck(UW_CameraControlsTakeover& Takeover);
+	void CheckHoverValues(const UW_CameraControlsTakeover& Takeover, const bool bExpectHovered);
+	static int32 FindGlassElement(const UW_CameraControlsTakeover& Takeover, const FString& NamePrefix);
 	static bool GetIsLastPage(const UW_CameraControlsTakeover& Takeover);
 	void TickCheckingClosed();
 	void TickWatchingDroppedQueue();

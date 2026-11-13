@@ -5,6 +5,8 @@
 #include "Engine/DataTable.h"
 #include "W_CameraControlsTakeover.h"
 #include "W_CoverTakeover.h"
+#include "W_NomadicConversionTakeover.h"
+#include "W_BxpPackUpTakeover.h"
 #include "W_SpacedArmourTakeover.h"
 #include "W_VehicleInfoTakeover.h"
 
@@ -21,4 +23,9 @@ UInfoTakeoverSettings::UInfoTakeoverSettings()
 	SpacedArmourTakeoverWidgetClass = TSoftClassPtr<UW_SpacedArmourTakeover>(FSoftObjectPath(TEXT(
 		"/Game/RTS_Survival/Blueprints/GameUI/InfoTakeover/SpacedArmour/WBP_SpacedArmourTakeover."
 		"WBP_SpacedArmourTakeover_C")));
+	NomadicConversionTakeoverWidgetClass = TSoftClassPtr<UW_NomadicConversionTakeover>(FSoftObjectPath(TEXT(
+		"/Game/RTS_Survival/Blueprints/GameUI/InfoTakeover/NomadicConversion/WBP_NomadicConversionTakeover."
+		"WBP_NomadicConversionTakeover_C")));
+	BxpPackUpTakeoverWidgetClass = TSoftClassPtr<UW_BxpPackUpTakeover>(FSoftObjectPath(TEXT(
+		"/Game/RTS_Survival/Blueprints/GameUI/InfoTakeover/BxpPackUp/WBP_BxpPackUpTakeover.WBP_BxpPackUpTakeover_C")));
 }

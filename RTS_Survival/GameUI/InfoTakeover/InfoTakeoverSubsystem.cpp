@@ -14,8 +14,10 @@
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 #include "VehicleInfoTakeoverContent.h"
+#include "W_BxpPackUpTakeover.h"
 #include "W_CameraControlsTakeover.h"
 #include "W_CoverTakeover.h"
+#include "W_NomadicConversionTakeover.h"
 #include "W_SpacedArmourTakeover.h"
 #include "W_VehicleInfoTakeover.h"
 
@@ -30,6 +32,8 @@ namespace InfoTakeoverSubsystemPrivate
 	const FName CameraControlsArchiveKey(TEXT("InfoTakeover.CameraControls"));
 	const FName CoverArchiveKey(TEXT("InfoTakeover.Cover"));
 	const FName SpacedArmourArchiveKey(TEXT("InfoTakeover.SpacedArmour"));
+	const FName NomadicConversionArchiveKey(TEXT("InfoTakeover.NomadicConversion"));
+	const FName BxpPackUpArchiveKey(TEXT("InfoTakeover.BxpPackUp"));
 }
 
 bool UInfoTakeoverSubsystem::ShouldCreateSubsystem(UObject* Outer) const
@@ -129,6 +133,16 @@ int32 UInfoTakeoverSubsystem::QueueCoverTakeover()
 int32 UInfoTakeoverSubsystem::QueueSpacedArmourTakeover()
 {
 	return QueueWaitedTutorialTakeover(EInfoTakeoverKind::SpacedArmour);
+}
+
+int32 UInfoTakeoverSubsystem::QueueNomadicConversionTakeover()
+{
+	return QueueWaitedTutorialTakeover(EInfoTakeoverKind::NomadicConversion);
+}
+
+int32 UInfoTakeoverSubsystem::QueueBxpPackUpTakeover()
+{
+	return QueueWaitedTutorialTakeover(EInfoTakeoverKind::BxpPackUp);
 }
 
 int32 UInfoTakeoverSubsystem::QueueWaitedTutorialTakeover(const EInfoTakeoverKind Kind)
@@ -233,6 +247,10 @@ UW_InfoTakeover* UInfoTakeoverSubsystem::CreateTakeoverWidget(const FQueuedInfoT
 		return CreateCoverTakeoverWidget();
 	case EInfoTakeoverKind::SpacedArmour:
 		return CreateSpacedArmourTakeoverWidget();
+	case EInfoTakeoverKind::NomadicConversion:
+		return CreateNomadicConversionTakeoverWidget();
+	case EInfoTakeoverKind::BxpPackUp:
+		return CreateBxpPackUpTakeoverWidget();
 	default:
 		RTSFunctionLibrary::ReportError(TEXT("Info takeover: buildings and squads have no takeover widget yet."));
 		return nullptr;
@@ -336,6 +354,55 @@ UW_InfoTakeover* UInfoTakeoverSubsystem::CreateSpacedArmourTakeoverWidget() cons
 	return SpacedArmourTakeover;
 }
 
+UW_InfoTakeover* UInfoTakeoverSubsystem::CreateNomadicConversionTakeoverWidget() const
+{
+	ACPPController* const PlayerController = FRTS_Statics::GetRTSController(this);
+	if (not IsValid(PlayerController))
+	{
+		return nullptr;
+	}
+	TSubclassOf<UW_NomadicConversionTakeover> WidgetClass =
+		UInfoTakeoverSettings::Get()->NomadicConversionTakeoverWidgetClass.LoadSynchronous();
+	if (WidgetClass == nullptr)
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Info takeover: WBP_NomadicConversionTakeover could not be loaded; showing "
+			"the unstyled C++ widget."));
+		WidgetClass = UW_NomadicConversionTakeover::StaticClass();
+	}
+	UW_NomadicConversionTakeover* const NomadicConversionTakeover = CreateWidget<UW_NomadicConversionTakeover>(
+		PlayerController, WidgetClass);
+	if (not IsValid(NomadicConversionTakeover))
+	{
+		return nullptr;
+	}
+	NomadicConversionTakeover->SetupNomadicConversion();
+	return NomadicConversionTakeover;
+}
+
+UW_InfoTakeover* UInfoTakeoverSubsystem::CreateBxpPackUpTakeoverWidget() const
+{
+	ACPPController* const PlayerController = FRTS_Statics::GetRTSController(this);
+	if (not IsValid(PlayerController))
+	{
+		return nullptr;
+	}
+	TSubclassOf<UW_BxpPackUpTakeover> WidgetClass =
+		UInfoTakeoverSettings::Get()->BxpPackUpTakeoverWidgetClass.LoadSynchronous();
+	if (WidgetClass == nullptr)
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Info takeover: WBP_BxpPackUpTakeover could not be loaded; showing the "
+			"unstyled C++ widget."));
+		WidgetClass = UW_BxpPackUpTakeover::StaticClass();
+	}
+	UW_BxpPackUpTakeover* const BxpPackUpTakeover = CreateWidget<UW_BxpPackUpTakeover>(PlayerController, WidgetClass);
+	if (not IsValid(BxpPackUpTakeover))
+	{
+		return nullptr;
+	}
+	BxpPackUpTakeover->SetupBxpPackUp();
+	return BxpPackUpTakeover;
+}
+
 void UInfoTakeoverSubsystem::HandleTakeoverClosed(UW_InfoTakeover* ClosedTakeover)
 {
 	if (ClosedTakeover != M_ActiveTakeover)
@@ -385,6 +452,12 @@ void UInfoTakeoverSubsystem::AddToArchive(const FQueuedInfoTakeover& Takeover) c
 		break;
 	case EInfoTakeoverKind::SpacedArmour:
 		ArchiveContent = MakeSpacedArmourArchiveContent();
+		break;
+	case EInfoTakeoverKind::NomadicConversion:
+		ArchiveContent = MakeNomadicConversionArchiveContent();
+		break;
+	case EInfoTakeoverKind::BxpPackUp:
+		ArchiveContent = MakeBxpPackUpArchiveContent();
 		break;
 	default:
 		ArchiveContent = MakeArchiveContent(Takeover.VehicleContent);
@@ -440,6 +513,32 @@ FArchiveCustomContent UInfoTakeoverSubsystem::MakeSpacedArmourArchiveContent()
 	ArchiveContent.Title = UW_SpacedArmourTakeover::GetSpacedArmourTitle();
 	ArchiveContent.Description = UW_SpacedArmourTakeover::GetSpacedArmourSummary();
 	// Like cover: the archive item's picture slot has a fixed size that would squash the 16:9 render.
+	ArchiveContent.bHasImage = false;
+	ArchiveContent.SortType = ERTSArchiveType::GameMechanics;
+	return ArchiveContent;
+}
+
+FArchiveCustomContent UInfoTakeoverSubsystem::MakeNomadicConversionArchiveContent()
+{
+	using namespace InfoTakeoverSubsystemPrivate;
+	FArchiveCustomContent ArchiveContent;
+	ArchiveContent.Key = NomadicConversionArchiveKey;
+	ArchiveContent.Title = UW_NomadicConversionTakeover::GetNomadicConversionTitle();
+	ArchiveContent.Description = UW_NomadicConversionTakeover::GetNomadicConversionSummary();
+	// The picture is an animated widget; the archive item only takes a still image.
+	ArchiveContent.bHasImage = false;
+	ArchiveContent.SortType = ERTSArchiveType::GameMechanics;
+	return ArchiveContent;
+}
+
+FArchiveCustomContent UInfoTakeoverSubsystem::MakeBxpPackUpArchiveContent()
+{
+	using namespace InfoTakeoverSubsystemPrivate;
+	FArchiveCustomContent ArchiveContent;
+	ArchiveContent.Key = BxpPackUpArchiveKey;
+	ArchiveContent.Title = UW_BxpPackUpTakeover::GetBxpPackUpTitle();
+	ArchiveContent.Description = UW_BxpPackUpTakeover::GetBxpPackUpSummary();
+	// The picture is an animated widget; the archive item only takes a still image.
 	ArchiveContent.bHasImage = false;
 	ArchiveContent.SortType = ERTSArchiveType::GameMechanics;
 	return ArchiveContent;

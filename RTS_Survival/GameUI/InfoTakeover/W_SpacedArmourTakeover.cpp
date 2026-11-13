@@ -153,7 +153,7 @@ UWidget* UW_SpacedArmourTakeover::BuildRenderCard()
 		M_LoadedRender = LoadedRender;
 		UImage* const RenderImage = WidgetTree->ConstructWidget<UImage>(UImage::StaticClass());
 		RenderImage->SetBrushFromTexture(LoadedRender, false);
-		RenderBox->SetContent(RenderImage);
+		RenderBox->SetContent(MakePictureWithGlass(RenderImage));
 	}
 	else
 	{
@@ -185,7 +185,7 @@ UWidget* UW_SpacedArmourTakeover::BuildStatesCard()
 	return WrapInGlassPane(StatesColumn);
 }
 
-UWidget* UW_SpacedArmourTakeover::WrapInGlassPane(UWidget* Content) const
+UWidget* UW_SpacedArmourTakeover::WrapInGlassPane(UWidget* Content)
 {
 	// The vehicle takeover's facts pane: blurred glass over the plate.
 	UBackgroundBlur* const GlassBlur = WidgetTree->ConstructWidget<UBackgroundBlur>(UBackgroundBlur::StaticClass());
@@ -198,6 +198,7 @@ UWidget* UW_SpacedArmourTakeover::WrapInGlassPane(UWidget* Content) const
 	GlassPane->SetBrush(M_Style.Skin.VariantSectionGlass);
 	GlassPane->SetPadding(SpacedArmourTakeoverLayout::GlassPanePadding);
 	GlassPane->SetContent(Content);
+	RegisterGlassPane(*GlassPane);
 	GlassBlur->SetContent(GlassPane);
 	return GlassBlur;
 }

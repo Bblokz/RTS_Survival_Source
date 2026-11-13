@@ -161,6 +161,7 @@ UWidget* UW_CoverTakeover::BuildCard(const FCoverTakeoverCard& Card)
 	GlassPane->SetBrush(M_Style.Skin.VariantSectionGlass);
 	GlassPane->SetPadding(GlassPanePadding);
 	GlassPane->SetContent(CardColumn);
+	RegisterGlassPane(*GlassPane);
 	GlassBlur->SetContent(GlassPane);
 	return GlassBlur;
 }
@@ -186,7 +187,7 @@ UWidget* UW_CoverTakeover::BuildScreenshotWell(const TSoftObjectPtr<UTexture2D>&
 	M_Screenshots.Add(LoadedScreenshot);
 	UImage* const ScreenshotImage = WidgetTree->ConstructWidget<UImage>(UImage::StaticClass());
 	ScreenshotImage->SetBrushFromTexture(LoadedScreenshot, false);
-	ScreenshotBox->SetContent(ScreenshotImage);
+	ScreenshotBox->SetContent(MakePictureWithGlass(ScreenshotImage));
 	return ScreenshotWell;
 }
 

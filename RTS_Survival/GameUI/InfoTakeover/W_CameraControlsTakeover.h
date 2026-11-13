@@ -71,11 +71,14 @@ public:
 
 	ECameraControlsTakeoverPage GetActivePage() const { return M_ActivePage; }
 
+	virtual int32 GetPageCount() const override { return static_cast<int32>(ECameraControlsTakeoverPage::Count); }
+	virtual int32 GetCurrentPageIndex() const override { return static_cast<int32>(M_ActivePage); }
+
 	/** @return The illustrations of one page, for the headless validation. */
 	TArray<UUserWidget*> GetPageIllustrations(const ECameraControlsTakeoverPage Page) const;
 
 protected:
-	virtual bool TryShowNextPage() override;
+	virtual bool TryShowPage(const int32 PageIndex) override;
 
 	// Looping picture of the arrow keys moving a small map view.
 	UPROPERTY(EditDefaultsOnly, Category = "Camera Controls")
@@ -132,7 +135,7 @@ private:
 
 	UUserWidget* GetSidePageIllustration(const ECameraControlsTakeoverPage Page) const;
 	UWidget* BuildSectionCard(const FCameraControlsTakeoverSection& Section);
-	UWidget* BuildGlassPane(UWidget* Content) const;
+	UWidget* BuildGlassPane(UWidget* Content);
 
 	/**
 	 * @brief The framed, clipped well an illustration widget loops in.

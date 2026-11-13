@@ -153,20 +153,22 @@ void UW_CameraControlsTakeover::ApplyPageTexts(const ECameraControlsTakeoverPage
 	}
 }
 
-bool UW_CameraControlsTakeover::TryShowNextPage()
+bool UW_CameraControlsTakeover::TryShowPage(const int32 PageIndex)
 {
-	const int32 NextPageIndex = static_cast<int32>(M_ActivePage) + 1;
-	if (NextPageIndex >= static_cast<int32>(ECameraControlsTakeoverPage::Count) || not IsValid(M_PageSwitcher))
+	if (PageIndex < 0 || PageIndex >= GetPageCount() || not IsValid(M_PageSwitcher))
 	{
 		return false;
 	}
-	M_ActivePage = static_cast<ECameraControlsTakeoverPage>(NextPageIndex);
-	M_PageSwitcher->SetActiveWidgetIndex(NextPageIndex);
+	M_ActivePage = static_cast<ECameraControlsTakeoverPage>(PageIndex);
+	M_PageSwitcher->SetActiveWidgetIndex(PageIndex);
 	ApplyPageTexts(M_ActivePage);
-	if (UUserWidget* const SideIllustration = GetSidePageIllustration(M_ActivePage))
+	// Starts the page's loops at their beginning now that the page shows (also when PREVIOUS returns to it).
+	for (UUserWidget* const Illustration : GetPageIllustrations(M_ActivePage))
 	{
-		// Starts the loop at its beginning now that the page shows.
-		PlayAllAnimationsLooped(*SideIllustration);
+		if (IsValid(Illustration))
+		{
+			PlayAllAnimationsLooped(*Illustration);
+		}
 	}
 	RestartTyping();
 	return true;
@@ -329,7 +331,7 @@ UWidget* UW_CameraControlsTakeover::BuildSectionCard(const FCameraControlsTakeov
 	return BuildGlassPane(CardColumn);
 }
 
-UWidget* UW_CameraControlsTakeover::BuildGlassPane(UWidget* Content) const
+UWidget* UW_CameraControlsTakeover::BuildGlassPane(UWidget* Content)
 {
 	using namespace CameraControlsTakeoverLayout;
 	// The vehicle takeover's facts pane: blurred glass over the plate.
@@ -343,6 +345,7 @@ UWidget* UW_CameraControlsTakeover::BuildGlassPane(UWidget* Content) const
 	GlassPane->SetBrush(M_Style.Skin.VariantSectionGlass);
 	GlassPane->SetPadding(GlassPanePadding);
 	GlassPane->SetContent(Content);
+	RegisterGlassPane(*GlassPane);
 	GlassBlur->SetContent(GlassPane);
 	return GlassBlur;
 }
@@ -376,7 +379,7 @@ UWidget* UW_CameraControlsTakeover::BuildIllustrationWell(const TSoftClassPtr<UU
 	{
 		return IllustrationWell;
 	}
-	IllustrationBox->SetContent(Illustration);
+	IllustrationBox->SetContent(MakePictureWithGlass(Illustration));
 	PlayAllAnimationsLooped(*Illustration);
 	OutIllustration = Illustration;
 	return IllustrationWell;
