@@ -16,6 +16,7 @@ Content is in `/Game/RTS_Survival/Blueprints/Environment/Berlin/Furniture/`:
 | `Materials/` | `M_BerlinFurniture` (opaque, default lit, one-sided, 3 texture samples, `FurnitureTint` colour multiplier), `MI_BerlinFurniture` (on every piece and on the debris), `M_BerlinFurniture_WallHoles` (masked hole copy), `MI_BerlinFurniture_Holes` (two-sided, inner tint; what a hit swaps in). |
 | `Meshes/` | `SM_BerlinFurn_<NN>_<Name>` (168-488 triangles, 1-3 UCX box hulls, one slot, lightmap UV 1), `SM_BerlinFurn_Debris_0..5` (copies of the ruin kit debris with `MI_BerlinFurniture`). |
 | `Blueprints/` | `BP_BerlinFurniture_Base` and 16 children `BP_BerlinFurn_<NN>_<Name>`. |
+| `Sounds/` | 10 crush cues `Cue_BerlinFurn_Crush_<Group>` and their 30 waves `S_BerlinFurn_Crush_<Group>_<1..3>` (see "Crush sounds"). |
 
 Source: `D:\Blender\BlenderProjects\BlenderTanks\CustomMapItems\Environment\BerlinFurniture\` (`FBX/`, `Textures/`,
 `furniture_table.json`, `READY.txt`, `Previews/`). Pivot: on the ground at the centre of the body footprint (the UCX
@@ -55,9 +56,10 @@ components and the only graph. The children are graph-less.
 | `NavBlock` | Hidden box over the body footprint, at least 80 cm tall: dynamic obstacle with `RTS_NavArea_BlockChar`. |
 | `WallHoleDamage` | `UWallHoleDamageComponent` on `MainMesh`: NoGrid, `DamagedMaterials[0] = MI_BerlinFurniture_Holes`, the six furniture debris meshes, 0.3 cm hole radius per mm of calibre (a 75 mm hit bites about 22 cm), max 40, min 6, 900 cm2 per debris piece, 3 pieces per hit, 14 death pieces at 35 cm spacing, `bCollapseIntoChunksOnDeath` off. |
 
-- **Graph** (variables `CrushDestructionType` = AnyTank, `CrushTipSpeedScale`, `CrushSinkDeltaZ`, `CrushSinkTime`):
+- **Graph** (variables `CrushDestructionType` = AnyTank, `CrushTipSpeedScale`, `CrushSinkDeltaZ`, `CrushSinkTime`,
+  `CrushSound`):
   - `BeginPlay` -> `SetupCrush`: `SetupComponentCollisions([MainMesh], [], true)` ->
-    `ConfigureVerticalCollapse(MainMesh, CrushTipSpeedScale, Cue_Collapse_Tree, Att_Collapse, SC_Collapse)` ->
+    `ConfigureVerticalCollapse(MainMesh, CrushTipSpeedScale, CrushSound, Att_Collapse, SC_Collapse)` ->
     `SetupCrushDestructionOverlap(MainMesh, CrushDestructionType, VerticalCollapse)`.
   - `BP_OnUnitDies(DeathType)` -> `HandleDeath`: `Scavenging` (what a crush passes) ->
     `VerticalDestruction(DeltaZ = CrushSinkDeltaZ, CollapseTime = CrushSinkTime, bDestroyPostVerticalCollapse)`;
@@ -81,7 +83,7 @@ components and the only graph. The children are graph-less.
   into custom primitive data; up to six holes; splinters fly. Rifle and MG rounds make no hole (under the 6 cm
   minimum radius); they only take health.
 - **Death by damage.** 13-14 debris pieces fly, the mesh hides and loses its collision at once, the actor is
-  destroyed 3 s later.
+  destroyed 3 s later. It plays the piece's crush cue once (`WallHoleDamage.CollapseSettings.CollapseSound`).
 
 ## Material
 
@@ -121,6 +123,9 @@ UnrealEditor-Cmd.exe RTS_Survival.uproject -run=pythonscript -script=Source/Tool
   M_BerlinFurniture_WallHoles, instance kept", 29 / 29 assets written, no errors); the test passed again afterwards
   (run5).
 - Do not run either script while an editor has these assets loaded: a save then fails with "Error moving file".
+  `furniture_blueprints_build.py` takes `-FurnDryRun`: it then does everything in memory and saves nothing (report
+  `build_report_dry_run.json`), which works while another editor holds the Blueprints.
+- `furniture_blueprints_build.py` also sets the crush sound of every Blueprint; it needs the cues of "Crush sounds".
 
 ## Test
 
@@ -131,7 +136,8 @@ sh Source/Tools/BerlinMap/furniture/furniture_run.sh <logname> 260      (about 3
 
 `furniture_headless_test.py` spawns all 16 pieces in a row (1200 cm apart), rebuilds navigation, starts PIE and
 checks navigation, crushing by a light tank, real shells, debug hits and death by damage. Results:
-`Saved/Berlin/furniture/test_result.json`, `run4.log`, close-ups `piece_*.png` and `after_*.png`.
+`Saved/Berlin/furniture/test_result.json` (the last run, run5), `run1.log`, `run4.log`, `run5.log`, close-ups
+`piece_*.png` and `after_*.png`. Give the run script at least 260 s: a full run takes about 185 s.
 
 ### Result (run4, all checks passed; run1 gave the same behaviour)
 
@@ -166,6 +172,9 @@ checks navigation, crushing by a light tank, real shells, debug hits and death b
 - **Death by damage:** 05_Armchair and 13_Desk took lethal damage: mesh hidden, NoCollision, life span 3.0 s, actor
   gone 6 s later; `RTS_WALL_HOLES collapse ... threw=14 hide=1`. The two pieces killed by shells threw 13 and 14.
 - **Untouched pieces** were all still there at the end.
+- **Run5** (after re-running both build scripts): all checks passed again. Real shells holed all three targets
+  (TiledStove, Bathtub 2 holes, Piano; five `direct=1` hit lines); the Piano and the TiledStove then died under fire
+  and threw 14 pieces each.
 - All 16 children, the base and the 18 cover Blueprints compile on a fresh headless load with no Blueprint error.
 
 ### How it looks
@@ -174,6 +183,126 @@ checks navigation, crushing by a light tank, real shells, debug hits and death b
   (`piece_01_Wardrobe.png`).
 - Holes are clean round bites with a dark inside (`after_02_IronBed.png`); on thin parts such as the bed's mattress a
   hole goes right through.
+
+## Crush sounds (2026-11-13)
+
+A crushed piece plays one short sound of its own material, not the tree cue. The same cue plays once when the piece
+dies from damage.
+
+**Nobody has listened to these yet.** They were built offline and checked by loudness numbers, spectrograms and a log
+test. Listen first: `Saved/Berlin/furniture/sounds/preview/` (`all_in_a_row.wav` = every cue once in the table order
+below, at in-game cue level; `all_variations_in_a_row.wav`; `row_of_chairs_simulation.wav` = ten chairs 0.45 s apart
+with the cue's random rolls; one WAV and one spectrogram PNG per variation; two `reference_*.wav` of existing cues).
+
+### Cues
+
+Ten cues in `/Game/RTS_Survival/Blueprints/Environment/Berlin/Furniture/Sounds/`, three variations each. Wood, upholstery
+and the two cabinets share a cue. Cast iron and ceramic pieces each have their own, because a bathtub, a radiator and
+a bed frame do not sound alike, and the piano and the clock need a tone nothing else has.
+
+| Cue `Cue_BerlinFurn_Crush_` | Pieces | What you should hear | Length |
+|---|---|---|---|
+| `WoodSmall` | 03 KitchenTable, 04 ChairFallen, 10 ChestOfDrawers, 11 BookshelfFallen, 13 Desk; the base's default | two wood cracks, a sharp splinter snap, bits clattering | 1.0 s |
+| `WoodCabinet` | 01 Wardrobe, 12 KitchenDresser | hollow boom, long crack and creak, glass and crockery inside | 1.45 s |
+| `Upholstery` | 05 Armchair, 06 Sofa | soft whump, frame cracking inside the padding, spring squeak, a faint twang | 1.05 s |
+| `IronBed` | 02 IronBed | rattly tube-frame clang, spring mesh rattle and squeaks, muffled mattress | 1.3 s |
+| `Bathtub` | 07 Bathtub | deep dull boom, hard cast-iron knock, dull enamel ring, scrape | 1.45 s |
+| `Radiator` | 16 Radiator | hard clang, six ribs knocking in a run, pipe scrape | 1.3 s |
+| `TiledStove` | 08 TiledStove | masonry crunch, tiles cracking, dull ceramic shatter, tiles sliding off | 1.55 s |
+| `Washstand` | 14 Washstand | marble slab snapping, basin shattering, light wood crack | 1.25 s |
+| `Piano` | 09 Piano | case boom and crack, strings ringing at once out of tune, two strings letting go | 1.6 s |
+| `Clock` | 15 ClockFallen | thin case crack, door glass, two sagging chime strikes, movement running down | 1.5 s |
+
+- **Cue shape:** Modulator (pitch 0.94-1.06, volume 0.88-1.0) -> Random without replacement -> three wave players.
+  Cue volume 0.75 (as `Cue_Collapse_Tree`), sound class `RTS_SClass_Weapons` (as the cactus and small-metal collapse
+  cues; the tree cue has none). No attenuation or concurrency on the cue itself.
+- **Attenuation and concurrency** are the existing collapse assets, passed by the crush call and by the hole
+  component: `Att_Collapse` (full level to 20 m, linear fall-off to silence at 60 m) and `SC_Collapse` (8 voices, stop
+  farthest then oldest). They were kept: the new sounds last 1.0-1.6 s where the tree waves ran 4.7-6 s, so far
+  fewer of them overlap when a tank column crosses a row of furniture (not measured in a battle).
+- **Waves:** mono, 48 kHz, 16 bit. The longest is 1.6 s; 1.7 s at the lowest pitch roll.
+- **Sources:** layers of waves already in the project, pitched, cut and filtered: `/Game/WARFARE_SOUNDS/` (bullet
+  impacts on wood / glass / rock / brick / body, `Miscellaneous_Sounds/Metal`, `Glass`, `Doors`, wood footsteps, cloth
+  and bone-snap foley), `S_SmallStoneObj_Collapse_*` and `Sound_Stone_Destroy`. Synthesised (nothing tonal like it in
+  the project): the piano strings and snapping strings, the clock chime, the bathtub's enamel ring, the radiator's
+  pipe knock and the spring twang. The exact layers of each wave are the recipes in `furniture_sounds_build.py`; the
+  source list per wave is in `build_stats.json`.
+
+### Loudness
+
+Measured the same way for the new waves and the existing cues: K-weighted, loudest 400 ms (ffmpeg's `ebur128` reads
+between 0.1 dB higher and 0.7 dB lower than this meter on the 30 waves), and K-weighted energy of the whole one-shot, which does not depend
+on length. "In game" = wave x cue volume x the middle of the modulator's volume range.
+
+| | Loudest 400 ms, in game | Loudest roll | Whole-sound energy, in game | Wave length |
+|---|---|---|---|---|
+| New furniture cues (all 30 waves) | -19.0 LUFS | -18.5 | -22.7 to -20.2 dB (TiledStove -20.2 to -20.9, WoodCabinet_1 -20.5, the rest -22.7 to -21.6) | 1.0-1.6 s |
+| `Cue_FarmCrush_Wood` (existing small-prop crush) | -18.7 | -16.2 | -22.7 | 0.5-0.7 s |
+| `Cue_Collapse_Tree` (what furniture played before) | -17.4 | -15.6 | -14.2 | 4.7-6.0 s |
+| `Cue_MetalObj_Destruction` | -16.1 | -15.1 | -18.4 | 1.1-1.2 s |
+| `Cue_SmallStoneObj_Collapse` | -15.8 | -14.5 | -17.2 | 1.7-3.3 s |
+
+- Every wave is levelled to -16.0 LUFS (loudest 400 ms), peaks -4.6 to -1.0 dBFS; the loudest cue roll peaks at
+  -3.5 dBFS.
+- So the furniture is 0.3 dB under the farm wood crush and 1.6 dB under the tree cue on the 400 ms figure, and equal
+  to or up to 2.5 dB above the farm wood crush in total energy (it lasts two to three times as long).
+- Ten chairs in a row (simulation): loudest 400 ms -17.7 LUFS against -19.0 for one chair, peak -2.7 dBFS.
+
+### Rebuild
+
+```
+# 1. export the source waves from the project (read-only; 414 WAVs into Saved/Berlin/furniture/sounds/src)
+sh Source/Tools/BerlinMap/furniture/sounds/run_headless.sh furniture_sounds_export.py
+# 2. build the 30 waves and the preview folder (plain Python 3 + numpy, ffmpeg on the PATH; about 1 minute)
+python Source/Tools/BerlinMap/furniture/sounds/furniture_sounds_build.py
+# 3. import the waves and make the cues (idempotent)
+sh Source/Tools/BerlinMap/furniture/sounds/run_headless.sh furniture_sounds_import.py
+# 4. put the cues on the Blueprints (needs the Blueprints free: no editor may have them loaded)
+UnrealEditor-Cmd.exe RTS_Survival.uproject -run=pythonscript -script=Source/Tools/BerlinMap/furniture/furniture_blueprints_build.py -unattended -nosplash -nullrhi -DisablePlugins=Fab,BpGeneratorUltimate
+```
+
+- **One table:** `sounds/furniture_sound_table.py` says which piece plays which cue, the cue volume and the modulator
+  ranges. The offline build, the import, the Blueprint build and the test all read it. To change a sound, edit its
+  recipe in `furniture_sounds_build.py` (layers with start time and dB), then run steps 2 and 3.
+- **Step 2 is deterministic** (fixed seeds). Step 3 keeps the SHA-1 of each source WAV as asset metadata and skips
+  unchanged waves and cues, so an unchanged re-run saves nothing and is safe while an editor is open. A changed wave
+  cannot be saved while an editor has it loaded.
+- **Step 3 exits with code 1** and an ensure "Decoder for AudioFormat BINKA not found" on a first import: harmless (a
+  commandlet has no audio decoders). The line to read is `FURN_SND_IMPORT done: ...`.
+- **A new cue is a duplicate of `Cue_Cactus_Collapse`** retargeted to the furniture waves, because Python cannot create
+  Sound Cue graph nodes. The cues therefore open normally in the Sound Cue editor.
+- **Blueprint wiring.** `CrushSound` (SoundBase, category Crush) is a variable of the base; `SetupCrush` passes it to
+  `ConfigureVerticalCollapse`. The two graph calls are recorded in `base_graphs_uecp.json`. Step 4 sets the class
+  default of all 17 Blueprints and the death sound on each child's `WallHoleDamage` template. On 2026-11-13 the
+  shared editor held the Blueprints (Ger_Berlin open), so the variable, the graph change and the same per-Blueprint
+  statements went through that editor's bridge and each Blueprint was saved there; step 4 itself was only run with
+  `-FurnDryRun`.
+- **Death by damage plays the same cue at the same level.** A piano hit by a shell should still jangle, and many
+  deaths come from MG fire with no explosion to carry them. A quieter version would need a second set of cues.
+  `CollapseFX.CollapseSfx` in `HandleDeath` stays empty, so a crush is one sound, not two.
+
+### Sound test
+
+```
+sh Source/Tools/BerlinMap/furniture/sounds/furniture_sound_run.sh <logname> 360      (about 3 minutes)
+```
+
+`furniture_sound_test.py` runs in a throwaway editor on `RTS_ToCopySmall` with `LogAudio VeryVerbose`: 16 pieces with a
+Pz II Luchs in front of each, and a second row of the 16 pieces that takes lethal damage. Result:
+`Saved/Berlin/furniture/sounds/sound_test_result.json`, log `sound_run1.log`.
+
+Result of `sound_run1` (2026-11-13), all checks passed:
+
+- **Defaults:** all 32 spawned pieces and all 16 class defaults hold the cue of the table, both in `CrushSound` and in
+  the hole component's collapse sound. All 10 cues load as Modulator -> Random -> their three waves, volume 0.75.
+- **Crush:** all 16 pieces were crushed (4.6-8.7 s after the order). For each one the audio device logged
+  `New ActiveSound <the piece's cue> Comp: AudioComponent_NN Loc: <the piece's place>` exactly once.
+- **Death by damage:** all 16 row-2 pieces logged their own cue once at their place (`Comp: NO COMPONENT`, the
+  fire-and-forget call); 16 `RTS_WALL_HOLES collapse` lines.
+- 32 furniture sound starts in total, none rejected by range or concurrency, none at a wrong place, and
+  `Cue_Collapse_Tree` never started.
+- **What this proves:** the right cue became an active sound at the right place on a real audio device, after the
+  audible-range and concurrency checks. It does not prove how it sounds or that the mix is right in a battle.
 
 ## Placing on Ger_Berlin
 
@@ -201,8 +330,8 @@ checks navigation, crushing by a light tank, real shells, debug hits and death b
   build.
 - **Shader cost was not measured.** The headless import runs without a renderer, so the statistics read 0. By
   construction the intact material has 3 texture samples and the hole variant 4.
-- **Sounds are stand-ins.** The crush plays `Cue_Collapse_Tree` (wood) on every piece, the bathtub and the radiator
-  included. The sink itself has no smoke effect.
+- **Sounds were not listened to by their author.** Each piece has its own crush cue since 2026-11-13 ("Crush
+  sounds"); they were checked by numbers, spectrograms and a log test only. The sink itself has no smoke effect.
 - **Debris** is the ruin kit's six brick-chunk shapes with the furniture atlas on them. Their UVs do not match the
   atlas, so a piece shows whatever atlas area its UVs land on. It reads as splinters at RTS distance; real furniture
   splinter meshes would be better.

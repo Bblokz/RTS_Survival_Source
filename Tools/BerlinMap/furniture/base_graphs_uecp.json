@@ -4,6 +4,7 @@
   "An enum switch has no default pin: every ERTSDeathType value needs its own case.",
   "An unwired array input does not compile: SetupComponentCollisions gets the empty member array NoGeometryComponents.",
   "EventGraph must be sent with mode append: the new Blueprint's BeginPlay already runs Parent: BeginPlay and the tool refuses to cut it.",
+  "2026-11-13, crush sounds: the furniture base got the variable CrushSound (object SoundBase) and SetupCrush was regenerated (overwrite) to pass $CrushSound instead of the literal Cue_Collapse_Tree. Those two calls plus compile_blueprint went through the shared editor's bridge, because that editor had Ger_Berlin open and held the 17 .uasset files. The add_variable default is not used: furniture_blueprints_build.py sets the class default per Blueprint (the same statements were run through execute_python that day, then save_loaded_asset per Blueprint).",
   "For the furniture base create the Blueprint (parent /Script/RTS_Survival.DestructableEnvActor) and its components MainMesh (StaticMeshComponent under the root), NavBlock (BoxComponent under the root) and WallHoleDamage (WallHoleDamageComponent) first, with SubobjectDataSubsystem.add_new_subobject; the graph refers to them by name."
  ],
  "BP_BerlinCover_Base": [
@@ -43,10 +44,11 @@
    {"variable_name": "CrushSinkDeltaZ", "variable_type": "float", "default_value": "120.0", "category": "Crush", "instance_editable": true},
    {"variable_name": "CrushSinkTime", "variable_type": "float", "default_value": "2.5", "category": "Crush", "instance_editable": true}]}},
   {"action": "add_variable", "params": {"blueprint_path": "/Game/RTS_Survival/Blueprints/Environment/Berlin/Furniture/Blueprints/BP_BerlinFurniture_Base", "variable_name": "NoGeometryComponents", "variable_type": "object", "sub_type": "GeometryCollectionComponent", "is_array": true, "category": "Crush"}},
+  {"action": "add_variable", "params": {"blueprint_path": "/Game/RTS_Survival/Blueprints/Environment/Berlin/Furniture/Blueprints/BP_BerlinFurniture_Base", "variable_name": "CrushSound", "variable_type": "object", "sub_type": "SoundBase", "category": "Crush", "instance_editable": true, "tooltip": "Played once when a vehicle crushes the piece, and when it dies from damage. Set per child by furniture_blueprints_build.py."}},
   {"action": "synthesize_graph", "params": {"blueprint_path": "/Game/RTS_Survival/Blueprints/Environment/Berlin/Furniture/Blueprints/BP_BerlinFurniture_Base", "function": "SetupCrush", "overwrite": true, "body": [
    {"op": "make_array", "as": "Meshes", "items": ["$MainMesh"]},
    {"op": "call", "func": "SetupComponentCollisions", "args": {"MeshComponents": "$Meshes", "GeometryComponents": "$NoGeometryComponents", "bOverlapTanks": true}},
-   {"op": "call", "func": "ConfigureVerticalCollapse", "args": {"TargetPrimitive": "$MainMesh", "CollapseSpeedScale": "$CrushTipSpeedScale", "CollapseSound": "/Game/RTS_Survival/Sounds/DestructionAndCollapse/CollapsingTree/Cue_Collapse_Tree.Cue_Collapse_Tree", "Attenuation": "/Game/RTS_Survival/Sounds/Settings/Collapse/Att_Collapse.Att_Collapse", "Concurrency": "/Game/RTS_Survival/Sounds/Settings/Collapse/SC_Collapse.SC_Collapse"}},
+   {"op": "call", "func": "ConfigureVerticalCollapse", "args": {"TargetPrimitive": "$MainMesh", "CollapseSpeedScale": "$CrushTipSpeedScale", "CollapseSound": "$CrushSound", "Attenuation": "/Game/RTS_Survival/Sounds/Settings/Collapse/Att_Collapse.Att_Collapse", "Concurrency": "/Game/RTS_Survival/Sounds/Settings/Collapse/SC_Collapse.SC_Collapse"}},
    {"op": "call", "func": "SetupCrushDestructionOverlap", "args": {"OverlapComponent": "$MainMesh", "DestructionType": "$CrushDestructionType", "CrushDeathType": "VerticalCollapse"}}]}},
   {"action": "synthesize_graph", "params": {"blueprint_path": "/Game/RTS_Survival/Blueprints/Environment/Berlin/Furniture/Blueprints/BP_BerlinFurniture_Base", "function": "HandleDeath", "inputs": [{"name": "DeathType", "type": "ERTSDeathType"}], "body": [
    {"op": "switch_enum", "on": "$DeathType", "cases": {

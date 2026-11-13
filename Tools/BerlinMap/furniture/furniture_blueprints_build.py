@@ -3,6 +3,7 @@
 Headless (never in the shared editor):
   UnrealEditor-Cmd.exe RTS_Survival.uproject -run=pythonscript -script=<this file> -unattended -nosplash -nullrhi
       -DisablePlugins=Fab,BpGeneratorUltimate
+Add -FurnDryRun to do everything in memory and save nothing (works while another editor holds the Blueprints).
 Idempotent; never deletes a Blueprint. Report: Saved/Berlin/furniture/build_report.json.
 Doc: Source/Docs/Environment/BerlinFurniture.md.
 
@@ -11,11 +12,11 @@ Doc: Source/Docs/Environment/BerlinFurniture.md.
                                      WallHoleDamage. It carries the only graph, authored once through a UECP editor
                                      (headless Python cannot write graphs; this script never touches it):
       BeginPlay     -> SetupCrush: SetupComponentCollisions([MainMesh], [], OverlapTanks true)
-                       -> ConfigureVerticalCollapse(MainMesh, CrushTipSpeedScale, Cue_Collapse_Tree)
+                       -> ConfigureVerticalCollapse(MainMesh, CrushTipSpeedScale, CrushSound, Att_Collapse, SC_Collapse)
                        -> SetupCrushDestructionOverlap(MainMesh, CrushDestructionType, VerticalCollapse)
       BP_OnUnitDies -> HandleDeath: Scavenging (= crushed) -> VerticalDestruction(CrushSinkDeltaZ, CrushSinkTime,
                        destroy); every other death -> WallHoleDamage.CollapseIntoPieces(hide and destroy)
-  BP_BerlinFurn_<NN>_<Name>          graph-less children: mesh, health, nav box, sink depth.
+  BP_BerlinFurn_<NN>_<Name>          graph-less children: mesh, health, nav box, sink depth, crush sound.
 If the base is missing or lacks the crush variables the script stops: re-author the graph first (doc, "Rebuild").
 
 What this script sets:
@@ -27,6 +28,9 @@ What this script sets:
 - WallHoleDamage (on the base): NoGrid, DamagedMaterials[0] = MI_BerlinFurniture_Holes, the furniture debris, small
   holes; collapse_into_chunks_on_death off (the graph decides the death).
 - Class defaults: Health / DamageReduction (ADestructableEnvActor fields), aim point, tip speed and sink depth.
+- Sound: the variable CrushSound (what a crush plays) and WallHoleDamage.CollapseSettings.CollapseSound (what a death
+  by damage plays) both get the piece's cue from sounds/furniture_sound_table.py; the base gets the small-wood cue.
+  The cues are made by sounds/furniture_sounds_import.py (run that first).
 """
 import json
 import os
@@ -37,6 +41,8 @@ import unreal
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.normpath(os.path.join(HERE, '..', 'ruinkit')))
 import cover_build as cb  # noqa: E402  (hull_points, subobject helpers, nav box and nav area helpers)
+sys.path.insert(0, os.path.join(HERE, 'sounds'))
+import furniture_sound_table as sounds  # noqa: E402  (which piece plays which crush cue)
 
 SOURCE = 'D:/Blender/BlenderProjects/BlenderTanks/CustomMapItems/Environment/BerlinFurniture/'
 ROOT = '/Game/RTS_Survival/Blueprints/Environment/Berlin/Furniture'
@@ -45,9 +51,9 @@ MESHES = ROOT + '/Meshes'
 HOLES_MI = ROOT + '/Materials/MI_BerlinFurniture_Holes'
 BASE_NAME = 'BP_BerlinFurniture_Base'
 REPORT = 'D:/UE5Projects/RTS_Survival/Saved/Berlin/furniture/build_report.json'
-COLLAPSE_CUE = '/Game/RTS_Survival/Sounds/DestructionAndCollapse/CollapsingTree/Cue_Collapse_Tree'
-COLLAPSE_ATT = '/Game/RTS_Survival/Sounds/Settings/Collapse/Att_Collapse'
-COLLAPSE_CONC = '/Game/RTS_Survival/Sounds/Settings/Collapse/SC_Collapse'
+COLLAPSE_ATT = sounds.ATTENUATION
+COLLAPSE_CONC = sounds.CONCURRENCY
+DRY_RUN = '-furndryrun' in unreal.SystemLibrary.get_command_line().lower()
 
 CRUSH_RULE = 'ANY_TANK'                      # light tanks and above
 NAV_AREA = cb.CRUSH_NAV_AREA[CRUSH_RULE]     # RTS_NavArea_BlockChar
@@ -85,7 +91,7 @@ def load_base():
         raise RuntimeError(path + ' missing: author it first (BerlinFurniture.md, "Rebuild")')
     base = unreal.load_asset(path)
     cdo = unreal.get_default_object(base.generated_class())
-    for prop in ('CrushDestructionType', 'CrushTipSpeedScale', 'CrushSinkDeltaZ', 'CrushSinkTime'):
+    for prop in ('CrushDestructionType', 'CrushTipSpeedScale', 'CrushSinkDeltaZ', 'CrushSinkTime', 'CrushSound'):
         try:
             cdo.get_editor_property(prop)
         except Exception:  # noqa: BLE001
@@ -115,6 +121,24 @@ def setup_mesh_template(comp, mesh):
         comp.set_collision_response_to_channel(blocked, unreal.CollisionResponseType.ECR_BLOCK)
 
 
+def load_cue(key):
+    cue = unreal.load_asset(sounds.cue_path(key))
+    if cue is None:
+        raise RuntimeError(sounds.cue_path(key) + ' missing: run sounds/furniture_sounds_import.py')
+    return cue
+
+
+def save(blueprint):
+    return False if DRY_RUN else bool(EAL.save_loaded_asset(blueprint, False))
+
+
+def set_death_sound(comp, cue):
+    """What WallHoleDamage.CollapseIntoPieces plays (a death by damage): the piece's crush cue."""
+    collapse = comp.get_editor_property('CollapseSettings')
+    collapse.set_editor_property('collapse_sound', cue)
+    comp.set_editor_property('CollapseSettings', collapse)
+
+
 def setup_holes_template(comp, debris):
     c = HOLES
     comp.set_editor_property('WallMeshComponentName', 'MainMesh')
@@ -138,7 +162,7 @@ def setup_holes_template(comp, debris):
     collapse.set_editor_property('collapse_into_chunks_on_death', False)
     collapse.set_editor_property('destroy_owner_delay_seconds', c['destroy_delay'])
     collapse.set_editor_property('death_speed_scale', c['speed'])
-    collapse.set_editor_property('collapse_sound', unreal.load_asset(COLLAPSE_CUE))
+    collapse.set_editor_property('collapse_sound', load_cue(sounds.DEFAULT_CUE))
     collapse.set_editor_property('collapse_attenuation', unreal.load_asset(COLLAPSE_ATT))
     collapse.set_editor_property('collapse_concurrency', unreal.load_asset(COLLAPSE_CONC))
     comp.set_editor_property('CollapseSettings', collapse)
@@ -173,8 +197,9 @@ def setup_base(base, debris, area):
     cdo = unreal.get_default_object(base.generated_class())
     cdo.set_editor_property('CrushDestructionType', getattr(unreal.CrushDestructionType, CRUSH_RULE))
     cdo.set_editor_property('damage_reduction', DAMAGE_REDUCTION)
+    cdo.set_editor_property('CrushSound', load_cue(sounds.DEFAULT_CUE))
     unreal.BlueprintEditorLibrary.compile_blueprint(base)
-    return bool(EAL.save_loaded_asset(base, False))
+    return save(base)
 
 
 def get_or_create(name, base):
@@ -205,6 +230,8 @@ def build_one(piece, base, area):
     box, lo, hi = footprint_box(hulls)
     setup_mesh_template(cb._own(bp, named, 'MainMesh'), mesh)
     cb.setup_nav_box(cb._own(bp, named, 'NavBlock'), box, area)
+    cue = load_cue(sounds.PIECE_CUE[piece['name'][len('SM_BerlinFurn_'):]])
+    set_death_sound(cb._own(bp, named, 'WallHoleDamage'), cue)
     unreal.BlueprintEditorLibrary.compile_blueprint(bp)
     cdo = unreal.get_default_object(bp.generated_class())
     health = health_for(piece)
@@ -218,9 +245,13 @@ def build_one(piece, base, area):
     cdo.set_editor_property('CrushTipSpeedScale', TIP_SPEED_UPRIGHT if upright else TIP_SPEED_LOW)
     cdo.set_editor_property('CrushSinkDeltaZ', float(sink))
     cdo.set_editor_property('CrushSinkTime', SINK_TIME)
+    cdo.set_editor_property('CrushSound', cue)
     unreal.BlueprintEditorLibrary.compile_blueprint(bp)
-    saved = EAL.save_loaded_asset(bp, False)
+    saved = save(bp)
+    cdo = unreal.get_default_object(bp.generated_class())
+    death = cb._own(bp, named, 'WallHoleDamage').get_editor_property('CollapseSettings').get_editor_property('collapse_sound')
     return dict(blueprint=bp.get_path_name(), created=created, saved=bool(saved), health=health, upright=upright,
+                crush_sound=cdo.get_editor_property('CrushSound').get_name(), death_sound=death.get_name() if death else None,
                 sink_cm=sink, body_cm=[round(v) for v in body],
                 nav_box=[round(box['cx']), round(box['cy']), round(box['hu']), round(box['hv']), round(box['z1'])])
 
@@ -229,24 +260,24 @@ def run():
     if not os.path.isfile(SOURCE + 'READY.txt'):
         raise RuntimeError('READY.txt missing in ' + SOURCE)
     pieces = json.load(open(SOURCE + 'furniture_table.json'))['pieces']
-    report = {'pieces': {}, 'errors': []}
+    report = {'pieces': {}, 'errors': [], 'dry_run': DRY_RUN}
     base = load_base()
     area = cb.nav_area_class(NAV_AREA)
     report['base_saved'] = setup_base(base, debris_meshes(), area)
-    if not report['base_saved']:
+    if not report['base_saved'] and not DRY_RUN:
         report['errors'].append(BASE_NAME + ': save failed')
     for piece in pieces:
         try:
             info = build_one(piece, base, area)
             report['pieces'][piece['name']] = info
-            if not info['saved']:
+            if not info['saved'] and not DRY_RUN:
                 report['errors'].append(piece['name'] + ': save failed')
             log(piece['name'] + ': ' + json.dumps(info))
         except Exception as error:  # noqa: BLE001
             report['errors'].append(f'{piece["name"]}: {error!r}')
             log(f'{piece["name"]}: ERROR {error!r}')
     os.makedirs(os.path.dirname(REPORT), exist_ok=True)
-    with open(REPORT, 'w') as handle:
+    with open(REPORT.replace('.json', '_dry_run.json') if DRY_RUN else REPORT, 'w') as handle:
         json.dump(report, handle, indent=1)
     log(f'done: {len(report["pieces"])} Blueprints, nav area {NAV_AREA}, errors {report["errors"]}, report {REPORT}')
     return report
