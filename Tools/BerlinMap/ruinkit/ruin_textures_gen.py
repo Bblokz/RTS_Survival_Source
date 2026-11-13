@@ -292,21 +292,26 @@ def make_brick(seed=7202):
 
 # ----------------------------------------------------------------------------- rubble
 
+# 2026-11-13: dustier and less red than the first set (brick was (0.455, 0.290, 0.235) on 54 % of the fragments and the
+# heaps glowed pink from the game camera). Brick is still the largest single type, but dull, and every light type is
+# darker than the pale ash ground (sRGB mean about 0.55), so a heap sits in the ground instead of on it.
 RUBBLE_TYPES = [  # name, sRGB, weight
-    ('brick', (0.455, 0.290, 0.235), 0.42),
-    ('brick_dark', (0.345, 0.225, 0.195), 0.12),
-    ('plaster', (0.600, 0.580, 0.540), 0.20),
-    ('mortar', (0.520, 0.500, 0.460), 0.14),
-    ('char', (0.085, 0.075, 0.068), 0.07),
-    ('stone', (0.560, 0.545, 0.510), 0.05),
+    ('brick', (0.395, 0.290, 0.245), 0.32),
+    ('brick_dark', (0.300, 0.225, 0.200), 0.11),
+    ('plaster', (0.500, 0.482, 0.450), 0.21),
+    ('mortar', (0.430, 0.412, 0.380), 0.19),
+    ('char', (0.085, 0.075, 0.068), 0.08),
+    ('stone', (0.455, 0.442, 0.415), 0.09),
 ]
+RUBBLE_DUST = (0.435, 0.412, 0.378)     # settled dust between and over the fragments (sRGB)
+RUBBLE_DUST_TIE = 0.26                  # share of dust mixed over everything at the end
 
 
 def make_rubble(seed=7303):
     rng = np.random.default_rng(seed)
     cols = np.array([c for _, c, _ in RUBBLE_TYPES], F32)
     wts = np.array([w for _, _, w in RUBBLE_TYPES], np.float64)
-    dust_c = srgb((0.50, 0.475, 0.435))
+    dust_c = srgb(RUBBLE_DUST)
     # Ground: dust and grit.
     H = 0.004 * fnoise(rng, 4, 60) + 0.0015 * fnoise(rng, 100, 700, 0.3) - 0.02
     A = np.broadcast_to(dust_c, (N, N, 3)).copy() * (1 + 0.06 * fnoise(rng, 20, 400, 0.5))[..., None]
@@ -357,7 +362,7 @@ def make_rubble(seed=7303):
     A = A * (1 - dusty[..., None]) + dust_c * dusty[..., None]
     lit = np.clip(1 + (np.roll(H, 1, 0) - np.roll(H, -1, 0) + np.roll(H, 1, 1) - np.roll(H, -1, 1)) * 25.0, 0.75, 1.25)
     A = A * lit[..., None]
-    A = A * 0.82 + dust_c * 0.18                                  # settled dust ties the fragments together
+    A = A * (1 - RUBBLE_DUST_TIE) + dust_c * RUBBLE_DUST_TIE     # settled dust ties the fragments together
     return np.clip(A, 0, 1), equalize(H)
 
 
@@ -414,8 +419,9 @@ def wall_vertex_colours(w, h, res):
     return solid, R.astype(F32), G.astype(F32), B.astype(F32)
 
 
-def shade_wall(maps, f, w_m=12.0, h_m=9.0, soot_amount=1.0, tint=(1, 1, 1)):
-    """Evaluate the M_BerlinRuin wall maths (see ruin_material_build.py) on a facade, then light it."""
+def shade_wall(maps, f, w_m=12.0, h_m=9.0, soot_amount=1.0, tint=(1, 1, 1), close_up=False):
+    """Evaluate the M_BerlinRuin wall maths (see ruin_material_build.py) on a facade, then light it.
+    close_up: the Ruin_CloseUpDetail branch (plaster rim light / shadow, normal map); off = what the game draws."""
     S, V = RP.SCALARS, RP.VECTORS
     tex_px_m = N / RP.TILE_M
     P = _down(maps['plaster'], f)
@@ -434,21 +440,21 @@ def shade_wall(maps, f, w_m=12.0, h_m=9.0, soot_amount=1.0, tint=(1, 1, 1)):
     plaster = np.clip(d, 0, 1)
     edge = np.clip(2 - d, 0, 1) * plaster
     shadow = np.clip(1 + d * 0.5, 0, 1) * (1 - plaster)
-    pc = lin(P) * np.array(V['RuinPlasterColor'], F32) * (1 + edge * S['RuinPlasterEdgeLight'])[..., None]
-    bc = lin(Bc) * np.array(V['RuinBrickColor'], F32) * (1 - shadow * S['RuinPlasterEdgeShadow'])[..., None]
+    pc = lin(P) * np.array(V['RuinPlasterColor'], F32)
+    bc = lin(Bc) * np.array(V['RuinBrickColor'], F32)
+    if close_up:
+        pc = pc * (1 + edge * S['RuinPlasterEdgeLight'])[..., None]
+        bc = bc * (1 - shadow * S['RuinPlasterEdgeShadow'])[..., None]
     base = bc + (pc - bc) * plaster[..., None]
-    rough_b = S['RuinBrickRoughJoint'] + (S['RuinBrickRoughFace'] - S['RuinBrickRoughJoint']) * Cv
-    rough = rough_b + (S['RuinPlasterRoughness'] - rough_b) * plaster
     nxy = (Nn[..., 0:2] + (Nn[..., 2:4] - Nn[..., 0:2]) * plaster[..., None]) * 2 - 1
-    nrm = np.concatenate([nxy * S['RuinNormalStrength'], np.ones_like(nxy[..., :1])], -1)
+    nrm = np.concatenate([nxy * (S['RuinNormalStrength'] if close_up else 0.0), np.ones_like(nxy[..., :1])], -1)
     nrm /= np.linalg.norm(nrm, axis=-1, keepdims=True)
-    noise = Cv + (Hc - Cv) * plaster
+    noise = Cv + (Hc - Cv) * plaster if close_up else Hc
     base = base * np.array(tint, F32)
     soot = np.clip(R * soot_amount * (S['RuinSootStrength'] + S['RuinSootBreakup'] * (noise - 0.5)), 0, 1)
     base = base + (base * np.array(V['RuinSootColor'], F32) - base) * soot[..., None]
     dust = np.clip(B * (S['RuinDustStrength'] + S['RuinDustBreakup'] * (0.5 - noise)), 0, 1) * S['RuinDustOpacity']
     base = base + (np.array(V['RuinDustColor'], F32) - base) * dust[..., None]
-    rough = rough + (S['RuinMatteRoughness'] - rough) * np.maximum(soot, dust)
     # Light: low sun from upper left, slightly grazing; camera frontal-ish.
     L = np.array([-0.45, -0.55, 0.70], F32)   # DirectX tangent frame, y down the image
     L /= np.linalg.norm(L)
@@ -481,7 +487,7 @@ def preview(maps):
     sheet_w = cell * 4 + 50
     rts = shade_wall(maps, 16)              # 12 x 9 m at 3.1 cm/px (box-filtered like a mip) -> 384 x 288
     rts_soot0 = shade_wall(maps, 16, soot_amount=0.0, tint=(1.08, 1.0, 0.88))
-    close = shade_wall(maps, 4, w_m=7.5, h_m=6.0)
+    close = shade_wall(maps, 4, w_m=7.5, h_m=6.0, close_up=True)
     rts_big = np.repeat(np.repeat(rts, 3, 0), 3, 1)
     rts0_big = np.repeat(np.repeat(rts_soot0, 3, 0), 3, 1)
     rows_h = cell * 2 + 40 + max(rts_big.shape[0], close.shape[0]) + 40
@@ -504,7 +510,7 @@ def preview(maps):
         dr.text((10 + c * (cell + 10) + 4, 20 + r * (cell + 10) + 4), lab, fill=(255, 255, 0))
     dr.text((14, y0 + 4), 'RTS view 3.1 cm/px (x3 nearest), soot 1', fill=(255, 255, 0))
     dr.text((x1 + 4, y0 + 4), 'RTS view, CPD soot 0 + warm tint', fill=(255, 255, 0))
-    dr.text((x2 + 4, y0 + 4), 'close 0.78 cm/px', fill=(255, 255, 0))
+    dr.text((x2 + 4, y0 + 4), 'close 0.78 cm/px, Ruin_CloseUpDetail', fill=(255, 255, 0))
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     im.save(OUT_DIR / 'ruinkit_preview.png')
     # Also a pure RTS-scale image (no upscale) to judge shimmer / mush.
@@ -532,8 +538,14 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--no-preview', action='store_true')
     ap.add_argument('--preview-only', action='store_true')
+    ap.add_argument('--only-rubble', action='store_true', help='regenerate T_BerlinRuin_Rubble_D only')
     args = ap.parse_args()
-    if not args.preview_only:
+    if args.only_rubble:
+        Ar, Hrub = make_rubble()
+        save_rgba('T_BerlinRuin_Rubble_D', Ar, Hrub)
+        m = Ar.reshape(-1, 3).mean(0)
+        print('rubble done, mean sRGB', m.round(3), 'sat', round(float((m.max() - m.min()) / m.max()), 3))
+    elif not args.preview_only:
         Ap, Hc, Hr = make_plaster()
         save_rgba('T_BerlinRuin_Plaster_D', Ap, Hc)
         print('plaster done')

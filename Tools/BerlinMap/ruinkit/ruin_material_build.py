@@ -43,6 +43,17 @@ DBK_COMPARE = ['/Game/RTS_Survival/Blueprints/Environment/Berlin/RuinKit/MI_Berl
                '/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/RusBunkers/Materials/M_RusBunker_Concrete_WallHoles']
 
 
+# Material flags of the master (the hole master is a copy, so it gets them too). Measured in ruin_cost_probe.py.
+MASTER_FLAGS = {
+    # No baked lighting in this project: the flag only adds lightmap shader permutations (and makes get_statistics
+    # report the surface-lightmap base pass instead of the one every other material is measured with).
+    'used_with_static_lighting': False,
+    # The map draws rubble heaps and skirts as hierarchical instanced meshes: without the flag a cooked game shows
+    # the default material on them (the editor only sets it on the fly, on whatever copy is loaded).
+    'used_with_instanced_static_meshes': True,
+}
+
+
 def log(msg):
     unreal.log('RUINKIT_MAT ' + msg)
 
@@ -93,6 +104,8 @@ class Graph:
         self.x = -2400
         self.y = -1200
         self.failed = 0
+        self.switch_defaults = {}   # the cost probe compiles the branches of an unsaved master through these
+        self.samples = {}           # texture name -> sample node (the cost probe taps them)
 
     def node(self, cls, **props):
         n = MEL.create_material_expression(self.m, cls, self.x, self.y)
@@ -172,18 +185,43 @@ class Graph:
                       default_value=unreal.LinearColor(r, g, b, 1.0), group='BerlinRuin')
         return self.mask(n, 'rgb')
 
-    def switch(self, when_rubble, when_wall):
-        n = self.node(unreal.MaterialExpressionStaticSwitchParameter, parameter_name=RP.STATIC_SWITCH,
-                      default_value=False, group='BerlinRuin')
+    def switch(self, when_rubble, when_wall, name=None):
+        name = name or RP.STATIC_SWITCH
+        n = self.node(unreal.MaterialExpressionStaticSwitchParameter, parameter_name=name,
+                      default_value=bool(self.switch_defaults.get(name, False)), group='BerlinRuin')
         self._in(n, 'True', when_rubble)
         self._in(n, 'False', when_wall)
         return n
+
+    def close_up(self, when_on, when_off):
+        return self.switch(when_on, when_off, RP.CLOSE_UP_SWITCH)
+
+    def const(self, value):
+        return self.node(unreal.MaterialExpressionConstant, r=float(value))
+
+    def append(self, a, b):
+        n = self.node(unreal.MaterialExpressionAppendVector)
+        self._in(n, 'A', a)
+        self._in(n, 'B', b)
+        return n
+
+    def to_pixel(self, value):
+        """Vertex interpolator: everything feeding it runs in the vertex shader."""
+        n = self.node(unreal.MaterialExpressionVertexInterpolator)
+        node, out = value if isinstance(value, tuple) else (value, '')
+        self.link(node, out, n, '')
+        return n
+
+    def cpd_scalar(self, name, index):
+        return self.node(unreal.MaterialExpressionScalarParameter, parameter_name=name, default_value=0.0,
+                         use_custom_primitive_data=True, primitive_data_index=index, group='BerlinRuin')
 
     def texture(self, tex, uv, linear=False):
         sampler = unreal.MaterialSamplerType.SAMPLERTYPE_LINEAR_COLOR if linear else \
             unreal.MaterialSamplerType.SAMPLERTYPE_COLOR
         n = self.node(unreal.MaterialExpressionTextureSample, texture=tex, sampler_type=sampler)
         self.link(uv, '', n, 'UVs')
+        self.samples[tex.get_name()] = n
         return n
 
 
@@ -196,92 +234,118 @@ def _customized_uv0():
     return getattr(PROP, names[0])
 
 
+def build_graph(g, textures):
+    """The whole M_BerlinRuin graph on g.m. Returns (base colour, roughness, normal) nodes.
+    Per-pixel work is kept to what the game camera (20-40 m up) shows; everything that is constant per vertex or per
+    component (UV tile, custom primitive data fallbacks, vertex-colour scaling) runs in the vertex shader and reaches
+    the pixel shader through three vertex interpolators (7 scalars). Parameter-only maths folds into the preshader."""
+    # UVs in the vertex shader: UV0 (1 unit = 4 m) x the tile scalar picked by the rubble switch.
+    # Customized UVs are not reachable from Python; a vertex interpolator moves the multiply to the VS the same way.
+    uv0 = g.node(unreal.MaterialExpressionTextureCoordinate, coordinate_index=0)
+    uv = g.to_pixel(g.mul(uv0, g.switch(g.scalar('RuinRubbleTile'), g.scalar('RuinWallTile'))))
+    vc = g.node(unreal.MaterialExpressionVertexColor)
+    roughness = g.scalar('RuinRoughness')
+    flat = g.node(unreal.MaterialExpressionConstant3Vector, constant=unreal.LinearColor(0, 0, 1, 0))
+
+    # ---- per component, vertex shader: CPD 0-3 = tint RGB + soot amount. Unset CPD reads 0 -> parameter fallbacks.
+    cpd = g.node(unreal.MaterialExpressionVectorParameter, parameter_name='RuinCPD_TintSoot',
+                 default_value=unreal.LinearColor(1, 1, 1, 1), use_custom_primitive_data=True,
+                 primitive_data_index=RP.CPD_TINT_FIRST, group='BerlinRuin')
+    tint_set = g.sat(g.mul(g.add(g.add((cpd, 'R'), (cpd, 'G')), (cpd, 'B')), 1.0e6))
+    tint = g.lerp(g.vector_rgb('RuinTintFallback'), g.mask(cpd, 'rgb'), tint_set)
+    tint = g.switch(g.mul(tint, g.vector_rgb('RuinRubbleColor')), tint)      # rubble: its colour multiplier rides along
+    soot_set = g.sat(g.mul(g.unary(unreal.MaterialExpressionAbs, (cpd, 'A')), 1.0e6))
+    soot_amount = g.lerp(g.scalar('RuinSootAmountFallback'), g.max((cpd, 'A'), 0.0), soot_set)
+    per_component = g.to_pixel(g.append(tint, g.mul((vc, 'R'), soot_amount)))   # rgb tint, a = vertex soot x amount
+    tint_ps = g.mask(per_component, 'rgb')
+    soot_ps = g.mask(per_component, 'a')
+
+    # ---- wall: plaster / brick by vertex G thresholded against the plaster chip height (Plaster_D.A).
+    plas = g.texture(textures['T_BerlinRuin_Plaster_D'], uv)
+    brick = g.texture(textures['T_BerlinRuin_Brick_D'], uv)
+    chip = (plas, 'A')
+    cav = (brick, 'A')
+    width = g.scalar('RuinPlasterEdgeWidth')
+    # t = (G + loss) * (1 + 2w) - w = G * k + t0 (vertex shader) ; d = (chip - t) / w ; plaster = saturate(d)
+    k = g.add(g.mul(width, 2.0), 1.0)
+    t0 = g.sub(g.mul(g.scalar('RuinPlasterLoss'), k), width)
+    threshold = g.to_pixel(g.add(g.mul((vc, 'G'), k), t0))
+    d = g.mul(g.sub(chip, threshold), g.div(1.0, width))
+    plaster = g.sat(d)
+    plaster_col = g.mul((plas, 'RGB'), g.vector_rgb('RuinPlasterColor'))
+    brick_col = g.mul((brick, 'RGB'), g.vector_rgb('RuinBrickColor'))
+    # Ruin_CloseUpDetail (off by default): rim light and shadow at the plaster edge, roughness by cavity, normal map.
+    edge = g.mul(g.sat(g.sub(2.0, d)), plaster)                 # bright broken rim, 1..2 widths inside
+    shadow = g.mul(g.sat(g.add(g.mul(d, 0.5), 1.0)), g.unary(unreal.MaterialExpressionOneMinus, plaster))
+    plaster_rim = g.mul(plaster_col, g.add(g.mul(edge, g.scalar('RuinPlasterEdgeLight')), 1.0))
+    brick_rim = g.mul(brick_col, g.sub(1.0, g.mul(shadow, g.scalar('RuinPlasterEdgeShadow'))))
+    wall_base = g.lerp(g.close_up(brick_rim, brick_col), g.close_up(plaster_rim, plaster_col), plaster)
+    rough_detail = g.lerp(g.lerp(g.scalar('RuinBrickRoughJoint'), g.scalar('RuinBrickRoughFace'), cav),
+                          g.scalar('RuinPlasterRoughness'), plaster)
+    nrm = g.texture(textures['T_BerlinRuin_N'], uv, linear=True)
+    nxy = g.lerp(g.mask((nrm, 'RGBA'), 'rg'), g.mask((nrm, 'RGBA'), 'ba'), plaster)
+    nxy = g.mul(g.add(g.mul(nxy, 2.0), -1.0), g.scalar('RuinNormalStrength'))
+    normal_detail = g.append(nxy, g.const(1.0))                  # the shader normalises the tangent normal
+    wall_rough = g.close_up(rough_detail, roughness)
+    wall_normal = g.close_up(normal_detail, flat)
+    wall_noise = g.close_up(g.lerp(cav, chip, plaster), chip)    # soot / dust breakup: the chip height is noise enough
+
+    # ---- rubble: one texture; desaturation (CPD 4 or the parameter) and contrast about a grey pivot, then the tint.
+    rub = g.texture(textures['T_BerlinRuin_Rubble_D'], uv)
+    desat_cpd = g.cpd_scalar('RuinCPD_Desaturation', RP.CPD_DESATURATION)
+    desat_set = g.sat(g.mul(g.unary(unreal.MaterialExpressionAbs, desat_cpd), 1.0e6))
+    desat = g.to_pixel(g.lerp(g.scalar('RuinRubbleDesaturation'), g.sat(desat_cpd), desat_set))
+    luma = g.node(unreal.MaterialExpressionDotProduct)
+    g._in(luma, 'A', (rub, 'RGB'))
+    g._in(luma, 'B', g.node(unreal.MaterialExpressionConstant3Vector, constant=unreal.LinearColor(0.3, 0.59, 0.11, 0)))
+    rub_grey = g.lerp((rub, 'RGB'), luma, desat)
+    contrast = g.scalar('RuinRubbleContrast')
+    pivot = g.mul(g.scalar('RuinRubblePivot'), g.unary(unreal.MaterialExpressionOneMinus, contrast))
+    rub_base = g.add(g.mul(rub_grey, contrast), pivot)
+
+    base0 = g.switch(rub_base, wall_base)
+    rough = g.switch(roughness, wall_rough)
+    noise = g.switch((rub, 'A'), wall_noise)
+    normal = g.switch(flat, wall_normal)
+
+    # ---- tint, soot, dust (shared). The breakup terms are written as noise * a + b so a and b fold into the preshader.
+    base1 = g.mul(base0, tint_ps)
+    soot_breakup = g.scalar('RuinSootBreakup')
+    soot_k = g.add(g.mul(noise, soot_breakup), g.sub(g.scalar('RuinSootStrength'), g.mul(soot_breakup, 0.5)))
+    soot = g.sat(g.mul(soot_ps, soot_k))
+    # lerp(base, base * SootColor, soot) = base * (1 + soot * (SootColor - 1))
+    base2 = g.mul(base1, g.add(g.mul(g.add(g.vector_rgb('RuinSootColor'), -1.0), soot), 1.0))
+    dust_breakup = g.scalar('RuinDustBreakup')
+    dust_k = g.sub(g.add(g.scalar('RuinDustStrength'), g.mul(dust_breakup, 0.5)), g.mul(noise, dust_breakup))
+    dust = g.mul(g.sat(g.mul((vc, 'B'), dust_k)), g.scalar('RuinDustOpacity'))
+    base3 = g.lerp(base2, g.vector_rgb('RuinDustColor'), dust)
+    return base3, rough, normal
+
+
+def clear_graph(material):
+    for _ in range(30):   # delete_all_material_expressions only removes about half per call
+        left = MEL.get_num_material_expressions(material)
+        if left == 0:
+            break
+        log('clearing %d expressions' % left)
+        MEL.delete_all_material_expressions(material)
+
+
 def build_master(textures):
     if EAL.does_asset_exist(MASTER):
         material = unreal.load_asset(MASTER)
-        for _ in range(30):   # delete_all_material_expressions only removes about half per call
-            left = MEL.get_num_material_expressions(material)
-            if left == 0:
-                break
-            log('clearing %d expressions' % left)
-            MEL.delete_all_material_expressions(material)
+        clear_graph(material)        # headless only: this asserts in an editor that has the master in use on a level
     else:
         material = unreal.AssetToolsHelpers.get_asset_tools().create_asset(
             'M_BerlinRuin', FOLDER, unreal.Material, unreal.MaterialFactoryNew())
     material.set_editor_property('blend_mode', unreal.BlendMode.BLEND_OPAQUE)
     material.set_editor_property('shading_model', unreal.MaterialShadingModel.MSM_DEFAULT_LIT)
     material.set_editor_property('two_sided', False)
-    material.set_editor_property('used_with_static_lighting', True)
+    for key, value in MASTER_FLAGS.items():
+        material.set_editor_property(key, value)
     g = Graph(material)
-
-    # UVs in the vertex shader: UV0 (1 unit = 4 m) x the tile scalar picked by the rubble switch.
-    uv0 = g.node(unreal.MaterialExpressionTextureCoordinate, coordinate_index=0)
-    tile = g.switch(g.scalar('RuinRubbleTile'), g.scalar('RuinWallTile'))
-    uv_vs = g.mul(uv0, tile)
-    # Customized UVs are not reachable from Python; a vertex interpolator moves the multiply to the VS the same way.
-    uv = g.node(unreal.MaterialExpressionVertexInterpolator)
-    g.link(uv_vs, '', uv, '')
-    vc = g.node(unreal.MaterialExpressionVertexColor)
-
-    # ---- wall: plaster / brick by vertex G thresholded against the plaster chip height (Plaster_D.A).
-    plas = g.texture(textures['T_BerlinRuin_Plaster_D'], uv)
-    brick = g.texture(textures['T_BerlinRuin_Brick_D'], uv)
-    nrm = g.texture(textures['T_BerlinRuin_N'], uv, linear=True)
-    chip = (plas, 'A')
-    cav = (brick, 'A')
-    width = g.scalar('RuinPlasterEdgeWidth')
-    loss = g.add((vc, 'G'), g.scalar('RuinPlasterLoss'))
-    # t = loss * (1 + 2w) - w ; d = (chip - t) / w ; plaster = saturate(d)
-    threshold = g.sub(g.mul(loss, g.add(g.mul(width, 2.0), 1.0)), width)
-    d = g.div(g.sub(chip, threshold), width)
-    plaster = g.sat(d)
-    edge = g.mul(g.sat(g.sub(2.0, d)), plaster)                 # bright broken rim, 1..2 widths inside
-    shadow = g.mul(g.sat(g.add(g.mul(d, 0.5), 1.0)), g.unary(unreal.MaterialExpressionOneMinus, plaster))
-    plaster_col = g.mul(g.mul((plas, 'RGB'), g.vector_rgb('RuinPlasterColor')),
-                        g.add(g.mul(edge, g.scalar('RuinPlasterEdgeLight')), 1.0))
-    brick_col = g.mul(g.mul((brick, 'RGB'), g.vector_rgb('RuinBrickColor')),
-                      g.sub(1.0, g.mul(shadow, g.scalar('RuinPlasterEdgeShadow'))))
-    wall_base = g.lerp(brick_col, plaster_col, plaster)
-    wall_rough = g.lerp(g.lerp(g.scalar('RuinBrickRoughJoint'), g.scalar('RuinBrickRoughFace'), cav),
-                        g.scalar('RuinPlasterRoughness'), plaster)
-    nxy = g.lerp(g.mask((nrm, 'RGBA'), 'rg'), g.mask((nrm, 'RGBA'), 'ba'), plaster)
-    nxy = g.mul(g.add(g.mul(nxy, 2.0), -1.0), g.scalar('RuinNormalStrength'))
-    wall_normal = g.node(unreal.MaterialExpressionAppendVector)
-    g.link(nxy, '', wall_normal, 'A')
-    one = g.node(unreal.MaterialExpressionConstant, r=1.0)
-    g.link(one, '', wall_normal, 'B')                            # the shader normalises the tangent normal
-    wall_noise = g.lerp(cav, chip, plaster)
-
-    # ---- rubble: one texture, no blend, flat normal.
-    rub = g.texture(textures['T_BerlinRuin_Rubble_D'], uv)
-    rub_base = g.mul((rub, 'RGB'), g.vector_rgb('RuinRubbleColor'))
-    flat = g.node(unreal.MaterialExpressionConstant3Vector, constant=unreal.LinearColor(0, 0, 1, 0))
-
-    base0 = g.switch(rub_base, wall_base)
-    rough0 = g.switch(g.scalar('RuinRubbleRoughness'), wall_rough)
-    noise = g.switch((rub, 'A'), wall_noise)
-    normal = g.switch(flat, wall_normal)
-
-    # ---- per actor: CPD 0-3 = tint RGB + soot amount. Unset CPD reads 0 -> parameter fallbacks.
-    cpd = g.node(unreal.MaterialExpressionVectorParameter, parameter_name='RuinCPD_TintSoot',
-                 default_value=unreal.LinearColor(1, 1, 1, 1), use_custom_primitive_data=True,
-                 primitive_data_index=RP.CPD_TINT_FIRST, group='BerlinRuin')
-    cpd_rgb = g.mask(cpd, 'rgb')
-    tint_set = g.sat(g.mul(g.add(g.add((cpd, 'R'), (cpd, 'G')), (cpd, 'B')), 1.0e6))
-    tint = g.lerp(g.vector_rgb('RuinTintFallback'), cpd_rgb, tint_set)
-    soot_set = g.sat(g.mul(g.unary(unreal.MaterialExpressionAbs, (cpd, 'A')), 1.0e6))
-    soot_amount = g.lerp(g.scalar('RuinSootAmountFallback'), g.max((cpd, 'A'), 0.0), soot_set)
-
-    base1 = g.mul(base0, tint)
-    soot_k = g.add(g.scalar('RuinSootStrength'), g.mul(g.scalar('RuinSootBreakup'), g.sub(noise, 0.5)))
-    soot = g.sat(g.mul(g.mul((vc, 'R'), soot_amount), soot_k))
-    base2 = g.lerp(base1, g.mul(base1, g.vector_rgb('RuinSootColor')), soot)
-    dust_k = g.add(g.scalar('RuinDustStrength'), g.mul(g.scalar('RuinDustBreakup'), g.sub(0.5, noise)))
-    dust = g.mul(g.sat(g.mul((vc, 'B'), dust_k)), g.scalar('RuinDustOpacity'))
-    base3 = g.lerp(base2, g.vector_rgb('RuinDustColor'), dust)
-    rough = g.lerp(rough0, g.scalar('RuinMatteRoughness'), g.max(soot, dust))
-
-    for node, prop in ((base3, PROP.MP_BASE_COLOR), (rough, PROP.MP_ROUGHNESS), (normal, PROP.MP_NORMAL)):
+    base, rough, normal = build_graph(g, textures)
+    for node, prop in ((base, PROP.MP_BASE_COLOR), (rough, PROP.MP_ROUGHNESS), (normal, PROP.MP_NORMAL)):
         if not MEL.connect_material_property(node, '', prop):
             g.failed += 1
     MEL.layout_material_expressions(material)
@@ -295,8 +359,9 @@ def build_master(textures):
 
 # ----------------------------------------------------------------------------- instances
 
-def _apply(mi, scalars, vectors, rubble):
-    MEL.set_material_instance_static_switch_parameter_value(mi, RP.STATIC_SWITCH, rubble)
+def _apply(mi, scalars, vectors, switches):
+    for name, value in switches.items():
+        MEL.set_material_instance_static_switch_parameter_value(mi, name, bool(value))
     for name, value in scalars.items():
         MEL.set_material_instance_scalar_parameter_value(mi, name, float(value))
     for name, (r, g, b) in vectors.items():
@@ -304,17 +369,17 @@ def _apply(mi, scalars, vectors, rubble):
     MEL.update_material_instance(mi)
 
 
-def build_instances(master):
+def build_instances():
     out = {}
-    for name, (scalars, vectors, rubble) in RP.INSTANCES.items():
+    for name, (parent, scalars, vectors, switches) in RP.INSTANCES.items():
         path = FOLDER + '/' + name
         if EAL.does_asset_exist(path):
             mi = unreal.load_asset(path)
         else:
             mi = unreal.AssetToolsHelpers.get_asset_tools().create_asset(
                 name, FOLDER, unreal.MaterialInstanceConstant, unreal.MaterialInstanceConstantFactoryNew())
-        MEL.set_material_instance_parent(mi, master)
-        _apply(mi, scalars, vectors, rubble)
+        MEL.set_material_instance_parent(mi, unreal.load_asset(FOLDER + '/' + parent))
+        _apply(mi, scalars, vectors, switches)
         _save(mi)
         out[name] = mi
     return out
@@ -322,27 +387,25 @@ def build_instances(master):
 
 def build_holes():
     """The masked hole variant, exactly by the shared library (never edited afterwards)."""
-    holes_path = FOLDER + '/' + RP.HOLES_INSTANCE
-    if EAL.does_asset_exist(HOLES_MASTER):
-        if EAL.delete_asset(HOLES_MASTER):
-            log('holes: deleted stale M_BerlinRuin_WallHoles, instance kept')
-        else:
-            log('holes: FALLBACK, deleting MI_BerlinRuin_Wall_Holes too (Blueprint references to it break)')
-            # Fall back: the holes instance pins it; drop that too (it is re-made below).
-            EAL.delete_asset(holes_path)
-            if not EAL.delete_asset(HOLES_MASTER):
-                raise RuntimeError('could not delete stale ' + HOLES_MASTER)
+    if EAL.does_asset_exist(HOLES_MASTER) and not EAL.delete_asset(HOLES_MASTER):
+        # Never fall back to deleting MI_BerlinRuin_Wall_Holes: every ruin Blueprint references it. The library would
+        # silently reuse the stale master, so stop here instead.
+        raise RuntimeError('could not delete the stale ' + HOLES_MASTER + ' (open in another editor?)')
     mi = WH.make_holes_instance(FOLDER + '/MI_BerlinRuin_Wall', FOLDER, unreal.load_asset(PLACEHOLDER_MESH),
                                 grid_axis=None, two_sided=True, name=RP.HOLES_INSTANCE, inner_tint=True,
                                 inner_darken=RP.HOLES_INNER_DARKEN, inner_color=RP.HOLES_INNER_COLOR)
-    scalars, vectors, rubble = RP.INSTANCES['MI_BerlinRuin_Wall']
-    _apply(mi, scalars, vectors, rubble)
+    _parent, scalars, vectors, switches = RP.INSTANCES['MI_BerlinRuin_Wall']
+    _apply(mi, scalars, vectors, switches)       # every static switch: the kept instance must not drift from the wall
     _save(mi)
     master = unreal.load_asset(HOLES_MASTER)
-    log('holes master %s blend=%s, instance parent=%s two_sided=%s' % (
-        master.get_name(), master.get_editor_property('blend_mode'),
+    names = [str(n) for n in MEL.get_scalar_parameter_names(master)]
+    fresh = 'RuinRoughness' in names and 'WallHole0R' in names
+    log('holes master %s blend=%s fresh=%s, instance parent=%s two_sided=%s' % (
+        master.get_name(), master.get_editor_property('blend_mode'), fresh,
         mi.get_editor_property('parent').get_name(),
         mi.get_editor_property('base_property_overrides').get_editor_property('two_sided')))
+    if not fresh or mi.get_editor_property('parent') != master:
+        raise RuntimeError('M_BerlinRuin_WallHoles is not a fresh copy of the new master')
     return mi
 
 
@@ -363,7 +426,7 @@ def verify_on_disk():
 def stats():
     rows = []
     paths = [FOLDER + '/MI_BerlinRuin_Wall', FOLDER + '/' + RP.HOLES_INSTANCE, FOLDER + '/MI_BerlinRuin_Rubble',
-             MASTER, HOLES_MASTER] + DBK_COMPARE
+             FOLDER + '/MI_BerlinRuin_Rubble_Foot', MASTER, HOLES_MASTER] + DBK_COMPARE
     for path in paths:
         if not EAL.does_asset_exist(path):
             log('STATS %s missing' % path)
@@ -408,8 +471,8 @@ def run(mode=None):
         import time
         RUN_START[0] = time.time()
         textures = import_textures()
-        master = build_master(textures)
-        build_instances(master)
+        build_master(textures)
+        build_instances()
         build_holes()
         ok = verify_on_disk()
         log('BUILD RESULT %s' % ('DONE' if ok else 'FAIL'))

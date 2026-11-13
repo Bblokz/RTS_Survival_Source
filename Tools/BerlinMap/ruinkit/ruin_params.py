@@ -22,46 +22,60 @@ BRICK_STRETCHERS_PER_TILE = 16     # 25 cm stretcher incl. joint, 12.5 cm header
 
 # Scalar parameters: name -> default.
 SCALARS = {
-    'RuinWallTile': 1.0,              # UV0 multiplier for all three wall textures (1.0 = 4 m tile)
+    'RuinWallTile': 1.0,              # UV0 multiplier for the wall textures (1.0 = 4 m tile)
     'RuinRubbleTile': 1.333,          # UV0 multiplier for the rubble texture (1.333 = 3 m tile)
     'RuinPlasterLoss': 0.0,           # added to vertex G before the plaster threshold (-1..1)
     'RuinPlasterEdgeWidth': 0.04,     # width of the plaster->brick transition in chip-height units (sharp ~0.02-0.08)
+    'RuinRoughness': 0.90,            # one roughness for wall and rubble (the game camera cannot tell 0.8 from 0.97)
+    'RuinSootAmountFallback': 1.0,    # soot amount when CPD 3 is unset (0)
+    'RuinSootStrength': 1.0,          # soot = vertex R * amount * (strength + breakup * (noise - 0.5))
+    'RuinSootBreakup': 0.9,
+    'RuinDustStrength': 1.0,          # dust = vertex B * (strength + breakup * (0.5 - noise))
+    'RuinDustBreakup': 0.8,
+    'RuinDustOpacity': 0.75,
+    # Rubble branch only.
+    'RuinRubbleDesaturation': 0.30,   # 0 = texture colour, 1 = grey; used when CPD 4 is unset (0)
+    'RuinRubbleContrast': 0.85,       # 1 = texture contrast; lower flattens the fragments toward RuinRubblePivot
+    'RuinRubblePivot': 0.12,          # linear grey the contrast turns about (about the rubble texture's mean)
+    # Ruin_CloseUpDetail branch only (off by default: none of it shows from the game camera).
     'RuinPlasterEdgeLight': 0.22,     # brightening of the broken plaster rim (fresh lime core)
     'RuinPlasterEdgeShadow': 0.30,    # darkening of brick just below the plaster edge (plaster thickness)
     'RuinPlasterRoughness': 0.90,
     'RuinBrickRoughFace': 0.80,       # brick face roughness (brick A = 1)
     'RuinBrickRoughJoint': 0.97,      # mortar joint roughness (brick A = 0)
     'RuinNormalStrength': 1.0,        # scales the packed normal XY
-    'RuinSootAmountFallback': 1.0,    # soot amount when CPD 3 is unset (0)
-    'RuinSootStrength': 1.0,          # soot = vertex R * amount * (strength + breakup * (noise - 0.5))
-    'RuinSootBreakup': 0.9,
-    'RuinMatteRoughness': 0.97,       # roughness under soot and dust
-    'RuinDustStrength': 1.0,          # dust = vertex B * (strength + breakup * (0.5 - noise))
-    'RuinDustBreakup': 0.8,
-    'RuinDustOpacity': 0.75,
-    'RuinRubbleRoughness': 0.90,
 }
+# Parameters that only exist in the Ruin_CloseUpDetail branch (the docs and the preview read this).
+CLOSE_UP_SCALARS = ('RuinPlasterEdgeLight', 'RuinPlasterEdgeShadow', 'RuinPlasterRoughness', 'RuinBrickRoughFace',
+                    'RuinBrickRoughJoint', 'RuinNormalStrength')
 
 # Vector parameters (linear RGB): name -> default.
 VECTORS = {
     'RuinTintFallback': (1.0, 1.0, 1.0),   # per-actor tint when CPD 0-2 are all unset (0)
     'RuinPlasterColor': (1.0, 1.0, 1.0),   # multiplier on the plaster texture
     'RuinBrickColor': (1.0, 1.0, 1.0),     # multiplier on the brick texture
-    'RuinRubbleColor': (1.0, 1.0, 1.0),    # multiplier on the rubble texture
+    'RuinRubbleColor': (1.0, 1.0, 1.0),    # multiplier on the rubble texture (after desaturation and contrast)
     'RuinSootColor': (0.075, 0.068, 0.064),  # multiplier at full soot (keeps some texture)
     'RuinDustColor': (0.235, 0.212, 0.180),  # linear; sRGB ~ (0.52, 0.50, 0.47)
 }
 
-# Custom primitive data (the hole system owns 8-34).
+# Custom primitive data (the hole system owns 8-34 and never writes below 8; 5-7 are free).
 CPD_TINT_FIRST = 0     # 0,1,2 tint RGB multiplier; all three 0 (unset) -> RuinTintFallback
 CPD_SOOT = 3           # soot amount; 0 (unset) -> RuinSootAmountFallback; negative -> no soot
+CPD_DESATURATION = 4   # rubble desaturation 0..1; 0 (unset) -> RuinRubbleDesaturation; negative -> none
 
 STATIC_SWITCH = 'Ruin_IsRubble'
+CLOSE_UP_SWITCH = 'Ruin_CloseUpDetail'     # normal map, plaster rim light / shadow, roughness by brick cavity
+STATIC_SWITCHES = (STATIC_SWITCH, CLOSE_UP_SWITCH)
 
-# Instances: name -> (scalar overrides, vector overrides, static switch value)
+# Instances: name -> (parent asset name, scalar overrides, vector overrides, static switch values).
+# Every switch is written on every instance of the master, so the hole instance can never drift.
 INSTANCES = {
-    'MI_BerlinRuin_Wall': ({}, {}, False),
-    'MI_BerlinRuin_Rubble': ({}, {}, True),
+    'MI_BerlinRuin_Wall': ('M_BerlinRuin', {}, {}, {STATIC_SWITCH: False, CLOSE_UP_SWITCH: False}),
+    'MI_BerlinRuin_Rubble': ('M_BerlinRuin', {}, {}, {STATIC_SWITCH: True, CLOSE_UP_SWITCH: False}),
+    # Footprint skirts (berlin_map_build.step_feet): darker, thinner dust, or the skirts read as pale rings from above.
+    'MI_BerlinRuin_Rubble_Foot': ('MI_BerlinRuin_Rubble', {'RuinDustOpacity': 0.6},
+                                  {'RuinDustColor': (0.115, 0.102, 0.090)}, {}),
 }
 
 # Hole instance (made by make_wall_holes_material.make_holes_instance from MI_BerlinRuin_Wall).
