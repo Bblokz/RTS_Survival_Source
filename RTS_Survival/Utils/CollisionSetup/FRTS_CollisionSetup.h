@@ -143,6 +143,12 @@ public:
 
 	static void SetupSplineNoCollision(UMeshComponent* SplineMesh);
 
+	/**
+	 * @brief Invisible ramp that vehicle chassis drive over (field trench earth banks): physics only, so traces and
+	 * infantry capsules (query-only, ignoring its object type) never see it.
+	 */
+	static void SetupVehicleRampCollision(UPrimitiveComponent* RampComponent);
+
 	static void SetupPickupCollision(UBoxComponent* PickupBox, UMeshComponent* PickupMesh);
 
 	// Will dynamically be allied or not with this player by blocking or ignoring the trace channel used to hit the enemies of that player.

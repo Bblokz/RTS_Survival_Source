@@ -95,6 +95,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Pit Defense")
 	void HandlePitDeath();
 
+	/** For pits whose Blueprint death replaces them with a wreck: the sink would bury the pit before the swap. */
+	void HandlePitDeathWithoutSink();
+
 	/** Rebuilds the collider after construction or owner setup changed the pit's visible bounds or allegiance. */
 	void RefreshWeaponHitCollider();
 
@@ -113,6 +116,9 @@ private:
 	TObjectPtr<UBoxComponent> M_WeaponHitCollider;
 
 	bool bM_DeathStarted = false;
+
+	/** @return False when the death already started, so effects never play twice. */
+	bool StartPitDeathEffects();
 
 	ABuildingExpansion* GetPitOwner() const;
 	bool GetIsValidWeaponHitCollider() const;

@@ -169,6 +169,9 @@ public:
 	UFUNCTION(BlueprintPure, Category="WallHoles")
 	int32 GetHiddenCellCount() const;
 
+	// The mesh this component cuts holes into; null before BeginPlay. Owners with several hole components route hits by it.
+	UStaticMeshComponent* GetWallMeshComponent() const { return M_WallMesh; }
+
 	/**
 	 * @brief Test hit without a projectile, for tuning.
 	 * @param WorldLocation Impact point on the wall.
@@ -215,6 +218,15 @@ private:
 	// Owners with a health component (building expansions, garrisons, health walls) close holes on every heal.
 	void BeginPlay_BindOwnerHealing();
 	void OnOwnerHealthHealed(float HealthAfter, float MaxHealth);
+
+	/**
+	 * @brief A hit inside the mesh bounds can still be clear of the mesh (a shell bursting on a pit's gun mid-pit);
+	 * such a hole would take a slot and throw debris from the air.
+	 * @param MeshSpaceCentre Hole centre in mesh space.
+	 * @param Radius Hole radius in mesh space.
+	 * @return True when the hole sphere touches the wall mesh's collision, or the mesh has no query collision.
+	 */
+	bool GetDoesHoleTouchWallMesh(const FVector& MeshSpaceCentre, float Radius) const;
 
 	/** @return Where the hole sphere goes: on the surface, or moved back along the shot by HoleCentreOutsetShare. */
 	FVector GetOutsetHoleCentre(const FVector& SurfacePoint, const FTransform& MeshTransform, const FVector& ShotDirection,

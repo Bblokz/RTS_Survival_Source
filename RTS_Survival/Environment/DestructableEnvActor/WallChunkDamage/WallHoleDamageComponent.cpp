@@ -293,12 +293,19 @@ float UWallHoleDamageComponent::ApplyHit(const FVector& WorldHit, const FVector&
 	{
 		return 0.f;
 	}
-	TArray<FWallDebrisPiece> Pieces;
 	// A splash hole sits on the wall's surface nearest the explosion.
 	const FVector SurfacePoint = M_MeshBounds.GetClosestPointTo(MeshSpaceHit);
+	const FVector HoleCentre = GetOutsetHoleCentre(SurfacePoint, MeshTransform, ShotDirection, CappedRadius);
+	// Bounds of open shapes enclose air: a shell bursting on a pit's gun lies inside them but cuts nothing.
+	if (not GetDoesHoleTouchWallMesh(HoleCentre, CappedRadius))
+	{
+		UE_LOG(LogWallHoleDamage, Verbose, TEXT("RTS_WALL_HOLES skip %s: hole sphere clear of the mesh at %s r=%.0f"),
+		       *GetNameSafe(GetOwner()), *HoleCentre.ToCompactString(), CappedRadius);
+		return 0.f;
+	}
+	TArray<FWallDebrisPiece> Pieces;
 	const FWallHolePieceAnchor Anchor = MakePieceAnchor(SurfacePoint, MeshTransform, ShotDirection);
-	const float Removed = CutHole(GetOutsetHoleCentre(SurfacePoint, MeshTransform, ShotDirection, CappedRadius),
-	                              CappedRadius, Anchor, Pieces);
+	const float Removed = CutHole(HoleCentre, CappedRadius, Anchor, Pieces);
 	if (Removed > 0.f)
 	{
 		SwapToDamagedMaterials();
@@ -311,6 +318,29 @@ float UWallHoleDamageComponent::ApplyHit(const FVector& WorldHit, const FVector&
 	WallDamageShared::ThrowDebrisPieces(*GetOwner(), M_LoadedDebrisSystem, DebrisMeshes, Pieces,
 	                                    MeshTransform.GetRotation(), WorldHit, ShotDirection, 1.f, OutwardDirection);
 	return Removed;
+}
+
+bool UWallHoleDamageComponent::GetDoesHoleTouchWallMesh(const FVector& MeshSpaceCentre, const float Radius) const
+{
+	// Without query collision there is nothing to test against; such meshes keep every hole.
+	if (not M_WallMesh->IsQueryCollisionEnabled())
+	{
+		return true;
+	}
+	const FBodyInstance* const BodyInstance = M_WallMesh->GetBodyInstance();
+	if (BodyInstance == nullptr)
+	{
+		return true;
+	}
+	const FTransform MeshTransform = M_WallMesh->GetComponentTransform();
+	const FVector WorldCentre = MeshTransform.TransformPosition(MeshSpaceCentre);
+	const float WorldRadius = Radius * static_cast<float>(MeshTransform.GetMaximumAxisScale());
+	const FCollisionShape Sphere = FCollisionShape::MakeSphere(WorldRadius);
+	constexpr bool bTestComplexCollision = true;
+	// Simple shapes first (hulls, or the trimesh of complex-as-simple meshes); meshes with only complex collision
+	// still get their holes through the triangle test.
+	return BodyInstance->OverlapTest(WorldCentre, FQuat::Identity, Sphere)
+		|| BodyInstance->OverlapTest(WorldCentre, FQuat::Identity, Sphere, nullptr, bTestComplexCollision);
 }
 
 FVector UWallHoleDamageComponent::GetOutsetHoleCentre(const FVector& SurfacePoint, const FTransform& MeshTransform,

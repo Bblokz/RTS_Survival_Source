@@ -316,9 +316,28 @@ private:
 	UPROPERTY()
 	TObjectPtr<UWallChunkDamageComponent> M_WallChunkDamage;
 
-	// Optional: walls with procedural holes (no chunk mesh) get their hits forwarded the same way.
+	// Optional: walls with procedural holes (no chunk mesh) get their hits forwarded the same way. Usually one; actors
+	// with several meshes (wall gates: frame + leaf) carry one per mesh and each hit goes to the mesh it struck.
 	UPROPERTY()
-	TObjectPtr<UWallHoleDamageComponent> M_WallHoleDamage;
+	TArray<TObjectPtr<UWallHoleDamageComponent>> M_WallHoleDamageComponents;
+
+	/**
+	 * @brief With several hole components a hit must only hole the mesh it struck, not every mesh of the actor.
+	 * @param DamageAmount Damage actually applied.
+	 * @param DamageEvent The hit; a point event carries the impact.
+	 * @param DamageCauser Projectile, bomb or ability actor; may be null.
+	 * @param HealthBefore Health before this hit.
+	 * @param HealthAfter Health after this hit.
+	 */
+	void ForwardDamageToWallHoleComponents(float DamageAmount, const FDamageEvent& DamageEvent, const AActor* DamageCauser,
+	                                       float HealthBefore, float HealthAfter) const;
+
+	/**
+	 * @brief Projectiles only fill HitInfo.Location, so the struck mesh is the one whose collision lies nearest.
+	 * @param DamageEvent The hit.
+	 * @return The hole component of the struck mesh; null for splash or when no mesh has query collision.
+	 */
+	UWallHoleDamageComponent* FindWallHoleComponentForPointHit(const FDamageEvent& DamageEvent) const;
 
 	// Optional: vehicle wrecks and scavengeable vehicle parts get shell holes on any of their meshes.
 	UPROPERTY()

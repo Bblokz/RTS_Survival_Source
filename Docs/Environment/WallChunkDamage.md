@@ -435,7 +435,16 @@ component are untouched (user requirement). Agent brief: `Tools/WallChunks/PIT_A
     pit mesh up, that blocks projectiles. A hit on it lies above the mesh bounds; `ApplyHit` clamps it to the bounds
     top, so on the large pits such a hole would sit over the gun in the air. Not seen in the real-fire test (flat tank
     fire at the rim aim points hit the ring), but arcing or high fire could hit it. A fix would trace along the shot
-    onto the pit mesh (complex) and skip the hole when nothing is hit.
+    onto the pit mesh (complex) and skip the hole when nothing is hit. **Fixed 2026-11-12** by the hole guard (see
+    "Remaining weapon pits").
+  - **Cursor (2026-11-12):** the collider also blocks `ECC_Visibility`. The crew and gun meshes have no collision, so
+    before this the cursor passed through the gun to the ground. Hovering a pit's gun showed no attack marker, and only
+    the sandbags did (seen on the 53K pits).
+    - Hovering or clicking the gun now resolves to the pit.
+    - Check (DebugGame, `Tools/WallChunks/Pits2/lead_gun_hover_test.py`): 6/6 cursor-angle traces at the gun hit the
+      pit on 53K, 53K Sector, Ger Pak40 and B4.
+    - Side effects: a cursor location over a pit's gun is now the top of the box, not the pit floor. A Visibility
+      ground trace from above (impact decals) stops on the box.
   - Pack-up / unpack restore the cached materials; the holes come back on the next hit (the swap is re-checked per hole).
 
 ## Barracks and cooling towers (A + B, 2026-11-10)
@@ -643,6 +652,194 @@ Hits arrive through `AGarrisonableBuilding::ForwardDamageToWallHoles` (see "A + 
   the ground floor of a 23 m block.
 - **Scripts:** `Saved/PostApoGarrisonHoles/` (`add_components.py`, `aim_points.py`, `import_debris.py`, `gap.py`).
 - **Not tested in PIE** yet (the user tests).
+
+## Remaining weapon pits (A + B, 2026-11-12)
+
+The last ten pit expansions got the procedural holes, so every weapon pit now has them. There are 22 in all: the 8 German
+and 4 Soviet pits done earlier, plus these 10. Agent brief: `Tools/WallChunks/PIT2_AGENT_BRIEF.md`; scripts: `Tools/WallChunks/Pits2/`.
+No C++ change.
+
+- **Shared:** `/Game/SandBagPack/Materials/Holes/MI_RusPit_SandBag_01_WallHoles`, a NoGrid two-sided copy of the 53K
+  instance on `MM_Rus_SandBag_01_WallHoles`, serves every Soviet sandbag slot. Note: `Content/.gitignore` ignores
+  `SandBagPack`, the same as the master and `MI_Rus_SandBag_01`. TwinMG42 uses the German `GerPits/Meshes/Holes` set.
+- **Settings:** NoGrid, 0.85 cm per mm, max 220.
+  - Soviet pits: debris `SM_Rus_SandBag_Debris_0..7`, `AreaPerDebrisPiece` 4500 / max 12.
+  - TwinMG42: debris `SM_GerPit_Debris_0..7`, 3600 / 5.
+  - `bCollapseIntoChunksOnDeath`: false on TwinMG42, BS3 and the mortar pit (they sink); true on the six B4/ML20 pits
+    since 2026-11-12, when their wreck death was fixed (see "Pit deaths" below). Captured B4 inherits true.
+- **Single-mesh pits:** the component is on `BuildingMeshComponent`.
+
+  | Blueprint | Mesh | DamagedMaterials | Collision |
+  |---|---|---|---|
+  | `Ger_BXP_GerPit_TwinMG42` | `SM_GerPit_TwinMG42_Sandbags` | Ger sandbag, Ger ammo | trimesh (unchanged) |
+  | `Rus_BXP_BS3Pit` | `SM_BS3Pit` | RusPit | **7 hulls → complex-as-simple** |
+  | `Rus_BXP_120MortarPit` | `SM_Rus120MortarPit` | RusPit | trimesh (unchanged) |
+  | `Rus_BXP_B4HowitzerSteppedSquarePit` | `SM_B4Pit_SteppedSquare` | RusPit | trimesh (unchanged) |
+  | `Rus_BXP_ML20TwinShouldersPit` | `SM_ML20Pit_TwinShoulders` | RusPit | 13 hulls kept |
+
+  - **BS3 collision:** 43 % of rays hit within 30 cm of the bags, and 76 rays were blocked above them. V-HACD gave
+    no better hulls. Backup: `Saved/WallChunks/Pits2/agentA_SM_BS3Pit_collision_backup.txt`.
+  - **ML20 Twin Shoulders:** 98 % within 30 cm.
+- **Two-mesh pits:** `Rus_BXP_B4HowitzerPit` and its child `Ger_BXP_CapturedB4Pit`, `Rus_BXP_ML20Pit`,
+  `Rus_BXP_B4HowitzerConcretePit` and `Rus_BXP_ML20ConcretePit` keep their bags in a separate `Sandbags` component (same
+  transform) next to the concrete/earth emplacement.
+  - **Component:** `WallMeshComponentName = Sandbags`, `DamagedMaterials = [RusPit]`. The emplacement gets no holes.
+  - **Collision on `Sandbags`:** it was `NoCollision`. It is now QueryOnly, ignores every channel and doesn't affect
+    navigation.
+  - **Trace responses:** a BeginPlay arm after `BP_InitBuildingExp` copies the owner-dependent `TraceEnemy` /
+    `TracePlayer` responses from `BuildingMeshComponent`, so only enemy fire hits the bags. That is the same moment C++
+    sets up the main mesh, so pits built in game are covered too.
+  - **Collision on the meshes:** `SM_B4Pit_Sandbags` went from 1 default hull to complex-as-simple. Backup:
+    `Saved/WallChunks/Pits2/SM_B4Pit_Sandbags_collision_backup.txt`. The mesh is shared with ML20Pit and
+    `BP_Obstacle_B4Pit_Destroyed`, whose Sandbags stay NoCollision. `SM_B4ConcretePit_Sandbags` was already trimesh.
+  - **CapturedB4Pit:** it had its own Sandbags override on NoCollision; it is fixed. It also has two PitDefense
+    components.
+- **Aim points** were the class defaults in the pit centre. Each construction script now sets 3-4 points on the bag
+  ring at wall height, for example:
+  - TwinMG42: (110,0,55), (-180,0,45), (190,±420,45);
+  - B4/ML20 standard: (±480,±480,175), on the 47 cm bag band (r 630-716, z 147-195) on top of the concrete ring;
+  - concrete pits: (750,0,50), (0,750,50), (300,-750,50), (-750,450,50).
+- **Checks** (throwaway Development editor, `UT_VehicleObstacle`, enemy-owned pits, real tank fire):
+  - **Debug hits:** 37-105 mm hits cut holes and swapped the material on all ten.
+  - **Pictures:** `Saved/WallChunks/Pits2/<pit>/`, for example `BS3/agentA_debug_close.png`,
+    `Mortar120/agentA_realfire_4.png` and `B4HowitzerPit/run4/real_fire_4_crop.png`.
+  - **Own gun:** the B4/ML20 concrete pits fired 28 shells without hitting their own bags. The shells leave at z 520+;
+    the bags top out at 87.
+  - **Real fire, B4 standard:** 110 hits, 35 on or near the bags, 14 visible holes.
+  - **Real fire, B4 concrete:** 33 hits, 26 near, 19 visible holes.
+  - **Real fire, ML20 concrete:** 110 hits, 4 visible holes, because almost all fire was 30 mm flak at about 0.2 HP,
+    which leaves the health-based hole budget empty.
+- **Phantom holes (fixed 2026-11-12, C++ guard):** `FWeaponTargetingData` cycles through all four aim points
+  whatever side the shooter is on, so about half the shells aim across the pit. They burst on the gun, the crew or
+  `PitWeaponHitCollider` in the middle.
+  - `ApplyHit` clamps the hit to the target mesh's bounds, and a big pit's bounds include its interior. Such a burst
+    used to take a hole slot and throw debris in mid-pit without cutting any bags. In the B4 standard run 57 of 110
+    hits were of this kind.
+  - **The guard:** `ApplyHit` now asks `GetDoesHoleTouchWallMesh` first. It overlap-tests the hole sphere against the
+    wall mesh's body: simple shapes, then complex.
+    - A sphere clear of the mesh cuts nothing, throws no debris and takes no slot. The damage still applies, and
+      `RTS_WALL_HOLES skip` is logged at Verbose.
+    - A mesh without query collision keeps the old behaviour.
+    - Applies to every `UWallHoleDamageComponent` user, not only pits.
+  - **Checked** (throwaway DebugGame editor):
+    - B4 standard: 4 debug hits on the bags cut holes; 4 mid-pit 30 mm bursts were skipped (holes stayed at 4); under
+      real fire 20 hits were skipped and the near ring still breached (`Pits2/B4HowitzerPit/guard/real_fire_2.png`).
+    - All 20 surface debug hits still cut on `Rus_Wall_Concrete_Long_Holes`, `Rus_BXP_GuardTower`,
+      `BP_Scorch_Dest_DeadTree`, `Rus_BXP_53KPit` and `Ger_BXP_GerPit_Pak40` (`Tools/WallChunks/Pits2/lead_guard_walls_test.py`).
+  - **Still open:** the aim-point choice ignores the shooter's side, so half the shells on big pits still spend their
+    hit on the gun instead of the near wall.
+- **Bugs found here, fixed the same day:** see "Pit deaths (fixed 2026-11-12)".
+
+## Pit deaths (fixed 2026-11-12)
+
+Two bugs from the pit rollout above. The user picked the behaviour.
+
+- **Rule (C++, `ABuildingExpansion::UnitDies`):** for a pit with `UPitDefenseComponent`, the Blueprint decides.
+  - **Implements `BP_OnUnitDies`** (`GetHasBlueprintDeath`, i.e. `IsFunctionImplementedInScript`): the wreck replaces
+    the sink. `UPitDefenseComponent::HandlePitDeathWithoutSink` plays the crew deaths, sandbag explosion and scorch
+    decals and disables the weapon-hit collider. Then `BP_OnUnitDies` runs `DestroyAndSpawnActors`: the wreck obstacle
+    and destroyed gun appear and the pit is destroyed after 1 s.
+  - **Doesn't implement it:** the `HandlePitDeath` sink, as before.
+  - **Why not sink, then wreck:** `FRTS_Collapse` spawns at the owner's current location, so after the 3.5 m sink the
+    wreck would land underground. A pit with no `PitDefense` still just calls `BP_OnUnitDies`.
+- **Wreck pits:** B4 standard, Stepped Square and Concrete, ML20 standard, Concrete and Twin Shoulders, and Captured B4
+  (it inherits the B4 standard graph).
+  - `WallHoleDamage.bCollapseIntoChunksOnDeath = true` on all six; Captured inherits it. The bags now fly as chunks,
+    as on the 53K pits.
+  - Captured B4 had a duplicate `PitDefense1` with the same defaults as the inherited `PitDefense`. It is removed:
+    `FindComponentByClass` only ever handled one, and the second collider survived the death.
+- **Sink pits:**
+  - **Dead graphs removed:** 53K, 53K Sector, Ampulomet, DShK, BS3 and Assembly Yard had `BP_OnUnitDies` graphs that
+    spawned nothing (an explosion and a destroy at 1 s). The graphs never ran. They are deleted, so "implements
+    `BP_OnUnitDies`" means "has a wreck to spawn", and these pits keep sinking.
+  - **Unchanged:** the German pits (no graph).
+- **Mortar pit:** `Rus_BXP_120MortarPit` got a `PitDefense` component, the sink. Its crew has `GunPitCrewComponent`,
+  so the crew death montages play. It also gets the weapon-hit collider over the crew. `bCollapseIntoChunksOnDeath`
+  stays false.
+- **Test:** `Tools/WallChunks/Pits2/pitdeath_test.py` (run with `pitdeath_run_headless.sh`, throwaway DebugGame editor)
+  kills all 23 PitDefense pits in PIE on `UT_VehicleObstacle` (yaw 30°) and checks the outcome per pit (21 before the
+  German Flak88/Mortar fix below).
+  - **Result:** 21/21 PASS in each of the last three runs (logs `Saved/WallChunks/Pits2/pitdeath_run4..6.log`).
+  - **Verdicts fail on:** a pit still alive at 12 s; a sink pit that never sank; a wreck pit that sank; wrong wreck
+    classes; a wreck offset from the pit's XY, Z or yaw; a collider not NoCollision while the dead pit is still there.
+  - **Sink pits:** they sink about 100 cm in 0.5 s, are gone after the sink and spawn no wreck.
+  - **Wreck pits:** they don't sink. Both wreck actors sit at the pit's XY, Z and yaw (offset 0); the pit is gone by
+    2-4.5 s. The bags throw 20-71 chunks (`RTS_WALL_HOLES collapse ... threw=`).
+  - **Overlap:** the wreck spawns once its class has loaded, and the pit is destroyed 1 s after that. For about 1 s
+    the pit mesh (bags already thrown) and the wreck overlap, under the explosion.
+- **Weapon-hit collider fix:**
+  - **Bug:** on the old code the collider read QueryOnly again 0.5 s after death in 2 of 3 runs, on sink and wreck
+    pits alike, although `HandlePitDeath` had switched it off.
+  - **Fix:** `RefreshWeaponHitCollider` now returns once the death has started. In 3 of 3 runs the collider reads
+    NoCollision at every check.
+  - **Cause, likely but unconfirmed:** the only code that sets QueryOnly is `RefreshWeaponHitCollider`, reached from
+    BeginPlay and `OnBxpConstructed` (`OnFinishedExpansionConstruction`). The test pits die 12 s into PIE, perhaps
+    before their construction timer ends. If so, a pit that dies while still under construction also gets
+    `OnFinishedExpansionConstruction` (turrets re-engage, mesh swap); that is not fixed.
+- **`Ger_BXP_GerPit_Flak88` and `Ger_BXP_GerPit_Mortar`:** they never died. Like the Soviet mortar pit, they had no
+  PitDefense and no `BP_OnUnitDies`, and at 0 HP they stayed. Both now have a `PitDefense` component and sink; their
+  turrets have `GunPitCrewComponent`. The test checks them as sink pits: 23/23 PASS (`pitdeath_run7.log`).
+- **Shared editor:** its Development DLL predates this C++ change, so PIE there still sinks the wreck pits until it is
+  rebuilt.
+
+## Brandenburg Gate ruin (A + B, 2026-11-12)
+
+`Environment/Landmarks/BrandenburgGate/BP_BrandenburgGateRuin` is the war-damaged gate as a destructible environment actor.
+The user asked for: the procedural damage shader, 10 000 health, 20 damage reduction, and on death a vertical
+destruction with a lot of smoke. It is a copy of `BP_Dest_PostApo_HighRise1`, so it keeps that Blueprint's parent calls,
+`SetupComponentCollisions` and `CollapseIntoPieces(false)`; the rest is new. Scripts:
+`Tools/Landmarks/ue_brandenburg_gate_destructible.py` (materials, debris, the Blueprint copy and its components) and
+`Tools/Landmarks/gate_headless_test.py`. The graphs were edited through UECP and are described here.
+
+- **Materials.** `M_BG_Sandstone_Procedural_WallHoles` is the masked copy of the gate's sandstone master, which is itself
+  a copy of the Breakthrough concrete master. The two-sided NoGrid instances are `Holes/MI_BG_Sandstone_WallHoles` and
+  `MI_BG_SandstoneBroken_WallHoles`, child of the first; both keep the intact instances' overrides and switches. PS 712
+  against 593 intact. The master uses no custom primitive data of its own, so slots 8-34 are free for the holes.
+  - Bronze (slot 2) and rebar (slot 3) get no holes.
+- **Debris.** The 8 wall chunk pieces are copied as `Debris/SM_BG_Gate_Debris_0..7` in `MI_BG_SandstoneDebris_WallHoles`.
+  That instance has the curvature map, baked fields and rebar off, because the chunks have no gate LightMapUV.
+- **Component** `WallHoleDamage` on `StaticMesh`, as the PostApo ruins: NoGrid, outset 0, 1.1 cm per mm, max 260 cm,
+  `AreaPerDebrisPiece` 3600 / max 6 per hit, up to 160 collapse pieces, `bCollapseIntoChunksOnDeath = false`.
+- **Health.** The construction script sets `Health` 10 000 and `DamageReduction` 20; the class defaults match. The
+  reduction is flat per hit (`ADestructableEnvActor::TakeDamage`), so hits of 20 or less do nothing.
+- **Aim points** (mesh space, front +Y): (-369,0,700) and (±800,0,600) on the piers, (±1475,0,500) on the outer
+  columns, (0,0,1600) and (1000,0,1500) on the entablature, (±2500,0,400) on the gate houses. A point in the open centre
+  arch, (0,0,700), let shots pass through and was moved.
+- **Death** (`BP_OnUnitDies`):
+  1. `CollapseIntoPieces(false)` throws the surface pieces.
+  2. `VerticalDestruction`: sinks 2800 cm over 12 s, yaw 0-3 degrees, pitch/roll 1.5-4 degrees, and destroys the actor
+     at the end, so the nav modifier and the collision go with it. CollapseFX: `NS_RTSDebrisExplosion_Huge`
+     (`SetScaleColorLifetime`: size 3, lifetime 2.5, particles 8, ground offset 300, dust colour (0.85,0.78,0.68)) at
+     scale (2.5,2.5,3), with `Cue_LargeBuilding_Collapse`.
+  3. Three `NS_DestructionSmoke_Large` (one at the centre, x2.5; two at x ±2000, x2) and six `NS_DestructionSmoke`
+     around the footprint.
+  4. Three `Huge_Debris` explosions, at the centre and at x ±2200, 0.5, 2.5 and 4 s after death.
+  5. `SpawnSmokeWave` at death and after 3, 6 and 9 s. Each wave puts three `NS_RTSDebrisExplosion_Huge` along the
+     gate (x -2200 / 0 / 2200) with ground smoke on, size 1.8, lifetime 3, particles 6 and the dust colour. They are
+     placed from `DeathTransform`, the transform stored at death, so they stay on the ground while the mesh sinks.
+     Without the waves the smoke was gone by 6 s, halfway through the sink.
+- **Headless check** (RTS_ToCopySmall, `Saved/BG_Gate_Check/destructible/`):
+  - Health and reduction: runtime health 10 000 and reduction 20. A 15-damage hit changed nothing; a 100-damage hit
+    took 80.
+  - Holes: all 9 aim points hit the collision, 6 holes were open after the test hits, and the frieze holes show.
+  - Death: the gate sank 7.6 m at 3 s and 22.6 m at 9 s, and was gone after 14 s. The dust cloud covers the footprint
+    from 0.6 s to 11.5 s.
+- **Collision gap.** The 16 UCX boxes sit up to 2.2 m in front of the stone in places (between columns, on the gate
+  house fronts). Hits there make a hole sphere that may not reach the surface, so those hits show debris but no hole.
+  Fitted boxes per column and wall, as on the PostApo Construction ruin, would fix it.
+- **Six holes at a time.** With NoGrid, older holes merge into their nearest neighbour, capped at 260 cm. On a 65 m gate
+  that means old holes far from new ones disappear.
+- In Ger_Berlin the gate is still the static mesh `POI_BrandenburgGateRuin` (step_poi of the Berlin map build).
+
+## Berlin ruin kit (A + B, 2026-11-12)
+
+The 22 kit pieces for `Ger_Berlin` (`BP_BerlinRuin_*`, children of the graph-less `BP_BerlinRuin_Base`):
+- NoGrid holes on slot 0 only;
+- death by `bCollapseIntoChunksOnDeath`;
+- navigation blocked by `NavArea_Null` dynamic-obstacle boxes fitted to the UCX hulls.
+
+They are built by `Tools/BerlinMap/ruinkit/ruin_blueprints_build.py`. See `BerlinRuinKit.md` for the settings, the real
+tank fire test and the weak spots.
 
 ## Open points
 

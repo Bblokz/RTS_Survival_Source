@@ -4,6 +4,8 @@
 #include "DestructableEnvActor.h"
 
 #include "NiagaraComponent.h"
+#include "Components/StaticMeshComponent.h"
+#include "Engine/DamageEvents.h"
 #include "Components/SplineComponent.h"
 #include "Components/SplineMeshComponent.h"
 #include "CrushDestructionTypes/ECrushDestructionType.h"
@@ -121,7 +123,12 @@ void ADestructableEnvActor::BeginPlay()
 {
 	Super::BeginPlay();
 	M_WallChunkDamage = FindComponentByClass<UWallChunkDamageComponent>();
-	M_WallHoleDamage = FindComponentByClass<UWallHoleDamageComponent>();
+	TInlineComponentArray<UWallHoleDamageComponent*> WallHoleComponents(this);
+	M_WallHoleDamageComponents.Reset(WallHoleComponents.Num());
+	for (UWallHoleDamageComponent* const WallHoleComponent : WallHoleComponents)
+	{
+		M_WallHoleDamageComponents.Add(WallHoleComponent);
+	}
 	M_WreckHoleDamage = FindComponentByClass<UWreckHoleDamageComponent>();
 }
 
@@ -276,14 +283,91 @@ void ADestructableEnvActor::ForwardDamageToHoleComponents(const float DamageAmou
                                                          const AActor* DamageCauser, const float HealthBefore,
                                                          const float HealthAfter)
 {
-	if (IsValid(M_WallHoleDamage) && IsUnitAlive())
+	if (IsUnitAlive())
 	{
-		M_WallHoleDamage->OnOwnerDamaged(DamageAmount, DamageEvent, DamageCauser, HealthBefore, HealthAfter);
+		ForwardDamageToWallHoleComponents(DamageAmount, DamageEvent, DamageCauser, HealthBefore, HealthAfter);
 	}
 	if (IsValid(M_WreckHoleDamage) && IsUnitAlive())
 	{
 		M_WreckHoleDamage->OnOwnerDamaged(DamageAmount, DamageEvent, DamageCauser, HealthBefore, HealthAfter);
 	}
+}
+
+void ADestructableEnvActor::ForwardDamageToWallHoleComponents(const float DamageAmount, const FDamageEvent& DamageEvent,
+                                                             const AActor* DamageCauser, const float HealthBefore,
+                                                             const float HealthAfter) const
+{
+	// One hole component (every plain wall): it takes every hit, unchanged.
+	if (M_WallHoleDamageComponents.Num() == 1)
+	{
+		if (IsValid(M_WallHoleDamageComponents[0]))
+		{
+			M_WallHoleDamageComponents[0]->OnOwnerDamaged(DamageAmount, DamageEvent, DamageCauser, HealthBefore,
+			                                              HealthAfter);
+		}
+		return;
+	}
+	if (UWallHoleDamageComponent* const StruckComponent = FindWallHoleComponentForPointHit(DamageEvent))
+	{
+		StruckComponent->OnOwnerDamaged(DamageAmount, DamageEvent, DamageCauser, HealthBefore, HealthAfter);
+		return;
+	}
+	// Splash: every mesh that can be hit; each only holes where the blast reaches its own mesh. A mesh without query
+	// collision (an open gate leaf) would accept every blast, since it has nothing to test the hole against.
+	for (int32 ComponentIndex = 0; ComponentIndex < M_WallHoleDamageComponents.Num(); ++ComponentIndex)
+	{
+		UWallHoleDamageComponent* const WallHoleComponent = M_WallHoleDamageComponents[ComponentIndex];
+		const UStaticMeshComponent* const WallMesh = IsValid(WallHoleComponent)
+			                                             ? WallHoleComponent->GetWallMeshComponent()
+			                                             : nullptr;
+		if (not IsValid(WallMesh) || not WallMesh->IsQueryCollisionEnabled())
+		{
+			continue;
+		}
+		WallHoleComponent->OnOwnerDamaged(DamageAmount, DamageEvent, DamageCauser, HealthBefore, HealthAfter);
+	}
+}
+
+UWallHoleDamageComponent* ADestructableEnvActor::FindWallHoleComponentForPointHit(const FDamageEvent& DamageEvent) const
+{
+	if (not DamageEvent.IsOfType(FPointDamageEvent::ClassID))
+	{
+		return nullptr;
+	}
+	const FPointDamageEvent& PointEvent = static_cast<const FPointDamageEvent&>(DamageEvent);
+	const UPrimitiveComponent* const HitComponent = PointEvent.HitInfo.Component.Get();
+	const FVector HitLocation = PointEvent.HitInfo.Location;
+	UWallHoleDamageComponent* NearestComponent = nullptr;
+	float NearestDistance = TNumericLimits<float>::Max();
+	for (const TObjectPtr<UWallHoleDamageComponent>& WallHoleComponent : M_WallHoleDamageComponents)
+	{
+		const UStaticMeshComponent* const WallMesh = IsValid(WallHoleComponent)
+			                                             ? WallHoleComponent->GetWallMeshComponent()
+			                                             : nullptr;
+		if (not IsValid(WallMesh) || not WallMesh->IsQueryCollisionEnabled())
+		{
+			continue;
+		}
+		// Full hit results name the component; projectiles and bombs only fill the location.
+		if (HitComponent != nullptr && HitComponent == WallMesh)
+		{
+			return WallHoleComponent;
+		}
+		FVector ClosestPointOnCollision;
+		float Distance = WallMesh->GetDistanceToCollision(HitLocation, ClosestPointOnCollision);
+		if (Distance < 0.f)
+		{
+			// Complex-only collision has no distance query; the render bounds are the fallback.
+			Distance = FMath::Sqrt(static_cast<float>(WallMesh->Bounds.GetBox().ComputeSquaredDistanceToPoint(HitLocation)));
+		}
+		if (Distance < NearestDistance)
+		{
+			NearestDistance = Distance;
+			NearestComponent = WallHoleComponent;
+		}
+	}
+	// Without a location the hit is resolved from the causer's position, like splash.
+	return HitLocation.IsNearlyZero() ? nullptr : NearestComponent;
 }
 
 float ADestructableEnvActor::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent,

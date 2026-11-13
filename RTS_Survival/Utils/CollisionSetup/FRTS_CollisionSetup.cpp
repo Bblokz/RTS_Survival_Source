@@ -842,6 +842,31 @@ void FRTS_CollisionSetup::SetupSplineNoCollision(UMeshComponent* SplineMesh)
 	SplineMesh->SetCollisionResponseToAllChannels(ECR_Ignore);
 }
 
+void FRTS_CollisionSetup::SetupVehicleRampCollision(UPrimitiveComponent* RampComponent)
+{
+	if (not IsValid(RampComponent))
+	{
+		RTSFunctionLibrary::ReportError("Invalid ramp component for vehicle ramp collision setup.");
+		return;
+	}
+	// Physics only: no trace, click or sweep ever hits the ramp, so infantry movement (sweeps), weapons and the
+	// landscape traces keep seeing the trench itself.
+	RampComponent->SetCollisionEnabled(ECollisionEnabled::PhysicsOnly);
+	// PhysicsBody: vehicle chassis block every object type but a few, infantry capsules ignore this one. Not
+	// WorldDynamic, which player chassis only overlap (triggers).
+	RampComponent->SetCollisionObjectType(ECC_PhysicsBody);
+	RampComponent->SetCollisionResponseToAllChannels(ECR_Ignore);
+	// The chassis of both sides. Chaos files an enemy chassis with its welded hull box under the hull channel (see
+	// COLLISION_OBJ_ENEMY_HULL), so that one must block too or enemy vehicles drop through the ramp.
+	RampComponent->SetCollisionResponseToChannel(COLLISION_OBJ_PLAYER, ECR_Block);
+	RampComponent->SetCollisionResponseToChannel(COLLISION_OBJ_ENEMY, ECR_Block);
+	RampComponent->SetCollisionResponseToChannel(COLLISION_OBJ_ENEMY_HULL, ECR_Block);
+	RampComponent->SetCollisionResponseToChannel(ECC_Vehicle, ECR_Block);
+	RampComponent->SetGenerateOverlapEvents(false);
+	RampComponent->SetCanEverAffectNavigation(false);
+	RampComponent->SetReceivesDecals(false);
+}
+
 void FRTS_CollisionSetup::SetupPickupCollision(UBoxComponent* PickupBox, UMeshComponent* PickupMesh)
 {
 	if (IsValid(PickupMesh))
