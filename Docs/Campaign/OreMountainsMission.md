@@ -4,6 +4,21 @@ Status: concept only, nothing built. Started 2026-11-13. This is the **second mi
 Lore reference: `Source/DesignTexts/Lore.txt`. Related: [BerlinMission.md](BerlinMission.md) (the mission that follows).
 Every item marked **(open)** is undecided.
 
+## Where the files are
+
+- **This doc:** `Source/Docs/Campaign/OreMountainsMission.md` (Source is a submodule; commit from inside `Source`).
+- **Layout sketch (v5, current):** `MapDesigner/OreMountains/ore_01.layout.json` (outer repo root). Older versions kept next to
+  it as `ore_01_v1` to `ore_01_v4.layout.json`. Regenerate the renders from `MapDesigner/` with
+  `python md.py all OreMountains/ore_01.layout.json --out OreMountains/out` (`out/` is gitignored).
+- **Tracked render copies:** `Source/Docs/Campaign/OreMountainsMission_layout_v5.png` and
+  `OreMountainsMission_layout_v5_report.md`.
+- **Spec generators:** `MapDesigner/OreMountains/generators/` (`gen_ore.py` to `gen_ore5.py`, each version built from the
+  previous one by `make_gen2.py` to `make_gen5.py`). The spec polygons have about 90 vertices each, so change the layout in
+  the latest generator (`gen_ore5.py <out.json>`), not the JSON by hand.
+- **Sketch facts (v5):** map 850 x 850 m (units cm, +X north, +Y east), Czech border and ridge on the **south** edge,
+  convoy road 868 m. The tool features it relies on (slope passability per unit class, curved graded ramps) are described
+  in `MapDesigner/AGENTS.md`.
+
 ## One-line pitch
 
 The resistance holds a base on an intact ridge in the Ore Mountains and hits Soviet supply convoys running along the
@@ -94,6 +109,60 @@ Tuning (amounts, positions, how far they sit from the base) comes later. **(open
   with AT guns and some infantry on the high ground. It forces a **flanking approach** and uses the elevation tiers.
 - **(open)** whether each base thins escorts or removes a convoy source, and the exact defences.
 
+### Soviet artillery battery (top right)
+
+Added 2026-11-13. A Soviet **artillery battery in the top right (north-east) of the map**, built from the **various
+weapon pits the game already has** (for example the Rus pits: 53-K, BS-3, 120 mm mortar, DShK and Ampulomet).
+
+- **Ammo trucks drive to the battery.** Separate from the supply convoys on the valley road.
+- **Supplied state:** whenever an ammo truck **arrives**, the battery gets **increased range** and **starts barraging the
+  player**. Unsupplied, it has its normal (shorter) range and does not reach the player's base.
+- **Counterplay:** the player can intercept the ammo trucks to deny the barrage, or destroy the battery itself.
+- **(open)** the ammo truck route (where they start, whether they use the valley road for part of the way, how many, how
+  often), how long the supplied state lasts after a truck arrives, the barrage's target selection (the base, the player's
+  units, or both), and what each pit type contributes. Range numbers need tuning against the pits' real ranges.
+- **(open)** whether the battery counts as one of the "two small bases" or is a third site, and how it is defended.
+- **(open)** whether ammo trucks count toward the "Soviet supply delivered" meter.
+
+### Landmarks and set dressing
+
+Added 2026-11-13, so the map is not all nature. Each has a lore job.
+
+- **Weighbridge / checkpoint on the valley road.** The convoys pass through it. It is a natural ambush spot with a clear
+  sight line (from the ridge). **(open)** how it is staffed, and whether convoys stop at it.
+- **Broken viaduct or overpass from the old A4 line.** Gives the road some history. **(open)** where it crosses the road,
+  and whether its collapse blocks or only narrows the road.
+- **Small Forge survey post** near the Radixite field: sampling stakes with flags, a cryo canister rack and a generator.
+  It matches the Forge survey station in Berlin and **foreshadows it**, so the Berlin mission feels earned when the
+  special convoy's cargo turns up. **(open)** whether it has a guard, and whether it is a target or only dressing.
+
+## Environment: what happened here
+
+The Phytophage passed through the Ore Mountains in 1945-46, but the ridge was not nuked in Operation Svarog. Thirty years
+later the place should read as a **dying mountain range**: related to, but different from, the other maps (Berlin is
+glass; the Svarog line is vitrified wall).
+
+### Vegetation
+
+The Ore Mountains were covered in spruce forest. The Phytophage attacked cellulose and organic matter, so most of it is
+now **dead or blackened standing trunks and fallen timber, not a healthy forest.**
+
+- **Peat bog scars:** lowland and valley patches of dark, boggy ground, with the odd smouldering patch (the
+  "self-combusting peat bogs" from the lore).
+- **Hardy survivors:** a few patches of scrub, grass tufts and lichen in sheltered pockets, for contrast and cover.
+- **Fossilised, blackened roots** visible in cuts and erosion gullies. This is the Act 1 visual clue, and it fits the ridge
+  as well as Berlin.
+
+### Ground tint
+
+- **A dry, dusty desert tint over most of the ground** (the world is heating up), but **less extreme than the
+  Radixite-heavy areas.**
+- The Ore Mountains are **far from the blast**, so the ground is **lighter than the Berlin glass**, with **some cooler
+  higher ground on the ridge.**
+
+**(open)** the rest of the environment ideas (erosion gullies, contaminated stream, Radixite dead ground, hazy sky and
+dust, newer Soviet additions against 30-year-old ruins) are not decided yet.
+
 ## Mission structure
 
 **(open)** not yet designed beyond the beats above. Likely: hold the ridge, ambush the first lightly escorted convoys,
@@ -105,6 +174,8 @@ discover and hit the bases, then escalate to the heavy last convoy and the speci
 - A large Radixite field and metal deposits placed in the map. **(open)**
 - Wismut-style mine and processing site assets for the Soviet bases and the player's tunnel base. **(open)**
 - Soviet truck convoy units and the convoy movement/spawn logic along a road. **(open)** check what exists.
+- The artillery battery: the existing Rus weapon pits, ammo trucks, and a "supplied" state that raises range and starts
+  the barrage when a truck arrives. **(open)** check whether the pits' ammo/range can be driven by mission scripting.
 - Escort scaling per difficulty and a "supply delivered" meter with a fail threshold. **(open)** check what exists.
 - Starting base buildings: HQ (expanded), Gamma Facility, refinery and barracks, placed on the ridge. The Gamma Facility
   is an existing building (`Nomadic_GerGammaFacility`).
@@ -117,3 +188,5 @@ discover and hit the bases, then escalate to the heavy last convoy and the speci
 3. Exactly how each base affects the convoys, and the exact defences.
 4. Resource field sizes and positions (tuning later).
 5. How much of the rest of the base-building kit is available this early.
+6. The artillery battery: ammo truck route and frequency, how long the supplied state lasts, what the barrage targets,
+   whether it is a third site, and how it is defended.

@@ -150,6 +150,30 @@ alone. Applying in the shared editor through the bridge crashed it once during a
   (R = (variant + 0.5) / 16). 377 on the map: beside about 70 % of the furniture, the rest loose on ruin footprints.
   Build: `furniture/debris_decal_build.py` (headless).
 
+## Update 2026-11-13 (late): lighting, crater erosion
+
+- **Lighting:** the sun has its own light function (soft drifting cloud shadows, a pall per district) and the map has
+  no engine height fog: `Docs/Lighting/BerlinLighting.md`, `step_sun_light_function()`.
+- **Crater erosion (`Dress.erode_craters`):** every crater and puddle decal of 2.5 m or more has a real bowl under it
+  (a 4 m crater about 18 cm deep, a 14 m one about 55 cm, puddles 60 % of that, ragged outline, low rim; overlapping
+  bowls add up to at most 95 cm), painted mud. 1185 decals, 5.9 % of the play area lowered by 5 cm or more. Skipped
+  within 13 m of openings and at wall cores, gaps, sinkholes, the blast crater, landmark pads, the bridge, the quay
+  and under ruin footprints. It runs before `seat()`, and everything placed follows the ground.
+
+## Update 2026-11-13 (night): material pass, ambient motion, crater erosion on the map
+
+Applied in the shared editor and saved; nav check 0 problems after the landscape rebuild.
+
+- **Ruin material pass** (`Docs/Environment/BerlinRuinKitMaterial.md`): rubble desaturated (texture and a per-component
+  control in custom primitive data 4), wall shader 367 -> 292 pixel-shader instructions. `RUBBLE_TINTS` and `FOOT_TINTS`
+  now hold (r, g, b, soot, desaturation); `step_dress` and `step_feet` were rerun with them.
+- **Ambient motion** (`Docs/Environment/BerlinAmbientMotion.md`, `step_ambient()`, labels `AMB_*`): 85 street-litter
+  stretches, 736 curtains, wires, cables and lamps on 383 ruins, 151 perched crows in 34 groups, 3 circling flocks.
+  No collision, no nav effect. Rerun `ambient/ambient_gen.py` and `step_ambient()` after any change of the ruin list
+  and after every `step_ruins()` (the dressing is destroyed with the ruins). The crows' take-off reaction is a design
+  only (needs C++).
+- **Crater erosion** is on the map (see the previous section).
+
 ## Known gaps
 
 - The track-smoke surface map is not baked, and the Berlin layer names are not in `URTSGroundSurfaceSettings`, so a bake

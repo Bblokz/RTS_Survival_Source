@@ -1,0 +1,324 @@
+# Ger_2ndOreMountains: the map (first pass, no mission scripting)
+
+`/Game/RTS_Survival/Maps/GerMissions/Ger_2ndOreMountains`, started 2026-11-13 from the v5 layout sketch
+(`MapDesigner/OreMountains/ore_01.layout.json`, see [OreMountainsMission.md](OreMountainsMission.md)). It is a copy of
+`Maps/ToCopy/RTS_ToCopyMap` with a new landscape. Status: **large sections only** (terrain, paint, lighting, resources,
+stand-in trees, placeholder blocks). No units, enemy buildings, triggers or objectives.
+
+## Size and axes
+
+- Play area **570 x 570 m**, centred on the origin. +X is north. The ridge and the Czech border are on the south edge.
+  The owner found the sketch's 850 m too large on 2026-11-13 ("reduce it by 33 %"), so the generator scales the whole
+  sketch by 0.67 about the centre (`SCALE` in `ore_terrain_gen.py`; it writes the scaled spec to
+  `Saved/OreMountains/terrain/ore_01_impl.layout.json`). The sketch file itself is still the 850 m one.
+- Heights, the 10 m road, tracks, gates and the viaduct deck keep their real sizes; ramps keep at least 12 m of width.
+  Every ramp is therefore 1.5 times steeper than drawn: main 12 %, west 14 %, east 16 %, knoll west 19 %, prow sally 34 %.
+- Landscape 12 x 12 components of 63 quads at 100 cm (756 m square, centred): 93 m of camera margin a side.
+- Heights: valley road 0 m, foothills 4-10 m, battery pad 9.5 m, Base B knoll 16 m, ridge bench 18 m, crest 35-38 m
+  inside the play area and up to 97 m in the camera margin south of it.
+- Material `MI_RTS_Landscape_DryCastle_OreMountains`, a child of `MI_RTS_Landscape_DryCastle_Inst` with
+  `LS_RadixiteBlight` on. The shared master and its other instances are untouched.
+
+## Rebuilding
+
+Scripts are in `Source/Tools/OreMountainsMap`.
+
+```bash
+python Source/Tools/OreMountainsMap/ore_terrain_gen.py   # heights, 7 layer weights, layout, masks, check.txt
+python Source/Tools/OreMountainsMap/ore_dress_gen.py     # resources, stand-in trees, placeholders -> Ore_dress.json
+```
+
+Both write to `Saved/OreMountains/terrain`. Then, in a throwaway full editor started with
+`-ExecCmds="py .../ore_editor_server.py"` (commands are sent with `ore_cmd.py <file>`; its command folder is
+`Saved/OreMountains/cmd`, separate from the Berlin one):
+
+```python
+import ore_map_build as omb
+omb.load_layout()
+omb.step_duplicate(); omb.step_strip()            # only for a new map file
+omb.step_landscape(); omb.step_fit_level_actors(); omb.step_lighting()
+omb.step_resources(); omb.step_trees(); omb.step_placeholders()
+omb.save_level()                                  # after the navmesh has finished building
+import ore_nav_check; ore_nav_check.run()
+```
+
+`step_landscape` destroys and recreates the landscape, so run `step_fit_level_actors` after it (the RVT volumes align
+to the landscape). Each dressing step clears its own actors first (`ORE_Res_`, `ORE_Trees_`, `ORE_PH_`, `ORE_Note_`).
+
+## How the terrain is made
+
+- Heights come from the sketch's `elevation` block (contours, pads, graded ramps), not from region `z`.
+- All four nav agents have `agent_max_slope` 44 degrees, so MapDesigner's per-class grades do not exist in the game.
+  The escarpment, the knoll sides and the crest face are sharpened into rock faces of about 60 degrees; the six graded
+  ramps are left as drawn (4-13 degrees along the centre line).
+- `check.txt` holds a flood-fill check on the height field; `ore_nav_check.run()` repeats it on the built navmesh
+  (2026-11-13: 0 problems; every ramp passes for all four agents, and no path crosses a rock face).
+- How the DryCastle layers look here: Desert = khaki with orange flecks (valley), MountainTop = pale grey-tan (bench,
+  high ground, tracks), RTSSand = dark earth (peat bogs, gullies, under dead woods), GraySand = orange dust (thin
+  drifts), RockDesert = faces and spoil heaps, Asphalt = the valley road and yard patches, GrassCastle = scrub.
+
+## What differs from the sketch
+
+- **Prow sally ramp:** the sketch closes it to heavy vehicles by its 23 % grade. In the game heavy tanks can use it
+  (same slope limit for every agent). Closing it needs a `BP_NavBlocker_*` volume; not placed.
+- **Skybox mesh:** the template's sunset sky dome was removed with the test actors; the map has a SkyAtmosphere and
+  daylight lighting instead (`step_lighting`).
+
+## Placeholders
+
+Grey blocks labelled `ORE_PH_*` with a red text above them mark landmarks that have no model in the project yet: the
+three mine adit portals, the Wismut headframe and hoist house (Base B), the Wismut ore plant, conveyor and sheds
+(Base A), the weighbridge, booth and boom barrier, the four A4 viaduct pieces, the Forge survey post items, the five
+fossil-root spots and the two smouldering-peat spots. Yellow `ORE_Note_*` texts mark sites that use existing content
+later (player buildings, the Soviet bases, the battery's eight pits). Blocks have no collision and no nav effect.
+The dead trees are stand-ins too (`SM_RTS_DeadTree_*`, instanced, no collision).
+
+## Objects the map needs (2026-11-13)
+
+Positions are metres from the map centre (X north, Y east).
+
+**Not in the project (new models):**
+
+| Object | Where | Size and seating |
+|---|---|---|
+| Mine adit portal (3, one "main") | X -240 to -244, Y 40 / 84 / 127 | opening about 12 m wide, 8 m high; buried in a rock face of about 60 degrees that rises from the 18 m bench to 35 m; flat apron in front |
+| Wismut headframe + hoist house | Base B knoll top, X 127, Y -60 | flat top about 60 m across at 16 m; headframe about 12 x 12 x 25 m, hoist house about 10 x 16 m |
+| Wismut ore plant, conveyor + loading bunker, sheds | Base A yard, X 10, Y 238 | yard 57 x 67 m, flat at 0 m, the convoy road runs through its south part |
+| Weighbridge deck + guard booth | X 1, Y 81 (deck in the roadway), booth X -6, Y 75 | deck about 4 x 18 m flush with the 10 m road; booth about 4 x 5 m |
+| Forge survey post props | X -56, Y 117 | sampling stakes with flags (4 on the Radixite field), cryo canister rack about 1.5 x 3 m; Director of Forge style as in Berlin |
+| Dead spruce kit | 9 woods, about 440 trees | standing snags and broken trunks 8-14 m, crushable like the Wpo trees, instanced; fallen spruce logs |
+| Fossil roots | 5 gully cuts | blackened root mass about 3 x 6 m lying in a 1.3 m deep gully |
+| Border markers | south edge, X -271 | posts or boundary stones; dressing only |
+
+**Close fits exist, owner decides whether they do:** broken A4 viaduct (132 m line from X -70, Y -56 to X 59, Y -30, deck
+12 m wide, 10 m road gap at X -5, Y -43; option A picked, see the detail pass; `BP_Dest_PostApo_RoadOnPillars*`), boom barrier (`SM_GateBarrier_1`,
+`SM_Boom_Barrier_1`), generator and tent (`BP_Generator_A/B`, Rus tents), smouldering peat (`NS_BerlinAtmo_Smoulder_*`),
+adit stand-in (`BP_Tunnel_01`, `SM_Tunnel_End_01`), yard dressing (QuarryEnv, PostApo silos and cranes), rock faces
+(`SM_RTS_RockMoss_*`, Brushify cliffs; no granite set), watchtowers (`Rus_BXP_GuardTowerMG_Soviet`).
+
+**Not objects:** a peat or forest-floor landscape layer (the bogs use the dark RTSSand layer for now).
+
+## Checked in a play session (2026-11-13)
+
+The map starts: the camera pawn sits over the start on the bench (camera 40 m above it; repeated on the 570 m build), the default
+start units spawn, fog of war works and the ground reads pale grey-tan at normal brightness. Editor scene captures of
+this map come out dark; the game view does not.
+
+## Known gaps
+
+- At 570 m the sketch's weapon ranges no longer fit: the battery's 380 m "normal" range now reaches the bench (the
+  battery is about 360 m from the HQ). Ranges and the Base B overwatch circle need retuning with the mission design.
+- The bench is about 160 m deep and 570 m wide; the knoll top is about 60 m across (tight for a headframe plus AT guns).
+
+- The viaduct blocks and the checkpoint have no collision and no nav effect: the 10 m choke does not exist yet.
+- The stand-in trees neither slow nor block.
+- The placeholder blocks are visible in game (only their labels are editor-only).
+- The sun comes from the north-north-east so the escarpment is lit; that is not where the real sun stands.
+
+## Detail pass (2026-11-13)
+
+- **Terrain:** the straight creases the sketch's contour polygons left in the foothills are rounded off; the east and
+  west camera margins got their own noise.
+- **Roads (`step_roads`, labels `ORE_Road_*`):** the valley road is `BP_GroundPathSpline_Road` with
+  `MI_GroundPath_Road_WarTorn`, 9 m wide, running out through both margins (368 tiles). The ammo track and the Base B
+  depot track are `BP_GroundPathSpline_TwoTrack`. The landscape under the road only carries a faint dark stain.
+- **Checkpoint (`step_checkpoint`, labels `ORE_CP_*`):** concrete fence panels either side of the 12 m gate, barbed
+  wire and hedgehogs carrying the line on, two sandbag walls, a stop sign and a raised boom barrier (posts and bars
+  have no collision). The booth, the weighbridge deck and the two towers are still placeholders.
+- **Rock faces (`step_rocks`, labels `ORE_Rocks_*`):** 401 `SM_RTS_RockMoss_*` chunks along the lip and foot of the
+  faces. **The owner rejected these on sight ("these look ridiculous").** They were removed from the map the same day; do not run
+  `step_rocks` again; a proper cliff kit followed
+  (`CustomMapItems/Environment/OreCliffKit`, sheets in `Saved/OreMountains/cliffs`). The owner picked options
+  **C (blocky crag) and E (quarried benches)** on 2026-11-13; read as C on the escarpment and knoll, E on the crest
+  face with the adits. The kit is being modelled and imported under
+  `/Game/RTS_Survival/Blueprints/Environment/OreMountains/CliffKit`; placement data comes as `Ore_cliffs.json`.
+- **Viaduct:** concept sheets in `CustomMapItems/Environment/A4Viaduct` (copies in `Saved/OreMountains/viaduct`).
+  The owner picked **option A (stone arch viaduct)** on 2026-11-13 and wants it to look clearly 1940s and heavily
+  damaged; a refinement round (v02) gave two variants and he picked **A1 "broken teeth"** (arches caved in, piers
+  standing); it is being modelled and imported under `/Game/RTS_Survival/Blueprints/Environment/OreMountains/A4Viaduct`
+  with a placement file `Saved/OreMountains/viaduct/A4Viaduct_pieces.json`. The four placeholders now sit where the road really
+  crosses the viaduct line: 10 m gap centred on X -5, Y -43, south end X -70, Y -56, north end X 59, Y -30
+  (parts south to north 22.5 | 17 | 22.5 | 10 | 24 | 17 | 19 m). The sketch's own deck regions left a 6.9 m gap
+  7 m north of the road after scaling.
+- Play session at 570 m: the map starts, start units spawn, fog of war works. An unfocused throwaway editor runs the
+  play session at about 2 fps and screenshots come out black until `t.IdleWhenNotForeground 0` is set.
+
+## Detail pass 2 (2026-11-13, `ore_detail_gen.py` + `step_props`)
+
+`ore_detail_gen.py` writes `Ore_detail.json`; `step_props` places it (labels `ORE_Prop_*`, `ORE_Scatter_*`) and
+removes the placeholders it replaces. Everything is existing project content.
+
+- **Base A yard:** `BP_Industrial_Dest_Hangar` (in place of the sheds placeholder), chimney, water tower, a Rus fuel
+  store, crate and barrel stacks, two containers, and 37 concrete fence panels round the perimeter with stretches
+  missing and openings where the road and the ammo track pass. The ore plant and conveyor are still placeholders.
+- **Battery:** Rus supply storage and crate stacks at the rear, a camo net, three sandbag arcs on the rim that faces
+  the valley. The eight pits are still notes.
+- **Survey post:** a (holed) Rus small tent and crates; the cryo rack, generator and stakes are still placeholders
+  (`BP_Generator_A` is a 16 x 21 m building, not a field generator).
+- **Smouldering peat:** six `NS_BerlinAtmo_Smoulder_Wisp` effects at the two sketch spots.
+- **Valley road:** crushable power poles on the north verge about every 42 m (none at the checkpoint, the viaduct
+  and the yard), four 1945 tank wrecks and four old cars on the verges near the viaduct and the checkpoint.
+- **Bench:** a narrow mine railway (track panels at 0.55 scale, no collision) from the west adit to the metal by
+  the bench edge, with three mine carts.
+- **Dead woods:** 26 fallen logs (`BP_Cover_DeadTreeLog_*`, natural cover), instanced stumps, dead shrubs and litter.
+- **Ground detail (instanced, no collision):** scree at the feet of the faces, stones in the gully beds and on the
+  spoil heaps (`SM_GS_*`), dead shrubs and dry tufts in the bogs and scrub pockets.
+- **Camera margin:** about 620 dead trees and 680 dead shrubs on the ground past the play edge (north, east, west).
+- **Fixes:** the valley road spline uses every third sketch point (the full set kinked the tiles) and the viaduct
+  rubble swell keeps 10 m off the road (it lifted the road bed through the tiles).
+- **Base B and the adits (added later the same day):** sandbag arcs at the three gun positions on the knoll rim, a
+  camo net and stores by the shaft; crate and barrel stacks at two adit mouths. `BP_Cover_RusSandbags_LongArc`
+  bulges about 80 degrees clockwise of its yaw (`SANDBAG_FACE`).
+- Nav check after the pass: 0 problems, including a new leg along the road through the yard fence.
+- Play session after the pass: starts, start units and fog of war present, no errors from the new actors.
+  A play session in an unfocused throwaway editor stays paused at time 0 (black screenshots): call
+  `GameplayStatics.set_game_paused(world, False)` and wait on game time, as in `Saved/OreMountains/cmd_pie_debug.py`.
+- Editor scene captures of this map have no sky light (pitch-black shadows, orange ground); the game view is fine.
+  Use them for layout, not for judging colour.
+
+## Cliff kit in the map (2026-11-13, `step_cliffs`)
+
+- Assets: `/Game/RTS_Survival/Blueprints/Environment/OreMountains/CliffKit` (23 meshes `SM_OreCliff_*`, one material
+  `M_OreCliff` / `MI_OreCliff`, world-aligned gneiss). Source, brief and placement guide:
+  `CustomMapItems/Environment/OreCliffKit` in the Blender project.
+- Layout: `Saved/OreMountains/terrain/Ore_cliffs.json`, written by the kit's own `ock_place.py`
+  (`escarpment=C knoll=C crest=E`): 705 instances (escarpment 224, knoll 80, crest 401). `step_cliffs` places them as
+  29 instanced components, labels `ORE_Cliff_<face>_<piece>`, no collision and no nav effect (the landscape blocks).
+- If the terrain generator changes a face, rerun `ock_place.py` before `step_cliffs`.
+- `MI_OreCliff` was retuned after the first in-game look (the rock read near white and bluish): `RockTint`
+  (0.74, 0.67, 0.58), `DustAmount` 0.75, `GroundFromRVT` 0.45.
+- Checked in game with the fog of war off (`ore_ingame_shots.py`): faces read as continuous rock, the crest reads as
+  cut benches round the adit openings. Nav check 0 problems after placing.
+- Open: the three adit openings still hold placeholder blocks; lip pieces stand up to 2.3 m above the bench within
+  about 4 m of the edge (units there can clip); outcrop pieces `Crag9` / `Crag5` are not placed.
+- **In-game screenshots anywhere on the map:** `ore_ingame_shots.py` starts a play session, unpauses it, switches the
+  fog of war off with `ShowFlag.PostProcessMaterial 0`, moves the camera pawn to each spot and writes a HighResShot.
+
+## Viaduct in the map (2026-11-13, `step_viaduct`)
+
+- Assets: `/Game/RTS_Survival/Blueprints/Environment/OreMountains/A4Viaduct` (nine static meshes, 38.6k triangles,
+  instances `MI_A4_Granite`, `MI_A4_Rubble`, `MI_A4_Concrete`, `MI_A4_RebarRust`; the instances hang off the
+  Brandenburg Gate masters `M_BG_Sandstone_Procedural` and `M_BG_BronzePatina`, so a change there changes the viaduct).
+  Source and README: `CustomMapItems/Environment/A4Viaduct/Model` in the Blender project.
+- Placement: `Saved/OreMountains/viaduct/A4Viaduct_pieces.json`; `step_viaduct` places 17 actors (labels
+  `ORE_Viaduct_*`: four standing pieces with their UCX hulls, two fallen spans and eleven rubble fans without collision
+  or nav effect) and removes the four viaduct placeholders. One yaw for every piece: 11.43 degrees.
+- Checked on the built navmesh: the road passes the 10 m gap, both fallen spans are crossed in a straight line by
+  infantry, light and heavy tanks, and a path across a standing stub goes round its end.
+- Checked in game with the fog of war off: reads as a heavily damaged stone-arch viaduct, the road clear in the gap.
+- Open: stone coursing was only judged from above; LODs and shot collision are untested; the viaduct has no
+  Blueprint and is not destructible; the wreck-seal idea for the gap is mission scripting.
+
+## Ambient sand and dust (2026-11-13, `ore_fx_gen.py` + `step_fx`)
+
+The owner asked to go through the Fab pack `Content/DustAndSandStorm` (87 Niagara systems), improve what is usable
+and add some to this map.
+
+- **Survey.** All 72 looping systems were shot in game on this map from the RTS camera (`ore_fx_survey.py`; sheets in
+  `Saved/OreMountains/fx/sheet_*.jpg`). Out of the box almost none reads from 40 m up: they are sized for a walking
+  camera and coloured dark grey-brown. The pack's systems expose user parameters (colours, size, spawn rates), so the
+  improvement is done as **tuned presets**: a pack system plus parameter overrides and a scale, stored on each placed
+  component. The pack assets themselves are unchanged.
+- **Presets** (in `ore_fx_gen.py`, tested with `ore_fx_presets.py`):
+  - `SandStreak` = `NS_SandPush`: wind-driven sand hugging the ground. Longer (18 m), recoloured to the map's pale
+    dust, brightened (`AddWhiteColor` 0.38, `Emessive` 0.42; below about 0.4 the sand sprites stay a dark smudge) and
+    cut from 4000 to 1500 GPU particles a second. Yaw follows the project wind (35 degrees) with a little scatter.
+  - `DustCloud` = `NS_StormSmoke_02`: a wide soft haze, 2.5 times the size, dust-coloured.
+- **On the map** (`step_fx`, labels `ORE_Fx_*`): 11 sand streaks (five on the valley floor, three on the bench,
+  three on the foothills) and 4 dust clouds (both valley mouths, the foothill slope, the valley centre).
+- **Dropped:** the sand falls (`NS_SandFall01/02/04/05`) on the rock lips and `NS_FallingDust_01` under the viaduct
+  stubs. Scaled and recoloured they still do not show from the RTS camera at any time after spawning, so they would
+  only cost simulation time. The big set pieces (`NS_Tornado`, `NS_SandStorm_B`) fill the screen and were not used.
+- **Checks:** the overrides survive a save and a fresh load (reload shot `fx/reload_streak_bench.png`). Frame time with
+  the 15 effects on against off, camera on a streak: 11.65 ms against 11.20 ms (unfocused editor play session, about
+  500 frames each: a rough figure, not a profile).
+- **Open:** the placed effects ignore the player's Ambient Effects setting (`rts.AmbientFx`); from above the streaks
+  read slightly cool grey on the warm bench ground; they are subtle and static in place.
+- **Second round, same day (owner: "Yes, stronger").** `SandStreak` is denser and larger (`Length` 2400, `SandScale`
+  1.8, `ParticleSmokeSizeScale` 2.6, spawn rates 110 / 35 / 35, 2000 GPU particles a second) and warmer in colour;
+  `AddWhiteColor` stays 0.38 because 0.2-0.3 with more `Emessive` came out whiter and cooler. `DustCloud` is larger
+  and brighter (`Smoke_Size_Scale` 3.2, spawn 1.3, `Emessive_Scale` 1.6, alpha 0.6 / 0.7). The map now holds **21
+  streaks and 6 clouds**. In-game sheet: `Saved/OreMountains/fx/sheet_final2.jpg`. The frame-time comparison for this
+  round was unusable (the machine was busy: 20.1 ms with the effects on, 22.8 ms with them off), so the cost of the
+  stronger set is not measured.
+- **Dust devils.** The project's own dust devils (`ULandscapeAmbientFxSubsystem`) already ran on this map through the
+  landscape's sand physical material (820 flat cells). `SandMask_Ger_2ndOreMountains` is now baked
+  (`RTS.AmbientFx.BakeSandMask`): 583 flat sand cells, so devils no longer form on rock, scrub or asphalt paint.
+  Rebake after repainting the landscape.
+
+## Mid-map relief and the dead forest (2026-11-13, evening)
+
+Owner: "work on the dead foliage for this map, use what we already have ... make sure there are some interesting
+height changes in the middle of the map; still traversible with vehicles ... adjust the landscape blending for that".
+
+**Relief (`ore_terrain_gen.py`, block "2b").** Swells, nine low ridges (to about 4.8 m), four hollows (to about 3 m)
+and a dry wash (1.9 m deep, 14 m wide, between the road and the foothills) on the valley floor and the foothills;
+`RELIEF_GAIN` scales all of it. Slopes in the changed ground: median 4, 99th percentile 25 degrees (nav limit 44).
+Nothing changes on the bench, within 20 m of a rock face, 25 m of the viaduct line, 10-19 m of the road, on ramps or on
+the level pads: the cliff kit and the viaduct sit at absolute heights, and a check after generating confirmed 0.0 cm of
+change under every cliff and viaduct piece (`Ore_height_before_relief.raw` is the reference). Nav check: 0 problems.
+
+**Paint for the relief.** From the RTS camera (pitch -52 to -70) a 4 m swell barely shades, so the paint carries it:
+slopes facing the map's sun are pale (MountainTop), lee slopes darker (RTSSand), crests pale, hollows darker with a
+little scrub, drifted orange sand (GraySand) in the wash, bare rock where a swell is steeper than about 11 degrees.
+Instanced stones lie on the crests and in the wash, dead scrub and dry tufts in the hollows
+(`ore_detail_gen.py`, masks `relief_crest`, `relief_hollow`, `wash`). The sand mask was rebaked (582 cells).
+
+**Dead forest from existing content (`step_trees`, labels `ORE_Tree_*`).** The instanced stand-ins are gone; every
+tree in the play area is a real actor:
+- 298 `BP_Scorch_Dest_DeadTree` (stout spiky trunks) and 205 `BP_Scorch_Dest_DeadWillow` (thin bare crowns): tanks
+  crush them, their `BlockChar` child keeps infantry out of the trunk. The mesh is varied per tree (six dead-tree
+  meshes, five willow meshes) by setting the Blueprint's `StaticMesh` component; the destroyed state is still the
+  Blueprint's own.
+- 17 survivors: `BP_WpoSpruce_SmallDark`, `BP_WpoSpruce_Small`, `BP_WpoFir_Small` in the scrub pockets and at a few
+  wood edges.
+- Dense woods mix 70 % stout / 30 % willow, thin woods about half and half; about 80 lone dead trees are dotted over
+  the valley and foothills (none on the bench, at sites, on the Radixite field or the knoll).
+- 38 fallen logs as cover (was 26). The camera margin keeps its instanced trees (no units go there).
+- Not usable: `Fab/Dead_Trees/dead_trees` is one 600 km wide mesh of a whole tree set (wrong import scale);
+  `SM_RTS_AshTree_Log_*` have no material (world grid); the Megascans dwarf birch has 63k triangles at LOD0.
+
+A concept round for a proper dead-spruce kit (`CustomMapItems/Environment/OreDeadForest`, sheets in
+`Saved/OreMountains/foliage`) gave five options; the owner picked **B "Gerippe"** (whorled grey spruce skeletons) on
+2026-11-13. It is being modelled with the fossil roots R2 (ribs) and R1 (root plate) and imported under
+`/Game/RTS_Survival/Blueprints/Environment/OreMountains/DeadForest`, to plug into the crushable Wpo tree setup;
+placement data comes as `Saved/OreMountains/foliage/OreDeadForest_pieces.json`.
+
+## Dead spruce kit in the map (2026-11-13, night, `step_trees`)
+
+The owner picked concept B "Gerippe" (whorled grey spruce skeletons). Assets:
+`/Game/RTS_Survival/Blueprints/Environment/OreMountains/DeadForest` (20 meshes `SM_OreDead_*` on one 2048 atlas, four
+material instances of the existing Wpo masters, nine crushable `BP_OreDeadSpruce_<Piece>`; source, brief and README in
+`CustomMapItems/Environment/OreDeadForest`). Placement data: `Saved/OreMountains/foliage/OreDeadForest_pieces.json`.
+
+- **Trees (`ORE_Tree_*`):** 659 actors in the play area, mixed by the kit's shares for dense woods, thin woods and lone
+  trees: 444 skeletons in four sizes, 85 silver snags, 75 snapped, 33 leaning, 15 dying survivors, plus 7
+  `BP_Scorch_Dest_DeadWillow` among the lone trees. They are `AWpoTree` (medium and heavy tanks crush them; light
+  tanks do not, inherited from the Blueprint they were copied from; the owner confirmed "Keep medium+heavy" on
+  2026-11-14, so the dead woods stay an obstacle for light vehicles). Dense woods are about 2.4 trees per 100 m2.
+  The old stout dead trees and the living Wpo spruces are gone from the play area.
+- **Windthrown (`ORE_Timber_*`):** 41 `Windthrow_12m` as one instanced component with its collision.
+- **Fossil roots (`ORE_Roots_*`):** at the five gully spots: `Roots_R2_Ribs` across the cut (pitched to the floor
+  slope from the kit file), `Roots_R1_Plate` on the bank, one `BP_OreDeadSpruce_Black_8m` as a marker. The five
+  placeholder blocks are gone. The ribs were fitted to a level test gully; spots 1 and 2 have about 1 m of floor
+  relief under them and may need hand seating.
+- **Woods floor and margin (`ore_detail_gen.py`):** the kit's stumps, fallen tops, brash, bilberry mats, dead fern
+  and tussocks replace the old oak stumps; the trees past the play edge are instanced kit meshes.
+- **Fix made after the first in-game look:** from the game camera the trees read as bare poles, because the thin twig
+  alpha averages out of the lower mips of the masked cards. `Opacity_Instensity` is now 3.0 on
+  `MI_OreDeadForest_Cards` and `_Cards_Still` (1.0 as delivered); with that the whorls and the fishbone shadows read.
+  Setting the atlas's alpha-coverage thresholds from Python was attempted and not saved.
+- Tall thin trunks seen from a 28 m high camera project as lines radiating from the picture centre: that is
+  perspective, not fallen trees.
+- Nav check after placing: 0 problems.
+- **Crush test (`ore_crush_test.py`, play session):** a Panzer III M slid through a `BP_OreDeadSpruce_Skeleton_9m`: the
+  tree was destroyed within 9 s and the tank left ruts in the ground. A Panzer 38(t) through another one: the tree
+  stood unchanged (the trees take medium and heavy tanks only). The test moves the tank kinematically, so it shows the
+  crush overlap works, not how a tank paths through a wood; the fall itself was not captured, only before and after
+  (`Saved/OreMountains/shots/crush_sheet.jpg`).
+- **Not verified:** wind motion and the cost of 659 tree actors (no profile taken).
+
+## Not done yet
+
+Real enemy sites, border dressing, gully and bog
+detail, grass output, surface-map bake, map margins east and west (they repeat the edge profile).

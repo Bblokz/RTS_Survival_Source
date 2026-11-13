@@ -167,6 +167,32 @@ ground decides everything.
 - **Fuel depot.** Capture one so ME410 sorties do not run dry. (Only relevant if the airstrip uses fuel.)
 - **Demeter pod crash site.** In the bog, reachable on foot by the boardwalk. Lore intel.
 
+## Location POIs (to reuse from the Blender projects)
+
+Props that say "Polesie, Belarus, thirty years after the Phytophage". Check the Blender projects first (found
+2026-11-14, by file name only, in `D:\Blender\BlenderProjects\BlenderTanks\`):
+
+1. **Kolkhoz grain silo and a leaning radio mast** on the ridge, as the pre-war airfield's surviving tower. It could be
+   what the airstrip repair objective points at.
+   - Found: silos only, no radio mast. `AA_LaptopWork\Quarry\SM_Quarry_Silo3.FBX` and `SM_Quarry_Silo4.FBX`
+     (already in UE as `AtlassedQuarry/SM_Quarry_Silo3` and `_Silo4`) and `AA_LaptopWork\Airport\SM_FuelSilo_1.FBX` /
+     `SM_FuelSilo_Combined.FBX` (in UE as `MilitaryAirport/Meshes/Buildings/`). A grain silo and the radio mast are
+     probably still to build; not checked whether these fit a kolkhoz look.
+2. **Partisan memorial obelisk.** A concrete monument with a star and a faded inscription, on a rise beside the west
+   road. It tells the player the Soviets built the road here and later abandoned it. It can also hold an audio log.
+   - Found: `CustomMapItems\PartisanMemorial\PartisanMemorial.blend` with PBR texture, a metallic-star variant and a
+     preview image. Not checked whether it is in UE yet.
+3. **Bilingual road and rail signs** (Cyrillic place names) at each edge entry. They mark the direction the columns come
+   from, and they cost almost nothing to build.
+   - Found: `CustomMapItems\PolesieSigns\` with `SM_RoadSign_Mozyr`, `_Pinsk`, `_Stolin`, `_Turov` and
+     `_BlankRoad` (FBX). Four place names for the four directions (three entries and the west road). No rail signs
+     found. Not checked whether they are in UE yet.
+
+Other ideas not picked yet (not decided): stork nest poles and a wooden well with a sweep, peat-cutting works with a
+narrow-gauge line, a ruined windmill, a land-reclamation sluice and pump house, an algae-choked rail bridge, a
+purple-stained cottage on the burning peat, fossilised root arches, downed aircraft wrecks at the pilot sites, a sunken
+Demeter pod, and the island base silhouette (camouflage-netted hangar, fuel tank, radio mast).
+
 ## Armored columns
 
 - Each column is a long line on a causeway, so it is the ideal ME410 target.
