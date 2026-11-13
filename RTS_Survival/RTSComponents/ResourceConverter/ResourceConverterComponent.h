@@ -11,6 +11,8 @@
 #include "RTS_Survival/GameUI/Pooled_AnimatedVerticalText/RTSVerticalAnimatedText/RTSVerticalAnimatedText.h"
 #include "ResourceConverterComponent.generated.h"
 
+struct FUnitAbilityEntry;
+enum class EAbilityID : uint8;
 class URTSComponent;
 class UPlayerResourceManager;
 class UAnimatedTextWidgetPoolManager;
@@ -167,6 +169,10 @@ private:
 	UPROPERTY()
 	bool bM_IsOwnedByBuildingExpansion = false;
 
+	// CustomType (EResourceConversionAbilityType) put on the conversion card entries; derived from the deltas in
+	// InitResourceConverter so the action UI shows what this converter turns into what.
+	int32 M_ConversionAbilityCustomType = 0;
+
 	mutable bool bM_HasReportedInvalidAnimatedTextManager = false;
 
 	/** Our conversion timer handle; we do not use actor ticking. */
@@ -214,6 +220,15 @@ private:
 	void HandleBuildingExpansionPackingCancelled();
 	void UpdateBuildingExpansionConversionAbility();
 	void RemoveBuildingExpansionConversionAbilities();
+	FUnitAbilityEntry MakeConversionAbilityEntry(const EAbilityID ConversionAbility) const;
+
+	/**
+	 * @brief Keeps an entry the card already holds but makes sure it carries this converter's subtype
+	 * (an entry may have been added before InitResourceConverter derived it).
+	 * @param ConversionAbility Enable or Disable Resource Conversion.
+	 * @return Whether the building expansion's card holds the ability.
+	 */
+	bool EnsureBuildingExpansionAbilityHasConversionType(const EAbilityID ConversionAbility) const;
 
 	// ---- Validity helpers with logging (rule 0.5) ----
 	bool GetIsValidRTSComponent() const;

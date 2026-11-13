@@ -13,6 +13,8 @@
 #include "RTS_Survival/GameUI/Pooled_AnimatedVerticalText/RTSVerticalAnimatedText/RTSVerticalAnimatedText.h"
 #include "RTS_Survival/Player/PlayerResourceManager/PlayerResourceManager.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
+#include "RTS_Survival/RTSComponents/ResourceConverter/ResourceConversionAbilityTypes.h"
+#include "RTS_Survival/UnitData/UnitAbilityEntry.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 
 
@@ -44,6 +46,8 @@ void UResourceConverterComponent::InitResourceConverter(const FResourceConverter
 	// Cache settings first.
 	M_Settings = InSettings;
 	bM_ConversionRequested = M_Settings.Tick.bStartEnabled;
+	M_ConversionAbilityCustomType = static_cast<int32>(
+		FResourceConversionAbilityTypes::GetTypeFromResourceDeltas(M_Settings.Tick.ResourceDeltas));
 
 	// Cache RTS component on the owner.
 	AActor* Owner = GetOwner();
@@ -280,7 +284,7 @@ void UResourceConverterComponent::UpdateBuildingExpansionConversionAbility()
 	const EAbilityID OppositeAbility = bM_Enabled
 		                                     ? EAbilityID::IdEnableResourceConversion
 		                                     : EAbilityID::IdDisableResourceConversion;
-	if (BuildingExpansion->HasAbility(DesiredAbility))
+	if (EnsureBuildingExpansionAbilityHasConversionType(DesiredAbility))
 	{
 		if (BuildingExpansion->HasAbility(OppositeAbility))
 		{
@@ -289,9 +293,10 @@ void UResourceConverterComponent::UpdateBuildingExpansionConversionAbility()
 		return;
 	}
 
+	const FUnitAbilityEntry DesiredEntry = MakeConversionAbilityEntry(DesiredAbility);
 	if (BuildingExpansion->HasAbility(OppositeAbility))
 	{
-		if (not BuildingExpansion->SwapAbility(OppositeAbility, DesiredAbility))
+		if (not BuildingExpansion->SwapAbility(OppositeAbility, DesiredEntry))
 		{
 			RTSFunctionLibrary::ReportError(TEXT("ResourceConverter: Failed to update the building expansion "
 				"conversion ability."));
@@ -299,11 +304,50 @@ void UResourceConverterComponent::UpdateBuildingExpansionConversionAbility()
 		return;
 	}
 
-	if (not BuildingExpansion->AddAbility(DesiredAbility))
+	if (not BuildingExpansion->AddAbility(DesiredEntry))
 	{
 		RTSFunctionLibrary::ReportError(TEXT("ResourceConverter: Failed to add the building expansion "
 			"conversion ability."));
 	}
+}
+
+FUnitAbilityEntry UResourceConverterComponent::MakeConversionAbilityEntry(const EAbilityID ConversionAbility) const
+{
+	FUnitAbilityEntry Entry = FAbilityHelpers::CreateAbilityEntryFromId(ConversionAbility);
+	Entry.CustomType = M_ConversionAbilityCustomType;
+	return Entry;
+}
+
+bool UResourceConverterComponent::EnsureBuildingExpansionAbilityHasConversionType(
+	const EAbilityID ConversionAbility) const
+{
+	if (not GetIsValidBuildingExpansion())
+	{
+		return false;
+	}
+	ABuildingExpansion* BuildingExpansion = M_BuildingExpansion.Get();
+	if (not BuildingExpansion->HasAbility(ConversionAbility))
+	{
+		return false;
+	}
+
+	// A copy: the swap below changes the card.
+	const TArray<FUnitAbilityEntry> CardEntries = BuildingExpansion->GetUnitAbilityEntries();
+	for (const FUnitAbilityEntry& Entry : CardEntries)
+	{
+		if (Entry.AbilityId != ConversionAbility || Entry.CustomType == M_ConversionAbilityCustomType)
+		{
+			continue;
+		}
+		if (not BuildingExpansion->SwapAbility(ConversionAbility, Entry.CustomType,
+		                                       MakeConversionAbilityEntry(ConversionAbility)))
+		{
+			RTSFunctionLibrary::ReportError(TEXT("ResourceConverter: Failed to set the conversion type on the "
+				"building expansion conversion ability."));
+		}
+		break;
+	}
+	return true;
 }
 
 void UResourceConverterComponent::RemoveBuildingExpansionConversionAbilities()
