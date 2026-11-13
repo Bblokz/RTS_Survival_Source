@@ -96,6 +96,18 @@ The text is saved as `<name>.script.txt` beside the line. How it is used:
 - **A script beats a hand edit in the JSON.** Changing the script alone re-times from cached whisper output in
   under a second.
 
+### Lines in another language: subtitles are always English
+
+The Soviet portraits speak Russian (the Mosin rifleman, made with `mosin_lines.py`; see `VoiceLines/AGENTS.md`). For
+these lines the subtitle is the English translation:
+- `<name>.script.txt` holds the Russian words. A Cyrillic script makes whisper run with `-l ru`
+  (`spoken_language`), and `align_script` times the Russian words as usual.
+- `<name>.translation.txt` holds the English text, with the same sentences in the same order.
+- `translate_words` spreads each English sentence over the matching Russian sentence's time span, by character
+  count. If the sentence counts differ, the whole English text is spread over the line and the entry is flagged.
+- The JSON entry gets `"translation": true`, and `"text"`/`"sentences"` are English. A line with a Cyrillic script and
+  no translation is flagged ("subtitles must be English").
+
 A line with no `.timing.json` (saved before 2026-11-11, or dropped in by hand) is transcribed from the final file.
 That works, but on a test line it misheard words and was 0.25-0.35 s early, so the entry is flagged for review.
 Re-saving the line from the app fixes it.
