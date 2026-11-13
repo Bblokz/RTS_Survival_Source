@@ -7,27 +7,17 @@
 #include "RTS_Survival/Enemy/EnemyController/EnemyController.h"
 #include "RTS_Survival/Enemy/EnemyController/EnemyFormationController/EnemyFormationController.h"
 #include "RTS_Survival/Enemy/Formation/FormationData.h"
-#include "RTS_Survival/FOWSystem/FowManager/FowManager.h"
-#include "RTS_Survival/GameUI/MiniMap/CustomIcons/MinimapIconTypes.h"
-#include "RTS_Survival/Interfaces/Commands.h"
+#include "RTS_Survival/GameUI/MiniMap/CustomIcons/UnitGroupMiniMapMarker.h"
 #include "RTS_Survival/Units/SquadController.h"
 #include "RTS_Survival/Units/Squads/SquadUnit/SquadUnit.h"
 #include "RTS_Survival/Units/Tanks/TankMaster.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
-#include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 #include "TimerManager.h"
 
 namespace SurvivalWaveMarkerConstants
 {
-	constexpr float UpdateIntervalSeconds = 0.25f;
 	// Same tolerance the wave director uses to recognise a group's formation by its last waypoint.
 	constexpr float FinalWaypointMatchTolerance = 1.f;
-	// The heading is re-measured once the group moved this far (units standing in combat jitter).
-	constexpr float MinMoveForHeading = 500.f;
-	// Share of a new heading taken per measurement; smooths the turn of a group that zigzags around obstacles.
-	constexpr float HeadingBlend = 0.5f;
-	// Icons are kept this share of the map's half size inside the minimap edge.
-	constexpr float EdgeMarginFraction = 0.1f;
 	constexpr float DebugKillDamage = 1.0e8f;
 }
 
@@ -92,7 +82,7 @@ void USurvivalWaveMarkerTracker::EnsureUpdateTimer()
 		return;
 	}
 	World->GetTimerManager().SetTimer(M_UpdateTimerHandle, this, &USurvivalWaveMarkerTracker::UpdateMarkers,
-	                                  SurvivalWaveMarkerConstants::UpdateIntervalSeconds, true);
+	                                  RTSUnitGroupMiniMapMarker::UpdateIntervalSeconds, true);
 }
 
 void USurvivalWaveMarkerTracker::UpdateMarkers()
@@ -176,91 +166,25 @@ void USurvivalWaveMarkerTracker::BindMarkerToFormations(FSurvivalWaveMarker& Mar
 
 bool USurvivalWaveMarkerTracker::UpdateMarker(FSurvivalWaveMarker& Marker, const double Now) const
 {
-	using namespace SurvivalWaveMarkerConstants;
-	Marker.Units.RemoveAll([](const TWeakObjectPtr<AActor>& Unit)
-	{
-		return not RTSFunctionLibrary::RTSIsValid(Unit.Get());
-	});
-	if (Marker.Units.IsEmpty())
+	if (not RTSUnitGroupMiniMapMarker::UpdateFromUnits(Marker.Units, Marker.Location, Marker.HeadingAnchor,
+	                                                   Marker.HeadingYaw))
 	{
 		// Still waiting for (another) formation of the group to appear: keep the marker where it is.
 		const bool bWaitingForFormation = not Marker.PendingFinalWaypoints.IsEmpty();
 		return bWaitingForFormation and Now - Marker.LaunchTime < M_FormationBindTimeoutSeconds;
 	}
-	FVector Centroid = FVector::ZeroVector;
-	for (const TWeakObjectPtr<AActor>& Unit : Marker.Units)
-	{
-		const ICommands* Commands = Cast<ICommands>(Unit.Get());
-		Centroid += Commands ? Commands->GetOwnerLocation() : Unit->GetActorLocation();
-	}
-	Centroid /= Marker.Units.Num();
-	const FVector Progress = Centroid - Marker.HeadingAnchor;
-	if (Progress.Size2D() >= MinMoveForHeading)
-	{
-		const float MoveYaw = Progress.GetSafeNormal2D().Rotation().Yaw;
-		Marker.HeadingYaw = FRotator::NormalizeAxis(
-			Marker.HeadingYaw + FMath::FindDeltaAngleDegrees(Marker.HeadingYaw, MoveYaw) * HeadingBlend);
-		Marker.HeadingAnchor = Centroid;
-	}
-	Marker.Location = Centroid;
-	MoveMarkerIcons(Marker);
+	RTSUnitGroupMiniMapMarker::MoveIcons(this, Marker.IconId, Marker.Location, Marker.HeadingYaw);
 	return true;
 }
 
 void USurvivalWaveMarkerTracker::AddMarkerIcons(const FSurvivalWaveMarker& Marker) const
 {
-	AFowManager* FowManager = FRTS_Statics::GetFowManager(this);
-	if (not IsValid(FowManager))
-	{
-		return;
-	}
-	const FMinimapIconTextPayload NoText{};
-	const FVector DrawLocation = GetDrawLocation(Marker.Location);
-	FowManager->AddCustomMiniMapIcon(Marker.IconId, EMinimapIconType::IncomingWave, DrawLocation,
-	                                 FRotator(0.f, Marker.HeadingYaw, 0.f), NoText);
-	FowManager->AddCustomMiniMapIcon(GetBadgeIconId(Marker), EMinimapIconType::IncomingWaveBadge, DrawLocation,
-	                                 FRotator::ZeroRotator, NoText);
-}
-
-void USurvivalWaveMarkerTracker::MoveMarkerIcons(const FSurvivalWaveMarker& Marker) const
-{
-	AFowManager* FowManager = FRTS_Statics::GetFowManager(this);
-	if (not IsValid(FowManager))
-	{
-		return;
-	}
-	const FVector DrawLocation = GetDrawLocation(Marker.Location);
-	FowManager->SetCustomMiniMapIconTransform(Marker.IconId, DrawLocation, FRotator(0.f, Marker.HeadingYaw, 0.f));
-	FowManager->SetCustomMiniMapIconTransform(GetBadgeIconId(Marker), DrawLocation, FRotator::ZeroRotator);
+	RTSUnitGroupMiniMapMarker::AddIcons(this, Marker.IconId, Marker.Location, Marker.HeadingYaw);
 }
 
 void USurvivalWaveMarkerTracker::RemoveMarkerIcons(const FSurvivalWaveMarker& Marker) const
 {
-	AFowManager* FowManager = FRTS_Statics::GetFowManager(this);
-	if (not IsValid(FowManager))
-	{
-		return;
-	}
-	FowManager->RemoveCustomMiniMapIcon(Marker.IconId);
-	FowManager->RemoveCustomMiniMapIcon(GetBadgeIconId(Marker));
-}
-
-FVector USurvivalWaveMarkerTracker::GetDrawLocation(const FVector& Location) const
-{
-	const AFowManager* FowManager = FRTS_Statics::GetFowManager(this);
-	if (not IsValid(FowManager) or FowManager->GetMapExtent() <= 0.f)
-	{
-		return Location;
-	}
-	const FVector Center = FowManager->GetActorLocation();
-	const float Limit = FowManager->GetMapExtent() * (1.f - SurvivalWaveMarkerConstants::EdgeMarginFraction);
-	return FVector(FMath::Clamp(Location.X, Center.X - Limit, Center.X + Limit),
-	               FMath::Clamp(Location.Y, Center.Y - Limit, Center.Y + Limit), Location.Z);
-}
-
-FName USurvivalWaveMarkerTracker::GetBadgeIconId(const FSurvivalWaveMarker& Marker)
-{
-	return FName(*(Marker.IconId.ToString() + TEXT("_Badge")));
+	RTSUnitGroupMiniMapMarker::RemoveIcons(this, Marker.IconId);
 }
 
 bool USurvivalWaveMarkerTracker::GetIsValidEnemyController() const

@@ -97,12 +97,9 @@ private:
 	/** @return False when the marker has no unit left alive (or its formation never appeared) and must go. */
 	bool UpdateMarker(FSurvivalWaveMarker& Marker, double Now) const;
 
+	// Icons, centroid and heading are shared with mission unit-group markers (RTSUnitGroupMiniMapMarker).
 	void AddMarkerIcons(const FSurvivalWaveMarker& Marker) const;
-	void MoveMarkerIcons(const FSurvivalWaveMarker& Marker) const;
 	void RemoveMarkerIcons(const FSurvivalWaveMarker& Marker) const;
-	static FName GetBadgeIconId(const FSurvivalWaveMarker& Marker);
-	/** @return The marker location pulled inside the minimap so an icon at the map edge is drawn whole. */
-	FVector GetDrawLocation(const FVector& Location) const;
 
 	bool GetIsValidEnemyController() const;
 };

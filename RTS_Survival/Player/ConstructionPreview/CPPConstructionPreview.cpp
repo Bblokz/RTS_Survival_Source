@@ -143,9 +143,21 @@ bool ACPPConstructionPreview::MapTest_EvaluateFieldDefensePlacement(const FVecto
 	OutInclineDegrees = M_SlopeAngle;
 	return bM_IsValidBuildingLocation;
 }
+
+bool ACPPConstructionPreview::MapTest_EvaluateNomadicPlacement(const FVector& CursorLocation)
+{
+	if (M_ActivePreviewStatus != EConstructionPreviewMode::Construct_NomadicPreview)
+	{
+		return false;
+	}
+	SetCursorPosition(CursorLocation);
+	bool bHasValidIncline = false;
+	bM_IsValidBuildingLocation = TickRadiiBuildingPlacement(bHasValidIncline);
+	return bM_IsValidBuildingLocation;
+}
 #endif
 
-#if RTS_WITH_SHIPPING_MAP_TESTS
+#if RTS_WITH_SHIPPING_MAP_TESTS || RTS_WITH_MAP_TESTS
 bool ACPPConstructionPreview::ShippingTest_GetHasActivePreview() const
 {
 	return GetHasActivePreview();
@@ -821,6 +833,11 @@ bool ACPPConstructionPreview::TickAtBuildingOriginBxpPlacement(bool& bOutHasVali
 		return false;
 	}
 	SetActorLocation(PlacementLocation);
+	// Origin expansions turn with their building mesh (yaw only); the truck actor's yaw can differ by a degree or two.
+	if (const UStaticMeshComponent* AttachToMesh = BxpConstructionData.GetAttachToMesh())
+	{
+		SetActorRotation(FRotator(0.f, AttachToMesh->GetComponentRotation().Yaw, 0.f));
+	}
 	return true;
 }
 

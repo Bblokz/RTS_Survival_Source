@@ -529,6 +529,14 @@ public:
 	void MissionOnHqSpawned(const FUnitCost BonusPerResource);
 
 	/**
+	 * @brief Makes this nomadic the player HQ: the HQ truck then converts without a build radius and harvesters
+	 * use its drop-off. Grants no resources; MissionOnHqSpawned still does that.
+	 * @param PlayerHQ The player's HQ, in truck or building mode.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission")
+	void RegisterPlayerHQ(ANomadicVehicle* PlayerHQ);
+
+	/**
 	 * @brief Spawns a batch of reinforcement units and directs them to a projected formation point.
 	 * @param WaveElements Options and spawn locations for each unit in the batch.
 	 * @param ProjectionExtentScale Scale used to project the formation location to navigable space.
@@ -791,6 +799,17 @@ public:
 	 * @return Whether laying out the trench is over.
 	 */
 	bool MapTest_ClickFieldTrenchAt(const FVector& Location);
+
+	/**
+	 * @brief Map tests: the player converts a nomadic truck: selects it, presses the convert button on its command
+	 * card and clicks the preview at this spot, which stands in for the cursor.
+	 * @param NomadicTruck A player nomadic in truck mode.
+	 * @param Location Ground location of the placement click.
+	 * @param bOutNeededBuildRadius Whether the preview demanded a build radius (false for the player HQ).
+	 * @return 1 ordered, 2 not a truck, 3 no nomadic preview started, 4 the spot was rejected (slope, overlap or
+	 * radius), 5 the click was not taken, 0 invalid input.
+	 */
+	int32 MapTest_ConvertNomadicAt(ANomadicVehicle* NomadicTruck, const FVector& Location, bool& bOutNeededBuildRadius);
 #endif
 
 #if RTS_WITH_SHIPPING_MAP_TESTS

@@ -1550,6 +1550,24 @@ void ACPPController::MissionOnHqSpawned(const FUnitCost BonusPerResource)
 	OnPlayerProfileLoadComplete();
 }
 
+void ACPPController::RegisterPlayerHQ(ANomadicVehicle* PlayerHQ)
+{
+	if (not IsValid(PlayerHQ))
+	{
+		RTSFunctionLibrary::ReportError(TEXT("RegisterPlayerHQ was given no valid nomadic."));
+		return;
+	}
+	M_PlayerHQ = PlayerHQ;
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(M_HqReferenceHandle);
+	}
+	if (GetIsValidPlayerResourceManager())
+	{
+		M_PlayerResourceManager->SetupPlayerHQDropOffReference(M_PlayerHQ);
+	}
+}
+
 void ACPPController::SpawnReinforcementAttackWave(
 	const TArray<FAttackWaveElement>& WaveElements,
 	const float ProjectionExtentScale,
@@ -2125,6 +2143,46 @@ bool ACPPController::MapTest_ClickFieldTrenchAt(const FVector& Location)
 	return false;
 }
 
+int32 ACPPController::MapTest_ConvertNomadicAt(ANomadicVehicle* NomadicTruck, const FVector& Location,
+                                               bool& bOutNeededBuildRadius)
+{
+	constexpr int32 InvalidInput = 0;
+	constexpr int32 Ordered = 1;
+	constexpr int32 NotATruck = 2;
+	constexpr int32 NoPreview = 3;
+	constexpr int32 SpotRejected = 4;
+	constexpr int32 ClickNotTaken = 5;
+	bOutNeededBuildRadius = false;
+	if (not IsValid(NomadicTruck) || not GetIsValidConstructionPreview())
+	{
+		return InvalidInput;
+	}
+	if (not NomadicTruck->GetIsInTruckMode())
+	{
+		return NotATruck;
+	}
+	SelectSingleUnitFromUI(NomadicTruck);
+	ConstructBuilding(NomadicTruck);
+	if (M_IsBuildingPreviewModeActive != EPlayerBuildingPreviewMode::NomadicPreviewMode)
+	{
+		return NoPreview;
+	}
+	bOutNeededBuildRadius = CPPConstructionPreviewRef->MapTest_GetNeedsBuildRadius();
+	if (not CPPConstructionPreviewRef->MapTest_EvaluateNomadicPlacement(Location))
+	{
+		StopPreviewAndBuildingMode(false);
+		return SpotRejected;
+	}
+	FVector ClickedLocation = Location;
+	if (TryPlaceBuilding(ClickedLocation))
+	{
+		StopPreviewAndBuildingMode(true);
+	}
+	const bool bTookOrder = NomadicTruck->GetHasCommandInQueue(EAbilityID::IdCreateBuilding)
+		|| not NomadicTruck->GetIsInTruckMode();
+	return bTookOrder ? Ordered : ClickNotTaken;
+}
+
 bool ACPPController::MapTest_PlaceFieldDefenseAt(const FVector& Location, float& OutInclineDegrees)
 {
 	OutInclineDegrees = 0.f;
@@ -2290,7 +2348,8 @@ bool ACPPController::OnBxpSpawnedAsync_InstantPlacement(
 	}
 	else
 	{
-		BxpRotation = FRotator::ZeroRotator;
+		// Same as the first placement: origin expansions turn with their building mesh (yaw only).
+		BxpRotation = FRotator(0.f, BxpOwner->GetAttachToMeshComponent()->GetComponentRotation().Yaw, 0.f);
 		BxpLocation = BxpOwner->GetAttachToMeshComponent()->GetComponentLocation();
 		if (BxpLocation.IsNearlyZero())
 		{
