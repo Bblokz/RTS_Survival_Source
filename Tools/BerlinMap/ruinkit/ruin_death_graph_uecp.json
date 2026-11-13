@@ -1,0 +1,85 @@
+{
+ "about": "The UECP (Ultimate Engine CoPilot) calls that authored the death graph of the Berlin ruin kit on 2026-11-13: BP_BerlinRuin_Base only (the 22 children stay graph-less). Headless Python cannot write Blueprint graphs, so these were sent to a throwaway UnrealEditor.exe started on RTS_ToCopySmall with -DisablePlugins=Fab (BpGeneratorUltimate left on, so the editor registers its own UECP port in %LOCALAPPDATA%/UECP/instances/<pid>.json; calls went to that port, POST /mcp, never to the 9855 broker), then compile_blueprint, save, ruin_blueprints_build.run(), quit. Replay in this order only if the base lost its graph; each entry is {action, params}. synthesize_graph regenerates a function whole; the EventGraph call names BP_OnUnitDies, so replaying it rewrites that event. Doc: Source/Docs/Environment/BerlinRuinKit.md, section Death.",
+ "notes": [
+  "The per-Blueprint values (sink depth and time, dust scale and spread, heap transforms) are class defaults set by ruin_blueprints_build.py; the add_variable defaults only matter for a child the builder has not touched.",
+  "Array defaults cannot be given to add_variable: DeathHeapsSmall / DeathHeapsLarge are set on each child's class default object by the builder.",
+  "The heap classes are literal class pins on two SpawnActor nodes (one per heap size): a class-typed variable or function input compiles in the live editor but fails on a fresh load.",
+  "delay is EventGraph-only, so the heap dust and the heap spawn are chained in the event, not inside StartRuinDeath.",
+  "K2_GetComponentsByClass and GetComponentsByTag are const, so their nodes are pure: a for_each re-evaluates them on every pass. Destroying components inside such a loop skips every second one (seen in the first test run: 3 boxes -> 1 left, 11 -> 5). The nav boxes are therefore copied into the member array DeathNavBoxes first.",
+  "Remnants (third session, same day): LeaveRemnant turns the destroy at the end of the sink off; the C++ then calls BP_OnVerticalDestructionComplete, which only stops the dust timer, so nothing runs on a remnant afterwards.",
+  "History: a first session the same day had the variables HeapSpawnDelay, DeathBurstVfx and DeathBurstScale and a white smoke plus a burst; the second session removed them (delete_variable) for the dust pulses below. This file is the final state, as a from-scratch sequence."
+ ],
+ "BP_BerlinRuin_Base": [
+  {"action": "add_variable", "params": {"blueprint_path": "/Game/RTS_Survival/Blueprints/Environment/Berlin/RuinKit/Blueprints/BP_BerlinRuin_Base", "items": [
+   {"variable_name": "SinkOnDeath", "variable_type": "bool", "default_value": "true", "category": "Death", "instance_editable": true, "tooltip": "True: the ruin sinks with dust and leaves its collapse heaps (StartRuinDeath). False: nothing here runs; the hole component's own chunk death must then be on."},
+   {"variable_name": "LeaveRemnant", "variable_type": "bool", "default_value": "false", "category": "Death", "instance_editable": true, "tooltip": "Large ruins: the sink stops at SinkDeltaZ and the dead, tilted actor stays (no destroy). NavBlock boxes tagged RemnantNav are detached and keep blocking at ground level. False: the piece sinks completely and is destroyed."},
+   {"variable_name": "SinkDeltaZ", "variable_type": "float", "default_value": "600.0", "category": "Death", "instance_editable": true, "tooltip": "How far the ruin sinks (cm). Small pieces: the mesh top plus a margin. Remnants: a share of the mesh height. Set by ruin_blueprints_build.py."},
+   {"variable_name": "SinkTime", "variable_type": "float", "default_value": "4.0", "category": "Death", "instance_editable": true, "tooltip": "Seconds from death until the ruin is under the ground and destroyed."},
+   {"variable_name": "SinkMinTilt", "variable_type": "float", "default_value": "2.0", "category": "Death", "instance_editable": true},
+   {"variable_name": "SinkMaxTilt", "variable_type": "float", "default_value": "5.0", "category": "Death", "instance_editable": true},
+   {"variable_name": "SinkMaxYaw", "variable_type": "float", "default_value": "2.0", "category": "Death", "instance_editable": true},
+   {"variable_name": "HeapDustDelay", "variable_type": "float", "default_value": "0.8", "category": "Death", "instance_editable": true, "tooltip": "Seconds after death at which dust starts where the collapse heaps will stand."},
+   {"variable_name": "HeapDustLead", "variable_type": "float", "default_value": "0.45", "category": "Death", "instance_editable": true, "tooltip": "Seconds after HeapDustDelay at which the heaps are spawned, inside that dust. HeapDustDelay + HeapDustLead must be shorter than SinkTime: the actor is gone after that."},
+   {"variable_name": "DustPulseInterval", "variable_type": "float", "default_value": "0.5", "category": "Death", "instance_editable": true, "tooltip": "A dust cloud is spawned every this many seconds while the ruin sinks, at a random spot of the footprint."},
+   {"variable_name": "DustSpreadX", "variable_type": "float", "default_value": "200.0", "category": "Death", "instance_editable": true, "tooltip": "Half size (local X, cm) of the area the dust pulses are scattered over, around DeathVfxOffset."},
+   {"variable_name": "DustSpreadY", "variable_type": "float", "default_value": "200.0", "category": "Death", "instance_editable": true},
+   {"variable_name": "DeathVfxOffset", "variable_type": "Vector", "category": "Death", "instance_editable": true, "tooltip": "Centre of the dust, in the actor's local space (cm): the middle of the mesh footprint, a little above the ground."},
+   {"variable_name": "DeathDustScale", "variable_type": "Vector", "default_value": "(X=1,Y=1,Z=1)", "category": "Death", "instance_editable": true},
+   {"variable_name": "DeathHeapDustScale", "variable_type": "Vector", "default_value": "(X=1.5,Y=1.5,Z=1.5)", "category": "Death", "instance_editable": true, "tooltip": "Scale of the dust cloud spawned on each heap spot just before the heap appears."},
+   {"variable_name": "DeathStartTransform", "variable_type": "Transform", "category": "Death", "tooltip": "Runtime: the actor transform at death, before the sink moves and tilts it. The heaps and the dust are placed against it."}]}},
+  {"action": "add_variable", "params": {"blueprint_path": "/Game/RTS_Survival/Blueprints/Environment/Berlin/RuinKit/Blueprints/BP_BerlinRuin_Base", "variable_name": "DeathDustVfx", "variable_type": "object", "sub_type": "NiagaraSystem", "category": "Death", "instance_editable": true, "tooltip": "One-shot dust cloud: at the death (the CollapseFX of the vertical sink), then every DustPulseInterval while the ruin sinks, and on each heap spot. Must not loop."}},
+  {"action": "add_variable", "params": {"blueprint_path": "/Game/RTS_Survival/Blueprints/Environment/Berlin/RuinKit/Blueprints/BP_BerlinRuin_Base", "variable_name": "DeathSound", "variable_type": "object", "sub_type": "SoundCue", "category": "Death", "instance_editable": true}},
+  {"action": "add_variable", "params": {"blueprint_path": "/Game/RTS_Survival/Blueprints/Environment/Berlin/RuinKit/Blueprints/BP_BerlinRuin_Base", "variable_name": "DeathHeapsSmall", "variable_type": "Transform", "is_array": true, "category": "Death", "instance_editable": true, "tooltip": "Actor-relative transforms of the BP_BerlinCoverHeap_Collapse_S heaps this ruin leaves (footprint_table.json, dead)."}},
+  {"action": "add_variable", "params": {"blueprint_path": "/Game/RTS_Survival/Blueprints/Environment/Berlin/RuinKit/Blueprints/BP_BerlinRuin_Base", "variable_name": "DeathHeapsLarge", "variable_type": "Transform", "is_array": true, "category": "Death", "instance_editable": true, "tooltip": "Actor-relative transforms of the BP_BerlinCoverHeap_Collapse_L heaps this ruin leaves."}},
+  {"action": "add_variable", "params": {"blueprint_path": "/Game/RTS_Survival/Blueprints/Environment/Berlin/RuinKit/Blueprints/BP_BerlinRuin_Base", "variable_name": "DeathNavBoxes", "variable_type": "object", "sub_type": "BoxComponent", "is_array": true, "category": "Death", "tooltip": "Runtime: the NavBlock boxes, copied here at death so they can be destroyed in a loop."}},
+  {"action": "synthesize_graph", "params": {"blueprint_path": "/Game/RTS_Survival/Blueprints/Environment/Berlin/RuinKit/Blueprints/BP_BerlinRuin_Base", "function": "HideDressing", "overwrite": true, "inputs": [{"name": "ComponentTag", "type": "name"}], "body": [
+   {"op": "call", "func": "Actor.GetComponentsByTag", "args": {"ComponentClass": "/Script/Engine.SceneComponent", "Tag": "$ComponentTag"}, "as": "Tagged"},
+   {"op": "for_each", "array": "$Tagged", "as": "Piece", "body": [
+    {"op": "call", "func": "SceneComponent.SetVisibility", "target": "$Piece", "args": {"bNewVisibility": false, "bPropagateToChildren": true}}]}]}},
+  {"action": "synthesize_graph", "params": {"blueprint_path": "/Game/RTS_Survival/Blueprints/Environment/Berlin/RuinKit/Blueprints/BP_BerlinRuin_Base", "function": "DustPulse", "overwrite": true, "body": [
+   {"op": "is_valid", "value": "$DeathDustVfx", "then": [
+    {"op": "call", "func": "NiagaraFunctionLibrary.SpawnSystemAtLocation", "args": {"WorldContextObject": "$self", "SystemTemplate": "$DeathDustVfx", "Location": "=TransformLocation($DeathStartTransform, $DeathVfxOffset + MakeVector(RandomFloatInRange(0 - $DustSpreadX, $DustSpreadX), RandomFloatInRange(0 - $DustSpreadY, $DustSpreadY), 0))", "Scale": "$DeathDustScale", "bAutoDestroy": true, "bAutoActivate": true}}]}]}},
+  {"action": "synthesize_graph", "params": {"blueprint_path": "/Game/RTS_Survival/Blueprints/Environment/Berlin/RuinKit/Blueprints/BP_BerlinRuin_Base", "function": "DustAtHeap", "overwrite": true, "inputs": [{"name": "HeapLocal", "type": "Transform"}], "body": [
+   {"op": "is_valid", "value": "$DeathDustVfx", "then": [
+    {"op": "break_struct", "value": {"op": "call", "func": "KismetMathLibrary.ComposeTransforms", "args": {"A": "$HeapLocal", "B": "$DeathStartTransform"}}, "struct": "Transform", "into": {"Location": "HeapWorld"}},
+    {"op": "call", "func": "NiagaraFunctionLibrary.SpawnSystemAtLocation", "args": {"WorldContextObject": "$self", "SystemTemplate": "$DeathDustVfx", "Location": "=$HeapWorld + MakeVector(0, 0, 100)", "Scale": "$DeathHeapDustScale", "bAutoDestroy": true, "bAutoActivate": true}}]}]}},
+  {"action": "synthesize_graph", "params": {"blueprint_path": "/Game/RTS_Survival/Blueprints/Environment/Berlin/RuinKit/Blueprints/BP_BerlinRuin_Base", "function": "DustAtHeaps", "overwrite": true, "body": [
+   {"op": "for_each", "array": "$DeathHeapsSmall", "as": "SmallHeap", "body": [{"op": "call", "func": "DustAtHeap", "args": {"HeapLocal": "$SmallHeap"}}]},
+   {"op": "for_each", "array": "$DeathHeapsLarge", "as": "LargeHeap", "body": [{"op": "call", "func": "DustAtHeap", "args": {"HeapLocal": "$LargeHeap"}}]}]}},
+  {"action": "synthesize_graph", "params": {"blueprint_path": "/Game/RTS_Survival/Blueprints/Environment/Berlin/RuinKit/Blueprints/BP_BerlinRuin_Base", "function": "StartRuinDeath", "overwrite": true, "body": [
+   {"op": "set_var", "var": "DeathStartTransform", "value": {"op": "call", "func": "Actor.GetTransform"}},
+   {"op": "call", "func": "HideDressing", "args": {"ComponentTag": "BerlinAmbient"}},
+   {"op": "call", "func": "HideDressing", "args": {"ComponentTag": "BerlinCrowPerch"}},
+   {"op": "set_var", "var": "DeathNavBoxes", "value": {"op": "call", "func": "Actor.K2_GetComponentsByClass", "args": {"ComponentClass": "/Script/Engine.BoxComponent"}}},
+   {"op": "for_each", "array": "$DeathNavBoxes", "as": "NavBox", "body": [
+    {"op": "is_valid", "value": "$NavBox", "then": [
+     {"op": "branch", "condition": "$LeaveRemnant", "then": [
+      {"op": "branch", "condition": {"op": "call", "func": "ActorComponent.ComponentHasTag", "target": "$NavBox", "args": {"Tag": "RemnantNav"}}, "then": [
+       {"op": "call", "func": "SceneComponent.K2_DetachFromComponent", "target": "$NavBox", "args": {"LocationRule": "KeepWorld", "RotationRule": "KeepWorld", "ScaleRule": "KeepWorld", "bCallModify": false}}], "else": [
+       {"op": "call", "func": "ActorComponent.K2_DestroyComponent", "target": "$NavBox", "args": {"Object": "$self"}}]}], "else": [
+      {"op": "call", "func": "ActorComponent.K2_DestroyComponent", "target": "$NavBox", "args": {"Object": "$self"}}]}]}]},
+   {"op": "call", "func": "Actor.GetComponentByClass", "args": {"ComponentClass": "/Script/RTS_Survival.WallHoleDamageComponent"}, "as": "Holes"},
+   {"op": "is_valid", "value": "$Holes", "then": [
+    {"op": "call", "func": "WallHoleDamageComponent.CollapseIntoPieces", "target": "$Holes", "args": {"bHideAndDestroyOwner": false}}]},
+   {"op": "make_struct", "struct": "RTSVerticalCollapseSettings", "fields": {"DeltaZ": "$SinkDeltaZ", "CollapseTime": "$SinkTime", "MinRandomYaw": 0.0, "MaxRandomYaw": "$SinkMaxYaw", "MinPitchRoll": "$SinkMinTilt", "MaxPitchRoll": "$SinkMaxTilt", "bDestroyPostVerticalCollapse": "=!$LeaveRemnant"}, "as": "Sink"},
+   {"op": "make_struct", "struct": "CollapseFX", "fields": {"CollapseVfx": "$DeathDustVfx", "FxLocationOffset": "=TransformLocation($DeathStartTransform, $DeathVfxOffset) - GetActorLocation()", "VfxScale": "$DeathDustScale", "CollapseSfx": "$DeathSound", "SfxAttenuation": "/Game/RTS_Survival/Sounds/Settings/Collapse/Att_Collapse.Att_Collapse", "SfxConcurrency": "/Game/RTS_Survival/Sounds/Settings/Collapse/SC_Collapse.SC_Collapse"}, "as": "Fx"},
+   {"op": "call", "func": "VerticalDestruction", "args": {"CollapseSettings": "$Sink", "CollapseFX": "$Fx"}},
+   {"op": "timer", "function": "DustPulse", "time": "$DustPulseInterval", "looping": true}]}},
+  {"action": "synthesize_graph", "params": {"blueprint_path": "/Game/RTS_Survival/Blueprints/Environment/Berlin/RuinKit/Blueprints/BP_BerlinRuin_Base", "function": "SpawnDeathHeaps", "overwrite": true, "body": [
+   {"op": "for_each", "array": "$DeathHeapsSmall", "as": "SmallHeap", "body": [
+    {"op": "spawn_actor", "class": "/Game/RTS_Survival/Blueprints/Environment/Berlin/RuinKit/Cover/BP_BerlinCoverHeap_Collapse_S.BP_BerlinCoverHeap_Collapse_S_C", "transform": {"op": "call", "func": "KismetMathLibrary.ComposeTransforms", "args": {"A": "$SmallHeap", "B": "$DeathStartTransform"}}}]},
+   {"op": "for_each", "array": "$DeathHeapsLarge", "as": "LargeHeap", "body": [
+    {"op": "spawn_actor", "class": "/Game/RTS_Survival/Blueprints/Environment/Berlin/RuinKit/Cover/BP_BerlinCoverHeap_Collapse_L.BP_BerlinCoverHeap_Collapse_L_C", "transform": {"op": "call", "func": "KismetMathLibrary.ComposeTransforms", "args": {"A": "$LargeHeap", "B": "$DeathStartTransform"}}}]}]}},
+  {"action": "synthesize_graph", "params": {"blueprint_path": "/Game/RTS_Survival/Blueprints/Environment/Berlin/RuinKit/Blueprints/BP_BerlinRuin_Base", "function": "EventGraph", "body": [
+   {"op": "event", "name": "BP_OnUnitDies", "body": [
+    {"op": "branch", "condition": "$SinkOnDeath", "then": [
+     {"op": "call", "func": "StartRuinDeath"},
+     {"op": "delay", "duration": "$HeapDustDelay"},
+     {"op": "call", "func": "DustAtHeaps"},
+     {"op": "delay", "duration": "$HeapDustLead"},
+     {"op": "call", "func": "SpawnDeathHeaps"}]}]},
+   {"op": "event", "name": "BP_OnVerticalDestructionComplete", "body": [
+    {"op": "clear_timer", "function": "DustPulse"}]}]}},
+  {"action": "compile_blueprint", "params": {"blueprint_path": "/Game/RTS_Survival/Blueprints/Environment/Berlin/RuinKit/Blueprints/BP_BerlinRuin_Base"}}
+ ]
+}

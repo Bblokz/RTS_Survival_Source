@@ -30,7 +30,7 @@ EFFECT_TYPE = FOLDER + "/NET_BerlinAmbient"
 
 STRETCH_LENGTH = 3000.0     # cm, local X; ambient_place.py spaces the components to match
 STRETCH_WIDTH = 700.0       # cm, local Y (component scale Y widens it for the 9 m lanes)
-CULL_DISTANCE = 11000.0     # cm from the camera; the RTS camera sits 20-40 m up and sees about 65 x 36 m of ground
+CULL_DISTANCE = 9500.0      # cm from the camera; the RTS camera sits 20-40 m up, its far view corner is about 75 m away
 
 MEL = unreal.MaterialEditingLibrary
 ASSETS = unreal.EditorAssetLibrary
@@ -286,8 +286,8 @@ def write_recipe():
     wisp = FOLDER + "/M_BerlinAmbient_Wisp"
     grow_shrink = [(0, 0.0), (0.06, 1.0), (0.9, 1.0), (1, 0.0)]     # masked sprites cannot fade: they grow in and shrink out
     layers = [
-        # paper: frames 0-11 of the atlas tumble in a loop; about 14 sheets alive per stretch, 30 in a gust
-        layer("Paper", litter, (4, 4), 16, rate=1.8, bursts=[(2.0, 5, 8), (2.5, 4, 7), (3.2, 2, 4)], loop=(11, 17),
+        # paper: frames 0-11 of the atlas tumble in a loop; about 22 sheets alive per stretch, 45 in a gust
+        layer("Paper", litter, (4, 4), 16, rate=2.4, bursts=[(2.0, 8, 12), (2.5, 6, 9), (3.2, 3, 5)], loop=(11, 17),
               lifetime=(7, 11), size=(30, 46), color_low=(0.62, 0.60, 0.55, 1), color_high=(0.95, 0.93, 0.86, 1),
               speed=(170, 430), lift=(-4, 14), curl=140, rotation_rate=(-150, 150), size_curve=grow_shrink,
               alpha_curve=[(0, 1), (1, 1)], height=(12, 130),

@@ -26,7 +26,6 @@ SCALARS = {
     'RuinRubbleTile': 1.333,          # UV0 multiplier for the rubble texture (1.333 = 3 m tile)
     'RuinPlasterLoss': 0.0,           # added to vertex G before the plaster threshold (-1..1)
     'RuinPlasterEdgeWidth': 0.04,     # width of the plaster->brick transition in chip-height units (sharp ~0.02-0.08)
-    'RuinRoughness': 0.90,            # one roughness for wall and rubble (the game camera cannot tell 0.8 from 0.97)
     'RuinSootAmountFallback': 1.0,    # soot amount when CPD 3 is unset (0)
     'RuinSootStrength': 1.0,          # soot = vertex R * amount * (strength + breakup * (noise - 0.5))
     'RuinSootBreakup': 0.9,
@@ -34,20 +33,22 @@ SCALARS = {
     'RuinDustBreakup': 0.8,
     'RuinDustOpacity': 0.75,
     # Rubble branch only.
-    'RuinRubbleDesaturation': 0.30,   # 0 = texture colour, 1 = grey; used when CPD 4 is unset (0)
-    'RuinRubbleContrast': 0.85,       # 1 = texture contrast; lower flattens the fragments toward RuinRubblePivot
-    'RuinRubblePivot': 0.12,          # linear grey the contrast turns about (about the rubble texture's mean)
+    'RuinRubbleDesaturation': 0.20,   # 0 = texture colour, 1 = grey; used when CPD 4 is unset (0)
+    'RuinRubbleContrast': 0.90,       # 1 = texture contrast; lower flattens the fragments toward RuinRubblePivot
+    'RuinRubblePivot': 0.13,          # linear grey the contrast turns about (about the rubble texture's mean)
     # Ruin_CloseUpDetail branch only (off by default: none of it shows from the game camera).
     'RuinPlasterEdgeLight': 0.22,     # brightening of the broken plaster rim (fresh lime core)
     'RuinPlasterEdgeShadow': 0.30,    # darkening of brick just below the plaster edge (plaster thickness)
-    'RuinPlasterRoughness': 0.90,
+    'RuinNormalStrength': 1.0,        # scales the packed normal XY
+    # Only built when the master is not Fully Rough (ruin_material_build.MASTER_FLAGS); it is, so these are unused.
+    'RuinRoughness': 0.90,            # one roughness for wall and rubble
+    'RuinPlasterRoughness': 0.90,     # the next three: roughness by cavity in the Ruin_CloseUpDetail branch
     'RuinBrickRoughFace': 0.80,       # brick face roughness (brick A = 1)
     'RuinBrickRoughJoint': 0.97,      # mortar joint roughness (brick A = 0)
-    'RuinNormalStrength': 1.0,        # scales the packed normal XY
 }
 # Parameters that only exist in the Ruin_CloseUpDetail branch (the docs and the preview read this).
-CLOSE_UP_SCALARS = ('RuinPlasterEdgeLight', 'RuinPlasterEdgeShadow', 'RuinPlasterRoughness', 'RuinBrickRoughFace',
-                    'RuinBrickRoughJoint', 'RuinNormalStrength')
+CLOSE_UP_SCALARS = ('RuinPlasterEdgeLight', 'RuinPlasterEdgeShadow', 'RuinNormalStrength')
+ROUGHNESS_SCALARS = ('RuinRoughness', 'RuinPlasterRoughness', 'RuinBrickRoughFace', 'RuinBrickRoughJoint')
 
 # Vector parameters (linear RGB): name -> default.
 VECTORS = {
@@ -65,7 +66,7 @@ CPD_SOOT = 3           # soot amount; 0 (unset) -> RuinSootAmountFallback; negat
 CPD_DESATURATION = 4   # rubble desaturation 0..1; 0 (unset) -> RuinRubbleDesaturation; negative -> none
 
 STATIC_SWITCH = 'Ruin_IsRubble'
-CLOSE_UP_SWITCH = 'Ruin_CloseUpDetail'     # normal map, plaster rim light / shadow, roughness by brick cavity
+CLOSE_UP_SWITCH = 'Ruin_CloseUpDetail'     # normal map, plaster rim light / shadow
 STATIC_SWITCHES = (STATIC_SWITCH, CLOSE_UP_SWITCH)
 
 # Instances: name -> (parent asset name, scalar overrides, vector overrides, static switch values).

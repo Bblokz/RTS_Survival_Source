@@ -142,6 +142,18 @@ def place_slice():
     S["result"]["slice"]["component_names_after_replacing"] = names
     log("ambient components after clear + place: %d, unnamed %d" % (len(names), sum(1 for n in names if not n.startswith("AMB_"))))
     actors.spawn_actor_from_class(unreal.CameraActor, unreal.Vector(0, 0, 3000))
+    # 40 copies of one dressing mesh, set up like the placed components, 300 m from the slice (see the "copies" phase)
+    curtain = unreal.load_asset(ambient_place.DRESSING + "SM_BerlinAmb_Curtain_A")
+    for index in range(40):
+        x, y = 30000.0 + (index % 8) * 150.0, 300.0 + (index // 8) * 300.0
+        copy = actors.spawn_actor_from_class(unreal.StaticMeshActor, unreal.Vector(x, y, ground_z(world, x, y) + 300.0), unreal.Rotator(0.0, 0.0, 180.0))
+        copy.set_actor_label("AMBX_Copy_%02d" % index)
+        comp = copy.static_mesh_component
+        comp.set_mobility(unreal.ComponentMobility.MOVABLE)
+        comp.set_static_mesh(curtain)
+        comp.set_collision_enabled(unreal.CollisionEnabled.NO_COLLISION)
+        comp.set_editor_property("cast_shadow", False)
+        comp.set_visibility(False, False)
     material_stats()
 
 
@@ -182,6 +194,8 @@ def find_runtime(world):
     S["ruins"] = ruins
     S["niagara"] = [a for a in unreal.GameplayStatics.get_all_actors_of_class(world, unreal.NiagaraActor)]
     S["flocks"] = [a for a in unreal.GameplayStatics.get_all_actors_of_class(world, unreal.BirdFlock)]
+    S["copies"] = [a for a in unreal.GameplayStatics.get_all_actors_of_class(world, unreal.StaticMeshActor)
+                   if a.static_mesh_component.static_mesh is not None and a.static_mesh_component.static_mesh.get_name() == "SM_BerlinAmb_Curtain_A"]
     dressing, crows = [], []
     for actor in ruins.values():
         for comp in actor.get_components_by_class(unreal.StaticMeshComponent):
@@ -265,8 +279,9 @@ def queue_views():
             views.append(("close_" + key, close_view(key, dist, height)))
             views.append(("rts_" + key, rts_view(S["targets"][key][1] + unreal.Vector(0, 0, -S["targets"][key][1].z + centre.z))))
     for name, view in views:
-        for frame in "abc":
-            S["pics"].append(("%s_%s" % (name, frame), view, frame == "a"))
+        # a screenshot can land a moment after it is asked for: frame 0 only settles the camera and is not kept for judging
+        for frame in "0abc":
+            S["pics"].append(("%s_%s" % (name, frame), view, frame == "0"))
 
 
 def run_pictures(next_phase):
@@ -311,10 +326,6 @@ def bench(delta):
     if b["stage"] == "settle":
         if S["t"] - b["mark"] >= BENCH_SETTLE:
             b["stage"] = "measure"
-            if b["index"] >= 8:      # the single-part states and the last pair: one stat dump each (draw calls, primitives)
-                unreal.log("AMBTEST STATDUMP BEGIN %s" % BENCH_STATES[b["index"]][0])
-                unreal.SystemLibrary.execute_console_command(game_world(), "stat dumpframe -ms=0")
-                unreal.SystemLibrary.execute_console_command(game_world(), "r.MeshDrawCommands.LogDynamicInstancingStats 1")
         return True
     b["frames"].append(delta)
     if len(b["frames"]) >= BENCH_FRAMES:
@@ -350,7 +361,7 @@ def tick(delta):
             world = game_world()
             if world is not None and S["t"] - S["mark"] > 14.0:
                 unreal.GameplayStatics.set_game_paused(world, False)
-                for command in ("ShowFlag.PostProcessMaterial 0", "t.MaxFPS 0", "r.VSync 0", "stat RHI", "stat SceneRendering", "stat Niagara"):
+                for command in ("ShowFlag.PostProcessMaterial 0", "t.MaxFPS 0", "r.VSync 0"):
                     unreal.SystemLibrary.execute_console_command(world, command)
                 find_runtime(world)
                 queue_views()
@@ -362,8 +373,6 @@ def tick(delta):
         elif phase == "pictures":
             run_pictures("bench_setup")
         elif phase == "bench_setup":
-            for command in ("stat RHI", "stat SceneRendering", "stat Niagara"):       # second call hides the overlays again; the groups stay collected for the dump
-                unreal.SystemLibrary.execute_console_command(game_world(), command)
             centre = unreal.Vector(0.0, 0.0, ground_z(game_world(), 0.0, 0.0))
             place_camera(*rts_view(centre))
             S["result"]["awake_litter_at_slice"] = None
@@ -382,6 +391,69 @@ def tick(delta):
                 S["result"]["bench_pairs_on_minus_off_ms"] = deltas
                 log("bench pair deltas (on - off, ms): %s" % deltas)
                 set_ambient(True, True, True)
+                busiest = max(S["ruins"].values(), key=lambda r: sum(1 for c in S["dressing"] + S["crows"] if c.get_owner() == r))
+                place_camera(*rts_view(busiest.get_actor_location()))
+                S["phase"], S["mark"] = "rendered", S["t"]
+        elif phase == "rendered" and S["t"] - S["mark"] > 2.5:
+            first = S["dressing"][0] if S["dressing"] else None
+            S["result"]["dressing_component_settings"] = None if first is None else dict(
+                cast_shadow=first.get_editor_property("cast_shadow"), wpo_disable_distance=first.get_editor_property("world_position_offset_disable_distance"),
+                max_draw_distance=first.get_editor_property("ld_max_draw_distance"), mobility=str(first.mobility),
+                collision=str(first.get_collision_enabled()), tick=first.is_component_tick_enabled())
+            seen = dict(dressing=sum(1 for c in S["dressing"] if c.was_recently_rendered(0.3)),
+                        crow_components=sum(1 for c in S["crows"] if c.was_recently_rendered(0.3)),
+                        litter_components=sum(1 for a in S["niagara"] if a.get_component_by_class(unreal.NiagaraComponent).was_recently_rendered(0.3)))
+            S["result"]["rendered_in_busiest_rts_view"] = seen
+            log("dressing component settings in the game: %s; rendered in the busiest RTS view: %s" % (S["result"]["dressing_component_settings"], seen))
+            place_camera(*close_view("crows", 600.0, 350.0))
+            S["phase"], S["mark"] = "airborne_before", S["t"]
+        elif phase == "airborne_before" and S["t"] - S["mark"] > 2.5:
+            # the crow manager contract: per-instance custom data 2 = 1 folds a perched bird away
+            picture("airborne_0_all_perched")
+            owner = S["ruins"].get(S["lookup_labels"][S["targets"]["crows"][0]])
+            S["airborne_comp"] = next(c for c in S["crows"] if c.get_owner() == owner)
+            for instance in (0, 1):
+                S["airborne_comp"].set_custom_data_value(instance, 2, 1.0, True)
+            S["phase"], S["mark"] = "airborne_after", S["t"]
+        elif phase == "airborne_after" and S["t"] - S["mark"] > 1.5:
+            picture("airborne_1_two_folded")
+            for instance in (0, 1):
+                S["airborne_comp"].set_custom_data_value(instance, 2, 0.0, True)
+            S["phase"], S["mark"] = "flock_find", S["t"]
+        elif phase == "flock_find" and S["t"] - S["mark"] > 0.5:
+            flock = S["flocks"][0]
+            birds = flock.get_component_by_class(unreal.InstancedStaticMeshComponent)
+            heights = []
+            for instance in range(birds.get_instance_count()):
+                transform = birds.get_instance_transform(instance, True)
+                transform = transform[1] if isinstance(transform, tuple) else transform
+                heights.append(round(transform.translation.z - ground_z(game_world(), transform.translation.x, transform.translation.y)))
+                if instance == 0:
+                    lead = transform.translation
+            S["result"]["flock_bird_heights_cm"] = heights
+            log("flock bird heights above the ground: %s" % heights)
+            place_camera(*rts_view(unreal.Vector(lead.x, lead.y, ground_z(game_world(), lead.x, lead.y))))
+            S["phase"], S["mark"], S["flock_shots"] = "flock_shot", S["t"], 0
+        elif phase == "flock_shot" and S["t"] - S["mark"] > 0.9:
+            picture("flock_rts_%s" % "abc"[S["flock_shots"]])
+            S["flock_shots"] += 1
+            S["mark"] = S["t"]
+            if S["flock_shots"] >= 3:
+                centre = unreal.Vector(30000.0 + 525.0, 900.0, ground_z(game_world(), 30500.0, 900.0))
+                place_camera(*rts_view(centre))
+                S["phase"], S["copies_index"] = "copies", 0
+        elif phase == "copies":
+            # 40 copies of one curtain mesh, alone in the view: do equal dressing components merge into one draw call?
+            if S["t"] - S["mark"] < 1.2:
+                return
+            shown = S["copies_index"] % 2 == 1
+            unreal.log("AMBTEST COPIES %s" % ("shown" if shown else "hidden"))
+            unreal.SystemLibrary.execute_console_command(game_world(), "r.MeshDrawCommands.LogDynamicInstancingStats 1")
+            S["copies_index"] += 1
+            S["mark"] = S["t"]
+            for actor in S["copies"]:
+                actor.static_mesh_component.set_visibility(S["copies_index"] % 2 == 1, False)
+            if S["copies_index"] >= 8:
                 # far away: every stretch of the slice must go to sleep, the far one near the camera wakes
                 place_camera(unreal.Vector(30000.0 - 1090.0, 0.0, 3000.0), unreal.Vector(30000.0, 0.0, 0.0))
                 S["phase"], S["mark"] = "far", S["t"]

@@ -1742,6 +1742,72 @@ class Dress:
                  "CornerTenement": (1170, 1420), "Courtyard": (1515, 1225), "CollapseHeap_S": (440, 475),
                  "CollapseHeap_L": (640, 715)}
 
+    def follow_ground(self, delta):
+        """Everything already placed moves by the change of the ground under it."""
+        def dz(x, y):
+            r, c = self.rc(x, y)
+            return float(delta[r, c])
+
+        for items in self.ism.values():
+            for it in items:
+                it[2] = round(it[2] + dz(it[0], it[1]), 1)
+        for group in (self.actors, self.ruins, self.decals):
+            for e in group:
+                e["z"] = round(e["z"] + dz(e["x"], e["y"]), 1)
+        for f in self.feet:
+            f[3] = round(f[3] + dz(f[1], f[2]), 1)
+        for f in self.furn:
+            f[3] = round(f[3] + dz(f[1], f[2]), 1)
+
+    def erode_craters(self):
+        """The crater and puddle decals get real ground under them (owner, 2026-11-13): a shallow, ragged bowl with a
+        low thrown-up rim, so vehicles and infantry dip into a ditch there. Overlapping craters add up (capped), which
+        makes the churned ground of a stick of shells or a cluster of puddles the deepest. The bowls are mud in the
+        paint. Nothing is carved at openings, gaps, wall cores, pads, the bridge or the water's edge."""
+        g = self.gen
+        m = g.out_masks
+        old = g.Z.copy()
+        dip = np.zeros(tg.SHAPE)
+        rim = np.zeros(tg.SHAPE)
+        wet = np.zeros(tg.SHAPE)
+        ragged = 0.22 * tg.noise(301, 3.0) + 0.12 * tg.noise(302, 1.6)       # warps every outline a little
+        count = 0
+        for e in self.decals:
+            if e["kind"] not in ("crater", "puddle"):
+                continue
+            size = e["size"]
+            if size < 250.0:
+                continue
+            x, y = e["x"], e["y"]
+            if any(math.hypot(x - o[0], y - o[1]) < 1300.0 for o in self.openings_at):
+                continue
+            radius = 0.40 * size
+            # a 4 m crater dips about 18 cm, a 14 m one about 55 cm; puddles are shallower pans
+            depth = min(60.0, 6.0 + 0.036 * size) * (0.6 if e["kind"] == "puddle" else 1.0)
+            reach = radius * 1.7 + 200.0
+            r0, c0 = self.rc(x + reach, y - reach)
+            r1, c1 = self.rc(x - reach, y + reach)
+            d = np.hypot(g.X[r0:r1 + 1, c0:c1 + 1] - x, g.Y[r0:r1 + 1, c0:c1 + 1] - y) / radius
+            d = d * (1.0 + ragged[r0:r1 + 1, c0:c1 + 1])
+            bowl = np.clip(1.0 - d * d, 0.0, 1.0) ** 1.4
+            dip[r0:r1 + 1, c0:c1 + 1] += depth * bowl
+            rim[r0:r1 + 1, c0:c1 + 1] = np.maximum(rim[r0:r1 + 1, c0:c1 + 1], 0.2 * depth * np.exp(-((d - 1.12) / 0.2) ** 2))
+            wet[r0:r1 + 1, c0:c1 + 1] = np.maximum(wet[r0:r1 + 1, c0:c1 + 1], tg.smoothstep(1.05, 0.55, d))
+            count += 1
+        dip = np.minimum(dip, 95.0)                      # several craters on one spot: deep, but never a trap
+        keep = tg.soft(m["ruin_core"] | m["core_gap"] | m["sink_gap"] | m["sinkhole"] | m["crater"] | m["landmark_pad"] |
+                       m["bridge"], 3) > 0.02
+        keep |= g.river_dist < tg.RIVER_HALF + tg.QUAY + 400.0
+        keep |= self.body_mask                           # not under a ruin's own footprint: seat() levels that ground
+        allow = 1.0 - tg.soft(keep, 2)
+        allow = np.clip(allow, 0.0, 1.0) ** 2
+        g.Z = old + (rim * (dip < 2.0) - dip) * allow
+        g.Z = g.Z * 0.6 + tg.box_blur(g.Z, 1) * 0.4      # take the 1 m stair-steps off the bowls
+        g.crater_wet = np.clip(wet * allow, 0.0, 1.0)
+        delta = g.Z - old
+        self.follow_ground(delta)
+        return count, float(-delta.min()), float((delta < -5.0)[g.inside].mean())
+
     def seat(self):
         """A piece stands at the ground height of its pivot, so on a slope or a berm one edge of its base floated and
         the other was buried. Here the landscape is levelled to the piece's height under its whole footprint and
@@ -1780,21 +1846,7 @@ class Dress:
         target = np.where(den > 1e-6, num / np.maximum(den, 1e-6), old)
         g.Z = old * (1.0 - weight) + target * weight
         delta = g.Z - old
-
-        def dz(x, y):
-            r, c = self.rc(x, y)
-            return float(delta[r, c])
-
-        for items in self.ism.values():
-            for it in items:
-                it[2] = round(it[2] + dz(it[0], it[1]), 1)
-        for group in (self.actors, self.ruins, self.decals):
-            for e in group:
-                e["z"] = round(e["z"] + dz(e["x"], e["y"]), 1)
-        for f in self.feet:
-            f[3] = round(f[3] + dz(f[1], f[2]), 1)
-        for f in self.furn:
-            f[3] = round(f[3] + dz(f[1], f[2]), 1)
+        self.follow_ground(delta)
         changed = np.abs(delta) > 3.0
         return len(rects), float(changed[g.inside].mean()), float(np.abs(delta).max())
 
@@ -1823,6 +1875,8 @@ class Dress:
         self.actors = [a for a in self.actors if not (a["label"].startswith("BER_Yard") and
                                                       math.hypot(a["x"] - target[0], a["y"] - target[1]) < 1900.0)]
         print("furniture: %d on plots, %d along kerbs" % self.furniture())
+        print("crater erosion: %d decals carved, deepest %.0f cm, %.1f %% of the play area lowered by 5 cm or more" % (
+            (lambda r: (r[0], r[1], 100.0 * r[2]))(self.erode_craters())))
         seated, share, biggest = self.seat()
         print("seated %d footprints: ground changed on %.1f %% of the play area, largest change %.0f cm" % (
             seated, 100.0 * share, biggest))

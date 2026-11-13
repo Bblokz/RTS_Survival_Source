@@ -5,16 +5,28 @@ Never on Ger_Berlin, never in the shared editor. Launch with ruin_look_run.sh <o
     -ExecCmds="py <this file>" -unattended -nosplash -DisablePlugins=Fab,BpGeneratorUltimate -NoLiveCoding
 The map is never saved; the editor quits at the end. No PIE: plain mesh actors in the editor world.
 
-Scene (all on a 140 m plane of the Berlin ash ground texture, with a mud and a landscape-rubble patch as references):
-  row A  kit pieces as on the map: E7 half house on its skirt, B3 facade, B7 wall core, E5 shell on its skirt,
-         E1 corner tower on its skirt; custom primitive data 0-3 as step_ruins writes them (tint + soot).
-  row B  loose rubble heaps on MI_BerlinRuin_Rubble, one per RUBBLE_TINTS entry and one without primitive data
-         (the flat street litter), and collapse heaps + a skirt on MI_BerlinRuin_Rubble_Foot per FOOT_TINTS entry.
-The lights are set to berlin_map_build.step_lighting's values (cold sun, sky, fog, saturation 0.86, 6900 K).
+Scene (on a plane of the Berlin ash ground texture, with a mud and a landscape-rubble patch as references), seen from
++Y so the sun lights the faces toward the camera:
+  back row    kit pieces as on the map: E7 half house and E5 shell on their skirts, B3 facade; custom primitive data
+              0-3 as step_ruins writes them (tint + soot). A second group 90 m behind: E1 corner tower on its skirt,
+              B7 wall core, B5 corner.
+  middle row  loose rubble heaps on MI_BerlinRuin_Rubble, one per berlin_map_build.RUBBLE_TINTS entry, one without
+              primitive data and three pieces of flat street litter (also without).
+  front row   collapse heaps on MI_BerlinRuin_Rubble_Foot, one per FOOT_TINTS entry.
+  group 3     (picture game_25m_instanced) two hierarchical instanced components made by
+              berlin_map_build._instance_actor with the brickiest and the greyest RUBBLE_TINTS entry, and a dirt-tracks
+              decal across a collapse heap and the ground.
+The lights are set to berlin_map_build.step_lighting's values as of 2026-11-13 morning (cold sun, sky, fog 0.0035,
+saturation 0.86, 6900 K); the template's drifting cloud-shadow light function is switched off so two runs compare
+(RUIN_LOOK_CLOUDS=1 keeps it). The picture is darker than the map's own critic shots; judge relative to the patches.
 Pictures (1600 x 900, editor viewport high-res screenshot through a CameraActor, as the map critic shots):
-  game_42m (42 m up, pitch -48, fov 60), game_25m, heaps_25m, top (straight down, for the colour sampling).
-Colour sampling: mean sRGB of the picture `top` round each heap / patch -> <out>/colours.json and the log.
-Results: Saved/Berlin/ruinkit_look/<outname>/.  Env: RUIN_LOOK_OUT (folder name, default 'run').
+  game_42m, game_42m_heroes (42 m up, pitch -48, fov 60), game_25m_pieces, game_25m_heaps, game_25m_heaps_left,
+  close_12m_heaps, top (straight down from 120 m, for the colour sampling).
+Colour sampling (ruin_look_colours.py, run by the launcher): mean display sRGB of `top` round each heap and patch
+-> <out>/colours.json. Before | after sheets of two runs: ruin_look_compare.py.
+Results: Saved/Berlin/ruinkit_look/<outname>/.
+Env: RUIN_LOOK_OUT (folder name, set by the launcher), RUIN_LOOK_EXEC (a python file run in this module before the
+scene is placed: unsaved experiments such as other tint tables or instance parameters).
 """
 import json
 import math
@@ -193,6 +205,7 @@ def place_all():
         spawn_mesh(unreal.load_asset(KIT + 'Footprints/' + name), cx + x, cy + 1500, z, 90.0 * index, 1.0, foot, tint,
                    'LOOK_Collapse_%d' % index)
         S['spots']['collapse_tint%d' % index] = (cx + x, cy + 1500, 170)
+    place_instanced(cx, cy, z, foot)
     set_lighting()
     S['camera'] = actors().spawn_actor_from_class(unreal.CameraActor, unreal.Vector(cx, cy, z + 4200))
     S['camera'].camera_component.set_editor_property('constrain_aspect_ratio', False)
@@ -205,7 +218,40 @@ def place_all():
                  ('game_25m_heaps', (0, 2700, 2500), -48, -90, 60),
                  ('game_25m_heaps_left', (-1400, 2400, 2500), -48, -90, 60),
                  ('close_12m_heaps', (-900, 1100, 1200), -48, -90, 60),
+                 ('game_25m_instanced', (0, 8900, 2500), -48, -90, 60),
                  ('top', (0, 0, 12000), -90, -90, 60)]
+
+
+DECAL = '/Game/RTS_Survival/Materials/Decals/DirtTracks/MI_Decal_Dirt_Tracks_02'
+
+
+def place_instanced(cx, cy, z, foot):
+    """Group 3 (60 m toward the camera side): the map's own instanced path and a ground decal across a heap.
+    Two hierarchical instanced components of one heap mesh, built by berlin_map_build._instance_actor with the
+    greyest and the brickiest RUBBLE_TINTS entry (custom primitive data per component, desaturation in slot 4), and a
+    dirt-tracks decal laid across a collapse heap and the ground as step_decals places them."""
+    try:
+        mesh = unreal.load_asset(DBK + 'Brick/DBK_Brick_Rubble_A')
+        rubble = unreal.load_asset(KIT + 'Materials/MI_BerlinRuin_Rubble')
+        by_grey = sorted(RUBBLE_TINTS, key=lambda t: t[4] if len(t) > 4 else 0.0)
+        for name, tint, x0 in (('brickiest', by_grey[0], -2100.0), ('greyest', by_grey[-1], 300.0)):
+            transforms = [unreal.Transform(unreal.Vector(cx + x0 + 700.0 * k, cy + 6000.0, z), unreal.Rotator(0, 0, 50.0 * k),
+                                           unreal.Vector(1, 1, 1)) for k in range(3)]
+            actor = BMB._instance_actor('LOOK_ISM_' + name, 'Look', mesh, transforms, material=rubble, cpd=tint)
+            comp = actor.get_component_by_class(unreal.HierarchicalInstancedStaticMeshComponent)
+            log('instanced %s: %d instances, tint %s, component data %s' % (
+                name, comp.get_instance_count(), tint,
+                [round(v, 2) for v in comp.get_editor_property('custom_primitive_data').get_editor_property('data')]))
+            S['spots']['ism_' + name] = (cx + x0 + 700.0, cy + 6000.0, 110)
+        spawn_mesh(unreal.load_asset(KIT + 'Footprints/SM_BerlinFoot_CollapseHeap_L'), cx, cy + 7300.0, z, 0.0, 1.0, foot,
+                   FOOT_TINTS[0], 'LOOK_Collapse_decal')
+        decal = actors().spawn_actor_from_class(unreal.DecalActor, unreal.Vector(cx + 500.0, cy + 7300.0, z + 20.0),
+                                                unreal.Rotator(0.0, -90.0, 0.0))
+        decal.decal.set_decal_material(unreal.load_asset(DECAL))
+        decal.decal.set_editor_property('decal_size', unreal.Vector(260.0, 500.0, 500.0))
+        decal.set_actor_label('LOOK_Decal')
+    except Exception as error:  # noqa: BLE001
+        log('instanced group failed: %r' % (error,))
 
 
 def picture():

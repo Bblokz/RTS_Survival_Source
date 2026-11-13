@@ -208,7 +208,7 @@ def place_flocks(flocks, folder="Berlin/Ambient/Crows"):
         flight = actor.get_editor_property("flight_settings")
         flight.set_editor_property("bird_count", flock["count"])
         flight.set_editor_property("flight_height", flock["height"])
-        flight.set_editor_property("height_spread", 350.0)
+        flight.set_editor_property("height_spread", flock.get("spread", 200.0))
         flight.set_editor_property("speed", 820.0)
         flight.set_editor_property("formation_length", 0.5)       # radians of this much smaller ellipse: a loose string of birds
         flight.set_editor_property("formation_width", 900.0)

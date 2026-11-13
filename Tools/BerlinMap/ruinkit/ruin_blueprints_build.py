@@ -7,15 +7,20 @@ or run() inside your own throwaway editor. Re-run it whenever kit meshes are add
 SM_BerlinRuin_* in RuinKit/Meshes and creates or updates BP_BerlinRuin_<suffix> in RuinKit/Blueprints. Blueprints are
 never deleted, so actors already placed keep working.
 
-Per Blueprint (parent: BP_BerlinRuin_Base, a graph-less child of the C++ ADestructableEnvActor that only holds the
-Movable DefaultSceneRoot; no graphs anywhere, because headless Python cannot author Blueprint graphs):
+Per Blueprint (parent: BP_BerlinRuin_Base, a child of the C++ ADestructableEnvActor that holds the Movable
+DefaultSceneRoot and the kit's one death graph; the children have no graphs, headless Python cannot author them):
 - StaticMesh (Movable, as the PostApo ruins): the kit mesh with its own slot materials; the collision that
   ADestructableEnvActor::SetupComponentCollisions would give it at BeginPlay is set on the template instead (object type
   Destructible, blocks Visibility / Projectile / TraceEnemy / TracePlayer, overlaps BuildingPlacement, ignores pawns,
   no decals) and it does not affect navigation.
 - WallHoleDamage on StaticMesh: NoGrid, DamagedMaterials[0] = MI_BerlinRuin_Wall_Holes (slot 1 rubble never), kit debris
-  SM_BerlinRuin_Debris_*, per-class hole size and debris counts (CLASSES), bCollapseIntoChunksOnDeath = true: on death the
-  surface flies off as pieces, the mesh hides and loses collision, and the actor is destroyed 4.5 s later.
+  SM_BerlinRuin_Debris_*, per-class hole size and debris counts (CLASSES). bCollapseIntoChunksOnDeath is false when the
+  base has its death graph (the graph throws the pieces itself, then sinks the ruin); true otherwise (old chunk death).
+- Death (2026-11-13): the graph lives in BP_BerlinRuin_Base only (authored through UECP, calls in
+  ruin_death_graph_uecp.json; this builder never touches graphs). Per child this builder sets the class defaults the
+  graph reads: sink depth / time / tilt, the dust effect with its scale, spread and pulse rate for the piece's size,
+  the collapse cue, and the collapse heaps of footprint_table.json ("dead") as actor-relative transforms
+  (DeathHeapsSmall / DeathHeapsLarge) with the moment they appear.
 - NavBlock_NN: hidden, collision-less UBoxComponents set as dynamic navigation obstacles with NavArea_Null, one per
   ground-touching wall run / rubble heap (the mesh's UCX hulls merged where they line up). They block every agent's
   navmesh exactly where the hulls stand, are runtime modifiers (DynamicModifiersOnly), and leave the navmesh when the
@@ -40,6 +45,55 @@ REPORT ='D:/UE5Projects/RTS_Survival/Saved/Berlin/ruinkit_bp/build_report.json'
 COLLAPSE_CUE = '/Game/RTS_Survival/StarterContent/Audio/Collapse_Cue'
 COLLAPSE_ATT = '/Game/RTS_Survival/Sounds/Settings/Collapse/Att_Collapse'
 COLLAPSE_CONC = '/Game/RTS_Survival/Sounds/Settings/Collapse/SC_Collapse'
+FOOTPRINT_TABLE = 'D:/UE5Projects/RTS_Survival/Source/Tools/BerlinMap/ruinkit/footprint_table.json'
+# One-shot brown dust cloud with a few stones, about 6.5 m across at scale 1 and gone after 2.5 s. It is the only death
+# effect: once at the death, then as pulses over the footprint while the ruin sinks, and on each heap spot. (The white
+# NS_DestructionSmoke(_Large) reads as steam on these ruins; the NS_RTS_GroundDust* systems loop and never end.)
+DEATH_DUST = '/Game/RTS_Survival/ImpactSfxVfx/4SuperHeavyCalibre/Stone/NS_RTSDebrisExplosion_Huge'
+DUST_DIAMETER = 650.0
+HEAP_MESH_TO_ARRAY = {'SM_BerlinFoot_CollapseHeap_S': 'DeathHeapsSmall', 'SM_BerlinFoot_CollapseHeap_L': 'DeathHeapsLarge'}
+# Dust scale on a heap spot, per heap size (times the heap's own scale): the cloud must hide a 9 m / 14 m heap.
+HEAP_DUST_SCALE = {'SM_BerlinFoot_CollapseHeap_S': 1.6, 'SM_BerlinFoot_CollapseHeap_L': 2.3}
+# The variables the death graph of BP_BerlinRuin_Base reads. When one is missing the base has no death graph (or an
+# older one): the children then keep the hole component's own chunk death and the report says so.
+DEATH_VARIABLES = ('SinkOnDeath', 'LeaveRemnant', 'SinkDeltaZ', 'SinkTime', 'SinkMinTilt', 'SinkMaxTilt', 'SinkMaxYaw', 'HeapDustDelay',
+                   'HeapDustLead', 'DustPulseInterval', 'DustSpreadX', 'DustSpreadY', 'DeathVfxOffset', 'DeathDustScale',
+                   'DeathHeapDustScale', 'DeathDustVfx', 'DeathSound', 'DeathHeapsSmall', 'DeathHeapsLarge')
+# Death per size class: sink seconds, tilt range and yaw (degrees; tall pieces lean less, their tops travel far),
+# heap_at = share of the sink time after which the collapse heaps are spawned (dust starts on their spots
+# HEAP_DUST_LEAD seconds earlier), pulse = seconds between dust pulses, dust = (min, max) scale of one pulse; the
+# scale itself makes a cloud about DUST_CLOUD_SHARE of the piece's shorter ground side.
+DEATH = {
+    'hero':   dict(time=6.0, tilt=(1.0, 2.5), yaw=1.0, heap_at=0.30, pulse=0.45, dust=(1.2, 2.2)),
+    'core':   dict(time=5.0, tilt=(1.0, 3.0), yaw=1.0, heap_at=0.30, pulse=0.45, dust=(1.2, 2.2)),
+    'slab':   dict(time=4.0, tilt=(2.0, 4.0), yaw=2.0, heap_at=0.30, pulse=0.5, dust=(0.9, 1.6)),
+    'filler': dict(time=3.5, tilt=(2.0, 5.0), yaw=2.0, heap_at=0.30, pulse=0.5, dust=(0.9, 1.5)),
+    'stub':   dict(time=2.5, tilt=(2.0, 6.0), yaw=3.0, heap_at=0.36, pulse=0.5, dust=(0.7, 1.1)),
+    'rubble': dict(time=2.5, tilt=(0.0, 2.0), yaw=0.0, heap_at=0.36, pulse=0.5, dust=(0.7, 1.2)),
+}
+# LARGE / SMALL split (owner, 2026-11-13): a large ruin does not vanish. Its sink stops with the given share of its
+# height in the ground, slightly tilted, and the dead actor stays as a remnant (no destroy, nothing ticks). A small
+# piece sinks completely and is destroyed. suffix -> (share of the mesh height that goes into the ground,
+# (min, max) pitch/roll degrees, max yaw degrees). The C++ sink picks the tilt size, its direction and the yaw sign at
+# random per death, so a row of dead ruins does not lean alike. Every piece not listed here is small.
+REMNANTS = {
+    'E1_CornerTower': (0.62, (2.0, 4.0), 2.0),     # hero, 20.8 m -> about 7.9 m left standing
+    'E2_Courtyard':   (0.60, (2.0, 4.0), 2.0),     # hero, 16.0 m -> 6.4 m
+    'E3_CoreRow':     (0.60, (2.0, 4.0), 2.0),     # wall core row, 18.4 m -> 7.3 m
+    'B7_WallCore':    (0.55, (2.0, 4.0), 2.0),     # wall core, 11.5 m -> 5.2 m
+    'B3_Facade4St':   (0.65, (3.0, 5.0), 3.0),     # lone four-storey facade, 15.5 m -> 5.4 m
+    'B4_Firewall':    (0.65, (3.0, 5.0), 3.0),     # lone firewall, 16.7 m -> 5.9 m
+    'B5_CornerL':     (0.60, (3.0, 5.0), 3.0),     # corner of two facades, 11.1 m -> 4.4 m
+}
+# A NavBlock box stays (tag REMNANT_NAV_TAG; the death graph detaches it so it keeps standing at ground level while the
+# actor sinks) when the hulls it was made from still stand at least this high after the sink; lower ones are destroyed.
+REMNANT_NAV_TAG = 'RemnantNav'
+REMNANT_NAV_MIN_STAND = 150.0
+HEAP_DUST_LEAD = 0.45        # s between the dust on a heap spot and the heap itself
+DUST_CLOUD_SHARE = 0.75
+DUST_SPREAD_SHARE = 0.32     # pulses are scattered this share of each ground side around the footprint centre
+SINK_MARGIN = 80.0           # cm under the ground beyond the mesh top (the tilt lifts one side)
+SINK_SCALE_ALLOWANCE = 1.15  # fillers may be placed scaled up to 1.15; the sink depth is not scaled with the actor
 
 # Size classes. Lengths are mesh cm (kit meshes stand at scale 1; fillers may be scaled up to 1.15, never below 1).
 #   radius/mm: hole radius per mm calibre (75 mm -> 75 x value cm); max: largest hole; min: smallest hole worth a slot.
@@ -271,9 +325,10 @@ def _delete_component(bp, actor_handle, handle):
 
 
 def ensure_base():
-    """BP_BerlinRuin_Base: the shared parent (C++ ADestructableEnvActor, a Movable DefaultSceneRoot, no graphs). It
-    exists so a death graph (e.g. CollapseIntoPieces(false) + VerticalDestruction with destroy) can be added ONCE for
-    the whole kit; see BerlinRuinKit.md. The builder never touches its graphs."""
+    """BP_BerlinRuin_Base: the shared parent (C++ ADestructableEnvActor, a Movable DefaultSceneRoot). It holds the one
+    death graph of the kit (BP_OnUnitDies -> StartRuinDeath -> DustAtHeaps -> SpawnDeathHeaps; see BerlinRuinKit.md and
+    ruin_death_graph_uecp.json). The builder never touches its graphs; a base created here has none, and the children
+    then keep the chunk death until the graph calls are replayed."""
     path = f'{BLUEPRINTS}/{BASE_NAME}'
     if EAL.does_asset_exist(path):
         base = unreal.load_asset(path)
@@ -353,7 +408,85 @@ def setup_mesh_template(comp, mesh):
         comp.set_collision_response_to_channel(blocked, block)
 
 
-def setup_holes_template(comp, kind, is_rubble_only, pieces):
+def base_death_ready(base):
+    """True when BP_BerlinRuin_Base carries every variable its death graph reads (see ruin_death_graph_uecp.json)."""
+    cdo = unreal.get_default_object(base.generated_class())
+    missing = []
+    for name in DEATH_VARIABLES:
+        try:
+            cdo.get_editor_property(name)
+        except Exception:  # noqa: BLE001 - a missing Blueprint variable raises
+            missing.append(name)
+    if missing:
+        log(f'{BASE_NAME} has no death graph variables {missing}: children keep the chunk death')
+    return not missing
+
+
+def death_heaps(suffix):
+    """({'DeathHeapsSmall': [Transform], 'DeathHeapsLarge': [Transform]}, list for the report) from the "dead" entries
+    of the footprint table: actor-relative (x, y, 0), yaw added to the piece yaw, uniform scale. Pieces without an
+    entry leave no heap."""
+    with open(FOOTPRINT_TABLE, 'r') as handle:
+        table = json.load(handle)['pieces']
+    out = {'DeathHeapsSmall': [], 'DeathHeapsLarge': []}
+    listed = []
+    for entry in table.get(suffix, {}).get('dead', []):
+        scale = float(entry.get('scale', 1.0))
+        transform = unreal.Transform(unreal.Vector(entry['x'], entry['y'], 0.0),
+                                     unreal.Rotator(roll=0.0, pitch=0.0, yaw=entry['yaw']),
+                                     unreal.Vector(scale, scale, scale))
+        out[HEAP_MESH_TO_ARRAY[entry['mesh']]].append(transform)
+        listed.append([entry['mesh'].rsplit('_', 1)[1], entry['x'], entry['y'], entry['yaw'], scale])
+    return out, listed
+
+
+def death_defaults(suffix, kind, mesh):
+    """Class defaults the death graph reads, from the mesh size, the size class and the footprint table."""
+    d = DEATH[kind]
+    box = mesh.get_bounding_box()
+    size_x, size_y = box.max.x - box.min.x, box.max.y - box.min.y
+    heaps, listed = death_heaps(suffix)
+    remnant = REMNANTS.get(suffix)
+    tilt, yaw = d['tilt'], d['yaw']
+    if remnant:
+        # Measured from the mesh top, so the share is of what stands above the ground.
+        sink = round(box.max.z * remnant[0])
+        tilt, yaw = remnant[1], remnant[2]
+    else:
+        sink = round((box.max.z + SINK_MARGIN) * SINK_SCALE_ALLOWANCE)
+    dust = round(min(max(DUST_CLOUD_SHARE * min(size_x, size_y) / DUST_DIAMETER, d['dust'][0]), d['dust'][1]), 2)
+    heap_dust = round(max([HEAP_DUST_SCALE['SM_BerlinFoot_CollapseHeap_' + h[0]] * h[4] for h in listed] or [1.5]), 2)
+    heap_time = d['time'] * d['heap_at']
+    values = {
+        'SinkOnDeath': True,
+        'LeaveRemnant': bool(remnant),
+        'SinkDeltaZ': float(sink),
+        'SinkTime': d['time'],
+        'SinkMinTilt': tilt[0], 'SinkMaxTilt': tilt[1], 'SinkMaxYaw': yaw,
+        'HeapDustDelay': round(max(heap_time - HEAP_DUST_LEAD, 0.2), 2),
+        'HeapDustLead': HEAP_DUST_LEAD,
+        'DustPulseInterval': d['pulse'],
+        'DustSpreadX': round(size_x * DUST_SPREAD_SHARE), 'DustSpreadY': round(size_y * DUST_SPREAD_SHARE),
+        # The dust is centred on the middle of the mesh footprint, 1 m up (local space; the graph turns it with the actor).
+        'DeathVfxOffset': unreal.Vector(round((box.min.x + box.max.x) * 0.5), round((box.min.y + box.max.y) * 0.5), 100.0),
+        'DeathDustScale': unreal.Vector(dust, dust, dust),
+        'DeathHeapDustScale': unreal.Vector(heap_dust, heap_dust, heap_dust),
+        'DeathDustVfx': unreal.load_asset(DEATH_DUST),
+        'DeathSound': unreal.load_asset(COLLAPSE_CUE),
+        'DeathHeapsSmall': heaps['DeathHeapsSmall'],
+        'DeathHeapsLarge': heaps['DeathHeapsLarge'],
+    }
+    info = {'remnant': bool(remnant), 'top_cm': round(box.max.z), 'stands_after_cm': round(box.max.z - sink) if remnant else 0,
+            'tilt_deg': list(tilt), 'yaw_deg': yaw,
+            'sink_cm': sink, 'sink_s': d['time'], 'heap_dust_s': values['HeapDustDelay'],
+            'heap_spawn_s': round(values['HeapDustDelay'] + HEAP_DUST_LEAD, 2), 'heaps': listed,
+            'dust_scale': dust, 'heap_dust_scale': heap_dust, 'dust_pulse_s': d['pulse'],
+            'dust_spread': [values['DustSpreadX'], values['DustSpreadY']],
+            'fx_offset': [values['DeathVfxOffset'].x, values['DeathVfxOffset'].y, 100.0]}
+    return values, info
+
+
+def setup_holes_template(comp, kind, is_rubble_only, pieces, graph_death=False):
     c = CLASSES[kind]
     comp.set_editor_property('WallMeshComponentName', 'StaticMesh')
     comp.set_editor_property('DamagedMaterials', [] if is_rubble_only else [unreal.load_asset(HOLES_MI)])
@@ -371,7 +504,9 @@ def setup_holes_template(comp, kind, is_rubble_only, pieces):
     grid.set_editor_property('max_collapse_pieces', c['collapse'])
     comp.set_editor_property('GridSettings', grid)
     collapse = comp.get_editor_property('CollapseSettings')
-    collapse.set_editor_property('collapse_into_chunks_on_death', True)
+    # With the death graph in the base, the graph calls CollapseIntoPieces(false) and sinks the ruin; the component's
+    # own death would hide the mesh at once and the sink would never show.
+    collapse.set_editor_property('collapse_into_chunks_on_death', not graph_death)
     collapse.set_editor_property('destroy_owner_delay_seconds', 4.5)
     collapse.set_editor_property('death_speed_scale', c['speed'])
     collapse.set_editor_property('collapse_sound', unreal.load_asset(COLLAPSE_CUE))
@@ -380,7 +515,23 @@ def setup_holes_template(comp, kind, is_rubble_only, pieces):
     comp.set_editor_property('CollapseSettings', collapse)
 
 
-def setup_nav_box(comp, box):
+def remnant_nav_flags(suffix, mesh, hulls, boxes):
+    """Per nav box: True when it must stay under a remnant (some hull inside it still stands REMNANT_NAV_MIN_STAND above
+    the ground after the sink). All False for a small piece."""
+    remnant = REMNANTS.get(suffix)
+    if not remnant:
+        return [False] * len(boxes)
+    sink = mesh.get_bounding_box().max.z * remnant[0]
+    flags = []
+    for b in boxes:
+        tops = [h[5] for h in hulls if h[2] < NAV_MAX_BOTTOM and h[0] >= b[0] - 1 and h[1] >= b[1] - 1
+                and h[3] <= b[3] + 1 and h[4] <= b[4] + 1]
+        flags.append(bool(tops) and max(tops) - sink >= REMNANT_NAV_MIN_STAND)
+    return flags
+
+
+def setup_nav_box(comp, box, keep_under_remnant=False):
+    comp.set_editor_property('component_tags', [REMNANT_NAV_TAG] if keep_under_remnant else [])
     centre = unreal.Vector((box[0] + box[3]) * 0.5, (box[1] + box[4]) * 0.5, (box[2] + box[5]) * 0.5)
     extent = unreal.Vector((box[3] - box[0]) * 0.5, (box[4] - box[1]) * 0.5, (box[5] - box[2]) * 0.5)
     comp.set_editor_property('relative_location', centre)
@@ -398,7 +549,7 @@ def setup_nav_box(comp, box):
     comp.set_editor_property('hidden_in_game', True)
 
 
-def build_one(mesh, pieces, base):
+def build_one(mesh, pieces, base, graph_death=False):
     suffix = mesh.get_name()[len('SM_BerlinRuin_'):]
     name = 'BP_BerlinRuin_' + suffix
     kind, health, reduction = _settings_for(suffix)
@@ -410,14 +561,22 @@ def build_one(mesh, pieces, base):
     bp, created = get_or_create_blueprint(name, base)
     named = ensure_components(bp, len(boxes))
     setup_mesh_template(named['StaticMesh'][1], mesh)
-    setup_holes_template(named['WallHoleDamage'][1], kind, is_rubble_only, pieces)
+    setup_holes_template(named['WallHoleDamage'][1], kind, is_rubble_only, pieces, graph_death)
+    keep = remnant_nav_flags(suffix, mesh, hulls, boxes)
     for index, box in enumerate(boxes):
-        setup_nav_box(named['NavBlock_%02d' % index][1], box)
+        setup_nav_box(named['NavBlock_%02d' % index][1], box, keep[index] and graph_death)
     unreal.BlueprintEditorLibrary.compile_blueprint(bp)
     cdo = unreal.get_default_object(bp.generated_class())
     cdo.set_editor_property('health', float(health))
     cdo.set_editor_property('damage_reduction', float(reduction))
     cdo.set_editor_property('aim_offset_points', aims)
+    death_info = {'graph': False}
+    if graph_death:
+        values, death_info = death_defaults(suffix, kind, mesh)
+        for key, value in values.items():
+            cdo.set_editor_property(key, value)
+        death_info['graph'] = True
+        death_info['nav_boxes_kept_under_remnant'] = '%d/%d' % (sum(keep), len(keep))
     unreal.BlueprintEditorLibrary.compile_blueprint(bp)
     saved = EAL.save_loaded_asset(bp, False)
     info = {'blueprint': bp.get_path_name(), 'created': created, 'saved': bool(saved), 'class': kind,
@@ -426,7 +585,7 @@ def build_one(mesh, pieces, base):
             # Footprint the boxes block vs the ground hulls' own AABB footprints (m2): how much merging overstates.
             'nav_box_m2': round(sum(_area(b) for b in boxes) / 1e4, 1),
             'ground_hull_m2': round(sum(_area(h) for h in hulls if h[2] < NAV_MAX_BOTTOM) / 1e4, 1),
-            'aims': [[a.x, a.y, a.z] for a in aims], 'settings': CLASSES[kind]}
+            'aims': [[a.x, a.y, a.z] for a in aims], 'settings': CLASSES[kind], 'death': death_info}
     log(json.dumps(info))
     return info
 
@@ -438,12 +597,17 @@ def run(only=None):
     if not pieces:
         raise RuntimeError('no SM_BerlinRuin_Debris_* meshes in ' + DEBRIS)
     base = ensure_base()
+    graph_death = base_death_ready(base)
+    report['death_graph_in_base'] = graph_death
+    if not graph_death:
+        report['errors'] = [f'{BASE_NAME} lacks the death graph variables: every piece keeps the chunk death '
+                            f'(replay ruin_death_graph_uecp.json, then re-run)']
     for mesh in kit_meshes():
         suffix = mesh.get_name()[len('SM_BerlinRuin_'):]
         if only and suffix not in only:
             continue
         try:
-            report['blueprints'][suffix] = build_one(mesh, pieces, base)
+            report['blueprints'][suffix] = build_one(mesh, pieces, base, graph_death)
         except Exception as error:  # noqa: BLE001 - report every piece, keep going
             report['blueprints'][suffix] = {'error': repr(error)}
             log(f'{suffix}: ERROR {error!r}')

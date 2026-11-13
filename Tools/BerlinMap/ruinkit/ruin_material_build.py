@@ -5,14 +5,19 @@ Creates / refreshes in /Game/RTS_Survival/Blueprints/Environment/Berlin/RuinKit/
   M_BerlinRuin                opaque master (graph rebuilt in place, so instances and mesh slots stay valid)
   MI_BerlinRuin_Wall          Ruin_IsRubble off
   MI_BerlinRuin_Rubble        Ruin_IsRubble on
+  MI_BerlinRuin_Rubble_Foot   child of the rubble instance for the footprint skirts (darker, thinner dust)
   M_BerlinRuin_WallHoles      masked copy made by Tools/WallChunks/make_wall_holes_material.masked_master_for
                               (deleted and re-made each run so it never goes stale against M_BerlinRuin)
   MI_BerlinRuin_Wall_Holes    make_holes_instance(MI_BerlinRuin_Wall, NoGrid, two-sided, inner tint)
 
-Headless (never in the shared editor):
-  UnrealEditor-Cmd.exe RTS_Survival.uproject -run=pythonscript -script=<this file> -unattended -nosplash
-  stats only (needs rendering):  set RUIN_MODE=stats and add -AllowCommandletRendering
+Headless (never in the shared editor: clearing a master that a level uses asserts there):
+  sh ruin_cmd_run.sh ruin_material_build.py <logname> RUIN_MODE=all
+  = UnrealEditor-Cmd.exe RTS_Survival.uproject -run=pythonscript -script=<this file> -unattended -nosplash
+    -AllowCommandletRendering (the stats need a renderer)
 Modes (env RUIN_MODE): build (default) | stats | all
+Every editor that has the kit loaded keeps the .uasset files open and the saves then fail ("Error moving file"):
+see "Rebuild while editors are open" in the doc (ruin_wait_unlocked.ps1).
+Cost attribution of the graph: ruin_cost_probe.py. Pictures: ruin_look_test.py.
 """
 import os
 import sys
@@ -51,6 +56,12 @@ MASTER_FLAGS = {
     # The map draws rubble heaps and skirts as hierarchical instanced meshes: without the flag a cooked game shows
     # the default material on them (the editor only sets it on the fly, on whatever copy is loaded).
     'used_with_instanced_static_meshes': True,
+    # Roughness forced to 1 and no specular: the kit is 0.8-0.97 rough everywhere, and the base pass saves 12
+    # instructions. The roughness pin is then ignored, so build_graph does not build one.
+    'fully_rough': True,
+    # Decals still colour the kit (tracks, dirt, craters across skirts and heaps) but no longer change its normal and
+    # roughness: one DBuffer texture read instead of three, 23 instructions less.
+    'material_decal_response': unreal.MaterialDecalResponse.MDR_COLOR,
 }
 
 
@@ -104,6 +115,7 @@ class Graph:
         self.x = -2400
         self.y = -1200
         self.failed = 0
+        self.flags = dict(MASTER_FLAGS)   # material flags the graph depends on (Fully Rough: no roughness pin)
         self.switch_defaults = {}   # the cost probe compiles the branches of an unsaved master through these
         self.samples = {}           # texture name -> sample node (the cost probe taps them)
 
@@ -244,7 +256,7 @@ def build_graph(g, textures):
     uv0 = g.node(unreal.MaterialExpressionTextureCoordinate, coordinate_index=0)
     uv = g.to_pixel(g.mul(uv0, g.switch(g.scalar('RuinRubbleTile'), g.scalar('RuinWallTile'))))
     vc = g.node(unreal.MaterialExpressionVertexColor)
-    roughness = g.scalar('RuinRoughness')
+    with_roughness = not g.flags.get('fully_rough', False)
     flat = g.node(unreal.MaterialExpressionConstant3Vector, constant=unreal.LinearColor(0, 0, 1, 0))
 
     # ---- per component, vertex shader: CPD 0-3 = tint RGB + soot amount. Unset CPD reads 0 -> parameter fallbacks.
@@ -280,13 +292,10 @@ def build_graph(g, textures):
     plaster_rim = g.mul(plaster_col, g.add(g.mul(edge, g.scalar('RuinPlasterEdgeLight')), 1.0))
     brick_rim = g.mul(brick_col, g.sub(1.0, g.mul(shadow, g.scalar('RuinPlasterEdgeShadow'))))
     wall_base = g.lerp(g.close_up(brick_rim, brick_col), g.close_up(plaster_rim, plaster_col), plaster)
-    rough_detail = g.lerp(g.lerp(g.scalar('RuinBrickRoughJoint'), g.scalar('RuinBrickRoughFace'), cav),
-                          g.scalar('RuinPlasterRoughness'), plaster)
     nrm = g.texture(textures['T_BerlinRuin_N'], uv, linear=True)
     nxy = g.lerp(g.mask((nrm, 'RGBA'), 'rg'), g.mask((nrm, 'RGBA'), 'ba'), plaster)
     nxy = g.mul(g.add(g.mul(nxy, 2.0), -1.0), g.scalar('RuinNormalStrength'))
     normal_detail = g.append(nxy, g.const(1.0))                  # the shader normalises the tangent normal
-    wall_rough = g.close_up(rough_detail, roughness)
     wall_normal = g.close_up(normal_detail, flat)
     wall_noise = g.close_up(g.lerp(cav, chip, plaster), chip)    # soot / dust breakup: the chip height is noise enough
 
@@ -304,7 +313,12 @@ def build_graph(g, textures):
     rub_base = g.add(g.mul(rub_grey, contrast), pivot)
 
     base0 = g.switch(rub_base, wall_base)
-    rough = g.switch(roughness, wall_rough)
+    rough = None
+    if with_roughness:      # only when the master is not Fully Rough: one scalar, by cavity in the close-up branch
+        roughness = g.scalar('RuinRoughness')
+        rough_detail = g.lerp(g.lerp(g.scalar('RuinBrickRoughJoint'), g.scalar('RuinBrickRoughFace'), cav),
+                              g.scalar('RuinPlasterRoughness'), plaster)
+        rough = g.switch(roughness, g.close_up(rough_detail, roughness))
     noise = g.switch((rub, 'A'), wall_noise)
     normal = g.switch(flat, wall_normal)
 
@@ -346,7 +360,7 @@ def build_master(textures):
     g = Graph(material)
     base, rough, normal = build_graph(g, textures)
     for node, prop in ((base, PROP.MP_BASE_COLOR), (rough, PROP.MP_ROUGHNESS), (normal, PROP.MP_NORMAL)):
-        if not MEL.connect_material_property(node, '', prop):
+        if node is not None and not MEL.connect_material_property(node, '', prop):
             g.failed += 1
     MEL.layout_material_expressions(material)
     MEL.recompile_material(material)
@@ -399,7 +413,7 @@ def build_holes():
     _save(mi)
     master = unreal.load_asset(HOLES_MASTER)
     names = [str(n) for n in MEL.get_scalar_parameter_names(master)]
-    fresh = 'RuinRoughness' in names and 'WallHole0R' in names
+    fresh = 'RuinRubbleContrast' in names and 'WallHole0R' in names
     log('holes master %s blend=%s fresh=%s, instance parent=%s two_sided=%s' % (
         master.get_name(), master.get_editor_property('blend_mode'), fresh,
         mi.get_editor_property('parent').get_name(),

@@ -295,16 +295,29 @@ def _instance_actor(label, folder, mesh, transforms, collision=True, material=No
         comp.set_collision_enabled(unreal.CollisionEnabled.NO_COLLISION)
         comp.set_editor_property("can_ever_affect_navigation", False)
     if cpd is not None:
-        # custom primitive data 0-2 tint, 3 soot of the Berlin ruin material; one value per component
-        comp.set_default_custom_primitive_data_vector4(0, unreal.Vector4(*cpd))
+        _set_ruin_cpd(comp, cpd)        # one set of values per component
     comp.add_instances(transforms, False, True)
     return actor
 
 
-# loose rubble heaps: cool, darker tints with more soot, so heaps of one mesh do not all glow the same brick pink
-RUBBLE_TINTS = ((0.60, 0.64, 0.68, 1.30), (0.70, 0.70, 0.70, 1.10), (0.52, 0.55, 0.58, 1.35), (0.78, 0.74, 0.70, 0.95))
-# a little darker than the ground they lie on: pale skirts read as sandbag rings from above
-FOOT_TINTS = ((0.78, 0.78, 0.78, 1.1), (0.68, 0.70, 0.72, 1.3), (0.85, 0.82, 0.79, 1.0), (0.62, 0.64, 0.66, 1.35))
+def _set_ruin_cpd(comp, values):
+    """Custom primitive data defaults of the Berlin ruin material (M_BerlinRuin), from index 0:
+    0-2 tint RGB, 3 soot amount, 4 rubble desaturation (0 = grey off .. 1 = all grey). A value of 0 means "unset" in
+    the material and falls back to the instance's parameter; write a negative value for "none". 5-7 are free, the
+    shell-hole system owns 8-34. Docs: Docs/Environment/BerlinRuinKitMaterial.md."""
+    for index, value in enumerate(values):
+        comp.set_default_custom_primitive_data_float(index, float(value))
+
+
+# Per component: (tint R, tint G, tint B, soot amount, rubble desaturation), see _set_ruin_cpd.
+# Retuned 2026-11-13 for the less saturated rubble texture: the old sets were cool and dark to fight the brick pink
+# (RUBBLE 0.52-0.78 with soot 0.95-1.35, FOOT 0.62-0.85 with soot 1.0-1.35) and now turn rubble as dark as the mud.
+# loose rubble heaps: near-neutral, two greyer and two brickier, so heaps of one mesh do not all look the same
+RUBBLE_TINTS = ((0.90, 0.90, 0.90, 1.20, 0.35), (1.00, 0.97, 0.93, 1.00, 0.10),
+                (0.80, 0.81, 0.82, 1.30, 0.45), (0.95, 0.93, 0.90, 0.90, 0.25))
+# skirts and collapse heaps: a little darker than the ground they lie on (pale skirts read as sandbag rings from above)
+FOOT_TINTS = ((0.95, 0.95, 0.95, 0.80, 0.20), (0.85, 0.86, 0.87, 0.90, 0.35),
+              (1.00, 0.97, 0.94, 0.60, 0.10), (0.80, 0.81, 0.82, 0.90, 0.30))
 
 
 def foot_material():
@@ -429,7 +442,7 @@ def _heap_cover_actors(key, items, label_prefix, start, tints=None):
         actor.set_actor_scale3d(unreal.Vector(scale, scale, scale))
         comp = actor.get_component_by_class(unreal.StaticMeshComponent)
         if comp is not None:
-            comp.set_default_custom_primitive_data_vector4(0, unreal.Vector4(*tints[(start + index) % len(tints)]))
+            _set_ruin_cpd(comp, tints[(start + index) % len(tints)])
         actor.set_actor_label("%s%s_%03d" % (label_prefix, key, start + index))
         actor.set_folder_path("Berlin/Cover/Heaps")
     return len(items)
@@ -900,3 +913,19 @@ def step_ambient():
     importlib.reload(ambient_gen)
     importlib.reload(ambient_place)
     return ambient_place.run()
+
+
+# ---- atmosphere per district: low smoke in Mitte, green glow at the crater, fires in the east (Docs/Lighting/BerlinLighting.md) ----
+def step_atmosphere():
+    """Haze sheets, smoke sprites, the crater's glow and shimmer, the fires of the east with their lights: everything
+    labelled or named ATM_ (fires hang on their host ruin or wreck). No engine fog. Run after step_ruins() and
+    step_dress(); needs no navmesh rebuild. The work is in atmosphere/atmosphere_place.py."""
+    require_map()
+    import importlib
+    import sys
+    folder = "D:/UE5Projects/RTS_Survival/Source/Tools/BerlinMap/atmosphere"
+    if folder not in sys.path:
+        sys.path.insert(0, folder)
+    import atmosphere_place
+    importlib.reload(atmosphere_place)
+    return atmosphere_place.run()

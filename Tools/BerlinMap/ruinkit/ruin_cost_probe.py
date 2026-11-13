@@ -77,6 +77,8 @@ def baseline():
         return m
     base = measure('baseline empty default lit', empty())
     measure('baseline + fully rough', empty(fully_rough=True))
+    measure('baseline + used with static lighting', empty(used_with_static_lighting=True),
+            '(another base pass is reported: not comparable)')
     try:
         measure('baseline + no decal response', empty(material_decal_response=unreal.MaterialDecalResponse.MDR_NONE))
     except Exception as error:  # noqa: BLE001
@@ -195,9 +197,11 @@ def legacy_section(textures):
 
 def current(textures, rubble=False, close_up=False, blend=None, two_sided=False, flags=None):
     m = fresh(blend, two_sided)
-    for key, value in (B.MASTER_FLAGS if flags is None else flags).items():
+    flags = dict(B.MASTER_FLAGS if flags is None else flags)
+    for key, value in flags.items():
         m.set_editor_property(key, value)
     g = B.Graph(m)
+    g.flags = flags
     g.switch_defaults = {RP.STATIC_SWITCH: rubble, RP.CLOSE_UP_SWITCH: close_up}
     connect(g, *B.build_graph(g, textures))
     return m, g
@@ -209,6 +213,8 @@ def current_section(textures):
     measure('current wall graph, fully rough', current(textures, flags={'fully_rough': True})[0])
     measure('current wall graph, decal colour only', current(textures, flags={'material_decal_response': mdr.MDR_COLOR})[0])
     measure('current wall graph, no decal response', current(textures, flags={'material_decal_response': mdr.MDR_NONE})[0])
+    measure('current wall graph, fully rough + decal colour only', current(
+        textures, flags={'fully_rough': True, 'material_decal_response': mdr.MDR_COLOR})[0])
     measure('current rubble graph, engine default flags', current(textures, rubble=True, flags={})[0])
     log('--- with the build flags %s' % {k: str(v) for k, v in B.MASTER_FLAGS.items()})
     measure('current wall', current(textures)[0])
@@ -307,8 +313,6 @@ def saved_section():
 
 def run():
     textures = {name: unreal.load_asset(B.FOLDER + '/' + name) for name in RP.TEXTURES}
-    for name in ('RuinRoughness',):
-        RP.SCALARS.setdefault(name, 0.9)
     saved_section()
     baseline()
     legacy_section(textures)

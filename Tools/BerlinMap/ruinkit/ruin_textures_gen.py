@@ -293,17 +293,17 @@ def make_brick(seed=7202):
 # ----------------------------------------------------------------------------- rubble
 
 # 2026-11-13: dustier and less red than the first set (brick was (0.455, 0.290, 0.235) on 54 % of the fragments and the
-# heaps glowed pink from the game camera). Brick is still the largest single type, but dull, and every light type is
-# darker than the pale ash ground (sRGB mean about 0.55), so a heap sits in the ground instead of on it.
+# heaps glowed pink from the game camera). Brick is still the largest single type, but dull; the mean stays near the
+# old one (luminance 0.39 against 0.39) with less saturation (0.19 against 0.26) and less contrast between fragments.
 RUBBLE_TYPES = [  # name, sRGB, weight
-    ('brick', (0.395, 0.290, 0.245), 0.32),
-    ('brick_dark', (0.300, 0.225, 0.200), 0.11),
-    ('plaster', (0.500, 0.482, 0.450), 0.21),
-    ('mortar', (0.430, 0.412, 0.380), 0.19),
+    ('brick', (0.442, 0.325, 0.274), 0.32),
+    ('brick_dark', (0.336, 0.252, 0.224), 0.11),
+    ('plaster', (0.560, 0.540, 0.504), 0.21),
+    ('mortar', (0.482, 0.461, 0.426), 0.19),
     ('char', (0.085, 0.075, 0.068), 0.08),
-    ('stone', (0.455, 0.442, 0.415), 0.09),
+    ('stone', (0.510, 0.495, 0.465), 0.09),
 ]
-RUBBLE_DUST = (0.435, 0.412, 0.378)     # settled dust between and over the fragments (sRGB)
+RUBBLE_DUST = (0.487, 0.461, 0.423)     # settled dust between and over the fragments (sRGB)
 RUBBLE_DUST_TIE = 0.26                  # share of dust mixed over everything at the end
 
 

@@ -39,6 +39,7 @@ STRETCH_SPACING = 3600.0        # cm between litter components along a lane (the
 LITTER_KEEP_ALONG = 0.92        # share of stretches kept on a lane that runs with the wind ...
 LITTER_KEEP_ACROSS = 0.40       # ... and on one that runs across it
 LITTER_PATH_KINDS = ("lane", "road")
+LITTER_MIN_GAP = 2400.0         # cm between two stretches of different lanes (junctions, lanes that start together)
 CURTAIN_CHANCE = 0.075           # per window
 SHUTTER_CHANCE = 0.02
 CABLE_CHANCE = 0.04             # per perch with a free wall face
@@ -50,6 +51,9 @@ CROW_MIN_HEIGHT = 500.0
 CROW_GROUP_SIZE = (3, 6)
 FLOCKS = 3
 FLOCK_SPACING = 30000.0         # cm between two circling groups
+FLOCK_HEIGHT = 1500.0           # cm above the ground: the game camera is about 28 m up, the birds must stay well under it
+FLOCK_SPREAD = 200.0            # each bird flies this much above or below FLOCK_HEIGHT
+FLOCK_HALF_WIDTH = 600.0        # half the width of the string of birds: clearance kept from tall ruins
 HEROES = ("E1", "E2", "E3")
 
 
@@ -113,7 +117,8 @@ def litter(layout, ground, rng):
                 x, y = ax + (bx - ax) * at / length, ay + (by - ay) * at / length
                 at += STRETCH_SPACING
                 inside = bounds["xmin"] + 1500 < x < bounds["xmax"] - 1500 and bounds["ymin"] + 1500 < y < bounds["ymax"] - 1500
-                if inside and rng.random() < keep:
+                crowded = any(math.hypot(x - other[0], y - other[1]) < LITTER_MIN_GAP for other in items)
+                if inside and not crowded and rng.random() < keep:
                     yaw = math.degrees(heading) + rng.uniform(-6.0, 6.0)
                     items.append([round(x, 1), round(y, 1), round(ground.z(x, y), 1), round((yaw + 180.0) % 360.0 - 180.0, 2),
                                   round(max(path.get("width", 800.0), 500.0) / 700.0, 2)])
@@ -232,20 +237,70 @@ def crow_group(index, attach, rng):
     return {"ruin": index, "birds": birds} if len(birds) >= 3 else None
 
 
-def crow_flocks(ruins, ground, rng):
-    """Circling groups over the places with the most tall ruins, well apart from each other."""
-    tall = [r for r in ruins if r["piece"].split("_")[0] in ("E1", "E2", "E3", "B3", "B4", "B5", "B7")]
-    scored = sorted(tall, key=lambda r: -sum(1 for o in tall if math.hypot(o["x"] - r["x"], o["y"] - r["y"]) < 6000.0))
+def crow_flocks(ruins, table, layout, ground, rng):
+    """Circling groups (ABirdFlock) over ruin fields. The birds fly FLOCK_HEIGHT above the ground: well under the game
+    camera (about 28 m up; a bird near the lens fills the screen), which is lower than the tallest ruins. ABirdFlock does
+    not steer, so each ellipse is chosen to pass over as many low ruins and as few tall ones as possible."""
+    def height(ruin):
+        return table.get(ruin["piece"], {"bounds": [0, 0, 0, 0, 0, 0]})["bounds"][5]
+
+    def radius(ruin):
+        bounds = table.get(ruin["piece"], {"bounds": [-500, -500, 0, 500, 500, 0]})["bounds"]
+        return 0.5 * math.hypot(bounds[3] - bounds[0], bounds[4] - bounds[1])
+
+    tall = [(r["x"], r["y"], radius(r)) for r in ruins if height(r) > FLOCK_HEIGHT - FLOCK_SPREAD - 200.0]
+    # the landmark objects are far taller than the flight band
+    tall += [(layout["reichstag_at"][0], layout["reichstag_at"][1], 9000.0), (layout["gate_at"][0], layout["gate_at"][1], 4500.0)]
+    tall += [(f["points"][0][0], f["points"][0][1], 5000.0) for f in layout["features"] if "flak" in f["id"].lower() and f.get("points")]
+    bounds = layout["bounds"]
+    candidates = []
+    for ruin in ruins:
+        if not 400.0 <= height(ruin) <= FLOCK_HEIGHT - FLOCK_SPREAD - 200.0:
+            continue
+        for yaw in (0.0, 30.0, 60.0, 90.0, 120.0, 150.0):
+            semi_x, semi_y = rng.uniform(5000.0, 7000.0), rng.uniform(2800.0, 3600.0)
+            cos_yaw, sin_yaw = math.cos(math.radians(yaw)), math.sin(math.radians(yaw))
+            path = []
+            for step in range(40):
+                angle = 2 * math.pi * step / 40
+                px, py = semi_x * math.cos(angle), semi_y * math.sin(angle)
+                path.append((ruin["x"] + px * cos_yaw - py * sin_yaw, ruin["y"] + px * sin_yaw + py * cos_yaw))
+            if any(not (bounds["xmin"] < x < bounds["xmax"] and bounds["ymin"] < y < bounds["ymax"]) for x, y in path):
+                continue
+            hits = sum(1 for x, y in path if any(math.hypot(x - tx, y - ty) < tr + FLOCK_HALF_WIDTH for tx, ty, tr in tall))
+            under = sum(1 for o in ruins if math.hypot(o["x"] - ruin["x"], o["y"] - ruin["y"]) < semi_x)
+            candidates.append((hits, -under, ruin["x"], ruin["y"], yaw, semi_x, semi_y))
+    candidates.sort()
     flocks = []
-    for ruin in scored:
-        if all(math.hypot(ruin["x"] - f["x"], ruin["y"] - f["y"]) >= FLOCK_SPACING for f in flocks):
-            flocks.append({"x": round(ruin["x"], 0), "y": round(ruin["y"], 0), "z": round(ground.z(ruin["x"], ruin["y"]), 0),
-                           "yaw": round(rng.uniform(0.0, 360.0), 0), "semi_x": round(rng.uniform(6000.0, 8500.0), 0),
-                           "semi_y": round(rng.uniform(3200.0, 4500.0), 0), "height": 2500.0, "count": rng.randint(6, 8),
-                           "seed": rng.randint(1, 9999), "clockwise": rng.random() < 0.5})
+    for hits, under, x, y, yaw, semi_x, semi_y in candidates:
+        if all(math.hypot(x - f["x"], y - f["y"]) >= FLOCK_SPACING for f in flocks):
+            flocks.append({"x": round(x, 0), "y": round(y, 0), "z": round(ground.z(x, y), 0), "yaw": yaw, "semi_x": round(semi_x, 0),
+                           "semi_y": round(semi_y, 0), "height": FLOCK_HEIGHT, "spread": FLOCK_SPREAD, "count": rng.randint(6, 8),
+                           "seed": rng.randint(1, 9999), "clockwise": rng.random() < 0.5, "tall_ruins_on_path": hits,
+                           "ruins_under": -under})
         if len(flocks) >= FLOCKS:
             break
     return flocks
+
+
+def busiest_view(out, ruins):
+    """Worst case for the renderer: the most ambient pieces whose ruin stands inside one game-camera view (about 65 x 36 m)
+    and the most litter stretches within the Niagara cull distance (95 m) of one point."""
+    per_ruin = {}
+    for item in out["dressing"]:
+        per_ruin[item[0]] = per_ruin.get(item[0], 0) + 1
+    crows = {g["ruin"]: len(g["birds"]) for g in out["crow_groups"]}
+    worst = (0, 0, 0)
+    for index in per_ruin:
+        cx, cy = ruins[index]["x"], ruins[index]["y"]
+        inside = [i for i, r in enumerate(ruins) if abs(r["x"] - cx) < 1800.0 and abs(r["y"] - cy) < 3250.0]
+        count = sum(per_ruin.get(i, 0) for i in inside)
+        if count > worst[0]:
+            worst = (count, sum(1 for i in inside if i in crows), sum(crows.get(i, 0) for i in inside))
+    awake = max(sum(1 for o in out["litter"] if math.hypot(o[0] - l[0], o[1] - l[1]) < 9500.0) for l in out["litter"])
+    print("ambient: busiest game-camera view has %d dressing pieces, %d crow groups (%d birds); at most %d litter stretches awake at once" % (
+        worst[0], worst[1], worst[2], awake))
+    return worst, awake
 
 
 def main():
@@ -258,7 +313,7 @@ def main():
         table = json.load(handle)
     ground = Ground(layout)
     out = {"stamp": ruin_stamp(ruins), "wind_yaw": wind_yaw(), "litter": litter(layout, ground, rng), "dressing": [],
-           "crow_groups": [], "crow_flocks": crow_flocks(ruins, ground, rng)}
+           "crow_groups": [], "crow_flocks": crow_flocks(ruins, table, layout, ground, random.Random(SEED + 7))}
     for index, ruin in enumerate(ruins):
         attach = table.get(ruin["piece"])
         if attach is None:
@@ -276,8 +331,12 @@ def main():
         counts[item[1]] = counts.get(item[1], 0) + 1
     print("ambient: wind yaw %.0f, litter stretches %d, dressing %d on %d ruins %s" % (
         out["wind_yaw"], len(out["litter"]), len(out["dressing"]), len({i[0] for i in out["dressing"]}), dict(sorted(counts.items()))))
+    busiest_view(out, ruins)
     print("ambient: crow groups %d with %d birds, circling flocks %d -> %s" % (
         len(out["crow_groups"]), sum(len(g["birds"]) for g in out["crow_groups"]), len(out["crow_flocks"]), OUT_FILE))
+    for flock in out["crow_flocks"]:
+        print("ambient: flock at %.0f %.0f, %d ruins under it, %d of 40 path samples near a ruin taller than the flight band" % (
+            flock["x"], flock["y"], flock["ruins_under"], flock["tall_ruins_on_path"]))
 
 
 if __name__ == "__main__":

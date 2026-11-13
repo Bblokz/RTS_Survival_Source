@@ -182,6 +182,7 @@ class Gen:
         # set by the dressing generator before its second paint pass: where ruins stand (0..1 stain, 0..1 nearness)
         self.ruin_stain = None
         self.ruin_near = None
+        self.crater_wet = None      # 0..1 where the dressing carved a crater or puddle bowl: painted mud
 
     # ---- helpers on the raster (row = north..south, col = west..east) -------------------------------------------
     def region(self, *ids):
@@ -436,6 +437,13 @@ class Gen:
             ash = ash * (1.0 - 0.9 * stain)
             cobble = cobble * (1.0 - 0.7 * stain)
             mud = np.maximum(mud, 0.3 * stain * np.clip(0.6 + 0.8 * n_fine, 0.0, 1.0))
+        # crater and puddle bowls carved by the dressing: wet churned earth, over cobble and ash alike
+        if self.crater_wet is not None:
+            bowl = self.crater_wet * (1.0 - glass)
+            mud = np.maximum(mud, 0.8 * bowl * np.clip(0.75 + 0.5 * n_fine, 0.0, 1.0))
+            ash = ash * (1.0 - 0.8 * bowl)
+            cobble = cobble * (1.0 - 0.85 * bowl)
+            scrub = scrub * (1.0 - 0.6 * bowl)
         # the street berms read as rubble heaps, darker than the carriageway: rubble with wet dirt and dead weeds
         bw = np.clip(self.berm_w, 0.0, 1.0)
         ash = ash * (1.0 - bw)

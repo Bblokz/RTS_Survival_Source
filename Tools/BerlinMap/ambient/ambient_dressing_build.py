@@ -162,7 +162,7 @@ def finish_mesh(name, material):
         response.set_editor_property("collision_profile_name", "NoCollision")
         body.set_editor_property("default_instance", response)
     # the vertex shader moves vertices up to about a metre out of the rest bounds: pad them, or the mesh pops at screen edges
-    pad = unreal.Vector(70.0, 70.0, 30.0) if "Crow" not in name else unreal.Vector(10.0, 10.0, 10.0)
+    pad = unreal.Vector(95.0, 95.0, 30.0) if "Crow" not in name else unreal.Vector(10.0, 10.0, 10.0)
     mesh.set_editor_property("positive_bounds_extension", pad)
     mesh.set_editor_property("negative_bounds_extension", pad)
     mesh.modify()
@@ -293,7 +293,7 @@ def run():
     master = build_dressing_master(cloth)
     materials = {
         "MI_BerlinAmb_Cloth": instance("MI_BerlinAmb_Cloth", master, ["UseTexture", "MotionFlutter"],
-                                       {"FlutterSwayCm": 55.0, "FlutterLiftCm": 10.0, "FlutterSpeed": 1.1}, (1, 1, 1, 1), False),
+                                       {"FlutterSwayCm": 80.0, "FlutterLiftCm": 12.0, "FlutterSpeed": 1.1}, (1, 1, 1, 1), False),
         "MI_BerlinAmb_Wire": instance("MI_BerlinAmb_Wire", master, ["MotionFlutter"],
                                       {"FlutterSwayCm": 24.0, "FlutterLiftCm": 7.0, "FlutterSpeed": 0.8, "Roughness": 0.6},
                                       (0.03, 0.028, 0.026, 1), True),
