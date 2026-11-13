@@ -6,8 +6,10 @@
 #include "NiagaraComponent.h"
 #include "NiagaraDataInterfaceArrayFunctionLibrary.h"
 #include "NiagaraSystem.h"
+#include "RTS_Survival/Audio/BulletFlyBy/BulletFlyByAudioSubsystem.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Subsystems/CameraShakeSubsystem/RTSCameraShakeSubsystem.h"
+#include "MuzzleVfx/SmallArmsMuzzleVfxBatcher.h"
 #include "TraceImpactVfx/TraceImpactVfxBatcher.h"
 
 namespace SmallArmsProjectileManagerPrivate
@@ -31,6 +33,7 @@ ASmallArmsProjectileManager::ASmallArmsProjectileManager()
 	M_LastActivatedProjectileIndex = -1;
 	M_NiagaraComponent = CreateDefaultSubobject<UNiagaraComponent>(TEXT("NiagaraComponent"));
 	M_TraceImpactVfxBatcher = CreateDefaultSubobject<UTraceImpactVfxBatcher>(TEXT("TraceImpactVfxBatcher"));
+	M_SmallArmsMuzzleVfxBatcher = CreateDefaultSubobject<USmallArmsMuzzleVfxBatcher>(TEXT("SmallArmsMuzzleVfxBatcher"));
 }
 
 void ASmallArmsProjectileManager::FireProjectile(
@@ -65,6 +68,10 @@ void ASmallArmsProjectileManager::FireProjectile(
 		SetTracersHidden(false);
 		UpdateNiagaraWithData();
 	}
+	if (UBulletFlyByAudioSubsystem* const FlyByAudio = M_FlyByAudio.Get())
+	{
+		FlyByAudio->OnTracerFired(Position, EndPosition, StartTime);
+	}
 }
 
 AProjectile* ASmallArmsProjectileManager::GetDormantTankProjectile()
@@ -95,6 +102,7 @@ void ASmallArmsProjectileManager::BeginPlay()
 {
 	Super::BeginPlay();
 	M_World = GetWorld();
+	M_FlyByAudio = IsValid(GetWorld()) ? GetWorld()->GetSubsystem<UBulletFlyByAudioSubsystem>() : nullptr;
 }
 
 void ASmallArmsProjectileManager::InitProjectileManager(UNiagaraSystem* ProjectileSystem,

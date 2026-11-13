@@ -13,6 +13,8 @@ class AProjectile;
 class UNiagaraSystem;
 class UNiagaraComponent;
 class UTraceImpactVfxBatcher;
+class USmallArmsMuzzleVfxBatcher;
+class UBulletFlyByAudioSubsystem;
 struct FSoA_SmallArmsProjectilesPool;
 
 UCLASS()
@@ -43,6 +45,9 @@ public:
 
 	// Draws the impacts of all trace weapons with one Niagara system.
 	UTraceImpactVfxBatcher* GetTraceImpactVfxBatcher() const { return M_TraceImpactVfxBatcher; }
+
+	// Draws the muzzle flashes and powder smoke of all infantry small arms with one Niagara system.
+	USmallArmsMuzzleVfxBatcher* GetSmallArmsMuzzleVfxBatcher() const { return M_SmallArmsMuzzleVfxBatcher; }
 
 protected:
 	// Called when the game starts or when spawned
@@ -85,11 +90,17 @@ private:
 	// Cached World pointer.
 	TWeakObjectPtr<UWorld> M_World;
 
+	// Hears every tracer to play bullet fly-bys near the camera focus; null when the world has none.
+	TWeakObjectPtr<UBulletFlyByAudioSubsystem> M_FlyByAudio;
+
 	UPROPERTY()
 	TObjectPtr<UNiagaraComponent> M_NiagaraComponent;
 
 	UPROPERTY()
 	TObjectPtr<UTraceImpactVfxBatcher> M_TraceImpactVfxBatcher;
+
+	UPROPERTY()
+	TObjectPtr<USmallArmsMuzzleVfxBatcher> M_SmallArmsMuzzleVfxBatcher;
 
 	bool EnsureSystemIsValid(TObjectPtr<UNiagaraSystem> System) const;
 	bool EnsureWorldIsValid();

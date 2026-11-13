@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Engine/DeveloperSettings.h"
+#include "RTS_Survival/Weapons/SmallArmsProjectileManager/MuzzleVfx/SmallArmsMuzzleClass.h"
 #include "RTS_Survival/Weapons/WeaponData/WeaponShellType/WeaponShellType.h"
 #include "RTSWeaponVFXSettings.generated.h"
 
@@ -42,6 +43,38 @@ public:
 	// Impacts above this amount in one frame are not drawn; keeps a huge fight from flooding the system.
 	UPROPERTY(EditAnywhere, Config, Category="Trace Impact VFX", meta=(ClampMin="1", UIMin="1"))
 	int32 MaxTraceImpactsPerFrame = 256;
+
+	/**
+	 * The one Niagara system that draws the muzzle flash and powder smoke of every infantry small arm.
+	 * Emitters are named Flash_<Layer> / Smoke_<Layer>; built by the console command RTS.MuzzleVfx.PatchNiagaraSystem.
+	 */
+	UPROPERTY(EditAnywhere, Config, Category="Small Arms Muzzle VFX")
+	TSoftObjectPtr<UNiagaraSystem> SmallArmsMuzzleNiagaraSystem;
+
+	// Off: infantry weapons keep the launch effect configured on each weapon.
+	UPROPERTY(EditAnywhere, Config, Category="Small Arms Muzzle VFX")
+	bool bUseBatchedSmallArmsMuzzleVfx = true;
+
+	// Shots above this amount in one frame are not drawn; keeps a huge fight from flooding the system.
+	UPROPERTY(EditAnywhere, Config, Category="Small Arms Muzzle VFX", meta=(ClampMin="1", UIMin="1"))
+	int32 MaxSmallArmsMuzzleShotsPerFrame = 128;
+
+	/**
+	 * Only weapons whose own launch effect is one of these are drawn by the batcher (and only when their weapon
+	 * name has a muzzle class); a weapon with any other launch effect keeps it.
+	 */
+	UPROPERTY(EditAnywhere, Config, Category="Small Arms Muzzle VFX")
+	TArray<TSoftObjectPtr<UNiagaraSystem>> SmallArmsLaunchEffectsToBatch;
+
+	// How the flash and smoke of each class of small arms look; classes come from the weapon name.
+	UPROPERTY(EditAnywhere, Config, Category="Small Arms Muzzle VFX")
+	TMap<ESmallArmsMuzzleClass, FSmallArmsMuzzleProfile> SmallArmsMuzzleProfiles;
+
+	/** @return The profile of a muzzle class; the built-in default when the map has no entry for it. */
+	FSmallArmsMuzzleProfile GetSmallArmsMuzzleProfile(const ESmallArmsMuzzleClass MuzzleClass) const;
+
+	/** @return Whether a weapon with this launch effect may be drawn by the small arms muzzle batcher. */
+	bool GetIsSmallArmsLaunchEffectToBatch(const UNiagaraSystem* LaunchEffect) const;
 
 	/** Convenience accessor. */
 	static const URTSWeaponVFXSettings* Get();

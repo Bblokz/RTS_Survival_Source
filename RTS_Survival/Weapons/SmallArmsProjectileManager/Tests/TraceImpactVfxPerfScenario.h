@@ -51,6 +51,11 @@ private:
 	int32 M_ScreenshotCount = 0;
 	// Draws one impact of every type in a row in front of the screenshot camera, over and over.
 	bool bM_ShowcaseImpactTypes = false;
+	// -SmallArmsMuzzleShowcase: a row of muzzles, one per small arms class, firing in front of the camera; with
+	// -SmallArmsMuzzleShowcaseLegacy the old launch effect of each class fires one step behind it.
+	bool bM_ShowcaseMuzzles = false;
+	// -SmallArmsMuzzleShowcaseRts: looks at the muzzle row from the height and angle of the game camera.
+	bool bM_MuzzleShowcaseFromRtsHeight = false;
 	double M_LastTickSeconds = 0.0;
 	FVector M_FightCenter = FVector::ZeroVector;
 	FTraceImpactVfxPerfSamples M_Samples;
@@ -77,5 +82,9 @@ private:
 	void RecordFrame(UWorld& World);
 	void SampleCounts(UWorld& World);
 	void DrawShowcaseImpacts(UWorld& World) const;
+	void DrawShowcaseMuzzles(UWorld& World) const;
+	bool GetIsMuzzleShowcaseScreenshotFrame() const;
+	// Frames since the start of the current muzzle showcase cycle.
+	int32 GetFramesIntoMuzzleCycle() const;
 	void ReportFight(UWorld& World) const;
 };
