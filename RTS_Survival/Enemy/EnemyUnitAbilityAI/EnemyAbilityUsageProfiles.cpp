@@ -50,6 +50,7 @@ EEnemyGrenadeUsage FEnemyAbilityUsageProfiles::GetGrenadeUsage(const EGrenadeAbi
 	switch (GrenadeAbility)
 	{
 	case EGrenadeAbilityType::GerAtGrenade:
+	case EGrenadeAbilityType::StickGrenadeVultures:
 	case EGrenadeAbilityType::RusRPG43:
 		return EEnemyGrenadeUsage::AntiArmor;
 	case EGrenadeAbilityType::DefaultGerBundleGrenade:

@@ -14,6 +14,7 @@
 #include "RTS_Survival/Weapons/Projectile/ProjectileVfxSettings/ProjectileVfxSettings.h"
 #include "Sound/SoundCue.h"
 #include "WeaponShellType/WeaponShellType.h"
+#include "RTS_Survival/Weapons/SmallArmsProjectileManager/MuzzleVfx/SmallArmsMuzzleClass.h"
 
 #include "RTS_Survival/Utils/RTSMapTests/RTSMapTests.h"
 #include "WeaponData.generated.h"
@@ -27,6 +28,7 @@ class UArmorCalculation;
 class UPrimitiveComponent;
 class ASmallArmsProjectileManager;
 class UTraceImpactVfxBatcher;
+class USmallArmsMuzzleVfxBatcher;
 class USoundBase;
 class USoundAttenuation;
 class USoundConcurrency;
@@ -585,6 +587,35 @@ private:
 	float M_WeaponCalibre = 1.f;
 };
 
+/** How a weapon state hands its shots to the small arms muzzle batcher instead of its own launch effect. */
+USTRUCT()
+struct FWeaponStateSmallArmsMuzzle
+{
+	GENERATED_BODY()
+
+	// None: the weapon draws its own launch effect. Set on init from the weapon name and launch effect.
+	ESmallArmsMuzzleClass MuzzleClass = ESmallArmsMuzzleClass::None;
+
+	// The launch effect MuzzleClass was decided for; a behaviour that swaps the weapon's launch effect
+	// (UBehWeaponOverwriteVFX) makes the weapon decide again on its next shot. Only compared, never used.
+	UPROPERTY()
+	TWeakObjectPtr<UNiagaraSystem> DecidedForLaunchEffect;
+
+	// Found on the first shot; the batcher lives on the projectile manager, which the base weapon state does not know.
+	UPROPERTY()
+	TWeakObjectPtr<USmallArmsMuzzleVfxBatcher> Batcher;
+
+	// World time of the last search for the batcher; a missing batcher is searched for at most once a second.
+	double LastBatcherSearchSeconds = -1.0;
+
+	// World time of the last smoke puff; automatic weapons puff at most once per MinSecondsBetweenSmokePuffs.
+	double LastSmokePuffSeconds = -1000.0;
+
+	// SingleBurst draws the launch effect once, when the burst starts; batched weapons flash on the other rounds too.
+	// True from the burst start until its first round is fired, whose flash the burst start already drew.
+	bool bIsBurstStartRoundPending = false;
+};
+
 /**
  * @brief contains logic for firing all different weapon systems in the game. Public interface contains the Fire function.
  * This function calls a function pointer whicsh is set according to the mode of fire that is chosen for this weapon on Init.
@@ -943,6 +974,29 @@ private:
 	EWeaponShellType M_LastShellTypeForLaunchVfx = EWeaponShellType::Shell_None;
 
 	// --------------------------- END Niagara Launch Caching ---------------------------
+
+	// Infantry small arms draw their flash and smoke through the shared muzzle batcher; see InitSmallArmsMuzzle.
+	UPROPERTY()
+	FWeaponStateSmallArmsMuzzle M_SmallArmsMuzzle;
+
+	// Picks the muzzle class once on init; stays None for weapons that keep their own launch effect.
+	void InitSmallArmsMuzzle();
+
+	/**
+	 * @brief Hands the shot to the small arms muzzle batcher when this weapon is drawn by it.
+	 * @param FireDirection Direction the barrel points.
+	 * @param LaunchLocation World location of the barrel end.
+	 * @return True when the shot needs no launch effect of its own: drawn by the batcher, or hidden by the fog of war.
+	 */
+	bool TryDrawBatchedSmallArmsMuzzle(const FVector& FireDirection, const FVector& LaunchLocation);
+
+	USmallArmsMuzzleVfxBatcher* GetSmallArmsMuzzleBatcher();
+
+	// A SingleBurst round after the first: batched small arms flash on every round, other weapons keep one effect per burst.
+	void DrawBatchedSmallArmsMuzzleForBurstRound();
+
+	// True when the weapon or an actor it is attached to is hidden, e.g. an enemy squad in the fog of war.
+	bool GetIsWeaponHiddenInGame() const;
 
 	// Name of the weapon to access data in the player controller.
 	UPROPERTY()

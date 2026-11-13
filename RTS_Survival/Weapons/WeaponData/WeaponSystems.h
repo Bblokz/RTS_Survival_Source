@@ -20,7 +20,8 @@ enum class EWeaponFireMode : uint8
 {
 	// Single shot weapon; cooldown after each shot using PC weaponcooldown.
 	Single UMETA(DisplayName = "Single Fire"),
-	// Amount of bullets in one burst set with Max burst amount. Creates only one launch effect
+	// Amount of bullets in one burst set with Max burst amount. Creates only one launch effect (and sound) per burst,
+	// except infantry small arms drawn by the muzzle batcher: they flash on every round.
 	// Cooldown between shots set with burst cooldown.
 	SingleBurst UMETA(DisplayName = "Burst Fire"),
 	// Fires a random amount of multiple shots in one burst depending on min and max burst amount.

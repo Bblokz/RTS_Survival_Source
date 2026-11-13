@@ -23,6 +23,7 @@
 #include "RTS_Survival/Weapons/RTSWeaponVFXSettings/RTSWeaponVFXSettings.h"
 #include "RTS_Survival/Weapons/ImpactVfxAuthoring/ImpactVfxSpriteScale.h"
 #include "RTS_Survival/Weapons/SmallArmsProjectileManager/SmallArmsProjectileManager.h"
+#include "RTS_Survival/Weapons/SmallArmsProjectileManager/MuzzleVfx/SmallArmsMuzzleVfxBatcher.h"
 #include "RTS_Survival/Weapons/SmallArmsProjectileManager/TraceImpactVfx/TraceImpactVfxBatcher.h"
 #include "RTS_Survival/Weapons/SmallArmsProjectileManager/TraceImpactVfx/TraceImpactVfxPerfCounters.h"
 #include "Trace/Trace.h"
@@ -34,6 +35,24 @@
 #include "RTS_Survival/RTSComponents/AbilityComponents/AttachedRockets/HideableInstancedStaticMeshComponent/RTSHidableInstancedStaticMeshComponent.h"
 #include "RTS_Survival/RTSComponents/RTSOptimizer/RTSOptimizer.h"
 #include "RTS_Survival/Subsystems/CameraShakeSubsystem/RTSCameraShakeSubsystem.h"
+#include "RTS_Survival/Weapons/SmallArmsProjectileManager/MuzzleVfx/SmallArmsMuzzleRoundAudit.h"
+
+namespace WeaponDataSmallArmsMuzzleAudit
+{
+	// Map tests: counts the rounds of batched small arms, to compare with the flashes they hand to the batcher.
+	void NoteBatchedRoundFired(
+		const ESmallArmsMuzzleClass MuzzleClass,
+		const EWeaponName WeaponName,
+		const EWeaponFireMode FireMode)
+	{
+#if RTS_WITH_MAP_TESTS
+		if (MuzzleClass != ESmallArmsMuzzleClass::None)
+		{
+			SmallArmsMuzzleRoundAudit::NoteRoundFired(WeaponName, FireMode);
+		}
+#endif
+	}
+}
 
 // === Global shell-color cache ================================================
 
@@ -1271,6 +1290,7 @@ void UWeaponState::InitWeaponState(
 	// Refresh damage type class now that we have loaded the data.
 	RefreshDamageTypeClass();
 	M_WeaponVfx = NewWeaponVFX;
+	InitSmallArmsMuzzle();
 	WeaponShellCase = NewWeaponShellCase;
 	// Setup references
 	WeaponShellCase.InitShellCase(NewMeshComponent, NewWorld);
@@ -1330,6 +1350,8 @@ void UWeaponState::FireSingleShot()
 			{
 				WeaponOwner->PlayWeaponAnimation(WeaponIndex, M_WeaponFireMode, WeaponData.WeaponCalibre);
 			}
+			WeaponDataSmallArmsMuzzleAudit::NoteBatchedRoundFired(
+				M_SmallArmsMuzzle.MuzzleClass, M_WeaponName, M_WeaponFireMode);
 			FireWeaponSystem();
 			M_CurrentMagCapacity--;
 			OnMagConsumed.Broadcast(M_CurrentMagCapacity);
@@ -1386,6 +1408,8 @@ void UWeaponState::InitSingleBurstMode()
 
 	const float BurstSpeed = GetTimeWithFlux(M_BurstCooldown, WeaponData.CooldownFlux);
 
+	// FireSingleBurst drew the launch effect of the first round just before this.
+	M_SmallArmsMuzzle.bIsBurstStartRoundPending = true;
 	// Immediate call to OnSingleBurst, del bound on Init.
 	M_BurstModeDel.ExecuteIfBound();
 
@@ -1395,6 +1419,8 @@ void UWeaponState::InitSingleBurstMode()
 
 void UWeaponState::OnSingleBurst()
 {
+	DrawBatchedSmallArmsMuzzleForBurstRound();
+	WeaponDataSmallArmsMuzzleAudit::NoteBatchedRoundFired(M_SmallArmsMuzzle.MuzzleClass, M_WeaponName, M_WeaponFireMode);
 	M_CurrentMagCapacity--;
 	M_AmountLeftInBurst--;
 	OnMagConsumed.Broadcast(M_CurrentMagCapacity);
@@ -1480,7 +1506,7 @@ void UWeaponState::OnRandomBurst()
 	CreateLaunchVfx(
 		GetLaunchAndForwardVector().Key,
 		GetLaunchAndForwardVector().Value, bM_CreateShellCaseOnEachRandomBurst);
-
+	WeaponDataSmallArmsMuzzleAudit::NoteBatchedRoundFired(M_SmallArmsMuzzle.MuzzleClass, M_WeaponName, M_WeaponFireMode);
 
 	M_CurrentMagCapacity--;
 	M_AmountLeftInBurst--;
@@ -1800,6 +1826,10 @@ void UWeaponState::CreateLaunchAndSmokeVfx(
 	{
 		return;
 	}
+	if (TryDrawBatchedSmallArmsMuzzle(LaunchRotation.Vector(), LaunchLocation))
+	{
+		return;
+	}
 
 	// Ensure (or create) the pooled component for this socket.
 	UNiagaraComponent* const NiagaraComp =
@@ -1829,6 +1859,147 @@ void UWeaponState::CreateLaunchAndSmokeVfx(
 	// Clean restart for this shot, then explicitly activate to be robust.
 	NiagaraComp->ReinitializeSystem();
 	NiagaraComp->Activate(true);
+}
+
+void UWeaponState::InitSmallArmsMuzzle()
+{
+	M_SmallArmsMuzzle = FWeaponStateSmallArmsMuzzle();
+	const URTSWeaponVFXSettings* VfxSettings = URTSWeaponVFXSettings::Get();
+	const ESmallArmsMuzzleClass MuzzleClass = SmallArmsMuzzleClass::GetMuzzleClassForWeapon(M_WeaponName);
+	const bool bHasBatchedLaunchEffect = VfxSettings != nullptr
+		&& VfxSettings->bUseBatchedSmallArmsMuzzleVfx
+		&& VfxSettings->GetIsSmallArmsLaunchEffectToBatch(M_WeaponVfx.LaunchEffectSettings.LaunchEffect);
+	M_SmallArmsMuzzle.MuzzleClass = bHasBatchedLaunchEffect ? MuzzleClass : ESmallArmsMuzzleClass::None;
+	M_SmallArmsMuzzle.DecidedForLaunchEffect = M_WeaponVfx.LaunchEffectSettings.LaunchEffect;
+#if !UE_BUILD_SHIPPING
+	// Once per weapon, owner and effect: shows in a log which weapons the batcher draws.
+	static TSet<FString> LoggedWeapons;
+	const UObject* OwnerObject = WeaponOwner.GetObject();
+	const UClass* OwnerNativeClass = OwnerObject != nullptr ? OwnerObject->GetClass() : nullptr;
+	while (OwnerNativeClass != nullptr && not OwnerNativeClass->IsNative())
+	{
+		OwnerNativeClass = OwnerNativeClass->GetSuperClass();
+	}
+	const FString Key = FString::Printf(
+		TEXT("weapon=%s owner=%s effect=%s class=%d batched=%d"),
+		*Global_GetWeaponEnumAsString(M_WeaponName),
+		*GetNameSafe(OwnerNativeClass),
+		*GetNameSafe(M_WeaponVfx.LaunchEffectSettings.LaunchEffect),
+		static_cast<int32>(MuzzleClass),
+		M_SmallArmsMuzzle.MuzzleClass != ESmallArmsMuzzleClass::None ? 1 : 0);
+	if (MuzzleClass != ESmallArmsMuzzleClass::None && not LoggedWeapons.Contains(Key))
+	{
+		LoggedWeapons.Add(Key);
+		UE_LOG(LogTemp, Log, TEXT("RTS_MUZZLE_VFX configured %s"), *Key);
+	}
+#endif
+}
+
+bool UWeaponState::TryDrawBatchedSmallArmsMuzzle(const FVector& FireDirection, const FVector& LaunchLocation)
+{
+	if (M_SmallArmsMuzzle.DecidedForLaunchEffect.Get() != M_WeaponVfx.LaunchEffectSettings.LaunchEffect)
+	{
+		// A behaviour swapped the launch effect: a special effect is drawn by the weapon itself, the standard one
+		// (restored when the behaviour ends) by the batcher again.
+		const double LastSmokePuffSeconds = M_SmallArmsMuzzle.LastSmokePuffSeconds;
+		const TWeakObjectPtr<USmallArmsMuzzleVfxBatcher> Batcher = M_SmallArmsMuzzle.Batcher;
+		InitSmallArmsMuzzle();
+		M_SmallArmsMuzzle.LastSmokePuffSeconds = LastSmokePuffSeconds;
+		M_SmallArmsMuzzle.Batcher = Batcher;
+	}
+	if (M_SmallArmsMuzzle.MuzzleClass == ESmallArmsMuzzleClass::None)
+	{
+		return false;
+	}
+	if (GetIsWeaponHiddenInGame())
+	{
+		// The batched effect is not attached to the weapon, so it would show a hidden enemy firing.
+		return true;
+	}
+	USmallArmsMuzzleVfxBatcher* Batcher = GetSmallArmsMuzzleBatcher();
+	const URTSWeaponVFXSettings* VfxSettings = URTSWeaponVFXSettings::Get();
+	if (Batcher == nullptr || VfxSettings == nullptr)
+	{
+		return false;
+	}
+	const FSmallArmsMuzzleProfile Profile = VfxSettings->GetSmallArmsMuzzleProfile(M_SmallArmsMuzzle.MuzzleClass);
+	const double NowSeconds = World->GetTimeSeconds();
+	const bool bPuffsSmoke = NowSeconds - M_SmallArmsMuzzle.LastSmokePuffSeconds >= Profile.MinSecondsBetweenSmokePuffs;
+	if (bPuffsSmoke)
+	{
+		M_SmallArmsMuzzle.LastSmokePuffSeconds = NowSeconds;
+	}
+#if RTS_WITH_MAP_TESTS
+	SmallArmsMuzzleRoundAudit::NoteFlashDrawn(M_WeaponName, M_WeaponFireMode);
+#endif
+	Batcher->AddShot(
+		LaunchLocation,
+		FireDirection,
+		Profile.FlashScale,
+		bPuffsSmoke ? Profile.SmokeScale : 0.0f,
+		Profile.SmokeLifetimeMlt);
+	return true;
+}
+
+void UWeaponState::DrawBatchedSmallArmsMuzzleForBurstRound()
+{
+	if (M_SmallArmsMuzzle.bIsBurstStartRoundPending)
+	{
+		M_SmallArmsMuzzle.bIsBurstStartRoundPending = false;
+		return;
+	}
+	// Weapons with their own launch effect keep one effect per burst (it may be authored as a burst).
+	// A behaviour's launch effect swap is picked up by the next burst start, which runs the full launch path.
+	if (M_SmallArmsMuzzle.MuzzleClass == ESmallArmsMuzzleClass::None)
+	{
+		return;
+	}
+	const TPair<FVector, FVector> LaunchAndForward = GetLaunchAndForwardVector();
+	TryDrawBatchedSmallArmsMuzzle(LaunchAndForward.Value, LaunchAndForward.Key);
+}
+
+USmallArmsMuzzleVfxBatcher* UWeaponState::GetSmallArmsMuzzleBatcher()
+{
+	if (USmallArmsMuzzleVfxBatcher* CachedBatcher = M_SmallArmsMuzzle.Batcher.Get())
+	{
+		return CachedBatcher->GetIsReadyToDraw() ? CachedBatcher : nullptr;
+	}
+	constexpr double SecondsBetweenBatcherSearches = 1.0;
+	if (not IsValid(World))
+	{
+		return nullptr;
+	}
+	const double NowSeconds = World->GetTimeSeconds();
+	const bool bHasSearchedRecently = M_SmallArmsMuzzle.LastBatcherSearchSeconds >= 0.0
+		&& NowSeconds - M_SmallArmsMuzzle.LastBatcherSearchSeconds < SecondsBetweenBatcherSearches;
+	if (bHasSearchedRecently)
+	{
+		return nullptr;
+	}
+	M_SmallArmsMuzzle.LastBatcherSearchSeconds = NowSeconds;
+	USmallArmsMuzzleVfxBatcher* FoundBatcher = USmallArmsMuzzleVfxBatcher::FindReadyBatcher(World);
+	M_SmallArmsMuzzle.Batcher = FoundBatcher;
+	return FoundBatcher;
+}
+
+bool UWeaponState::GetIsWeaponHiddenInGame() const
+{
+	if (not IsValid(MeshComponent))
+	{
+		return false;
+	}
+	if (not MeshComponent->IsVisible())
+	{
+		return true;
+	}
+	for (const AActor* Actor = MeshComponent->GetOwner(); Actor != nullptr; Actor = Actor->GetAttachParentActor())
+	{
+		if (Actor->IsHidden())
+		{
+			return true;
+		}
+	}
+	return false;
 }
 
 void UWeaponState::OnCooldownShutDown()
