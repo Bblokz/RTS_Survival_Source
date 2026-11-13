@@ -1,0 +1,369 @@
+{
+ "meta": {
+  "axes": "UNREAL: x forward (street front of the piece), y = -Blender y (Unreal mirrors Y on FBX import), cm; yaw degrees about Z, added to the piece yaw",
+  "plots": "B_PLOT / B_PLOT_STUB are not pieces in the ruin list: anchor them on the B8_DebrisBed of the plot (the plot centre). Plot yaw = B8 yaw on full plots, B8 yaw - 90 on stub plots (place_b turns the bed 90 deg when the frontage is under 10 m; a stub plot is the one with B6 stubs). Slabs placed alone on short wall-core runs (B1/B6 without a B8) get no footprint.",
+  "rule": "spawn each footprint at piece_transform * (x, y, 0) with yaw piece_yaw + yaw, uniform scale = \"scale\" if given (dead heaps) else 1, z = the piece pivot z (rim already sinks 10-20 cm). Same CPD 0-2 tint as the piece. Collision: mesh has no simple collision; set the component to NoCollision / no navmesh effect.",
+  "dead": "when the piece dies, the skirt stays and the \"dead\" entries are spawned (collapse heaps)",
+  "yaw": "footprints are asymmetric (street side kept short): never random yaw; use the yaw given"
+ },
+ "pieces": {
+  "E7_HalfHouse_A": {
+   "footprints": [
+    {
+     "mesh": "SM_BerlinFoot_HalfHouse_A",
+     "x": 0.0,
+     "y": 0.0,
+     "yaw": 0.0
+    }
+   ],
+   "dead": [
+    {
+     "mesh": "SM_BerlinFoot_CollapseHeap_S",
+     "x": 0.0,
+     "y": 0.0,
+     "yaw": 180.0,
+     "scale": 0.8,
+     "reach_beyond_piece_bound_cm": -36.0
+    }
+   ]
+  },
+  "E7_HalfHouse_B": {
+   "footprints": [
+    {
+     "mesh": "SM_BerlinFoot_HalfHouse_B",
+     "x": 0.0,
+     "y": 0.0,
+     "yaw": 0.0
+    }
+   ],
+   "dead": [
+    {
+     "mesh": "SM_BerlinFoot_CollapseHeap_S",
+     "x": 0.0,
+     "y": 0.0,
+     "yaw": 180.0,
+     "scale": 0.8,
+     "reach_beyond_piece_bound_cm": -36.0
+    }
+   ]
+  },
+  "E5_Shell1St_A": {
+   "footprints": [
+    {
+     "mesh": "SM_BerlinFoot_Shell_A",
+     "x": 0.0,
+     "y": 0.0,
+     "yaw": 0.0
+    }
+   ],
+   "dead": [
+    {
+     "mesh": "SM_BerlinFoot_CollapseHeap_S",
+     "x": 0.0,
+     "y": 0.0,
+     "yaw": 180.0,
+     "scale": 1.0,
+     "reach_beyond_piece_bound_cm": -163.2
+    }
+   ]
+  },
+  "E5_Shell1St_B": {
+   "footprints": [
+    {
+     "mesh": "SM_BerlinFoot_Shell_B",
+     "x": 0.0,
+     "y": 0.0,
+     "yaw": 0.0
+    }
+   ],
+   "dead": [
+    {
+     "mesh": "SM_BerlinFoot_CollapseHeap_S",
+     "x": 0.0,
+     "y": 0.0,
+     "yaw": 180.0,
+     "scale": 1.0,
+     "reach_beyond_piece_bound_cm": -163.2
+    }
+   ]
+  },
+  "E4_StubRing_A": {
+   "footprints": [
+    {
+     "mesh": "SM_BerlinFoot_StubHeap",
+     "x": 0.0,
+     "y": 0.0,
+     "yaw": 0.0
+    }
+   ],
+   "dead": [
+    {
+     "mesh": "SM_BerlinFoot_CollapseHeap_S",
+     "x": 0.0,
+     "y": 0.0,
+     "yaw": 180.0,
+     "scale": 1.0,
+     "reach_beyond_piece_bound_cm": -110.7
+    }
+   ]
+  },
+  "E4_StubRing_B": {
+   "footprints": [
+    {
+     "mesh": "SM_BerlinFoot_StubHeap",
+     "x": 0.0,
+     "y": 0.0,
+     "yaw": 0.0
+    }
+   ],
+   "dead": [
+    {
+     "mesh": "SM_BerlinFoot_CollapseHeap_S",
+     "x": 0.0,
+     "y": 0.0,
+     "yaw": 180.0,
+     "scale": 1.0,
+     "reach_beyond_piece_bound_cm": -110.7
+    }
+   ]
+  },
+  "E6_HeapFin_A": {
+   "footprints": [
+    {
+     "mesh": "SM_BerlinFoot_StubHeap",
+     "x": 0.0,
+     "y": 0.0,
+     "yaw": 0.0
+    }
+   ],
+   "dead": [
+    {
+     "mesh": "SM_BerlinFoot_CollapseHeap_S",
+     "x": 0.0,
+     "y": 0.0,
+     "yaw": 180.0,
+     "scale": 1.0,
+     "reach_beyond_piece_bound_cm": -107.3
+    }
+   ]
+  },
+  "E6_HeapFin_B": {
+   "footprints": [
+    {
+     "mesh": "SM_BerlinFoot_StubHeap",
+     "x": 0.0,
+     "y": 0.0,
+     "yaw": 0.0
+    }
+   ],
+   "dead": [
+    {
+     "mesh": "SM_BerlinFoot_CollapseHeap_S",
+     "x": 0.0,
+     "y": 0.0,
+     "yaw": 180.0,
+     "scale": 1.0,
+     "reach_beyond_piece_bound_cm": -108.5
+    }
+   ]
+  },
+  "E1_CornerTower": {
+   "footprints": [
+    {
+     "mesh": "SM_BerlinFoot_CornerTenement",
+     "x": 150.0,
+     "y": -150.0,
+     "yaw": 0.0
+    }
+   ],
+   "dead": [
+    {
+     "mesh": "SM_BerlinFoot_CollapseHeap_L",
+     "x": 150.0,
+     "y": -150.0,
+     "yaw": 180.0,
+     "scale": 1.0,
+     "reach_beyond_piece_bound_cm": -398.2
+    }
+   ]
+  },
+  "E2_Courtyard": {
+   "footprints": [
+    {
+     "mesh": "SM_BerlinFoot_Courtyard",
+     "x": 75.0,
+     "y": 0.0,
+     "yaw": 0.0
+    }
+   ],
+   "dead": [
+    {
+     "mesh": "SM_BerlinFoot_CollapseHeap_L",
+     "x": 620.0,
+     "y": 0.0,
+     "yaw": 270.0,
+     "scale": 1.0,
+     "reach_beyond_piece_bound_cm": -129.8
+    },
+    {
+     "mesh": "SM_BerlinFoot_CollapseHeap_S",
+     "x": -650.0,
+     "y": 560.0,
+     "yaw": 0.0,
+     "scale": 1.0,
+     "reach_beyond_piece_bound_cm": -1609.4
+    }
+   ]
+  },
+  "E3_CoreRow": {
+   "footprints": [
+    {
+     "mesh": "SM_BerlinFoot_RowStrip",
+     "x": 650.0,
+     "y": 750.0,
+     "yaw": 0.0
+    },
+    {
+     "mesh": "SM_BerlinFoot_RowStrip",
+     "x": 650.0,
+     "y": -750.0,
+     "yaw": 0.0
+    },
+    {
+     "mesh": "SM_BerlinFoot_RowStrip",
+     "x": -575.0,
+     "y": 750.0,
+     "yaw": 180.0
+    },
+    {
+     "mesh": "SM_BerlinFoot_RowStrip",
+     "x": -575.0,
+     "y": -750.0,
+     "yaw": 180.0
+    }
+   ],
+   "dead": [
+    {
+     "mesh": "SM_BerlinFoot_CollapseHeap_L",
+     "x": 0.0,
+     "y": 750.0,
+     "yaw": 270.0,
+     "scale": 1.0,
+     "reach_beyond_piece_bound_cm": -104.7
+    },
+    {
+     "mesh": "SM_BerlinFoot_CollapseHeap_L",
+     "x": 0.0,
+     "y": -750.0,
+     "yaw": 270.0,
+     "scale": 1.0,
+     "reach_beyond_piece_bound_cm": -104.7
+    }
+   ],
+   "mound_foot_cm": {
+    "front": 675.0,
+    "back": -600.0
+   }
+  },
+  "B7_WallCore": {
+   "footprints": [
+    {
+     "mesh": "SM_BerlinFoot_RowStrip",
+     "x": 525.0,
+     "y": 0.0,
+     "yaw": 0.0
+    },
+    {
+     "mesh": "SM_BerlinFoot_RowStrip",
+     "x": -525.0,
+     "y": 0.0,
+     "yaw": 180.0
+    }
+   ],
+   "dead": [
+    {
+     "mesh": "SM_BerlinFoot_CollapseHeap_L",
+     "x": 0.0,
+     "y": 0.0,
+     "yaw": 270.0,
+     "scale": 0.9,
+     "reach_beyond_piece_bound_cm": -43.3
+    }
+   ],
+   "mound_foot_cm": {
+    "front": 550.0,
+    "back": -550.0
+   }
+  },
+  "B_PLOT": {
+   "footprints": [
+    {
+     "mesh": "SM_BerlinFoot_SlabPlot_A",
+     "x": 0.0,
+     "y": 0.0,
+     "yaw": 0.0
+    }
+   ],
+   "alternates": [
+    {
+     "mesh": "SM_BerlinFoot_SlabPlot_B",
+     "x": 0.0,
+     "y": 0.0,
+     "yaw": 0.0
+    }
+   ],
+   "dead": [
+    {
+     "mesh": "SM_BerlinFoot_CollapseHeap_L",
+     "x": 0.0,
+     "y": 0.0,
+     "yaw": 180.0,
+     "scale": 1.0,
+     "reach_beyond_piece_bound_cm": -143.0
+    }
+   ],
+   "note": "full plot (frontage 12 m, depth 9 m): pick SlabPlot_A or _B per plot"
+  },
+  "B_PLOT_STUB": {
+   "footprints": [
+    {
+     "mesh": "SM_BerlinFoot_StubHeap",
+     "x": 0.0,
+     "y": 0.0,
+     "yaw": 0.0
+    }
+   ],
+   "dead": [
+    {
+     "mesh": "SM_BerlinFoot_CollapseHeap_S",
+     "x": 0.0,
+     "y": 0.0,
+     "yaw": 180.0,
+     "scale": 1.0,
+     "reach_beyond_piece_bound_cm": -284.6
+    }
+   ],
+   "note": "stub plot (frontage 9 m, depth 8 m, two B6 stubs): reuses the StubHeap ring"
+  },
+  "B5_CornerL": {
+   "footprints": [
+    {
+     "mesh": "SM_BerlinFoot_CornerL",
+     "x": 0.0,
+     "y": 0.0,
+     "yaw": 0.0
+    }
+   ],
+   "dead": [
+    {
+     "mesh": "SM_BerlinFoot_CollapseHeap_S",
+     "x": 0.0,
+     "y": 0.0,
+     "yaw": 180.0,
+     "scale": 1.0,
+     "reach_beyond_piece_bound_cm": -128.7
+    }
+   ]
+  }
+ }
+}

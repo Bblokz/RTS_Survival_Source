@@ -1,0 +1,65 @@
+{
+ "about": "The UECP (Ultimate Engine CoPilot) calls that authored the only two graphs of the crushable Berlin props on 2026-11-13: BP_BerlinCover_Base (rubble cover) and BP_BerlinFurniture_Base (furniture). Headless Python cannot write Blueprint graphs, so these were sent to a throwaway UnrealEditor.exe started on RTS_ToCopySmall with -DisablePlugins=Fab (BpGeneratorUltimate left on, so the editor registers a UECP endpoint), then compile_blueprint, save, quit. Replay them in this order only if a base Blueprint lost its graph; each list entry is {action, params}. synthesize_graph regenerates a function whole; the EventGraph call is additive, so do not replay it on a graph that already has the two events wired.",
+ "notes": [
+  "An enum switch has no default pin: every ERTSDeathType value needs its own case.",
+  "An unwired array input does not compile: SetupComponentCollisions gets the empty member array NoGeometryComponents.",
+  "EventGraph must be sent with mode append: the new Blueprint's BeginPlay already runs Parent: BeginPlay and the tool refuses to cut it.",
+  "For the furniture base create the Blueprint (parent /Script/RTS_Survival.DestructableEnvActor) and its components MainMesh (StaticMeshComponent under the root), NavBlock (BoxComponent under the root) and WallHoleDamage (WallHoleDamageComponent) first, with SubobjectDataSubsystem.add_new_subobject; the graph refers to them by name."
+ ],
+ "BP_BerlinCover_Base": [
+  {"action": "add_variable", "params": {"blueprint_path": "/Game/RTS_Survival/Blueprints/Environment/Berlin/RuinKit/Cover/BP_BerlinCover_Base", "items": [
+   {"variable_name": "Crushable", "variable_type": "bool", "default_value": "false", "category": "Crush", "instance_editable": true},
+   {"variable_name": "CrushDestructionType", "variable_type": "ECrushDestructionType", "category": "Crush", "instance_editable": true},
+   {"variable_name": "CrushTipSpeedScale", "variable_type": "float", "default_value": "0.6", "category": "Crush", "instance_editable": true},
+   {"variable_name": "CrushSinkDeltaZ", "variable_type": "float", "default_value": "220.0", "category": "Crush", "instance_editable": true},
+   {"variable_name": "CrushSinkTime", "variable_type": "float", "default_value": "3.0", "category": "Crush", "instance_editable": true}]}},
+  {"action": "synthesize_graph", "params": {"blueprint_path": "/Game/RTS_Survival/Blueprints/Environment/Berlin/RuinKit/Cover/BP_BerlinCover_Base", "function": "SetupCrush", "body": [
+   {"op": "branch", "condition": "$Crushable", "then": [
+    {"op": "call", "func": "ConfigureVerticalCollapse", "args": {"TargetPrimitive": "$MainMesh", "CollapseSpeedScale": "$CrushTipSpeedScale", "CollapseSound": "/Game/RTS_Survival/StarterContent/Audio/Collapse_Cue.Collapse_Cue", "Attenuation": "/Game/RTS_Survival/Sounds/Settings/Collapse/Att_Collapse.Att_Collapse", "Concurrency": "/Game/RTS_Survival/Sounds/Settings/Collapse/SC_Collapse.SC_Collapse"}},
+    {"op": "call", "func": "SetupCrushDestructionOverlap", "args": {"OverlapComponent": "$MainMesh", "DestructionType": "$CrushDestructionType", "CrushDeathType": "VerticalCollapse"}}]}]}},
+  {"action": "synthesize_graph", "params": {"blueprint_path": "/Game/RTS_Survival/Blueprints/Environment/Berlin/RuinKit/Cover/BP_BerlinCover_Base", "function": "CollapseIntoDebris", "overwrite": true, "body": [
+   {"op": "call", "func": "GetComponentByClass", "args": {"ComponentClass": "/Script/RTS_Survival.WallHoleDamageComponent"}, "as": "Holes"},
+   {"op": "is_valid", "value": "$Holes", "then": [
+    {"op": "call", "func": "WallHoleDamageComponent.CollapseIntoPieces", "target": "$Holes", "args": {"bHideAndDestroyOwner": true}}]}]}},
+  {"action": "synthesize_graph", "params": {"blueprint_path": "/Game/RTS_Survival/Blueprints/Environment/Berlin/RuinKit/Cover/BP_BerlinCover_Base", "function": "HandleCrushableDeath", "overwrite": true, "inputs": [{"name": "DeathType", "type": "ERTSDeathType"}], "body": [
+   {"op": "branch", "condition": "$Crushable", "then": [
+    {"op": "switch_enum", "on": "$DeathType", "cases": {
+     "Scavenging": [
+      {"op": "make_struct", "struct": "RTSVerticalCollapseSettings", "fields": {"DeltaZ": "$CrushSinkDeltaZ", "CollapseTime": "$CrushSinkTime", "bDestroyPostVerticalCollapse": true}, "as": "Sink"},
+      {"op": "make_struct", "struct": "CollapseFX", "fields": {"CollapseVfx": "/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/Effects/NS_DestructionSmoke.NS_DestructionSmoke", "FxLocationOffset": "0,0,40"}, "as": "Fx"},
+      {"op": "call", "func": "VerticalDestruction", "args": {"CollapseSettings": "$Sink", "CollapseFX": "$Fx"}}],
+     "Kinetic": [{"op": "call", "func": "CollapseIntoDebris"}],
+     "FireOrLaser": [{"op": "call", "func": "CollapseIntoDebris"}],
+     "Radiation": [{"op": "call", "func": "CollapseIntoDebris"}]}}]}]}},
+  {"action": "synthesize_graph", "params": {"blueprint_path": "/Game/RTS_Survival/Blueprints/Environment/Berlin/RuinKit/Cover/BP_BerlinCover_Base", "function": "EventGraph", "mode": "append", "body": [
+   {"op": "event", "name": "BeginPlay", "body": [{"op": "call", "func": "SetupCrush"}]},
+   {"op": "event", "name": "BP_OnUnitDies", "as": {"DeathType": "dt"}, "body": [{"op": "call", "func": "HandleCrushableDeath", "args": {"DeathType": "$dt"}}]}]}},
+  {"action": "compile_blueprint", "params": {"blueprint_path": "/Game/RTS_Survival/Blueprints/Environment/Berlin/RuinKit/Cover/BP_BerlinCover_Base"}}
+ ],
+ "BP_BerlinFurniture_Base": [
+  {"action": "add_variable", "params": {"blueprint_path": "/Game/RTS_Survival/Blueprints/Environment/Berlin/Furniture/Blueprints/BP_BerlinFurniture_Base", "items": [
+   {"variable_name": "CrushDestructionType", "variable_type": "ECrushDestructionType", "category": "Crush", "instance_editable": true},
+   {"variable_name": "CrushTipSpeedScale", "variable_type": "float", "default_value": "1.2", "category": "Crush", "instance_editable": true},
+   {"variable_name": "CrushSinkDeltaZ", "variable_type": "float", "default_value": "120.0", "category": "Crush", "instance_editable": true},
+   {"variable_name": "CrushSinkTime", "variable_type": "float", "default_value": "2.5", "category": "Crush", "instance_editable": true}]}},
+  {"action": "add_variable", "params": {"blueprint_path": "/Game/RTS_Survival/Blueprints/Environment/Berlin/Furniture/Blueprints/BP_BerlinFurniture_Base", "variable_name": "NoGeometryComponents", "variable_type": "object", "sub_type": "GeometryCollectionComponent", "is_array": true, "category": "Crush"}},
+  {"action": "synthesize_graph", "params": {"blueprint_path": "/Game/RTS_Survival/Blueprints/Environment/Berlin/Furniture/Blueprints/BP_BerlinFurniture_Base", "function": "SetupCrush", "overwrite": true, "body": [
+   {"op": "make_array", "as": "Meshes", "items": ["$MainMesh"]},
+   {"op": "call", "func": "SetupComponentCollisions", "args": {"MeshComponents": "$Meshes", "GeometryComponents": "$NoGeometryComponents", "bOverlapTanks": true}},
+   {"op": "call", "func": "ConfigureVerticalCollapse", "args": {"TargetPrimitive": "$MainMesh", "CollapseSpeedScale": "$CrushTipSpeedScale", "CollapseSound": "/Game/RTS_Survival/Sounds/DestructionAndCollapse/CollapsingTree/Cue_Collapse_Tree.Cue_Collapse_Tree", "Attenuation": "/Game/RTS_Survival/Sounds/Settings/Collapse/Att_Collapse.Att_Collapse", "Concurrency": "/Game/RTS_Survival/Sounds/Settings/Collapse/SC_Collapse.SC_Collapse"}},
+   {"op": "call", "func": "SetupCrushDestructionOverlap", "args": {"OverlapComponent": "$MainMesh", "DestructionType": "$CrushDestructionType", "CrushDeathType": "VerticalCollapse"}}]}},
+  {"action": "synthesize_graph", "params": {"blueprint_path": "/Game/RTS_Survival/Blueprints/Environment/Berlin/Furniture/Blueprints/BP_BerlinFurniture_Base", "function": "HandleDeath", "inputs": [{"name": "DeathType", "type": "ERTSDeathType"}], "body": [
+   {"op": "switch_enum", "on": "$DeathType", "cases": {
+    "Scavenging": [
+     {"op": "make_struct", "struct": "RTSVerticalCollapseSettings", "fields": {"DeltaZ": "$CrushSinkDeltaZ", "CollapseTime": "$CrushSinkTime", "bDestroyPostVerticalCollapse": true}, "as": "Sink"},
+     {"op": "make_struct", "struct": "CollapseFX", "fields": {"FxLocationOffset": "0,0,20"}, "as": "Fx"},
+     {"op": "call", "func": "VerticalDestruction", "args": {"CollapseSettings": "$Sink", "CollapseFX": "$Fx"}}],
+    "Kinetic": [{"op": "call", "func": "WallHoleDamageComponent.CollapseIntoPieces", "target": "$WallHoleDamage", "args": {"bHideAndDestroyOwner": true}}],
+    "FireOrLaser": [{"op": "call", "func": "WallHoleDamageComponent.CollapseIntoPieces", "target": "$WallHoleDamage", "args": {"bHideAndDestroyOwner": true}}],
+    "Radiation": [{"op": "call", "func": "WallHoleDamageComponent.CollapseIntoPieces", "target": "$WallHoleDamage", "args": {"bHideAndDestroyOwner": true}}]}}]}},
+  {"action": "synthesize_graph", "params": {"blueprint_path": "/Game/RTS_Survival/Blueprints/Environment/Berlin/Furniture/Blueprints/BP_BerlinFurniture_Base", "function": "EventGraph", "mode": "append", "body": [
+   {"op": "event", "name": "BeginPlay", "body": [{"op": "call", "func": "SetupCrush"}]},
+   {"op": "event", "name": "BP_OnUnitDies", "as": {"DeathType": "dt"}, "body": [{"op": "call", "func": "HandleDeath", "args": {"DeathType": "$dt"}}]}]}},
+  {"action": "compile_blueprint", "params": {"blueprint_path": "/Game/RTS_Survival/Blueprints/Environment/Berlin/Furniture/Blueprints/BP_BerlinFurniture_Base"}}
+ ]
+}

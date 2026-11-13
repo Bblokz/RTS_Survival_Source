@@ -1,0 +1,1270 @@
+{
+ "generator": "Model/generate_furniture.py",
+ "units": "Unreal cm",
+ "axes": "sizes and boxes are in UNREAL axes: +X front, +Z up. Pivot = centre of the BODY footprint (the bounds of the collision hulls) on the ground (z = 0 = lowest point of the mesh). size_cm / bounds_*_cm are the whole render mesh INCLUDING loose debris and open doors, so they are not centred on the pivot; body_size_cm and footprint_half_extents_cm are the body only (hull bounds, centred on the pivot). Hull bounds are axis-aligned bounds of the hulls; hulls of tilted pieces (03, 04, 07, 15, 16) are rotated boxes. The FBX holds the Y-mirrored mesh on purpose: Unreal mirrors Y on FBX import, so the imported mesh matches this table (and the previews).",
+ "fbx": "cm data, 0.01 unit-scale scene, FBX_SCALE_NONE, axis_forward X / axis_up Z, identity transforms; import with the LEGACY FBX importer (Interchange drops UCX), uniform scale 1, no mirroring in the map",
+ "material_slot": "M_BerlinFurniture",
+ "uv0": "atlas (UVMap)",
+ "uv1": "unique lightmap rectangles (LightMapUV), authored for 128 px or more; small faces are only 2 px wide at 256",
+ "vertex_colours": "none",
+ "collision": "UCX_<mesh>_<k>, k = 1..n, boxes (convex). Loose bits beside a piece (books, fallen drawer, broken legs, tiles) are not covered by a hull.",
+ "suggested_health_note": "rough relative values by size and material (wood chair 30 .. tiled stove 350); tune freely",
+ "normal_map_convention": "DirectX (green = -Y, Unreal default; leave \"Flip Green Channel\" OFF). Generated from the painted height field, not baked.",
+ "textures": {
+  "base_colour": "Textures/T_BerlinFurniture_D.png (sRGB, no alpha)",
+  "normal": "Textures/T_BerlinFurniture_N.png (linear, DirectX)",
+  "orm": "Textures/T_BerlinFurniture_ORM.png (linear: R ambient occlusion, G roughness, B metallic)",
+  "size": [
+   2048,
+   2048
+  ]
+ },
+ "atlas_layout": {
+  "type": "4 x 4 grid, 512 px cells, row 0 at the TOP of the image, cell index = row * 4 + col = piece number - 1",
+  "island_inset_from_cell_px": 8,
+  "island_gap_inside_cell_px": 8,
+  "bleed_px": 4,
+  "note": "islands of one piece are 8 px apart (each bled 4 px); islands of different pieces are at least 16 px apart; small repeated faces of one piece share an island",
+  "cells": [
+   {
+    "piece": "SM_BerlinFurn_01_Wardrobe",
+    "cell": 0,
+    "col": 0,
+    "row": 0,
+    "px_rect": [
+     0,
+     0,
+     512,
+     512
+    ],
+    "unreal_uv_rect": [
+     0.0,
+     0.0,
+     0.25,
+     0.25
+    ],
+    "islands": 56,
+    "texel_px_per_cm": 0.811
+   },
+   {
+    "piece": "SM_BerlinFurn_02_IronBed",
+    "cell": 1,
+    "col": 1,
+    "row": 0,
+    "px_rect": [
+     512,
+     0,
+     1024,
+     512
+    ],
+    "unreal_uv_rect": [
+     0.25,
+     0.0,
+     0.5,
+     0.25
+    ],
+    "islands": 47,
+    "texel_px_per_cm": 1.196
+   },
+   {
+    "piece": "SM_BerlinFurn_03_KitchenTable",
+    "cell": 2,
+    "col": 2,
+    "row": 0,
+    "px_rect": [
+     1024,
+     0,
+     1536,
+     512
+    ],
+    "unreal_uv_rect": [
+     0.5,
+     0.0,
+     0.75,
+     0.25
+    ],
+    "islands": 55,
+    "texel_px_per_cm": 2.168
+   },
+   {
+    "piece": "SM_BerlinFurn_04_ChairFallen",
+    "cell": 3,
+    "col": 3,
+    "row": 0,
+    "px_rect": [
+     1536,
+     0,
+     2048,
+     512
+    ],
+    "unreal_uv_rect": [
+     0.75,
+     0.0,
+     1.0,
+     0.25
+    ],
+    "islands": 49,
+    "texel_px_per_cm": 3.417
+   },
+   {
+    "piece": "SM_BerlinFurn_05_Armchair",
+    "cell": 4,
+    "col": 0,
+    "row": 1,
+    "px_rect": [
+     0,
+     512,
+     512,
+     1024
+    ],
+    "unreal_uv_rect": [
+     0.0,
+     0.25,
+     0.25,
+     0.5
+    ],
+    "islands": 45,
+    "texel_px_per_cm": 1.531
+   },
+   {
+    "piece": "SM_BerlinFurn_06_Sofa",
+    "cell": 5,
+    "col": 1,
+    "row": 1,
+    "px_rect": [
+     512,
+     512,
+     1024,
+     1024
+    ],
+    "unreal_uv_rect": [
+     0.25,
+     0.25,
+     0.5,
+     0.5
+    ],
+    "islands": 56,
+    "texel_px_per_cm": 1.092
+   },
+   {
+    "piece": "SM_BerlinFurn_07_Bathtub",
+    "cell": 6,
+    "col": 2,
+    "row": 1,
+    "px_rect": [
+     1024,
+     512,
+     1536,
+     1024
+    ],
+    "unreal_uv_rect": [
+     0.5,
+     0.25,
+     0.75,
+     0.5
+    ],
+    "islands": 81,
+    "texel_px_per_cm": 1.651
+   },
+   {
+    "piece": "SM_BerlinFurn_08_TiledStove",
+    "cell": 7,
+    "col": 3,
+    "row": 1,
+    "px_rect": [
+     1536,
+     512,
+     2048,
+     1024
+    ],
+    "unreal_uv_rect": [
+     0.75,
+     0.25,
+     1.0,
+     0.5
+    ],
+    "islands": 63,
+    "texel_px_per_cm": 1.201
+   },
+   {
+    "piece": "SM_BerlinFurn_09_Piano",
+    "cell": 8,
+    "col": 0,
+    "row": 2,
+    "px_rect": [
+     0,
+     1024,
+     512,
+     1536
+    ],
+    "unreal_uv_rect": [
+     0.0,
+     0.5,
+     0.25,
+     0.75
+    ],
+    "islands": 76,
+    "texel_px_per_cm": 1.033
+   },
+   {
+    "piece": "SM_BerlinFurn_10_ChestOfDrawers",
+    "cell": 9,
+    "col": 1,
+    "row": 2,
+    "px_rect": [
+     512,
+     1024,
+     1024,
+     1536
+    ],
+    "unreal_uv_rect": [
+     0.25,
+     0.5,
+     0.5,
+     0.75
+    ],
+    "islands": 60,
+    "texel_px_per_cm": 1.142
+   },
+   {
+    "piece": "SM_BerlinFurn_11_BookshelfFallen",
+    "cell": 10,
+    "col": 2,
+    "row": 2,
+    "px_rect": [
+     1024,
+     1024,
+     1536,
+     1536
+    ],
+    "unreal_uv_rect": [
+     0.5,
+     0.5,
+     0.75,
+     0.75
+    ],
+    "islands": 60,
+    "texel_px_per_cm": 1.204
+   },
+   {
+    "piece": "SM_BerlinFurn_12_KitchenDresser",
+    "cell": 11,
+    "col": 3,
+    "row": 2,
+    "px_rect": [
+     1536,
+     1024,
+     2048,
+     1536
+    ],
+    "unreal_uv_rect": [
+     0.75,
+     0.5,
+     1.0,
+     0.75
+    ],
+    "islands": 79,
+    "texel_px_per_cm": 0.944
+   },
+   {
+    "piece": "SM_BerlinFurn_13_Desk",
+    "cell": 12,
+    "col": 0,
+    "row": 3,
+    "px_rect": [
+     0,
+     1536,
+     512,
+     2048
+    ],
+    "unreal_uv_rect": [
+     0.0,
+     0.75,
+     0.25,
+     1.0
+    ],
+    "islands": 83,
+    "texel_px_per_cm": 1.134
+   },
+   {
+    "piece": "SM_BerlinFurn_14_Washstand",
+    "cell": 13,
+    "col": 1,
+    "row": 3,
+    "px_rect": [
+     512,
+     1536,
+     1024,
+     2048
+    ],
+    "unreal_uv_rect": [
+     0.25,
+     0.75,
+     0.5,
+     1.0
+    ],
+    "islands": 70,
+    "texel_px_per_cm": 1.585
+   },
+   {
+    "piece": "SM_BerlinFurn_15_ClockFallen",
+    "cell": 14,
+    "col": 2,
+    "row": 3,
+    "px_rect": [
+     1024,
+     1536,
+     1536,
+     2048
+    ],
+    "unreal_uv_rect": [
+     0.5,
+     0.75,
+     0.75,
+     1.0
+    ],
+    "islands": 69,
+    "texel_px_per_cm": 1.567
+   },
+   {
+    "piece": "SM_BerlinFurn_16_Radiator",
+    "cell": 15,
+    "col": 3,
+    "row": 3,
+    "px_rect": [
+     1536,
+     1536,
+     2048,
+     2048
+    ],
+    "unreal_uv_rect": [
+     0.75,
+     0.75,
+     1.0,
+     1.0
+    ],
+    "islands": 54,
+    "texel_px_per_cm": 3.082
+   }
+  ]
+ },
+ "total_tris": 4336,
+ "pieces": [
+  {
+   "name": "SM_BerlinFurn_01_Wardrobe",
+   "label": "Wardrobe, one door hanging open, the other closed",
+   "size_cm": [
+    113.9,
+    152.3,
+    203.0
+   ],
+   "tris": 168,
+   "hulls": 1,
+   "bounds_min_cm": [
+    -30.5,
+    -65.0,
+    0.0
+   ],
+   "bounds_max_cm": [
+    83.4,
+    87.3,
+    203.0
+   ],
+   "body_size_cm": [
+    61.0,
+    130.0,
+    188.0
+   ],
+   "footprint_half_extents_cm": [
+    30.5,
+    65.0
+   ],
+   "suggested_health": 120,
+   "where_it_fits": "indoors against a wall (back = -X); also believable standing alone in a gutted room",
+   "collision_hull_bounds_unreal_cm": [
+    {
+     "min": [
+      -30.5,
+      -65.0,
+      0.0
+     ],
+     "max": [
+      30.5,
+      65.0,
+      188.0
+     ]
+    }
+   ],
+   "atlas_cell": 0,
+   "texel_px_per_cm": 0.811,
+   "fbx": "FBX/SM_BerlinFurn_01_Wardrobe.FBX"
+  },
+  {
+   "name": "SM_BerlinFurn_02_IronBed",
+   "label": "Iron bed frame, mattress slid askew, blanket hanging off",
+   "size_cm": [
+    206.3,
+    124.7,
+    118.0
+   ],
+   "tris": 376,
+   "hulls": 3,
+   "bounds_min_cm": [
+    -103.1,
+    -51.6,
+    0.0
+   ],
+   "bounds_max_cm": [
+    103.2,
+    73.1,
+    118.0
+   ],
+   "body_size_cm": [
+    205.0,
+    100.0,
+    112.0
+   ],
+   "footprint_half_extents_cm": [
+    102.5,
+    50.0
+   ],
+   "suggested_health": 110,
+   "where_it_fits": "indoors, head end (-X) to a wall; or thrown into the street",
+   "collision_hull_bounds_unreal_cm": [
+    {
+     "min": [
+      -100.0,
+      -50.0,
+      0.0
+     ],
+     "max": [
+      100.0,
+      50.0,
+      52.0
+     ]
+    },
+    {
+     "min": [
+      -102.5,
+      -50.0,
+      52.0
+     ],
+     "max": [
+      -97.5,
+      50.0,
+      112.0
+     ]
+    },
+    {
+     "min": [
+      97.5,
+      -50.0,
+      52.0
+     ],
+     "max": [
+      102.5,
+      50.0,
+      84.0
+     ]
+    }
+   ],
+   "atlas_cell": 1,
+   "texel_px_per_cm": 1.196,
+   "fbx": "FBX/SM_BerlinFurn_02_IronBed.FBX"
+  },
+  {
+   "name": "SM_BerlinFurn_03_KitchenTable",
+   "label": "Kitchen table collapsed onto two broken legs, top boards split",
+   "size_cm": [
+    99.1,
+    141.5,
+    71.5
+   ],
+   "tris": 220,
+   "hulls": 1,
+   "bounds_min_cm": [
+    -40.2,
+    -71.9,
+    0.0
+   ],
+   "bounds_max_cm": [
+    58.9,
+    69.6,
+    71.5
+   ],
+   "body_size_cm": [
+    70.0,
+    110.4,
+    71.1
+   ],
+   "footprint_half_extents_cm": [
+    35.0,
+    55.2
+   ],
+   "suggested_health": 60,
+   "where_it_fits": "indoors mid-room or thrown into the street",
+   "collision_hull_bounds_unreal_cm": [
+    {
+     "min": [
+      -35.0,
+      -55.2,
+      0.4
+     ],
+     "max": [
+      35.0,
+      55.2,
+      71.5
+     ]
+    }
+   ],
+   "atlas_cell": 2,
+   "texel_px_per_cm": 2.168,
+   "fbx": "FBX/SM_BerlinFurn_03_KitchenTable.FBX"
+  },
+  {
+   "name": "SM_BerlinFurn_04_ChairFallen",
+   "label": "Wooden kitchen chair lying on its side, one leg snapped",
+   "size_cm": [
+    60.8,
+    101.3,
+    42.0
+   ],
+   "tris": 232,
+   "hulls": 1,
+   "bounds_min_cm": [
+    -37.1,
+    -51.2,
+    0.0
+   ],
+   "bounds_max_cm": [
+    23.7,
+    50.1,
+    42.0
+   ],
+   "body_size_cm": [
+    79.7,
+    102.4,
+    42.0
+   ],
+   "footprint_half_extents_cm": [
+    39.8,
+    51.2
+   ],
+   "suggested_health": 30,
+   "where_it_fits": "anywhere: indoors, on rubble, in the street",
+   "collision_hull_bounds_unreal_cm": [
+    {
+     "min": [
+      -39.8,
+      -51.2,
+      -0.0
+     ],
+     "max": [
+      39.8,
+      51.2,
+      42.0
+     ]
+    }
+   ],
+   "atlas_cell": 3,
+   "texel_px_per_cm": 3.417,
+   "fbx": "FBX/SM_BerlinFurn_04_ChairFallen.FBX"
+  },
+  {
+   "name": "SM_BerlinFurn_05_Armchair",
+   "label": "Club armchair, green upholstery, seat cushion pulled out",
+   "size_cm": [
+    104.7,
+    86.0,
+    94.8
+   ],
+   "tris": 188,
+   "hulls": 2,
+   "bounds_min_cm": [
+    -46.5,
+    -43.0,
+    0.0
+   ],
+   "bounds_max_cm": [
+    58.2,
+    43.0,
+    94.8
+   ],
+   "body_size_cm": [
+    93.0,
+    86.0,
+    92.0
+   ],
+   "footprint_half_extents_cm": [
+    46.5,
+    43.0
+   ],
+   "suggested_health": 80,
+   "where_it_fits": "indoors or thrown into the street",
+   "collision_hull_bounds_unreal_cm": [
+    {
+     "min": [
+      -44.5,
+      -43.0,
+      0.0
+     ],
+     "max": [
+      46.5,
+      43.0,
+      62.0
+     ]
+    },
+    {
+     "min": [
+      -46.5,
+      -43.0,
+      62.0
+     ],
+     "max": [
+      -20.5,
+      43.0,
+      92.0
+     ]
+    }
+   ],
+   "atlas_cell": 4,
+   "texel_px_per_cm": 1.531,
+   "fbx": "FBX/SM_BerlinFurn_05_Armchair.FBX"
+  },
+  {
+   "name": "SM_BerlinFurn_06_Sofa",
+   "label": "Sofa, red upholstery, one cushion thrown out, one tipped up",
+   "size_cm": [
+    160.3,
+    190.0,
+    93.0
+   ],
+   "tris": 240,
+   "hulls": 2,
+   "bounds_min_cm": [
+    -46.0,
+    -95.0,
+    0.0
+   ],
+   "bounds_max_cm": [
+    114.3,
+    95.0,
+    93.0
+   ],
+   "body_size_cm": [
+    92.0,
+    190.0,
+    93.0
+   ],
+   "footprint_half_extents_cm": [
+    46.0,
+    95.0
+   ],
+   "suggested_health": 110,
+   "where_it_fits": "indoors against a wall (back = -X) or thrown into the street",
+   "collision_hull_bounds_unreal_cm": [
+    {
+     "min": [
+      -44.0,
+      -95.0,
+      0.0
+     ],
+     "max": [
+      46.0,
+      95.0,
+      60.0
+     ]
+    },
+    {
+     "min": [
+      -46.0,
+      -95.0,
+      60.0
+     ],
+     "max": [
+      -20.0,
+      95.0,
+      93.0
+     ]
+    }
+   ],
+   "atlas_cell": 5,
+   "texel_px_per_cm": 1.092,
+   "fbx": "FBX/SM_BerlinFurn_06_Sofa.FBX"
+  },
+  {
+   "name": "SM_BerlinFurn_07_Bathtub",
+   "label": "Cast-iron claw-foot bathtub, enamel chipped, rubble inside",
+   "size_cm": [
+    77.4,
+    184.2,
+    75.0
+   ],
+   "tris": 336,
+   "hulls": 1,
+   "bounds_min_cm": [
+    -41.1,
+    -98.8,
+    0.0
+   ],
+   "bounds_max_cm": [
+    36.3,
+    85.4,
+    75.0
+   ],
+   "body_size_cm": [
+    84.0,
+    179.3,
+    79.7
+   ],
+   "footprint_half_extents_cm": [
+    42.0,
+    89.6
+   ],
+   "suggested_health": 300,
+   "where_it_fits": "bathroom ruin, or fallen through a floor onto rubble",
+   "collision_hull_bounds_unreal_cm": [
+    {
+     "min": [
+      -42.0,
+      -89.6,
+      -2.7
+     ],
+     "max": [
+      42.0,
+      89.6,
+      77.0
+     ]
+    }
+   ],
+   "atlas_cell": 6,
+   "texel_px_per_cm": 1.651,
+   "fbx": "FBX/SM_BerlinFurn_07_Bathtub.FBX"
+  },
+  {
+   "name": "SM_BerlinFurn_08_TiledStove",
+   "label": "Kachelofen: green tiled stove, crown cracked, flue pipe torn loose",
+   "size_cm": [
+    114.2,
+    122.9,
+    202.6
+   ],
+   "tris": 216,
+   "hulls": 2,
+   "bounds_min_cm": [
+    -53.7,
+    -46.0,
+    0.0
+   ],
+   "bounds_max_cm": [
+    60.5,
+    76.9,
+    202.6
+   ],
+   "body_size_cm": [
+    62.0,
+    92.0,
+    188.0
+   ],
+   "footprint_half_extents_cm": [
+    31.0,
+    46.0
+   ],
+   "suggested_health": 350,
+   "where_it_fits": "indoors in a room corner or against a wall (back = -X); survives as a lone stump in gutted buildings",
+   "collision_hull_bounds_unreal_cm": [
+    {
+     "min": [
+      -31.0,
+      -46.0,
+      0.0
+     ],
+     "max": [
+      31.0,
+      46.0,
+      104.0
+     ]
+    },
+    {
+     "min": [
+      -28.0,
+      -43.0,
+      104.0
+     ],
+     "max": [
+      28.0,
+      40.0,
+      188.0
+     ]
+    }
+   ],
+   "atlas_cell": 7,
+   "texel_px_per_cm": 1.201,
+   "fbx": "FBX/SM_BerlinFurn_08_TiledStove.FBX"
+  },
+  {
+   "name": "SM_BerlinFurn_09_Piano",
+   "label": "Upright piano, lid knocked askew, keys missing",
+   "size_cm": [
+    134.6,
+    158.4,
+    130.4
+   ],
+   "tris": 284,
+   "hulls": 2,
+   "bounds_min_cm": [
+    -37.9,
+    -75.5,
+    0.0
+   ],
+   "bounds_max_cm": [
+    96.7,
+    82.8,
+    130.4
+   ],
+   "body_size_cm": [
+    59.0,
+    150.0,
+    127.0
+   ],
+   "footprint_half_extents_cm": [
+    29.5,
+    75.0
+   ],
+   "suggested_health": 200,
+   "where_it_fits": "indoors against a wall (back = -X), or dragged into the street",
+   "collision_hull_bounds_unreal_cm": [
+    {
+     "min": [
+      -29.5,
+      -75.0,
+      0.0
+     ],
+     "max": [
+      8.5,
+      75.0,
+      127.0
+     ]
+    },
+    {
+     "min": [
+      8.5,
+      -75.0,
+      0.0
+     ],
+     "max": [
+      29.5,
+      75.0,
+      77.0
+     ]
+    }
+   ],
+   "atlas_cell": 8,
+   "texel_px_per_cm": 1.033,
+   "fbx": "FBX/SM_BerlinFurn_09_Piano.FBX"
+  },
+  {
+   "name": "SM_BerlinFurn_10_ChestOfDrawers",
+   "label": "Chest of drawers, one drawer hanging out, one on the floor",
+   "size_cm": [
+    133.8,
+    106.0,
+    86.0
+   ],
+   "tris": 204,
+   "hulls": 1,
+   "bounds_min_cm": [
+    -26.5,
+    -55.0,
+    0.0
+   ],
+   "bounds_max_cm": [
+    107.3,
+    51.0,
+    86.0
+   ],
+   "body_size_cm": [
+    53.0,
+    102.0,
+    83.5
+   ],
+   "footprint_half_extents_cm": [
+    26.5,
+    51.0
+   ],
+   "suggested_health": 90,
+   "where_it_fits": "indoors against a wall (back = -X)",
+   "collision_hull_bounds_unreal_cm": [
+    {
+     "min": [
+      -26.5,
+      -51.0,
+      0.0
+     ],
+     "max": [
+      26.5,
+      51.0,
+      83.5
+     ]
+    }
+   ],
+   "atlas_cell": 9,
+   "texel_px_per_cm": 1.142,
+   "fbx": "FBX/SM_BerlinFurn_10_ChestOfDrawers.FBX"
+  },
+  {
+   "name": "SM_BerlinFurn_11_BookshelfFallen",
+   "label": "Bookshelf fallen on its back, books spilled around it",
+   "size_cm": [
+    180.0,
+    155.1,
+    30.0
+   ],
+   "tris": 220,
+   "hulls": 1,
+   "bounds_min_cm": [
+    -90.0,
+    -75.9,
+    0.0
+   ],
+   "bounds_max_cm": [
+    90.0,
+    79.2,
+    30.0
+   ],
+   "body_size_cm": [
+    180.0,
+    90.0,
+    30.0
+   ],
+   "footprint_half_extents_cm": [
+    90.0,
+    45.0
+   ],
+   "suggested_health": 70,
+   "where_it_fits": "lying on a floor or in the street; the open front faces up",
+   "collision_hull_bounds_unreal_cm": [
+    {
+     "min": [
+      -90.0,
+      -45.0,
+      0.0
+     ],
+     "max": [
+      90.0,
+      45.0,
+      30.0
+     ]
+    }
+   ],
+   "atlas_cell": 10,
+   "texel_px_per_cm": 1.204,
+   "fbx": "FBX/SM_BerlinFurn_11_BookshelfFallen.FBX"
+  },
+  {
+   "name": "SM_BerlinFurn_12_KitchenDresser",
+   "label": "Kuechenbuffet: cream kitchen dresser, doors torn off, crockery left",
+   "size_cm": [
+    150.9,
+    140.7,
+    191.0
+   ],
+   "tris": 328,
+   "hulls": 2,
+   "bounds_min_cm": [
+    -28.5,
+    -82.7,
+    0.0
+   ],
+   "bounds_max_cm": [
+    122.4,
+    58.0,
+    191.0
+   ],
+   "body_size_cm": [
+    57.0,
+    116.0,
+    191.0
+   ],
+   "footprint_half_extents_cm": [
+    28.5,
+    58.0
+   ],
+   "suggested_health": 120,
+   "where_it_fits": "kitchen ruin against a wall (back = -X)",
+   "collision_hull_bounds_unreal_cm": [
+    {
+     "min": [
+      -26.5,
+      -58.0,
+      0.0
+     ],
+     "max": [
+      28.5,
+      58.0,
+      91.5
+     ]
+    },
+    {
+     "min": [
+      -28.5,
+      -58.0,
+      91.5
+     ],
+     "max": [
+      7.5,
+      58.0,
+      191.0
+     ]
+    }
+   ],
+   "atlas_cell": 11,
+   "texel_px_per_cm": 0.944,
+   "fbx": "FBX/SM_BerlinFurn_12_KitchenDresser.FBX"
+  },
+  {
+   "name": "SM_BerlinFurn_13_Desk",
+   "label": "Pedestal desk, masonry chunk fallen on the top, typewriter, drawer pulled out",
+   "size_cm": [
+    110.6,
+    147.4,
+    100.0
+   ],
+   "tris": 232,
+   "hulls": 3,
+   "bounds_min_cm": [
+    -36.0,
+    -71.0,
+    0.0
+   ],
+   "bounds_max_cm": [
+    74.6,
+    76.4,
+    100.0
+   ],
+   "body_size_cm": [
+    72.0,
+    142.0,
+    76.0
+   ],
+   "footprint_half_extents_cm": [
+    36.0,
+    71.0
+   ],
+   "suggested_health": 110,
+   "where_it_fits": "study or office ruin, mid-room or against a wall",
+   "collision_hull_bounds_unreal_cm": [
+    {
+     "min": [
+      -32.0,
+      -68.0,
+      0.0
+     ],
+     "max": [
+      30.0,
+      -30.0,
+      72.0
+     ]
+    },
+    {
+     "min": [
+      -32.0,
+      30.0,
+      0.0
+     ],
+     "max": [
+      30.0,
+      68.0,
+      72.0
+     ]
+    },
+    {
+     "min": [
+      -36.0,
+      -71.0,
+      72.0
+     ],
+     "max": [
+      36.0,
+      71.0,
+      76.0
+     ]
+    }
+   ],
+   "atlas_cell": 12,
+   "texel_px_per_cm": 1.134,
+   "fbx": "FBX/SM_BerlinFurn_13_Desk.FBX"
+  },
+  {
+   "name": "SM_BerlinFurn_14_Washstand",
+   "label": "Washstand: marble top, tiled splashback, basin and jug, door hanging",
+   "size_cm": [
+    83.5,
+    88.0,
+    121.0
+   ],
+   "tris": 368,
+   "hulls": 2,
+   "bounds_min_cm": [
+    -25.2,
+    -42.0,
+    0.0
+   ],
+   "bounds_max_cm": [
+    58.3,
+    46.0,
+    121.0
+   ],
+   "body_size_cm": [
+    50.5,
+    84.0,
+    121.0
+   ],
+   "footprint_half_extents_cm": [
+    25.2,
+    42.0
+   ],
+   "suggested_health": 80,
+   "where_it_fits": "bedroom or bathroom ruin against a wall (back = -X)",
+   "collision_hull_bounds_unreal_cm": [
+    {
+     "min": [
+      -24.8,
+      -42.0,
+      0.0
+     ],
+     "max": [
+      25.2,
+      42.0,
+      80.5
+     ]
+    },
+    {
+     "min": [
+      -25.2,
+      -42.0,
+      80.5
+     ],
+     "max": [
+      -20.8,
+      42.0,
+      121.0
+     ]
+    }
+   ],
+   "atlas_cell": 13,
+   "texel_px_per_cm": 1.585,
+   "fbx": "FBX/SM_BerlinFurn_14_Washstand.FBX"
+  },
+  {
+   "name": "SM_BerlinFurn_15_ClockFallen",
+   "label": "Grandfather clock fallen on its back, hood broken off, case door open",
+   "size_cm": [
+    221.5,
+    92.4,
+    35.3
+   ],
+   "tris": 236,
+   "hulls": 2,
+   "bounds_min_cm": [
+    -110.7,
+    -48.0,
+    0.0
+   ],
+   "bounds_max_cm": [
+    110.8,
+    44.5,
+    35.3
+   ],
+   "body_size_cm": [
+    221.6,
+    95.9,
+    35.0
+   ],
+   "footprint_half_extents_cm": [
+    110.8,
+    48.0
+   ],
+   "suggested_health": 70,
+   "where_it_fits": "lying on a floor or in the street, face up",
+   "collision_hull_bounds_unreal_cm": [
+    {
+     "min": [
+      -39.2,
+      -48.0,
+      0.0
+     ],
+     "max": [
+      110.8,
+      3.0,
+      31.0
+     ]
+    },
+    {
+     "min": [
+      -110.8,
+      -20.0,
+      0.0
+     ],
+     "max": [
+      -38.9,
+      48.0,
+      35.0
+     ]
+    }
+   ],
+   "atlas_cell": 14,
+   "texel_px_per_cm": 1.567,
+   "fbx": "FBX/SM_BerlinFurn_15_ClockFallen.FBX"
+  },
+  {
+   "name": "SM_BerlinFurn_16_Radiator",
+   "label": "Cast-iron column radiator torn off the wall, lying on a wall chunk, pipe bent",
+   "size_cm": [
+    92.0,
+    166.8,
+    39.3
+   ],
+   "tris": 488,
+   "hulls": 1,
+   "bounds_min_cm": [
+    -37.4,
+    -66.8,
+    0.0
+   ],
+   "bounds_max_cm": [
+    54.6,
+    100.1,
+    39.3
+   ],
+   "body_size_cm": [
+    76.6,
+    99.1,
+    40.8
+   ],
+   "footprint_half_extents_cm": [
+    38.3,
+    49.6
+   ],
+   "suggested_health": 250,
+   "where_it_fits": "on a floor below a window opening, on rubble, or in the street",
+   "collision_hull_bounds_unreal_cm": [
+    {
+     "min": [
+      -38.3,
+      -49.6,
+      -0.4
+     ],
+     "max": [
+      38.3,
+      49.6,
+      40.5
+     ]
+    }
+   ],
+   "atlas_cell": 15,
+   "texel_px_per_cm": 3.082,
+   "fbx": "FBX/SM_BerlinFurn_16_Radiator.FBX"
+  }
+ ]
+}
