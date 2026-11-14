@@ -480,3 +480,16 @@ patch, lichen crust, soot fall-out, rust wash, ore fines, rock-flour fan). Sourc
   the placeholders are replaced.
 - Open: from the default top-down camera only the fans, fines and lip patches show; the wall stains need a rotated
   camera. Cost of 316 decals is not measured. Editor views: `Saved/OreMountains/cliffs/decals/ue/all2_sheet.jpg`.
+
+## Crushable rocks (2026-11-14)
+
+- Kit: `Environment/OreMountains/CrushableRocks/` (16 rocks, one atlas; see `Docs/Environment/OreCrushableRocks.md`).
+- Plan: `ore_crush_rocks_gen.py` (own seed, own file `Ore_crush_rocks.json`, preview `Saved/OreMountains/rocks/placement_plan.png`).
+  284 rocks (37 medium, 247 small) in 96 clumps: rockfall at cliff feet, ramp fans, the wash, scoured crests, crater
+  rims, road shoulders, a few strays. Keep-out: roads, tracks, wear tracks, ramps, pads, gullies, bogs, spur, viaduct,
+  bases, resources, adits, 32 m round the HQ. Gaps: 3 m round a medium rock, 1 m round a small one.
+- Build: `ore_map_build.step_crush_rocks()` places single Blueprint actors `ORE_CrushRock_*` (instances would have no
+  crush), sunk by the plan's amount for the slope. In the full rebuild order after `step_spur()`.
+- Checked: `NAV PROBLEMS 0`; editor views in `Saved/OreMountains/rocks/map/`. The nav check does not use the per-agent
+  area filters, so the gaps in the plan are what keeps infantry and light vehicles from being walled in.
+- Open: no crush driven on this map; puff and sound of the crush are still the building-sized ones.

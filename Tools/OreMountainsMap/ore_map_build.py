@@ -1136,6 +1136,34 @@ def step_spur():
     return info
 
 
+# ---- crushable rocks (CrushableRocks kit; plan from ore_crush_rocks_gen.py) -------------------------------------------
+CRUSH_ROCK_FILE = "D:/UE5Projects/RTS_Survival/Saved/OreMountains/terrain/Ore_crush_rocks.json"
+
+
+def step_crush_rocks():
+    """Crushable rocks as single Blueprint actors (an instanced copy would have no crush, health or nav area): small
+    ones any vehicle crushes, medium ones medium and heavy tanks crush. Flat bases, so each is sunk by the plan's
+    amount for the slope it lies on. Rebuild navigation afterwards. Labels ORE_CrushRock_*."""
+    require_map()
+    removed = clear_prefix(PREFIX + "CrushRock_")
+    with open(CRUSH_ROCK_FILE, "r") as handle:
+        data = json.load(handle)
+    classes, placed = {}, {}
+    for index, (name, x, y, yaw, scale, sink, zone) in enumerate(data["rocks"]):
+        if name not in classes:
+            classes[name] = unreal.EditorAssetLibrary.load_blueprint_class(data["blueprint"].replace("<name>", name))
+            if classes[name] is None:
+                raise RuntimeError("missing crushable rock Blueprint " + name)
+        actor = actors_sub().spawn_actor_from_class(classes[name], unreal.Vector(x, y, ground_z(x, y) - sink),
+                                                    unreal.Rotator(0.0, 0.0, yaw))
+        actor.set_actor_scale3d(unreal.Vector(scale, scale, scale))
+        actor.set_actor_label("%sCrushRock_%s_%03d" % (PREFIX, name, index))
+        actor.set_folder_path(FOLDER + "CrushRocks/" + zone)
+        placed[zone] = placed.get(zone, 0) + 1
+    log("crushable rocks: removed %d, placed %d %s" % (removed, len(data["rocks"]), placed))
+    return placed
+
+
 # ---- cliff decals (OreCliffKit/Decals/v02, built by a subagent; spec decals.json) ----------------------------------------
 CLIFF_DECAL_SPEC = "D:/Blender/BlenderProjects/BlenderTanks/CustomMapItems/Environment/OreCliffKit/Decals/v02/decals.json"
 CLIFF_DECAL_MI = "/Game/RTS_Survival/Blueprints/Environment/OreMountains/CliffKit/Decals/MI_OreCliffDecal_"

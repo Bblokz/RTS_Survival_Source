@@ -71,6 +71,7 @@ if REBUILD:
         omb.step_viaduct()
         omb.step_fx()
         omb.step_spur()
+        omb.step_crush_rocks()
         omb.step_cliff_decals()
     omb.step_decals()                     # after every rebuild: the decals sit on the new ground
 unreal.SystemLibrary.execute_console_command(omb.world(), "t.IdleWhenNotForeground 0")
