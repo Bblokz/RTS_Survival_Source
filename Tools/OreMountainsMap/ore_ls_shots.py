@@ -31,6 +31,21 @@ VIEWS = [("01_valley_ridge_s", -4500.0, -13000.0, 0.0), ("02_hollow", -5500.0, -
          ("13_peat_bog", -2500.0, -24500.0, 0.0), ("14_spoil_heap", 3200.0, 6400.0, 0.0), ("15_gully", 5600.0, 10500.0, 0.0),
          ("16_knoll_top", 12700.0, -6000.0, 0.0), ("17_yard", 1000.0, 23800.0, 0.0), ("18_west_shoulder", -12000.0, -23500.0, 0.0),
          ("19_valley_open_w", 1500.0, -19000.0, 0.0), ("20_battery", 18700.0, 13400.0, 0.0)]
+# realism round: views on what the round added (a ramp-foot track, craters, a wood edge, a tributary junction, the yard)
+_lay = omb.LAYOUT
+if _lay.get("craters"):
+    _sunk = [c for c in _lay["craters"] if c[3]] or _lay["craters"]
+    VIEWS += [("21_crater_a", float(_sunk[0][0]), float(_sunk[0][1]), 0.0), ("22_crater_b", float(_sunk[-1][0]), float(_sunk[-1][1]), 0.0)]
+if _lay.get("tributaries"):
+    VIEWS += [("23_tributary_join", float(_lay["tributaries"][0][-1][0]), float(_lay["tributaries"][0][-1][1]), 0.0),
+              ("24_gully_fan", float(_lay["tributaries"][2][0][0]), float(_lay["tributaries"][2][0][1]), 0.0)]
+if _lay.get("wear_tracks"):
+    _t = _lay["wear_tracks"]
+    VIEWS += [("25_track_ramp_road", float(_t[1][len(_t[1]) // 2][0]), float(_t[1][len(_t[1]) // 2][1]), 0.0),
+              ("26_track_bench", float(_t[0][len(_t[0]) // 3][0]), float(_t[0][len(_t[0]) // 3][1]), 0.0),
+              ("27_track_road_join", float(_t[1][-1][0]), float(_t[1][-1][1]), 0.0)]
+VIEWS += [("28_wood_edge", 19800.0, 5400.0, 0.0), ("29_yard_open", 2600.0, 22400.0, 0.0), ("30_battery_field", 16200.0, 10200.0, 0.0),
+          ("31_viaduct_stick", 2400.0, -4800.0, 0.0), ("32_start_apron", -15500.0, 9500.0, 0.0)]
 if REBUILD:
     omb.step_landscape()
     omb.step_fit_level_actors()

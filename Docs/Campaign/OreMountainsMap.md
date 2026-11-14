@@ -322,3 +322,58 @@ material instances of the existing Wpo masters, nine crushable `BP_OreDeadSpruce
 
 Real enemy sites, border dressing, gully and bog
 detail, grass output, surface-map bake, map margins east and west (they repeat the edge profile).
+
+## Landscape critic rounds and realism round (2026-11-14)
+
+Owner request: an adversarial agent reviews the landscaping and layer blending, five reviews and five improvements, then
+one more round aimed at realism. Every round: `ore_ls_round.sh <tag> paint|full` rebuilds, runs the nav check, saves and
+takes the fixed in-game views into `Saved/OreMountains/critic/<tag>/` (sheets + top view). Critic grades went from
+shapes 4 / blending 3 (out of 10) to 6 / 6 after round 5; the realism review of that state gave 4 / 10 and led to round 6.
+
+What was learned about the material (holds for any map on the DryCastle landscape master):
+
+- **No scalar removes the cloudy look, one removes the orange blotches.** The blotches are the Desert layer's variation
+  texture let through by a noise mask: `Noise_Mask_Power` 0.35 and `Texture_Scale_Noise_Near` 8 on this map's own
+  instance (`LANDSCAPE_SCALARS` in `ore_map_build.py`) thin them to small flecks.
+- **Paint edges cannot be sharper than about 2 m.** Weights are one per metre vertex and interpolated; a hard 0/1 step
+  in the weight file still shows as a 1.5-2.5 m ramp at game zoom (a view is about 32 m wide). A crisper edge has to
+  come from heights, stones or decals.
+- **There is no dark layer.** RTSSand reads salmon red in sunlight, Asphalt at full weight is mid grey and below about
+  0.85 barely darkens, RockDesert at high weight on a slope reads charcoal. Dark needle litter or peat needs a new layer.
+- `MaterialEditingLibrary.set_material_instance_scalar_parameter_value` in a loop over every parameter turns them all
+  into overrides. `tune_landscape_material` resets the instance to the two intended ones.
+
+What the rounds built (all in `ore_terrain_gen.py`, `ore_detail_gen.py`, `ore_map_build.py`):
+
+- Paint: all former RTSSand "dark" moved to partial Asphalt; bench pale against gravel; valley half pale with long
+  GraySand drifts along the wind; foothills with a rock base tone; thresholded, noise-broken edges.
+- Shapes: ribs as cuestas (steep shaded face, long sunny back); bogs as flat pans 1.4 m down behind a cut bank with peat
+  hags; the wash with scalloped banks, gravel bars and a bed that runs edge to edge; deflation pans; a continuous road
+  ditch on the north side (0.8 m). A gully meander was added but only applies mid-length, away from the rock faces and
+  fossil-root spots: it moved about 0.1 % of the ground.
+- Scatter (`stone_scatter`): stones in clumps with a size mix, sunk a third into the ground, only where something put
+  them (faces, beds, crests, heaps, fans, headwalls, crater rims); tussock belts on bog rims; stump and brash belts
+  round the woods. 21.9k instances (5.3k before the rounds); cost not measured.
+- Realism round: a wear network of 14 two-track paths (3 km) routed by least cost over the built ground from the start
+  to every ramp, the road, the adits, the overlook, the spoil heaps and the knoll ramps (`build_wear`, exported as
+  `wear_tracks`, placed by `step_roads`); 28 shell craters (9 sunk, the rest paint and rim stones: beside the viaduct,
+  round the battery and checkpoint, along the bench lip); every gully and bog drains to the wash by a rill with a fan.
+- Fixed ground never moved: `Saved/OreMountains/check_fixed_ground.py` compares the heights under the cliff kit and the
+  viaduct with the reference raw after every regeneration (0.0 cm every round).
+
+Not done, with reasons:
+
+- Crater decals: the project's dirt crater decals render brick red on this ground; craters are heights and paint only.
+- Rides through the woods, straight compartment edges, heaps moved to the adit mouths, flat-topped tips: these change
+  the sketch or vehicle pathing and are the owner's call.
+- The ditch reads weakly; the yard slabs were never judged (always in building shadow in the fixed view).
+- The wood floor still reads pale and the shaded wash bank still reads as a dark band (no dark layer, see above).
+- From the realism review, not built: a yard turning loop, checkpoint pull-offs, braided tracks at ramp feet, talus
+  aprons beyond the cliff kit's own scree, seep lines to the bogs, road headwalls only as stone clumps.
+- 3 of the 17 track legs found no route and were dropped (the generator prints the count, not which).
+- Grades: 6 / 6 was given on the round-4 state; improvements 5 and 6 were not graded again, and the 4 / 10 realism
+  grade was given before round 6.
+- Cost not measured: 21.9k scatter instances and about 1 600 two-track spline tiles (separate components) were added.
+- Tool trap: a patch written through a shell heredoc left a literal backslash-n in the generator, and two rebuilds were
+  saved with stale paint because the generator's exit code was not checked. Edit the generators with the editor tools
+  and check the exit code before a rebuild.

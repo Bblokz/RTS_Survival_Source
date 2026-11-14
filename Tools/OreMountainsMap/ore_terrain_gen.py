@@ -49,9 +49,13 @@ NAV_MAX_SLOPE_DEG = 44.0                # agent_max_slope of all four RecastNavM
 CLIFF_R = 8                             # cells: half width of the band a slope is sharpened over
 CREST_EXTRA = 5200.0                    # the border crest keeps rising past the play edge (cm above its 35 m)
 NORTH_RISE = 2200.0
-GULLY_DEPTH = 130.0
-BOG_DEPTH = 45.0
+GULLY_DEPTH = 150.0
+BOG_DEPTH = 140.0
 RELIEF_GAIN = 1.55                      # mid-map relief: ridges to about 5.5 m, hollows to about 3 m
+
+
+# the fossil roots sit on the gully cut at these spots (OreDeadForest_pieces.json): the cut must not move there
+FOSSIL_ROOT_SPOTS = ((-7103, 3953), (-7827, -6667), (5513, 10519), (5794, -9916), (-7035, -24790))
 
 
 def box_blur(a, r):
@@ -97,6 +101,28 @@ def fbm(seed, wavelength_cells, octaves=3):
         norm += amp
         amp *= 0.5
     return total / norm
+
+
+def streak_noise(seed, along_cells, across_cells, bearing_deg, shape=SHAPE):
+    """Value noise in -1..1 stretched along a compass bearing (wind streaks): long along it, short across."""
+    rng = np.random.default_rng(seed)
+    size = int(max(shape) * 1.5)
+    small = rng.random((max(2, int(size / across_cells) + 2), max(2, int(size / along_cells) + 2))).astype(np.float32)
+    img = Image.fromarray(small, mode="F").resize((size, size), Image.BICUBIC)       # streaks run west-east
+    img = img.rotate(90.0 - bearing_deg, resample=Image.BICUBIC)                    # then turn them to the bearing
+    off = (size - shape[0]) // 2
+    big = np.asarray(img, dtype=np.float64)[off:off + shape[0], off:off + shape[1]]
+    big = (big - big.mean()) / (big.std() + 1e-9)
+    return np.clip(big / 2.2, -1.0, 1.0)
+
+
+def crisp(v, t, w=0.06):
+    """A sharp threshold: 0 below t - w, 1 above t + w."""
+    return smoothstep(t - w, t + w, v)
+
+
+def band(v, lo, hi, w=0.06):
+    return crisp(v, lo, w) * (1.0 - crisp(v, hi, w))
 
 
 def grey(a, r, fn):
@@ -341,24 +367,47 @@ class Gen:
             a = math.radians(yaw_deg)
             u = (self.X - x) * math.cos(a) + (self.Y - y) * math.sin(a)
             v = -(self.X - x) * math.sin(a) + (self.Y - y) * math.cos(a)
-            return height * np.exp(-(u / (length / 2.0)) ** 2 - (v / (width / 2.0)) ** 2)
+            half = width / 2.0
+            if height > 0.0:
+                # critic round 4: a cuesta, not a symmetric swell. The face turned away from the sun is as steep as a
+                # vehicle takes (about 27 degrees), so it stands in shadow; the sunny side runs out twice as far.
+                sun_side = 1.0 if (-math.sin(a) * 0.613 + math.cos(a) * 0.326) >= 0.0 else -1.0
+                half = np.where(v * sun_side > 0.0, width, max(0.36 * width, 2.6 * height))
+            return height * np.exp(-(u / (length / 2.0)) ** 2 - (v / half) ** 2)
 
         # (x, y, length, width, height, yaw): low ridges and knobs; negative heights are hollows
-        for form in ((-4500, -13000, 5000, 1500, 300, 85), (-5300, 9500, 4200, 1300, 260, 100), (3200, -9500, 4500, 1400, 290, 70),
-                     (5200, 17500, 3800, 1200, 250, 95), (11000, 9000, 6000, 1900, 380, 60), (16000, -20000, 6000, 1900, 350, 120),
+        for form in ((-4500, -13000, 5000, 1500, 420, 85), (-5300, 9500, 4200, 1300, 260, 100), (3200, -9500, 4500, 1400, 400, 70),
+                     (5200, 17500, 3800, 1200, 250, 95), (11000, 9000, 6000, 1900, 460, 60), (16000, -20000, 6000, 1900, 350, 120),
                      (8000, -16000, 4500, 1600, 300, 45), (20000, -3000, 5000, 1700, 330, 20), (13500, 22000, 4500, 1500, 280, 110),
                      (-5500, -2500, 2600, 2400, -190, 0), (2900, 3200, 2400, 2000, -160, 0), (7500, 2500, 3000, 2600, -200, 30),
-                     (10500, -8500, 2800, 2400, -170, 0)):
+                     (10500, -8500, 2800, 2400, -170, 0),
+                     # critic round 1: the ribs were all one size; short sharp ones (15-30 m) and a long low one (80 m)
+                     (-5600, -19500, 1900, 800, 170, 60), (-4200, 5200, 1600, 750, 160, 110), (4300, -15500, 2300, 850, 180, 95),
+                     (6800, 14500, 1700, 800, 165, 40), (14500, 1500, 2600, 900, 185, 75), (18500, -13500, 2000, 850, 170, 130),
+                     (9500, 20500, 8000, 1500, 210, 85), (-3600, -24000, 2200, 850, 170, 100)):
             relief = relief + ridge(*form)
         # a dry wash between the road and the foothills: 1.4 m deep, 14 m wide, with a low bank on its north side
-        wash_pts = np.array([[2600, -29500], [1900, -19000], [2700, -11000], [2000, -2500], [2900, 5000], [2300, 12500], [3000, 19500]], float)
+        wash_pts = np.array([[2600, -29500], [1900, -19000], [2700, -11000], [2000, -2500], [2900, 5000], [2300, 12500], [3000, 19500], [2500, 24500], [3100, 30500]], float)
         wash_d = self.dist_line(wash_pts) + 160.0 * noise(133, 14.0)
-        wash = smoothstep(760.0, 180.0, wash_d)
-        relief = relief - 140.0 * wash + 45.0 * np.exp(-((wash_d - 950.0) / 320.0) ** 2)
+        # critic round 4: the bank is cut (28 degrees) in 8-15 m scallops and slumped to about 10 degrees between them;
+        # low gravel bars lie in the bed
+        gap = smoothstep(0.1, 0.5, noise(134, 16.0))
+        wash = smoothstep(680.0 + 520.0 * gap, 280.0, wash_d)
+        self.wash_d = wash_d
+        self.wash_gap = gap
+        self.wash_bars = None
+        bars = smoothstep(330.0, 200.0, wash_d) * crisp(noise(135, 7.0), 0.45, 0.2)
+        self.wash_bars = bars
+        relief = relief - 140.0 * wash + 45.0 * np.exp(-((wash_d - 950.0) / 320.0) ** 2) + 20.0 * bars
+        # shallow deflation pans on the open floor: 8-15 m, 0.45 m deep
+        pan = crisp(fbm(161, 38.0, 3) + 0.3 * noise(163, 8.0), 0.4, 0.06) * smoothstep(900.0, 1500.0, wash_d)
+        self.pan_w = pan
+        relief = relief - 30.0 * pan
         relief = relief * RELIEF_GAIN
         Z = Z + relief * zone
         self.relief_zone = zone
         self.wash_w = wash * zone
+        self.pan_w = self.pan_w * zone
         self.out_masks["wash"] = self.wash_w > 0.4
 
         # 3. spoil heaps: the pads give a 5 m level top; make them rounded heaps with a small crown
@@ -368,20 +417,60 @@ class Gen:
 
         # 4. erosion gullies: shallow V channels (walkable, about 30 % sides)
         gully = np.full(SHAPE, 1e9)
-        for reg in spec.regions:
-            if reg.id.startswith("gully_"):
-                gully = np.minimum(gully, self.dist_line(reg.geom.pts))
-        gully += 120.0 * noise(41, 6.0)
-        cut = smoothstep(480.0, 60.0, gully) * (1.0 - np.clip(ramp_keep + smoothstep(900.0, 600.0, self.road_dist), 0, 1))
-        Z -= GULLY_DEPTH * cut
+        gully_m = np.full(SHAPE, 1e9)
+        keep_face = np.clip(near_face * 1.5, 0.0, 1.0)
+        for k, reg in enumerate(r for r in spec.regions if r.id.startswith("gully_")):
+            gully = np.minimum(gully, self.dist_line(reg.geom.pts))
+            gully_m = np.minimum(gully_m, self.dist_line(self.meander(reg.geom.pts, keep_face, 300 + k)))
+        # critic round 1: a gully is a cut with banks, not a V smear: flat bed about 3 m wide, banks of about 30 degrees,
+        # and the line meanders. Within 20 m of a rock face the old shallow V stays exactly as it was: the cliff kit's
+        # scree is placed there at absolute heights.
+        keep_old = np.clip(near_face * 1.5, 0.0, 1.0)
+        open_ground = 1.0 - np.clip(ramp_keep + smoothstep(900.0, 600.0, self.road_dist), 0, 1)
+        old_cut = smoothstep(480.0, 60.0, gully + 120.0 * noise(41, 6.0)) * open_ground
+        # critic round 2: the line itself meanders (5 m swings every 25-40 m), see meander()
+        gully = gully_m + 230.0 * noise(41, 9.0) + 60.0 * noise(141, 3.0)
+        new_cut = smoothstep(430.0, 170.0, gully) * open_ground
+        Z -= 130.0 * old_cut * keep_old + GULLY_DEPTH * new_cut * (1.0 - keep_old)
+        cut = old_cut * keep_old + new_cut * (1.0 - keep_old)
+        self.gully_d = gully + 1e6 * (keep_old > 0.5)          # no bed/bank paint on the kept stretches
         self.gully_w = cut
         self.out_masks["gully"] = cut > 0.35
 
         # 5. peat bogs: sunken, hummocky
-        bog = soft(self.regions_like("peat_bog_"), 5)
-        Z += bog * (-BOG_DEPTH + 22.0 * noise(51, 5.0)) * (1.0 - smoothstep(900.0, 600.0, self.road_dist))
+        # critic round 1: the bogs were clean ovals; the outline is now warped into lobes at 8-15 m and the bog sinks
+        # critic round 4: a 1 m dish over 20 m is invisible. Now a flat pan 1.4 m down behind a cut bank about 4 m wide,
+        # with peat hags (3-6 m, half a metre high) left standing in it.
+        bog = soft(smoothstep(0.44, 0.56, soft(self.regions_like("peat_bog_"), 5) + 0.34 * fbm(151, 12.0, 2)), 1)
+        hag = crisp(noise(152, 6.0) + 0.3 * noise(153, 3.0), 0.5, 0.12) * smoothstep(0.9, 1.0, soft(bog, 2))
+        Z += bog * (-BOG_DEPTH + 10.0 * noise(51, 5.0) + 50.0 * hag) * (1.0 - smoothstep(900.0, 600.0, self.road_dist))
         self.bog_w = bog
+        self.bog_hag = hag * bog
         self.out_masks["peat_bog"] = bog > 0.5
+
+        # 5b. realism round: every gully and bog drains to the wash by a rill (0.35 m deep, 2 m wide, free ground only);
+        # shell craters sunk 0.55-0.85 m with a 0.2 m rim on free valley ground
+        self.wash_pts = wash_pts
+        self.tribs = self.tributary_lines(Z, wash_pts)
+        trib_d = np.full(SHAPE, 1e9)
+        for line in self.tribs:
+            trib_d = np.minimum(trib_d, self.dist_line(line))
+        trib_d = trib_d + 90.0 * noise(181, 7.0)
+        root_free = np.ones(SHAPE)
+        for spot in FOSSIL_ROOT_SPOTS:
+            root_free = root_free * smoothstep(1000.0, 2200.0, self.dist_point(spot))
+        free_ground = zone * root_free * (1.0 - np.clip(self.bog_w * 2.0, 0.0, 1.0))
+        Z -= 35.0 * smoothstep(230.0, 60.0, trib_d) * free_ground
+        self.trib_d = trib_d
+        self.craters = self.crater_sites(zone, near_face, via_d, pads)
+        self.crater_r = np.full(SHAPE, 9.0)                    # distance to the nearest crater in radii
+        for x, y, radius, sunk in self.craters:
+            rho = self.dist_point((x, y)) / radius
+            self.crater_r = np.minimum(self.crater_r, rho)
+            if sunk:
+                depth = 55.0 + 30.0 * (radius - 240.0) / 280.0
+                Z += (-depth * smoothstep(1.0, 0.3, rho) + 20.0 * np.exp(-((rho - 1.05) / 0.22) ** 2)) * free_ground
+        self.near_face = near_face
 
         # 6. viaduct: a low rubble swell under the collapsed spans, the 10 m road gap left clear
         rubble = soft(self.region("viaduct_rubble"), 3) * (1.0 - smoothstep(1600.0, 1050.0, self.road_dist))
@@ -395,6 +484,16 @@ class Gen:
         Z = Z * (1.0 - bed) + (level - 12.0) * bed
         tbed = smoothstep(520.0, 300.0, track) * (1.0 - bed)
         Z = Z * (1.0 - tbed) + (level - 8.0) * tbed
+
+        # 7b. critic round 4: a real ditch on the north side of the road, 1.5 m wide and 0.4 m deep, in 10-25 m runs
+        north_side = (np.gradient(self.road_dist, axis=0) < 0.0).astype(np.float64)
+        calm_d = np.clip(soft(pads, 5) * 1.6 + ramp_keep + near_face + smoothstep(3300.0, 2500.0, via_d)
+                         + smoothstep(900.0, 500.0, track) + self.bog_w, 0.0, 1.0)
+        ditch = crisp(self.road_dist, 800.0, 70.0) * (1.0 - crisp(self.road_dist, 1010.0, 70.0)) * north_side * (1.0 - calm_d)
+        ditch = ditch * (np.abs(self.Y) < spec.ymax + 2000.0)
+        Z -= 80.0 * ditch
+        self.ditch_run = north_side * (1.0 - calm_d)
+        self.ditch_w = ditch
 
         # 8. past the play edge: the crest keeps climbing south, the foothills rise north; east and west the valley
         # runs on (the contour field already repeats its edge profile there)
@@ -413,6 +512,210 @@ class Gen:
         self.Z = Z
         self.edge_dist = np.maximum.reduce([d_s, d_n, d_ew])
 
+    def meander(self, pts, keep, seed):
+        """A gully line with sideways swings of about 5 m every 25-40 m. No swing at its ends, where keep (a 0..1 grid:
+        the stretches by a rock face) is set, or within 12 m of a fossil-root spot (those were measured on the cut)."""
+        pts = np.asarray(pts, float)
+        seg = np.hypot(*np.diff(pts, axis=0).T)
+        s_knots = np.r_[0.0, np.cumsum(seg)]
+        s = np.arange(0.0, s_knots[-1] + 1.0, 300.0)
+        line = np.c_[np.interp(s, s_knots, pts[:, 0]), np.interp(s, s_knots, pts[:, 1])]
+        tangent = np.gradient(line, axis=0)
+        tangent /= np.hypot(tangent[:, 0], tangent[:, 1])[:, None] + 1e-9
+        normal = np.c_[-tangent[:, 1], tangent[:, 0]]
+        rng = np.random.default_rng(seed)
+        ph = rng.random(2) * 6.283
+        swing = 380.0 * np.sin(6.283 * s / 3300.0 + ph[0]) + 220.0 * np.sin(6.283 * s / 2100.0 + ph[1])
+        taper = smoothstep(0.0, 700.0, s) * smoothstep(0.0, 700.0, s_knots[-1] - s)
+        rows = np.clip(np.round((SIZE / 2.0 - line[:, 0]) / QUAD_CM).astype(int), 0, V - 1)
+        cols = np.clip(np.round((line[:, 1] + SIZE / 2.0) / QUAD_CM).astype(int), 0, V - 1)
+        taper = taper * (1.0 - box_blur(keep, 6)[rows, cols])
+        for spot in FOSSIL_ROOT_SPOTS:
+            taper = taper * smoothstep(900.0, 2200.0, np.hypot(line[:, 0] - spot[0], line[:, 1] - spot[1]))
+        return line + normal * (swing * taper)[:, None]
+
+    # ---- realism round: drainage, craters, wear --------------------------------------------------------------------
+    def low_end(self, pts, Z):
+        """The lower end of a line, and the point just before it."""
+        pts = np.asarray(pts, float)
+
+        def h(p):
+            r = int(np.clip(round((SIZE / 2.0 - p[0]) / QUAD_CM), 0, V - 1))
+            c = int(np.clip(round((p[1] + SIZE / 2.0) / QUAD_CM), 0, V - 1))
+            return Z[r, c]
+        return (pts[-1], pts[-2]) if h(pts[-1]) < h(pts[0]) else (pts[0], pts[1])
+
+    def tributary_lines(self, Z, wash_pts):
+        """Every gully and every bog drains to the wash: a line from the gully's low end (or the bog) to the wash,
+        meeting it at an acute angle pointing downstream (west)."""
+        lines = []
+        starts = [self.low_end(r.geom.pts, Z)[0] for r in self.spec.regions if r.id.startswith("gully_")]
+        starts += [np.asarray(r.geom.pts, float).mean(axis=0) for r in self.spec.regions if r.id.startswith("peat_bog_")]
+        for k, start in enumerate(starts):
+            start = np.asarray(start, float)[:2]
+            y_join = start[1] - 700.0 - 0.15 * abs(start[0] - 2500.0)
+            x_join = float(np.interp(y_join, wash_pts[:, 1], wash_pts[:, 0]))
+            end = np.array([x_join, y_join])
+            if np.hypot(*(end - start)) < 900.0:
+                continue
+            # a wandering line, not a ruler stroke: sideways swings of 2-3 m every 15-25 m, none at the two ends
+            t = np.linspace(0.0, 1.0, max(4, int(np.hypot(*(end - start)) / 400.0)))
+            line = start[None, :] + (end - start)[None, :] * t[:, None]
+            swing = 260.0 * np.sin(t * np.hypot(*(end - start)) / 330.0 + k) * np.sin(3.1416 * t)
+            line[:, 1] += swing
+            lines.append(line)
+        return lines
+
+    def crater_sites(self, zone, near_face, via_d, pads):
+        """Shell and bomb craters: misses beside the viaduct, round the battery and the checkpoint, along the bench
+        lip. [x, y, radius, sunk]: only craters on free valley ground are sunk, the rest are decal and paint."""
+        rng = np.random.default_rng(606)
+        sites = []
+
+        def cell(x, y):
+            return (int(np.clip(round((SIZE / 2.0 - x) / QUAD_CM), 0, V - 1)), int(np.clip(round((y + SIZE / 2.0) / QUAD_CM), 0, V - 1)))
+
+        def free(x, y, gap):
+            r, c = cell(x, y)
+            return (self.inside[r, c] and self.road_dist[r, c] > 1300.0 and self.track_dist[r, c] > 700.0 and not pads[r, c]
+                    and near_face[r, c] < 0.05 and self.bog_w[r, c] < 0.05
+                    and all(math.hypot(x - s[0], y - s[1]) > gap for s in sites)
+                    and all(math.hypot(x - s[0], y - s[1]) > 2200.0 for s in FOSSIL_ROOT_SPOTS))
+
+        def ring(centre, lo, hi, count, r_lo, r_hi, need=None):
+            tries = 0
+            placed = 0
+            while placed < count and tries < 4000:
+                tries += 1
+                a, d = rng.uniform(0.0, 6.283), rng.uniform(lo, hi)
+                x, y = centre[0] + d * math.cos(a), centre[1] + d * math.sin(a)
+                if not free(x, y, 1100.0) or (need is not None and not need(x, y)):
+                    continue
+                r, c = cell(x, y)
+                sites.append([float(x), float(y), float(rng.uniform(r_lo, r_hi)), bool(zone[r, c] > 0.85)])
+                placed += 1
+
+        via_a = np.array(self.spec.by_id["viaduct_south"].geom.pts[0], float)
+        via_b = np.array(self.spec.by_id["viaduct_north"].geom.pts[-1], float)
+
+        def via(x, y):
+            r, c = cell(x, y)
+            return via_d[r, c]
+        for t in np.linspace(0.08, 0.92, 9):                       # the stick along the bridge: 6-20 m off its axis
+            p = via_a + (via_b - via_a) * t
+            ring(p, 500.0, 1900.0, 1, 280.0, 420.0, lambda x, y: 600.0 < via(x, y) < 2100.0)
+        ring(0.5 * (via_a + via_b), 3600.0, 6000.0, 4, 380.0, 520.0, lambda x, y: via(x, y) > 3500.0)     # the misses
+        ring(self.feature("artillery_battery").points[0], 2200.0, 6000.0, 7, 260.0, 440.0)
+        ring(self.feature("checkpoint").points[0], 2400.0, 5200.0, 4, 240.0, 380.0)
+        bench = self.region("ridge_bench")
+        hq = self.feature("hq").points[0]
+        lip = self.feature("overlook").points[0]
+
+        def on_lip(x, y):
+            r, c = cell(x, y)
+            return bench[r, c] and math.hypot(x - hq[0], y - hq[1]) > 6200.0
+        for dy in (-9000.0, -4500.0, 0.0, 5000.0, 9500.0):
+            ring((lip[0] - 1500.0, lip[1] + dy), 300.0, 1800.0, 1, 240.0, 360.0, on_lip)
+        return sites
+
+    def build_wear(self):
+        """Vehicle wear as a track network: least-cost routes over the built ground (slope, woods, bogs, cliffs) from
+        the start to every ramp and on to the road, to the adits and the overlook, and from the road to each spoil
+        heap and knoll ramp. Later routes prefer ground an earlier one already used, so tracks merge into trunks."""
+        import heapq
+        step = 3
+        slope = slope_deg(self.Z)[::step, ::step]
+        m = self.out_masks
+        sub = lambda a: np.asarray(a)[::step, ::step]
+        blocked = (slope > 33.0) | sub(grey(m["cliff"].astype(np.float64), 2, np.maximum) > 0) | sub(self.bog_w > 0.3) | ~sub(self.inside)
+        cost = 1.0 + (slope / 9.0) ** 2
+        cost = cost * np.where(sub(self.regions_like("fh_woods_") | self.regions_like("bench_woods_")), 3.0, 1.0)
+        cost = cost * np.where(sub(self.regions_like("dead_thin_") | self.regions_like("dead_face_")), 1.6, 1.0)
+        cost = cost * np.where(sub(self.region("radixite_ground")), 6.0, 1.0) * np.where(sub(m["gully"]), 3.0, 1.0)
+        cost = cost * np.where(sub(self.region("base_a_yard", "battery_pad", "checkpoint_yard")), 4.0, 1.0)
+        cost = cost * np.where(sub(self.road_dist) < 450.0, 0.3, 1.0) * np.where(sub(self.track_dist) < 300.0, 0.4, 1.0)
+        n = cost.shape[0]
+
+        def node(p):
+            r = int(np.clip(round((SIZE / 2.0 - p[0]) / QUAD_CM / step), 0, n - 1))
+            c = int(np.clip(round((p[1] + SIZE / 2.0) / QUAD_CM / step), 0, n - 1))
+            if blocked[r, c]:
+                rr, cc = np.nonzero(~blocked)
+                k = int(np.argmin((rr - r) ** 2 + (cc - c) ** 2))
+                r, c = int(rr[k]), int(cc[k])
+            return r, c
+
+        def world(r, c):
+            return [SIZE / 2.0 - r * step * QUAD_CM, c * step * QUAD_CM - SIZE / 2.0]
+
+        def route(a, b):
+            a, b = node(a), node(b)
+            dist = np.full(cost.shape, np.inf)
+            prev = {}
+            dist[a] = 0.0
+            heap = [(0.0, a)]
+            while heap:
+                d, cur = heapq.heappop(heap)
+                if cur == b:
+                    break
+                if d > dist[cur]:
+                    continue
+                r, c = cur
+                for dr, dc, w in ((1, 0, 1.0), (-1, 0, 1.0), (0, 1, 1.0), (0, -1, 1.0), (1, 1, 1.414), (1, -1, 1.414), (-1, 1, 1.414), (-1, -1, 1.414)):
+                    rr, cc = r + dr, c + dc
+                    if rr < 0 or cc < 0 or rr >= n or cc >= n or blocked[rr, cc]:
+                        continue
+                    nd = d + w * 0.5 * (cost[r, c] + cost[rr, cc])
+                    if nd < dist[rr, cc]:
+                        dist[rr, cc] = nd
+                        prev[(rr, cc)] = cur
+                        heapq.heappush(heap, (nd, (rr, cc)))
+            if b not in prev:
+                return None
+            nodes = [b]
+            while nodes[-1] != a:
+                nodes.append(prev[nodes[-1]])
+            for r, c in nodes:
+                cost[max(0, r - 1):r + 2, max(0, c - 1):c + 2] *= 0.6
+                cost[r, c] *= 0.5
+            nodes = nodes[::-1]
+            pts = np.array([world(r, c) for r, c in nodes[::4] + [nodes[-1]]], float)
+            for _ in range(2):                                   # Chaikin corner cutting
+                q = 0.75 * pts[:-1] + 0.25 * pts[1:]
+                s = 0.25 * pts[:-1] + 0.75 * pts[1:]
+                pts = np.vstack([pts[:1], np.column_stack([q, s]).reshape(-1, 2), pts[-1:]])
+            return pts
+
+        road = np.asarray(self.path("valley_road").pts, float)
+
+        def on_road(p):
+            return road[int(np.argmin(np.hypot(road[:, 0] - p[0], road[:, 1] - p[1])))]
+
+        f = lambda fid: np.asarray(self.feature(fid).points[0], float)
+        hq = f("hq") + np.array([900.0, 0.0])
+        legs = []
+        for ramp in ("ramp_main", "ramp_sally", "ramp_west", "ramp_east"):
+            legs += [(hq, f(ramp)), (f(ramp), on_road(f(ramp)))]
+        legs += [(hq, f("adit_1")), (hq, f("adit_2")), (hq, f("adit_3")), (hq, f("overlook"))]
+        for heap_id in ("spoil_heap_1", "spoil_heap_2", "spoil_heap_3"):
+            centre = np.asarray(self.spec.by_id[heap_id].geom.pts, float).mean(axis=0)
+            legs.append((on_road(centre), centre))
+        for lane in ("flank_w", "flank_e"):
+            pts = np.asarray(self.path(lane).pts, float)
+            legs.append((pts[0], pts[-1]))
+        self.wear_paths = []
+        wear_d = np.full(SHAPE, 1e9)
+        for a, b in legs:
+            pts = route(a, b)
+            if pts is None or len(pts) < 4:
+                continue
+            self.wear_paths.append(pts)
+            wear_d = np.minimum(wear_d, self.dist_line(pts))
+        self.wear_d = wear_d
+        self.out_masks["wear"] = wear_d < 350.0
+        print("wear tracks: %d of %d legs, %.0f m" % (len(self.wear_paths), len(legs),
+                                                    sum(np.hypot(*np.diff(p, axis=0).T).sum() for p in self.wear_paths) / 100.0))
+
     def band_between(self, outer_id, inner_id):
         """Cells inside the outer contour and outside the inner one."""
         el = self.spec.elevation
@@ -423,72 +726,293 @@ class Gen:
 
     # ---- paint layers -------------------------------------------------------------------------------------------
     def build_layers(self):
+        """Paint weights. Critic round 1 (2026-11-14): transitions thresholded and broken by noise instead of feathered,
+        a base mix per zone, feature paint follows the shape that causes it (bank, bed, rim, apron, shoulder).
+        Critic round 2: RTSSand reads salmon red in sunlight, so every "dark" is now soot = a partial Asphalt weight;
+        edges wander 2-3 m (5 m noise in the edge term, distances perturbed in cm); the valley Desert is diluted with
+        MountainTop (its orange blotches come from the texture, no material scalar removes them)."""
         n_big, n_mid, n_fine = fbm(81, 70.0, 3), fbm(82, 18.0, 2), noise(83, 5.0)
+        n_micro, n_tiny = noise(85, 2.2), noise(86, 1.2)
+        n_patch = fbm(87, 30.0, 2)                    # 20-40 m ground patches
+        n_gravel = fbm(88, 8.0, 2)                    # 3-8 m stony patches
+        n_piece = noise(90, 4.5)                      # 3-6 m pieces (rims, outcrop lines)
+        streak = streak_noise(89, 26.0, 5.0, 35.0)    # wind streaks along the project wind (bearing 35 degrees)
+        grit = 0.45 * n_fine + 0.35 * n_micro + 0.2 * n_tiny
+        wander = 170.0 * n_fine + 70.0 * n_micro      # cm: added to a distance so its contour wanders 2-3 m
+
+        def broken(v, t, amp=0.34, w=0.05):
+            """Sharp threshold of a 0..1 field with a ragged edge."""
+            return crisp(v + amp * grit, t, w)
+
         slope = slope_deg(self.Z)
         self.slope = slope
         height = self.Z
-
-        # How the DryCastle layers look on this map (checked in a top-down capture): Desert = khaki dry ground with
-        # orange flecks, GraySand = saturated orange sand, RTSSand = dark red-brown earth, MountainTop = pale grey-tan,
-        # RockDesert = grey-brown rock, Asphalt = near black, GrassCastle = green.
-        bench = soft(self.region("ridge_bench", "border_crest"), 10)
-        # cooler, paler ground on the ridge bench and the high ground
-        pale = np.clip(0.8 * bench + 0.3 * smoothstep(500.0, 1500.0, height) + 0.3 * n_big, 0.0, 0.92)
-        pale = np.maximum(pale, smoothstep(2900.0, 3700.0, height + 250.0 * n_mid))
-        # worn dirt tracks read pale
-        pale = np.maximum(pale, 0.65 * smoothstep(330.0, 200.0, self.track_dist) * np.clip(0.7 + 0.5 * n_fine, 0.0, 1.0))
-        # orange dust drifts on the valley floor, thin
-        dust = 0.4 * smoothstep(0.2, 0.7, n_big + 0.4 * n_mid) * (1.0 - bench) * smoothstep(700.0, 150.0, height)
-        # dark earth: peat bogs, gully beds, the stain under the dense dead woods
+        zone = self.relief_zone
+        bench = soft(self.region("ridge_bench", "border_crest"), 6)
+        foot = soft(self.region("foothills", "west_shoulder", "side_valley"), 8) * (1.0 - bench)
+        valley = np.clip(1.0 - bench - foot, 0.0, 1.0)
         woods = soft(self.regions_like("fh_woods_") | self.regions_like("bench_woods_"), 8)
         thin = soft(self.regions_like("dead_thin_") | self.regions_like("dead_face_"), 6)
-        dark = 0.9 * smoothstep(0.25, 0.7, self.bog_w + 0.25 * n_mid * (self.bog_w > 0.05))
-        dark = np.maximum(dark, 0.7 * smoothstep(0.3, 0.8, self.gully_w))
-        dark = np.maximum(dark, (0.4 * woods + 0.15 * thin) * smoothstep(-0.2, 0.5, n_mid + 0.4 * n_fine))
-        # mid-map relief: wind-scoured pale crests, darker damp hollows, drifted sand in the dry wash, bare ribs where
-        # a swell is steep
-        curve = height - box_blur(height, 10)                      # cm above (+) or below (-) the surrounding ground
-        zone = self.relief_zone
-        pale = np.maximum(pale, 0.7 * zone * smoothstep(25.0, 110.0, curve + 20.0 * n_fine))
-        dark = np.maximum(dark, 0.4 * zone * smoothstep(25.0, 110.0, -curve + 20.0 * n_fine) * (1.0 - smoothstep(0.2, 0.6, self.wash_w)))
-        # From the RTS camera (pitch -52 to -70) a 4 m swell hardly shades at all, so the paint carries the relief:
-        # slopes that face the map's sun (north-north-east, 46 degrees up) are scoured pale, the lee slopes hold darker
-        # soil. sun = unit vector towards the sun in (x north, y east, z up).
+        heap = self.regions_like("spoil_heap_")
+        radix = soft(self.region("radixite_ground"), 10)
+        cliff_core = smoothstep(0.35, 0.8, self.cliff_w)
+        in_zone = (zone > 0.3).astype(np.float64)
+        away_wash = crisp(self.wash_d, 850.0, 60.0) * in_zone + (1.0 - in_zone)
+
+        # -- base mix per zone: valley warm (Desert thinned with pale), foothills greyer and stonier, bench pale patches --
+        patches = broken(0.5 + 0.5 * n_patch + 0.15 * n_mid, 0.5, 0.25)
+        patch_hi = broken(0.5 + 0.5 * n_patch, 0.68, 0.25)
+        pale = bench * (0.66 + 0.3 * patches) + foot * (0.14 + 0.6 * broken(0.5 + 0.5 * n_patch, 0.58, 0.25)) \
+            + valley * (0.36 + 0.45 * patch_hi)
+        pale = np.maximum(pale, crisp(height + 250.0 * n_mid, 3300.0, 400.0))
+        gravel = broken(0.5 + 0.5 * n_gravel, 0.5, 0.3)
+        rock = 0.7 * gravel * foot * crisp(0.5 + 0.5 * n_big + 0.3 * n_mid, 0.62, 0.1)
+        rock = np.maximum(rock, 0.32 * foot)          # critic round 4: the foothills carry a stony base tone
+        rock = np.maximum(rock, 0.32 * bench * crisp(0.5 + 0.5 * n_gravel + 0.25 * n_patch + 0.1 * n_micro, 0.6, 0.04))
+        dark = np.zeros(SHAPE)                        # RTSSand: salmon red, traces only
+        soot = np.zeros(SHAPE)                        # partial Asphalt: the real dark
+        dust = np.zeros(SHAPE)
+        scrub = np.zeros(SHAPE)
+
+        # -- mid-map relief: lit slopes scoured pale, lee slopes sooty, a broken outcrop line along the sharp crests ------
+        curve = height - box_blur(height, 10)
+        curve3 = height - box_blur(height, 3)
         sun = (0.613, 0.326, 0.719)
-        dzdx = -np.gradient(height, axis=0) / QUAD_CM          # rows run north to south
+        dzdx = -np.gradient(height, axis=0) / QUAD_CM
         dzdy = np.gradient(height, axis=1) / QUAD_CM
         lambert = (-dzdx * sun[0] - dzdy * sun[1] + sun[2]) / np.sqrt(dzdx ** 2 + dzdy ** 2 + 1.0)
-        lit = box_blur(lambert - sun[2], 2)
-        pale = np.maximum(pale, 0.6 * zone * smoothstep(0.025, 0.14, lit + 0.02 * n_fine))
-        dark = np.maximum(dark, 0.5 * zone * smoothstep(0.025, 0.14, -lit + 0.02 * n_fine) * (1.0 - smoothstep(0.2, 0.6, self.wash_w)))
+        lit = box_blur(lambert - sun[2], 1)
+        pale = np.maximum(pale, 0.9 * zone * broken(smoothstep(0.02, 0.12, lit), 0.5, 0.3))
+        pale = np.maximum(pale, 0.9 * zone * broken(smoothstep(25.0, 110.0, curve), 0.55, 0.3))
+        lee = broken(smoothstep(0.02, 0.12, -lit), 0.55, 0.3) * zone * away_wash
+        soot = np.maximum(soot, 0.09 * lee)
+        dark = np.maximum(dark, 0.06 * lee)
+        ridge_cells = (zone > 0.5) & (curve > 45.0) & (self.wash_d > 1100.0)
+        if ridge_cells.any():
+            t_lo, t_hi = np.percentile(curve3[ridge_cells], 40.0), np.percentile(curve3[ridge_cells], 85.0)
+            line = smoothstep(t_lo, t_hi, curve3) * ridge_cells
+            outcrop = crisp(line + 0.4 * n_piece + 0.15 * n_micro, 0.52, 0.07)
+            rock = np.maximum(rock, zone * outcrop * (0.5 + 0.3 * (0.5 + 0.5 * n_micro)))
+            soot = soot * (1.0 - soft(outcrop, 2))
+        rock = np.maximum(rock, 0.25 * zone * broken(smoothstep(12.0, 22.0, slope), 0.55, 0.3))
+        hollow = smoothstep(30.0, 120.0, -curve) * zone * away_wash
+        hol = broken(hollow * (0.6 + 0.4 * (0.5 + 0.5 * n_fine)), 0.5, 0.35)
+        soot = np.maximum(soot, 0.1 * hol)
+        dark = np.maximum(dark, 0.07 * hol)
+        scrub = np.maximum(scrub, 0.55 * broken(hollow * (0.5 + 0.5 * n_mid), 0.5, 0.3))
         self.out_masks["relief_crest"] = (zone > 0.5) & (curve > 55.0)
         self.out_masks["relief_hollow"] = (zone > 0.5) & (curve < -55.0) & (self.wash_w < 0.2)
-        dust = np.maximum(dust, 0.75 * smoothstep(0.25, 0.8, self.wash_w) * np.clip(0.7 + 0.5 * n_mid, 0.0, 1.0))
-        relief_scrub = 0.4 * zone * smoothstep(40.0, 120.0, -curve) * smoothstep(0.0, 0.5, n_mid) * (1.0 - smoothstep(0.2, 0.6, self.wash_w))
-        # survivors: scrub pockets, a little dead grass at the bog rims
-        scrub = soft(self.regions_like("survivors_"), 4) * np.clip(0.8 + 0.6 * n_mid, 0.0, 1.0)
-        scrub = np.maximum(scrub, 0.35 * smoothstep(0.1, 0.4, self.bog_w) * (1.0 - smoothstep(0.5, 0.8, self.bog_w)))
-        scrub = np.maximum(scrub, relief_scrub)
+
+        # -- orange drift sand: only thin wind streaks in the lee of the ribs ---------------------------------------------
+        lee_streak = crisp(0.5 + 0.5 * streak + 0.5 * smoothstep(0.0, 0.08, -lit), 1.0, 0.07)
+        dust = np.maximum(dust, 0.3 * zone * valley * lee_streak * away_wash)
+        # critic round 4: zone identity. Long warm sand drifts (40-80 m, along the wind) on the valley floor only.
+        drift_big = crisp(0.5 + 0.5 * streak_noise(91, 70.0, 28.0, 35.0) + 0.1 * n_fine, 0.63, 0.05)
+        dust = np.maximum(dust, 0.4 * valley * drift_big * away_wash * (1.0 - soft(heap, 6)))
+        # deflation pans: a pale crust on the floor; stone pavements beside them
+        pan = crisp(self.pan_w, 0.55, 0.2)
+        pale = np.maximum(pale, 0.92 * pan)
+        pavement = crisp(fbm(162, 20.0, 2), 0.45, 0.05) * zone * (1.0 - pan) * away_wash
+        rock = np.maximum(rock, 0.3 * pavement)
+        self.out_masks["pavement"] = pavement > 0.5
+        dust = dust * (1.0 - crisp(radix, 0.15, 0.1))                  # none round the Radixite field
+
+        # -- the dry wash: a pale bed 5-6 m wide with a clear edge, rock only on the steep bank faces ----------------------
+        wd = self.wash_d + 0.6 * wander
+        bed = crisp(-wd, -300.0, 25.0) * in_zone
+        pale = np.maximum(pale * (1.0 - 0.6 * band(wd, 300.0, 700.0, 30.0) * in_zone), 0.93 * bed)
+        wash_bank = band(wd, 300.0, 690.0, 30.0) * in_zone
+        rock = rock * (1.0 - wash_bank)
+        rock = np.maximum(rock, (0.25 + 0.3 * (lit > 0.0)) * wash_bank * crisp(slope + 3.0 * n_micro, 14.0, 3.0)
+                          * crisp(0.5 + 0.5 * n_gravel + 0.3 * n_mid, 0.5, 0.06) * (1.0 - self.wash_gap))
+        self.out_masks["wash_bar"] = (self.wash_bars * in_zone) > 0.5
+        self.out_masks["ditch_lip"] = (band(self.road_dist, 1030.0, 1130.0, 20.0) * self.ditch_run) > 0.5
+        self.out_masks["wash_foot"] = (band(self.wash_d, 270.0, 400.0, 20.0) * in_zone) > 0.5
+
+        # -- gullies: pale bed, rock on both bank faces, a sooty line at the bank foot ------------------------------------
+        in_gully = self.gully_w > 0.02
+        gd = self.gully_d + 0.6 * wander
+        gully_bed = crisp(-gd, -165.0, 20.0) * in_gully
+        pale = np.maximum(pale, 0.85 * gully_bed)
+        rock = np.maximum(rock, 0.93 * band(gd, 170.0, 460.0, 25.0) * in_gully)
+        soot = np.maximum(soot, 0.17 * band(gd, 140.0, 230.0, 20.0) * in_gully)
+
+        # -- peat bogs: soot body, tar core, a rock lip, a cracked pale rim in 3-6 m pieces round a third of the edge ------
+        bw = self.bog_w
+        body = broken(bw, 0.45, 0.15)
+        lip = body * (1.0 - np.roll(body, 2, axis=0)) * crisp(0.5 + 0.5 * n_piece, 0.3, 0.08)      # its north edge
+        hag = crisp(self.bog_hag, 0.5, 0.2)
+        soot = np.maximum(soot, 0.9 * body * (1.0 - lip) * (1.0 - hag))     # Asphalt under 0.85 barely darkens
+        dark = np.maximum(dark * (1.0 - body), 0.1 * body)
+        soot = np.maximum(soot, 0.86 * hag)             # Asphalt at 0.5 left the hags as pale islands
+        self.out_masks["bog_hag"] = hag > 0.5
+        belt = band(soft(body, 3), 0.04, 0.5, 0.03) * (1.0 - body) * crisp(0.5 + 0.5 * n_piece + 0.2 * n_mid, 0.42, 0.05)
+        self.out_masks["bog_belt"] = belt > 0.5
+        self.out_masks["bog_near"] = soft(body, 4) > 0.02
+        self.out_masks["bog_lip"] = (band(soft(body, 1), 0.05, 0.6, 0.03) * (1.0 - body)) > 0.3
+        tar = np.zeros(SHAPE)
+        rock = np.maximum(rock * (1.0 - body), 0.85 * lip)
+        rim = band(soft(body, 3), 0.04, 0.5, 0.03) * (1.0 - body)                                   # about 3 m outside
+        pale = np.maximum(pale * (1.0 - body), 0.92 * rim * crisp(0.5 + 0.5 * n_piece + 0.15 * n_micro, 0.7, 0.05))
+        scrub = np.maximum(scrub * (1.0 - body), 0.15 * hag)
+        dust = dust * (1.0 - body)
+        scrub = np.maximum(scrub, 0.12 * rim * crisp(0.5 + 0.5 * n_fine, 0.7, 0.08))
+
+        # -- dead woods floor: sooty needle litter broken at 1-3 m with stones showing, densest under the dense woods ------
+        litter = np.clip(0.75 * woods + 0.35 * thin, 0.0, 1.0)
+        pale = pale * (1.0 - 0.85 * crisp(litter, 0.3, 0.2))
+        lit_b = broken(litter * (0.55 + 0.45 * (0.5 + 0.5 * n_fine)), 0.42, 0.35)
+        lit_p = lit_b * crisp(0.5 + 0.5 * n_micro + 0.2 * n_tiny, 0.48, 0.06)
+        soot = np.maximum(soot, 0.16 * lit_p)
+        dark = np.maximum(dark, 0.08 * lit_b)
+        rock = np.maximum(rock, 0.28 * lit_p)
+        # critic round 4: 0.15 is invisible; near-black litter in 2-3 m patches under the densest clumps only
+        soot = np.maximum(soot, 0.86 * lit_b * crisp(0.5 + 0.5 * n_piece + 0.2 * n_micro, 0.67, 0.05) * crisp(woods, 0.6, 0.1))
+        scrub = np.maximum(scrub, soft(self.regions_like("survivors_"), 3) * broken(0.5 + 0.5 * n_mid, 0.4, 0.3))
         self.out_masks["woods_dense"] = woods > 0.5
         self.out_masks["woods_thin"] = thin > 0.5
         self.out_masks["scrub"] = soft(self.regions_like("survivors_"), 4) > 0.5
-        # rock: faces, anything too steep to walk, the spoil heaps and the viaduct rubble
-        rock = np.maximum(smoothstep(30.0, 42.0, slope + 6.0 * n_fine), smoothstep(0.35, 0.8, self.cliff_w))
-        rock = np.maximum(rock, 0.55 * smoothstep(0.3, 0.8, soft(self.out_masks["viaduct_rubble"], 2)))
-        rock = np.maximum(rock, 0.45 * zone * smoothstep(11.0, 19.0, slope + 3.0 * n_fine))
-        rock = np.maximum(rock, 0.6 * smoothstep(0.2, 0.7, soft(self.regions_like("spoil_heap_"), 4)) * np.clip(0.7 + 0.6 * n_mid, 0, 1))
-        # asphalt: the old valley road (8 m), broken by drift; the checkpoint and the Wismut yard paved in patches
-        patch = smoothstep(-0.7, -0.1, 0.7 * fbm(84, 5.0, 2) + 0.5 * n_mid)
-        # the road itself is a spline mesh (BP_GroundPathSpline_Road): under it only a dark stain, so its dithered
-        # shoulders fade into worn ground
-        asphalt = 0.3 * smoothstep(420.0, 300.0, self.road_dist) * patch
-        yard = smoothstep(0.35, 0.7, soft(self.region("base_a_yard", "checkpoint_yard"), 4) + 0.25 * n_mid)
-        asphalt = np.maximum(asphalt, 0.6 * yard * smoothstep(-0.3, 0.3, n_mid + 0.5 * n_fine))
 
+        # -- spoil heaps: bare broken rock with a pale fines skirt streaked downwind ---------------------------------------
+        heap_s = soft(heap, 4)
+        rock = np.maximum(rock, 0.9 * broken(heap_s, 0.45, 0.3))
+        pale = np.maximum(pale, 0.85 * band(soft(heap, 7), 0.06, 0.5, 0.05) * crisp(0.5 + 0.5 * streak + 0.3 * grit, 0.45, 0.1))
+
+        # -- rock faces and their aprons: a broken gravel band along every lip and foot -----------------------------------
+        # full rock only on and beside the faces; a steep bank elsewhere (ramp sides) gets 0.35 and scree scatter instead
+        by_face = np.clip(soft(grey((self.cliff_w > 0.1).astype(np.float64), 8, np.maximum), 2) + cliff_core, 0.0, 1.0)
+        steep = smoothstep(30.0, 42.0, slope + 6.0 * n_fine)
+        rock = rock * (1.0 - steep * (1.0 - by_face))
+        rock = np.maximum(rock, np.maximum(steep * (0.35 + 0.65 * by_face), cliff_core))
+        self.out_masks["steep_bank"] = (slope > 24.0) & (by_face < 0.1) & self.inside
+        apron = soft(grey((self.cliff_w > 0.3).astype(np.float64), 5, np.maximum), 2) * (1.0 - cliff_core)
+        rock = np.maximum(rock, 0.8 * broken(apron * (0.6 + 0.4 * (0.5 + 0.5 * n_fine)), 0.42, 0.35))
+        rock = np.maximum(rock, 0.55 * crisp(soft(self.out_masks["viaduct_rubble"], 2), 0.5, 0.15))
+
+        # -- road: a compacted pale shoulder 3-4 m wide with a ragged outer edge, a sooty ditch in 5-15 m dashes -----------
+        shoulder = crisp(self.road_dist, 395.0, 20.0) * (1.0 - crisp(self.road_dist + wander, 790.0, 35.0))
+        pale = np.maximum(pale, 0.92 * shoulder)
+        rock = rock * (1.0 - 0.8 * shoulder)
+        ditch = crisp(self.ditch_w, 0.5, 0.25)
+        soot = np.maximum(soot, 0.7 * ditch)
+        pale = pale * (1.0 - 0.9 * ditch)
+        pale = pale * (1.0 - 0.55 * band(self.road_dist + wander, 800.0, 1500.0, 80.0))
+        pale = np.maximum(pale, 0.7 * broken(smoothstep(330.0, 200.0, self.track_dist), 0.5, 0.35))
+        paving = 0.3 * crisp(-self.road_dist, -380.0, 40.0)
+
+        # -- yards: concrete slabs with chipped edges, broken-out holes showing rubble, sand drifted over the windward side
+        yard = soft(self.region("base_a_yard", "checkpoint_yard"), 3)
+        paved = soft(self.region("base_a_yard"), 3)
+        slab_cells = crisp(0.5 + 0.5 * fbm(84, 9.0, 2), 0.42, 0.05)
+        slabs = crisp(paved * (0.5 + 0.5 * slab_cells) + 0.2 * n_micro + 0.12 * n_tiny, 0.62, 0.03)
+        holes = crisp(0.5 + 0.5 * n_gravel + 0.25 * n_micro, 0.72, 0.04)
+        drift = crisp(0.5 + 0.5 * streak + 0.25 * grit, 0.68, 0.06)
+        rock = np.maximum(rock, 0.75 * slabs * holes)
+        slabs = slabs * (1.0 - holes)
+        pale = np.maximum(pale, 0.85 * yard * drift)
+        pale = np.maximum(pale, 0.6 * yard * (1.0 - slabs) * crisp(0.5 + 0.5 * n_fine, 0.4, 0.1))
+        paving = np.maximum(paving, 0.92 * slabs * (1.0 - 0.9 * drift))
+        # the worn ground round the player's start
+        hq = self.feature("hq").points[0]
+        wear = smoothstep(3200.0, 900.0, self.dist_point(hq) + 500.0 * n_mid)
+        soot = np.maximum(soot, 0.08 * broken(wear * (0.5 + 0.5 * n_fine), 0.45, 0.3))
+
+        soot = soot * (1.0 - bed) * (1.0 - gully_bed)
+
+        # ==== realism round ============================================================================================
+        pads_m = soft(self.out_masks["pads"], 2)
+        # the wash carries on as a pale cobbled bed where the ground could not be cut (viaduct, road ends)
+        thru = crisp(-wd, -280.0, 25.0) * (1.0 - in_zone) * (1.0 - pads_m) * crisp(self.road_dist, 700.0, 60.0) * (1.0 - cliff_core)
+        pale = np.maximum(pale, 0.9 * thru)
+        self.out_masks["wash_bar"] = self.out_masks["wash_bar"] | ((thru > 0.5) & (n_fine > 0.0))
+        # tributary rills: pale bed, a fan of fines where each reaches the wash and where each gully leaves the slope
+        td = self.trib_d + 0.4 * wander
+        rill = crisp(-td, -130.0, 25.0) * (1.0 - pads_m) * crisp(self.road_dist, 480.0, 40.0) * (1.0 - cliff_core)
+        rill = rill * (1.0 - crisp(soft(body, 2), 0.05, 0.04))        # a bog drains from its rim, not through its middle
+        pale = np.maximum(pale, 0.85 * rill)
+        soot = soot * (1.0 - rill)
+        fan = np.zeros(SHAPE)
+        for line in self.tribs:
+            fan = np.maximum(fan, smoothstep(650.0, 250.0, self.dist_point(line[0]) + 200.0 * n_fine))
+            fan = np.maximum(fan, smoothstep(520.0, 200.0, self.dist_point(line[-1]) + 200.0 * n_fine))
+        fan = fan * (1.0 - pads_m) * crisp(self.road_dist, 480.0, 40.0) * (1.0 - cliff_core) * (1.0 - crisp(self.bog_w, 0.3, 0.1))
+        pale = np.maximum(pale, 0.75 * crisp(fan + 0.25 * n_micro, 0.5, 0.08))
+        self.out_masks["fan"] = fan > 0.5
+        self.out_masks["headwall"] = (self.trib_d < 260.0) & (self.road_dist > 430.0) & (self.road_dist < 640.0)
+        # ramp feet: a wash fan of fines and small stones below each ramp
+        ramps_m = self.out_masks["ramps"]
+        foot_fan = np.zeros(SHAPE, dtype=bool)
+        rr, cc = np.nonzero(ramps_m)
+        if rr.size:
+            from collections import deque
+            seen = np.zeros(SHAPE, dtype=bool)
+            for r0, c0 in zip(rr[::40], cc[::40]):
+                if seen[r0, c0]:
+                    continue
+                queue, cells = deque([(r0, c0)]), []
+                seen[r0, c0] = True
+                while queue:
+                    r, c = queue.popleft()
+                    cells.append((r, c))
+                    for dr, dc in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                        r2, c2 = r + dr, c + dc
+                        if 0 <= r2 < V and 0 <= c2 < V and ramps_m[r2, c2] and not seen[r2, c2]:
+                            seen[r2, c2] = True
+                            queue.append((r2, c2))
+                cells = np.array(cells)
+                hs = height[cells[:, 0], cells[:, 1]]
+                low_cells = cells[hs < hs.min() + 120.0]
+                foot_fan[low_cells[:, 0], low_cells[:, 1]] = True
+        foot_fan = soft(grey(foot_fan.astype(np.float64), 9, np.maximum), 3) * (1.0 - cliff_core) * crisp(self.road_dist, 480.0, 40.0)
+        foot_fan = foot_fan * (height < box_blur(height, 12) + 60.0)
+        pale = np.maximum(pale, 0.8 * crisp(foot_fan + 0.3 * n_fine + 0.15 * n_micro, 0.55, 0.08))
+        self.out_masks["ramp_fan"] = foot_fan > 0.5
+        # dead woods: the whole footprint stony and dark (three rounds of faint litter never showed)
+        wood_f = crisp(soft(self.regions_like("fh_woods_") | self.regions_like("bench_woods_"), 5) + 0.25 * n_fine, 0.4, 0.08)
+        thin_f = crisp(thin + 0.25 * n_fine, 0.55, 0.08)
+        floor = np.maximum(wood_f, 0.6 * thin_f) * (1.0 - cliff_core)
+        pale = pale * (1.0 - 0.9 * floor)
+        rock = np.maximum(rock, 0.5 * wood_f * (1.0 - cliff_core))
+        rock = np.maximum(rock, 0.3 * thin_f * (1.0 - cliff_core))
+        # dark patches under the dense woods only: on the thin woods they read as smoke shadows on open ground
+        soot = np.maximum(soot, 0.86 * wood_f * (1.0 - cliff_core) * crisp(0.5 + 0.5 * n_gravel + 0.15 * n_micro, 0.53, 0.05))
+        ring = grey((woods > 0.5).astype(np.float64), 12, np.maximum) > 0
+        self.out_masks["woods_ring"] = ring & ~(woods > 0.35) & self.inside
+        # craters: scorched bowl, pale ejecta thrown out in rays
+        cr = self.crater_r + 0.12 * n_micro
+        scorch = crisp(-cr, -0.62, 0.08)
+        ejecta = band(cr, 0.95, 2.1, 0.08) * crisp(0.5 + 0.5 * n_micro + 0.25 * n_tiny, 0.45, 0.06)
+        pale = np.maximum(pale * (1.0 - scorch), 0.85 * ejecta)
+        rock = np.maximum(rock * (1.0 - scorch), 0.5 * band(cr, 0.6, 1.0, 0.06))
+        soot = np.maximum(soot, 0.88 * scorch)
+        self.out_masks["crater_rim"] = (cr > 0.8) & (cr < 1.45)
+        self.out_masks["crater"] = self.crater_r < 1.5
+        # wear: compacted ground under every track, khaki on the pale bench and pale on the valley floor; churned
+        # ground where the tracks leave the road and at ramp feet
+        wd_t = self.wear_d + 0.5 * wander
+        worn = crisp(-wd_t, -170.0, 30.0) * (1.0 - cliff_core)
+        wide = crisp(-wd_t, -420.0, 60.0) * crisp(-self.road_dist, -1500.0, 200.0) * (1.0 - cliff_core)
+        worn = np.maximum(worn, wide * crisp(0.5 + 0.5 * n_fine, 0.4, 0.1))
+        pale = np.maximum(pale * (1.0 - worn * bench), 0.7 * worn * (1.0 - bench))
+        rock = np.maximum(rock * (1.0 - worn), 0.25 * worn * bench)
+        scrub = scrub * (1.0 - worn)
+        soot = soot * (1.0 - worn)
+        dust = dust * (1.0 - worn)
+        # the start: a worn apron round the buildings instead of untouched ground
+        apron_hq = crisp(smoothstep(2600.0, 900.0, self.dist_point(hq) + 500.0 * n_mid) + 0.3 * n_fine, 0.5, 0.08)
+        pale = pale * (1.0 - 0.6 * apron_hq)
+        rock = np.maximum(rock, 0.22 * apron_hq)
+        # mine yard and checkpoint: oil patches at the parking spots, pale fines spilled between the sheds
+        work = soft(self.region("base_a_yard", "checkpoint_yard"), 3)
+        oil = crisp(noise(191, 3.0) + 0.3 * n_tiny, 0.78, 0.04) * work
+        soot = np.maximum(soot, 0.88 * oil)
+        pale = np.maximum(pale, 0.85 * crisp(noise(192, 7.0), 0.55, 0.06) * work * (1.0 - oil) * (1.0 - paving))
+        # ===============================================================================================================
+        asphalt = np.maximum(np.maximum(paving, tar), soot)
         w = {"Desert": np.ones(SHAPE)}
         for name, layer in (("MountainTop", pale), ("GraySand", dust), ("RTSSand", dark), ("GrassCastle", scrub),
                             ("RockDesert", rock), ("Asphalt", asphalt)):
-            layer = np.clip(box_blur(layer, 1), 0.0, 1.0)
+            layer = np.clip(0.5 * layer + 0.5 * box_blur(layer, 1), 0.0, 1.0)
             for other in w:
                 w[other] = w[other] * (1.0 - layer)
             w[name] = layer
@@ -620,6 +1144,9 @@ class Gen:
             "bounds": {"xmin": spec.xmin, "xmax": spec.xmax, "ymin": spec.ymin, "ymax": spec.ymax},
             "z_range": [float(self.Z.min()), float(self.Z.max())], "scale": SCALE,
             "layers": LAYERS, "files": files, "regions": regions, "features": features, "paths": paths,
+            "wear_tracks": [[[round(float(x)), round(float(y))] for x, y in p] for p in self.wear_paths],
+            "craters": [[round(c[0]), round(c[1]), round(c[2]), bool(c[3])] for c in self.craters],
+            "tributaries": [[[round(float(x)), round(float(y))] for x, y in t] for t in self.tribs],
         }
         with open(os.path.join(OUT, "Ore_layout.json"), "w") as handle:
             json.dump(layout, handle, indent=1)
@@ -659,6 +1186,7 @@ class Gen:
 def main():
     gen = Gen()
     gen.build_heights()
+    gen.build_wear()
     gen.build_layers()
     os.makedirs(OUT, exist_ok=True)
     gen.check()

@@ -163,12 +163,32 @@ def step_strip():
     return removed
 
 
+# The Desert layer's orange blotches come from its variation-noise mask: thinned out for this map only.
+LANDSCAPE_SCALARS = {"Noise_Mask_Power": 0.35, "Texture_Scale_Noise_Near": 8.0}
+
+
+def tune_landscape_material(mi):
+    """Only LANDSCAPE_SCALARS are overridden; every other scalar keeps following the shared parent instance."""
+    current = {str(v.parameter_info.name): round(v.parameter_value, 4) for v in mi.get_editor_property("scalar_parameter_values")}
+    if current == LANDSCAPE_SCALARS:
+        return False
+    mi.set_editor_property("scalar_parameter_values", [])
+    for name, value in LANDSCAPE_SCALARS.items():
+        unreal.MaterialEditingLibrary.set_material_instance_scalar_parameter_value(mi, name, value)
+    unreal.MaterialEditingLibrary.update_material_instance(mi)
+    unreal.EditorAssetLibrary.save_loaded_asset(mi, False)
+    log("landscape material scalars reset to %s" % LANDSCAPE_SCALARS)
+    return True
+
+
 def landscape_material():
     """Child instance of the shared DryCastle instance (tank trails on) with the radixite blight switched on.
     The shared master and its three existing instances are left alone."""
     mel = unreal.MaterialEditingLibrary
     if unreal.EditorAssetLibrary.does_asset_exist(LANDSCAPE_MATERIAL):
-        return unreal.load_asset(LANDSCAPE_MATERIAL)
+        mi = unreal.load_asset(LANDSCAPE_MATERIAL)
+        tune_landscape_material(mi)
+        return mi
     mi = unreal.AssetToolsHelpers.get_asset_tools().create_asset(
         LANDSCAPE_MATERIAL.split("/")[-1], LS_ROOT.rstrip("/"), unreal.MaterialInstanceConstant,
         unreal.MaterialInstanceConstantFactoryNew())
@@ -587,6 +607,9 @@ def step_roads():
     _path_actor(PREFIX + "Road_Valley", "Road/BP_GroundPathSpline_Road", spline_pts, 900.0, worn)
     _path_actor(PREFIX + "Road_AmmoTrack", "BP_GroundPathSpline_TwoTrack", path("ammo_route")["points"], 420.0)
     _path_actor(PREFIX + "Road_DepotTrack", "BP_GroundPathSpline_TwoTrack", path("depot_track")["points"], 420.0)
+    # realism round: the wear network routed by ore_terrain_gen.build_wear
+    for k, pts in enumerate(LAYOUT.get("wear_tracks", [])):
+        _path_actor("%sRoad_Wear_%02d" % (PREFIX, k), "BP_GroundPathSpline_TwoTrack", pts[::2] + pts[-1:], 380.0)
     return removed
 
 
@@ -742,7 +765,7 @@ def step_props():
             missing.add(group["mesh"].split("/")[-1])
             continue
         box = loaded.get_bounding_box()
-        transforms = [unreal.Transform(unreal.Vector(x, y, ground_z(x, y) - (box.min.z + 0.08 * (box.max.z - box.min.z)) * s),
+        transforms = [unreal.Transform(unreal.Vector(x, y, ground_z(x, y) - (box.min.z + group.get("sink", 0.08) * (box.max.z - box.min.z)) * s),
                                        unreal.Rotator(0.0, 0.0, yaw), unreal.Vector(s, s, s)) for x, y, yaw, s in group["items"]]
         _instance_actor(PREFIX + "Scatter_" + name, FOLDER + "GroundDetail", loaded, transforms, collision=False)
         total += len(transforms)

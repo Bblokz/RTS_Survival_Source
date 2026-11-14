@@ -73,7 +73,7 @@ def inside_play(x, y, margin=300.0):
 def free(x, y, road=900.0):
     """Open ground: not on a road, track, ramp, face or flat building pad."""
     return inside_play(x, y) and road_dist(x, y) > road and track_dist(x, y) > 500.0 and \
-        not any(mask_at(n, x, y) for n in ("ramps", "cliff", "pads"))
+        not any(mask_at(n, x, y) for n in ("ramps", "cliff", "pads", "wear"))
 
 
 def bp(asset, label, x, y, yaw=0.0, scale=1.0, dz=0.0):
@@ -94,6 +94,45 @@ def grid_scatter(name, asset, spacing, keep, accept, lo=0.8, hi=1.3):
             if rng.random() > keep or not accept(x, y):
                 continue
             items.append([round(x), round(y), round(float(rng.uniform(0, 360)), 1), round(float(rng.uniform(lo, hi)), 2)])
+
+
+def _smooth_field(seed, cells):
+    from PIL import Image
+    r = np.random.default_rng(seed)
+    n = int(V / cells) + 3
+    img = Image.fromarray(r.random((n, n)).astype(np.float32), mode="F").resize((int(n * cells), int(n * cells)), Image.BICUBIC)
+    return np.asarray(img)[:V, :V]
+
+
+CLUMP_FIELD = _smooth_field(901, 3.0)          # 2-4 m clumps
+PATCH_FIELD = _smooth_field(902, 14.0)         # which patches exist at all
+
+
+def stone_scatter(name, asset, spacing, accept, lo, hi, clump_at=0.56, patch_at=0.0, straggle=0.06, sink=0.3, grade=None):
+    """Critic round 5: stones in clumps of touching pieces (2-4 m noise), a few stragglers, a size mix of 70 % small,
+    25 % medium, 5 % large, each sunk about a third into the ground. grade(x, y) -> 0..1 shifts the mix to large."""
+    group = scatter.setdefault(name, {"mesh": asset, "items": [], "sink": sink})
+    n = int(lay["size_x"] / spacing)
+    for i in range(n):
+        for j in range(n):
+            x = lay["corner"][0] + (i + rng.uniform(0.0, 1.0)) * spacing
+            y = lay["corner"][1] + (j + rng.uniform(0.0, 1.0)) * spacing
+            if not accept(x, y):
+                continue
+            ix, iy = cell(x, y)
+            if PATCH_FIELD[iy, ix] < patch_at:
+                continue
+            if CLUMP_FIELD[iy, ix] < clump_at and rng.random() > straggle:
+                continue
+            roll = rng.random()
+            big = grade(x, y) if grade else 0.0
+            if roll < 0.70 - 0.5 * big:
+                s = rng.uniform(lo, lo + 0.25 * (hi - lo))
+            elif roll < 0.95 - 0.25 * big:
+                s = rng.uniform(lo + 0.25 * (hi - lo), lo + 0.6 * (hi - lo))
+            else:
+                s = rng.uniform(lo + 0.6 * (hi - lo), hi)
+            group["items"].append([round(x), round(y), round(float(rng.uniform(0, 360)), 1), round(float(s), 2)])
 
 
 def at(fid):
@@ -293,11 +332,17 @@ def heap(x, y):
     return mask_at("spoil_heap", x, y) and free(x, y, 700.0)
 
 
+def toe_any(x, y):
+    ix, iy = cell(x, y)
+    return 1.0 if H[iy, ix] < box_H9[iy, ix] - 40.0 else 0.0
+
+
+box_H9 = box_mean(H, 9)
 STONES = ENV + "GroundStones/Meshes/SM_GS_"
 for name, piece, spacing, keep, lo, hi in (("Scree_Chunk_A", "Chunk_A", 300.0, 0.5, 1.2, 2.8), ("Scree_Chunk_C", "Chunk_C", 340.0, 0.45, 1.2, 3.0),
                                          ("Scree_Field_B", "Field_B", 380.0, 0.5, 1.4, 2.6), ("Scree_Slab_B", "Slab_B", 420.0, 0.45, 1.5, 3.2),
                                          ("Scree_Cluster_A", "Cluster_A", 360.0, 0.5, 1.5, 2.6)):
-    grid_scatter(name, STONES + piece, spacing, keep, scree, lo, hi)
+    stone_scatter(name, STONES + piece, spacing * 0.6, scree, lo * 0.45, hi, clump_at=0.45, straggle=0.2, sink=0.25, grade=toe_any)
 grid_scatter("Gully_Long_A", STONES + "Long_A", 330.0, 0.5, gully_bed, 1.0, 2.2)
 
 # mid-map relief: stones on the wind-scoured crests and in the dry wash, dead scrub and tufts in the hollows
@@ -313,14 +358,90 @@ def wash_bed(x, y):
     return mask_at("wash", x, y) and free(x, y, 800.0)
 
 
-grid_scatter("Crest_Slab_A", STONES + "Slab_A", 520.0, 0.28, crest, 1.0, 3.4)
-grid_scatter("Crest_Chunk_D", STONES + "Chunk_D", 610.0, 0.28, crest, 0.9, 3.0)
-grid_scatter("Crest_Field_D", STONES + "Field_D", 700.0, 0.3, crest, 1.2, 3.0)
-grid_scatter("Wash_Cluster_C", STONES + "Cluster_C", 300.0, 0.5, wash_bed, 1.0, 2.2)
-grid_scatter("Wash_Long_B", STONES + "Long_B", 360.0, 0.45, wash_bed, 1.0, 2.0)
+# critic round 4: crest stones in clumps of 3-5 with gaps, not an even row; three times the cobbles in the wash bed;
+# stones at the bank foot, on stone pavements and as scree on steep banks carry the edges paint cannot (1 m weights)
+def clump(x, y, size=900.0, share=45):
+    return ((int(math.floor(x / size)) * 73856093) ^ (int(math.floor(y / size)) * 19349663)) % 100 < share
+
+
+def crest_clump(x, y):
+    return crest(x, y) and clump(x, y)
+
+
+def wash_foot(x, y):
+    return mask_at("wash_foot", x, y) and free(x, y, 800.0)
+
+
+def pavement(x, y):
+    return mask_at("pavement", x, y) and free(x, y, 800.0)
+
+
+def steep_bank(x, y):
+    return mask_at("steep_bank", x, y) and road_dist(x, y) > 600.0
+
+
+def bog_lip(x, y):
+    return mask_at("bog_lip", x, y) and free(x, y, 800.0)
+
+
+def bog_hag(x, y):
+    return mask_at("bog_hag", x, y) and free(x, y, 800.0)
+
+
+def wash_bar(x, y):
+    return mask_at("wash_bar", x, y) and free(x, y, 800.0)
+
+
+def bank_dry(x, y):
+    return steep_bank(x, y) and not mask_at("bog_near", x, y)
+
+
+def toe(x, y):
+    ix, iy = cell(x, y)
+    return 1.0 if low[iy, ix] else 0.0
+
+
+def ditch_lip(x, y):
+    return mask_at("ditch_lip", x, y)
+
+
+def bog_belt(x, y):
+    return mask_at("bog_belt", x, y) and free(x, y, 800.0)
+
+
+# ledge stones along the crests in clumps; cobbles gathered on the gravel bars of the wash with bare sand between;
+# pavements in half the patches; graded scree on the steep banks (blocks at the toe, small stuff at the top)
+stone_scatter("Crest_Slab_A", STONES + "Slab_A", 190.0, crest, 0.8, 3.4, clump_at=0.6, straggle=0.03)
+stone_scatter("Crest_Chunk_D", STONES + "Chunk_D", 170.0, crest, 0.5, 2.6, clump_at=0.6, straggle=0.04)
+stone_scatter("Wash_Cluster_C", STONES + "Cluster_C", 150.0, wash_bar, 0.6, 2.0, clump_at=0.45, straggle=0.1)
+stone_scatter("Wash_Long_B", STONES + "Long_B", 190.0, wash_bar, 0.6, 1.8, clump_at=0.45, straggle=0.1)
+stone_scatter("Wash_Stray_C", STONES + "Chunk_C", 260.0, wash_bed, 0.4, 1.2, clump_at=0.72, straggle=0.03)
+# realism round: stones only where something put them (faces, beds, crests, heaps, crater rims, fans, headwalls)
+def m_(name):
+    return lambda x, y: mask_at(name, x, y)
+
+
+stone_scatter("Fan_Field_B", STONES + "Field_B", 140.0, m_("fan"), 0.3, 1.0, clump_at=0.5, straggle=0.1)
+stone_scatter("RampFan_Field_B", STONES + "Field_B", 150.0, m_("ramp_fan"), 0.3, 1.1, clump_at=0.52, straggle=0.1)
+stone_scatter("RampFan_Chunk_C", STONES + "Chunk_C", 190.0, m_("ramp_fan"), 0.3, 1.0, clump_at=0.55, straggle=0.08)
+stone_scatter("Headwall_Chunk_A", STONES + "Chunk_A", 90.0, m_("headwall"), 0.6, 1.6, clump_at=0.3, straggle=0.5)
+stone_scatter("CraterRim_Chunk_C", STONES + "Chunk_C", 110.0, m_("crater_rim"), 0.25, 1.1, clump_at=0.5, straggle=0.15)
+stone_scatter("CraterRim_Chunk_A", STONES + "Chunk_A", 150.0, m_("crater_rim"), 0.25, 0.9, clump_at=0.55, straggle=0.1)
+# salvage-felling belt round every wood: stumps and brash
+grid_scatter("Ring_Stump", "/Game/RTS_Survival/Blueprints/Environment/OreMountains/DeadForest/Meshes/SM_OreDead_Stump_Shattered", 330.0, 0.5,
+             lambda x, y: mask_at("woods_ring", x, y) and free(x, y, 900.0), 0.8, 1.2)
+grid_scatter("Ring_Brash", "/Game/RTS_Survival/Blueprints/Environment/OreMountains/DeadForest/Meshes/SM_OreDead_BrashPile", 700.0, 0.5,
+             lambda x, y: mask_at("woods_ring", x, y) and free(x, y, 900.0), 0.8, 1.3)
+# Shell craters are heights + paint + rim stones only: the project's dirt crater decals (BP_RTS_RandomDirtCraterDecal_*)
+# render brick red on this ground and were taken out again after the first in-game look.
+stone_scatter("Bank_Chunk_A", STONES + "Chunk_A", 110.0, bank_dry, 0.4, 2.2, clump_at=0.42, straggle=0.25, grade=toe)
+stone_scatter("Bank_Field_B", STONES + "Field_B", 140.0, bank_dry, 0.5, 1.8, clump_at=0.42, straggle=0.25, grade=toe)
+stone_scatter("Bank_Chunk_C", STONES + "Chunk_C", 150.0, bank_dry, 0.4, 2.0, clump_at=0.42, straggle=0.25, grade=toe)
+grid_scatter("DitchLip_Tuft_A", ENV + "GroundFoliage/Meshes/SM_GF_DryTuft_A", 110.0, 0.5, ditch_lip, 0.9, 1.7)
+stone_scatter("DitchLip_Chunk_C", STONES + "Chunk_C", 150.0, ditch_lip, 0.3, 1.0, clump_at=0.5, straggle=0.1)
 grid_scatter("Gully_Cluster_B", STONES + "Cluster_B", 380.0, 0.5, gully_bed, 1.2, 2.2)
-grid_scatter("Heap_Field_C", STONES + "Field_C", 300.0, 0.55, heap, 1.0, 2.0)
-grid_scatter("Heap_Chunk_B", STONES + "Chunk_B", 360.0, 0.5, heap, 1.0, 2.2)
+stone_scatter("Heap_Chunk_A", STONES + "Chunk_A", 120.0, heap, 0.3, 1.2, clump_at=0.45, straggle=0.2)
+stone_scatter("Heap_Chunk_C", STONES + "Chunk_C", 150.0, heap, 0.3, 1.1, clump_at=0.45, straggle=0.2)
 
 
 def bog(x, y):
@@ -349,12 +470,17 @@ grid_scatter("Tuft_Hollow_B", GF + "DryTuft_B", 300.0, 0.4, hollow, 1.0, 1.8)
 grid_scatter("Tuft_A", GF + "DryTuft_A", 190.0, 0.45, scrub, 1.0, 1.8)
 grid_scatter("Tuft_B", GF + "DryTuft_B", 210.0, 0.45, scrub, 1.0, 1.8)
 grid_scatter("Tuft_Bog_A", GF + "DryTuft_A", 330.0, 0.4, bog, 1.0, 1.8)
-grid_scatter("Litter_Woods", GF + "DryLitter", 420.0, 0.4, wood_floor, 1.0, 2.0)
+# a tussock belt half a metre to 3 m wide with gaps (not a one-plant necklace), and tussocks on every hag
+grid_scatter("Tuft_BogLip_A", GF + "DryTuft_A", 90.0, 0.5, bog_belt, 1.0, 2.0)
+grid_scatter("Tuft_BogLip_B", GF + "DryTuft_B", 100.0, 0.5, bog_belt, 1.0, 2.0)
+grid_scatter("Tuft_BogHag_A", GF + "DryTuft_A", 70.0, 0.55, bog_hag, 1.0, 1.9)
+grid_scatter("Tuft_BogHag_B", GF + "DryTuft_B", 90.0, 0.5, bog_hag, 1.0, 1.9)
+grid_scatter("Litter_Woods", GF + "DryLitter", 240.0, 0.45, wood_floor, 1.0, 2.2)
 # the dead-spruce kit's own clutter on the woods floor (OreDeadForest, instanced, no collision)
 KITM = "/Game/RTS_Survival/Blueprints/Environment/OreMountains/DeadForest/Meshes/SM_OreDead_"
 grid_scatter("Kit_Stump", KITM + "Stump_Shattered", 1500.0, 0.5, wood_floor, 0.9, 1.2)
-grid_scatter("Kit_FallenTop", KITM + "FallenTop_5m", 1900.0, 0.45, wood_floor, 0.9, 1.15)
-grid_scatter("Kit_Brash", KITM + "BrashPile", 1300.0, 0.5, wood_floor, 0.9, 1.3)
+grid_scatter("Kit_FallenTop", KITM + "FallenTop_5m", 1200.0, 0.5, wood_floor, 0.9, 1.15)
+grid_scatter("Kit_Brash", KITM + "BrashPile", 650.0, 0.5, wood_floor, 0.8, 1.4)
 grid_scatter("Kit_Bilberry", KITM + "BilberryMat", 760.0, 0.5, wood_floor, 0.9, 1.4)
 grid_scatter("Kit_Fern", KITM + "DeadFern", 1000.0, 0.5, wood_floor, 0.9, 1.3)
 grid_scatter("Kit_Tussock", KITM + "Tussock", 700.0, 0.5, wood_floor, 0.9, 1.4)

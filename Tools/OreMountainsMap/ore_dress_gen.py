@@ -32,7 +32,7 @@ def mask_at(name, x, y):
 
 
 def blocked(x, y):
-    return any(mask_at(n, x, y) for n in ("road", "track", "ramps", "cliff", "pads", "gully")) or \
+    return any(mask_at(n, x, y) for n in ("road", "track", "ramps", "cliff", "pads", "gully", "wear", "crater")) or \
         abs(x) > B["xmax"] - 300 or abs(y) > B["ymax"] - 300
 
 
