@@ -42,7 +42,7 @@ SIZE = COMPONENTS * QUADS * QUAD_CM     # 107 100 cm
 SHAPE = (V, V)                          # work arrays: row = north..south, col = west..east
 
 # DryCastle master layers (the Ger_MarderStugMission set)
-LAYERS = ["Desert", "GrassCastle", "RockDesert", "GraySand", "RTSSand", "MountainTop", "Asphalt"]
+LAYERS = ["Desert", "GrassCastle", "RockDesert", "GraySand", "RTSSand", "MountainTop", "Asphalt", "DarkEarth"]
 LAYER_TRACE = 2
 
 NAV_MAX_SLOPE_DEG = 44.0                # agent_max_slope of all four RecastNavMesh actors in the template
@@ -285,13 +285,20 @@ class Gen:
         # roads: the valley road runs out both ends, the ammo track and depot track stay inside
         road_pts = self.extended(self.path("valley_road").pts)
         self.road_dist = self.dist_line(road_pts)
+        # the Base B road (2026-11-14, user request): south-west corner -> across the valley road -> knoll west ramp.
+        # Routed by ore_road_route.py; runs out through the west margin at its start.
+        with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "ore_base_b_road.json"), "r") as handle:
+            self.road2_pts = np.asarray(json.load(handle)["points"], float)
+        lead = self.road2_pts[0] + (self.road2_pts[0] - self.road2_pts[1]) / np.linalg.norm(self.road2_pts[0] - self.road2_pts[1]) * 4500.0
+        self.road2_line = np.vstack([lead[None, :], self.road2_pts])
+        self.road2_dist = self.dist_line(self.road2_line)
         self.ammo_dist = self.dist_line(self.path("ammo_route").pts)
         self.depot_dist = self.dist_line(self.path("depot_track").pts)
         track = np.minimum(self.ammo_dist, self.depot_dist)
         for pid in ("flank_w", "flank_e"):
             track = np.minimum(track, self.dist_line(self.path(pid).pts) + 150.0)
         self.track_dist = track
-        self.out_masks["road"] = self.road_dist < 1000.0
+        self.out_masks["road"] = (self.road_dist < 1000.0) | (self.road2_dist < 1000.0)
         self.out_masks["track"] = track < 650.0
 
         # 1. rock faces. A slope is sharpened by taking the dilated height above the local mean and the eroded height
@@ -490,10 +497,41 @@ class Gen:
         calm_d = np.clip(soft(pads, 5) * 1.6 + ramp_keep + near_face + smoothstep(3300.0, 2500.0, via_d)
                          + smoothstep(900.0, 500.0, track) + self.bog_w, 0.0, 1.0)
         ditch = crisp(self.road_dist, 800.0, 70.0) * (1.0 - crisp(self.road_dist, 1010.0, 70.0)) * north_side * (1.0 - calm_d)
-        ditch = ditch * (np.abs(self.Y) < spec.ymax + 2000.0)
+        ditch = ditch * (np.abs(self.Y) < spec.ymax + 2000.0) * smoothstep(1100.0, 1700.0, self.road2_dist)
         Z -= 80.0 * ditch
         self.ditch_run = north_side * (1.0 - calm_d)
         self.ditch_w = ditch
+
+        # 7c. the Base B road: a graded bed. The long profile is the ground along the line, smoothed over about 60 m
+        # (cut and fill), pinned where the ground must stay (ramps, pads, rock faces); side slopes blend out over 10 m.
+        keep2 = np.clip(ramp_keep + near_face + soft(pads, 5) * 1.6, 0.0, 1.0)
+        seg = np.hypot(*np.diff(self.road2_line, axis=0).T)
+        cum = np.concatenate([[0.0], np.cumsum(seg)])
+        s = np.arange(0.0, cum[-1], QUAD_CM)
+        lx, ly = np.interp(s, cum, self.road2_line[:, 0]), np.interp(s, cum, self.road2_line[:, 1])
+        lr = np.clip(np.round((SIZE / 2.0 - lx) / QUAD_CM).astype(int), 0, V - 1)
+        lc = np.clip(np.round((ly + SIZE / 2.0) / QUAD_CM).astype(int), 0, V - 1)
+        z_line = Z[lr, lc].copy()
+        pin = keep2[lr, lc] > 0.3
+        pin[0] = pin[-1] = True
+        prof = z_line.copy()
+        kernel = np.ones(21) / 21.0
+        for _ in range(12):
+            prof = np.convolve(np.pad(prof, 10, mode="edge"), kernel, mode="valid")
+            prof[pin] = z_line[pin]
+        near2 = np.nonzero(self.road2_dist.ravel() < 1700.0)[0]
+        cx, cy = self.X.ravel()[near2], self.Y.ravel()[near2]
+        target = np.zeros(near2.size)
+        for k in range(0, near2.size, 4000):
+            d2 = (cx[k:k + 4000, None] - lx[None, :]) ** 2 + (cy[k:k + 4000, None] - ly[None, :]) ** 2
+            target[k:k + 4000] = prof[np.argmin(d2, axis=1)]
+        level2 = Z.copy()
+        level2.ravel()[near2] = target
+        bed2 = smoothstep(1600.0, 560.0, self.road2_dist) * (1.0 - keep2)
+        Z = Z * (1.0 - bed2) + (level2 - 12.0 * smoothstep(750.0, 450.0, self.road2_dist)) * bed2
+        grade2 = np.abs(np.diff(prof)) / QUAD_CM * 100.0
+        print("base B road: %.0f m, profile moved up to %.0f cm (mean %.0f cm), max grade %.1f %% off the ramp" % (
+            cum[-1] / 100.0, np.abs(prof - z_line).max(), np.abs(prof - z_line).mean(), grade2[~pin[1:]].max()))
 
         # 8. past the play edge: the crest keeps climbing south, the foothills rise north; east and west the valley
         # runs on (the contour field already repeats its edge profile there)
@@ -577,7 +615,7 @@ class Gen:
 
         def free(x, y, gap):
             r, c = cell(x, y)
-            return (self.inside[r, c] and self.road_dist[r, c] > 1300.0 and self.track_dist[r, c] > 700.0 and not pads[r, c]
+            return (self.inside[r, c] and self.road_dist[r, c] > 1300.0 and self.road2_dist[r, c] > 1300.0 and self.track_dist[r, c] > 700.0 and not pads[r, c]
                     and near_face[r, c] < 0.05 and self.bog_w[r, c] < 0.05
                     and all(math.hypot(x - s[0], y - s[1]) > gap for s in sites)
                     and all(math.hypot(x - s[0], y - s[1]) > 2200.0 for s in FOSSIL_ROOT_SPOTS))
@@ -634,6 +672,7 @@ class Gen:
         cost = cost * np.where(sub(self.region("radixite_ground")), 6.0, 1.0) * np.where(sub(m["gully"]), 3.0, 1.0)
         cost = cost * np.where(sub(self.region("base_a_yard", "battery_pad", "checkpoint_yard")), 4.0, 1.0)
         cost = cost * np.where(sub(self.road_dist) < 450.0, 0.3, 1.0) * np.where(sub(self.track_dist) < 300.0, 0.4, 1.0)
+        cost = cost * np.where(sub(self.road2_dist) < 450.0, 0.3, 1.0)
         n = cost.shape[0]
 
         def node(p):
@@ -716,6 +755,21 @@ class Gen:
         print("wear tracks: %d of %d legs, %.0f m" % (len(self.wear_paths), len(legs),
                                                     sum(np.hypot(*np.diff(p, axis=0).T).sum() for p in self.wear_paths) / 100.0))
 
+    def wear_runs(self):
+        """The wear tracks for the map, cut where they run along the Base B road (no two-track drawn on the macadam)."""
+        runs = []
+        for pts in self.wear_paths:
+            off = dist_to_polyline(np.asarray(pts, float), self.road2_line) > 620.0
+            start = None
+            for k, flag in enumerate(list(off) + [False]):
+                if flag and start is None:
+                    start = k
+                elif not flag and start is not None:
+                    if k - start >= 4:
+                        runs.append(pts[start:k])
+                    start = None
+        return runs
+
     def band_between(self, outer_id, inner_id):
         """Cells inside the outer contour and outside the inner one."""
         el = self.spec.elevation
@@ -770,7 +824,8 @@ class Gen:
         rock = np.maximum(rock, 0.32 * foot)          # critic round 4: the foothills carry a stony base tone
         rock = np.maximum(rock, 0.32 * bench * crisp(0.5 + 0.5 * n_gravel + 0.25 * n_patch + 0.1 * n_micro, 0.6, 0.04))
         dark = np.zeros(SHAPE)                        # RTSSand: salmon red, traces only
-        soot = np.zeros(SHAPE)                        # partial Asphalt: the real dark
+        soot = np.zeros(SHAPE)                        # partial Asphalt: oil and tar only since DarkEarth exists
+        earth = np.zeros(SHAPE)                       # DarkEarth: the real dark (damp soil, peat, litter, scorch)
         dust = np.zeros(SHAPE)
         scrub = np.zeros(SHAPE)
 
@@ -785,7 +840,7 @@ class Gen:
         pale = np.maximum(pale, 0.9 * zone * broken(smoothstep(0.02, 0.12, lit), 0.5, 0.3))
         pale = np.maximum(pale, 0.9 * zone * broken(smoothstep(25.0, 110.0, curve), 0.55, 0.3))
         lee = broken(smoothstep(0.02, 0.12, -lit), 0.55, 0.3) * zone * away_wash
-        soot = np.maximum(soot, 0.09 * lee)
+        earth = np.maximum(earth, 0.12 * lee)
         dark = np.maximum(dark, 0.06 * lee)
         ridge_cells = (zone > 0.5) & (curve > 45.0) & (self.wash_d > 1100.0)
         if ridge_cells.any():
@@ -793,11 +848,11 @@ class Gen:
             line = smoothstep(t_lo, t_hi, curve3) * ridge_cells
             outcrop = crisp(line + 0.4 * n_piece + 0.15 * n_micro, 0.52, 0.07)
             rock = np.maximum(rock, zone * outcrop * (0.5 + 0.3 * (0.5 + 0.5 * n_micro)))
-            soot = soot * (1.0 - soft(outcrop, 2))
+            earth = earth * (1.0 - soft(outcrop, 2))
         rock = np.maximum(rock, 0.25 * zone * broken(smoothstep(12.0, 22.0, slope), 0.55, 0.3))
         hollow = smoothstep(30.0, 120.0, -curve) * zone * away_wash
         hol = broken(hollow * (0.6 + 0.4 * (0.5 + 0.5 * n_fine)), 0.5, 0.35)
-        soot = np.maximum(soot, 0.1 * hol)
+        earth = np.maximum(earth, 0.2 * hol)
         dark = np.maximum(dark, 0.07 * hol)
         scrub = np.maximum(scrub, 0.55 * broken(hollow * (0.5 + 0.5 * n_mid), 0.5, 0.3))
         self.out_masks["relief_crest"] = (zone > 0.5) & (curve > 55.0)
@@ -823,8 +878,10 @@ class Gen:
         pale = np.maximum(pale * (1.0 - 0.6 * band(wd, 300.0, 700.0, 30.0) * in_zone), 0.93 * bed)
         wash_bank = band(wd, 300.0, 690.0, 30.0) * in_zone
         rock = rock * (1.0 - wash_bank)
-        rock = np.maximum(rock, (0.25 + 0.3 * (lit > 0.0)) * wash_bank * crisp(slope + 3.0 * n_micro, 14.0, 3.0)
+        rock = np.maximum(rock, (0.1 + 0.12 * (lit > 0.0)) * wash_bank * crisp(slope + 3.0 * n_micro, 14.0, 3.0)
                           * crisp(0.5 + 0.5 * n_gravel + 0.3 * n_mid, 0.5, 0.06) * (1.0 - self.wash_gap))
+        earth = np.maximum(earth, 0.3 * smoothstep(560.0, 320.0, wd) * wash_bank * (1.0 - self.wash_gap)
+                           * crisp(0.5 + 0.5 * n_fine + 0.2 * n_micro, 0.38, 0.1))
         self.out_masks["wash_bar"] = (self.wash_bars * in_zone) > 0.5
         self.out_masks["ditch_lip"] = (band(self.road_dist, 1030.0, 1130.0, 20.0) * self.ditch_run) > 0.5
         self.out_masks["wash_foot"] = (band(self.wash_d, 270.0, 400.0, 20.0) * in_zone) > 0.5
@@ -835,16 +892,16 @@ class Gen:
         gully_bed = crisp(-gd, -165.0, 20.0) * in_gully
         pale = np.maximum(pale, 0.85 * gully_bed)
         rock = np.maximum(rock, 0.93 * band(gd, 170.0, 460.0, 25.0) * in_gully)
-        soot = np.maximum(soot, 0.17 * band(gd, 140.0, 230.0, 20.0) * in_gully)
+        earth = np.maximum(earth, 0.6 * band(gd, 140.0, 250.0, 20.0) * in_gully)
 
         # -- peat bogs: soot body, tar core, a rock lip, a cracked pale rim in 3-6 m pieces round a third of the edge ------
         bw = self.bog_w
         body = broken(bw, 0.45, 0.15)
         lip = body * (1.0 - np.roll(body, 2, axis=0)) * crisp(0.5 + 0.5 * n_piece, 0.3, 0.08)      # its north edge
         hag = crisp(self.bog_hag, 0.5, 0.2)
-        soot = np.maximum(soot, 0.9 * body * (1.0 - lip) * (1.0 - hag))     # Asphalt under 0.85 barely darkens
+        earth = np.maximum(earth, 0.95 * body * (1.0 - lip) * (1.0 - hag))  # peat
         dark = np.maximum(dark * (1.0 - body), 0.1 * body)
-        soot = np.maximum(soot, 0.86 * hag)             # Asphalt at 0.5 left the hags as pale islands
+        earth = np.maximum(earth, 0.8 * hag)
         self.out_masks["bog_hag"] = hag > 0.5
         belt = band(soft(body, 3), 0.04, 0.5, 0.03) * (1.0 - body) * crisp(0.5 + 0.5 * n_piece + 0.2 * n_mid, 0.42, 0.05)
         self.out_masks["bog_belt"] = belt > 0.5
@@ -863,11 +920,9 @@ class Gen:
         pale = pale * (1.0 - 0.85 * crisp(litter, 0.3, 0.2))
         lit_b = broken(litter * (0.55 + 0.45 * (0.5 + 0.5 * n_fine)), 0.42, 0.35)
         lit_p = lit_b * crisp(0.5 + 0.5 * n_micro + 0.2 * n_tiny, 0.48, 0.06)
-        soot = np.maximum(soot, 0.16 * lit_p)
         dark = np.maximum(dark, 0.08 * lit_b)
         rock = np.maximum(rock, 0.28 * lit_p)
         # critic round 4: 0.15 is invisible; near-black litter in 2-3 m patches under the densest clumps only
-        soot = np.maximum(soot, 0.86 * lit_b * crisp(0.5 + 0.5 * n_piece + 0.2 * n_micro, 0.67, 0.05) * crisp(woods, 0.6, 0.1))
         scrub = np.maximum(scrub, soft(self.regions_like("survivors_"), 3) * broken(0.5 + 0.5 * n_mid, 0.4, 0.3))
         self.out_masks["woods_dense"] = woods > 0.5
         self.out_masks["woods_thin"] = thin > 0.5
@@ -890,15 +945,16 @@ class Gen:
         rock = np.maximum(rock, 0.55 * crisp(soft(self.out_masks["viaduct_rubble"], 2), 0.5, 0.15))
 
         # -- road: a compacted pale shoulder 3-4 m wide with a ragged outer edge, a sooty ditch in 5-15 m dashes -----------
-        shoulder = crisp(self.road_dist, 395.0, 20.0) * (1.0 - crisp(self.road_dist + wander, 790.0, 35.0))
+        rd_any = np.minimum(self.road_dist, self.road2_dist)
+        shoulder = crisp(rd_any, 395.0, 20.0) * (1.0 - crisp(rd_any + wander, 790.0, 35.0))
         pale = np.maximum(pale, 0.92 * shoulder)
         rock = rock * (1.0 - 0.8 * shoulder)
         ditch = crisp(self.ditch_w, 0.5, 0.25)
-        soot = np.maximum(soot, 0.7 * ditch)
+        earth = np.maximum(earth, 0.5 * ditch)
         pale = pale * (1.0 - 0.9 * ditch)
-        pale = pale * (1.0 - 0.55 * band(self.road_dist + wander, 800.0, 1500.0, 80.0))
+        pale = pale * (1.0 - 0.55 * band(rd_any + wander, 800.0, 1500.0, 80.0))
         pale = np.maximum(pale, 0.7 * broken(smoothstep(330.0, 200.0, self.track_dist), 0.5, 0.35))
-        paving = 0.3 * crisp(-self.road_dist, -380.0, 40.0)
+        paving = 0.3 * crisp(-rd_any, -380.0, 40.0)
 
         # -- yards: concrete slabs with chipped edges, broken-out holes showing rubble, sand drifted over the windward side
         yard = soft(self.region("base_a_yard", "checkpoint_yard"), 3)
@@ -915,9 +971,9 @@ class Gen:
         # the worn ground round the player's start
         hq = self.feature("hq").points[0]
         wear = smoothstep(3200.0, 900.0, self.dist_point(hq) + 500.0 * n_mid)
-        soot = np.maximum(soot, 0.08 * broken(wear * (0.5 + 0.5 * n_fine), 0.45, 0.3))
 
         soot = soot * (1.0 - bed) * (1.0 - gully_bed)
+        earth = earth * (1.0 - bed) * (1.0 - gully_bed)
 
         # ==== realism round ============================================================================================
         pads_m = soft(self.out_masks["pads"], 2)
@@ -927,15 +983,16 @@ class Gen:
         self.out_masks["wash_bar"] = self.out_masks["wash_bar"] | ((thru > 0.5) & (n_fine > 0.0))
         # tributary rills: pale bed, a fan of fines where each reaches the wash and where each gully leaves the slope
         td = self.trib_d + 0.4 * wander
-        rill = crisp(-td, -130.0, 25.0) * (1.0 - pads_m) * crisp(self.road_dist, 480.0, 40.0) * (1.0 - cliff_core)
+        rill = crisp(-td, -130.0, 25.0) * (1.0 - pads_m) * crisp(np.minimum(self.road_dist, self.road2_dist), 480.0, 40.0) * (1.0 - cliff_core)
         rill = rill * (1.0 - crisp(soft(body, 2), 0.05, 0.04))        # a bog drains from its rim, not through its middle
         pale = np.maximum(pale, 0.85 * rill)
         soot = soot * (1.0 - rill)
+        earth = earth * (1.0 - rill)
         fan = np.zeros(SHAPE)
         for line in self.tribs:
             fan = np.maximum(fan, smoothstep(650.0, 250.0, self.dist_point(line[0]) + 200.0 * n_fine))
             fan = np.maximum(fan, smoothstep(520.0, 200.0, self.dist_point(line[-1]) + 200.0 * n_fine))
-        fan = fan * (1.0 - pads_m) * crisp(self.road_dist, 480.0, 40.0) * (1.0 - cliff_core) * (1.0 - crisp(self.bog_w, 0.3, 0.1))
+        fan = fan * (1.0 - pads_m) * crisp(np.minimum(self.road_dist, self.road2_dist), 480.0, 40.0) * (1.0 - cliff_core) * (1.0 - crisp(self.bog_w, 0.3, 0.1))
         pale = np.maximum(pale, 0.75 * crisp(fan + 0.25 * n_micro, 0.5, 0.08))
         self.out_masks["fan"] = fan > 0.5
         self.out_masks["headwall"] = (self.trib_d < 260.0) & (self.road_dist > 430.0) & (self.road_dist < 640.0)
@@ -972,10 +1029,16 @@ class Gen:
         thin_f = crisp(thin + 0.25 * n_fine, 0.55, 0.08)
         floor = np.maximum(wood_f, 0.6 * thin_f) * (1.0 - cliff_core)
         pale = pale * (1.0 - 0.9 * floor)
-        rock = np.maximum(rock, 0.5 * wood_f * (1.0 - cliff_core))
+        rock = np.maximum(rock, 0.4 * wood_f * (1.0 - cliff_core))
         rock = np.maximum(rock, 0.3 * thin_f * (1.0 - cliff_core))
+        # the floor itself: dark earth and litter over most of the dense woods, stones showing through the gaps;
+        # thinner and patchier under the thin woods, fading out over a few metres past the last trunks
+        floor_gap = crisp(0.5 + 0.5 * n_gravel + 0.2 * n_micro, 0.24, 0.07)
+        earth = np.maximum(earth, (0.78 + 0.18 * crisp(0.5 + 0.5 * n_piece, 0.5, 0.15)) * wood_f * floor_gap * (1.0 - cliff_core))
+        earth = np.maximum(earth, 0.5 * thin_f * crisp(0.5 + 0.5 * n_piece + 0.2 * n_micro, 0.5, 0.08) * (1.0 - cliff_core))
+        earth = np.maximum(earth, 0.3 * crisp(soft(wood_f, 4), 0.25, 0.2) * (1.0 - wood_f) * (1.0 - cliff_core)
+                           * crisp(0.5 + 0.5 * n_fine, 0.45, 0.1))
         # dark patches under the dense woods only: on the thin woods they read as smoke shadows on open ground
-        soot = np.maximum(soot, 0.86 * wood_f * (1.0 - cliff_core) * crisp(0.5 + 0.5 * n_gravel + 0.15 * n_micro, 0.53, 0.05))
         ring = grey((woods > 0.5).astype(np.float64), 12, np.maximum) > 0
         self.out_masks["woods_ring"] = ring & ~(woods > 0.35) & self.inside
         # craters: scorched bowl, pale ejecta thrown out in rays
@@ -984,7 +1047,7 @@ class Gen:
         ejecta = band(cr, 0.95, 2.1, 0.08) * crisp(0.5 + 0.5 * n_micro + 0.25 * n_tiny, 0.45, 0.06)
         pale = np.maximum(pale * (1.0 - scorch), 0.85 * ejecta)
         rock = np.maximum(rock * (1.0 - scorch), 0.5 * band(cr, 0.6, 1.0, 0.06))
-        soot = np.maximum(soot, 0.88 * scorch)
+        earth = np.maximum(earth * (1.0 - band(cr, 0.95, 2.1, 0.08)), 0.92 * scorch)
         self.out_masks["crater_rim"] = (cr > 0.8) & (cr < 1.45)
         self.out_masks["crater"] = self.crater_r < 1.5
         # wear: compacted ground under every track, khaki on the pale bench and pale on the valley floor; churned
@@ -997,6 +1060,7 @@ class Gen:
         rock = np.maximum(rock * (1.0 - worn), 0.25 * worn * bench)
         scrub = scrub * (1.0 - worn)
         soot = soot * (1.0 - worn)
+        earth = earth * (1.0 - 0.85 * worn)
         dust = dust * (1.0 - worn)
         # the start: a worn apron round the buildings instead of untouched ground
         apron_hq = crisp(smoothstep(2600.0, 900.0, self.dist_point(hq) + 500.0 * n_mid) + 0.3 * n_fine, 0.5, 0.08)
@@ -1008,10 +1072,15 @@ class Gen:
         soot = np.maximum(soot, 0.88 * oil)
         pale = np.maximum(pale, 0.85 * crisp(noise(192, 7.0), 0.55, 0.06) * work * (1.0 - oil) * (1.0 - paving))
         # ===============================================================================================================
+        # the Base B road and its shoulder stay clear of woods floor, scorch, scrub and dust paint
+        clear2 = crisp(self.road2_dist, 760.0, 60.0)
+        earth, soot, scrub, dust = earth * clear2, soot * clear2, scrub * clear2, dust * clear2
+        rock = rock * (0.25 + 0.75 * clear2)
+        self.out_masks["wear"] = self.out_masks["wear"] | (self.road2_dist < 650.0)
         asphalt = np.maximum(np.maximum(paving, tar), soot)
         w = {"Desert": np.ones(SHAPE)}
         for name, layer in (("MountainTop", pale), ("GraySand", dust), ("RTSSand", dark), ("GrassCastle", scrub),
-                            ("RockDesert", rock), ("Asphalt", asphalt)):
+                            ("RockDesert", rock), ("DarkEarth", earth), ("Asphalt", asphalt)):
             layer = np.clip(0.5 * layer + 0.5 * box_blur(layer, 1), 0.0, 1.0)
             for other in w:
                 w[other] = w[other] * (1.0 - layer)
@@ -1144,7 +1213,8 @@ class Gen:
             "bounds": {"xmin": spec.xmin, "xmax": spec.xmax, "ymin": spec.ymin, "ymax": spec.ymax},
             "z_range": [float(self.Z.min()), float(self.Z.max())], "scale": SCALE,
             "layers": LAYERS, "files": files, "regions": regions, "features": features, "paths": paths,
-            "wear_tracks": [[[round(float(x)), round(float(y))] for x, y in p] for p in self.wear_paths],
+            "wear_tracks": [[[round(float(x)), round(float(y))] for x, y in p] for p in self.wear_runs()],
+            "base_b_road": [[round(float(x)), round(float(y))] for x, y in self.road2_line],
             "craters": [[round(c[0]), round(c[1]), round(c[2]), bool(c[3])] for c in self.craters],
             "tributaries": [[[round(float(x)), round(float(y))] for x, y in t] for t in self.tribs],
         }
@@ -1160,7 +1230,7 @@ class Gen:
     def preview(self):
         colours = {"Desert": (176, 150, 110), "GrassCastle": (120, 120, 70), "RockDesert": (104, 92, 80),
                    "GraySand": (150, 146, 134), "RTSSand": (206, 186, 146), "MountainTop": (128, 122, 116),
-                   "Asphalt": (70, 70, 74)}
+                   "Asphalt": (70, 70, 74), "DarkEarth": (58, 50, 44)}
         rgb = np.zeros((V, V, 3))
         for name, col in colours.items():
             rgb += (self.W[name].astype(np.float64) / 255.0)[:, :, None] * np.array(col)[None, None, :]

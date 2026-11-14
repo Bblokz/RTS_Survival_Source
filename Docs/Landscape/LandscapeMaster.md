@@ -107,3 +107,19 @@ UnrealEditor-Win64-DebugGame-Cmd.exe <uproject> -run=pythonscript -script="<this
 - **Field test:** the fence edges are precomputed as unit normals and offsets (`Field<i>_C`, `_D`, `_E`). That took the field test from about 30 to about 10 instructions per field.
 - **Blight:** compares squared distances scaled by 1 / radius² with one square root at the end.
 - **What stays the same:** the detail noise UV is plain math instead of a custom node (+4 instructions), and moving the furrow maths out of the loop by hand made it 4 instructions worse, because the compiler already shares it.
+
+## Tenth layer: DarkEarth (2026-11-14)
+
+The master's only dark ground, added for Ger_2ndOreMountains: forest-floor soil in world space at two scales,
+desaturated and tinted. Weight-blended like the other nine layers; a landscape that does not paint it compiles it out.
+
+- Builder: `ls_darkearth_build.py` (`run()` builds and checks that the nine older layers kept their inputs, `save()`
+  saves). Its nodes carry the desc `LSDarkEarth`, so `ls_master_build.run()` leaves them alone.
+- Layer info: `CastleGrassDesertDry/DATA/DarkEarth_LayerInfo`, made by `ls_darkearth_layerinfo.py` in a headless run.
+- Parameters (group "Dark Earth"): `DarkEarth_Tint`, `DarkEarth_Desaturation`, `DarkEarth_Roughness`,
+  `DarkEarth_Tiling`, `DarkEarth_FarMix`, texture objects `DarkEarth_BaseColor` / `DarkEarth_Normal`.
+- Tank trails: the layer counts as soft ground. `ls_master_build.SOFT_ONLY_LAYERS` adds it to SoftGround; until the
+  next `run()` a small splice (desc `LSDarkEarthSoft`) does the same.
+- Not in the ground-surface settings (track smoke tints, surface map).
+- Shader stats of the master and its instances did not change (preview weight 0); the cost on a landscape that paints
+  the layer is not measured.

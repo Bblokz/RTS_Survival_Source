@@ -492,7 +492,7 @@ def margin(x, y):
     out = max(abs(x) - B["xmax"], abs(y) - B["ymax"])
     ix, iy = cell(x, y)
     return 200.0 < out < 8500.0 and x > -B["xmax"] + 9000.0 and H[iy, ix] < 2600.0 and not masks["cliff"][iy, ix] \
-        and road_dist(x, y) > 1100.0 and dist_poly(PATHS["ammo_route"], x, y) > 600.0
+        and road_dist(x, y) > 1100.0 and dist_poly(PATHS["ammo_route"], x, y) > 600.0 and not masks["road"][iy, ix]
 
 
 for name, spacing in (("Skeleton_13m", 2300.0), ("Skeleton_11m", 2300.0), ("Skeleton_11m_B", 2600.0), ("Skeleton_9m", 2600.0),

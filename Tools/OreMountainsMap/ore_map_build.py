@@ -11,6 +11,7 @@ prefix and sit under the outliner folder OreMountains/, so a step can clear and 
 import array
 import json
 import math
+import os
 
 import unreal
 
@@ -29,6 +30,7 @@ LAYER_INFOS = {
     "RTSSand": "/Game/RTS_Survival/Maps/GerMissions/Ger_DestroyT35_sharedassets/RTSSand_LayerInfo",
     "MountainTop": "/Game/RTS_Survival/Maps/GerMissions/Ger_DestroyT35_sharedassets/MountainTop_LayerInfo",
     "Asphalt": "/Game/MilitaryAirport/Landscape/LandscapeMaterial/Asphalt_LayerInfo",
+    "DarkEarth": LS_ROOT + "DATA/DarkEarth_LayerInfo",
 }
 LANDSCAPE_LABEL = "Ore_Landscape"
 RVT_ROOT = "/Game/RTS_Survival/Meshes/RVTs/"
@@ -164,17 +166,23 @@ def step_strip():
 
 
 # The Desert layer's orange blotches come from its variation-noise mask: thinned out for this map only.
-LANDSCAPE_SCALARS = {"Noise_Mask_Power": 0.35, "Texture_Scale_Noise_Near": 8.0}
+LANDSCAPE_SCALARS = {"Noise_Mask_Power": 0.35, "Texture_Scale_Noise_Near": 8.0, "DarkEarth_Desaturation": 0.3}
+# The dark earth layer, warmer and deeper than the master default for this sunlit ground.
+LANDSCAPE_VECTORS = {"DarkEarth_Tint": (0.31, 0.26, 0.22)}
 
 
 def tune_landscape_material(mi):
     """Only LANDSCAPE_SCALARS are overridden; every other scalar keeps following the shared parent instance."""
     current = {str(v.parameter_info.name): round(v.parameter_value, 4) for v in mi.get_editor_property("scalar_parameter_values")}
-    if current == LANDSCAPE_SCALARS:
+    vectors = {str(v.parameter_info.name): tuple(round(c, 4) for c in v.parameter_value.to_tuple()[:3])
+               for v in mi.get_editor_property("vector_parameter_values")}
+    if current == LANDSCAPE_SCALARS and vectors == LANDSCAPE_VECTORS:
         return False
     mi.set_editor_property("scalar_parameter_values", [])
     for name, value in LANDSCAPE_SCALARS.items():
         unreal.MaterialEditingLibrary.set_material_instance_scalar_parameter_value(mi, name, value)
+    for name, value in LANDSCAPE_VECTORS.items():
+        unreal.MaterialEditingLibrary.set_material_instance_vector_parameter_value(mi, name, unreal.LinearColor(value[0], value[1], value[2], 1.0))
     unreal.MaterialEditingLibrary.update_material_instance(mi)
     unreal.EditorAssetLibrary.save_loaded_asset(mi, False)
     log("landscape material scalars reset to %s" % LANDSCAPE_SCALARS)
@@ -605,6 +613,10 @@ def step_roads():
     lead_out = [thin[-1], [2.0 * thin[-1][0] - thin[-2][0], 2.0 * thin[-1][1] - thin[-2][1]]]
     spline_pts = _extended(lead_in, 6000.0)[:1] + thin + _extended(lead_out, 6000.0)[-1:]
     _path_actor(PREFIX + "Road_Valley", "Road/BP_GroundPathSpline_Road", spline_pts, 900.0, worn)
+    # the Base B road (same macadam): south-west margin -> across the valley road -> knoll west ramp -> Base B
+    side = LAYOUT.get("base_b_road")
+    if side:
+        _path_actor(PREFIX + "Road_BaseB", "Road/BP_GroundPathSpline_Road", side[:1] + side[1:-1:2] + side[-1:], 900.0, worn)
     _path_actor(PREFIX + "Road_AmmoTrack", "BP_GroundPathSpline_TwoTrack", path("ammo_route")["points"], 420.0)
     _path_actor(PREFIX + "Road_DepotTrack", "BP_GroundPathSpline_TwoTrack", path("depot_track")["points"], 420.0)
     # realism round: the wear network routed by ore_terrain_gen.build_wear
@@ -786,8 +798,11 @@ def step_cliffs():
     removed = clear_prefix(PREFIX + "Cliff_")
     with open(CLIFF_FILE, "r") as handle:
         data = json.load(handle)
+    cleared = spur_cleared_cliffs()
     groups = {}
-    for item in data["instances"]:
+    for index, item in enumerate(data["instances"]):
+        if index in cleared:
+            continue                                    # under the viaduct spur's landing
         groups.setdefault((item["face"], item["piece"]), []).append(item)
     total, missing = 0, set()
     for (face, piece), items in sorted(groups.items()):
@@ -892,4 +907,414 @@ def step_fx():
         actor.set_folder_path(FOLDER + "Fx/" + name)
         placed[name] = placed.get(name, 0) + 1
     log("fx: removed %d, placed %s" % (removed, placed))
+    return placed
+
+
+# ---- ground decals ---------------------------------------------------------------------------------------------------
+# Judged in game on valley sand, pale bench and dark earth (Saved/OreMountains/critic/decals/sheet.jpg). Left out:
+# MI_Decal_Dirt_TracksSandy_* (brick red here, like the dirt crater BPs), the Zone MI_Decals_* (paint markings), embers.
+DECAL_SCORCH = "/Game/Crater_Decals/Decals/Scorched/"
+DECAL_DIRT = "/Game/RTS_Survival/Materials/Decals/DirtTracks/"
+DECAL_IMPACT = "/Game/RTS_Survival/Materials/Decals/LandscapeImpacts/"
+DECALS = {
+    "scorch": [DECAL_SCORCH + "MI_Decal_Scorch_01", DECAL_SCORCH + "MI_Decal_Scorch_02", DECAL_SCORCH + "MI_Decal_Scorch_03"],
+    "soot": [DECAL_SCORCH + "MI_Decal_Scorch_04", DECAL_SCORCH + "MI_Decal_Scorch_03"],
+    "crater": [DECAL_IMPACT + "MI_BombImpactDecal", DECAL_IMPACT + "MI_LandscapeImpactDecal",
+               DECAL_SCORCH + "MI_Decal_Crater_Scorched_Dirt_01"],
+    "debris": [DECAL_SCORCH + "MI_Decal_Crater_Scorched_Scatter_01", DECAL_SCORCH + "MI_Decal_Scorched_Dirt_Debris_01",
+               "/Game/Crater_Decals/Decals/Dirt/MI_Decal_Dirt_Scatter_01"],
+    "erosion": [DECAL_DIRT + "MI_Decal_Erosion_Channel_01", DECAL_DIRT + "MI_Decal_Erosion_Channel_03"],
+}
+
+
+def decal_plan():
+    """[(kind, variant, x, y, half size cm, yaw, sort order)]: scorch, a crater where the ground could not be sunk and
+    thrown debris at every shell crater; soot under the wrecks, smoulder spots and the fuel store; an erosion channel
+    where each rill starts and half-way down it."""
+    import math
+    import random
+    rng = random.Random(1947)
+    plan = []
+    for index, (x, y, radius, sunk) in enumerate(LAYOUT.get("craters", [])):
+        plan.append(("scorch", index, x, y, radius * (1.35 if sunk else 1.6), rng.uniform(0.0, 360.0), 1))
+        if not sunk:
+            plan.append(("crater", index, x, y, radius * 1.05, rng.uniform(0.0, 360.0), 2))
+        for _ in range(1 if sunk else 2):
+            angle, reach = rng.uniform(0.0, 2.0 * math.pi), radius * rng.uniform(1.2, 1.9)
+            plan.append(("debris", rng.randrange(3), x + reach * math.cos(angle), y + reach * math.sin(angle),
+                         radius * rng.uniform(0.7, 1.0), rng.uniform(0.0, 360.0), 3))
+    with open(DETAIL_FILE, "r") as handle:
+        props = json.load(handle)["props"]
+    for prop in props:
+        label, x, y = prop[2], prop[3], prop[4]
+        if label.startswith("Wreck_"):
+            plan.append(("soot", 1, x, y, 520.0, rng.uniform(0.0, 360.0), 1))
+            plan.append(("debris", rng.randrange(2), x + rng.uniform(-250.0, 250.0), y + rng.uniform(-250.0, 250.0), 380.0,
+                         rng.uniform(0.0, 360.0), 2))
+        elif label.startswith("Smoulder_") or label == "Yard_Fuel":
+            plan.append(("soot", 0, x, y, rng.uniform(260.0, 360.0), rng.uniform(0.0, 360.0), 1))
+    for index, line in enumerate(LAYOUT.get("tributaries", [])):
+        for at in (1, len(line) // 2):
+            if at + 1 >= len(line):
+                continue
+            (x0, y0), (x1, y1) = line[at], line[at + 1]
+            yaw = math.degrees(math.atan2(y1 - y0, x1 - x0))
+            plan.append(("erosion", index + at, x0, y0, rng.uniform(300.0, 400.0), yaw, 1))
+    return plan
+
+
+def step_decals():
+    """Ground decals from decal_plan(). Labels ORE_Decal_*. Shared decal instances are used as they are."""
+    require_map()
+    removed = clear_prefix(PREFIX + "Decal_")
+    materials = {kind: [unreal.load_asset(path) for path in paths] for kind, paths in DECALS.items()}
+    missing = [paths[i] for kind, paths in DECALS.items() for i, m in enumerate(materials[kind]) if m is None]
+    if missing:
+        raise RuntimeError("missing decal materials %s" % missing)
+    placed = {}
+    for index, (kind, variant, x, y, half, yaw, order) in enumerate(decal_plan()):
+        options = materials[kind]
+        actor = actors_sub().spawn_actor_from_class(
+            unreal.DecalActor, unreal.Vector(x, y, ground_z(x, y) + 30.0), unreal.Rotator(0.0, -90.0, yaw))
+        actor.decal.set_decal_material(options[variant % len(options)])
+        actor.decal.set_editor_property("decal_size", unreal.Vector(max(220.0, 0.6 * half), half, half))
+        actor.decal.set_editor_property("sort_order", order)
+        actor.set_actor_label("%sDecal_%s_%03d" % (PREFIX, kind, index))
+        actor.set_folder_path(FOLDER + "Decals/" + kind)
+        placed[kind] = placed.get(kind, 0) + 1
+    log("decals: removed %d, placed %s" % (removed, placed))
+    return placed
+
+
+# ---- road junction ---------------------------------------------------------------------------------------------------
+JUNCTION_BP = PATH_ROOT + "Road/Junction/BP_GroundPath_RoadJunction"
+
+
+def step_junction():
+    """The junction overlay where the Base B road crosses the valley road (asset and placement rules:
+    Source/Docs/Landscape/path_road_junction_build.py). Pivot, yaw and height come from the placed splines.
+    Label ORE_Junction_BaseB. Run after step_roads()."""
+    require_map()
+    removed = clear_prefix(PREFIX + "Junction_")
+    actors = by_label()
+    main, side = actors.get(PREFIX + "Road_Valley"), actors.get(PREFIX + "Road_BaseB")
+    if main is None or side is None:
+        raise RuntimeError("both road splines must exist before the junction")
+    world_space = unreal.SplineCoordinateSpace.WORLD
+    main_spline = main.get_component_by_class(unreal.SplineComponent)
+    side_spline = side.get_component_by_class(unreal.SplineComponent)
+    best = None
+    distance = 0.0
+    length = side_spline.get_spline_length()
+    while distance < length:
+        on_side = side_spline.get_location_at_distance_along_spline(distance, world_space)
+        on_main = main_spline.find_location_closest_to_world_location(on_side, world_space)
+        gap = math.hypot(on_side.x - on_main.x, on_side.y - on_main.y)
+        if best is None or gap < best[0]:
+            best = (gap, on_main, on_side, distance)
+        distance += 25.0
+    gap, pivot, on_side, at = best
+    main_dir = main_spline.find_tangent_closest_to_world_location(pivot, world_space)
+    side_dir = side_spline.get_tangent_at_distance_along_spline(at, world_space)
+    main_yaw = math.degrees(math.atan2(main_dir.y, main_dir.x))
+    side_yaw = math.degrees(math.atan2(side_dir.y, side_dir.x))
+    skew = ((side_yaw - main_yaw) % 180.0) - 90.0
+    tiles = main.get_components_by_class(unreal.SplineMeshComponent)
+    near = min(tiles, key=lambda c: (unreal.SystemLibrary.get_component_bounds(c)[0] - pivot).length())
+    tile_origin, tile_extent, _ = unreal.SystemLibrary.get_component_bounds(near)
+    ground = ground_z(pivot.x, pivot.y)
+    z = max(tile_origin.z, ground + 20.0) + 6.0
+    cls = unreal.EditorAssetLibrary.load_blueprint_class(JUNCTION_BP)
+    actor = actors_sub().spawn_actor_from_class(cls, unreal.Vector(pivot.x, pivot.y, z), unreal.Rotator(0.0, 0.0, main_yaw))
+    actor.set_actor_label(PREFIX + "Junction_BaseB")
+    actor.set_folder_path(FOLDER + "Roads")
+    actor.get_component_by_class(unreal.StaticMeshComponent).set_default_custom_primitive_data_float(0, skew)
+    info = {"pivot": [round(pivot.x), round(pivot.y), round(z)], "gap_cm": round(gap, 1), "main_yaw": round(main_yaw, 1),
+            "side_yaw": round(side_yaw, 1), "skew": round(skew, 1), "ground": round(ground),
+            "tile_z": round(tile_origin.z), "tile_half_height": round(tile_extent.z)}
+    log("junction: removed %d, placed %s" % (removed, info))
+    return info
+
+
+# ---- the intact viaduct spur at Base B (concept C Kurve, CustomMapItems/Environment/A4Viaduct/Model/Spur) -------------------
+SPUR_FILE = "D:/UE5Projects/RTS_Survival/Saved/OreMountains/viaduct/A4ViaductSpur_pieces.json"
+# rim pieces the spur file marks "shift or remove": removed too, their bounds reach onto the road
+SPUR_ALSO_CLEARED = (664, 701)
+
+
+def spur_data():
+    if not os.path.exists(SPUR_FILE):
+        return None
+    with open(SPUR_FILE, "r") as handle:
+        return json.load(handle)
+
+
+def spur_cleared_cliffs():
+    """Indices into Ore_cliffs.json instances that stand on the spur's landing."""
+    data = spur_data()
+    if data is None:
+        return set()
+    listed = {item["index"] for item in data["remove_cliff_kit_instances"]["remove"] if item.get("action") == "remove"}
+    return listed | set(SPUR_ALSO_CLEARED)
+
+
+def _inside(poly, x, y):
+    hit = False
+    for (x0, y0), (x1, y1) in zip(poly, poly[1:] + poly[:1]):
+        if (y0 > y) != (y1 > y) and x < x0 + (y - y0) / (y1 - y0) * (x1 - x0):
+            hit = not hit
+    return hit
+
+
+def step_spur():
+    """The intact viaduct stretch on the Base B knoll: one standing mesh whose UCX hulls carry the drivable deck.
+    Clears what would stand in or poke through it: trees inside its footprint, ground scatter on the approach slab,
+    the stand-in face rocks the file lists. Run after step_cliffs() (which leaves the landing's rim pieces out),
+    step_trees() and step_props(). Label ORE_Spur_Kurve."""
+    require_map()
+    data = spur_data()
+    if data is None:
+        raise RuntimeError("missing " + SPUR_FILE)
+    removed = clear_prefix(PREFIX + "Spur_")
+    piece = data["pieces"][0]
+    mesh = unreal.load_asset(piece["asset"])
+    if mesh is None:
+        raise RuntimeError("missing " + piece["asset"])
+    loc = piece["world_cm"]
+    actor = actors_sub().spawn_actor_from_class(unreal.StaticMeshActor, unreal.Vector(loc[0], loc[1], loc[2]),
+                                                unreal.Rotator(0.0, 0.0, piece["yaw_deg"]))
+    actor.static_mesh_component.set_static_mesh(mesh)
+    actor.static_mesh_component.set_mobility(unreal.ComponentMobility.STATIC)
+    actor.set_actor_label(PREFIX + "Spur_Kurve")
+    actor.set_folder_path(FOLDER + "Viaduct")
+    foot = data["footprint_polygon_world_cm"]
+    slab = data["approach_slab_polygon_world_cm"]
+    rocks = [item["world_cm"] for item in data["dress_rocks"]["move_or_delete"]]
+    trees = scatter = props = 0
+
+    def near_slab(x, y, margin):
+        if _inside(slab, x, y):
+            return True
+        for (x0, y0), (x1, y1) in zip(slab, slab[1:] + slab[:1]):
+            t = max(0.0, min(1.0, ((x - x0) * (x1 - x0) + (y - y0) * (y1 - y0)) / ((x1 - x0) ** 2 + (y1 - y0) ** 2)))
+            if math.hypot(x - x0 - t * (x1 - x0), y - y0 - t * (y1 - y0)) < margin:
+                return True
+        return False
+
+    for other in all_actors():
+        label = other.get_actor_label()
+        if label.startswith(PREFIX + "Prop_"):
+            # Base B's own props (a sandbag arc stood on the slab and shut medium and heavy tanks out of the deck)
+            at = other.get_actor_location()
+            if near_slab(at.x, at.y, 600.0):
+                log("spur: removed %s from the landing" % label)
+                actors_sub().destroy_actor(other)
+                props += 1
+            continue
+        if label.startswith(PREFIX + "Tree_"):
+            at = other.get_actor_location()
+            if _inside(foot, at.x, at.y):
+                actors_sub().destroy_actor(other)
+                trees += 1
+            continue
+        if not (label.startswith(PREFIX + "Scatter_") or label.startswith(PREFIX + "Rocks_") or label.startswith(PREFIX + "Timber_")):
+            continue
+        comp = other.get_component_by_class(unreal.HierarchicalInstancedStaticMeshComponent)
+        if comp is None:
+            continue
+        for index in range(comp.get_instance_count() - 1, -1, -1):
+            at = comp.get_instance_transform(index, True).translation
+            on_slab = _inside(slab, at.x, at.y)
+            under = _inside(foot, at.x, at.y) and label.startswith(PREFIX + "Timber_")
+            listed = any(math.hypot(at.x - r[0], at.y - r[1]) < 150.0 for r in rocks)
+            if on_slab or under or listed:
+                comp.remove_instance(index)
+                scatter += 1
+    info = {"removed_old": removed, "trees_removed": trees, "instances_removed": scatter, "props_removed": props,
+            "cliff_instances_left_out": sorted(spur_cleared_cliffs())}
+    log("spur: %s" % info)
+    return info
+
+
+# ---- cliff decals (OreCliffKit/Decals/v02, built by a subagent; spec decals.json) ----------------------------------------
+CLIFF_DECAL_SPEC = "D:/Blender/BlenderProjects/BlenderTanks/CustomMapItems/Environment/OreCliffKit/Decals/v02/decals.json"
+CLIFF_DECAL_MI = "/Game/RTS_Survival/Blueprints/Environment/OreMountains/CliffKit/Decals/MI_OreCliffDecal_"
+# decals per 20 m of face; the adit dressing and the tops and fans follow the rules in cliff_decal_plan()
+# (halved after the first full placement: 486 decals striped every block)
+CLIFF_DECAL_RATE = {"SeepCurtain_A": 0.45, "SeepCurtain_B": 0.4, "WeatherBand": 0.3, "LeachBand": 0.2, "CalciteCurtain": 0.14}
+# image orientation on a placed decal, found on the first placement: roll for wall decals, yaw offset for down decals
+# whose image top must point at the face
+# A decal maps image U along its local Z and V along its local Y (seen on the first placement: text came out turned
+# 90 degrees), so every decal is turned a quarter and its width and height swap places in DecalSize.
+CLIFF_DECAL_WALL_ROLL = 90.0
+CLIFF_DECAL_DOWN_YAW = 90.0
+
+
+def cliff_decal_plan(only_adit=None):
+    """[(name, location, (roll, pitch, yaw), half size (depth, width, height) cm, sort)] for the wall stains and bands
+    on the face pieces, the patches on the lip tops, the fans at the foot and the adit dressing."""
+    import random
+    rng = random.Random(4711)
+    with open(CLIFF_FILE, "r") as handle:
+        cliffs = json.load(handle)
+    with open(CLIFF_DECAL_SPEC, "r") as handle:
+        spec = {d["name"]: d for d in json.load(handle)["decals"]}
+    cleared = spur_cleared_cliffs()
+    boxes = {}
+
+    def box(piece):
+        if piece not in boxes:
+            mesh = unreal.load_asset(cliffs["mesh_path"].replace("<piece>", piece))
+            bounds = mesh.get_bounding_box()
+            boxes[piece] = (bounds.min, bounds.max)
+        return boxes[piece]
+
+    def world_point(item, lx, ly, lz):
+        yaw, s = math.radians(item["yaw"]), item["scale"]
+        return (item["x"] + s * (lx * math.cos(yaw) - ly * math.sin(yaw)),
+                item["y"] + s * (lx * math.sin(yaw) + ly * math.cos(yaw)), item["z"] + s * lz)
+
+    plan = []
+
+    def wall(name, item, along=0.0, top=None, roll=0.0, sort=0):
+        lo, hi = box(item["piece"])
+        d = spec[name]
+        width, height = d["size_m"][0] * 100.0, d["size_m"][1] * 100.0
+        face_h = (hi.z - lo.z) * item["scale"]
+        k = min(1.0, (face_h + 150.0) / height)
+        width, height = width * max(k, 0.6), height * k
+        top_z = (hi.z if top is None else top) * item["scale"]
+        ly = along * max(0.0, (hi.y - lo.y) * 0.5 - width * 0.4 / item["scale"])
+        x, y, _ = world_point(item, (lo.x + hi.x) * 0.5, (lo.y + hi.y) * 0.5 + ly, 0.0)
+        centre = (x, y, item["z"] + top_z + 40.0 - height * 0.5)
+        depth = max(d["depth_m"] * 50.0, (hi.x - lo.x) * 0.5 * item["scale"] + 120.0)
+        plan.append((name, centre, (CLIFF_DECAL_WALL_ROLL + roll, 0.0, item["yaw"] + 180.0), (depth, width * 0.5, height * 0.5), sort))
+
+    def down(name, x, y, z, yaw, scale=1.0, sort=0):
+        d = spec[name]
+        plan.append((name, (x, y, z + 60.0), (0.0, -90.0, yaw + CLIFF_DECAL_DOWN_YAW),
+                     (max(200.0, d["depth_m"] * 50.0), d["size_m"][0] * 50.0 * scale, d["size_m"][1] * 50.0 * scale), sort))
+
+    adits = cliffs["adit_openings"]
+
+    def face_offset(adit, out):
+        """How far the real rock face stands from the adit point along the outward normal (mean over the face pieces
+        within 16 m), so the adit's wall decals sit on the rock and not in front of it."""
+        hits = []
+        for item in cliffs["instances"]:
+            if item["role"] == "face" and math.hypot(item["x"] - adit["x"], item["y"] - adit["y"]) < 1600.0:
+                lo, hi = box(item["piece"])
+                x, y, _ = world_point(item, (lo.x + hi.x) * 0.5, 0.0, 0.0)
+                hits.append((x - adit["x"]) * out[0] + (y - adit["y"]) * out[1])
+        return sum(hits) / len(hits) if hits else 0.0
+
+    if only_adit is None:
+        for index, item in enumerate(cliffs["instances"]):
+            if index in cleared:
+                continue
+            lo, hi = box(item["piece"])
+            width_m = (hi.y - lo.y) * item["scale"] / 100.0
+            near_adit = any(math.hypot(item["x"] - a["x"], item["y"] - a["y"]) < 1400.0 for a in adits)
+            if item["role"] == "face" and not near_adit:
+                for name, rate in CLIFF_DECAL_RATE.items():
+                    if rng.random() < rate * width_m / 20.0:
+                        roll = rng.uniform(-8.0, 8.0) if name.endswith("Band") else 0.0
+                        top = None
+                        if name == "WeatherBand":
+                            top = lo.z + (hi.z - lo.z) * rng.uniform(0.45, 0.7)
+                        elif name == "CalciteCurtain":
+                            top = lo.z + (hi.z - lo.z) * rng.uniform(0.6, 0.85)
+                        wall(name, item, along=rng.uniform(-1.0, 1.0), top=top, roll=roll)
+                if item["piece"] in ("Bench12", "Panel4") and rng.random() < 0.08:
+                    wall("HalfCasts", item, along=rng.uniform(-1.0, 1.0))
+            elif item["role"] == "lip" and rng.random() < 0.25:
+                x, y, z = world_point(item, (lo.x + hi.x) * 0.5, (lo.y + hi.y) * 0.5, hi.z)
+                down("DampPatch" if rng.random() < 0.55 else "LichenCrust", x, y, z, rng.uniform(0.0, 360.0), rng.uniform(0.8, 1.15))
+            elif item["role"] == "talus" and rng.random() < 0.1 and not near_adit:
+                x, y, _ = world_point(item, hi.x + 250.0, (lo.y + hi.y) * 0.5, 0.0)
+                down("RockFlourFan", x, y, ground_z(x, y), item["yaw"], rng.uniform(0.75, 1.1))
+    for number, adit in enumerate(adits):
+        if only_adit is not None and number != only_adit:
+            continue
+        yaw = math.radians(adit["yaw"])
+        out, side = (math.cos(yaw), math.sin(yaw)), (-math.sin(yaw), math.cos(yaw))
+        top = adit["z"] + adit["height_cm"]
+        facing = (CLIFF_DECAL_WALL_ROLL, 0.0, adit["yaw"] + 180.0)
+        back = face_offset(adit, out)
+        adit = dict(adit, x=adit["x"] + out[0] * back, y=adit["y"] + out[1] * back)
+        d = spec["BlastFan"]
+        plan.append(("BlastFan", (adit["x"], adit["y"], top + d["size_m"][1] * 50.0 - 60.0), facing,
+                     (650.0, d["size_m"][0] * 50.0, d["size_m"][1] * 50.0), 0))
+        mark = ("Mark_Strosse", "Mark_Warning_B", "Mark_Warning_A")[number % 3]
+        d = spec[mark]
+        plan.append((mark, (adit["x"] + side[0] * 150.0, adit["y"] + side[1] * 150.0, top + 170.0), facing,
+                     (350.0, d["size_m"][0] * 30.0, d["size_m"][1] * 30.0), 2))
+        d = spec["SootCurtain"]
+        plan.append(("SootCurtain", (adit["x"] + side[0] * 1150.0, adit["y"] + side[1] * 1150.0, top + 250.0), facing,
+                     (450.0, d["size_m"][0] * 50.0, d["size_m"][1] * 50.0), 0))
+        d = spec["RustField"]
+        rx, ry = adit["x"] - side[0] * 1500.0, adit["y"] - side[1] * 1500.0
+        plan.append(("RustField", (rx, ry, top + 150.0), facing, (450.0, d["size_m"][0] * 50.0, d["size_m"][1] * 50.0), 0))
+        gx, gy = adit["x"] + out[0] * 700.0, adit["y"] + out[1] * 700.0
+        down("SootFallout", gx, gy, ground_z(gx, gy), adit["yaw"], 1.0)
+        gx, gy = adit["x"] + out[0] * 900.0 + side[0] * 500.0, adit["y"] + out[1] * 900.0 + side[1] * 500.0
+        down("OreFines", gx, gy, ground_z(gx, gy), adit["yaw"], 1.0, 1)
+        gx, gy = rx + out[0] * 600.0, ry + out[1] * 600.0
+        down("RustWash", gx, gy, ground_z(gx, gy), adit["yaw"], 0.9)
+        if number == 1:
+            d = spec["Radixite"]
+            plan.append(("Radixite", (adit["x"] + side[0] * 2300.0, adit["y"] + side[1] * 2300.0, top - 100.0), facing,
+                         (400.0, d["size_m"][0] * 50.0, d["size_m"][1] * 50.0), 1))
+    return plan
+
+
+# In the engine the instances read far weaker than in the kit's Blender previews (first placement, 2026-11-14): the
+# dark stains get more opacity and a darker colour, the pale ones more opacity and a slightly brighter colour.
+CLIFF_DECAL_PALE = ("CalciteCurtain", "LeachBand", "RockFlourFan", "LichenCrust", "Mark_Strosse", "Mark_Warning_A", "Mark_Warning_B")
+CLIFF_DECAL_TUNE = {"dark": {"BaseColour_OpacityScale": 1.45, "BaseColour_Brightness": 0.74, "OpacityLerpB": 1.0},
+                    "pale": {"BaseColour_OpacityScale": 1.25, "BaseColour_Brightness": 0.98, "OpacityLerpB": 1.0}}
+
+
+def tune_cliff_decals():
+    """Writes CLIFF_DECAL_TUNE into the kit's decal instances and saves them."""
+    mel = unreal.MaterialEditingLibrary
+    with open(CLIFF_DECAL_SPEC, "r") as handle:
+        names = [d["name"] for d in json.load(handle)["decals"]]
+    for name in names:
+        mi = unreal.load_asset(CLIFF_DECAL_MI + name)
+        if mi is None:
+            raise RuntimeError("missing " + CLIFF_DECAL_MI + name)
+        for key, value in CLIFF_DECAL_TUNE["pale" if name in CLIFF_DECAL_PALE else "dark"].items():
+            mel.set_material_instance_scalar_parameter_value(mi, key, value)
+        mel.set_material_instance_scalar_parameter_value(mi, "AngleFadeAmount", 1.0)
+        mel.update_material_instance(mi)
+        unreal.EditorAssetLibrary.save_loaded_asset(mi, False)
+    log("cliff decal instances tuned: %d" % len(names))
+
+
+def step_cliff_decals(only_adit=None):
+    """Weathering decals on the cliff kit, shared instances used as they are. Labels ORE_CliffDecal_*.
+    The adit placeholder boxes stop receiving decals (they stand in front of the portal the marks belong on)."""
+    require_map()
+    removed = clear_prefix(PREFIX + "CliffDecal_")
+    for other in all_actors():
+        if other.get_actor_label().startswith(PREFIX + "PH_adit"):
+            for comp in other.get_components_by_class(unreal.PrimitiveComponent):
+                comp.set_editor_property("receives_decals", False)
+    plan = cliff_decal_plan(only_adit)
+    materials, placed = {}, {}
+    for index, (name, loc, rot, half, sort) in enumerate(plan):
+        if name not in materials:
+            materials[name] = unreal.load_asset(CLIFF_DECAL_MI + name)
+            if materials[name] is None:
+                raise RuntimeError("missing " + CLIFF_DECAL_MI + name)
+        actor = actors_sub().spawn_actor_from_class(unreal.DecalActor, unreal.Vector(loc[0], loc[1], loc[2]),
+                                                    unreal.Rotator(rot[0], rot[1], rot[2]))
+        actor.decal.set_decal_material(materials[name])
+        actor.decal.set_editor_property("decal_size", unreal.Vector(half[0], half[2], half[1]))     # quarter turn: swapped
+        actor.decal.set_editor_property("sort_order", sort)
+        actor.set_actor_label("%sCliffDecal_%s_%03d" % (PREFIX, name, index))
+        actor.set_folder_path(FOLDER + "CliffDecals/" + name)
+        placed[name] = placed.get(name, 0) + 1
+    log("cliff decals: removed %d, placed %d %s" % (removed, len(plan), placed))
     return placed

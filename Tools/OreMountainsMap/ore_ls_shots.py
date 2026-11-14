@@ -44,8 +44,18 @@ if _lay.get("wear_tracks"):
     VIEWS += [("25_track_ramp_road", float(_t[1][len(_t[1]) // 2][0]), float(_t[1][len(_t[1]) // 2][1]), 0.0),
               ("26_track_bench", float(_t[0][len(_t[0]) // 3][0]), float(_t[0][len(_t[0]) // 3][1]), 0.0),
               ("27_track_road_join", float(_t[1][-1][0]), float(_t[1][-1][1]), 0.0)]
+if _lay.get("base_b_road"):
+    _b = _lay["base_b_road"]
+    _n = len(_b)
+    VIEWS += [("33_side_road_start", float(_b[4][0]), float(_b[4][1]), 0.0), ("34_side_road_shoulder", float(_b[_n // 5][0]), float(_b[_n // 5][1]), 0.0),
+              ("35_side_road_gully", float(_b[_n // 3][0]), float(_b[_n // 3][1]), 0.0), ("36_side_road_crossing", 2760.0, -20500.0, 0.0),
+              ("37_side_road_north", float(_b[2 * _n // 3][0]), float(_b[2 * _n // 3][1]), 0.0), ("38_side_road_ramp", 14100.0, -13500.0, 0.0),
+              ("39_side_road_base", 13800.0, -7600.0, 0.0)]
+VIEWS += [("40_spur_landing", 9900.0, -4600.0, 0.0), ("41_spur_deck", 8300.0, -3300.0, 0.0), ("42_spur_east", 8300.0, -3300.0, -110.0)]
 VIEWS += [("28_wood_edge", 19800.0, 5400.0, 0.0), ("29_yard_open", 2600.0, 22400.0, 0.0), ("30_battery_field", 16200.0, 10200.0, 0.0),
           ("31_viaduct_stick", 2400.0, -4800.0, 0.0), ("32_start_apron", -15500.0, 9500.0, 0.0)]
+if globals().get("VIEWS_ONLY"):          # a one-off set of views (ore_ls_round.sh always resets it to None)
+    VIEWS = list(VIEWS_ONLY)
 if REBUILD:
     omb.step_landscape()
     omb.step_fit_level_actors()
@@ -54,11 +64,15 @@ if REBUILD:
         omb.step_trees()
         omb.step_placeholders()
         omb.step_roads()
+        omb.step_junction()
         omb.step_checkpoint()
         omb.step_props()
         omb.step_cliffs()
         omb.step_viaduct()
         omb.step_fx()
+        omb.step_spur()
+        omb.step_cliff_decals()
+    omb.step_decals()                     # after every rebuild: the decals sit on the new ground
 unreal.SystemLibrary.execute_console_command(omb.world(), "t.IdleWhenNotForeground 0")
 _les = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
 _ues = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem)

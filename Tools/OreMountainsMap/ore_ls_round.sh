@@ -5,7 +5,7 @@ set -u
 cd /d/UE5Projects/RTS_Survival
 TAG="$1"
 REBUILD="${2:-}"
-{ echo "TAG = '$TAG'"; echo "REBUILD = '$REBUILD'"; cat Source/Tools/OreMountainsMap/ore_ls_shots.py; } > Saved/OreMountains/_ls_run.py
+{ echo "TAG = '$TAG'"; echo "REBUILD = '$REBUILD'"; echo "VIEWS_ONLY = ${VIEWS_ONLY:-None}"; cat Source/Tools/OreMountainsMap/ore_ls_shots.py; } > Saved/OreMountains/_ls_run.py
 python Source/Tools/OreMountainsMap/ore_cmd.py Saved/OreMountains/_ls_run.py --timeout 3000 | grep -v "^ok " | cut -c1-240
 python - "$TAG" <<'EOF'
 import glob, sys, os

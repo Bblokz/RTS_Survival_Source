@@ -35,7 +35,7 @@ MAT_PATH = "/Game/RTS_Survival/Materials/ground/Landscape/CastleGrassDesertDry/M
 MI_INST_PATH = "/Game/RTS_Survival/Materials/ground/Landscape/CastleGrassDesertDry/MI_RTS_Landscape_DryCastle_Inst"
 MI_TRAINS_PATH = ls_detail_build.MI_PATH
 DESC = "LSMaster"
-OLD_DESCS = ["LSBreakup", "LSTankTrails", "LSGroundDetail", "LSGroundGrass"]
+OLD_DESCS = ["LSBreakup", "LSTankTrails", "LSGroundDetail", "LSGroundGrass", "LSDarkEarthSoft"]
 SWITCHES = {"LS_NoiseBreakup": "Ground Breakup", "LS_RadixiteBlight": "Radixite Blight",
             "LS_TankTrails": "Tank Trails", "LS_GroundDetail": "Ground Detail", "LS_GroundGrass": "Ground Grass"}
 DESERT_PAINTABLE_PATH = ls_trails_build.DESERT_PAINTABLE["material"]
@@ -44,6 +44,8 @@ BLIGHT_DESC = "LSBlight"
 # Soft layers: grass may grow into the sand ones; tank trails dent all of them (rock and roads keep no ruts).
 GRASS_LAYER = "GrassCastle"
 SAND_LAYERS = ["Desert", "RTSSand", "GraySand"]
+# Soft for the tank trails only (no grass grows into it): the dark earth layer of ls_darkearth_build.py.
+SOFT_ONLY_LAYERS = ["DarkEarth"]
 
 # The original hand-made graph, framed with comments (node names, comment text, colour).
 ORIGINAL_SECTIONS = [
@@ -171,7 +173,12 @@ def layer_weights(x, y):
         weight = N("LandscapeLayerSample", x, y + 120 * (index + 1), parameter_name=layer, preview_weight=0.0)
         total = weight if total is None else G.op("Add", total, "", weight, "", x + 260, y + 120 * (index + 1))
     sand = G.sat(total, "", x + 420, y + 240)
-    soft = G.sat(G.op("Add", grass, "", total, "", x + 420, y + 380), "", x + 560, y + 380)
+    soft_total = G.op("Add", grass, "", total, "", x + 420, y + 380)
+    for index, layer in enumerate(SOFT_ONLY_LAYERS):
+        row = y + 120 * (len(SAND_LAYERS) + 1 + index)
+        weight = N("LandscapeLayerSample", x, row, parameter_name=layer, preview_weight=0.0)
+        soft_total = G.op("Add", soft_total, "", weight, "", x + 420, row)
+    soft = G.sat(soft_total, "", x + 560, y + 380)
     return grass, sand, soft
 
 

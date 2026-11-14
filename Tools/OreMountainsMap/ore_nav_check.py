@@ -20,8 +20,8 @@ def run():
         return None
     navs = {a.get_actor_label().split("-")[-1]: a for a in omb.all_actors() if isinstance(a, u.RecastNavMesh)}
 
-    def P(x, y):
-        return u.Vector(x, y, omb.ground_z(x, y) + 20.0)
+    def P(x, y, z=None):
+        return u.Vector(x, y, (omb.ground_z(x, y) if z is None else z) + 20.0)      # z given: a point on a deck
 
     def query(nav, a, b):
         path = u.NavigationSystemV1.find_path_to_location_synchronously(world, P(*a), P(*b), nav, None)
@@ -61,6 +61,18 @@ def run():
              ("WALL knoll top->south foot", (15500.0, -9000.0), (11500.0, -9000.0), "wall"),
              ("WALL knoll top->east foot", (19000.0, -5500.0), (19000.0, -1500.0), "wall"),
              ("WALL bench->crest", (-33000.0, 0.0), (-39500.0, 0.0), "none")]
+    side = omb.LAYOUT.get("base_b_road")
+    if side:                                                   # the Base B road: every agent drives its whole length
+        inside = [tuple(p) for p in side if p[1] > -27500.0]
+        cross = min(inside, key=lambda p: math.hypot(p[0] - 2760.0, p[1] + 20500.0))
+        legs.append(("Base B road: west shoulder->crossing", inside[0], cross, "ramp"))
+        legs.append(("Base B road: crossing->Base B", cross, inside[-1], "ramp"))
+    spur = omb.spur_data()
+    if spur:                                                   # the viaduct spur: its deck is reached from the plateau only
+        tip = spur["footprint_polygon_world_cm"]
+        deck = ((tip[5][0] + tip[10][0]) / 2.0, (tip[5][1] + tip[10][1]) / 2.0, spur["frame"]["deck_z_at_closure_cm"] + 20.0)
+        legs.append(("spur: Base B->deck near the broken end", knoll, deck, "ramp"))
+        legs.append(("WALL spur deck->ground 25 m east of it", deck, (deck[0], deck[1] + 2500.0), "wall"))
     for name, a, b, kind in fixed:
         if name.startswith("WALL"):
             a, b = (a[0] * k, a[1] * k), (b[0] * k, b[1] * k)      # drawn on the 850 m sketch

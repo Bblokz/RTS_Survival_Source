@@ -24,7 +24,7 @@ stand-in trees, placeholder blocks). No units, enemy buildings, triggers or obje
 Scripts are in `Source/Tools/OreMountainsMap`.
 
 ```bash
-python Source/Tools/OreMountainsMap/ore_terrain_gen.py   # heights, 7 layer weights, layout, masks, check.txt
+python Source/Tools/OreMountainsMap/ore_terrain_gen.py   # heights, 8 layer weights, layout, masks, check.txt
 python Source/Tools/OreMountainsMap/ore_dress_gen.py     # resources, stand-in trees, placeholders -> Ore_dress.json
 ```
 
@@ -377,3 +377,106 @@ Not done, with reasons:
 - Tool trap: a patch written through a shell heredoc left a literal backslash-n in the generator, and two rebuilds were
   saved with stale paint because the generator's exit code was not checked. Edit the generators with the editor tools
   and check the exit code before a rebuild.
+
+## Dark earth layer and ground decals (2026-11-14)
+
+**DarkEarth layer.** The DryCastle master had no dark ground, so it got a tenth weight-blended layer, `DarkEarth`
+(forest-floor soil in world space at two scales, desaturated and tinted). Builder: `Source/Docs/Landscape/ls_darkearth_build.py`
+(`run()` builds and checks, `save()` saves); layer info `DATA/DarkEarth_LayerInfo` from `ls_darkearth_layerinfo.py`
+(headless run). The layer's weight is also added to the tank trails' SoftGround; `ls_master_build.py` does the same
+from `SOFT_ONLY_LAYERS` on its next run.
+
+- Shader stats of the master, `_Inst`, `_Trains` and this map's instance were the same before and after (the preview
+  weight is 0). A landscape that does not paint the layer compiles it out.
+- This map overrides `DarkEarth_Tint` (0.31, 0.26, 0.22) and `DarkEarth_Desaturation` 0.3 on its own instance
+  (`LANDSCAPE_VECTORS` / `LANDSCAPE_SCALARS` in `ore_map_build.py`).
+- Paint (`ore_terrain_gen.py`, `earth`): dense wood floor 0.78-0.96 with stone gaps, thin woods in patches, a fading
+  skirt past the last trunks, peat bog bodies and hags, crater bowls, gully bank feet, the road ditch, lee slopes and
+  hollows (faint). Asphalt soot is left for oil patches and paving only.
+- Wash bank: the RockDesert weight that rendered as a charcoal band is more than halved; a narrow patchy damp-earth
+  band (0.3) sits at the bank foot instead.
+- The sand mask was rebaked: 269 of 900 cells (582 before the critic rounds), so fewer dust devils.
+
+**Decals** (`ore_map_build.step_decals()`, labels `ORE_Decal_*`, plan in `decal_plan()`; it runs after every rebuild
+in `ore_ls_shots.py`). Candidates were judged in game first (`Saved/OreMountains/critic/decals/sheet.jpg`).
+
+- Every shell crater: a scorch star, thrown debris, and a crater decal where the ground could not be sunk.
+- Soot under the four tank wrecks, the smoulder spots and the yard fuel store.
+- An erosion channel where each rill starts and half-way down it.
+- Left out: `MI_Decal_Dirt_TracksSandy_*` (brick red on this ground), the Zone `MI_Decals_*` (paint markings), embers.
+
+**Not done / not checked**
+
+- `DarkEarth` is not in the ground-surface settings (track smoke tints, surface map): tanks on it get the default.
+- Tank ruts on the dark earth are wired but were not watched in a play session.
+- Dark earth on open sunlit ground still reads a little like a cloud shadow (ditch, lee slopes): it is kept faint there.
+- Decal cost is not measured; no decal was checked for overlap with the wear-track tiles one by one.
+- Views: `Saved/OreMountains/critic/dark2`, comparison `critic/dark_before_after.jpg` (top r6d, bottom now; the camera
+  sat higher in the second set).
+
+## Base B road (2026-11-14)
+
+User request: a second road of the same macadam spline from the south-west corner to the Soviet base, with curves, and
+an intersection piece where it crosses the valley road. My reading: "the Soviet base" is Base B on the knoll (the one
+in the screenshot); the road starts on the bench in the west margin, comes down the west shoulder (not down the
+player's ramps), crosses the valley road at about (2760, -20500) at a right angle and climbs the knoll's west ramp.
+
+- Route: `ore_road_route.py` (least-cost over the built ground with a grade cost, inside the play area once off the
+  shoulder, away from cliffs, bogs, pads, craters, heaps) -> `ore_base_b_road.json`, then smoothed and cut back to the
+  ramp top by hand after the first in-game look. About 450 m in the play area against about 400 m straight.
+- Terrain (`ore_terrain_gen.py`, step 7c): graded bed (long profile smoothed over about 60 m, up to 1.4 m of cut and
+  fill, side slopes blended over 10 m), pinned on ramps, pads and rock faces. Steepest stretch off the ramp 17.5 %.
+  The valley road's ditch stops short of the crossing. Cliff kit and viaduct ground unchanged (0.0 cm).
+- Paint, scatter, trees, craters and rills keep off it (shared `road` mask, `wear` mask); wear tracks are cut where they
+  would run along it. `step_roads()` places it as `ORE_Road_BaseB`.
+- Nav check has two new legs (west shoulder -> crossing, crossing -> Base B): all agents, 0 problems.
+- Junction: `ore_map_build.step_junction()` places `BP_GroundPath_RoadJunction` (subagent-built overlay, spec in
+  `Source/Docs/Landscape/path_road_junction_build.py`) as `ORE_Junction_BaseB`, with pivot, yaw, height and skew read
+  from the two placed splines (skew -4.2 degrees here). It runs after `step_roads()` in a full rebuild. In-game view:
+  `Saved/OreMountains/critic/junction/junction.png`.
+- Open: the road links the
+  player's bench to Base B, which the mission design has not seen; the sketch JSON and mission doc do not have it.
+  Views: `Saved/OreMountains/critic/road3` (33-39).
+
+## Intact viaduct spur at Base B (2026-11-14)
+
+User request: a largely intact stretch of the viaduct with an arch between the old north end (P4) and the Base B
+knoll, drivable from the base, not connected to the other pieces. Four greybox concepts
+(`Saved/OreMountains/viaduct/v04`); the user picked **C Kurve** (three arches on a curve, deck falling 4 % from the
+plateau, broken end 9.2 m short of P4).
+
+- Asset `SM_A4Viaduct_Spur_Kurve` (14k triangles, 17 UCX hulls, kit materials), built by a subagent; source
+  `CustomMapItems/Environment/A4Viaduct/Model/Spur`, placement file `Saved/OreMountains/viaduct/A4ViaductSpur_pieces.json`.
+- `ore_map_build.step_spur()` places it at (9750, -4380, 1603) yaw 134.5 as `ORE_Spur_Kurve` and clears its landing:
+  cliff-kit instances 662, 663, 664, 701 are left out by `step_cliffs()`, trees inside the footprint, scatter on the
+  approach slab and props within 6 m of the slab are removed (one Base B sandbag arc, `BaseB_Sandbags_2`, stood on the
+  slab and shut medium and heavy tanks out). It runs last in a full rebuild.
+- Nav check: every agent drives from Base B to the deck near the broken end; the deck is not reachable from the ground
+  beside it. 0 problems. Bay 1 under the arches is closed, bays 2 and 3 are open (6.5 m between piers).
+- Open: the layout's Base B AT gun point (10211, -5113) is 2.5 m behind the landing (a layout point only, nothing
+  placed there yet); no arch face shows from the default camera (the plan shape does); units under the open bays and
+  on the deck were not watched in play. Views: `Saved/OreMountains/critic/spur2`.
+
+## Cliff weathering decals (2026-11-14)
+
+User request: decals for the cliff kit that fit its palette; the first round was "barely visible", the second
+(stronger) round is the one placed. Built by a subagent: 19 decals (seep and soot curtains, weather and leach bands,
+calcite, rust field, radixite seep, blast fan, drill half-casts, three painted marks; for the top-down view damp
+patch, lichen crust, soot fall-out, rust wash, ore fines, rock-flour fan). Source and spec:
+`CustomMapItems/Environment/OreCliffKit/Decals/v02` (`decals.json`); Unreal assets under `CliffKit/Decals`
+(`M_OreCliffDecal` with an angle fade, `MI_OreCliffDecal_*`).
+
+- `ore_map_build.step_cliff_decals()` places them from `Ore_cliffs.json` (labels `ORE_CliffDecal_*`, 316 decals):
+  stains and bands on the face pieces by a rate per 20 m, patches on a quarter of the lip tops, flour fans at a tenth
+  of the talus pieces, and at each adit a blast fan, a painted mark (STROSSE 2, Cyrillic warning, German warning), a
+  soot curtain, a rust field with its wash, soot fall-out and ore fines; one radixite seep by adit 2. It runs last in
+  a full rebuild.
+- Found on the first placement: a decal maps image U along its local Z, so every decal is turned a quarter with width
+  and height swapped; the adit decals are anchored to the real face pieces (the adit point lies in front of the rock);
+  in the engine the instances read far weaker than in the Blender previews, so `tune_cliff_decals()` raises opacity and
+  darkens the stains (values in `CLIFF_DECAL_TUNE`, saved into the instances); the first full set (486) striped every
+  block, so the rates were halved.
+- The adit placeholder boxes no longer receive decals; the marks sit on the portal lintel behind them and show once
+  the placeholders are replaced.
+- Open: from the default top-down camera only the fans, fines and lip patches show; the wall stains need a rotated
+  camera. Cost of 316 decals is not measured. Editor views: `Saved/OreMountains/cliffs/decals/ue/all2_sheet.jpg`.
