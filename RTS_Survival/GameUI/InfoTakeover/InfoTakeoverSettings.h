@@ -13,6 +13,11 @@ class UW_CoverTakeover;
 class UW_NomadicConversionTakeover;
 class UW_BxpPackUpTakeover;
 class UW_SpacedArmourTakeover;
+class UW_VulturesAtTakeover;
+class UW_RattleFeedTakeover;
+class UW_WespeBarrageTakeover;
+class UW_DigInTakeover;
+class UW_AdrenalineShotTakeover;
 class UW_VehicleInfoTakeover;
 
 /**
@@ -40,6 +45,12 @@ public:
 		meta = (RequiredAssetDataTags = "RowStructure=/Script/RTS_Survival.VehicleInfoTakeoverEntry"))
 	TSoftObjectPtr<UDataTable> VehicleLibrary;
 
+	// DT_SquadInfoTakeovers: one row (FSquadInfoTakeoverEntry) per prefab, picked by row name in the mission node. Squads
+	// open in the vehicle widget class above, so both share one style.
+	UPROPERTY(EditAnywhere, Config, Category = "Squads",
+		meta = (RequiredAssetDataTags = "RowStructure=/Script/RTS_Survival.SquadInfoTakeoverEntry"))
+	TSoftObjectPtr<UDataTable> SquadLibrary;
+
 	// WBP_CameraControlsTakeover: the Blueprint child that carries the style and the animated illustrations.
 	UPROPERTY(EditAnywhere, Config, Category = "Tutorials")
 	TSoftClassPtr<UW_CameraControlsTakeover> CameraControlsTakeoverWidgetClass;
@@ -59,4 +70,24 @@ public:
 	// WBP_BxpPackUpTakeover: the Blueprint child that carries the style for the building expansion pack-up field manual.
 	UPROPERTY(EditAnywhere, Config, Category = "Tutorials")
 	TSoftClassPtr<UW_BxpPackUpTakeover> BxpPackUpTakeoverWidgetClass;
+
+	// WBP_VulturesAtTakeover: the Blueprint child that carries the style for the Vultures AT stick grenade field manual.
+	UPROPERTY(EditAnywhere, Config, Category = "Tutorials")
+	TSoftClassPtr<UW_VulturesAtTakeover> VulturesAtTakeoverWidgetClass;
+
+	// WBP_RattleFeedTakeover: the Blueprint child that carries the style for the Rattle-Feed field manual.
+	UPROPERTY(EditAnywhere, Config, Category = "Tutorials")
+	TSoftClassPtr<UW_RattleFeedTakeover> RattleFeedTakeoverWidgetClass;
+
+	// WBP_WespeBarrageTakeover: the Blueprint child that carries the style for the Wespe Barrage field manual.
+	UPROPERTY(EditAnywhere, Config, Category = "Tutorials")
+	TSoftClassPtr<UW_WespeBarrageTakeover> WespeBarrageTakeoverWidgetClass;
+
+	// WBP_DigInTakeover: the Blueprint child that carries the style for the Dig In field manual.
+	UPROPERTY(EditAnywhere, Config, Category = "Tutorials")
+	TSoftClassPtr<UW_DigInTakeover> DigInTakeoverWidgetClass;
+
+	// WBP_AdrenalineShotTakeover: the Blueprint child that carries the style for the Adrenaline Shot field manual.
+	UPROPERTY(EditAnywhere, Config, Category = "Tutorials")
+	TSoftClassPtr<UW_AdrenalineShotTakeover> AdrenalineShotTakeoverWidgetClass;
 };

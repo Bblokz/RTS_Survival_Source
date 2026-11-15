@@ -9,6 +9,11 @@
 #include "W_BxpPackUpTakeover.h"
 #include "W_SpacedArmourTakeover.h"
 #include "W_VehicleInfoTakeover.h"
+#include "W_RattleFeedTakeover.h"
+#include "W_WespeBarrageTakeover.h"
+#include "W_DigInTakeover.h"
+#include "W_AdrenalineShotTakeover.h"
+#include "W_VulturesAtTakeover.h"
 
 UInfoTakeoverSettings::UInfoTakeoverSettings()
 {
@@ -16,6 +21,8 @@ UInfoTakeoverSettings::UInfoTakeoverSettings()
 		"/Game/RTS_Survival/Blueprints/GameUI/InfoTakeover/WBP_VehicleInfoTakeover.WBP_VehicleInfoTakeover_C")));
 	VehicleLibrary = TSoftObjectPtr<UDataTable>(FSoftObjectPath(TEXT(
 		"/Game/RTS_Survival/Blueprints/GameUI/InfoTakeover/DT_VehicleInfoTakeovers.DT_VehicleInfoTakeovers")));
+	SquadLibrary = TSoftObjectPtr<UDataTable>(FSoftObjectPath(TEXT(
+		"/Game/RTS_Survival/Blueprints/GameUI/InfoTakeover/DT_SquadInfoTakeovers.DT_SquadInfoTakeovers")));
 	CameraControlsTakeoverWidgetClass = TSoftClassPtr<UW_CameraControlsTakeover>(FSoftObjectPath(TEXT(
 		"/Game/RTS_Survival/Blueprints/GameUI/InfoTakeover/WBP_CameraControlsTakeover.WBP_CameraControlsTakeover_C")));
 	CoverTakeoverWidgetClass = TSoftClassPtr<UW_CoverTakeover>(FSoftObjectPath(TEXT(
@@ -28,4 +35,14 @@ UInfoTakeoverSettings::UInfoTakeoverSettings()
 		"WBP_NomadicConversionTakeover_C")));
 	BxpPackUpTakeoverWidgetClass = TSoftClassPtr<UW_BxpPackUpTakeover>(FSoftObjectPath(TEXT(
 		"/Game/RTS_Survival/Blueprints/GameUI/InfoTakeover/BxpPackUp/WBP_BxpPackUpTakeover.WBP_BxpPackUpTakeover_C")));
+	VulturesAtTakeoverWidgetClass = TSoftClassPtr<UW_VulturesAtTakeover>(FSoftObjectPath(TEXT(
+		"/Game/RTS_Survival/Blueprints/GameUI/InfoTakeover/VulturesAt/WBP_VulturesAtTakeover.WBP_VulturesAtTakeover_C")));
+	RattleFeedTakeoverWidgetClass = TSoftClassPtr<UW_RattleFeedTakeover>(FSoftObjectPath(TEXT(
+		"/Game/RTS_Survival/Blueprints/GameUI/InfoTakeover/RattleFeed/WBP_RattleFeedTakeover.WBP_RattleFeedTakeover_C")));
+	WespeBarrageTakeoverWidgetClass = TSoftClassPtr<UW_WespeBarrageTakeover>(FSoftObjectPath(TEXT(
+		"/Game/RTS_Survival/Blueprints/GameUI/InfoTakeover/WespeBarrage/WBP_WespeBarrageTakeover.WBP_WespeBarrageTakeover_C")));
+	DigInTakeoverWidgetClass = TSoftClassPtr<UW_DigInTakeover>(FSoftObjectPath(TEXT(
+		"/Game/RTS_Survival/Blueprints/GameUI/InfoTakeover/DigIn/WBP_DigInTakeover.WBP_DigInTakeover_C")));
+	AdrenalineShotTakeoverWidgetClass = TSoftClassPtr<UW_AdrenalineShotTakeover>(FSoftObjectPath(TEXT(
+		"/Game/RTS_Survival/Blueprints/GameUI/InfoTakeover/AdrenalineShot/WBP_AdrenalineShotTakeover.WBP_AdrenalineShotTakeover_C")));
 }

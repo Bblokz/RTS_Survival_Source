@@ -197,3 +197,133 @@ protected:
 	virtual int32 QueueTakeover(UInfoTakeoverSubsystem& InfoTakeoverSubsystem) const override;
 	virtual FString GetNodeName() const override { return TEXT("Show Building Expansion Pack Up Takeover"); }
 };
+
+/**
+ * @brief Mission node that pauses the game with the Vultures AT stick grenade field manual (a short clip of the squad
+ * sticking its grenades onto a T-26, and how the volley works) and continues from On Closed once the player pressed
+ * UNDERSTOOD.
+ */
+UCLASS()
+class RTS_SURVIVAL_API UAsyncShowVulturesAtTakeover : public UAsyncShowInfoTakeoverBase
+{
+	GENERATED_BODY()
+
+public:
+	/**
+	 * @brief Shows the Vultures AT stick grenade takeover and waits for it to close.
+	 * @param WorldContextObject The mission (or any object in the game world); filled in as self.
+	 * @return The node; On Closed fires later, or in the same frame when the takeovers are turned off.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Mission|Info Takeover",
+		meta = (BlueprintInternalUseOnly = "true", DefaultToSelf = "WorldContextObject",
+			HidePin = "WorldContextObject", DisplayName = "Show Vultures AT Grenade Takeover"))
+	static UAsyncShowVulturesAtTakeover* ShowVulturesAtTakeover(UObject* WorldContextObject);
+
+protected:
+	virtual int32 QueueTakeover(UInfoTakeoverSubsystem& InfoTakeoverSubsystem) const override;
+	virtual FString GetNodeName() const override { return TEXT("Show Vultures AT Grenade Takeover"); }
+};
+
+/**
+ * @brief Mission node that pauses the game with the Rattle-Feed field manual (a short clip of a Panzer II switching
+ * its 20 mm gun to Rattle-Feed on a T-26, and how the burst works) and continues from On Closed once the player pressed
+ * UNDERSTOOD.
+ */
+UCLASS()
+class RTS_SURVIVAL_API UAsyncShowRattleFeedTakeover : public UAsyncShowInfoTakeoverBase
+{
+	GENERATED_BODY()
+
+public:
+	/**
+	 * @brief Shows the Rattle-Feed takeover and waits for it to close.
+	 * @param WorldContextObject The mission (or any object in the game world); filled in as self.
+	 * @return The node; On Closed fires later, or in the same frame when the takeovers are turned off.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Mission|Info Takeover",
+		meta = (BlueprintInternalUseOnly = "true", DefaultToSelf = "WorldContextObject",
+			HidePin = "WorldContextObject", DisplayName = "Show Rattle-Feed Takeover"))
+	static UAsyncShowRattleFeedTakeover* ShowRattleFeedTakeover(UObject* WorldContextObject);
+
+protected:
+	virtual int32 QueueTakeover(UInfoTakeoverSubsystem& InfoTakeoverSubsystem) const override;
+	virtual FString GetNodeName() const override { return TEXT("Show Rattle-Feed Takeover"); }
+};
+
+/**
+ * @brief Mission node that pauses the game with the Wespe Barrage field manual (a Wespe battery
+ * shelling a T-26 and a rifle squad, and how the area barrage works) and continues from On Closed once the player pressed
+ * UNDERSTOOD.
+ */
+UCLASS()
+class RTS_SURVIVAL_API UAsyncShowWespeBarrageTakeover : public UAsyncShowInfoTakeoverBase
+{
+	GENERATED_BODY()
+
+public:
+	/**
+	 * @brief Shows the Wespe Barrage takeover and waits for it to close.
+	 * @param WorldContextObject The mission (or any object in the game world); filled in as self.
+	 * @return The node; On Closed fires later, or in the same frame when the takeovers are turned off.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Mission|Info Takeover",
+		meta = (BlueprintInternalUseOnly = "true", DefaultToSelf = "WorldContextObject",
+			HidePin = "WorldContextObject", DisplayName = "Show Wespe Barrage Takeover"))
+	static UAsyncShowWespeBarrageTakeover* ShowWespeBarrageTakeover(UObject* WorldContextObject);
+
+protected:
+	virtual int32 QueueTakeover(UInfoTakeoverSubsystem& InfoTakeoverSubsystem) const override;
+	virtual FString GetNodeName() const override { return TEXT("Show Wespe Barrage Takeover"); }
+};
+
+/**
+ * @brief Mission node that pauses the game with the Dig In field manual (a Panzer IV digging in
+ * behind sandbags while two T-26s fire at it, and how the wall works) and continues from On Closed once the player pressed
+ * UNDERSTOOD.
+ */
+UCLASS()
+class RTS_SURVIVAL_API UAsyncShowDigInTakeover : public UAsyncShowInfoTakeoverBase
+{
+	GENERATED_BODY()
+
+public:
+	/**
+	 * @brief Shows the Dig In takeover and waits for it to close.
+	 * @param WorldContextObject The mission (or any object in the game world); filled in as self.
+	 * @return The node; On Closed fires later, or in the same frame when the takeovers are turned off.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Mission|Info Takeover",
+		meta = (BlueprintInternalUseOnly = "true", DefaultToSelf = "WorldContextObject",
+			HidePin = "WorldContextObject", DisplayName = "Show Dig In Takeover"))
+	static UAsyncShowDigInTakeover* ShowDigInTakeover(UObject* WorldContextObject);
+
+protected:
+	virtual int32 QueueTakeover(UInfoTakeoverSubsystem& InfoTakeoverSubsystem) const override;
+	virtual FString GetNodeName() const override { return TEXT("Show Dig In Takeover"); }
+};
+
+/**
+ * @brief Mission node that pauses the game with the Adrenaline Shot field manual (a Panzer 38(t)
+ * firing at a T-26 at its normal pace and then with Adrenaline Shot, and how the rush works) and continues from On Closed once the player pressed
+ * UNDERSTOOD.
+ */
+UCLASS()
+class RTS_SURVIVAL_API UAsyncShowAdrenalineShotTakeover : public UAsyncShowInfoTakeoverBase
+{
+	GENERATED_BODY()
+
+public:
+	/**
+	 * @brief Shows the Adrenaline Shot takeover and waits for it to close.
+	 * @param WorldContextObject The mission (or any object in the game world); filled in as self.
+	 * @return The node; On Closed fires later, or in the same frame when the takeovers are turned off.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Mission|Info Takeover",
+		meta = (BlueprintInternalUseOnly = "true", DefaultToSelf = "WorldContextObject",
+			HidePin = "WorldContextObject", DisplayName = "Show Adrenaline Shot Takeover"))
+	static UAsyncShowAdrenalineShotTakeover* ShowAdrenalineShotTakeover(UObject* WorldContextObject);
+
+protected:
+	virtual int32 QueueTakeover(UInfoTakeoverSubsystem& InfoTakeoverSubsystem) const override;
+	virtual FString GetNodeName() const override { return TEXT("Show Adrenaline Shot Takeover"); }
+};

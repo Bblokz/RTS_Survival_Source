@@ -13,6 +13,7 @@
 class ATankMaster;
 class UDataTable;
 class UW_InfoTakeover;
+class UW_VehicleInfoTakeover;
 
 /** How a takeover that a caller waits on ended. */
 enum class EInfoTakeoverRequestResult : uint8
@@ -39,6 +40,9 @@ struct FQueuedInfoTakeover
 
 	UPROPERTY()
 	FVehicleInfoTakeoverContent VehicleContent;
+
+	UPROPERTY()
+	FSquadInfoTakeoverContent SquadContent;
 
 	// Set when a caller waits for the close (OnTakeoverRequestFinished); INDEX_NONE for fire-and-forget takeovers.
 	UPROPERTY()
@@ -78,6 +82,22 @@ public:
 	bool QueueVehicleTakeover(ATankMaster* Vehicle, const FVehicleInfoTakeoverEntry& Entry);
 
 	/**
+	 * @brief Queues the squad takeover of a library prefab.
+	 * @param Infantry A squad controller or a solo infantry unit; its soldiers and weapons are shown.
+	 * @param LibraryEntry Row name in the squad library (DT_SquadInfoTakeovers).
+	 * @return False when takeovers are turned off or the infantry or row is missing.
+	 */
+	bool QueueSquadTakeoverFromLibrary(AActor* Infantry, const FName LibraryEntry);
+
+	/**
+	 * @brief Queues a squad takeover with the caller's own text and picture.
+	 * @param Infantry A squad controller or a solo infantry unit; its soldiers and weapons are shown.
+	 * @param Entry Name, description, year and picture; empty fields fall back to the unit's training data.
+	 * @return False when takeovers are turned off or the infantry is missing.
+	 */
+	bool QueueSquadTakeover(AActor* Infantry, const FSquadInfoTakeoverEntry& Entry);
+
+	/**
 	 * @brief Queues the camera controls field manual; a mission waits on OnTakeoverRequestFinished with the returned id
 	 * so its voice lines start only after the player closed it.
 	 * @return The request id that OnTakeoverRequestFinished reports exactly once; INDEX_NONE when takeovers are off
@@ -107,6 +127,41 @@ public:
 	int32 QueueNomadicConversionTakeover();
 
 	/**
+	 * @brief Queues the Vultures AT stick grenade field manual (a short clip and how the volley works), waited on like
+	 * the camera controls takeover.
+	 * @return The request id that OnTakeoverRequestFinished reports exactly once; INDEX_NONE when takeovers are off.
+	 */
+	int32 QueueVulturesAtTakeover();
+
+	/**
+	 * @brief Queues the Rattle-Feed field manual (a short clip and how the Panzer II's autocannon burst works), waited on
+	 * like the camera controls takeover.
+	 * @return The request id that OnTakeoverRequestFinished reports exactly once; INDEX_NONE when takeovers are off.
+	 */
+	int32 QueueRattleFeedTakeover();
+
+	/**
+	 * @brief Queues the Wespe Barrage field manual (a short clip and how the Wespe's area barrage works), waited on like the camera
+	 * controls takeover.
+	 * @return The request id that OnTakeoverRequestFinished reports exactly once; INDEX_NONE when takeovers are off.
+	 */
+	int32 QueueWespeBarrageTakeover();
+
+	/**
+	 * @brief Queues the Dig In field manual (a short clip and how a tank digs in behind sandbags), waited on like the camera
+	 * controls takeover.
+	 * @return The request id that OnTakeoverRequestFinished reports exactly once; INDEX_NONE when takeovers are off.
+	 */
+	int32 QueueDigInTakeover();
+
+	/**
+	 * @brief Queues the Adrenaline Shot field manual (a short clip and how the Panzer 38(t)'s crew rush works), waited on like the camera
+	 * controls takeover.
+	 * @return The request id that OnTakeoverRequestFinished reports exactly once; INDEX_NONE when takeovers are off.
+	 */
+	int32 QueueAdrenalineShotTakeover();
+
+	/**
 	 * @brief Queues the building expansion pack-up field manual (expansions pack up with their nomadic building and come
 	 * back after it deploys), waited on like the camera controls takeover.
 	 * @return The request id that OnTakeoverRequestFinished reports exactly once; INDEX_NONE when takeovers are off.
@@ -124,6 +179,12 @@ public:
 
 	/** @return The library prefab, or null when the row is missing. */
 	static const FVehicleInfoTakeoverEntry* FindVehicleLibraryEntry(const FName LibraryEntry);
+
+	/** @return The row names of the squad library, for the mission node's dropdown. */
+	static TArray<FName> GetSquadLibraryEntryNames();
+
+	/** @return The library prefab, or null when the row is missing. */
+	static const FSquadInfoTakeoverEntry* FindSquadLibraryEntry(const FName LibraryEntry);
 
 	UW_InfoTakeover* GetActiveTakeover() const { return M_ActiveTakeover; }
 	int32 GetQueuedTakeoverCount() const { return M_QueuedTakeovers.Num(); }
@@ -159,11 +220,20 @@ private:
 	/** @return The opened widget, or null when its class could not be created. */
 	UW_InfoTakeover* CreateTakeoverWidget(const FQueuedInfoTakeover& QueuedTakeover);
 	UW_InfoTakeover* CreateVehicleTakeoverWidget(const FQueuedInfoTakeover& QueuedTakeover) const;
+	// Squads use the vehicle widget class (one style for every unit takeover).
+	UW_InfoTakeover* CreateSquadTakeoverWidget(const FQueuedInfoTakeover& QueuedTakeover) const;
+	/** @return The styled vehicle widget, or the unstyled C++ widget when the Blueprint cannot be loaded. */
+	UW_VehicleInfoTakeover* CreateUnitInfoWidget() const;
 	UW_InfoTakeover* CreateCameraControlsTakeoverWidget() const;
 	UW_InfoTakeover* CreateCoverTakeoverWidget() const;
 	UW_InfoTakeover* CreateSpacedArmourTakeoverWidget() const;
 	UW_InfoTakeover* CreateNomadicConversionTakeoverWidget() const;
 	UW_InfoTakeover* CreateBxpPackUpTakeoverWidget() const;
+	UW_InfoTakeover* CreateVulturesAtTakeoverWidget() const;
+	UW_InfoTakeover* CreateRattleFeedTakeoverWidget() const;
+	UW_InfoTakeover* CreateWespeBarrageTakeoverWidget() const;
+	UW_InfoTakeover* CreateDigInTakeoverWidget() const;
+	UW_InfoTakeover* CreateAdrenalineShotTakeoverWidget() const;
 
 	/**
 	 * @brief Queues a field manual takeover that a mission node waits on; shared by every tutorial kind.
@@ -181,10 +251,16 @@ private:
 	 */
 	void AddToArchive(const FQueuedInfoTakeover& Takeover) const;
 	static FArchiveCustomContent MakeArchiveContent(const FVehicleInfoTakeoverContent& VehicleContent);
+	static FArchiveCustomContent MakeSquadArchiveContent(const FSquadInfoTakeoverContent& SquadContent);
 	static FArchiveCustomContent MakeCameraControlsArchiveContent();
 	static FArchiveCustomContent MakeCoverArchiveContent();
 	static FArchiveCustomContent MakeSpacedArmourArchiveContent();
 	static FArchiveCustomContent MakeNomadicConversionArchiveContent();
 	static FArchiveCustomContent MakeBxpPackUpArchiveContent();
+	static FArchiveCustomContent MakeVulturesAtArchiveContent();
+	static FArchiveCustomContent MakeRattleFeedArchiveContent();
+	static FArchiveCustomContent MakeWespeBarrageArchiveContent();
+	static FArchiveCustomContent MakeDigInArchiveContent();
+	static FArchiveCustomContent MakeAdrenalineShotArchiveContent();
 	const UDataTable* GetTrainingOptionsTable();
 };

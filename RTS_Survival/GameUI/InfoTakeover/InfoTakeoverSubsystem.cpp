@@ -13,6 +13,7 @@
 #include "RTS_Survival/Units/Variants/UnitVariantPresentationLibrary.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
+#include "SquadInfoTakeoverContent.h"
 #include "VehicleInfoTakeoverContent.h"
 #include "W_BxpPackUpTakeover.h"
 #include "W_CameraControlsTakeover.h"
@@ -20,6 +21,11 @@
 #include "W_NomadicConversionTakeover.h"
 #include "W_SpacedArmourTakeover.h"
 #include "W_VehicleInfoTakeover.h"
+#include "W_RattleFeedTakeover.h"
+#include "W_WespeBarrageTakeover.h"
+#include "W_DigInTakeover.h"
+#include "W_AdrenalineShotTakeover.h"
+#include "W_VulturesAtTakeover.h"
 
 namespace InfoTakeoverSubsystemPrivate
 {
@@ -29,11 +35,17 @@ namespace InfoTakeoverSubsystemPrivate
 	constexpr float ArchiveNotificationSeconds = 20.f;
 	constexpr int32 ArchiveSortingPriority = 0;
 	const TCHAR* const VehicleArchiveKeyPrefix = TEXT("InfoTakeover.Vehicle.");
+	const TCHAR* const SquadArchiveKeyPrefix = TEXT("InfoTakeover.Squad.");
 	const FName CameraControlsArchiveKey(TEXT("InfoTakeover.CameraControls"));
 	const FName CoverArchiveKey(TEXT("InfoTakeover.Cover"));
 	const FName SpacedArmourArchiveKey(TEXT("InfoTakeover.SpacedArmour"));
 	const FName NomadicConversionArchiveKey(TEXT("InfoTakeover.NomadicConversion"));
 	const FName BxpPackUpArchiveKey(TEXT("InfoTakeover.BxpPackUp"));
+	const FName VulturesAtArchiveKey(TEXT("InfoTakeover.VulturesAt"));
+	const FName RattleFeedArchiveKey(TEXT("InfoTakeover.RattleFeed"));
+	const FName WespeBarrageArchiveKey(TEXT("InfoTakeover.WespeBarrage"));
+	const FName DigInArchiveKey(TEXT("InfoTakeover.DigIn"));
+	const FName AdrenalineShotArchiveKey(TEXT("InfoTakeover.AdrenalineShot"));
 }
 
 bool UInfoTakeoverSubsystem::ShouldCreateSubsystem(UObject* Outer) const
@@ -120,6 +132,58 @@ bool UInfoTakeoverSubsystem::QueueVehicleTakeover(ATankMaster* Vehicle, const FV
 	return true;
 }
 
+TArray<FName> UInfoTakeoverSubsystem::GetSquadLibraryEntryNames()
+{
+	const UDataTable* const Library = UInfoTakeoverSettings::Get()->SquadLibrary.LoadSynchronous();
+	return IsValid(Library) ? Library->GetRowNames() : TArray<FName>();
+}
+
+const FSquadInfoTakeoverEntry* UInfoTakeoverSubsystem::FindSquadLibraryEntry(const FName LibraryEntry)
+{
+	const UDataTable* const Library = UInfoTakeoverSettings::Get()->SquadLibrary.LoadSynchronous();
+	if (not IsValid(Library))
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Info takeover: the squad library DataTable in Project Settings > Info "
+			"Takeovers could not be loaded."));
+		return nullptr;
+	}
+	return Library->FindRow<FSquadInfoTakeoverEntry>(LibraryEntry, TEXT("UInfoTakeoverSubsystem"), false);
+}
+
+bool UInfoTakeoverSubsystem::QueueSquadTakeoverFromLibrary(AActor* Infantry, const FName LibraryEntry)
+{
+	const FSquadInfoTakeoverEntry* const Entry = FindSquadLibraryEntry(LibraryEntry);
+	if (Entry == nullptr)
+	{
+		RTSFunctionLibrary::ReportError(FString::Printf(
+			TEXT("Info takeover: no row '%s' in the squad library (DT_SquadInfoTakeovers)."),
+			*LibraryEntry.ToString()));
+		return false;
+	}
+	return QueueSquadTakeover(Infantry, *Entry);
+}
+
+bool UInfoTakeoverSubsystem::QueueSquadTakeover(AActor* Infantry, const FSquadInfoTakeoverEntry& Entry)
+{
+	if (not IsValid(Infantry) || not SquadInfoTakeoverContent::GetIsInfantry(*Infantry))
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Info takeover: the squad passed to the mission node is not a valid squad "
+			"controller or infantry unit."));
+		return false;
+	}
+	FQueuedInfoTakeover QueuedTakeover;
+	QueuedTakeover.Kind = EInfoTakeoverKind::Squad;
+	QueuedTakeover.SquadContent = SquadInfoTakeoverContent::BuildContent(*Infantry, Entry, GetTrainingOptionsTable());
+	if (not GetAreInfoTakeoversEnabled())
+	{
+		// The player turned the takeovers off, but the archive still gets the entry and its pop-up.
+		AddToArchive(QueuedTakeover);
+		return false;
+	}
+	Enqueue(QueuedTakeover);
+	return true;
+}
+
 int32 UInfoTakeoverSubsystem::QueueCameraControlsTakeover()
 {
 	return QueueWaitedTutorialTakeover(EInfoTakeoverKind::CameraControls);
@@ -143,6 +207,31 @@ int32 UInfoTakeoverSubsystem::QueueNomadicConversionTakeover()
 int32 UInfoTakeoverSubsystem::QueueBxpPackUpTakeover()
 {
 	return QueueWaitedTutorialTakeover(EInfoTakeoverKind::BxpPackUp);
+}
+
+int32 UInfoTakeoverSubsystem::QueueVulturesAtTakeover()
+{
+	return QueueWaitedTutorialTakeover(EInfoTakeoverKind::VulturesAt);
+}
+
+int32 UInfoTakeoverSubsystem::QueueRattleFeedTakeover()
+{
+	return QueueWaitedTutorialTakeover(EInfoTakeoverKind::RattleFeed);
+}
+
+int32 UInfoTakeoverSubsystem::QueueWespeBarrageTakeover()
+{
+	return QueueWaitedTutorialTakeover(EInfoTakeoverKind::WespeBarrage);
+}
+
+int32 UInfoTakeoverSubsystem::QueueDigInTakeover()
+{
+	return QueueWaitedTutorialTakeover(EInfoTakeoverKind::DigIn);
+}
+
+int32 UInfoTakeoverSubsystem::QueueAdrenalineShotTakeover()
+{
+	return QueueWaitedTutorialTakeover(EInfoTakeoverKind::AdrenalineShot);
 }
 
 int32 UInfoTakeoverSubsystem::QueueWaitedTutorialTakeover(const EInfoTakeoverKind Kind)
@@ -241,6 +330,8 @@ UW_InfoTakeover* UInfoTakeoverSubsystem::CreateTakeoverWidget(const FQueuedInfoT
 	{
 	case EInfoTakeoverKind::Vehicle:
 		return CreateVehicleTakeoverWidget(QueuedTakeover);
+	case EInfoTakeoverKind::Squad:
+		return CreateSquadTakeoverWidget(QueuedTakeover);
 	case EInfoTakeoverKind::CameraControls:
 		return CreateCameraControlsTakeoverWidget();
 	case EInfoTakeoverKind::Cover:
@@ -251,13 +342,45 @@ UW_InfoTakeover* UInfoTakeoverSubsystem::CreateTakeoverWidget(const FQueuedInfoT
 		return CreateNomadicConversionTakeoverWidget();
 	case EInfoTakeoverKind::BxpPackUp:
 		return CreateBxpPackUpTakeoverWidget();
+	case EInfoTakeoverKind::VulturesAt:
+		return CreateVulturesAtTakeoverWidget();
+	case EInfoTakeoverKind::RattleFeed:
+		return CreateRattleFeedTakeoverWidget();
+	case EInfoTakeoverKind::WespeBarrage:
+		return CreateWespeBarrageTakeoverWidget();
+	case EInfoTakeoverKind::DigIn:
+		return CreateDigInTakeoverWidget();
+	case EInfoTakeoverKind::AdrenalineShot:
+		return CreateAdrenalineShotTakeoverWidget();
 	default:
-		RTSFunctionLibrary::ReportError(TEXT("Info takeover: buildings and squads have no takeover widget yet."));
+		RTSFunctionLibrary::ReportError(TEXT("Info takeover: buildings have no takeover widget yet."));
 		return nullptr;
 	}
 }
 
 UW_InfoTakeover* UInfoTakeoverSubsystem::CreateVehicleTakeoverWidget(const FQueuedInfoTakeover& QueuedTakeover) const
+{
+	UW_VehicleInfoTakeover* const VehicleTakeover = CreateUnitInfoWidget();
+	if (not IsValid(VehicleTakeover))
+	{
+		return nullptr;
+	}
+	VehicleTakeover->SetupVehicle(QueuedTakeover.VehicleContent);
+	return VehicleTakeover;
+}
+
+UW_InfoTakeover* UInfoTakeoverSubsystem::CreateSquadTakeoverWidget(const FQueuedInfoTakeover& QueuedTakeover) const
+{
+	UW_VehicleInfoTakeover* const SquadTakeover = CreateUnitInfoWidget();
+	if (not IsValid(SquadTakeover))
+	{
+		return nullptr;
+	}
+	SquadTakeover->SetupSquad(QueuedTakeover.SquadContent);
+	return SquadTakeover;
+}
+
+UW_VehicleInfoTakeover* UInfoTakeoverSubsystem::CreateUnitInfoWidget() const
 {
 	ACPPController* const PlayerController = FRTS_Statics::GetRTSController(this);
 	if (not IsValid(PlayerController))
@@ -272,13 +395,7 @@ UW_InfoTakeover* UInfoTakeoverSubsystem::CreateVehicleTakeoverWidget(const FQueu
 			"unstyled C++ widget."));
 		WidgetClass = UW_VehicleInfoTakeover::StaticClass();
 	}
-	UW_VehicleInfoTakeover* const VehicleTakeover = CreateWidget<UW_VehicleInfoTakeover>(PlayerController, WidgetClass);
-	if (not IsValid(VehicleTakeover))
-	{
-		return nullptr;
-	}
-	VehicleTakeover->SetupVehicle(QueuedTakeover.VehicleContent);
-	return VehicleTakeover;
+	return CreateWidget<UW_VehicleInfoTakeover>(PlayerController, WidgetClass);
 }
 
 UW_InfoTakeover* UInfoTakeoverSubsystem::CreateCameraControlsTakeoverWidget() const
@@ -403,6 +520,131 @@ UW_InfoTakeover* UInfoTakeoverSubsystem::CreateBxpPackUpTakeoverWidget() const
 	return BxpPackUpTakeover;
 }
 
+UW_InfoTakeover* UInfoTakeoverSubsystem::CreateVulturesAtTakeoverWidget() const
+{
+	ACPPController* const PlayerController = FRTS_Statics::GetRTSController(this);
+	if (not IsValid(PlayerController))
+	{
+		return nullptr;
+	}
+	TSubclassOf<UW_VulturesAtTakeover> WidgetClass =
+		UInfoTakeoverSettings::Get()->VulturesAtTakeoverWidgetClass.LoadSynchronous();
+	if (WidgetClass == nullptr)
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Info takeover: WBP_VulturesAtTakeover could not be loaded; showing the "
+			"unstyled C++ widget."));
+		WidgetClass = UW_VulturesAtTakeover::StaticClass();
+	}
+	UW_VulturesAtTakeover* const VulturesAtTakeover = CreateWidget<UW_VulturesAtTakeover>(PlayerController,
+		WidgetClass);
+	if (not IsValid(VulturesAtTakeover))
+	{
+		return nullptr;
+	}
+	VulturesAtTakeover->SetupVulturesAt();
+	return VulturesAtTakeover;
+}
+
+UW_InfoTakeover* UInfoTakeoverSubsystem::CreateRattleFeedTakeoverWidget() const
+{
+	ACPPController* const PlayerController = FRTS_Statics::GetRTSController(this);
+	if (not IsValid(PlayerController))
+	{
+		return nullptr;
+	}
+	TSubclassOf<UW_RattleFeedTakeover> WidgetClass =
+		UInfoTakeoverSettings::Get()->RattleFeedTakeoverWidgetClass.LoadSynchronous();
+	if (WidgetClass == nullptr)
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Info takeover: WBP_RattleFeedTakeover could not be loaded; showing the "
+			"unstyled C++ widget."));
+		WidgetClass = UW_RattleFeedTakeover::StaticClass();
+	}
+	UW_RattleFeedTakeover* const RattleFeedTakeover = CreateWidget<UW_RattleFeedTakeover>(PlayerController,
+		WidgetClass);
+	if (not IsValid(RattleFeedTakeover))
+	{
+		return nullptr;
+	}
+	RattleFeedTakeover->SetupRattleFeed();
+	return RattleFeedTakeover;
+}
+
+UW_InfoTakeover* UInfoTakeoverSubsystem::CreateWespeBarrageTakeoverWidget() const
+{
+	ACPPController* const PlayerController = FRTS_Statics::GetRTSController(this);
+	if (not IsValid(PlayerController))
+	{
+		return nullptr;
+	}
+	TSubclassOf<UW_WespeBarrageTakeover> WidgetClass =
+		UInfoTakeoverSettings::Get()->WespeBarrageTakeoverWidgetClass.LoadSynchronous();
+	if (WidgetClass == nullptr)
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Info takeover: WBP_WespeBarrageTakeover could not be loaded; showing the "
+			"unstyled C++ widget."));
+		WidgetClass = UW_WespeBarrageTakeover::StaticClass();
+	}
+	UW_WespeBarrageTakeover* const WespeBarrageTakeover = CreateWidget<UW_WespeBarrageTakeover>(PlayerController,
+		WidgetClass);
+	if (not IsValid(WespeBarrageTakeover))
+	{
+		return nullptr;
+	}
+	WespeBarrageTakeover->SetupWespeBarrage();
+	return WespeBarrageTakeover;
+}
+
+UW_InfoTakeover* UInfoTakeoverSubsystem::CreateDigInTakeoverWidget() const
+{
+	ACPPController* const PlayerController = FRTS_Statics::GetRTSController(this);
+	if (not IsValid(PlayerController))
+	{
+		return nullptr;
+	}
+	TSubclassOf<UW_DigInTakeover> WidgetClass =
+		UInfoTakeoverSettings::Get()->DigInTakeoverWidgetClass.LoadSynchronous();
+	if (WidgetClass == nullptr)
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Info takeover: WBP_DigInTakeover could not be loaded; showing the "
+			"unstyled C++ widget."));
+		WidgetClass = UW_DigInTakeover::StaticClass();
+	}
+	UW_DigInTakeover* const DigInTakeover = CreateWidget<UW_DigInTakeover>(PlayerController,
+		WidgetClass);
+	if (not IsValid(DigInTakeover))
+	{
+		return nullptr;
+	}
+	DigInTakeover->SetupDigIn();
+	return DigInTakeover;
+}
+
+UW_InfoTakeover* UInfoTakeoverSubsystem::CreateAdrenalineShotTakeoverWidget() const
+{
+	ACPPController* const PlayerController = FRTS_Statics::GetRTSController(this);
+	if (not IsValid(PlayerController))
+	{
+		return nullptr;
+	}
+	TSubclassOf<UW_AdrenalineShotTakeover> WidgetClass =
+		UInfoTakeoverSettings::Get()->AdrenalineShotTakeoverWidgetClass.LoadSynchronous();
+	if (WidgetClass == nullptr)
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Info takeover: WBP_AdrenalineShotTakeover could not be loaded; showing the "
+			"unstyled C++ widget."));
+		WidgetClass = UW_AdrenalineShotTakeover::StaticClass();
+	}
+	UW_AdrenalineShotTakeover* const AdrenalineShotTakeover = CreateWidget<UW_AdrenalineShotTakeover>(PlayerController,
+		WidgetClass);
+	if (not IsValid(AdrenalineShotTakeover))
+	{
+		return nullptr;
+	}
+	AdrenalineShotTakeover->SetupAdrenalineShot();
+	return AdrenalineShotTakeover;
+}
+
 void UInfoTakeoverSubsystem::HandleTakeoverClosed(UW_InfoTakeover* ClosedTakeover)
 {
 	if (ClosedTakeover != M_ActiveTakeover)
@@ -431,7 +673,7 @@ void UInfoTakeoverSubsystem::BroadcastRequestFinished(const FQueuedInfoTakeover&
 void UInfoTakeoverSubsystem::AddToArchive(const FQueuedInfoTakeover& Takeover) const
 {
 	using namespace InfoTakeoverSubsystemPrivate;
-	if (Takeover.Kind == EInfoTakeoverKind::Building || Takeover.Kind == EInfoTakeoverKind::Squad)
+	if (Takeover.Kind == EInfoTakeoverKind::Building)
 	{
 		return;
 	}
@@ -444,6 +686,9 @@ void UInfoTakeoverSubsystem::AddToArchive(const FQueuedInfoTakeover& Takeover) c
 	FArchiveCustomContent ArchiveContent;
 	switch (Takeover.Kind)
 	{
+	case EInfoTakeoverKind::Squad:
+		ArchiveContent = MakeSquadArchiveContent(Takeover.SquadContent);
+		break;
 	case EInfoTakeoverKind::CameraControls:
 		ArchiveContent = MakeCameraControlsArchiveContent();
 		break;
@@ -458,6 +703,21 @@ void UInfoTakeoverSubsystem::AddToArchive(const FQueuedInfoTakeover& Takeover) c
 		break;
 	case EInfoTakeoverKind::BxpPackUp:
 		ArchiveContent = MakeBxpPackUpArchiveContent();
+		break;
+	case EInfoTakeoverKind::VulturesAt:
+		ArchiveContent = MakeVulturesAtArchiveContent();
+		break;
+	case EInfoTakeoverKind::RattleFeed:
+		ArchiveContent = MakeRattleFeedArchiveContent();
+		break;
+	case EInfoTakeoverKind::WespeBarrage:
+		ArchiveContent = MakeWespeBarrageArchiveContent();
+		break;
+	case EInfoTakeoverKind::DigIn:
+		ArchiveContent = MakeDigInArchiveContent();
+		break;
+	case EInfoTakeoverKind::AdrenalineShot:
+		ArchiveContent = MakeAdrenalineShotArchiveContent();
 		break;
 	default:
 		ArchiveContent = MakeArchiveContent(Takeover.VehicleContent);
@@ -477,6 +737,21 @@ FArchiveCustomContent UInfoTakeoverSubsystem::MakeArchiveContent(const FVehicleI
 	ArchiveContent.ImageTexture = VehicleContent.ImageTexture;
 	ArchiveContent.ImageBrush = VehicleContent.ImageBrush;
 	ArchiveContent.bHasImage = VehicleContent.bHasImage;
+	ArchiveContent.SortType = ERTSArchiveType::Units;
+	return ArchiveContent;
+}
+
+FArchiveCustomContent UInfoTakeoverSubsystem::MakeSquadArchiveContent(const FSquadInfoTakeoverContent& SquadContent)
+{
+	using namespace InfoTakeoverSubsystemPrivate;
+	FArchiveCustomContent ArchiveContent;
+	// Keyed by name: the same squad introduced again in a later mission is archived once.
+	ArchiveContent.Key = FName(SquadArchiveKeyPrefix + SquadContent.DisplayName.ToString());
+	ArchiveContent.Title = SquadContent.DisplayName;
+	ArchiveContent.Description = SquadContent.Description;
+	ArchiveContent.ImageTexture = SquadContent.ImageTexture;
+	ArchiveContent.ImageBrush = SquadContent.ImageBrush;
+	ArchiveContent.bHasImage = SquadContent.bHasImage;
 	ArchiveContent.SortType = ERTSArchiveType::Units;
 	return ArchiveContent;
 }
@@ -539,6 +814,71 @@ FArchiveCustomContent UInfoTakeoverSubsystem::MakeBxpPackUpArchiveContent()
 	ArchiveContent.Title = UW_BxpPackUpTakeover::GetBxpPackUpTitle();
 	ArchiveContent.Description = UW_BxpPackUpTakeover::GetBxpPackUpSummary();
 	// The picture is an animated widget; the archive item only takes a still image.
+	ArchiveContent.bHasImage = false;
+	ArchiveContent.SortType = ERTSArchiveType::GameMechanics;
+	return ArchiveContent;
+}
+
+FArchiveCustomContent UInfoTakeoverSubsystem::MakeVulturesAtArchiveContent()
+{
+	using namespace InfoTakeoverSubsystemPrivate;
+	FArchiveCustomContent ArchiveContent;
+	ArchiveContent.Key = VulturesAtArchiveKey;
+	ArchiveContent.Title = UW_VulturesAtTakeover::GetVulturesAtTitle();
+	ArchiveContent.Description = UW_VulturesAtTakeover::GetVulturesAtSummary();
+	// The picture is a flipbook atlas; the archive item only takes a still image of a fixed size.
+	ArchiveContent.bHasImage = false;
+	ArchiveContent.SortType = ERTSArchiveType::GameMechanics;
+	return ArchiveContent;
+}
+
+FArchiveCustomContent UInfoTakeoverSubsystem::MakeRattleFeedArchiveContent()
+{
+	using namespace InfoTakeoverSubsystemPrivate;
+	FArchiveCustomContent ArchiveContent;
+	ArchiveContent.Key = RattleFeedArchiveKey;
+	ArchiveContent.Title = UW_RattleFeedTakeover::GetRattleFeedTitle();
+	ArchiveContent.Description = UW_RattleFeedTakeover::GetRattleFeedSummary();
+	// The picture is a flipbook atlas; the archive item only takes a still image of a fixed size.
+	ArchiveContent.bHasImage = false;
+	ArchiveContent.SortType = ERTSArchiveType::GameMechanics;
+	return ArchiveContent;
+}
+
+FArchiveCustomContent UInfoTakeoverSubsystem::MakeWespeBarrageArchiveContent()
+{
+	using namespace InfoTakeoverSubsystemPrivate;
+	FArchiveCustomContent ArchiveContent;
+	ArchiveContent.Key = WespeBarrageArchiveKey;
+	ArchiveContent.Title = UW_WespeBarrageTakeover::GetWespeBarrageTitle();
+	ArchiveContent.Description = UW_WespeBarrageTakeover::GetWespeBarrageSummary();
+	// The picture is a flipbook atlas; the archive item only takes a still image of a fixed size.
+	ArchiveContent.bHasImage = false;
+	ArchiveContent.SortType = ERTSArchiveType::GameMechanics;
+	return ArchiveContent;
+}
+
+FArchiveCustomContent UInfoTakeoverSubsystem::MakeDigInArchiveContent()
+{
+	using namespace InfoTakeoverSubsystemPrivate;
+	FArchiveCustomContent ArchiveContent;
+	ArchiveContent.Key = DigInArchiveKey;
+	ArchiveContent.Title = UW_DigInTakeover::GetDigInTitle();
+	ArchiveContent.Description = UW_DigInTakeover::GetDigInSummary();
+	// The picture is a flipbook atlas; the archive item only takes a still image of a fixed size.
+	ArchiveContent.bHasImage = false;
+	ArchiveContent.SortType = ERTSArchiveType::GameMechanics;
+	return ArchiveContent;
+}
+
+FArchiveCustomContent UInfoTakeoverSubsystem::MakeAdrenalineShotArchiveContent()
+{
+	using namespace InfoTakeoverSubsystemPrivate;
+	FArchiveCustomContent ArchiveContent;
+	ArchiveContent.Key = AdrenalineShotArchiveKey;
+	ArchiveContent.Title = UW_AdrenalineShotTakeover::GetAdrenalineShotTitle();
+	ArchiveContent.Description = UW_AdrenalineShotTakeover::GetAdrenalineShotSummary();
+	// The picture is a flipbook atlas; the archive item only takes a still image of a fixed size.
 	ArchiveContent.bHasImage = false;
 	ArchiveContent.SortType = ERTSArchiveType::GameMechanics;
 	return ArchiveContent;
