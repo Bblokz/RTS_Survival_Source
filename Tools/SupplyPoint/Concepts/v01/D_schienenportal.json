@@ -1,0 +1,456 @@
+{
+ "key": "D_schienenportal",
+ "title": "D  Schienenportal: rail-mounted portal over stock row and lane",
+ "notes": [
+  "The lane runs INSIDE the portal, parallel to the rails: in from the left between the rail ends, out to the right.",
+  "Parks at x 1.25, y -1.8, heading 0 deg (one stop). Rails on ballast beds at y -4.5 / +3.7, 0.8 m clear of the truck.",
+  "Crane: portal gantry travels along x on the rails, trolley runs along y on the girder, hoist. No slew.",
+  "Stocks in a straight row along the back rail (radixite, metal, parts at x -4.3 / 0 / 4.3) in low steel trays.",
+  "Cycle: travel to a tray, trolley back, lift, trolley forward + travel to a bed gap, lower. Readable, mechanical motion.",
+  "Loads drop between the bed bows: radixite skip front, metal bundle middle, parts pallet rear.",
+  "Animated: flag rise; gantry travel + trolley + hoist; tray fill levels step down. Ballast beds take uneven ground.",
+  "BP points: approach (-13, -1.8), park (1.25, -1.8) +x, exit (15, -1.8). Flag pole (-8.2, 4.4), 6.0 m travel.",
+  "Stop error is free: gantry travel follows the real bed along x, the trolley takes the side error."
+ ],
+ "subtitle": "Opel Blitz (real mesh) + soldier for scale  |  site 16 x 10 m between the rail ends, girder 5.8 m, flag 8 m",
+ "footprint": [
+  16.2,
+  9.9
+ ],
+ "height": 6.9,
+ "mast_height": 8.5,
+ "views": {
+  "rts": {
+   "file": "D_schienenportal_rts.png",
+   "size": [
+    1600,
+    1100
+   ],
+   "px_per_m": 61.81818181818182,
+   "caption": null,
+   "labels": [
+    {
+     "text": "Truck in",
+     "kind": "lane",
+     "xy": [
+      329.4,
+      635.4
+     ]
+    },
+    {
+     "text": "Truck out",
+     "kind": "lane",
+     "xy": [
+      1121.6,
+      941.6
+     ]
+    },
+    {
+     "text": "Opel Blitz parks here (empty bed)",
+     "kind": "truck",
+     "xy": [
+      863.3,
+      727.0
+     ]
+    },
+    {
+     "text": "Portal: travel (x) + trolley (y) + hoist",
+     "kind": "crane",
+     "xy": [
+      632.8,
+      518.5
+     ]
+    },
+    {
+     "text": "Radixite stock",
+     "kind": "radixite",
+     "xy": [
+      633.2,
+      560.9
+     ]
+    },
+    {
+     "text": "Metal stock",
+     "kind": "metal",
+     "xy": [
+      848.8,
+      644.2
+     ]
+    },
+    {
+     "text": "Vehicle parts stock",
+     "kind": "parts",
+     "xy": [
+      1064.4,
+      727.5
+     ]
+    },
+    {
+     "text": "Capture flag (rises up the pole)",
+     "kind": "flag",
+     "xy": [
+      533.5,
+      33.1
+     ]
+    },
+    {
+     "text": "lowered / neutral",
+     "kind": "flag",
+     "xy": [
+      533.5,
+      398.5
+     ]
+    },
+    {
+     "text": "Progress bar (UI)",
+     "kind": "ui",
+     "xy": [
+      821.7,
+      267.7
+     ]
+    }
+   ]
+  },
+  "rear": {
+   "file": "D_schienenportal_rear.png",
+   "size": [
+    800,
+    550
+   ],
+   "px_per_m": 30.90909090909091,
+   "caption": null,
+   "labels": [
+    {
+     "text": "Truck in",
+     "kind": "lane",
+     "xy": [
+      635.3,
+      409.7
+     ]
+    },
+    {
+     "text": "Truck out",
+     "kind": "lane",
+     "xy": [
+      239.2,
+      256.7
+     ]
+    },
+    {
+     "text": "Opel Blitz parks here (empty bed)",
+     "kind": "truck",
+     "xy": [
+      368.3,
+      249.2
+     ]
+    },
+    {
+     "text": "Portal: travel (x) + trolley (y) + hoist",
+     "kind": "crane",
+     "xy": [
+      483.6,
+      123.7
+     ]
+    },
+    {
+     "text": "Radixite stock",
+     "kind": "radixite",
+     "xy": [
+      483.4,
+      400.0
+     ]
+    },
+    {
+     "text": "Metal stock",
+     "kind": "metal",
+     "xy": [
+      375.6,
+      358.4
+     ]
+    },
+    {
+     "text": "Vehicle parts stock",
+     "kind": "parts",
+     "xy": [
+      267.8,
+      316.7
+     ]
+    },
+    {
+     "text": "Capture flag (rises up the pole)",
+     "kind": "flag",
+     "xy": [
+      533.2,
+      282.9
+     ]
+    },
+    {
+     "text": "lowered / neutral",
+     "kind": "flag",
+     "xy": [
+      533.2,
+      465.6
+     ]
+    },
+    {
+     "text": "Progress bar (UI)",
+     "kind": "ui",
+     "xy": [
+      389.2,
+      150.0
+     ]
+    }
+   ]
+  },
+  "top": {
+   "file": "D_schienenportal_top.png",
+   "size": [
+    800,
+    800
+   ],
+   "px_per_m": 30.58823529411765,
+   "caption": null,
+   "labels": [
+    {
+     "text": "Truck in",
+     "kind": "lane",
+     "xy": [
+      161.4,
+      467.3
+     ]
+    },
+    {
+     "text": "Truck out",
+     "kind": "lane",
+     "xy": [
+      644.7,
+      467.3
+     ]
+    },
+    {
+     "text": "Opel Blitz parks here (empty bed)",
+     "kind": "truck",
+     "xy": [
+      487.2,
+      467.3
+     ]
+    },
+    {
+     "text": "Portal: travel (x) + trolley (y) + hoist",
+     "kind": "crane",
+     "xy": [
+      406.1,
+      549.9
+     ]
+    },
+    {
+     "text": "Radixite stock",
+     "kind": "radixite",
+     "xy": [
+      268.5,
+      358.7
+     ]
+    },
+    {
+     "text": "Metal stock",
+     "kind": "metal",
+     "xy": [
+      400.0,
+      358.7
+     ]
+    },
+    {
+     "text": "Vehicle parts stock",
+     "kind": "parts",
+     "xy": [
+      531.5,
+      358.7
+     ]
+    },
+    {
+     "text": "Capture flag (rises up the pole)",
+     "kind": "flag",
+     "xy": [
+      149.2,
+      277.6
+     ]
+    },
+    {
+     "text": "lowered / neutral",
+     "kind": "flag",
+     "xy": [
+      149.2,
+      277.6
+     ]
+    },
+    {
+     "text": "Progress bar (UI)",
+     "kind": "ui",
+     "xy": [
+      400.0,
+      381.6
+     ]
+    }
+   ],
+   "grid": [
+    [
+     -517.6,
+     1329.9,
+     -517.6,
+     -505.4
+    ],
+    [
+     -364.7,
+     1329.9,
+     -364.7,
+     -505.4
+    ],
+    [
+     -211.8,
+     1329.9,
+     -211.8,
+     -505.4
+    ],
+    [
+     -58.8,
+     1329.9,
+     -58.8,
+     -505.4
+    ],
+    [
+     94.1,
+     1329.9,
+     94.1,
+     -505.4
+    ],
+    [
+     247.1,
+     1329.9,
+     247.1,
+     -505.4
+    ],
+    [
+     400.0,
+     1329.9,
+     400.0,
+     -505.4
+    ],
+    [
+     552.9,
+     1329.9,
+     552.9,
+     -505.4
+    ],
+    [
+     705.9,
+     1329.9,
+     705.9,
+     -505.4
+    ],
+    [
+     858.8,
+     1329.9,
+     858.8,
+     -505.4
+    ],
+    [
+     1011.8,
+     1329.9,
+     1011.8,
+     -505.4
+    ],
+    [
+     1164.7,
+     1329.9,
+     1164.7,
+     -505.4
+    ],
+    [
+     1317.6,
+     1329.9,
+     1317.6,
+     -505.4
+    ],
+    [
+     -517.6,
+     1329.9,
+     1317.6,
+     1329.9
+    ],
+    [
+     -517.6,
+     1176.9,
+     1317.6,
+     1176.9
+    ],
+    [
+     -517.6,
+     1024.0,
+     1317.6,
+     1024.0
+    ],
+    [
+     -517.6,
+     871.1,
+     1317.6,
+     871.1
+    ],
+    [
+     -517.6,
+     718.1,
+     1317.6,
+     718.1
+    ],
+    [
+     -517.6,
+     565.2,
+     1317.6,
+     565.2
+    ],
+    [
+     -517.6,
+     412.2,
+     1317.6,
+     412.2
+    ],
+    [
+     -517.6,
+     259.3,
+     1317.6,
+     259.3
+    ],
+    [
+     -517.6,
+     106.4,
+     1317.6,
+     106.4
+    ],
+    [
+     -517.6,
+     -46.6,
+     1317.6,
+     -46.6
+    ],
+    [
+     -517.6,
+     -199.5,
+     1317.6,
+     -199.5
+    ],
+    [
+     -517.6,
+     -352.5,
+     1317.6,
+     -352.5
+    ],
+    [
+     -517.6,
+     -505.4,
+     1317.6,
+     -505.4
+    ]
+   ]
+  }
+ },
+ "main_view": "rts"
+}
