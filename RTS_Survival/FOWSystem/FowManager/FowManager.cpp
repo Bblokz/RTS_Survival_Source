@@ -8,6 +8,8 @@
 #include "NiagaraDataInterfaceArrayFunctionLibrary.h"
 #include "NiagaraSystem.h"
 #include "Engine/TextureRenderTarget2D.h"
+#include "Kismet/KismetMaterialLibrary.h"
+#include "Materials/MaterialParameterCollection.h"
 #include "Engine/World.h"
 #include "TimerManager.h"
 #include "RTS_Survival/GameUI/MiniMap/CustomIcons/MinimapIconDataAsset.h"
@@ -47,6 +49,8 @@ AFowManager::AFowManager(const FObjectInitializer& ObjectInitializer)
 	MiniMapColorPlayerBuilding = FLinearColor(0.0f, 1.0f, 0.0f, 1.0f);
 	FowSystem = nullptr;
 	FoWReadBackSystem = nullptr;
+	FogOfWarParameterCollection = TSoftObjectPtr<UMaterialParameterCollection>(FSoftObjectPath(
+		TEXT("/Game/RTS_Survival/Blueprints/FowSystem/Materials/Collections/MPC_FogOfWar.MPC_FogOfWar")));
 	NiagaraDraw = nullptr;
 	NiagaraReadBack = nullptr;
 
@@ -481,6 +485,22 @@ void AFowManager::BeginPlay()
 	Super::BeginPlay();
 	BeginPlay_InitMinimapIconDataAsset();
 	BeginPlay_InitTransferMapExtentToPlayerCamera();
+}
+
+void AFowManager::SetUnexploredFogReveal(const float RevealBrightness)
+{
+	UMaterialParameterCollection* const Collection = FogOfWarParameterCollection.LoadSynchronous();
+	if (not IsValid(Collection))
+	{
+		RTSFunctionLibrary::ReportError(
+			"Fow manager has no valid fog of war material parameter collection; cannot reveal unexplored ground."
+			"\n See function: AFowManager::SetUnexploredFogReveal");
+		return;
+	}
+	// Name must match the scalar in MPC_FogOfWar read by MPP_FogOfWar_01.
+	static const FName UnexploredRevealName(TEXT("UnexploredReveal"));
+	UKismetMaterialLibrary::SetScalarParameterValue(this, Collection, UnexploredRevealName,
+	                                                FMath::Max(RevealBrightness, 0.f));
 }
 
 void AFowManager::BeginPlay_InitTransferMapExtentToPlayerCamera()

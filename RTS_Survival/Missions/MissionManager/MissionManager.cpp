@@ -11,6 +11,7 @@
 #include "NiagaraFunctionLibrary.h"
 #include "NiagaraSystem.h"
 #include "RTS_Survival/Enemy/EnemyController/EnemyController.h"
+#include "RTS_Survival/FOWSystem/FowManager/FowManager.h"
 #include "RTS_Survival/Game/RTSGameInstance/RTSGameInstance.h"
 #include "RTS_Survival/Missions/MissionClasses/DontLoseCommanderMission/DontLoseCommanderMission.h"
 #include "RTS_Survival/Missions/MissionClasses/MissionBase/MissionBase.h"
@@ -1097,6 +1098,24 @@ void AMissionManager::BeginPlay()
 	BeginPlay_InitMissionScheduler();
 	BeginPlay_InitMissionTriggerVolumesManager();
 	BeginPlay_CheckForDifficultyOverrideWithWidget();
+	BeginPlay_InitUnexploredFogReveal();
+}
+
+void AMissionManager::BeginPlay_InitUnexploredFogReveal() const
+{
+	if (not bRevealUnexploredFog)
+	{
+		return;
+	}
+	AFowManager* const FowManager = FRTS_Statics::GetFowManager(this);
+	if (not IsValid(FowManager))
+	{
+		RTSFunctionLibrary::ReportError(
+			"Mission manager wants to reveal unexplored fog but there is no fow manager on this map."
+			"\n See function: AMissionManager::BeginPlay_InitUnexploredFogReveal");
+		return;
+	}
+	FowManager->SetUnexploredFogReveal(UnexploredFogReveal);
 }
 
 void AMissionManager::PostInitializeComponents()

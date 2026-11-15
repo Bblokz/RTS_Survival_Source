@@ -11,6 +11,7 @@
 
 class UNiagaraSystem;
 class UNiagaraComponent;
+class UMaterialParameterCollection;
 class UFowComp;
 class UMinimapIconDataAsset;
 
@@ -240,6 +241,14 @@ public:
 
 	bool RemoveCustomMiniMapText(const FName TextId);
 
+	/**
+	 * @brief Lets never-explored ground show as a dim, desaturated, tinted copy of the scene instead of black.
+	 * Explored ground keeps its own (brighter) look, so the two stay distinguishable.
+	 * @param RevealBrightness 0 keeps unexplored ground black; explored ground renders at "Passive Opacity" (0.125)
+	 * of the scene, so values below that keep unexplored ground the darker of the two.
+	 */
+	void SetUnexploredFogReveal(const float RevealBrightness);
+
 protected:
 	/**
 	 * @brief Called when the game starts or when spawned.
@@ -340,6 +349,10 @@ protected:
 	// Fog of war post process material to draw
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Settings|Material")
 	TObjectPtr<UMaterialInterface> PostProcessMaterial;
+
+	// Collection read by the post process material; holds the per-map reveal of never-explored ground.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Settings|Material")
+	TSoftObjectPtr<UMaterialParameterCollection> FogOfWarParameterCollection;
 
 	UPROPERTY(BlueprintReadWrite, Category = "Settings|Niagara")
 	TObjectPtr<UNiagaraComponent> NiagaraDraw;

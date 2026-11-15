@@ -489,6 +489,17 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mission|Enemy")
 	EEnemyDirector M_EnemyDirector = EEnemyDirector::DirectorOfShield;
 
+	// Never-explored ground shows as a dim, desaturated, cold-tinted image instead of pure black, so the player can
+	// read the terrain on large maps. Explored ground keeps its own brighter, full-colour look.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mission|Fog Of War")
+	bool bRevealUnexploredFog = false;
+
+	// Brightness of never-explored ground. Explored ground renders at 0.125 of the scene; the desaturation and tint
+	// take roughly a quarter off this value, so up to 0.15 unexplored ground stays the darker of the two.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mission|Fog Of War",
+		meta=(EditCondition="bRevealUnexploredFog", ClampMin="0.0", ClampMax="0.15", UIMin="0.0", UIMax="0.15"))
+	float UnexploredFogReveal = 0.1f;
+
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void InitMissionSounds(const FMissionSoundSettings MissionSettings);
 
@@ -541,6 +552,7 @@ private:
 	bool GetIsValidGameDifficultyPickerWidgetClass() const;
 	void BeginPlay_InitMissionScheduler();
 	void BeginPlay_InitMissionTriggerVolumesManager();
+	void BeginPlay_InitUnexploredFogReveal() const;
 	void HidePlayerGlobalAbilityPanelIfNeeded() const;
 	bool EnsureValidPlayerController() const;
 	bool GetIsValidMissionScheduler() const;
