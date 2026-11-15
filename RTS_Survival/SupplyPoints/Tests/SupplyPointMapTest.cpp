@@ -184,6 +184,7 @@ private:
 	float M_NextTraceSeconds = 0.f;
 	float M_LastFlagProgress = 0.f;
 	bool bM_SawFlagRising = false;
+	bool bM_SawCaptureBar = false;
 	bool bM_SawTruckLoading = false;
 	bool bM_FirstTruckDelivered = false;
 	bool bM_FirstTruckRunEnded = false;
@@ -507,12 +508,15 @@ private:
 		}
 		const float FlagProgress = M_SupplyPoint->GetCaptureProgress();
 		bM_SawFlagRising |= FlagProgress > 0.05f and FlagProgress < 0.95f and FlagProgress > M_LastFlagProgress;
+		bM_SawCaptureBar |= M_SupplyPoint->GetIsCaptureProgressBarShown();
 		M_LastFlagProgress = FlagProgress;
 		if (M_SupplyPoint->GetOwningPlayer() != SupplyPointConstants::PlayerOwner)
 		{
 			return;
 		}
 		Check(bM_SawFlagRising, TEXT("flag_rose_gradually"));
+		Check(bM_SawCaptureBar, TEXT("capture_bar_shown_while_capturing"));
+		Check(not M_SupplyPoint->GetIsCaptureProgressBarShown(), TEXT("capture_bar_gone_after_capture"));
 		// The enemy flag comes down first, then the player's goes up: twice the capture duration.
 		Check(GetStepSeconds(World) >= M_Settings.CaptureDuration * 1.8f, TEXT("capture_took_lower_plus_raise"),
 		      FString::Printf(TEXT("seconds=%.1f"), GetStepSeconds(World)));
@@ -642,6 +646,10 @@ private:
 		Check(bM_FirstTruckDelivered, TEXT("first_truck_delivered"));
 		Check(bM_SawTruckLoading, TEXT("first_truck_was_loaded"));
 		CheckResourcesAfterRun(true, TEXT("resources_added_on_delivery"));
+		const USupplyPointSubsystem* SupplySubsystem = USupplyPointSubsystem::Get(&World);
+		// One rising text per delivered kind (radixite and metal; vehicle parts are zero in this test).
+		Check(SupplySubsystem != nullptr and SupplySubsystem->GetDeliveryTextsShown() == 2, TEXT("delivery_text_per_resource"),
+		      FString::FromInt(SupplySubsystem != nullptr ? SupplySubsystem->GetDeliveryTextsShown() : -1));
 		RememberResources();
 		bM_SawTruckLoading = false;
 		M_Truck.Reset();

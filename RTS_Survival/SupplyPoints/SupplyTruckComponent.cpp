@@ -448,7 +448,8 @@ void USupplyTruckComponent::DeliverCargoAndLeave()
 	SetSupplyTruckState(ESupplyTruckState::Delivered);
 	if (USupplyPointSubsystem* SupplySubsystem = USupplyPointSubsystem::Get(this))
 	{
-		SupplySubsystem->DeliverCargo(GetTruckOwningPlayer(), M_Cargo);
+		const FVector DeliveryLocation = M_Truck.IsValid() ? M_Truck->GetActorLocation() : FVector::ZeroVector;
+		SupplySubsystem->DeliverCargo(GetTruckOwningPlayer(), M_Cargo, DeliveryLocation);
 	}
 	M_Cargo.Reset();
 	OnSupplyTruckRunEnded.Broadcast(this, true);

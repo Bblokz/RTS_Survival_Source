@@ -40,6 +40,9 @@ struct FSupplyPointCaptureState
 
 	// Flag height the visuals have reached; follows Progress every frame while they differ.
 	float ShownProgress = 0.f;
+
+	// The player's running capture started under somebody else's flag, so its bar covers lowering and raising.
+	bool bPlayerCaptureIncludesLowering = false;
 };
 
 /**
@@ -73,6 +76,8 @@ public:
 	float GetCaptureProgress() const { return M_CaptureState.Progress; }
 
 	const FSupplyPointSettings& GetSupplyPointSettings() const { return SupplyPointSettings; }
+
+	bool GetIsCaptureProgressBarShown() const { return M_CaptureBarActivationId != INDEX_NONE; }
 
 	/** Replaces the instance settings; timers that already run keep their old duration. */
 	UFUNCTION(BlueprintCallable, Category = "Supply Point")
@@ -204,6 +209,11 @@ private:
 	void StopSupplyCycle();
 	void SetSupplyPointState(ESupplyPointState NewState);
 
+	// Shows the player how far their capture is; the bar runs by itself and is restarted whenever the capture
+	// stalls and resumes (contested, units left the radius).
+	void UpdateCaptureProgressBar(bool bIsPlayerCapturing);
+	float GetPlayerCaptureSecondsLeft() const;
+	void StopCaptureProgressBar();
 	void StartProgressBar(float Duration, const FText& Description);
 	void StopProgressBar();
 
@@ -226,6 +236,9 @@ private:
 
 	// Activation id of the pooled progress bar above the point; INDEX_NONE when none is shown.
 	int32 M_ProgressBarActivationId = INDEX_NONE;
+
+	// Activation id of the capture bar; INDEX_NONE while the player is not capturing.
+	int32 M_CaptureBarActivationId = INDEX_NONE;
 
 	FName M_MiniMapIconId = NAME_None;
 };

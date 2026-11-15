@@ -12,7 +12,10 @@ import math
 import unreal
 
 FBX = 'D:/Blender/BlenderProjects/BlenderTanks/CustomMapItems/SupplyPoint/FBX/'
-HOME = '/Game/RTS_Survival/Blueprints/Environment/SupplyPoint/Meshes'
+HOME = globals().get('SUPPLY_HOME', '/Game/RTS_Survival/Blueprints/Environment/SupplyPoint/Meshes')
+# A caller may exec this file with ONLY = [mesh names] to reimport a subset, and SUPPLY_IMPORT_LIBRARY = True to get
+# the functions without running main (ue_update_supply_point_v02.py, ue_render_supply_point_v02.py).
+ONLY = globals().get('ONLY')
 SHARED = '/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/Bunkers/BreakthroughShared/'
 EMBLEMS = '/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/RusBuildings/SovietFlags/Mat/Emblems/'
 MATERIALS = {
@@ -22,6 +25,8 @@ MATERIALS = {
     'M_BF_ResourceFill': '/Game/RTS_Survival/Blueprints/GroundVehicles/BaseAndNomadic/ChildBlueprints/BreakthroughHQ/Fills/M_BF_ResourceFill',
     'MI_Crystal1': '/Game/RTS_Survival/Blueprints/Resources/Crystals/Textures/MI_Crystal1',
     'MI_Emblem_DirectorOfShield': EMBLEMS + 'MI_Emblem_DirectorOfShield',
+    # v02: the game's metal-resource shader (harvestable metal nodes), on the metal fills and the metal load
+    'M_RTS_MetalResource': '/Game/RTS_Survival/Blueprints/Resources/Metal/Meshes/Materials/M_RTS_MetalResource',
 }
 PARTS = ['SM_SupplyPoint_Base', 'SM_SupplyPoint_UpperWorks', 'SM_SupplyPoint_Trolley', 'SM_SupplyPoint_Rope',
          'SM_SupplyPoint_HookBlock', 'SM_SupplyPoint_Flag']
@@ -190,7 +195,7 @@ def harvest_emblem():
 def main():
     unreal.SystemLibrary.execute_console_command(None, 'Interchange.FeatureFlags.Import.FBX 0')
     try:
-        for name in PARTS + LOADS + FILLS:
+        for name in [n for n in PARTS + LOADS + FILLS if ONLY is None or n in ONLY]:
             mesh = import_mesh(name)
             if mesh is None:
                 fail('import ' + name)
@@ -203,8 +208,10 @@ def main():
             report(mesh)
     finally:
         unreal.SystemLibrary.execute_console_command(None, 'Interchange.FeatureFlags.Import.FBX 1')
-    harvest_emblem()
+    if ONLY is None:
+        harvest_emblem()
 
 
-main()
-log('RESULT ' + ('OK' if OK[0] else 'FAIL'))
+if not globals().get('SUPPLY_IMPORT_LIBRARY'):
+    main()
+    log('RESULT ' + ('OK' if OK[0] else 'FAIL'))

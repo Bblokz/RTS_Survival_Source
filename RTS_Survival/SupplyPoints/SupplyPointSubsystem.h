@@ -79,8 +79,16 @@ public:
 	void SetSupplyBaseOverride(uint8 OwningPlayer, const FTransform& BaseTransform);
 	void ClearSupplyBaseOverride(uint8 OwningPlayer);
 
-	/** Adds the cargo to the owner's storage; whatever does not fit is lost. */
-	void DeliverCargo(uint8 OwningPlayer, const FSupplyTruckCargo& Cargo) const;
+	/**
+	 * @brief Adds the cargo to the owner's storage (whatever does not fit is lost) and shows the player what
+	 * arrived as rising text, like a harvester drop-off.
+	 * @param OwningPlayer Player the truck belongs to.
+	 * @param Cargo What the truck carries.
+	 * @param DeliveryLocation Where the truck handed over; the text rises from here.
+	 */
+	void DeliverCargo(uint8 OwningPlayer, const FSupplyTruckCargo& Cargo, const FVector& DeliveryLocation);
+
+	int32 GetDeliveryTextsShown() const { return M_DeliveryTextsShown; }
 
 	/** Plays the next portrait line of this moment for the human player; other owners are silent. */
 	void PlaySupplyAnnouncement(ESupplyAnnouncement Announcement, uint8 OwningPlayer);
@@ -98,6 +106,7 @@ private:
 	void OnSupplyTruckRunEnded(USupplyTruckComponent* SupplyTruck, bool bDelivered);
 	FSupplyPointRun* FindRun(const ASupplyPoint* SupplyPoint);
 	bool GetPlayerBaseTransform(FTransform& OutBaseTransform) const;
+	void ShowDeliveredResourceText(ERTSResourceType ResourceType, int32 Amount, const FVector& Location);
 	const FSupplyAnnouncementLines& GetAnnouncementLines(ESupplyAnnouncement Announcement) const;
 
 	UPROPERTY()
@@ -106,4 +115,6 @@ private:
 	TMap<ESupplyAnnouncement, FSupplyAnnouncementDeck> M_AnnouncementDecks;
 
 	TMap<uint8, FTransform> M_SupplyBaseOverrides;
+
+	int32 M_DeliveryTextsShown = 0;
 };

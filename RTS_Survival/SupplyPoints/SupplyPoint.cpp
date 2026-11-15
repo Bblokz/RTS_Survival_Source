@@ -162,6 +162,7 @@ void ASupplyPoint::EndPlay(const EEndPlayReason::Type EndPlayReason)
 		World->GetTimerManager().ClearTimer(M_SupplyTimerHandle);
 	}
 	StopProgressBar();
+	StopCaptureProgressBar();
 	if (not M_MiniMapIconId.IsNone())
 	{
 		if (AFowManager* FowManager = FRTS_Statics::GetFowManager(this))
@@ -224,30 +225,90 @@ void ASupplyPoint::UpdateCapture()
 {
 	uint8 SinglePlayerPresent = SupplyPointConstants::NeutralOwner;
 	const bool bIsContested = FindPlayersInCaptureRadius(SinglePlayerPresent);
-	if (bIsContested)
-	{
-		// Both sides in the radius: the flag stays where it is.
-		return;
-	}
 	const bool bIsEnemyAlone = SinglePlayerPresent != SupplyPointConstants::NeutralOwner
 		and SinglePlayerPresent != SupplyPointConstants::PlayerOwner;
-	if (bIsEnemyAlone and not SupplyPointSettings.bEnemyCanCapture)
+	// Both sides in the radius, or an enemy that may not capture: the flag stays where it is.
+	const bool bIsStalled = bIsContested or (bIsEnemyAlone and not SupplyPointSettings.bEnemyCanCapture);
+	if (not bIsStalled)
+	{
+		const float PreviousProgress = M_CaptureState.Progress;
+		if (SinglePlayerPresent == SupplyPointConstants::NeutralOwner)
+		{
+			RelaxCapture(SupplyPointPrivate::CaptureSearchInterval);
+		}
+		else
+		{
+			AdvanceCapture(SinglePlayerPresent, SupplyPointPrivate::CaptureSearchInterval);
+		}
+		if (not FMath::IsNearlyEqual(PreviousProgress, M_CaptureState.Progress))
+		{
+			SetActorTickEnabled(true);
+		}
+	}
+	const bool bIsPlayerFlagUp = M_CaptureState.ProgressPlayer == SupplyPointConstants::PlayerOwner
+		and M_CaptureState.Progress >= 1.f;
+	const bool bIsPlayerCapturing = not bIsStalled and SinglePlayerPresent == SupplyPointConstants::PlayerOwner
+		and not bIsPlayerFlagUp;
+	UpdateCaptureProgressBar(bIsPlayerCapturing);
+}
+
+float ASupplyPoint::GetPlayerCaptureSecondsLeft() const
+{
+	const bool bIsForeignFlagUp = M_CaptureState.ProgressPlayer != SupplyPointConstants::PlayerOwner
+		and M_CaptureState.Progress > 0.f;
+	// A foreign flag comes down first, then the player's goes all the way up.
+	const float ProgressLeft = bIsForeignFlagUp ? M_CaptureState.Progress + 1.f : 1.f - M_CaptureState.Progress;
+	return ProgressLeft * SupplyPointSettings.CaptureDuration;
+}
+
+void ASupplyPoint::UpdateCaptureProgressBar(const bool bIsPlayerCapturing)
+{
+	if (not bIsPlayerCapturing)
+	{
+		StopCaptureProgressBar();
+		return;
+	}
+	if (M_CaptureBarActivationId != INDEX_NONE)
+	{
+		// Already running: the capture and the bar advance at the same speed.
+		return;
+	}
+	const UWorld* World = GetWorld();
+	URTSTimedProgressBarWorldSubsystem* ProgressSubsystem =
+		World != nullptr ? World->GetSubsystem<URTSTimedProgressBarWorldSubsystem>() : nullptr;
+	const float SecondsLeft = GetPlayerCaptureSecondsLeft();
+	if (ProgressSubsystem == nullptr or SecondsLeft <= 0.f)
 	{
 		return;
 	}
-	const float PreviousProgress = M_CaptureState.Progress;
-	if (SinglePlayerPresent == SupplyPointConstants::NeutralOwner)
+	const bool bIsForeignFlagUp = M_CaptureState.ProgressPlayer != SupplyPointConstants::PlayerOwner
+		and M_CaptureState.Progress > 0.f;
+	M_CaptureState.bPlayerCaptureIncludesLowering |= bIsForeignFlagUp;
+	constexpr float LoweringAndRaising = 2.f;
+	const float TotalSeconds = SupplyPointSettings.CaptureDuration
+		* (M_CaptureState.bPlayerCaptureIncludesLowering ? LoweringAndRaising : 1.f);
+	const float RatioStart = FMath::Clamp(1.f - SecondsLeft / FMath::Max(TotalSeconds, KINDA_SMALL_NUMBER), 0.f, 1.f);
+	constexpr bool bUsePercentageText = true;
+	constexpr bool bUseDescriptionText = true;
+	M_CaptureBarActivationId = ProgressSubsystem->ActivateTimedProgressBarAnchored(
+		SupplyPointRoot, SupplyPointSettings.ProgressBarOffset, RatioStart, SecondsLeft, bUsePercentageText,
+		ERTSProgressBarType::Default, bUseDescriptionText,
+		NSLOCTEXT("SupplyPoint", "Capturing", "Capturing").ToString(), SupplyPointSettings.ProgressBarScale);
+}
+
+void ASupplyPoint::StopCaptureProgressBar()
+{
+	if (M_CaptureBarActivationId == INDEX_NONE)
 	{
-		RelaxCapture(SupplyPointPrivate::CaptureSearchInterval);
+		return;
 	}
-	else
+	const UWorld* World = GetWorld();
+	if (URTSTimedProgressBarWorldSubsystem* ProgressSubsystem =
+		World != nullptr ? World->GetSubsystem<URTSTimedProgressBarWorldSubsystem>() : nullptr)
 	{
-		AdvanceCapture(SinglePlayerPresent, SupplyPointPrivate::CaptureSearchInterval);
+		ProgressSubsystem->ForceProgressBarDormant(M_CaptureBarActivationId);
 	}
-	if (not FMath::IsNearlyEqual(PreviousProgress, M_CaptureState.Progress))
-	{
-		SetActorTickEnabled(true);
-	}
+	M_CaptureBarActivationId = INDEX_NONE;
 }
 
 bool ASupplyPoint::FindPlayersInCaptureRadius(uint8& OutSinglePlayerPresent) const
@@ -373,6 +434,12 @@ void ASupplyPoint::SetOwningPlayer(const uint8 NewOwningPlayer)
 	}
 	StopSupplyCycle();
 	M_CaptureState.OwningPlayer = NewOwningPlayer;
+	if (NewOwningPlayer != SupplyPointConstants::NeutralOwner)
+	{
+		// A flag is fully up: whatever capture comes next starts a fresh bar.
+		M_CaptureState.bPlayerCaptureIncludesLowering = false;
+		StopCaptureProgressBar();
+	}
 	UpdateMiniMapIcon();
 	BP_OnOwnerChanged(NewOwningPlayer, PreviousOwner);
 	if (NewOwningPlayer != SupplyPointConstants::NeutralOwner)

@@ -7,6 +7,7 @@
 #include "Sound/SoundBase.h"
 #include "TimerManager.h"
 #include "RTS_Survival/GameUI/TrainingUI/TrainerComponent/TrainerComponent.h"
+#include "RTS_Survival/GameUI/Pooled_AnimatedVerticalText/RTSVerticalAnimatedText/RTSVerticalAnimatedText.h"
 #include "RTS_Survival/Player/PlayerResourceManager/PlayerResourceManager.h"
 #include "RTS_Survival/Player/PortraitManager/PortraitManager.h"
 #include "RTS_Survival/SupplyPoints/SupplyPoint.h"
@@ -15,6 +16,8 @@
 #include "RTS_Survival/Units/Tanks/TankMaster.h"
 #include "RTS_Survival/Units/Tanks/WheeledTank/BaseTruck/NomadicVehicle.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
+#include "RTS_Survival/Utils/RTSBlueprintFunctionLibrary.h"
+#include "RTS_Survival/Utils/RTSRichTextConverters/FRTSRichTextConverter.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 #include "RTS_Survival/Utils/UnitSpawning/RTSUnitOwnerSpawning.h"
 
@@ -26,6 +29,12 @@ namespace SupplyPointSubsystemPrivate
 	constexpr float FallbackSpawnDistanceFromHq = 1500.f;
 	// Lift the spawn off the navmesh point so the truck does not start inside the ground.
 	constexpr float SpawnHeightOffset = 60.f;
+	// Delivery text: starts above the truck, one line per resource kind stacked upwards.
+	constexpr float DeliveryTextHeight = 350.f;
+	constexpr float DeliveryTextLineSpacing = 90.f;
+	constexpr float DeliveryTextRise = 150.f;
+	constexpr float DeliveryTextVisibleSeconds = 5.f;
+	constexpr float DeliveryTextFadeSeconds = 2.5f;
 	const TArray<ERTSResourceType> CargoResourceTypes = {
 		ERTSResourceType::Resource_Radixite, ERTSResourceType::Resource_Metal, ERTSResourceType::Resource_VehicleParts
 	};
@@ -353,8 +362,10 @@ bool USupplyPointSubsystem::GetPlayerBaseTransform(FTransform& OutBaseTransform)
 	return true;
 }
 
-void USupplyPointSubsystem::DeliverCargo(const uint8 OwningPlayer, const FSupplyTruckCargo& Cargo) const
+void USupplyPointSubsystem::DeliverCargo(const uint8 OwningPlayer, const FSupplyTruckCargo& Cargo,
+                                         const FVector& DeliveryLocation)
 {
+	using namespace SupplyPointSubsystemPrivate;
 	if (OwningPlayer != SupplyPointConstants::PlayerOwner)
 	{
 		// AI supply runs: credit the enemy economy here.
@@ -366,15 +377,41 @@ void USupplyPointSubsystem::DeliverCargo(const uint8 OwningPlayer, const FSupply
 		RTSFunctionLibrary::ReportError("Supply truck cargo lost: no player resource manager.");
 		return;
 	}
-	for (const ERTSResourceType ResourceType : SupplyPointSubsystemPrivate::CargoResourceTypes)
+	FVector TextLocation = DeliveryLocation + FVector(0.f, 0.f, DeliveryTextHeight);
+	for (const ERTSResourceType ResourceType : CargoResourceTypes)
 	{
 		const int32 Amount = Cargo.GetAmount(ResourceType);
-		if (Amount > 0)
+		if (Amount <= 0)
 		{
-			// Clamps to the storage; the part that does not fit is lost by design.
-			ResourceManager->AddResource(ResourceType, Amount);
+			continue;
 		}
+		const int32 AmountBefore = ResourceManager->GetResourceAmount(ResourceType);
+		// Clamps to the storage; the part that does not fit is lost by design.
+		ResourceManager->AddResource(ResourceType, Amount);
+		const int32 AmountStored = ResourceManager->GetResourceAmount(ResourceType) - AmountBefore;
+		ShowDeliveredResourceText(ResourceType, AmountStored, TextLocation);
+		TextLocation.Z += DeliveryTextLineSpacing;
 	}
+}
+
+void USupplyPointSubsystem::ShowDeliveredResourceText(const ERTSResourceType ResourceType, const int32 Amount,
+                                                      const FVector& Location)
+{
+	using namespace SupplyPointSubsystemPrivate;
+	// The amount that really went into storage: a full store shows "+ 0" so the player sees the load was lost.
+	FRTSVerticalAnimTextSettings TextSettings;
+	TextSettings.DeltaZ = DeliveryTextRise;
+	TextSettings.VisibleDuration = DeliveryTextVisibleSeconds;
+	TextSettings.FadeOutDuration = DeliveryTextFadeSeconds;
+	const FString PlainText = "+ " + FString::FromInt(FMath::Max(Amount, 0)) + " "
+		+ Global_GetResourceTypeDisplayString(ResourceType);
+	const FString RichText = FRTSRichTextConverter::MakeRTSRich(
+		PlainText, FRTSRichTextConverter::ConvertResourceToRTSRichText(ResourceType));
+	constexpr bool bAutoWrap = false;
+	constexpr float WrapAt = 0.f;
+	URTSBlueprintFunctionLibrary::RTSSpawnVerticalAnimatedTextAtLocation(
+		this, RichText, Location, bAutoWrap, WrapAt, ETextJustify::Center, TextSettings);
+	++M_DeliveryTextsShown;
 }
 
 const FSupplyAnnouncementLines& USupplyPointSubsystem::GetAnnouncementLines(
