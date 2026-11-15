@@ -141,3 +141,53 @@ int32 UAsyncShowBxpPackUpTakeover::QueueTakeover(UInfoTakeoverSubsystem& InfoTak
 {
 	return InfoTakeoverSubsystem.QueueBxpPackUpTakeover();
 }
+
+UAsyncShowVulturesAtTakeover* UAsyncShowVulturesAtTakeover::ShowVulturesAtTakeover(UObject* WorldContextObject)
+{
+	return CreateNode<UAsyncShowVulturesAtTakeover>(WorldContextObject);
+}
+
+int32 UAsyncShowVulturesAtTakeover::QueueTakeover(UInfoTakeoverSubsystem& InfoTakeoverSubsystem) const
+{
+	return InfoTakeoverSubsystem.QueueVulturesAtTakeover();
+}
+
+UAsyncShowRattleFeedTakeover* UAsyncShowRattleFeedTakeover::ShowRattleFeedTakeover(UObject* WorldContextObject)
+{
+	return CreateNode<UAsyncShowRattleFeedTakeover>(WorldContextObject);
+}
+
+int32 UAsyncShowRattleFeedTakeover::QueueTakeover(UInfoTakeoverSubsystem& InfoTakeoverSubsystem) const
+{
+	return InfoTakeoverSubsystem.QueueRattleFeedTakeover();
+}
+
+UAsyncShowWespeBarrageTakeover* UAsyncShowWespeBarrageTakeover::ShowWespeBarrageTakeover(UObject* WorldContextObject)
+{
+	return CreateNode<UAsyncShowWespeBarrageTakeover>(WorldContextObject);
+}
+
+int32 UAsyncShowWespeBarrageTakeover::QueueTakeover(UInfoTakeoverSubsystem& InfoTakeoverSubsystem) const
+{
+	return InfoTakeoverSubsystem.QueueWespeBarrageTakeover();
+}
+
+UAsyncShowDigInTakeover* UAsyncShowDigInTakeover::ShowDigInTakeover(UObject* WorldContextObject)
+{
+	return CreateNode<UAsyncShowDigInTakeover>(WorldContextObject);
+}
+
+int32 UAsyncShowDigInTakeover::QueueTakeover(UInfoTakeoverSubsystem& InfoTakeoverSubsystem) const
+{
+	return InfoTakeoverSubsystem.QueueDigInTakeover();
+}
+
+UAsyncShowAdrenalineShotTakeover* UAsyncShowAdrenalineShotTakeover::ShowAdrenalineShotTakeover(UObject* WorldContextObject)
+{
+	return CreateNode<UAsyncShowAdrenalineShotTakeover>(WorldContextObject);
+}
+
+int32 UAsyncShowAdrenalineShotTakeover::QueueTakeover(UInfoTakeoverSubsystem& InfoTakeoverSubsystem) const
+{
+	return InfoTakeoverSubsystem.QueueAdrenalineShotTakeover();
+}

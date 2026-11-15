@@ -121,6 +121,14 @@ public:
 	 */
 	static TArray<FUnitVariantWeaponStats> ReadWeaponStats(const AActor& Unit);
 
+	/**
+	 * @brief Merges weapons the caller collected itself (identical weapons counted), for units the probe does not know,
+	 * such as the soldiers of a squad in the squad info takeover.
+	 * @param WeaponStates Weapons whose BeginPlay setup has run; null entries are skipped.
+	 * @return One entry per distinct weapon.
+	 */
+	static TArray<FUnitVariantWeaponStats> ReadWeaponStatsFromStates(const TArray<const UWeaponState*>& WeaponStates);
+
 private:
 	UPROPERTY()
 	TMap<TObjectPtr<UClass>, FUnitVariantProbeResult> M_Results;

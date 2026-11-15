@@ -132,6 +132,20 @@ TArray<FUnitVariantWeaponStats> UUnitVariantProbes::ReadWeaponStats(const AActor
 	return Weapons;
 }
 
+TArray<FUnitVariantWeaponStats> UUnitVariantProbes::ReadWeaponStatsFromStates(
+	const TArray<const UWeaponState*>& WeaponStates)
+{
+	TArray<FUnitVariantWeaponStats> Weapons;
+	for (const UWeaponState* const Weapon : WeaponStates)
+	{
+		if (IsValid(Weapon))
+		{
+			AddWeapon(Weapons, *Weapon);
+		}
+	}
+	return Weapons;
+}
+
 void UUnitVariantProbes::ReadAddOnArmor(const AActor& Probe, FUnitVariantProbeResult& Result)
 {
 	if (Probe.FindComponentByClass<UAddOnArmorPanelsComponent>() == nullptr)

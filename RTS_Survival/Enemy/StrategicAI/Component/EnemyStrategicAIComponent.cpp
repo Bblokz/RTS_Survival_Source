@@ -258,6 +258,11 @@ bool UEnemyStrategicAIComponent::GetIsAllowedUnitTraining() const
 	return M_Blackboard.StrategicAIMissionSettings.bAllowUnitTraining;
 }
 
+bool UEnemyStrategicAIComponent::GetIsAllowedBuilding() const
+{
+	return M_Blackboard.StrategicAIMissionSettings.bAllowBuilding;
+}
+
 void UEnemyStrategicAIComponent::PreThinKStep_InitThinkingTimers(const float Now)
 {
 	M_AIThinkTimers.Reset();
