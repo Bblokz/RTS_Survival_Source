@@ -841,6 +841,36 @@ The 22 kit pieces for `Ger_Berlin` (`BP_BerlinRuin_*`, children of the graph-les
 They are built by `Tools/BerlinMap/ruinkit/ruin_blueprints_build.py`. See `BerlinRuinKit.md` for the settings, the real
 tank fire test and the weak spots.
 
+## Rus factory A2 (A + B, no damage meshes, 2026-11-15)
+
+`Rus_Building_Factory` (`BuildingExpansions/RusBuildings/`; A2 crane remodel applied IN PLACE on 2026-11-15 after testing
+on the copy `Rus_Building_Factory_A2`, same scripts with `RUSA2_TARGET_BP`; backup of the old asset in
+`Saved/Backup_RusFactory_2026-11-15`) shows damage only through procedural holes, as the user asked: no
+At66 / At33 / destroyed meshes. Script: `Tools/RusFactoryA2/ue_rusfactory_a2_holes.py` (execute_uecp_script,
+`allow_destructive`).
+
+- **Component** `WallHoleDamage`: `BuildingMeshComponent`, holes on slot 0 (`MI_concrete2` slot =
+  `MI_Rus_BunkerConcrete_05`) only; metal, camo nets, sandbags and the atlas trim get `None`. Grid, hole and collapse
+  settings copied from `Rus_Building_Barracks` (NoGrid, outset 0, 0.85 cm per mm, 3600 / max 5,
+  `bCollapseIntoChunksOnDeath = true`).
+- **Material:** `FactoryA2/Holes/MI_SM_Rus_WarFactory_A2_MI_Rus_BunkerConcrete_05_WallHoles` (two-sided, NoGrid) on the
+  shared `M_RusBunker_Concrete_WallHoles`, PS 438 vs 319; debris `SM_Rus_WarFactory_A2_Debris_0..7`.
+- **Graph:** the 100 / 66 / 33 % `SetStaticMesh` swaps removed; `ExplosionsAt66` / `At33` run straight from the
+  health switch. The unused `GeometryCollection` (GC_Rus_Bunker05) and its unconnected `CollapseMesh` removed. Death
+  unchanged (`DestroyAndSpawnActors`, barrels, explosion, destroy after 1 s), plus the hole pieces flying and the crane
+  machinery hiding.
+- **Collision:** the original `SM_Collision_RusWarFactory` (83 tris, complex as simple). Measured in Blender against the
+  visible concrete: front 70 %, back 100 %, right 90 % of rays within 30 cm (collision a few cm behind the face); the
+  gate side and its corner are poor (25 % / 15 %: the collision skips the wing walls), so holes there can sit inside.
+  The new crane tower has no collision.
+- **Headless check** (`Tools/RusFactoryA2/rusfactory_a2_holes_headless_test.py`, throwaway DebugGame editor,
+  RTS_ToCopySmall): 8 debug hits on the front, east, back and roof all struck the collision and cut holes (6 slots
+  full, then merging); slot 0 swapped to the holes instance, other slots unchanged; at 60 % and 30 % health the mesh
+  stays SM_Rus_WarFactory_A2 with the holes. Pictures `Saved/RusFactoryA2/Holes/` (east face holes + debris clear; the
+  front face is in shadow on that map; the 30 % shot is grey, probably the At33 explosion smoke over the camera).
+- **Open:** aim points still the class default; a front hit at the bastion's corner (mesh x -600) struck the
+  collision ~1.5 m behind the face (no visible hole).
+
 ## Open points
 
 - The collapse reads as a blast, not a falling wall. Tune `CollapseSettings.DeathSpeedScale`, or add a slumping
