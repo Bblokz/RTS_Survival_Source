@@ -196,6 +196,9 @@ public:
 
 	const FStrategicAIResultBatch& GetLatestStrategicAIResults() const;
 	const FStrategicAIBlackboard& GetStrategicAIBlackboard() const;
+
+	// Also gates the base trenches the AI digs (UEnemyBaseTrenchComponent).
+	bool GetIsAllowedBuilding() const;
 	FStrategicAIBlackboard& GetEditableStrategicAIBlackboard();
 	FEnemyStrategicTrainingState& GetEditableEnemyTrainingState();
 	void RegisterDroppedUnitWithBlackboardWhenReady(AActor* DroppedUnit);
@@ -295,8 +298,6 @@ private:
 #endif
 	bool GetIsAllowedDirectControlUnits()const;
 	bool GetIsAllowedUnitTraining()const;
-	// Also gates the base trenches the AI digs (UEnemyBaseTrenchComponent).
-	bool GetIsAllowedBuilding()const;
 
 	FTimerHandle M_StrategicAIThinkingTimerHandle;
 	FTimerHandle M_StrategicAIStartDelayTimerHandle;
