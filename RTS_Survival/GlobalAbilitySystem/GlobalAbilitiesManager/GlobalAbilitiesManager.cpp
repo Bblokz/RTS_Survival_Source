@@ -8,6 +8,7 @@
 #include "RTS_Survival/GlobalAbilitySystem/GlobalAbilities/GlobalAbility.h"
 #include "RTS_Survival/GlobalAbilitySystem/DevSettings/RTSGlobalAbilitySettings.h"
 #include "RTS_Survival/GlobalAbilitySystem/DevSettings/GlobalAbilitySetDataAsset.h"
+#include "RTS_Survival/GlobalAbilitySystem/EnemyAirWarnings/EnemyAirWarningSubsystem.h"
 #include "RTS_Survival/GlobalAbilitySystem/UI/W_GA_Description/W_GA_Description.h"
 #include "RTS_Survival/GlobalAbilitySystem/UI/W_GA_Item/W_GA_Item.h"
 #include "RTS_Survival/TechTree/Technologies/Technologies.h"
@@ -1121,6 +1122,14 @@ bool UGlobalAbilitiesManager::TryExecuteAbilityAtLocation(UGlobalAbility* Abilit
 
 	Ability->ExecuteAbilityAtLocation(TargetLocation);
 	OnAbilityFinishedExecuting(Ability);
+	if (IsEnemyAbilityManager())
+	{
+		// The enemy sent aircraft: the announcer portrait warns the player (silent for non-air abilities).
+		if (UEnemyAirWarningSubsystem* AirWarnings = UEnemyAirWarningSubsystem::Get(this))
+		{
+			AirWarnings->OnEnemyAbilityExecuted(Ability->GetAbilityType());
+		}
+	}
 	return true;
 }
 
