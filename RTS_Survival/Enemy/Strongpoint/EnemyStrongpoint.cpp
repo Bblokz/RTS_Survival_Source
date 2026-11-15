@@ -223,6 +223,11 @@ bool AEnemyStrongpoint::SpawnPostDefender(const int32 PostIndex)
 	const TSharedRef<bool> bResolved = MakeShared<bool>(false);
 	auto OnSpawned = [WeakThis, bResolved](const FTrainingOption&, AActor* SpawnedUnit, const int32 SpawnedPostIndex)
 	{
+		// One answer per request, as the wave controller guards the same spawner call.
+		if (*bResolved)
+		{
+			return;
+		}
 		*bResolved = true;
 		if (WeakThis.IsValid())
 		{

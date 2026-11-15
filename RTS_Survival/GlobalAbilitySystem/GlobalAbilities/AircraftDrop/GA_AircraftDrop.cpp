@@ -61,6 +61,23 @@ void UGA_AircraftDrop::ExecuteAbilityAtLocation(const FVector& TargetLocation)
 	
 }
 
+void UGA_AircraftDrop::SetDropPayload(const TArray<ETankSubtype>& TankSubtypes,
+                                      const TArray<ESquadSubtype>& SquadSubtypes)
+{
+	// The template's own vehicle was tuned under its aircraft; other vehicles hang at the same height.
+	const FAircraftDropTankWithOffset TemplateTank = M_AircraftDropSettings.TanksWithOffsets.IsEmpty()
+		                                                 ? FAircraftDropTankWithOffset()
+		                                                 : M_AircraftDropSettings.TanksWithOffsets[0];
+	M_AircraftDropSettings.TanksWithOffsets.Reset();
+	for (const ETankSubtype TankSubtype : TankSubtypes)
+	{
+		FAircraftDropTankWithOffset& Entry = M_AircraftDropSettings.TanksWithOffsets.AddDefaulted_GetRef();
+		Entry.TankSubtype = TankSubtype;
+		Entry.TankAttachZOffset = TemplateTank.TankAttachZOffset;
+	}
+	M_AircraftDropSettings.SquadSubtypes = SquadSubtypes;
+}
+
 void UGA_AircraftDrop::BeginDestroy()
 {
 	M_AircraftClassLoadHandles.Reset();

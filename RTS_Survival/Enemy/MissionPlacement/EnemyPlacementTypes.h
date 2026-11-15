@@ -56,6 +56,8 @@ namespace EnemyPlacementColors
 	inline const FColor PatrolWave(40, 150, 255);
 	inline const FColor Convoy(70, 210, 90);
 	inline const FColor Strongpoint(225, 70, 200);
+	// Teal-cyan, set apart from the patrol blue by its green.
+	inline const FColor AirDrop(20, 225, 200);
 	inline const FColor Problem(255, 210, 0);
 	inline const FColor Facing = FColor::White;
 

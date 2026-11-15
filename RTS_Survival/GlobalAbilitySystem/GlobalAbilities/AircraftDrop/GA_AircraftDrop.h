@@ -88,6 +88,14 @@ public:
 	virtual void ExecuteAbilityAtLocation(const FVector& TargetLocation) override;
 	virtual void BeginDestroy() override;
 
+	/**
+	 * @brief Replaces what a copy of this ability drops (placed mission air drops); the aircraft, landing times,
+	 * squad spread and sounds stay the template's. Never call it on the data asset template itself.
+	 * @param TankSubtypes One aircraft per vehicle; each uses the attach offset of the template's first tank entry.
+	 * @param SquadSubtypes AmountInfantryPerAircraft squads share one aircraft.
+	 */
+	void SetDropPayload(const TArray<ETankSubtype>& TankSubtypes, const TArray<ESquadSubtype>& SquadSubtypes);
+
 private:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (AllowPrivateAccess = "true"))
 	FAircraftDropGlobalAbilitySettings M_AircraftDropSettings;

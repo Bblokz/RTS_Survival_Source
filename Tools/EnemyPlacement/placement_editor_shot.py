@@ -1,7 +1,8 @@
 """Throwaway-editor pictures of the placed enemy mission actors (never run in the shared editor).
-Places an attack and a patrol wave spawner, a convoy route (with its drive-path preview) and a strongpoint (with a
-trench arc and the attack spawner linked as reinforcements) on the startup map, then takes two HighResShots from
-above: nothing selected (summary layer only) and the strongpoint + convoy route selected (their detail layers too).
+Places an attack and a patrol wave spawner, a convoy route (with its drive-path preview), a strongpoint (with a
+trench arc and the attack spawner linked as reinforcements) and two air drops (a parachute drop that starts when the
+strongpoint is destroyed, and a cargo plane landing) on the startup map, then takes two HighResShots from above:
+nothing selected (summary layer only) and the strongpoint, convoy route and parachute drop selected (detail too).
 Run:
   UnrealEditor-Win64-DebugGame.exe RTS_Survival.uproject
     -ini:Engine:[/Script/EngineSettings.GameMapsSettings]:EditorStartupMap=/Game/RTS_Survival/Maps/UnitTests/UT_EnemyAI
@@ -134,15 +135,49 @@ def place_strongpoint(actors, world, reinforcements):
     return strongpoint
 
 
+def air_drop_entry(unit):
+    entry = unreal.EnemyAirDropUnitEntry()
+    entry.set_editor_property('unit_options', [unit])
+    entry.set_editor_property('count', 1)
+    return entry
+
+
+def place_air_drops(actors, world, linked_actor):
+    para = actors.spawn_actor_from_class(unreal.EnemyAirDrop, ground_at(world, -6500, -2000))
+    para.set_editor_property('air_drop_id', 'Berlin_ParkParadrop')
+    para.set_editor_property('landing_points', [unreal.Vector(0, 0, 0), unreal.Vector(1800, 1200, 0)])
+    units = para.get_editor_property('units')
+    units.set_editor_property('base_units', [air_drop_entry(squad(unreal.SquadSubtype.SQUAD_RUS_MOSIN)),
+                                             air_drop_entry(vehicle(unreal.TankSubtype.TANK_SU_85))])
+    units.set_editor_property('extra_units_hard', [air_drop_entry(squad(unreal.SquadSubtype.SQUAD_RUS_MOSIN))])
+    para.set_editor_property('units', units)
+    link = para.get_editor_property('link')
+    link.set_editor_property('rule', unreal.EnemyAirDropLinkRule.START_WHEN_DESTROYED)
+    link.set_editor_property('linked_actor', linked_actor)
+    para.set_editor_property('link', link)
+
+    cargo = actors.spawn_actor_from_class(unreal.EnemyAirDrop, ground_at(world, 9500, 3500))
+    cargo.set_editor_property('air_drop_id', 'Ore_AirfieldLanding')
+    delivery = cargo.get_editor_property('delivery')
+    delivery.set_editor_property('delivery', unreal.EnemyAirDropDelivery.CARGO_PLANE)
+    cargo.set_editor_property('delivery', delivery)
+    units = cargo.get_editor_property('units')
+    units.set_editor_property('base_units', [air_drop_entry(vehicle(unreal.TankSubtype.TANK_T34_76))])
+    cargo.set_editor_property('units', units)
+    return para, cargo
+
+
 def place_all(world):
     actors = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
     attack, patrol = place_wave_spawners(actors, world)
     route = place_convoy_route(actors, world)
     strongpoint = place_strongpoint(actors, world, attack)
-    for actor in (attack, patrol, route, strongpoint):
-        actor.rerun_construction_scripts()
+    para, cargo = place_air_drops(actors, world, strongpoint)
+    # set_editor_property already re-ran each actor's construction (its drawing); a second pass covers the link to the
+    # attack spawner, which was set before the strongpoint's own posts.
+    strongpoint.set_editor_property('strongpoint_id', 'Berlin_BridgeHold')
     actors.select_nothing()
-    S['detail'] = [strongpoint, route]
+    S['detail'] = [strongpoint, route, para]
     centre = ground_at(world, 1500, 0)
     unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).set_level_viewport_camera_info(
         centre + CAMERA_OFFSET, CAMERA_ROTATION)
