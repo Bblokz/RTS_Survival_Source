@@ -2992,6 +2992,8 @@ void ASquadUnit::PostInitializeComponents()
 
 	// Set up capsule collision
 	PostInitializeComp_SetupInfantryCapsuleCollision();
+	// No decals on the soldier's skeletal meshes.
+	PostInitializeComp_DisableDecalsOnSkeletalMeshes();
 
 	// Set up the reference to the M_AISquadUnit.
 	PostInitializeComp_SetupAISquadUnit();
@@ -4140,6 +4142,20 @@ void ASquadUnit::BeginPlay_SetPhysicalMaterials() const
 	}
 	USkeletalMeshComponent* MeshComp = GetMesh();
 	MeshComp->SetPhysMaterialOverride(PhysicalMaterialOverride);
+}
+
+void ASquadUnit::PostInitializeComp_DisableDecalsOnSkeletalMeshes()
+{
+	// Soldiers never show ground decals (impact marks, track ruts, blight) projected onto their bodies or gear.
+	TArray<USkeletalMeshComponent*> SkeletalMeshComponents;
+	GetComponents<USkeletalMeshComponent>(SkeletalMeshComponents);
+	for (USkeletalMeshComponent* SkeletalMeshComponent : SkeletalMeshComponents)
+	{
+		if (IsValid(SkeletalMeshComponent))
+		{
+			SkeletalMeshComponent->SetReceivesDecals(false);
+		}
+	}
 }
 
 void ASquadUnit::OnMoveCompleted_Cover(const EPathFollowingResult::Type Result)

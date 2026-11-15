@@ -224,6 +224,8 @@ enum class ETankSubtype : uint8
 	// GAZ-MM 72-K: the light GAZ-MM truck carrying a 25mm 72-K automatic anti-aircraft gun on a full-traverse
 	// pedestal; a cheap, unarmoured anti-aircraft truck.
 	Tank_GAZMM_72K UMETA(DisplayName = "Rus GAZ-MM 72-K"),
+	// Unarmed, uncontrollable Opel Blitz that carries supplies from a captured supply point to the HQ.
+	Tank_OpelSupplyTruck UMETA(DisplayName = "Ger Opel Supply Truck"),
 };
 
 
@@ -398,6 +400,7 @@ static bool Global_GetIsArmoredCar(const ETankSubtype TankSubtype)
 	case ETankSubtype::Tank_BM13:
 	case ETankSubtype::Tank_BTR152A:
 	case ETankSubtype::Tank_GAZMM_72K:
+	case ETankSubtype::Tank_OpelSupplyTruck:
 		return true;
 	default:
 		return false;

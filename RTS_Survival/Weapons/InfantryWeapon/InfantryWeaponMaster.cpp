@@ -585,6 +585,16 @@ void AInfantryWeaponMaster::PostInitializeComponents()
 	Super::PostInitializeComponents();
 	WeaponMesh = FindComponentByClass<UStaticMeshComponent>();
 	RTSRenderPerf::ExcludeSmallAttachmentsFromDistanceFields(this);
+	// Infantry weapons never show ground decals (impact marks, track ruts, blight) projected onto them.
+	TArray<UMeshComponent*> MeshComponents;
+	GetComponents<UMeshComponent>(MeshComponents);
+	for (UMeshComponent* MeshComponent : MeshComponents)
+	{
+		if (IsValid(MeshComponent))
+		{
+			MeshComponent->SetReceivesDecals(false);
+		}
+	}
 }
 
 void AInfantryWeaponMaster::SetWeaponAimOffsetType(const ESquadWeaponAimOffset AimOffsetType)

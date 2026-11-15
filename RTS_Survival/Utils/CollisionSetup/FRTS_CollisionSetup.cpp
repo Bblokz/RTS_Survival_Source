@@ -543,6 +543,7 @@ void FRTS_CollisionSetup::SetupInfantryWeaponCollision(UStaticMeshComponent* Wea
 		// no overlap and do not affect navigation.
 		WeaponMesh->SetGenerateOverlapEvents(false);
 		WeaponMesh->SetCanEverAffectNavigation(false);
+		WeaponMesh->SetReceivesDecals(false);
 		return;
 	}
 	RTSFunctionLibrary::ReportError("Invalid Weapon Mesh for Infantry Weapon Collision Setup."

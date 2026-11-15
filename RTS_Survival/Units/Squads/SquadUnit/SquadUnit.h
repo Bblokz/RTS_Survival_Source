@@ -645,6 +645,9 @@ protected:
 	void PostInitializeComp_InitSecondaryWeapon();
 	/** @brief Sets the collision for the infantry capsule component. */
 	void PostInitializeComp_SetupInfantryCapsuleCollision() const;
+
+	// Turns off receive decals on every skeletal mesh component of this unit (body, head, gear).
+	void PostInitializeComp_DisableDecalsOnSkeletalMeshes();
 	/** @brief Sets the M_AISquadUnit reference, may spawn a controller if none is found. */
 	void PostInitializeComp_SetupAISquadUnit();
 	/** @brief Initializes the ANimBP_SquadUnit reference. If a valid one is found we set the reference to our mesh on it. */
