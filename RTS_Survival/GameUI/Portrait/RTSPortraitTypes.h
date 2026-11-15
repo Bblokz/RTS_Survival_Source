@@ -24,4 +24,7 @@ enum class ERTSPortraitTypes :uint8
 	GermanTigerLoader,
 	// Scavenger in the open hatch of a speeding Panzer II Luchs (ride jolt + background flow + head-nod material).
 	GermanLuchsScavenger,
+	// IS-2 driver at his station, band of daylight across his eyes (panel-glow + dial + station-tremor material;
+	// his head never moves).
+	SovietIS2Driver,
 };
