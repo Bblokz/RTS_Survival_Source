@@ -22,7 +22,8 @@ struct FEnemyBaseTrenchSettings
 {
 	GENERATED_BODY()
 
-	// Off: the AI digs no trenches on this map.
+	// Off: the AI digs no trenches on this map. The AI also digs none while its mission settings do not allow
+	// building (FEnemyAIMissionSettings::bAllowBuilding).
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Base Trenches")
 	bool bEnabled = true;
 
@@ -129,6 +130,7 @@ struct FEnemyTrenchBase
  * nothing and are capped by FEnemyBaseTrenchSettings. Lives on AEnemyController and starts with the strategic AI's
  * thinking (UEnemyStrategicAIComponent::StartStrategicAIThinkingTimer), so in survival bases dig in during the grace
  * period. Bases come from the strategic AI's base clusters, from AddFortifiedBase, and from the pits themselves.
+ * No new trench starts while the strategic AI is not allowed to build; trenches already digging finish.
  */
 UCLASS(ClassGroup = (Custom))
 class RTS_SURVIVAL_API UEnemyBaseTrenchComponent : public UActorComponent
@@ -185,6 +187,8 @@ private:
 	TArray<FFieldTrenchAnchorHandle> M_FailedAnchors;
 
 	void ThinkStep();
+	// Read every think step so a mission can switch building on and off at runtime.
+	bool GetIsBuildingAllowed() const;
 	void UpdateBasesFromStrategicAI();
 	/** @return Index of the base nearest the location within the grouping radius; INDEX_NONE when none is. */
 	int32 FindBaseNear(const FVector& Location, const float Radius) const;

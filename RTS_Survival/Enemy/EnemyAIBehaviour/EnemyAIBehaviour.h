@@ -69,6 +69,7 @@ struct FEnemyAIMissionSettings
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	bool bAllowUnitTraining = true;
 
+	// Off: the AI builds nothing, which includes the trenches it digs around its bases.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	bool bAllowBuilding = false;
 

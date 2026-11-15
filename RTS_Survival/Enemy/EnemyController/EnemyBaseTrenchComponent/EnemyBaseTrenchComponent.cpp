@@ -110,7 +110,7 @@ void UEnemyBaseTrenchComponent::ThinkStep()
 	const UFieldTrenchAnchorSubsystem* AnchorSubsystem = IsValid(World)
 		? World->GetSubsystem<UFieldTrenchAnchorSubsystem>()
 		: nullptr;
-	if (not Settings.bEnabled || not IsValid(AnchorSubsystem))
+	if (not Settings.bEnabled || not IsValid(AnchorSubsystem) || not GetIsBuildingAllowed())
 	{
 		return;
 	}
@@ -130,6 +130,19 @@ void UEnemyBaseTrenchComponent::ThinkStep()
 		}
 		(void)TryDigForBase(BaseIndex, FreeAnchors);
 	}
+}
+
+bool UEnemyBaseTrenchComponent::GetIsBuildingAllowed() const
+{
+	const AEnemyController* EnemyController = Cast<AEnemyController>(GetOwner());
+	const UEnemyStrategicAIComponent* StrategicAI = IsValid(EnemyController)
+		? EnemyController->GetEnemyStrategicAIComponent()
+		: nullptr;
+	if (not IsValid(StrategicAI))
+	{
+		return false;
+	}
+	return StrategicAI->GetIsAllowedBuilding();
 }
 
 void UEnemyBaseTrenchComponent::UpdateBasesFromStrategicAI()

@@ -1,7 +1,7 @@
 # Info takeovers (vehicle info widget)
 
-A paused, full-screen panel that introduces a unit the first time a mission shows it. Built 2026-11-11 for vehicles; the
-base is ready for buildings and squads.
+A paused, full-screen panel that introduces a unit the first time a mission shows it. Built 2026-11-11 for vehicles;
+squads added 2026-11-15 (same widget and style); the base is ready for buildings.
 
 ## Using it in a mission graph
 
@@ -9,10 +9,14 @@ base is ready for buildings and squads.
 | --- | --- |
 | `Show Vehicle Info Takeover (Vehicle, Library Entry)` | Opens the prefab row `Library Entry` of `DT_VehicleInfoTakeovers` for the live `Vehicle`. The pin is a dropdown of the row names. |
 | `Show Custom Vehicle Info Takeover (Vehicle, Info)` | Same widget, with the text written on the node (split the `Info` pin). |
+| `Show Squad Info Takeover (Squad, Library Entry)` | Opens the prefab row `Library Entry` of `DT_SquadInfoTakeovers` for the live `Squad`. The pin is a dropdown of the row names. |
+| `Show Custom Squad Info Takeover (Squad, Info)` | Same, with the text written on the node (split the `Info` pin). |
 
 - The first parameter is the tank master in the world. Its weapons and armour are read from it when the node runs, so
   they always match the current balance. A queued takeover still shows them if the tank dies before it opens.
-- Both nodes return false when the player turned info takeovers off, or when the vehicle or row is missing.
+- The squad nodes take an actor: a squad controller (all its living soldiers are read) or a solo infantry unit such as
+  `BP_Solo_Rus_Bazooka` (just itself). Anything else reports an error and returns false.
+- The nodes return false when the player turned info takeovers off, or when the unit or row is missing.
 - Calls never stack. The subsystem (`UInfoTakeoverSubsystem`) queues them and opens the next one when Understood is
   clicked. It waits while a cinematic, the tech tree, the archive or another locked takeover holds the screen.
 
@@ -387,6 +391,213 @@ that fades, no widget named `Cursor`, moving parts only through RenderTransform 
 `UW_BxpPackUpTakeover` (C++). `build_takeover_style.py` does not list it yet: add it there, or re-run the create script,
 when the style changes.
 
+## Vultures AT stick grenade takeover (field manual)
+
+One page titled "AT Stick Grenades" under the kind label "VULTURES - SQUAD ABILITY", and UNDERSTOOD. Under the
+description:
+- **Left card:** a short looping in-game clip of a Vulture squad sticking its grenades onto an advancing T-26 and the
+  tank blowing up, with a one-line caption.
+- **Right card:** VOLLEY (all four throw, the grenades stick and go off a moment later, even on a driving tank),
+  TARGETS (wrecks most light tanks, badly hurts medium ones; the blast is dealt against the thinnest plate,
+  `DealDamageVsRearArmorInRadiusAsync`, so facing does not matter) and RELOAD (long cooldown; out of range the squad
+  walks up first). The text is qualitative on purpose; the numbers are in `GrenadeQuality.md` and may change.
+
+**Mission node:** `Show Vultures AT Grenade Takeover`, with the pin **On Closed (Was Shown)**. It is a
+`UAsyncShowInfoTakeoverBase` subclass (`UAsyncShowVulturesAtTakeover`, kind `EInfoTakeoverKind::VulturesAt`) with the
+same contract as the other field manual nodes. It is archived under Game Mechanics ("AT Stick Grenades", key
+`InfoTakeover.VulturesAt`), without a picture.
+
+**The clip** is a flipbook, not a video: `GameUI/InfoTakeover/VulturesAt/T_VulturesAt_ClipAtlas`, 80 frames of
+480 x 270 in 8 x 10 cells (3840 x 2700, UI group, no mips, never streamed, BC1). `UW_ClipInfoTakeover` (the shared
+base of the clip field manuals; `UW_VulturesAtTakeover` only adds the texts) moves the image brush's UV region to the next cell from `NativeTick` on real time (12 fps, the last frame held 1 s), so it plays
+while the takeover pauses the game; no Media Framework and no material are involved. The cells are inset half a texel
+so filtering never pulls in the next frame. The grid, frame count and rate are `M_Clip*` on the Blueprint's class
+defaults.
+
+**Re-recording the clip** (DebugGame, headless; the shared Development editor can stay open):
+
+```
+MAP=/Game/RTS_Survival/Maps/UnitTests/RTS_ToCopySmall   Source/Tools/InfoTakeover/VulturesAt/capture_clip.sh -VulturesAtClipSettle=4 -VulturesAtClipAt=0,0
+python Source/Tools/InfoTakeover/VulturesAt/make_clip_atlas.py --start 126 --step 2 --frames 80
+UnrealEditor-Win64-DebugGame-Cmd.exe RTS_Survival.uproject -run=pythonscript   -script=Source/Tools/InfoTakeover/VulturesAt/create_vultures_at_takeover.py -unattended -nullrhi   -DisablePlugins=Fab,BpGeneratorUltimate
+```
+
+- `-VulturesAtClipCapture` (`UVulturesAtClipCaptureSubsystem`, `GameUI/InfoTakeover/Tests`) spawns a player
+  Vulture squad and an enemy T-26 with its turret off, drives the tank in from the left to a stop in front of the
+  squad, orders the AT stick grenade throw once it is within 790, and saves every 1/24 s tick from a three-quarter
+  scene capture (1280 x 720) to `Saved/InfoTakeover/VulturesAt/Frames/` until 2.5 s after the tank died. Grep the
+  log (`Saved/Logs/VulturesAtClip.log`) for `VULTURES_AT_CLIP`; it gives the frame of the throw order.
+- The picked window (2026-11-15) starts at frame 126, 7 frames after the throw order (119), while the soldiers
+  wind up, and keeps every second frame for 80 frames, to the burning wreck. `make_clip_atlas.py` also
+  writes `clip_contact_sheet.png` and `clip_atlas.json`; the asset script reads the grid from the json.
+- Ger_Trains was tried first (it looks better), but only at its default spot (13200,-33249, the unit-image anchor):
+  there the T-26 hopped 50 units every few seconds, also after a 20 s warm-up. The cause was not found; other spots
+  may drive fine (tanks have driven there in other benches). RTS_ToCopySmall at 0,0 drives cleanly; its sand ground
+  gives the clip its orange tone.
+- `create_vultures_at_takeover.py` imports the atlas and makes `WBP_VulturesAtTakeover` as a copy of
+  `WBP_SpacedArmourTakeover` (already on the Rotsignal skin) reparented to `UW_VulturesAtTakeover`. It is also in
+  `Style/build_takeover_style.py`'s list.
+
+## Rattle-Feed takeover (field manual)
+
+One page titled "Rattle-Feed" under the kind label "PANZER II - VEHICLE ABILITY", and UNDERSTOOD. Same layout as the
+Vultures AT page (both are `UW_ClipInfoTakeover` children):
+- **Left card:** a looping clip of a Panzer II F firing at a parked T-26. It shows a normal burst and the start of the 5 s
+  reload, then a hard cut to the gun with Rattle-Feed on. Tags are stamped in the frames: NORMAL FIRE, RELOADING - 5 S,
+  RATTLE-FEED.
+- **Right card:** BURST (15 s; the gun barely pauses, twice the magazine, reload almost at once), WEAPONS (only the
+  autocannon; machine guns as normal; same damage and penetration per hit) and COOLDOWN (well over a minute).
+
+What Rattle-Feed is: the apply-behaviour ability `RattleFeedAbility` (`EBehaviourAbilityType::RapidFireAutoCannon`)
+adds `BP_Beh_RapidFire_Autocannon`, a `UBehaviourWeapon`. Values read from the assets on 2026-11-15
+(`Source/Tools/InfoTakeover/RattleFeed/dump_rattle_feed.py`):
+
+| | Value |
+| --- | --- |
+| Duration | 15 s |
+| `BaseCooldownMlt` | 0.33 (the pause between bursts, not the spacing of rounds inside a burst) |
+| `ReloadSpeedMlt` | 0.1 |
+| `MagSizeMlt` | 2 |
+| `MinimalWeaponCalibreToApplyTo` | 20 mm |
+| Ability cooldown | 100 s on Panzer II F, Luchs, Sd.Kfz. 231, Sd.Kfz. 140; 30 s on the Jaguar |
+
+The Panzer II F's KwK 30 fires bursts of five rounds (`M_BurstCooldown` spacing) with a 0.8 s `BaseCooldown` between
+bursts, a 10-round magazine and a 5 s reload. So Rattle-Feed does not make a burst faster: it removes the pauses. The
+capture measured about 1 shot/s over a magazine and its reload, and 3.4 shots/s with Rattle-Feed. A reload that is
+already running keeps its old length, which is why the capture switches it on right after a reload ends.
+
+**Mission node:** `Show Rattle-Feed Takeover` (`UAsyncShowRattleFeedTakeover`, kind `EInfoTakeoverKind::RattleFeed`),
+same contract as the other field manual nodes. Archived under Game Mechanics ("Rattle-Feed", key
+`InfoTakeover.RattleFeed`), without a picture. The clip is `GameUI/InfoTakeover/RattleFeed/T_RattleFeed_ClipAtlas`, 93
+frames of 480 x 270 in 8 x 12 cells (3840 x 3240), 12 fps, the last frame held 1 s. The tags are burned into the
+texture, so they are English only, and "5 S" must be re-cut if the KwK 30's reload changes.
+
+**Re-recording the clip** (DebugGame, headless):
+
+```
+Source/Tools/InfoTakeover/RattleFeed/capture_clip.sh
+python Source/Tools/InfoTakeover/VulturesAt/make_clip_atlas.py --clip RattleFeed --segments 54-112,206-330   --labels "54-81:NORMAL FIRE,82-112:RELOADING  -  5 S,206-330:RATTLE-FEED"
+UnrealEditor-Win64-DebugGame-Cmd.exe RTS_Survival.uproject -run=pythonscript   -script=Source/Tools/InfoTakeover/RattleFeed/create_rattle_feed_takeover.py -unattended -nullrhi   -DisablePlugins=Fab,BpGeneratorUltimate
+```
+
+- `-RattleFeedClipCapture` (`UBehaviourAbilityClipCaptureSubsystem`, `GameUI/InfoTakeover/Tests`; one scenario per
+  ability, shared with Adrenaline Shot) spawns a player Panzer II F
+  facing +X and an enemy T-26 1300 in front, turned 135° (turrets off). The Panzer's guns are held during a 4 s
+  settle, then it is ordered to attack. Rattle-Feed is clicked (`ActivateBehaviourAbility(..., true)`, like the card
+  without shift) the tick the first magazine has reloaded, and the run fails if the behaviour does not appear on the
+  tank within 1 s. It stops 12 s later or 2.5 s after the T-26 dies. Frames go to `Saved/InfoTakeover/RattleFeed/Frames/`
+  from a side camera on the Panzer's left flank. The log (`Saved/Logs/RattleFeedClip.log`, grep `ABILITY_CLIP`)
+  lists the frame of every 20 mm shot (magazine drops), each finished reload and the gun's cooldown, magazine and
+  reload in each phase. `-AbilityClipAt=X,Y`, `-AbilityClipDir=` and `-AbilityClipSettle=` work for every scenario.
+- The 2026-11-15 recording: shots at 7-31 and 57-81, reload 82-206, Rattle-Feed on at 206, then shots every 6-7 frames
+  with only short breaks. The clip keeps the second normal burst plus 1.3 s of the reload (54-112) and the first two
+  Rattle-Feed magazines (206-330). The T-26 survived, so the clip has no kill. At 110-130° it died within 2-3 s of Rattle-Feed
+  (too short to see the burst); at 140-150° it lived through 12 s of it.
+- Every re-shoot times a little differently (the re-run on the shared capture code reloaded at 212, not 206), so
+  re-pick the `--segments` frames from the new log before running `make_clip_atlas.py`. The saved frames are from that
+  re-run now; the atlas in the game is from the 206 run.
+- `make_clip_atlas.py` takes `--segments` (recorded frame ranges joined with a hard cut; a `Name:` prefix reads a
+  second camera's `Frames<Name>` folder) and `--labels` (`first-last:TEXT`, stamped top left in the recording's
+  pixels). It also writes `clip_preview.gif`.
+
+## Adrenaline Shot takeover (field manual)
+
+One page titled "Adrenaline Shot" under "PANZER 38(T) - VEHICLE ABILITY". Left: a clip of a Panzer 38(t) firing at a
+T-26 head on, first at the normal pace (tag NORMAL FIRE - 3.3 S RELOAD) and then with Adrenaline Shot (tag ADRENALINE
+SHOT), ending on the T-26 blowing up. Right: RELOAD (a third of the reload, about three times the shots), SHRAPNEL
+(more shrapnel over a wider area) and THE CATCH (worse aim, a few minutes of cooldown).
+
+The ability is `AdrenalineShot` (`EBehaviourAbilityType::AdrenalineShot`) on `Ger_Vehicle_Panzer38T`; it adds
+`Beh_WeaponVFX_Pz38AdrenalineShot`, a `UBehWeaponOverwriteVFX`. Values read on 2026-11-15
+(`Source/Tools/InfoTakeover/AdrenalineShot/dump_adrenaline_barrage.py`, which also reads the Wespe):
+
+| | Value |
+| --- | --- |
+| Duration / ability cooldown | 12 s / 180 s |
+| `ReloadSpeedMlt` | 0.33 (the KwK 38(t) holds one round; 3.3 s becomes 1.1 s) |
+| `AccuracyMlt` | 0.67 |
+| `WeaponCalibreMlt` | 2 (bigger shell visuals, decals and camera shake, more plate damage on bounces) |
+| Added | +1 g TNT, +80 shrapnel range, +15 shrapnel damage, +20 shrapnel particles; artillery impact effects |
+
+Node `Show Adrenaline Shot Takeover` (`UAsyncShowAdrenalineShotTakeover`, kind `AdrenalineShot`), archive key
+`InfoTakeover.AdrenalineShot`. Clip `GameUI/InfoTakeover/AdrenalineShot/T_AdrenalineShot_ClipAtlas`, 87 frames in
+8 x 11 cells.
+
+```
+Source/Tools/InfoTakeover/AdrenalineShot/capture_clip.sh
+python Source/Tools/InfoTakeover/VulturesAt/make_clip_atlas.py --clip AdrenalineShot --segments 96-150,203-320   --labels "96-150:NORMAL FIRE  -  3.3 S RELOAD,203-320:ADRENALINE SHOT"
+UnrealEditor-Win64-DebugGame-Cmd.exe RTS_Survival.uproject -run=pythonscript   -script=Source/Tools/InfoTakeover/AdrenalineShot/create_adrenaline_shot_takeover.py -unattended -nullrhi   -DisablePlugins=Fab,BpGeneratorUltimate
+```
+
+`-AdrenalineShotClipCapture` is the same capture as Rattle-Feed with the Panzer 38(t), the T-26 at 180° and the
+ability clicked after the second reload. The 2026-11-15 recording: normal shots at frames 7 and 108 (4.2 s apart,
+reload plus aiming), Adrenaline Shot on at 203, shots at 208, 244 and 280 (1.5 s apart), the T-26 died at 286.
+
+## Wespe Barrage takeover (field manual)
+
+One page titled "Barrage" under "WESPE - ARTILLERY ABILITY". Left: a clip spliced from two cameras: three Wespes firing
+(tag THREE WESPES FIRE A BARRAGE), then the target area with the shells landing on a T-26 and a Mosin squad (tag TARGET
+AREA). Right: AREA (20 s on the marked ground, even unseen), RATE (faster reload, worse aim, so the shells scatter;
+several Wespes hit far harder) and THE CATCH (cannot move, two minutes of cooldown).
+
+The ability is `BarrageAimAbility`, a `UTankAimAbilityComponent` (`EAimAbilityType::HeArtilleryBarrage`) on
+`Ger_Vehicle_Wespe`: `BehaviourDuration` 20 s, behaviour `Beh_Aim_WespeBarrage` (`ReloadSpeedMlt` 0.6,
+`AccuracyMlt` 0.5), `AbilitiesToRemove` Move and Reverse Move, radius 1500, cooldown 120 s. The leFH 18 reloads in 8 s,
+so one Wespe fires a shell about every 5 s in a barrage (four to five per barrage).
+
+Node `Show Wespe Barrage Takeover` (`UAsyncShowWespeBarrageTakeover`, kind `WespeBarrage`), archive key
+`InfoTakeover.WespeBarrage`. Clip `GameUI/InfoTakeover/WespeBarrage/T_WespeBarrage_ClipAtlas`, 104 frames in 8 x 13
+cells.
+
+```
+Source/Tools/InfoTakeover/WespeBarrage/capture_clip.sh
+python Source/Tools/InfoTakeover/VulturesAt/make_clip_atlas.py --clip WespeBarrage --segments 0-48,Target:64-220   --labels "0-48:THREE WESPES FIRE A BARRAGE,64-220:TARGET AREA"
+UnrealEditor-Win64-DebugGame-Cmd.exe RTS_Survival.uproject -run=pythonscript   -script=Source/Tools/InfoTakeover/WespeBarrage/create_wespe_barrage_takeover.py -unattended -nullrhi   -DisablePlugins=Fab,BpGeneratorUltimate
+```
+
+- `-WespeBarrageClipCapture` (`UWespeBarrageClipCaptureSubsystem`) spawns three player Wespes at the spot, an enemy
+  T-26 (turrets off) and Mosin squad 4500 out, and a player Panzer II 2000 short of them (guns held) for vision: in the
+  fog of war the targets were hidden and only flashed up in the blasts. After a 4 s settle with the battery's guns held
+  it orders `AimAbility(target, true, HeArtilleryBarrage)` on each Wespe and records 24 s from two cameras every tick:
+  `Frames/` (battery, 3500 behind its left at -35°; closer, the muzzle smoke cloud filled the picture) and
+  `FramesTarget/` (target area). Grep `WESPE_BARRAGE_CLIP` for the battery's shot frames.
+- The 2026-11-15 recording: volleys at frames 8-15, 145, 260-274, 375-411 and 522-546; the first shells land around
+  frame 80. Both targets survived that run (the previous one lost one).
+
+## Dig In takeover (field manual)
+
+One page titled "Dig In" under "TANKS - VEHICLE ABILITY". Left: a clip spliced from two cameras: a Panzer IV H piling
+its sandbags (close camera, every 8th frame so the 12 s build plays in about 3 s, tag DIGGING IN - 12 S), then a side
+view of two T-26s firing at it (tag SHELLS HIT THE SANDBAGS). Right: THE WALL (sandbags take the hits until shot
+away; heavier tanks build a stronger wall), BUILDING (no moving, turning or firing while it goes up; it starts weak) and
+THE CATCH (stays put; Break Cover to move; a destroyed wall breaks cover on its own).
+
+The ability is `IdDigIn` in the basic tank ability set, run by `UDigInComponent` on `ATrackedTankMaster`: it spawns
+the BP wall (`BP_DiginWall_GerMedium` on the Panzer IV) around the hull, at a third of its health, growing once a second
+(`DigInWallUpdateHealthDuringConstructionInterval`). Light / medium / heavy walls take 8 / 12 / 16 s and get
+320 / 560 / 960 health (`DeveloperSettings`, after `OverallHealthMlt` 0.8). While building, Move, Reverse Move and
+Rotate Towards are removed and the turrets are off; once built the turrets auto-engage but the tank does not aggro.
+
+Node `Show Dig In Takeover` (`UAsyncShowDigInTakeover`, kind `DigIn`), archive key `InfoTakeover.DigIn`. Clip
+`GameUI/InfoTakeover/DigIn/T_DigIn_ClipAtlas`, 111 frames in 8 x 14 cells.
+
+```
+Source/Tools/InfoTakeover/DigIn/capture_clip.sh
+python Source/Tools/InfoTakeover/VulturesAt/make_clip_atlas.py --clip DigIn --segments "0-312/8,Wide:318-384,Wide:388-460"   --labels "0-312:DIGGING IN  -  12 S,318-460:SHELLS HIT THE SANDBAGS"
+UnrealEditor-Win64-DebugGame-Cmd.exe RTS_Survival.uproject -run=pythonscript   -script=Source/Tools/InfoTakeover/DigIn/create_dig_in_takeover.py -unattended -nullrhi   -DisablePlugins=Fab,BpGeneratorUltimate
+```
+
+- `-DigInClipCapture` (`UDigInClipCaptureSubsystem`) spawns a player Panzer IV H facing +X and two enemy T-26s
+  1500-1600 ahead facing it (turrets held). After a 4 s settle it orders `DigIn(true)`, waits until the wall's max
+  health stops rising for 1.5 s, then orders both T-26s to attack and records until both are dead (+2.5 s) or 16 s. Two
+  cameras every tick: `Frames/` (close, front three-quarter) and `FramesWide/` (side view, 2700 away; from 2100 the
+  Panzer IV was cut off). Grep `DIGIN_CLIP` for every hit on the wall and on the tank. One T-26 died 1.4 s in after a
+  single wall hit, so the clip uses two.
+- The 2026-11-15 recording: wall done at frame 288 (560 hp), T-26s attack at 324, wall hits at 337 (both shells),
+  446, 543 and 652 (down to 79 hp), no hit on the tank; T-26 1 died at 366, T-26 2 at 674.
+- Frames 385-387 of `FramesWide/` show the first T-26's wreck swapping in with flat white quads, so the clip skips them
+  (`/N` in `--segments` keeps every N-th frame of one range).
+
 ## The library
 
 `Content/RTS_Survival/Blueprints/GameUI/InfoTakeover/DT_VehicleInfoTakeovers`, one row (`FVehicleInfoTakeoverEntry`)
@@ -405,6 +616,34 @@ script and re-run it; it overwrites only its own rows.
 
 Rows so far: T26, BT7, BT7_4, T34_76, T34E, KV1_L11. Their portraits are `UnitIcons/Rus/T_Rus_*`, made with the unit
 portrait tool (`Source/Tools/UnitPortraits`, list `rus_info_takeover.txt`).
+
+## The squad library
+
+`Content/RTS_Survival/Blueprints/GameUI/InfoTakeover/DT_SquadInfoTakeovers`, one row (`FSquadInfoTakeoverEntry`) per
+prefab. Fields as the vehicle library, with `ServiceYear` in place of `ProductionYear` (shown as "In service since:")
+and `ReferenceSquadClass` (a squad controller or solo infantry Blueprint) in place of `ReferenceVehicleClass`.
+
+The rows are authored by `Source/Tools/InfoTakeover/author_squad_info_takeovers.py` (headless DebugGame-Cmd, same as
+the vehicle script). Rows so far:
+
+| Row | Title | Year | Reference class | Picture |
+|---|---|---|---|---|
+| MosinBazooka | Bazooka Rifleman | 1942 | `BP_Solo_Rus_Bazooka` | `T_Rus_Squad_MosinBazooka` (portrait tool) |
+| HazmatEngineers | Hazmat Engineers | ???? | `Rus_Squad_HazmatEngineers` | `T_Rus_Squad_HazmatEngineers` (portrait tool on `BP_Solo_Rus_Hazmat`, same suit + SVT) |
+| Vultures | Hazmat Vultures | ???? | `Squad_Ger_HazmatVultures` | `T_Ger_Squad_VultureHazmats` (training card art) |
+| Scavengers | Scavengers | ???? | `Squad_Ger_Scavengers` | `T_Ger_Squad_Scavengers` (training card art) |
+
+A script row with `"Texture"` uses a texture already in the project; a row with `"Portrait"` imports the picked PNG.
+
+Portraits: `UnitIcons/Rus/T_Rus_Squad_*`, from the unit portrait tool with list `rus_squad_info_takeover.txt` and picks
+`rus_squad_info_takeover_picks.txt`. A solo infantry unit pictures on its own (`-UnitPortraitShots=2`; it does not fire,
+so the idle pictures are the usable ones). A squad controller cannot be pictured: its soldiers are separate actors, so
+list one soldier Blueprint (or a solo unit) instead.
+
+Squads open in `WBP_VehicleInfoTakeover` (`UW_VehicleInfoTakeover::SetupSquad`), so the look stays in one Blueprint. The
+label reads INFANTRY INTEL; the specifications are the service year, soldiers (living when the node ran) and health per
+soldier (the toughest soldier's max health); weapons are every soldier's weapon, identical ones merged ("4x"). Archived
+under Units, keyed `InfoTakeover.Squad.<name>`.
 
 ## What the widget shows
 
@@ -567,11 +806,18 @@ Archive item!" pop-up with the picture:
 | `UW_SpacedArmourTakeover`, `UAsyncShowSpacedArmourTakeover` | The spaced armour field manual and its node. |
 | `UW_NomadicConversionTakeover`, `UAsyncShowNomadicConversionTakeover` | The nomadic conversion field manual (two pages: conversion, build radius; a looping illustration each) and its node. |
 | `UW_BxpPackUpTakeover`, `UAsyncShowBxpPackUpTakeover` | The building expansion pack-up field manual (one page, looping illustration, slot legend) and its node. |
-| `UW_VehicleInfoTakeover` | The vehicle body. Blueprint child `WBP_VehicleInfoTakeover` holds `M_Style`; its skin is copied from `BP_W_UnitVariantSelectionMenu`. |
+| `UW_ClipInfoTakeover` | Abstract base of the clip field manuals: description, a flipbook clip card played on real time (`M_Clip*` on the class defaults) and a facts card. Children set the atlas and override `MakeFacts` and `GetClipCaption`. |
+| `UW_VulturesAtTakeover`, `UAsyncShowVulturesAtTakeover` | The Vultures AT stick grenade field manual (clip, three facts) and its node. |
+| `UW_RattleFeedTakeover`, `UAsyncShowRattleFeedTakeover` | The Rattle-Feed field manual (clip, three facts) and its node. |
+| `UW_AdrenalineShotTakeover`, `UAsyncShowAdrenalineShotTakeover` | The Adrenaline Shot field manual (clip, three facts) and its node. |
+| `UW_WespeBarrageTakeover`, `UAsyncShowWespeBarrageTakeover` | The Wespe Barrage field manual (two-camera clip, three facts) and its node. |
+| `UW_DigInTakeover`, `UAsyncShowDigInTakeover` | The Dig In field manual (two-camera clip, three facts) and its node. |
+| `UW_VehicleInfoTakeover` | The vehicle body, and the squad body (`SetupSquad`). Blueprint child `WBP_VehicleInfoTakeover` holds `M_Style`; its skin is copied from `BP_W_UnitVariantSelectionMenu`. |
 | `UPauseSafeProtoRichTextBlock` | Proto's typewriter driven on real time. Proto uses world timers, which stop while the game is paused. |
 | `UInfoTakeoverSubsystem` | Queue, setting check, library lookup. |
 | `UInfoTakeoverSettings` | Project Settings > Game > Info Takeovers: widget class and library. |
 | `VehicleInfoTakeoverContent` | Reads name, picture, weapons and armour off the live vehicle. |
+| `SquadInfoTakeoverContent` | Reads name, picture, soldiers, health and weapons off a live squad controller or solo infantry unit. |
 
 The Proto text styles are `DT_InfoTakeoverTitleText` and `DT_InfoTakeoverBodyText`. Both are copies of
 `DT_AnimatedRichText` with the animated font material.
@@ -657,3 +903,23 @@ Closed once and unpaused, at once while turned off), and also:
 
 Screenshots go to `Saved/InfoTakeover/BxpPackUp/<height>p/`. Result on 2026-11-12, DebugGame, `RTS_ToCopySmall`, 1080p
 and 720p: PASS.
+
+Run with `-VulturesAtTakeoverValidate` for the Vultures AT takeover. Grep the log for `VULTURES_AT_TAKEOVER`. It runs
+the spaced armour run's checks (start-screen wait, Blueprint child opened, game paused, typewriter wait, On Closed once
+and unpaused, at once while turned off), and also checks that the clip atlas loaded and that the clip changes frame at
+least 20 times while the game is paused, with two clip shots at 2 s and 3.6 s (`VulturesAt_clip_<n>_frame<cell>`).
+Screenshots go to `Saved/InfoTakeover/VulturesAt/<height>p/`. Result on 2026-11-15, DebugGame, `RTS_ToCopySmall`: PASS
+at 720p (96 frame changes in 10 s) and with `-ResX=1920 -ResY=1080`, which got a 500p offscreen viewport on this
+machine (30 changes in 10 s: the slow run skips frames, the clip keeps real time). After the move to
+`UW_ClipInfoTakeover` it passed again at 720p (99 changes in 10 s).
+
+Run with `-RattleFeedTakeoverValidate` for the Rattle-Feed takeover. Grep the log for `RATTLE_FEED_TAKEOVER`. Same
+checks as the Vultures AT run. Screenshots go to `Saved/InfoTakeover/RattleFeed/<height>p/`. Result on 2026-11-15,
+DebugGame, `RTS_ToCopySmall`, 720p: PASS (100 frame changes in 10 s while paused).
+
+Run with `-AdrenalineShotTakeoverValidate` (`ADRENALINE_SHOT_TAKEOVER`) and `-WespeBarrageTakeoverValidate`
+(`WESPE_BARRAGE_TAKEOVER`) for the two newest field manuals; same checks as the Vultures AT run. Result on 2026-11-15,
+DebugGame, `RTS_ToCopySmall`, 720p: both PASS (66 and 57 frame changes in 10 s while paused).
+
+Run with `-DigInTakeoverValidate` (`DIGIN_TAKEOVER`) for the Dig In takeover; same checks. Result on 2026-11-15,
+DebugGame, `RTS_ToCopySmall`, 720p: PASS (104 frame changes in 10 s while paused).

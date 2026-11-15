@@ -19,7 +19,7 @@ again (`rewire()` then save the map; `describe()` prints the layout).
 
 | # | Mission | What happens | Ends when |
 |---|---|---|---|
-| 1 | `Mission_Intro_MoveTo` | Camera-controls takeover, then the advisor lines. Move the Vultures to the road point. On the takeover's close it also starts the fuel convoy. | The Vultures reach trigger 1. |
+| 1 | `Mission_Intro_MoveTo` | Camera-controls takeover, then the advisor lines, queued on the `GermanAnnouncer` portrait: `HelloIsThisOn`, `IntroMission_AdvisorWelcome`, then the three briefing lines from `IntroMission/Briefing` (2026-11-15, user picks): `IntroMission_SovietStrongholds` ("Thirty years ze Soviets have hidden...", take 3, eleven_v3), `IntroMission_ClearStronghold` ("Our goal is to clear out a small soviet stronghold...", take 2, eleven_v4) and `IntroMission_TreadCarefully` ("Tread carefully kommandant...", take 3, eleven_v3), about 45 s together. Later mission lines queue behind them. Move the Vultures to the road point. On the takeover's close it also starts the fuel convoy. | The Vultures reach trigger 1. |
 | 2 | `Mission_Intro_SovietPatrols` | Cover takeover. When it closes: combat music, the advisor's "Soviet infantry spotted" line, then (queued after it) the Mosin rifleman's Russian radio line `IntroMission_MosinGermansSpotted` on the `SovietMosin` portrait, with English subtitles (see `VoiceLines/AGENTS.md`). Three Mosin squads are tracked. | All three squads are dead, or the player crosses the sandbag line (trigger 2). |
 | 3 | `Mission_Intro_HangarT26s` | Three T-26s leave the hangar mouths with attack-move orders. Four spaced-armour panzers arrive (Pz II F for the Strike Division, Luchs otherwise). As each spawns, `SendPanzerBehindVultures` attack-moves it to a line `PanzerBehindVulturesDistance` (1500) behind the Vulture soldiers' centre, away from the hangars, 500 apart, facing the hangars. The `IntroMission_LightPanzerSupport` line ("Kommandant soviet light panzers have been spotted!...", ElevenLabs take 3 of 3, 2026-11-12) plays. 5 s after the first panzer arrives (`OnPanzerSupportSpawned` -> `ShowSpacedArmourThenT26`: Delay 5 with the mission manager as world context) the spaced armour takeover opens; its On Closed calls `ShowT26InfoTakeover`, which opens the vehicle info takeover (library row `T26`) on the first living hangar T-26 (`TryShowT26InfoTakeover`). When no T-26 has spawned yet it sets `bT26TakeoverPending`, and the last hangar spawn opens it (`ShowT26TakeoverIfPending`). | The T-26s are destroyed. |
 | 4 | `Mission_Intro_RidgeArmor` | Soviet armour comes out of the ridge gate, eight T-26s flank from the convoy's map edge, and German heavy reinforcements arrive from the west map edge (below). The `IntroMission_HeavyArmorApproaching` line plays (take 4, 16.7 s). | Both Soviet groups are destroyed: the ridge wave (5 on Normal, 6 on Hard, 7 on Brutal and Ironman) and the 8 T-26s. Each group shows as a survival-style division marker on the minimap until its last tank dies. |
@@ -180,6 +180,12 @@ The objective text changes at every step through `SetObjective`, a wrapper aroun
 
 - `Source/Tools/IntroMission/intro_mission_headless_test.py` covers missions 1 to 5, the start of 6 and the convoy.
   - `chain_saved` checks the saved layout: the `Missions[0]` chain and the two triggered entries.
+  - `briefing_voice_lines_in_order`: `IntroMission_AdvisorWelcome`, then the three briefing lines, each heard at least
+    5 s after the one before.
+  - The Vultures parachute in (`DropVultures` global ability), so the test waits until every player soldier has stood
+    on the ground for 3 s (60 s at most) before teleporting them to the move-to point.
+  - 2026-11-15 Strike/Normal: 54/59. The 5 failures are the usual load ones (4 convoy checks and
+    `panzers_drove_behind_vultures`).
   - Env `INTRO_TEST_DIFFICULTY` (`normal`, `hard`, `brutal`, `ironman`) sets the PIE startup difficulty on the
     `URTSGameInstancePIEDeveloperSettings` defaults before PIE. Unset, the ini value (Hard) applies.
   - Ridge checks:
