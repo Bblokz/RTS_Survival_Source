@@ -539,7 +539,10 @@ public:
 	bool TryRemanAbandonedTeamWeapon(ATeamWeapon* AbandonedTeamWeapon);
 	virtual bool GetSquadAlreadyHasTeamWeapon() const;
 
-	/** The commander screen's ability preview keeps its target squads where it placed them: no automatic cover. */
+	/**
+	 * The commander screen's ability preview and strongpoint posts without "Take Nearby Cover" keep their squads where
+	 * they placed them: no automatic cover.
+	 */
 	void SetAutomaticCoverBlocked(const bool bBlocked) { bM_IsAutomaticCoverBlocked = bBlocked; }
 	bool GetIsAutomaticCoverBlocked() const { return bM_IsAutomaticCoverBlocked; }
 
@@ -1213,7 +1216,7 @@ protected:
 
 	void PlayAnnouncerLineNotEnoughSquadMembersToCapture();
 
-	// Off in every mission; set by AAbilityPreviewDirector's targets (SetAutomaticCoverBlocked).
+	// Off by default; set by AAbilityPreviewDirector's targets and AEnemyStrongpoint posts (SetAutomaticCoverBlocked).
 	bool bM_IsAutomaticCoverBlocked = false;
 
 	void OnLevelUp_UpdateHealthbarRankIcon(const int32 Level, const EVeterancyIconSet IconSetUsed) const;

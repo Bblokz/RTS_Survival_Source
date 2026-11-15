@@ -5,7 +5,7 @@
 #include "CoreMinimal.h"
 #include "RTS_Survival/Enemy/EnemyWaves/AttackWave.h"
 #include "RTS_Survival/GameUI/MiniMap/CustomIcons/MinimapIconTypes.h"
-#include "RTS_Survival/GameUI/TrainingUI/TrainingOptions/TrainingOptions.h"
+#include "RTS_Survival/Enemy/MissionPlacement/EnemyPlacementTypes.h"
 
 #include "EnemyWaveSpawnerTypes.generated.h"
 
@@ -19,6 +19,7 @@ enum class EEnemyWaveSpawnerBehaviour : uint8
 	PatrolWave UMETA(DisplayName = "Patrol Wave")
 };
 
+// How often a placed spawner or convoy route repeats (also used by AEnemyConvoyRoute).
 UENUM(BlueprintType)
 enum class EEnemyWaveSpawnerRepeat : uint8
 {
@@ -35,7 +36,7 @@ struct FEnemyWaveSpawnerUnitEntry
 
 	// Each spawned unit picks one of these at random (seeded by the campaign).
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Unit")
-	TArray<FTrainingOption> UnitOptions;
+	TArray<FEnemyPlacementUnit> UnitOptions;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Unit", meta = (ClampMin = "1", UIMin = "1"))
 	int32 Count = 1;

@@ -155,6 +155,8 @@ public:
 	void AddFortifiedBase(const FVector& Centre, const float PerimeterRadius, const FVector2D ThreatDirection);
 
 	bool GetIsDigging() const { return bM_IsDigging; }
+	// Placed strongpoints draw their trench arc in the editor with the map's arc width.
+	const FEnemyBaseTrenchSettings& GetSettings() const { return Settings; }
 	const TArray<TWeakObjectPtr<ARTSFieldTrench>>& GetDugTrenches() const { return M_Trenches; }
 	const TArray<FEnemyTrenchBase>& GetBases() const { return M_Bases; }
 

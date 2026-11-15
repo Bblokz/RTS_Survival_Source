@@ -3,7 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "GameFramework/Actor.h"
+#include "RTS_Survival/Enemy/MissionPlacement/EnemyPlacementActor.h"
 #include "RTS_Survival/Game/Difficulty/GameDifficulty.h"
 #include "RTS_Survival/Utils/RTSMapTests/RTSMapTests.h"
 #include "EnemyWaveSpawnerTypes.h"
@@ -12,11 +12,7 @@
 
 class AEnemyController;
 class AEnemyWaveSpawner;
-class UBillboardComponent;
 class UTexture2D;
-class UTextRenderComponent;
-class UEnemyWaveSpawnerVisualComponent;
-struct FEnemyWaveSpawnerVisualData;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnEnemyWaveSpawnerUnitsSpawned, AEnemyWaveSpawner*, Spawner,
                                              const TArray<AActor*>&, Units);
@@ -26,10 +22,11 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnEnemyWaveSpawnerFinished, AEnemyW
  * @brief Placed in a mission map to author an enemy attack or patrol wave in the level instead of in mission logic.
  * Drag the SpawnPoints and Waypoints diamonds in the viewport; red = attack wave, blue = patrol wave. The wave runs
  * on the enemy controller's wave controller (wave supply, owning building, formations, direct-control handoff).
- * Nothing of it shows in game. Starts on BeginPlay, or from a mission via FindEnemyWaveSpawner + StartSpawner.
+ * Nothing of it shows in game. Starts on BeginPlay, or from a mission via FindEnemyWaveSpawner + StartSpawner
+ * (a strongpoint can start it as its reinforcements).
  */
-UCLASS(Blueprintable, HideCategories = (Rendering, Collision, Input, HLOD, Physics, LOD, Cooking, Replication))
-class RTS_SURVIVAL_API AEnemyWaveSpawner : public AActor
+UCLASS(Blueprintable)
+class RTS_SURVIVAL_API AEnemyWaveSpawner : public AEnemyPlacementActor
 {
 	GENERATED_BODY()
 
@@ -54,6 +51,12 @@ public:
 	UFUNCTION(BlueprintPure, NotBlueprintable, Category = "Wave Spawner")
 	FName GetSpawnerId() const { return SpawnerId; }
 
+	// Strongpoints warn when a spawner linked as their reinforcements also starts by itself.
+	bool GetStartsOnBeginPlay() const { return Timing.bStartOnBeginPlay; }
+
+	virtual FColor GetPlacementColor() const override;
+	virtual FString GetConfigurationProblem() const override;
+
 	/** @return The placed spawner with this SpawnerId, or null (reports an error) when there is none. */
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Wave Spawner",
 		meta = (WorldContext = "WorldContextObject"))
@@ -70,7 +73,13 @@ public:
 protected:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
-	virtual void OnConstruction(const FTransform& Transform) override;
+
+	virtual FString GetPlacementKindName() const override;
+	virtual FName GetPlacementId() const override { return SpawnerId; }
+	virtual UTexture2D* GetEditorSpriteTexture() const override;
+	virtual void BuildEditorShapes(FEnemyPlacementShapes& OutSummary, FEnemyPlacementShapes& OutDetail) const override;
+	virtual void OnEnemyAIReady(AEnemyController* EnemyController, const ERTSGameDifficulty Difficulty) override;
+	virtual void OnEnemyAINeverReady() override;
 
 	// Name missions use to find this spawner (FindEnemyWaveSpawner); also shown above it in the editor.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Wave Spawner")
@@ -111,21 +120,11 @@ private:
 #if RTS_WITH_MAP_TESTS
 	// -EnemyWaveSpawnerValidate configures spawners and reads their markers and unit lists.
 	friend class UEnemyWaveSpawnerTestSubsystem;
+	// -EnemyPlacementValidate configures a spawner as strongpoint reinforcements.
+	friend class UEnemyPlacementTestSubsystem;
 #endif
 
-	UPROPERTY()
-	TObjectPtr<USceneComponent> M_Root = nullptr;
-
 #if WITH_EDITORONLY_DATA
-	UPROPERTY()
-	TObjectPtr<UBillboardComponent> M_EditorSprite = nullptr;
-
-	UPROPERTY()
-	TObjectPtr<UTextRenderComponent> M_EditorLabel = nullptr;
-
-	UPROPERTY()
-	TObjectPtr<UEnemyWaveSpawnerVisualComponent> M_EditorVisual = nullptr;
-
 	UPROPERTY()
 	TObjectPtr<UTexture2D> M_AttackSprite = nullptr;
 
@@ -140,24 +139,18 @@ private:
 	UPROPERTY()
 	TWeakObjectPtr<AEnemyController> M_EnemyController = nullptr;
 
-	FTimerHandle M_LaunchTimerHandle;
 	FTimerHandle M_MinimapTimerHandle;
 
 	// Wave on the enemy controller's wave controller while running; INDEX_NONE before launch and once ended.
 	int32 M_ActiveWaveId = INDEX_NONE;
 	int32 M_SpawnedWaveCount = 0;
 	int32 M_NextMarkerIndex = 0;
-	// Launch attempts made while the enemy controller or the game difficulty was not ready yet.
-	int32 M_LaunchRetryCount = 0;
 
 	bool bM_IsRunning = false;
 	bool bM_HasFinished = false;
 
 	// ----- Launch -----
-	void ScheduleLaunch(const float DelaySeconds);
-	void TryLaunchWave();
 	bool GetIsValidEnemyController() const;
-	bool TryGetGameDifficulty(ERTSGameDifficulty& OutDifficulty) const;
 	bool GetIsOwningBuildingAlive() const;
 	void LaunchWave(AEnemyController* EnemyController, const ERTSGameDifficulty Difficulty);
 	void FinishSpawner();
@@ -201,9 +194,6 @@ private:
 		int32& InOutNextSpreadPoint,
 		TArray<FAttackWaveElement>& OutElements) const;
 	FVector GetSpreadSpawnLocation(const FVector& SpawnPoint, const int32 UseIndex) const;
-	FVector ProjectToNavigationIfPossible(const FVector& Location) const;
-
-	TArray<FVector> GetWorldPoints(const TArray<FVector>& LocalPoints) const;
 
 	// ----- Wave callbacks -----
 	void HandleWaveUnitsSpawned(const int32 WaveId, const TArray<AActor*>& SpawnedUnits);
@@ -216,9 +206,13 @@ private:
 	void RemoveAllMinimapMarkers();
 
 	// ----- Editor -----
-	void RefreshEditorVisuals();
-	FColor GetBehaviourColor() const;
-	FString GetEditorLabelText() const;
-	FString GetConfigurationProblem() const;
-	void FillVisualData(FEnemyWaveSpawnerVisualData& OutVisualData) const;
+	bool GetIsPatrol() const { return Behaviour == EEnemyWaveSpawnerBehaviour::PatrolWave; }
+	bool GetHasUnsetUnitEntry() const;
+	FVector GetSpawnCentre(const TArray<FVector>& WorldSpawnPoints) const;
+	void AddSpawnPointShapes(const TArray<FVector>& WorldSpawnPoints, FEnemyPlacementShapes& OutSummary,
+	                         FEnemyPlacementShapes& OutDetail) const;
+	void AddAttackPathShapes(const TArray<FVector>& WorldSpawnPoints, const TArray<FVector>& WorldWaypoints,
+	                         FEnemyPlacementShapes& OutSummary, FEnemyPlacementShapes& OutDetail) const;
+	void AddPatrolLoopShapes(const TArray<FVector>& WorldSpawnPoints, const TArray<FVector>& WorldWaypoints,
+	                         FEnemyPlacementShapes& OutSummary, FEnemyPlacementShapes& OutDetail) const;
 };

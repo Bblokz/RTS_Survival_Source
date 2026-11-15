@@ -50,17 +50,17 @@ namespace EnemyWaveSpawnerTestPrivate
 		DifficultyLists
 	};
 
-	FTrainingOption GetTankOption()
+	FEnemyPlacementUnit GetTankOption()
 	{
-		return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_SU_85));
+		return FEnemyPlacementUnit::MakeVehicle(ETankSubtype::Tank_SU_85);
 	}
 
-	FTrainingOption GetSquadOption()
+	FEnemyPlacementUnit GetSquadOption()
 	{
-		return FTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(ESquadSubtype::Squad_Rus_Mosin));
+		return FEnemyPlacementUnit::MakeSquad(ESquadSubtype::Squad_Rus_Mosin);
 	}
 
-	FEnemyWaveSpawnerUnitEntry MakeEntry(const FTrainingOption& Option, const int32 Count)
+	FEnemyWaveSpawnerUnitEntry MakeEntry(const FEnemyPlacementUnit& Option, const int32 Count)
 	{
 		FEnemyWaveSpawnerUnitEntry Entry;
 		Entry.UnitOptions = {Option};
