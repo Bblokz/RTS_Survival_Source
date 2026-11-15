@@ -174,6 +174,19 @@ Applied in the shared editor and saved; nav check 0 problems after the landscape
   only (needs C++).
 - **Crater erosion** is on the map (see the previous section).
 
+## Update 2026-11-14: ruin death, atmosphere, 32 furniture types, litter fixes
+
+- **Ruin death** (`Docs/Environment/BerlinRuinKit.md`, "Death"): every ruin ends as a lowered, turned, dead remnant;
+  dust and debris sized per class; collapse heaps spawn on the larger classes. Class defaults only: no map step.
+- **Atmosphere** (`Docs/Lighting/BerlinLighting.md`, `step_atmosphere()`, labels `ATM_*`): 70 smouldering ruins, Mitte
+  smoke and haze sheets, crater glow and shimmer cards, five fires in the east. No engine fog.
+- **Furniture:** 32 types now (17-32 mapped onto the unchanged atlas). `Dress.furniture()` reads the `tall` flag of
+  `furniture/furniture_table.json`; 196 pieces on the map (124 on plots, 72 along kerbs), 413 debris decals. A piece
+  numbered above 16 uses the debris variant of (number - 1) mod 16.
+- **Street litter:** `NS_BerlinStreetLitter_B` (soft wisps, pause instead of deactivate); `step_ambient()` rerun.
+- **Bridge without the MCP tools:** `Source/Tools/BerlinMap/uecp_call.py <script.py> "description"` sends a script to
+  the editor's `execute_python` over a raw socket (the tool connection of a long session can drop).
+
 ## Known gaps
 
 - The track-smoke surface map is not baked, and the Berlin layer names are not in `URTSGroundSurfaceSettings`, so a bake

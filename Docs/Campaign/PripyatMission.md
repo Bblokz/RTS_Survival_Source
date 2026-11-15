@@ -188,10 +188,21 @@ Props that say "Polesie, Belarus, thirty years after the Phytophage". Check the 
      `_BlankRoad` (FBX). Four place names for the four directions (three entries and the west road). No rail signs
      found. Not checked whether they are in UE yet.
 
+**Establishes the Phytophage**
+
+4. **Algae-choked bridge** at the north rail bridge: a rail bridge with purple algae mats dragging in the current and a
+   blackened span.
+5. **Purple-stained farm cottage on the burning peat** at the smouldering patches, with a thin smoke column. It sells
+   the self-combusting peat bogs from the lore.
+   - Map positions (v10): the north rail bridge `bridge_n` at (275, 76) m; the smouldering peat patches
+     `burning_peat_se` at (-290, 250) m (r 28 m) and `burning_peat_nw` at (90, -265) m (r 20 m). Positions are metres
+     from the map centre, x north, y east.
+   - Not searched yet for existing assets.
+
 Other ideas not picked yet (not decided): stork nest poles and a wooden well with a sweep, peat-cutting works with a
-narrow-gauge line, a ruined windmill, a land-reclamation sluice and pump house, an algae-choked rail bridge, a
-purple-stained cottage on the burning peat, fossilised root arches, downed aircraft wrecks at the pilot sites, a sunken
-Demeter pod, and the island base silhouette (camouflage-netted hangar, fuel tank, radio mast).
+narrow-gauge line, a ruined windmill, a land-reclamation sluice and pump house, fossilised root arches, downed aircraft
+wrecks at the pilot sites, a sunken Demeter pod, and the island base silhouette (camouflage-netted hangar, fuel tank,
+radio mast).
 
 ## Armored columns
 

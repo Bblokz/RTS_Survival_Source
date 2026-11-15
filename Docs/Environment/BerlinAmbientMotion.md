@@ -43,7 +43,7 @@ bmb.save_level()
 | meshes | `BerlinAmbient/generate_berlin_ambient.py` (headless Blender) | 9 FBX, `SM_BerlinAmb.blend`, `Previews/sheet.png`, `build_info.json` |
 | attachment points | `BerlinAmbient/kit_attach_probe.py` (headless Blender) | `kit_attach_table.json`: windows, perches, spans per kit piece |
 | Unreal dressing | `ambient_dressing_build.py` (commandlet) | meshes, `M_BerlinAmbient_Dressing` + 3 instances, `M_BerlinAmbient_Crow` |
-| Unreal litter | `ambient_litter_build.py` (commandlet) | litter materials, `NET_BerlinAmbient`, `NS_BerlinStreetLitter` |
+| Unreal litter | `ambient_litter_build.py` (commandlet) | `M_BerlinAmbient_WispPuff`, `NET_BerlinAmbient_Pause`, `NS_BerlinStreetLitter_B`; the paper atlas and `M_BerlinAmbient_Litter` only when missing |
 | placement | `ambient_gen.py` | `Saved/Berlin/terrain/Ger_Berlin_ambient.json` |
 
 All of them can be rerun. The Unreal steps run in `UnrealEditor-Cmd -run=pythonscript -nullrhi` (`run_headless.sh`);
@@ -57,7 +57,7 @@ per actor), the engine's `FountainLightweight` (emitter template). Two project t
 
 ## 1. Street litter
 
-`NS_BerlinStreetLitter` holds three **stateless ("lightweight") emitters**. A stateless emitter keeps no particle
+`NS_BerlinStreetLitter_B` holds three **stateless ("lightweight") emitters**. A stateless emitter keeps no particle
 buffer and runs no simulation: a particle's position is a closed-form function of its age, evaluated on the GPU when it
 is drawn. So there is no collision, no per-particle light and no per-particle CPU work by construction.
 
@@ -65,7 +65,7 @@ is drawn. So there is no collision, no per-particle light and no per-particle CP
 |---|---|---|---|
 | Paper | 30-46 cm sheets tumbling through 12 atlas frames, 1.7-4.3 m/s, curl noise | 22 / 45 | `M_BerlinAmbient_Litter`: masked, lit |
 | Ash | 7-14 cm flakes, grey to charred, rising a little | 35 / 65 | same material, atlas frames 12-15 |
-| Wisp | 2.6-4.3 m soft dust sprites hugging the ground | 3 / 5 | `M_BerlinAmbient_Wisp`: lit translucent (volumetric non-directional), depth fade |
+| Wisp | 2.6-4.3 m soft dust sprites hugging the ground | 3 / 5 | `M_BerlinAmbient_WispPuff`: lit translucent (volumetric non-directional), depth fade |
 
 - **Why one component per lane stretch, and not one emitter fed with lane data:** every custom Niagara emitter in this
   project is authored by a C++ console command, and C++ was off limits for this pass. The stateless emitter needs none:
@@ -77,19 +77,58 @@ is drawn. So there is no collision, no per-particle light and no per-particle CP
   run `ambient_gen.py` and `step_ambient()` again.
 - **Gusts:** each emitter spawns a steady trickle plus two or three bursts close together once per loop; every stretch
   draws its own loop length (11-17 s), so neighbouring stretches gust at different moments.
-- **Culling:** the effect type `NET_BerlinAmbient` puts a component to sleep when it is further than 95 m from the
-  camera, and each emitter has the same distance in its own emitter state. Measured: with the camera on the test slice
-  3 of 6 components were awake (the two placed 300 m away were asleep); with the camera moved 300 m away, the only one
-  awake was the far one it stood next to.
+- **Culling:** the effect type `NET_BerlinAmbient_Pause` **pauses** a component that is further than 95 m from the
+  camera and resumes it when the camera returns (each emitter also has the distance in its own emitter state). See
+  "Fixes of 2026-11-14" for why it is pause and not deactivate.
 - **Lighting:** the paper is lit, with a fixed world-up normal. A sprite's own normal faces the camera, which made every
   sheet black when seen against the sun (first test run); with the up normal a sheet is lit like the ground it blows
   over and is dark in a shadowed street.
 - Masked sprites go through the base pass: no blending and no sorting. Only the wisps are translucent (3-5 per stretch,
-  peak opacity 0.34 times the puff texture).
+  peak opacity 0.62 times the puff's density).
 
 Tuning (`ambient_litter_build.py`, then rebuild): rates, bursts, sizes, speeds, colours per layer in `write_recipe()`;
 `STRETCH_LENGTH`, `CULL_DISTANCE`. Density on the map (`ambient_gen.py`): `STRETCH_SPACING`, `LITTER_KEEP_ALONG`,
 `LITTER_KEEP_ACROSS`, `LITTER_MIN_GAP`.
+
+### Fixes of 2026-11-14 (new asset names)
+
+Two faults of the first build, found on the map by the atmosphere work. Both are fixed in **new assets**
+(`M_BerlinAmbient_WispPuff`, `NET_BerlinAmbient_Pause`, `NS_BerlinStreetLitter_B`): the open editor held the old files,
+and a Niagara system rebuilt under an editor that has it loaded never activates again (`BerlinLighting.md`). The old
+`M_BerlinAmbient_Wisp`, `NET_BerlinAmbient` and `NS_BerlinStreetLitter` are no longer referenced by any script; delete
+them once the map has been re-stepped and saved.
+
+- **Wisps drew as flat grey squares.** `T_AmbientDust_Puffs` is a mask texture: the puff's density is in R (G is the
+  darker inner billow) and its alpha is 1 everywhere. The first material multiplied the particle alpha by the texture's
+  alpha, so every wisp was a full quad. The new material takes opacity from R (masks sampler) and darkens the colour by
+  G. The paper and ash material was checked for the same mistake and is right: it reads the alpha of its own atlas
+  (`T_BerlinAmbient_Litter`), which `ambient_textures_gen.py` writes as the cut-out. It was not rebuilt.
+- **Culled litter did not come back properly.** With "deactivate immediately, resume" the cull kills every particle,
+  and the stateless emitters start again from nothing, late. With "pause, resume" the stretch is as full on the return
+  as when the camera left.
+
+Test: `sh Source/Tools/BerlinMap/ambient/ambient_cull_run.sh <logname>` then `python .../ambient_cull_report.py`
+(`ambient_cull_test.py`: the old and the new system side by side on empty ground of `RTS_ToCopySmall`, game camera
+28 m up; on the stretches, 400 m away for 10 s, back). Sprites counted in the pictures (paper and pale ash), run3:
+
+| | Old (`NS_BerlinStreetLitter`, deactivate) | New (`NS_BerlinStreetLitter_B`, pause) |
+|---|---|---|
+| first visit, three frames | 30, 29, 30 | 51, 41, 49 |
+| camera away 10 s: component active | no | yes (paused) |
+| 15-17 s after the return | 5, 8, 6 | 30, 36, 40 |
+| 31-33 s after the return | 21, 10, 13 | 42, 37, 31 |
+
+(run2, same test before the wisp opacity was raised: old 38 -> 1, 12, 14 -> 18, 21, 21; new 45-54 -> 35, 43, 61 ->
+33, 37, 41.) So the litter was not dead for good, as the atmosphere's columns were, but a street stayed nearly empty
+for a quarter of a minute after the camera came back and had not refilled after half a minute.
+Pictures: `Saved/Berlin/ambient/cull_test/` (`visit1_*`, `away`, `visit2_*`, `visit3_*`; old stretch on the left, new
+on the right) and `wisp_old_left_new_right_*.png`: squares on the left, none on the right.
+
+- **Weaker than hoped:** on the test map's orange sand the soft wisps are hard to see at all, even after the peak
+  opacity went from 0.34 to 0.62 (the squares were visible mostly by their edges). They are grey dust (albedo
+  0.36-0.5) meant for Berlin's dark ground; judge them there. Knobs: the Wisp layer's `alpha_curve`, `color_low/high`
+  and `size` in `write_recipe()`.
+- Not tested: more than one leave-and-return cycle, and the pause on the map itself.
 
 ## 2. Wires and curtains
 
@@ -191,7 +230,7 @@ The test map's own squads and emplacements were alive in the same view, and othe
 | `MI_BerlinAmb_Rigid` | 398 | 295 | 0 / 3 |
 | `M_BerlinAmbient_Crow` | 441 | 300 | 3 / 0 |
 | `M_BerlinAmbient_Litter` | 289 | 282 | 0 / 4 |
-| `M_BerlinAmbient_Wisp` | 345 | 248 | 0 / 5 |
+| `M_BerlinAmbient_WispPuff` | 345 | 248 | 0 / 5 |
 | for comparison: `MI_BerlinRuin_Wall` (no motion) | 312 | 292 | 0 / 3 |
 | for comparison: `MI_BF_Trim_Flutter` (the depot's cloth) | 417 | 319 | 3 / 3 |
 | for comparison: `MI_Crow_VAT` (the flying crow) | 515 | 297 | 3 / 1 |
