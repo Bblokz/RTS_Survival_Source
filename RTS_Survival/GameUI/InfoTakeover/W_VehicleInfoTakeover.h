@@ -14,8 +14,9 @@ class UWidget;
 
 /**
  * @brief The vehicle info takeover: typewritten name, the designer's description on the left, and on the right the
- * picture, production year, armour and the weapons with the unit variant screen's pictograms. Opened by
- * UInfoTakeoverSubsystem from the mission nodes; its Blueprint child (WBP_VehicleInfoTakeover) holds the style.
+ * picture, production year, armour and the weapons with the unit variant screen's pictograms. Squads open in the same
+ * widget (SetupSquad) with soldiers and health in place of the armour. Opened by UInfoTakeoverSubsystem from the
+ * mission nodes; its Blueprint child (WBP_VehicleInfoTakeover) holds the style for both.
  */
 UCLASS()
 class RTS_SURVIVAL_API UW_VehicleInfoTakeover : public UW_InfoTakeover
@@ -26,9 +27,19 @@ public:
 	/** Builds the body for Content; call before OpenTakeover. */
 	void SetupVehicle(const FVehicleInfoTakeoverContent& Content);
 
+	/** Builds the squad body for Content; call before OpenTakeover. */
+	void SetupSquad(const FSquadInfoTakeoverContent& Content);
+
 private:
+	// What the body shows; for a squad only the parts both kinds share (name, text, picture, weapons) are filled.
 	UPROPERTY()
 	FVehicleInfoTakeoverContent M_Content;
+
+	UPROPERTY()
+	FSquadInfoTakeoverContent M_SquadContent;
+
+	// Vehicle or Squad: picks the specification rows.
+	EInfoTakeoverKind M_UnitKind = EInfoTakeoverKind::Vehicle;
 
 	// WeaponUI_Data and the stat pictograms, kept loaded while the widget lives.
 	UPROPERTY()
@@ -51,7 +62,10 @@ private:
 
 	void AddSectionLabel(UVerticalBox& Column, const FText& Label, const bool bIsFirstInColumn);
 	void AddSpecRow(const FText& Label, const FText& Value);
+	void SetupUnit(const FText& KindLabel);
+	void AddSpecificationRows();
 	void AddArmorRows();
+	void AddSquadRows();
 	void AddWeaponRows();
 	void AddWeaponRow(const FUnitVariantWeaponStats& Weapon);
 

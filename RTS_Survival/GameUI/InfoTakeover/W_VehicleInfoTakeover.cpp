@@ -58,10 +58,31 @@ namespace VehicleInfoTakeoverLayout
 void UW_VehicleInfoTakeover::SetupVehicle(const FVehicleInfoTakeoverContent& Content)
 {
 	M_Content = Content;
+	M_UnitKind = EInfoTakeoverKind::Vehicle;
+	SetupUnit(NSLOCTEXT("InfoTakeover", "VehicleKindLabel", "VEHICLE INTEL"));
+}
+
+void UW_VehicleInfoTakeover::SetupSquad(const FSquadInfoTakeoverContent& Content)
+{
+	M_SquadContent = Content;
+	M_UnitKind = EInfoTakeoverKind::Squad;
+	// The picture and weapon builders read the shared fields from M_Content.
+	M_Content = FVehicleInfoTakeoverContent();
+	M_Content.DisplayName = Content.DisplayName;
+	M_Content.Description = Content.Description;
+	M_Content.ImageTexture = Content.ImageTexture;
+	M_Content.ImageBrush = Content.ImageBrush;
+	M_Content.bHasImage = Content.bHasImage;
+	M_Content.Weapons = Content.Weapons;
+	SetupUnit(NSLOCTEXT("InfoTakeover", "SquadKindLabel", "INFANTRY INTEL"));
+}
+
+void UW_VehicleInfoTakeover::SetupUnit(const FText& KindLabel)
+{
 	M_WeaponCardTable = M_Style.Skin.WeaponCardTable.LoadSynchronous();
-	SetKindLabel(NSLOCTEXT("InfoTakeover", "VehicleKindLabel", "VEHICLE INTEL"));
-	SetTitleText(Content.DisplayName);
-	SetDescriptionText(Content.Description);
+	SetKindLabel(KindLabel);
+	SetTitleText(M_Content.DisplayName);
+	SetDescriptionText(M_Content.Description);
 	BuildBody();
 }
 
@@ -120,10 +141,7 @@ UWidget* UW_VehicleInfoTakeover::BuildFactsColumn()
 	UVerticalBox* const PaneColumn = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass());
 	M_SpecColumn = PaneColumn;
 	AddSectionLabel(*PaneColumn, NSLOCTEXT("InfoTakeover", "SpecificationsLabel", "SPECIFICATIONS"), true);
-	AddSpecRow(NSLOCTEXT("InfoTakeover", "ProductionYear", "Production year:"),
-	           M_Content.ProductionYear.IsEmpty() ? NSLOCTEXT("InfoTakeover", "UnknownYear", "????")
-	                                              : M_Content.ProductionYear);
-	AddArmorRows();
+	AddSpecificationRows();
 	M_WeaponColumn = PaneColumn;
 	AddWeaponRows();
 	UVerticalBoxSlot* const PaneSlot = FactsColumn->AddChildToVerticalBox(BuildGlassPane(PaneColumn));
@@ -220,6 +238,30 @@ void UW_VehicleInfoTakeover::AddSpecRow(const FText& Label, const FText& Value)
 	ValueSlot->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
 	ValueSlot->SetPadding(SpecValuePadding);
 	M_SpecColumn->AddChildToVerticalBox(Row)->SetPadding(SpecRowPadding);
+}
+
+void UW_VehicleInfoTakeover::AddSpecificationRows()
+{
+	const FText UnknownYear = NSLOCTEXT("InfoTakeover", "UnknownYear", "????");
+	if (M_UnitKind == EInfoTakeoverKind::Squad)
+	{
+		AddSpecRow(NSLOCTEXT("InfoTakeover", "ServiceYear", "In service since:"),
+		           M_SquadContent.ServiceYear.IsEmpty() ? UnknownYear : M_SquadContent.ServiceYear);
+		AddSquadRows();
+		return;
+	}
+	AddSpecRow(NSLOCTEXT("InfoTakeover", "ProductionYear", "Production year:"),
+	           M_Content.ProductionYear.IsEmpty() ? UnknownYear : M_Content.ProductionYear);
+	AddArmorRows();
+}
+
+void UW_VehicleInfoTakeover::AddSquadRows()
+{
+	AddSpecRow(NSLOCTEXT("InfoTakeover", "Soldiers", "Soldiers:"), FText::AsNumber(M_SquadContent.SoldierCount));
+	const FText HealthValue = M_SquadContent.HealthPerSoldier > 0.f
+		                          ? FText::AsNumber(FMath::RoundToInt(M_SquadContent.HealthPerSoldier))
+		                          : NSLOCTEXT("InfoTakeover", "UnknownHealth", "-");
+	AddSpecRow(NSLOCTEXT("InfoTakeover", "HealthPerSoldier", "Health per soldier:"), HealthValue);
 }
 
 void UW_VehicleInfoTakeover::AddArmorRows()

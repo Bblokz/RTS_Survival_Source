@@ -1018,6 +1018,23 @@ TArray<FName> UMissionBase::GetVehicleInfoTakeoverNames()
 	return UInfoTakeoverSubsystem::GetVehicleLibraryEntryNames();
 }
 
+bool UMissionBase::ShowSquadInfoTakeover(AActor* Squad, const FName LibraryEntry)
+{
+	UInfoTakeoverSubsystem* const InfoTakeovers = GetInfoTakeoverSubsystem();
+	return InfoTakeovers != nullptr && InfoTakeovers->QueueSquadTakeoverFromLibrary(Squad, LibraryEntry);
+}
+
+bool UMissionBase::ShowCustomSquadInfoTakeover(AActor* Squad, const FSquadInfoTakeoverEntry& Info)
+{
+	UInfoTakeoverSubsystem* const InfoTakeovers = GetInfoTakeoverSubsystem();
+	return InfoTakeovers != nullptr && InfoTakeovers->QueueSquadTakeover(Squad, Info);
+}
+
+TArray<FName> UMissionBase::GetSquadInfoTakeoverNames()
+{
+	return UInfoTakeoverSubsystem::GetSquadLibraryEntryNames();
+}
+
 UInfoTakeoverSubsystem* UMissionBase::GetInfoTakeoverSubsystem() const
 {
 	if (not GetIsValidMissionManager())
