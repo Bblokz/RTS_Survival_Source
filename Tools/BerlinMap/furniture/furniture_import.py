@@ -3,7 +3,10 @@
 Headless (never in the shared editor):
   UnrealEditor-Cmd.exe RTS_Survival.uproject -run=pythonscript -script=<this file> -unattended -nosplash -nullrhi
       -DisablePlugins=Fab,BpGeneratorUltimate
-Idempotent: re-imports textures and FBX over the assets, rebuilds the master graph in place, re-makes the hole master.
+Incremental and idempotent (since 2026-11-14, when pieces 17-32 were added): the shared assets (three textures,
+material, hole variant, debris) are built only when one is missing; a mesh is imported only when it is missing or its
+FBX changed (SHA-1 kept as asset metadata; the first 16 have none and are left alone). A second run saves nothing.
+Add -FurnForce to rebuild and re-import everything (needs every asset free: no editor may have them loaded).
 Report: Saved/Berlin/furniture/import_report.json. Doc: Source/Docs/Environment/BerlinFurniture.md.
 Then run furniture_blueprints_build.py.
 
@@ -23,6 +26,7 @@ Makes, under /Game/RTS_Survival/Blueprints/Environment/Berlin/Furniture/:
   Meshes/SM_BerlinFurn_<NN>_<Name>       legacy FBX import (Interchange drops UCX), MI_BerlinFurniture on slot 0
   Meshes/SM_BerlinFurn_Debris_0..5       copies of the ruin kit debris with MI_BerlinFurniture (splinters for holes/death)
 """
+import hashlib
 import json
 import os
 import sys
@@ -52,6 +56,10 @@ HOLES_INNER_DARKEN = 0.75
 HOLES_INNER_COLOR = (0.14, 0.085, 0.05)
 REPORT = 'D:/UE5Projects/RTS_Survival/Saved/Berlin/furniture/import_report.json'
 PROJECT_CONTENT = 'D:/UE5Projects/RTS_Survival/Content'
+SECOND_BATCH_READY = 'READY2.txt'                 # written last by the modeller for pieces 17-32
+SECOND_BATCH_FIRST = 17
+SHA_TAG = 'FurnSourceSha1'                        # asset metadata: SHA-1 of the FBX a mesh was imported from
+FORCE = '-furnforce' in unreal.SystemLibrary.get_command_line().lower()
 
 MEL = unreal.MaterialEditingLibrary
 EAL = unreal.EditorAssetLibrary
@@ -72,10 +80,21 @@ def _save(asset):
         raise RuntimeError('save failed (Error moving file? asset open elsewhere): ' + asset.get_path_name())
 
 
+def piece_number(name):
+    return int(name[len('SM_BerlinFurn_'):].split('_')[0])
+
+
 def table():
+    """furniture_table.json, limited to the batches whose READY file exists: READY.txt for 01-16, READY2.txt for 17-32."""
     if not os.path.isfile(SOURCE + 'READY.txt'):
         raise RuntimeError('READY.txt missing in ' + SOURCE + ': the models are not final, nothing imported')
-    return json.load(open(SOURCE + 'furniture_table.json'))
+    info = json.load(open(SOURCE + 'furniture_table.json'))
+    if not os.path.isfile(SOURCE + SECOND_BATCH_READY):
+        skipped = [p['name'] for p in info['pieces'] if piece_number(p['name']) >= SECOND_BATCH_FIRST]
+        if skipped:
+            log(f'{SECOND_BATCH_READY} missing: {len(skipped)} pieces from {SECOND_BATCH_FIRST} on are not imported')
+        info['pieces'] = [p for p in info['pieces'] if piece_number(p['name']) < SECOND_BATCH_FIRST]
+    return info
 
 
 # ---------------------------------------------------------------- textures
@@ -225,26 +244,26 @@ def import_mesh(name):
     unreal.AssetToolsHelpers.get_asset_tools().import_asset_tasks([task])
 
 
-def finish_mesh(piece, instance):
+def source_sha1(name):
+    with open(SOURCE + 'FBX/' + name + '.FBX', 'rb') as handle:
+        return hashlib.sha1(handle.read()).hexdigest()
+
+
+def check_mesh(piece, mesh):
+    """The mesh against furniture_table.json (read-only): hull count, size and bounds minimum within 1.5 cm."""
     name = piece['name']
-    mesh = unreal.load_asset(MESHES + '/' + name)
-    if mesh is None:
-        raise RuntimeError('import made nothing for ' + name)
     slots = [str(s.get_editor_property('material_slot_name')) for s in mesh.get_editor_property('static_materials')]
     if slots != [SLOT]:
         raise RuntimeError(f'{name}: slots {slots}, expected [{SLOT}]')
-    mesh.set_material(0, instance)
-    mesh.set_editor_property('light_map_coordinate_index', 1)
-    mesh.modify()
-    unreal.EditorLoadingAndSavingUtils.save_packages([mesh.get_outermost()], False)
     body = mesh.get_editor_property('body_setup')
     hulls = len(body.get_editor_property('agg_geom').get_editor_property('convex_elems')) if body else 0
     box = mesh.get_bounding_box()
     size = [round(box.max.x - box.min.x, 1), round(box.max.y - box.min.y, 1), round(box.max.z - box.min.z, 1)]
     tris = unreal.get_editor_subsystem(unreal.StaticMeshEditorSubsystem).get_number_verts(mesh, 0)
+    material = mesh.get_material(0)
     row = dict(hulls=hulls, table_hulls=piece['hulls'], size=size, table_size=piece['size_cm'], lod0_verts=tris,
                bounds_min=[round(box.min.x, 1), round(box.min.y, 1), round(box.min.z, 1)],
-               table_bounds_min=piece['bounds_min_cm'], material=mesh.get_material(0).get_name())
+               table_bounds_min=piece['bounds_min_cm'], material=material.get_name() if material else None)
     problems = []
     if hulls != piece['hulls']:
         problems.append(f'hulls {hulls} != table {piece["hulls"]}')
@@ -252,8 +271,34 @@ def finish_mesh(piece, instance):
         problems.append(f'size {size} != table {piece["size_cm"]}')
     if any(abs(a - b) > 1.5 for a, b in zip(row['bounds_min'], piece['bounds_min_cm'])):
         problems.append(f'bounds min {row["bounds_min"]} != table {piece["bounds_min_cm"]} (mirrored?)')
+    if row['material'] != 'MI_BerlinFurniture':
+        problems.append(f'slot 0 material {row["material"]}')
     row['problems'] = problems
     return row
+
+
+def finish_mesh(piece, instance):
+    """After an import: material, lightmap index, the source hash as metadata, save, then the table check."""
+    name = piece['name']
+    mesh = unreal.load_asset(MESHES + '/' + name)
+    if mesh is None:
+        raise RuntimeError('import made nothing for ' + name)
+    mesh.set_material(0, instance)
+    mesh.set_editor_property('light_map_coordinate_index', 1)
+    EAL.set_metadata_tag(mesh, SHA_TAG, source_sha1(name))
+    mesh.modify()
+    unreal.EditorLoadingAndSavingUtils.save_packages([mesh.get_outermost()], False)
+    return check_mesh(piece, mesh)
+
+
+def mesh_is_current(name):
+    """An existing mesh is left alone when its stored source hash matches the FBX, or when it has no stored hash
+    (the first 16, imported before the hash was kept). -FurnForce re-imports everything."""
+    path = MESHES + '/' + name
+    if FORCE or not EAL.does_asset_exist(path):
+        return False
+    stored = str(EAL.get_metadata_tag(unreal.load_asset(path), SHA_TAG) or '')
+    return stored in ('', 'None', source_sha1(name))
 
 
 def make_debris(instance):
@@ -275,42 +320,61 @@ def on_disk(package_path, since):
     return os.path.isfile(path) and os.path.getmtime(path) >= since - 2
 
 
+def shared_assets():
+    return [TEXTURES + '/' + n for n in TEXTURE_SETUP] + [MASTER, INSTANCE, HOLES_MASTER,
+                                                           MATERIALS + '/' + HOLES_INSTANCE_NAME] + \
+        [f'{MESHES}/SM_BerlinFurn_Debris_{index}' for index in range(DEBRIS_COUNT)]
+
+
 def run():
     start = time.time()
     info = table()
-    report = {'errors': [], 'meshes': {}}
-    textures = import_textures(info)
-    master = build_master(textures)
-    instance = build_instance(master)
-    report['holes'] = build_holes()
-    stats = MEL.get_statistics(master)
-    report['master_stats'] = dict(samplers=stats.num_samplers, pixel_texture_samples=stats.num_pixel_texture_samples)
+    report = {'errors': [], 'meshes': {}, 'force': FORCE}
+    written = []
+    # The atlas, the material, its hole variant and the debris are shared by every piece: once they exist they are
+    # not touched again (new pieces map into the same atlas). -FurnForce rebuilds them.
+    if FORCE or not all(EAL.does_asset_exist(path) for path in shared_assets()):
+        textures = import_textures(info)
+        master = build_master(textures)
+        instance = build_instance(master)
+        report['holes'] = build_holes()
+        report['debris'] = make_debris(instance)
+        report['shared'] = 'built'
+        written += shared_assets()
+    else:
+        instance = unreal.load_asset(INSTANCE)
+        report['shared'] = 'kept (textures, material, hole variant and debris exist; -FurnForce rebuilds them)'
+    todo = [piece for piece in info['pieces'] if not mesh_is_current(piece['name'])]
     unreal.SystemLibrary.execute_console_command(None, 'Interchange.FeatureFlags.Import.FBX 0')
     try:
-        for piece in info['pieces']:
+        for piece in todo:
             import_mesh(piece['name'])
     finally:
         unreal.SystemLibrary.execute_console_command(None, 'Interchange.FeatureFlags.Import.FBX 1')
     for piece in info['pieces']:
         try:
-            row = finish_mesh(piece, instance)
+            if piece in todo:
+                row = finish_mesh(piece, instance)
+                row['imported'] = True
+                written.append(MESHES + '/' + piece['name'])
+            else:
+                row = check_mesh(piece, unreal.load_asset(MESHES + '/' + piece['name']))
+                row['imported'] = False
             report['meshes'][piece['name']] = row
             if row['problems']:
                 report['errors'].append(f'{piece["name"]}: {row["problems"]}')
         except Exception as error:  # noqa: BLE001
             report['errors'].append(f'{piece["name"]}: {error!r}')
-    report['debris'] = make_debris(instance)
-    written = [TEXTURES + '/' + n for n in TEXTURE_SETUP] + [MASTER, INSTANCE, HOLES_MASTER,
-                                                              MATERIALS + '/' + HOLES_INSTANCE_NAME]
-    written += [MESHES + '/' + p['name'] for p in info['pieces']] + [f'{MESHES}/{n}' for n in report['debris']]
     missing = [p for p in written if not on_disk(p, start)]
+    report['imported'] = [p['name'] for p in todo]
     report['on_disk'] = f'{len(written) - len(missing)}/{len(written)}'
     if missing:
         report['errors'].append('not written this run: ' + str(missing))
     os.makedirs(os.path.dirname(REPORT), exist_ok=True)
     with open(REPORT, 'w') as handle:
         json.dump(report, handle, indent=1)
-    log(f'done: {len(report["meshes"])} meshes, on disk {report["on_disk"]}, errors {report["errors"]}, report {REPORT}')
+    log(f'done: {len(report["meshes"])} meshes checked, {len(todo)} imported, shared assets {report["shared"][:5]}, '
+        f'written {report["on_disk"]}, errors {report["errors"]}, report {REPORT}')
     return report
 
 

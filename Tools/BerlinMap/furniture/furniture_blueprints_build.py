@@ -1,10 +1,14 @@
-"""Berlin apartment furniture: the 16 crushable Blueprints (run furniture_import.py first).
+"""Berlin apartment furniture: the 32 crushable Blueprints (run furniture_import.py first).
 
 Headless (never in the shared editor):
   UnrealEditor-Cmd.exe RTS_Survival.uproject -run=pythonscript -script=<this file> -unattended -nosplash -nullrhi
       -DisablePlugins=Fab,BpGeneratorUltimate
 Add -FurnDryRun to do everything in memory and save nothing (works while another editor holds the Blueprints).
-Idempotent; never deletes a Blueprint. Report: Saved/Berlin/furniture/build_report.json.
+Incremental and idempotent (since 2026-11-14): a Blueprint whose settings already equal what this script would set
+is not compiled or saved, so a second run changes nothing and pieces 17-32 can be added while an editor holds the
+base and the first 16. Add -FurnForce to re-apply and save every Blueprint, the base included (needs them free).
+Pieces 17-32 are built only when the modeller's READY2.txt exists.
+Never deletes a Blueprint. Report: Saved/Berlin/furniture/build_report.json.
 Doc: Source/Docs/Environment/BerlinFurniture.md.
 
 /Game/RTS_Survival/Blueprints/Environment/Berlin/Furniture/Blueprints/
@@ -54,6 +58,9 @@ REPORT = 'D:/UE5Projects/RTS_Survival/Saved/Berlin/furniture/build_report.json'
 COLLAPSE_ATT = sounds.ATTENUATION
 COLLAPSE_CONC = sounds.CONCURRENCY
 DRY_RUN = '-furndryrun' in unreal.SystemLibrary.get_command_line().lower()
+FORCE = '-furnforce' in unreal.SystemLibrary.get_command_line().lower()
+SECOND_BATCH_READY = 'READY2.txt'             # written last by the modeller for pieces 17-32
+SECOND_BATCH_FIRST = 17
 
 CRUSH_RULE = 'ANY_TANK'                      # light tanks and above
 NAV_AREA = cb.CRUSH_NAV_AREA[CRUSH_RULE]     # RTS_NavArea_BlockChar
@@ -187,6 +194,22 @@ def debris_meshes():
     return out
 
 
+def base_is_set_up(base):
+    """The base already carries what setup_base writes (read-only check of the values children depend on)."""
+    named = cb._named(base)
+    holes = SDL.get_object(named['WallHoleDamage'][1])
+    damaged = list(holes.get_editor_property('DamagedMaterials'))
+    box = SDL.get_object(named['NavBlock'][1])
+    cdo = unreal.get_default_object(base.generated_class())
+    sound = cdo.get_editor_property('CrushSound')
+    area = box.get_editor_property('area_class_override')
+    return bool(len(damaged) == 1 and damaged[0] is not None and damaged[0].get_name() == HOLES_MI.split('/')[-1]
+                and len(list(holes.get_editor_property('DebrisMeshes'))) == 6
+                and str(holes.get_editor_property('WallMeshComponentName')) == 'MainMesh'
+                and sound is not None and sound.get_name() == sounds.cue_name(sounds.DEFAULT_CUE)
+                and area is not None and area.get_name() == NAV_AREA + '_C')
+
+
 def setup_base(base, debris, area):
     named = cb._named(base)
     setup_mesh_template(SDL.get_object(named['MainMesh'][1]), None)
@@ -217,61 +240,121 @@ def get_or_create(name, base):
     return bp, True
 
 
+def desired_state(piece, mesh, hulls):
+    """Everything this script sets on one child, as plain values (also what current_state reads back)."""
+    box, lo, hi = footprint_box(hulls)
+    body = [hi[i] - lo[i] for i in range(3)]
+    upright = body[2] > 1.2 * min(body[0], body[1])
+    cue = sounds.cue_name(sounds.PIECE_CUE[piece['name'][len('SM_BerlinFurn_'):]])
+    state = dict(mesh=mesh.get_name(),
+                 nav_box=[round(box['cx'], 1), round(box['cy'], 1), round((box['z0'] + box['z1']) * 0.5, 1),
+                          round(box['hu'], 1), round(box['hv'], 1), round((box['z1'] - box['z0']) * 0.5, 1)],
+                 nav_area=NAV_AREA + '_C', health=health_for(piece), damage_reduction=DAMAGE_REDUCTION,
+                 aim=[0.0, 0.0, float(round(max(hi[2] * 0.5, 20.0)))], crush_rule=CRUSH_RULE,
+                 tip=TIP_SPEED_UPRIGHT if upright else TIP_SPEED_LOW, sink=float(round(max(body) * 0.6 + 30.0)),
+                 sink_time=SINK_TIME, crush_sound=cue, death_sound=cue)
+    return state, box, body, upright
+
+
+def current_state(bp, named):
+    """The same values read from an existing child (class defaults and its component templates)."""
+    cdo = unreal.get_default_object(bp.generated_class())
+    mesh_comp = cb._own(bp, named, 'MainMesh')
+    box = cb._own(bp, named, 'NavBlock')
+    holes = cb._own(bp, named, 'WallHoleDamage')
+    mesh = mesh_comp.get_editor_property('static_mesh')
+    loc, ext = box.get_editor_property('relative_location'), box.get_editor_property('box_extent')
+    area = box.get_editor_property('area_class_override')
+    aims = list(cdo.get_editor_property('aim_offset_points'))
+    crush = cdo.get_editor_property('CrushSound')
+    death = holes.get_editor_property('CollapseSettings').get_editor_property('collapse_sound')
+    rule = str(cdo.get_editor_property('CrushDestructionType')).split('.')[-1].split(':')[0]
+    return dict(mesh=mesh.get_name() if mesh else None,
+                nav_box=[round(loc.x, 1), round(loc.y, 1), round(loc.z, 1), round(ext.x, 1), round(ext.y, 1),
+                         round(ext.z, 1)],
+                nav_area=area.get_name() if area else None, health=float(cdo.get_editor_property('health')),
+                damage_reduction=float(cdo.get_editor_property('damage_reduction')),
+                aim=[aims[0].x, aims[0].y, aims[0].z] if len(aims) == 1 else None, crush_rule=rule,
+                tip=round(float(cdo.get_editor_property('CrushTipSpeedScale')), 4),
+                sink=float(cdo.get_editor_property('CrushSinkDeltaZ')),
+                sink_time=round(float(cdo.get_editor_property('CrushSinkTime')), 4),
+                crush_sound=crush.get_name() if crush else None, death_sound=death.get_name() if death else None)
+
+
 def build_one(piece, base, area):
     mesh = unreal.load_asset(MESHES + '/' + piece['name'])
     if mesh is None:
         raise RuntimeError('mesh missing: ' + piece['name'])
-    name = 'BP_BerlinFurn_' + piece['name'][len('SM_BerlinFurn_'):]
-    bp, created = get_or_create(name, base)
-    named = cb._named(bp)
     hulls = cb.hull_points(mesh)
     if not hulls:
         raise RuntimeError(piece['name'] + ': no UCX hulls')
-    box, lo, hi = footprint_box(hulls)
+    name = 'BP_BerlinFurn_' + piece['name'][len('SM_BerlinFurn_'):]
+    want, box, body, upright = desired_state(piece, mesh, hulls)
+    info = dict(health=want['health'], upright=upright, table_tall=piece.get('tall'), crush_sound=want['crush_sound'],
+                death_sound=want['death_sound'], sink_cm=want['sink'], body_cm=[round(v) for v in body],
+                nav_box=[round(box['cx']), round(box['cy']), round(box['hu']), round(box['hv']), round(box['z1'])])
+    exists = EAL.does_asset_exist(f'{BLUEPRINTS}/{name}')
+    bp, created = get_or_create(name, base)
+    info.update(blueprint=bp.get_path_name(), created=created)
+    named = cb._named(bp)
+    if exists and not FORCE:
+        have = current_state(bp, named)
+        differing = sorted(k for k in want if have.get(k) != want[k])
+        if not differing:
+            info.update(changed=False, saved=False)
+            return info
+        info['differed'] = {k: [have.get(k), want[k]] for k in differing}
     setup_mesh_template(cb._own(bp, named, 'MainMesh'), mesh)
     cb.setup_nav_box(cb._own(bp, named, 'NavBlock'), box, area)
     cue = load_cue(sounds.PIECE_CUE[piece['name'][len('SM_BerlinFurn_'):]])
     set_death_sound(cb._own(bp, named, 'WallHoleDamage'), cue)
     unreal.BlueprintEditorLibrary.compile_blueprint(bp)
     cdo = unreal.get_default_object(bp.generated_class())
-    health = health_for(piece)
-    body = [hi[i] - lo[i] for i in range(3)]
-    upright = body[2] > 1.2 * min(body[0], body[1])
-    sink = round(max(body) * 0.6 + 30.0)
-    cdo.set_editor_property('health', health)
+    cdo.set_editor_property('health', want['health'])
     cdo.set_editor_property('damage_reduction', DAMAGE_REDUCTION)
-    cdo.set_editor_property('aim_offset_points', [unreal.Vector(0.0, 0.0, round(max(hi[2] * 0.5, 20.0)))])
+    cdo.set_editor_property('aim_offset_points', [unreal.Vector(*want['aim'])])
     cdo.set_editor_property('CrushDestructionType', getattr(unreal.CrushDestructionType, CRUSH_RULE))
-    cdo.set_editor_property('CrushTipSpeedScale', TIP_SPEED_UPRIGHT if upright else TIP_SPEED_LOW)
-    cdo.set_editor_property('CrushSinkDeltaZ', float(sink))
+    cdo.set_editor_property('CrushTipSpeedScale', want['tip'])
+    cdo.set_editor_property('CrushSinkDeltaZ', want['sink'])
     cdo.set_editor_property('CrushSinkTime', SINK_TIME)
     cdo.set_editor_property('CrushSound', cue)
     unreal.BlueprintEditorLibrary.compile_blueprint(bp)
-    saved = save(bp)
-    cdo = unreal.get_default_object(bp.generated_class())
-    death = cb._own(bp, named, 'WallHoleDamage').get_editor_property('CollapseSettings').get_editor_property('collapse_sound')
-    return dict(blueprint=bp.get_path_name(), created=created, saved=bool(saved), health=health, upright=upright,
-                crush_sound=cdo.get_editor_property('CrushSound').get_name(), death_sound=death.get_name() if death else None,
-                sink_cm=sink, body_cm=[round(v) for v in body],
-                nav_box=[round(box['cx']), round(box['cy']), round(box['hu']), round(box['hv']), round(box['z1'])])
+    info.update(changed=True, saved=save(bp))
+    after = current_state(bp, cb._named(bp))
+    left = sorted(k for k in want if after.get(k) != want[k])
+    if left:
+        info['not_applied'] = {k: [after.get(k), want[k]] for k in left}
+    return info
+
+
+def piece_number(name):
+    return int(name[len('SM_BerlinFurn_'):].split('_')[0])
 
 
 def run():
     if not os.path.isfile(SOURCE + 'READY.txt'):
         raise RuntimeError('READY.txt missing in ' + SOURCE)
     pieces = json.load(open(SOURCE + 'furniture_table.json'))['pieces']
-    report = {'pieces': {}, 'errors': [], 'dry_run': DRY_RUN}
+    if not os.path.isfile(SOURCE + SECOND_BATCH_READY):
+        pieces = [p for p in pieces if piece_number(p['name']) < SECOND_BATCH_FIRST]
+    report = {'pieces': {}, 'errors': [], 'dry_run': DRY_RUN, 'force': FORCE}
     base = load_base()
     area = cb.nav_area_class(NAV_AREA)
-    report['base_saved'] = setup_base(base, debris_meshes(), area)
-    if not report['base_saved'] and not DRY_RUN:
-        report['errors'].append(BASE_NAME + ': save failed')
+    if FORCE or not base_is_set_up(base):
+        report['base'] = 'set up'
+        report['base_saved'] = setup_base(base, debris_meshes(), area)
+        if not report['base_saved'] and not DRY_RUN:
+            report['errors'].append(BASE_NAME + ': save failed')
+    else:
+        report['base'] = 'kept (already set up; -FurnForce re-applies it)'
     for piece in pieces:
         try:
             info = build_one(piece, base, area)
             report['pieces'][piece['name']] = info
-            if not info['saved'] and not DRY_RUN:
+            if info['changed'] and not info['saved'] and not DRY_RUN:
                 report['errors'].append(piece['name'] + ': save failed')
+            if info.get('not_applied'):
+                report['errors'].append(f'{piece["name"]}: values did not stick {info["not_applied"]}')
             log(piece['name'] + ': ' + json.dumps(info))
         except Exception as error:  # noqa: BLE001
             report['errors'].append(f'{piece["name"]}: {error!r}')
@@ -279,7 +362,11 @@ def run():
     os.makedirs(os.path.dirname(REPORT), exist_ok=True)
     with open(REPORT.replace('.json', '_dry_run.json') if DRY_RUN else REPORT, 'w') as handle:
         json.dump(report, handle, indent=1)
-    log(f'done: {len(report["pieces"])} Blueprints, nav area {NAV_AREA}, errors {report["errors"]}, report {REPORT}')
+    changed = [n for n, i in report['pieces'].items() if i['changed']]
+    report['changed'] = changed
+    log(f'done: {len(report["pieces"])} Blueprints, {len(changed)} changed '
+        f'({sum(1 for n in changed if report["pieces"][n]["created"])} new), base {report["base"][:6]}, '
+        f'nav area {NAV_AREA}, errors {report["errors"]}, report {REPORT}')
     return report
 
 

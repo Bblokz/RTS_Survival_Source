@@ -397,7 +397,8 @@
    ],
    "atlas_cell": 0,
    "texel_px_per_cm": 0.811,
-   "fbx": "FBX/SM_BerlinFurn_01_Wardrobe.FBX"
+   "fbx": "FBX/SM_BerlinFurn_01_Wardrobe.FBX",
+   "tall": true
   },
   {
    "name": "SM_BerlinFurn_02_IronBed",
@@ -470,7 +471,8 @@
    ],
    "atlas_cell": 1,
    "texel_px_per_cm": 1.196,
-   "fbx": "FBX/SM_BerlinFurn_02_IronBed.FBX"
+   "fbx": "FBX/SM_BerlinFurn_02_IronBed.FBX",
+   "tall": false
   },
   {
    "name": "SM_BerlinFurn_03_KitchenTable",
@@ -519,7 +521,8 @@
    ],
    "atlas_cell": 2,
    "texel_px_per_cm": 2.168,
-   "fbx": "FBX/SM_BerlinFurn_03_KitchenTable.FBX"
+   "fbx": "FBX/SM_BerlinFurn_03_KitchenTable.FBX",
+   "tall": false
   },
   {
    "name": "SM_BerlinFurn_04_ChairFallen",
@@ -568,7 +571,8 @@
    ],
    "atlas_cell": 3,
    "texel_px_per_cm": 3.417,
-   "fbx": "FBX/SM_BerlinFurn_04_ChairFallen.FBX"
+   "fbx": "FBX/SM_BerlinFurn_04_ChairFallen.FBX",
+   "tall": false
   },
   {
    "name": "SM_BerlinFurn_05_Armchair",
@@ -629,7 +633,8 @@
    ],
    "atlas_cell": 4,
    "texel_px_per_cm": 1.531,
-   "fbx": "FBX/SM_BerlinFurn_05_Armchair.FBX"
+   "fbx": "FBX/SM_BerlinFurn_05_Armchair.FBX",
+   "tall": false
   },
   {
    "name": "SM_BerlinFurn_06_Sofa",
@@ -690,7 +695,8 @@
    ],
    "atlas_cell": 5,
    "texel_px_per_cm": 1.092,
-   "fbx": "FBX/SM_BerlinFurn_06_Sofa.FBX"
+   "fbx": "FBX/SM_BerlinFurn_06_Sofa.FBX",
+   "tall": false
   },
   {
    "name": "SM_BerlinFurn_07_Bathtub",
@@ -739,7 +745,8 @@
    ],
    "atlas_cell": 6,
    "texel_px_per_cm": 1.651,
-   "fbx": "FBX/SM_BerlinFurn_07_Bathtub.FBX"
+   "fbx": "FBX/SM_BerlinFurn_07_Bathtub.FBX",
+   "tall": false
   },
   {
    "name": "SM_BerlinFurn_08_TiledStove",
@@ -800,7 +807,8 @@
    ],
    "atlas_cell": 7,
    "texel_px_per_cm": 1.201,
-   "fbx": "FBX/SM_BerlinFurn_08_TiledStove.FBX"
+   "fbx": "FBX/SM_BerlinFurn_08_TiledStove.FBX",
+   "tall": true
   },
   {
    "name": "SM_BerlinFurn_09_Piano",
@@ -861,7 +869,8 @@
    ],
    "atlas_cell": 8,
    "texel_px_per_cm": 1.033,
-   "fbx": "FBX/SM_BerlinFurn_09_Piano.FBX"
+   "fbx": "FBX/SM_BerlinFurn_09_Piano.FBX",
+   "tall": true
   },
   {
    "name": "SM_BerlinFurn_10_ChestOfDrawers",
@@ -910,7 +919,8 @@
    ],
    "atlas_cell": 9,
    "texel_px_per_cm": 1.142,
-   "fbx": "FBX/SM_BerlinFurn_10_ChestOfDrawers.FBX"
+   "fbx": "FBX/SM_BerlinFurn_10_ChestOfDrawers.FBX",
+   "tall": false
   },
   {
    "name": "SM_BerlinFurn_11_BookshelfFallen",
@@ -959,7 +969,8 @@
    ],
    "atlas_cell": 10,
    "texel_px_per_cm": 1.204,
-   "fbx": "FBX/SM_BerlinFurn_11_BookshelfFallen.FBX"
+   "fbx": "FBX/SM_BerlinFurn_11_BookshelfFallen.FBX",
+   "tall": false
   },
   {
    "name": "SM_BerlinFurn_12_KitchenDresser",
@@ -1020,7 +1031,8 @@
    ],
    "atlas_cell": 11,
    "texel_px_per_cm": 0.944,
-   "fbx": "FBX/SM_BerlinFurn_12_KitchenDresser.FBX"
+   "fbx": "FBX/SM_BerlinFurn_12_KitchenDresser.FBX",
+   "tall": true
   },
   {
    "name": "SM_BerlinFurn_13_Desk",
@@ -1093,7 +1105,8 @@
    ],
    "atlas_cell": 12,
    "texel_px_per_cm": 1.134,
-   "fbx": "FBX/SM_BerlinFurn_13_Desk.FBX"
+   "fbx": "FBX/SM_BerlinFurn_13_Desk.FBX",
+   "tall": false
   },
   {
    "name": "SM_BerlinFurn_14_Washstand",
@@ -1154,7 +1167,8 @@
    ],
    "atlas_cell": 13,
    "texel_px_per_cm": 1.585,
-   "fbx": "FBX/SM_BerlinFurn_14_Washstand.FBX"
+   "fbx": "FBX/SM_BerlinFurn_14_Washstand.FBX",
+   "tall": true
   },
   {
    "name": "SM_BerlinFurn_15_ClockFallen",
@@ -1215,7 +1229,8 @@
    ],
    "atlas_cell": 14,
    "texel_px_per_cm": 1.567,
-   "fbx": "FBX/SM_BerlinFurn_15_ClockFallen.FBX"
+   "fbx": "FBX/SM_BerlinFurn_15_ClockFallen.FBX",
+   "tall": false
   },
   {
    "name": "SM_BerlinFurn_16_Radiator",
@@ -1264,7 +1279,2521 @@
    ],
    "atlas_cell": 15,
    "texel_px_per_cm": 3.082,
-   "fbx": "FBX/SM_BerlinFurn_16_Radiator.FBX"
+   "fbx": "FBX/SM_BerlinFurn_16_Radiator.FBX",
+   "tall": false
+  },
+  {
+   "name": "SM_BerlinFurn_17_Toilet",
+   "label": "WC bowl on a scrap of tiled floor, lid up, cast-iron high cistern and flush pipe fallen beside it",
+   "size_cm": [
+    94.3,
+    138.5,
+    85.9
+   ],
+   "tris": 276,
+   "hulls": 2,
+   "bounds_min_cm": [
+    -39.5,
+    -36.0,
+    0.0
+   ],
+   "bounds_max_cm": [
+    54.8,
+    102.5,
+    85.9
+   ],
+   "body_size_cm": [
+    57.0,
+    40.0,
+    83.0
+   ],
+   "footprint_half_extents_cm": [
+    28.5,
+    20.0
+   ],
+   "suggested_health": 150,
+   "where_it_fits": "bathroom or stairwell-toilet ruin; also believable on rubble",
+   "collision_hull_bounds_unreal_cm": [
+    {
+     "min": [
+      -24.5,
+      -20.0,
+      3.0
+     ],
+     "max": [
+      28.5,
+      20.0,
+      50.0
+     ]
+    },
+    {
+     "min": [
+      -28.5,
+      -16.0,
+      50.0
+     ],
+     "max": [
+      -18.5,
+      16.0,
+      86.0
+     ]
+    }
+   ],
+   "atlas_cells_used": [
+    2,
+    3,
+    4,
+    7,
+    8,
+    13,
+    15,
+    16
+   ],
+   "atlas_sources": [
+    {
+     "cell": 2,
+     "source_piece": "SM_BerlinFurn_02_IronBed",
+     "material": "iron",
+     "feature": null,
+     "faces": 16
+    },
+    {
+     "cell": 3,
+     "source_piece": "SM_BerlinFurn_03_KitchenTable",
+     "material": "enamel",
+     "feature": null,
+     "faces": 18
+    },
+    {
+     "cell": 4,
+     "source_piece": "SM_BerlinFurn_04_ChairFallen",
+     "material": "wood_mid",
+     "feature": null,
+     "faces": 6
+    },
+    {
+     "cell": 7,
+     "source_piece": "SM_BerlinFurn_07_Bathtub",
+     "material": "enamel",
+     "feature": null,
+     "faces": 50
+    },
+    {
+     "cell": 7,
+     "source_piece": "SM_BerlinFurn_07_Bathtub",
+     "material": "iron",
+     "feature": null,
+     "faces": 4
+    },
+    {
+     "cell": 7,
+     "source_piece": "SM_BerlinFurn_07_Bathtub",
+     "material": "plaster",
+     "feature": null,
+     "faces": 2
+    },
+    {
+     "cell": 8,
+     "source_piece": "SM_BerlinFurn_08_TiledStove",
+     "material": "iron",
+     "feature": null,
+     "faces": 16
+    },
+    {
+     "cell": 8,
+     "source_piece": "SM_BerlinFurn_08_TiledStove",
+     "material": "tile_brown",
+     "feature": null,
+     "faces": 2
+    },
+    {
+     "cell": 13,
+     "source_piece": "SM_BerlinFurn_13_Desk",
+     "material": "plaster",
+     "feature": null,
+     "faces": 2
+    },
+    {
+     "cell": 15,
+     "source_piece": "SM_BerlinFurn_15_ClockFallen",
+     "material": "brass",
+     "feature": null,
+     "faces": 2
+    },
+    {
+     "cell": 16,
+     "source_piece": "SM_BerlinFurn_16_Radiator",
+     "material": "brass",
+     "feature": null,
+     "faces": 4
+    },
+    {
+     "cell": 16,
+     "source_piece": "SM_BerlinFurn_16_Radiator",
+     "material": "plaster",
+     "feature": null,
+     "faces": 2
+    }
+   ],
+   "sound_group": "Washstand",
+   "sound_note": "glazed ceramic; Washstand (basin) is the closest cue",
+   "tall": true,
+   "fbx": "FBX/SM_BerlinFurn_17_Toilet.FBX"
+  },
+  {
+   "name": "SM_BerlinFurn_18_KitchenRange",
+   "label": "Kochmaschine: white-tiled kitchen range, iron top with ring plates, oven door hanging open, flue pipe bent",
+   "size_cm": [
+    122.9,
+    104.1,
+    173.3
+   ],
+   "tris": 360,
+   "hulls": 1,
+   "bounds_min_cm": [
+    -38.4,
+    -57.1,
+    0.0
+   ],
+   "bounds_max_cm": [
+    84.5,
+    47.0,
+    173.3
+   ],
+   "body_size_cm": [
+    65.0,
+    94.0,
+    82.4
+   ],
+   "footprint_half_extents_cm": [
+    32.5,
+    47.0
+   ],
+   "suggested_health": 320,
+   "where_it_fits": "kitchen ruin against a wall (back = -X)",
+   "collision_hull_bounds_unreal_cm": [
+    {
+     "min": [
+      -32.5,
+      -47.0,
+      0.0
+     ],
+     "max": [
+      32.5,
+      47.0,
+      82.4
+     ]
+    }
+   ],
+   "atlas_cells_used": [
+    2,
+    7,
+    8,
+    13,
+    14,
+    15,
+    16
+   ],
+   "atlas_sources": [
+    {
+     "cell": 2,
+     "source_piece": "SM_BerlinFurn_02_IronBed",
+     "material": "iron",
+     "feature": null,
+     "faces": 21
+    },
+    {
+     "cell": 7,
+     "source_piece": "SM_BerlinFurn_07_Bathtub",
+     "material": "enamel",
+     "feature": null,
+     "faces": 10
+    },
+    {
+     "cell": 7,
+     "source_piece": "SM_BerlinFurn_07_Bathtub",
+     "material": "iron",
+     "feature": null,
+     "faces": 26
+    },
+    {
+     "cell": 8,
+     "source_piece": "SM_BerlinFurn_08_TiledStove",
+     "material": "iron",
+     "feature": null,
+     "faces": 46
+    },
+    {
+     "cell": 13,
+     "source_piece": "SM_BerlinFurn_13_Desk",
+     "material": "iron",
+     "feature": null,
+     "faces": 11
+    },
+    {
+     "cell": 14,
+     "source_piece": "SM_BerlinFurn_14_Washstand",
+     "material": "interior",
+     "feature": null,
+     "faces": 4
+    },
+    {
+     "cell": 14,
+     "source_piece": "SM_BerlinFurn_14_Washstand",
+     "material": "tile_white",
+     "feature": null,
+     "faces": 12
+    },
+    {
+     "cell": 15,
+     "source_piece": "SM_BerlinFurn_15_ClockFallen",
+     "material": "brass",
+     "feature": null,
+     "faces": 3
+    },
+    {
+     "cell": 15,
+     "source_piece": "SM_BerlinFurn_15_ClockFallen",
+     "material": "interior",
+     "feature": null,
+     "faces": 2
+    },
+    {
+     "cell": 16,
+     "source_piece": "SM_BerlinFurn_16_Radiator",
+     "material": "brass",
+     "feature": null,
+     "faces": 21
+    }
+   ],
+   "sound_group": "TiledStove",
+   "sound_note": "tiled body, iron top",
+   "tall": true,
+   "fbx": "FBX/SM_BerlinFurn_18_KitchenRange.FBX"
+  },
+  {
+   "name": "SM_BerlinFurn_19_Sideboard",
+   "label": "Long sideboard, marble top cracked in two, one door open, mantel clock and a toppled vase on top",
+   "size_cm": [
+    93.9,
+    183.1,
+    119.0
+   ],
+   "tris": 292,
+   "hulls": 1,
+   "bounds_min_cm": [
+    -30.4,
+    -91.0,
+    0.0
+   ],
+   "bounds_max_cm": [
+    63.5,
+    92.1,
+    119.0
+   ],
+   "body_size_cm": [
+    53.0,
+    182.0,
+    91.0
+   ],
+   "footprint_half_extents_cm": [
+    26.5,
+    91.0
+   ],
+   "suggested_health": 130,
+   "where_it_fits": "living-room ruin against a wall (back = -X)",
+   "collision_hull_bounds_unreal_cm": [
+    {
+     "min": [
+      -26.5,
+      -91.0,
+      0.0
+     ],
+     "max": [
+      26.5,
+      91.0,
+      91.0
+     ]
+    }
+   ],
+   "atlas_cells_used": [
+    1,
+    3,
+    5,
+    6,
+    7,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15
+   ],
+   "atlas_sources": [
+    {
+     "cell": 1,
+     "source_piece": "SM_BerlinFurn_01_Wardrobe",
+     "material": "interior",
+     "feature": null,
+     "faces": 3
+    },
+    {
+     "cell": 1,
+     "source_piece": "SM_BerlinFurn_01_Wardrobe",
+     "material": "wood_dark",
+     "feature": null,
+     "faces": 5
+    },
+    {
+     "cell": 1,
+     "source_piece": "SM_BerlinFurn_01_Wardrobe",
+     "material": "wood_dark",
+     "feature": "door",
+     "faces": 4
+    },
+    {
+     "cell": 1,
+     "source_piece": "SM_BerlinFurn_01_Wardrobe",
+     "material": "wood_dark",
+     "feature": "panel",
+     "faces": 4
+    },
+    {
+     "cell": 3,
+     "source_piece": "SM_BerlinFurn_03_KitchenTable",
+     "material": "enamel",
+     "feature": null,
+     "faces": 5
+    },
+    {
+     "cell": 5,
+     "source_piece": "SM_BerlinFurn_05_Armchair",
+     "material": "wood_dark",
+     "feature": null,
+     "faces": 2
+    },
+    {
+     "cell": 6,
+     "source_piece": "SM_BerlinFurn_06_Sofa",
+     "material": "wood_dark",
+     "feature": null,
+     "faces": 11
+    },
+    {
+     "cell": 7,
+     "source_piece": "SM_BerlinFurn_07_Bathtub",
+     "material": "enamel",
+     "feature": null,
+     "faces": 20
+    },
+    {
+     "cell": 10,
+     "source_piece": "SM_BerlinFurn_10_ChestOfDrawers",
+     "material": "interior",
+     "feature": null,
+     "faces": 1
+    },
+    {
+     "cell": 11,
+     "source_piece": "SM_BerlinFurn_11_BookshelfFallen",
+     "material": "interior",
+     "feature": null,
+     "faces": 4
+    },
+    {
+     "cell": 11,
+     "source_piece": "SM_BerlinFurn_11_BookshelfFallen",
+     "material": "wood_dark",
+     "feature": null,
+     "faces": 43
+    },
+    {
+     "cell": 12,
+     "source_piece": "SM_BerlinFurn_12_KitchenDresser",
+     "material": "interior",
+     "feature": null,
+     "faces": 1
+    },
+    {
+     "cell": 13,
+     "source_piece": "SM_BerlinFurn_13_Desk",
+     "material": "wood_dark",
+     "feature": null,
+     "faces": 18
+    },
+    {
+     "cell": 14,
+     "source_piece": "SM_BerlinFurn_14_Washstand",
+     "material": "enamel",
+     "feature": null,
+     "faces": 1
+    },
+    {
+     "cell": 14,
+     "source_piece": "SM_BerlinFurn_14_Washstand",
+     "material": "interior",
+     "feature": null,
+     "faces": 4
+    },
+    {
+     "cell": 14,
+     "source_piece": "SM_BerlinFurn_14_Washstand",
+     "material": "marble",
+     "feature": null,
+     "faces": 12
+    },
+    {
+     "cell": 15,
+     "source_piece": "SM_BerlinFurn_15_ClockFallen",
+     "material": "interior",
+     "feature": null,
+     "faces": 4
+    },
+    {
+     "cell": 15,
+     "source_piece": "SM_BerlinFurn_15_ClockFallen",
+     "material": "wood_red",
+     "feature": "clock",
+     "faces": 1
+    }
+   ],
+   "sound_group": "WoodCabinet",
+   "sound_note": "",
+   "tall": true,
+   "fbx": "FBX/SM_BerlinFurn_19_Sideboard.FBX"
+  },
+  {
+   "name": "SM_BerlinFurn_20_RoundTableTipped",
+   "label": "Round pedestal dining table tipped onto its rim, tablecloth and a plate on the ground",
+   "size_cm": [
+    154.6,
+    118.9,
+    104.2
+   ],
+   "tris": 308,
+   "hulls": 2,
+   "bounds_min_cm": [
+    -102.0,
+    -64.2,
+    0.0
+   ],
+   "bounds_max_cm": [
+    52.6,
+    54.8,
+    104.2
+   ],
+   "body_size_cm": [
+    115.0,
+    103.5,
+    95.8
+   ],
+   "footprint_half_extents_cm": [
+    57.5,
+    51.7
+   ],
+   "suggested_health": 80,
+   "where_it_fits": "dining-room ruin, on rubble or in the street",
+   "collision_hull_bounds_unreal_cm": [
+    {
+     "min": [
+      -14.8,
+      -51.7,
+      6.6
+     ],
+     "max": [
+      57.5,
+      51.7,
+      98.2
+     ]
+    },
+    {
+     "min": [
+      -57.5,
+      -47.7,
+      30.4
+     ],
+     "max": [
+      33.4,
+      26.1,
+      102.4
+     ]
+    }
+   ],
+   "atlas_cells_used": [
+    1,
+    2,
+    5,
+    10,
+    11,
+    13,
+    14
+   ],
+   "atlas_sources": [
+    {
+     "cell": 1,
+     "source_piece": "SM_BerlinFurn_01_Wardrobe",
+     "material": "wood_dark",
+     "feature": null,
+     "faces": 4
+    },
+    {
+     "cell": 2,
+     "source_piece": "SM_BerlinFurn_02_IronBed",
+     "material": "linen",
+     "feature": null,
+     "faces": 9
+    },
+    {
+     "cell": 5,
+     "source_piece": "SM_BerlinFurn_05_Armchair",
+     "material": "linen",
+     "feature": null,
+     "faces": 1
+    },
+    {
+     "cell": 5,
+     "source_piece": "SM_BerlinFurn_05_Armchair",
+     "material": "wood_dark",
+     "feature": null,
+     "faces": 6
+    },
+    {
+     "cell": 10,
+     "source_piece": "SM_BerlinFurn_10_ChestOfDrawers",
+     "material": "ceramic",
+     "feature": null,
+     "faces": 1
+    },
+    {
+     "cell": 11,
+     "source_piece": "SM_BerlinFurn_11_BookshelfFallen",
+     "material": "wood_dark",
+     "feature": null,
+     "faces": 39
+    },
+    {
+     "cell": 13,
+     "source_piece": "SM_BerlinFurn_13_Desk",
+     "material": "ceramic",
+     "feature": null,
+     "faces": 1
+    },
+    {
+     "cell": 13,
+     "source_piece": "SM_BerlinFurn_13_Desk",
+     "material": "wood_dark",
+     "feature": null,
+     "faces": 45
+    },
+    {
+     "cell": 14,
+     "source_piece": "SM_BerlinFurn_14_Washstand",
+     "material": "ceramic",
+     "feature": null,
+     "faces": 8
+    },
+    {
+     "cell": 14,
+     "source_piece": "SM_BerlinFurn_14_Washstand",
+     "material": "linen",
+     "feature": null,
+     "faces": 8
+    }
+   ],
+   "sound_group": "WoodCabinet",
+   "sound_note": "heavy table; WoodSmall would also do",
+   "tall": false,
+   "fbx": "FBX/SM_BerlinFurn_20_RoundTableTipped.FBX"
+  },
+  {
+   "name": "SM_BerlinFurn_21_Pram",
+   "label": "Baby carriage: basket body, dark hood, one wheel off and lying beside it",
+   "size_cm": [
+    132.2,
+    91.1,
+    105.5
+   ],
+   "tris": 420,
+   "hulls": 1,
+   "bounds_min_cm": [
+    -63.4,
+    -34.7,
+    0.0
+   ],
+   "bounds_max_cm": [
+    68.8,
+    56.4,
+    105.5
+   ],
+   "body_size_cm": [
+    100.3,
+    55.8,
+    100.1
+   ],
+   "footprint_half_extents_cm": [
+    50.2,
+    27.9
+   ],
+   "suggested_health": 50,
+   "where_it_fits": "street, kerb or courtyard; also on a stair landing",
+   "collision_hull_bounds_unreal_cm": [
+    {
+     "min": [
+      -50.2,
+      -27.9,
+      -5.7
+     ],
+     "max": [
+      50.2,
+      27.9,
+      94.4
+     ]
+    }
+   ],
+   "atlas_cells_used": [
+    2,
+    3,
+    4,
+    7,
+    8,
+    12,
+    13,
+    14
+   ],
+   "atlas_sources": [
+    {
+     "cell": 2,
+     "source_piece": "SM_BerlinFurn_02_IronBed",
+     "material": "iron",
+     "feature": null,
+     "faces": 24
+    },
+    {
+     "cell": 2,
+     "source_piece": "SM_BerlinFurn_02_IronBed",
+     "material": "linen",
+     "feature": null,
+     "faces": 1
+    },
+    {
+     "cell": 2,
+     "source_piece": "SM_BerlinFurn_02_IronBed",
+     "material": "wool",
+     "feature": null,
+     "faces": 18
+    },
+    {
+     "cell": 3,
+     "source_piece": "SM_BerlinFurn_03_KitchenTable",
+     "material": "wood_light",
+     "feature": null,
+     "faces": 30
+    },
+    {
+     "cell": 4,
+     "source_piece": "SM_BerlinFurn_04_ChairFallen",
+     "material": "wood_mid",
+     "feature": null,
+     "faces": 4
+    },
+    {
+     "cell": 7,
+     "source_piece": "SM_BerlinFurn_07_Bathtub",
+     "material": "iron",
+     "feature": null,
+     "faces": 41
+    },
+    {
+     "cell": 8,
+     "source_piece": "SM_BerlinFurn_08_TiledStove",
+     "material": "iron",
+     "feature": null,
+     "faces": 37
+    },
+    {
+     "cell": 12,
+     "source_piece": "SM_BerlinFurn_12_KitchenDresser",
+     "material": "wood_light",
+     "feature": null,
+     "faces": 1
+    },
+    {
+     "cell": 13,
+     "source_piece": "SM_BerlinFurn_13_Desk",
+     "material": "iron",
+     "feature": null,
+     "faces": 6
+    },
+    {
+     "cell": 14,
+     "source_piece": "SM_BerlinFurn_14_Washstand",
+     "material": "linen",
+     "feature": null,
+     "faces": 10
+    },
+    {
+     "cell": 14,
+     "source_piece": "SM_BerlinFurn_14_Washstand",
+     "material": "wood_mid",
+     "feature": null,
+     "faces": 2
+    }
+   ],
+   "sound_group": "WoodSmall",
+   "sound_note": "nothing fits well (wicker on a light iron chassis); WoodSmall is the nearest",
+   "tall": false,
+   "fbx": "FBX/SM_BerlinFurn_21_Pram.FBX"
+  },
+  {
+   "name": "SM_BerlinFurn_22_SewingTable",
+   "label": "Treadle sewing machine: cast-iron side frames and flywheel, wooden top, cloth spilling off",
+   "size_cm": [
+    76.0,
+    103.5,
+    96.0
+   ],
+   "tris": 296,
+   "hulls": 1,
+   "bounds_min_cm": [
+    -22.0,
+    -53.5,
+    0.0
+   ],
+   "bounds_max_cm": [
+    54.0,
+    50.0,
+    96.0
+   ],
+   "body_size_cm": [
+    44.0,
+    100.0,
+    96.0
+   ],
+   "footprint_half_extents_cm": [
+    22.0,
+    50.0
+   ],
+   "suggested_health": 110,
+   "where_it_fits": "living-room or workshop ruin",
+   "collision_hull_bounds_unreal_cm": [
+    {
+     "min": [
+      -22.0,
+      -50.0,
+      0.0
+     ],
+     "max": [
+      22.0,
+      50.0,
+      96.0
+     ]
+    }
+   ],
+   "atlas_cells_used": [
+    2,
+    4,
+    6,
+    7,
+    8,
+    9,
+    10,
+    13,
+    14,
+    15,
+    16
+   ],
+   "atlas_sources": [
+    {
+     "cell": 2,
+     "source_piece": "SM_BerlinFurn_02_IronBed",
+     "material": "iron",
+     "feature": null,
+     "faces": 12
+    },
+    {
+     "cell": 4,
+     "source_piece": "SM_BerlinFurn_04_ChairFallen",
+     "material": "wood_mid",
+     "feature": null,
+     "faces": 8
+    },
+    {
+     "cell": 6,
+     "source_piece": "SM_BerlinFurn_06_Sofa",
+     "material": "fabric_red",
+     "feature": null,
+     "faces": 18
+    },
+    {
+     "cell": 7,
+     "source_piece": "SM_BerlinFurn_07_Bathtub",
+     "material": "iron",
+     "feature": null,
+     "faces": 10
+    },
+    {
+     "cell": 8,
+     "source_piece": "SM_BerlinFurn_08_TiledStove",
+     "material": "iron",
+     "feature": null,
+     "faces": 34
+    },
+    {
+     "cell": 9,
+     "source_piece": "SM_BerlinFurn_09_Piano",
+     "material": "wood_black",
+     "feature": null,
+     "faces": 16
+    },
+    {
+     "cell": 10,
+     "source_piece": "SM_BerlinFurn_10_ChestOfDrawers",
+     "material": "wood_mid",
+     "feature": null,
+     "faces": 7
+    },
+    {
+     "cell": 13,
+     "source_piece": "SM_BerlinFurn_13_Desk",
+     "material": "iron",
+     "feature": null,
+     "faces": 4
+    },
+    {
+     "cell": 14,
+     "source_piece": "SM_BerlinFurn_14_Washstand",
+     "material": "wood_mid",
+     "feature": null,
+     "faces": 3
+    },
+    {
+     "cell": 15,
+     "source_piece": "SM_BerlinFurn_15_ClockFallen",
+     "material": "brass",
+     "feature": null,
+     "faces": 2
+    },
+    {
+     "cell": 16,
+     "source_piece": "SM_BerlinFurn_16_Radiator",
+     "material": "brass",
+     "feature": null,
+     "faces": 8
+    }
+   ],
+   "sound_group": "IronBed",
+   "sound_note": "cast-iron frame under a wooden top; IronBed is the closest metal cue",
+   "tall": true,
+   "fbx": "FBX/SM_BerlinFurn_22_SewingTable.FBX"
+  },
+  {
+   "name": "SM_BerlinFurn_23_Gramophone",
+   "label": "Horn gramophone on its record cabinet, door open, records on the floor",
+   "size_cm": [
+    90.6,
+    78.8,
+    160.8
+   ],
+   "tris": 416,
+   "hulls": 2,
+   "bounds_min_cm": [
+    -27.0,
+    -29.4,
+    0.0
+   ],
+   "bounds_max_cm": [
+    63.6,
+    49.4,
+    160.8
+   ],
+   "body_size_cm": [
+    54.0,
+    61.0,
+    164.0
+   ],
+   "footprint_half_extents_cm": [
+    27.0,
+    30.5
+   ],
+   "suggested_health": 90,
+   "where_it_fits": "living-room ruin; stands out well on a collapsed floor",
+   "collision_hull_bounds_unreal_cm": [
+    {
+     "min": [
+      -27.0,
+      -21.5,
+      0.0
+     ],
+     "max": [
+      20.0,
+      30.5,
+      89.3
+     ]
+    },
+    {
+     "min": [
+      -17.0,
+      -30.5,
+      89.3
+     ],
+     "max": [
+      27.0,
+      21.5,
+      164.0
+     ]
+    }
+   ],
+   "atlas_cells_used": [
+    1,
+    4,
+    9,
+    10,
+    11,
+    13,
+    14,
+    15,
+    16
+   ],
+   "atlas_sources": [
+    {
+     "cell": 1,
+     "source_piece": "SM_BerlinFurn_01_Wardrobe",
+     "material": "book_tan",
+     "feature": null,
+     "faces": 6
+    },
+    {
+     "cell": 4,
+     "source_piece": "SM_BerlinFurn_04_ChairFallen",
+     "material": "wood_mid",
+     "feature": null,
+     "faces": 33
+    },
+    {
+     "cell": 9,
+     "source_piece": "SM_BerlinFurn_09_Piano",
+     "material": "wood_black",
+     "feature": null,
+     "faces": 32
+    },
+    {
+     "cell": 10,
+     "source_piece": "SM_BerlinFurn_10_ChestOfDrawers",
+     "material": "interior",
+     "feature": null,
+     "faces": 4
+    },
+    {
+     "cell": 10,
+     "source_piece": "SM_BerlinFurn_10_ChestOfDrawers",
+     "material": "wood_mid",
+     "feature": null,
+     "faces": 7
+    },
+    {
+     "cell": 11,
+     "source_piece": "SM_BerlinFurn_11_BookshelfFallen",
+     "material": "books",
+     "feature": null,
+     "faces": 6
+    },
+    {
+     "cell": 13,
+     "source_piece": "SM_BerlinFurn_13_Desk",
+     "material": "interior",
+     "feature": null,
+     "faces": 1
+    },
+    {
+     "cell": 14,
+     "source_piece": "SM_BerlinFurn_14_Washstand",
+     "material": "interior",
+     "feature": null,
+     "faces": 2
+    },
+    {
+     "cell": 14,
+     "source_piece": "SM_BerlinFurn_14_Washstand",
+     "material": "wood_mid",
+     "feature": null,
+     "faces": 9
+    },
+    {
+     "cell": 14,
+     "source_piece": "SM_BerlinFurn_14_Washstand",
+     "material": "wood_mid",
+     "feature": "door",
+     "faces": 1
+    },
+    {
+     "cell": 14,
+     "source_piece": "SM_BerlinFurn_14_Washstand",
+     "material": "wood_mid",
+     "feature": "panel",
+     "faces": 1
+    },
+    {
+     "cell": 15,
+     "source_piece": "SM_BerlinFurn_15_ClockFallen",
+     "material": "brass",
+     "feature": null,
+     "faces": 43
+    },
+    {
+     "cell": 15,
+     "source_piece": "SM_BerlinFurn_15_ClockFallen",
+     "material": "interior",
+     "feature": null,
+     "faces": 4
+    },
+    {
+     "cell": 16,
+     "source_piece": "SM_BerlinFurn_16_Radiator",
+     "material": "brass",
+     "feature": null,
+     "faces": 41
+    }
+   ],
+   "sound_group": "WoodCabinet",
+   "sound_note": "the brass horn has no cue of its own",
+   "tall": true,
+   "fbx": "FBX/SM_BerlinFurn_23_Gramophone.FBX"
+  },
+  {
+   "name": "SM_BerlinFurn_24_TrunkAndSuitcases",
+   "label": "Steamer trunk with a suitcase on top, a second case burst open on the ground",
+   "size_cm": [
+    140.8,
+    126.1,
+    75.6
+   ],
+   "tris": 220,
+   "hulls": 1,
+   "bounds_min_cm": [
+    -33.8,
+    -71.6,
+    0.0
+   ],
+   "bounds_max_cm": [
+    107.0,
+    54.5,
+    75.6
+   ],
+   "body_size_cm": [
+    69.8,
+    106.9,
+    58.2
+   ],
+   "footprint_half_extents_cm": [
+    34.9,
+    53.4
+   ],
+   "suggested_health": 70,
+   "where_it_fits": "street, kerb, courtyard or station; also in a hallway ruin",
+   "collision_hull_bounds_unreal_cm": [
+    {
+     "min": [
+      -34.9,
+      -53.4,
+      1.0
+     ],
+     "max": [
+      34.9,
+      53.4,
+      59.2
+     ]
+    }
+   ],
+   "atlas_cells_used": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16
+   ],
+   "atlas_sources": [
+    {
+     "cell": 1,
+     "source_piece": "SM_BerlinFurn_01_Wardrobe",
+     "material": "book_tan",
+     "feature": null,
+     "faces": 5
+    },
+    {
+     "cell": 2,
+     "source_piece": "SM_BerlinFurn_02_IronBed",
+     "material": "linen",
+     "feature": null,
+     "faces": 2
+    },
+    {
+     "cell": 2,
+     "source_piece": "SM_BerlinFurn_02_IronBed",
+     "material": "wool",
+     "feature": null,
+     "faces": 6
+    },
+    {
+     "cell": 3,
+     "source_piece": "SM_BerlinFurn_03_KitchenTable",
+     "material": "wood_light",
+     "feature": null,
+     "faces": 6
+    },
+    {
+     "cell": 4,
+     "source_piece": "SM_BerlinFurn_04_ChairFallen",
+     "material": "wood_mid",
+     "feature": null,
+     "faces": 1
+    },
+    {
+     "cell": 5,
+     "source_piece": "SM_BerlinFurn_05_Armchair",
+     "material": "linen",
+     "feature": null,
+     "faces": 2
+    },
+    {
+     "cell": 5,
+     "source_piece": "SM_BerlinFurn_05_Armchair",
+     "material": "wood_dark",
+     "feature": null,
+     "faces": 2
+    },
+    {
+     "cell": 10,
+     "source_piece": "SM_BerlinFurn_10_ChestOfDrawers",
+     "material": "interior",
+     "feature": null,
+     "faces": 1
+    },
+    {
+     "cell": 10,
+     "source_piece": "SM_BerlinFurn_10_ChestOfDrawers",
+     "material": "wood_mid",
+     "feature": null,
+     "faces": 2
+    },
+    {
+     "cell": 11,
+     "source_piece": "SM_BerlinFurn_11_BookshelfFallen",
+     "material": "book_tan",
+     "feature": null,
+     "faces": 1
+    },
+    {
+     "cell": 11,
+     "source_piece": "SM_BerlinFurn_11_BookshelfFallen",
+     "material": "interior",
+     "feature": null,
+     "faces": 2
+    },
+    {
+     "cell": 11,
+     "source_piece": "SM_BerlinFurn_11_BookshelfFallen",
+     "material": "wood_dark",
+     "feature": null,
+     "faces": 8
+    },
+    {
+     "cell": 12,
+     "source_piece": "SM_BerlinFurn_12_KitchenDresser",
+     "material": "wood_light",
+     "feature": null,
+     "faces": 8
+    },
+    {
+     "cell": 13,
+     "source_piece": "SM_BerlinFurn_13_Desk",
+     "material": "wood_dark",
+     "feature": null,
+     "faces": 20
+    },
+    {
+     "cell": 14,
+     "source_piece": "SM_BerlinFurn_14_Washstand",
+     "material": "interior",
+     "feature": null,
+     "faces": 5
+    },
+    {
+     "cell": 14,
+     "source_piece": "SM_BerlinFurn_14_Washstand",
+     "material": "linen",
+     "feature": null,
+     "faces": 2
+    },
+    {
+     "cell": 14,
+     "source_piece": "SM_BerlinFurn_14_Washstand",
+     "material": "wood_mid",
+     "feature": null,
+     "faces": 3
+    },
+    {
+     "cell": 15,
+     "source_piece": "SM_BerlinFurn_15_ClockFallen",
+     "material": "brass",
+     "feature": null,
+     "faces": 4
+    },
+    {
+     "cell": 15,
+     "source_piece": "SM_BerlinFurn_15_ClockFallen",
+     "material": "interior",
+     "feature": null,
+     "faces": 2
+    },
+    {
+     "cell": 15,
+     "source_piece": "SM_BerlinFurn_15_ClockFallen",
+     "material": "wood_red",
+     "feature": null,
+     "faces": 18
+    },
+    {
+     "cell": 16,
+     "source_piece": "SM_BerlinFurn_16_Radiator",
+     "material": "brass",
+     "feature": null,
+     "faces": 2
+    }
+   ],
+   "sound_group": "WoodCabinet",
+   "sound_note": "",
+   "tall": false,
+   "fbx": "FBX/SM_BerlinFurn_24_TrunkAndSuitcases.FBX"
+  },
+  {
+   "name": "SM_BerlinFurn_25_CoatStand",
+   "label": "Flurgarderobe: hall stand with bench chest, mirror, hat shelf, a coat and a hat left on it",
+   "size_cm": [
+    64.2,
+    88.0,
+    208.0
+   ],
+   "tris": 364,
+   "hulls": 2,
+   "bounds_min_cm": [
+    -17.8,
+    -44.0,
+    0.0
+   ],
+   "bounds_max_cm": [
+    46.4,
+    44.0,
+    208.0
+   ],
+   "body_size_cm": [
+    35.5,
+    88.0,
+    208.0
+   ],
+   "footprint_half_extents_cm": [
+    17.8,
+    44.0
+   ],
+   "suggested_health": 100,
+   "where_it_fits": "hallway ruin against a wall (back = -X)",
+   "collision_hull_bounds_unreal_cm": [
+    {
+     "min": [
+      -17.2,
+      -44.0,
+      0.0
+     ],
+     "max": [
+      17.8,
+      44.0,
+      47.0
+     ]
+    },
+    {
+     "min": [
+      -17.8,
+      -44.0,
+      47.0
+     ],
+     "max": [
+      9.8,
+      44.0,
+      208.0
+     ]
+    }
+   ],
+   "atlas_cells_used": [
+    1,
+    2,
+    5,
+    6,
+    9,
+    11,
+    13,
+    14,
+    16
+   ],
+   "atlas_sources": [
+    {
+     "cell": 1,
+     "source_piece": "SM_BerlinFurn_01_Wardrobe",
+     "material": "wood_dark",
+     "feature": null,
+     "faces": 12
+    },
+    {
+     "cell": 2,
+     "source_piece": "SM_BerlinFurn_02_IronBed",
+     "material": "wool",
+     "feature": null,
+     "faces": 26
+    },
+    {
+     "cell": 5,
+     "source_piece": "SM_BerlinFurn_05_Armchair",
+     "material": "wood_dark",
+     "feature": null,
+     "faces": 8
+    },
+    {
+     "cell": 6,
+     "source_piece": "SM_BerlinFurn_06_Sofa",
+     "material": "wood_dark",
+     "feature": null,
+     "faces": 8
+    },
+    {
+     "cell": 9,
+     "source_piece": "SM_BerlinFurn_09_Piano",
+     "material": "wood_black",
+     "feature": null,
+     "faces": 20
+    },
+    {
+     "cell": 11,
+     "source_piece": "SM_BerlinFurn_11_BookshelfFallen",
+     "material": "wood_dark",
+     "feature": null,
+     "faces": 47
+    },
+    {
+     "cell": 13,
+     "source_piece": "SM_BerlinFurn_13_Desk",
+     "material": "wood_dark",
+     "feature": null,
+     "faces": 20
+    },
+    {
+     "cell": 13,
+     "source_piece": "SM_BerlinFurn_13_Desk",
+     "material": "wood_dark",
+     "feature": "drawers",
+     "faces": 1
+    },
+    {
+     "cell": 14,
+     "source_piece": "SM_BerlinFurn_14_Washstand",
+     "material": "marble",
+     "feature": null,
+     "faces": 6
+    },
+    {
+     "cell": 16,
+     "source_piece": "SM_BerlinFurn_16_Radiator",
+     "material": "brass",
+     "feature": null,
+     "faces": 24
+    }
+   ],
+   "sound_group": "WoodCabinet",
+   "sound_note": "",
+   "tall": true,
+   "fbx": "FBX/SM_BerlinFurn_25_CoatStand.FBX"
+  },
+  {
+   "name": "SM_BerlinFurn_26_CellarShelf",
+   "label": "Rough cellar shelf with preserving jars, crocks and bottles, one board collapsed",
+   "size_cm": [
+    77.3,
+    105.0,
+    178.0
+   ],
+   "tris": 356,
+   "hulls": 1,
+   "bounds_min_cm": [
+    -21.0,
+    -52.5,
+    0.0
+   ],
+   "bounds_max_cm": [
+    56.3,
+    52.5,
+    178.0
+   ],
+   "body_size_cm": [
+    42.0,
+    105.0,
+    178.0
+   ],
+   "footprint_half_extents_cm": [
+    21.0,
+    52.5
+   ],
+   "suggested_health": 80,
+   "where_it_fits": "cellar or pantry ruin against a wall (back = -X)",
+   "collision_hull_bounds_unreal_cm": [
+    {
+     "min": [
+      -21.0,
+      -52.5,
+      0.0
+     ],
+     "max": [
+      21.0,
+      52.5,
+      178.0
+     ]
+    }
+   ],
+   "atlas_cells_used": [
+    3,
+    4,
+    7,
+    8,
+    11,
+    12,
+    14
+   ],
+   "atlas_sources": [
+    {
+     "cell": 3,
+     "source_piece": "SM_BerlinFurn_03_KitchenTable",
+     "material": "enamel",
+     "feature": null,
+     "faces": 9
+    },
+    {
+     "cell": 3,
+     "source_piece": "SM_BerlinFurn_03_KitchenTable",
+     "material": "wood_light",
+     "feature": null,
+     "faces": 50
+    },
+    {
+     "cell": 4,
+     "source_piece": "SM_BerlinFurn_04_ChairFallen",
+     "material": "wood_mid",
+     "feature": null,
+     "faces": 4
+    },
+    {
+     "cell": 7,
+     "source_piece": "SM_BerlinFurn_07_Bathtub",
+     "material": "enamel",
+     "feature": null,
+     "faces": 31
+    },
+    {
+     "cell": 8,
+     "source_piece": "SM_BerlinFurn_08_TiledStove",
+     "material": "tile_brown",
+     "feature": null,
+     "faces": 22
+    },
+    {
+     "cell": 11,
+     "source_piece": "SM_BerlinFurn_11_BookshelfFallen",
+     "material": "book_green",
+     "feature": null,
+     "faces": 36
+    },
+    {
+     "cell": 12,
+     "source_piece": "SM_BerlinFurn_12_KitchenDresser",
+     "material": "wood_light",
+     "feature": null,
+     "faces": 10
+    },
+    {
+     "cell": 14,
+     "source_piece": "SM_BerlinFurn_14_Washstand",
+     "material": "wood_mid",
+     "feature": null,
+     "faces": 2
+    }
+   ],
+   "sound_group": "WoodCabinet",
+   "sound_note": "jars and bottles have no glass cue",
+   "tall": true,
+   "fbx": "FBX/SM_BerlinFurn_26_CellarShelf.FBX"
+  },
+  {
+   "name": "SM_BerlinFurn_27_WashTubMangle",
+   "label": "Wooden wringer mangle with crank wheel next to a zinc wash tub with washboard and laundry",
+   "size_cm": [
+    83.7,
+    141.5,
+    125.0
+   ],
+   "tris": 452,
+   "hulls": 2,
+   "bounds_min_cm": [
+    -31.7,
+    -71.8,
+    0.0
+   ],
+   "bounds_max_cm": [
+    52.0,
+    69.8,
+    125.0
+   ],
+   "body_size_cm": [
+    52.0,
+    136.5,
+    109.0
+   ],
+   "footprint_half_extents_cm": [
+    26.0,
+    68.2
+   ],
+   "suggested_health": 110,
+   "where_it_fits": "wash kitchen, courtyard or cellar ruin; fine in a yard or street",
+   "collision_hull_bounds_unreal_cm": [
+    {
+     "min": [
+      -26.0,
+      -68.2,
+      0.0
+     ],
+     "max": [
+      18.0,
+      -11.8,
+      109.0
+     ]
+    },
+    {
+     "min": [
+      -26.0,
+      0.2,
+      0.0
+     ],
+     "max": [
+      26.0,
+      68.2,
+      34.0
+     ]
+    }
+   ],
+   "atlas_cells_used": [
+    2,
+    3,
+    4,
+    5,
+    7,
+    8,
+    10,
+    12,
+    13,
+    14
+   ],
+   "atlas_sources": [
+    {
+     "cell": 2,
+     "source_piece": "SM_BerlinFurn_02_IronBed",
+     "material": "iron",
+     "feature": null,
+     "faces": 3
+    },
+    {
+     "cell": 2,
+     "source_piece": "SM_BerlinFurn_02_IronBed",
+     "material": "linen",
+     "feature": null,
+     "faces": 3
+    },
+    {
+     "cell": 2,
+     "source_piece": "SM_BerlinFurn_02_IronBed",
+     "material": "ticking",
+     "feature": "buttons",
+     "faces": 2
+    },
+    {
+     "cell": 3,
+     "source_piece": "SM_BerlinFurn_03_KitchenTable",
+     "material": "wood_light",
+     "feature": null,
+     "faces": 28
+    },
+    {
+     "cell": 4,
+     "source_piece": "SM_BerlinFurn_04_ChairFallen",
+     "material": "wood_mid",
+     "feature": null,
+     "faces": 28
+    },
+    {
+     "cell": 5,
+     "source_piece": "SM_BerlinFurn_05_Armchair",
+     "material": "linen",
+     "feature": null,
+     "faces": 3
+    },
+    {
+     "cell": 7,
+     "source_piece": "SM_BerlinFurn_07_Bathtub",
+     "material": "iron",
+     "feature": null,
+     "faces": 26
+    },
+    {
+     "cell": 7,
+     "source_piece": "SM_BerlinFurn_07_Bathtub",
+     "material": "paint_tub",
+     "feature": null,
+     "faces": 58
+    },
+    {
+     "cell": 8,
+     "source_piece": "SM_BerlinFurn_08_TiledStove",
+     "material": "iron",
+     "feature": null,
+     "faces": 6
+    },
+    {
+     "cell": 10,
+     "source_piece": "SM_BerlinFurn_10_ChestOfDrawers",
+     "material": "wood_mid",
+     "feature": null,
+     "faces": 4
+    },
+    {
+     "cell": 12,
+     "source_piece": "SM_BerlinFurn_12_KitchenDresser",
+     "material": "wood_light",
+     "feature": null,
+     "faces": 2
+    },
+    {
+     "cell": 13,
+     "source_piece": "SM_BerlinFurn_13_Desk",
+     "material": "iron",
+     "feature": null,
+     "faces": 3
+    },
+    {
+     "cell": 14,
+     "source_piece": "SM_BerlinFurn_14_Washstand",
+     "material": "linen",
+     "feature": null,
+     "faces": 6
+    },
+    {
+     "cell": 14,
+     "source_piece": "SM_BerlinFurn_14_Washstand",
+     "material": "wood_mid",
+     "feature": null,
+     "faces": 16
+    }
+   ],
+   "sound_group": "Bathtub",
+   "sound_note": "zinc tub; the wooden mangle half would be WoodSmall",
+   "tall": false,
+   "fbx": "FBX/SM_BerlinFurn_27_WashTubMangle.FBX"
+  },
+  {
+   "name": "SM_BerlinFurn_28_Vitrine",
+   "label": "Glass display cabinet with the glass blown out: empty door frames, one swung open, crockery on the shelves, shards on the floor",
+   "size_cm": [
+    84.5,
+    109.9,
+    198.0
+   ],
+   "tris": 452,
+   "hulls": 2,
+   "bounds_min_cm": [
+    -24.0,
+    -49.0,
+    0.0
+   ],
+   "bounds_max_cm": [
+    60.5,
+    60.9,
+    198.0
+   ],
+   "body_size_cm": [
+    48.0,
+    98.0,
+    198.0
+   ],
+   "footprint_half_extents_cm": [
+    24.0,
+    49.0
+   ],
+   "suggested_health": 110,
+   "where_it_fits": "living-room ruin against a wall (back = -X)",
+   "collision_hull_bounds_unreal_cm": [
+    {
+     "min": [
+      -24.0,
+      -49.0,
+      0.0
+     ],
+     "max": [
+      24.0,
+      49.0,
+      79.0
+     ]
+    },
+    {
+     "min": [
+      -23.0,
+      -48.0,
+      79.0
+     ],
+     "max": [
+      21.5,
+      48.0,
+      198.0
+     ]
+    }
+   ],
+   "atlas_cells_used": [
+    1,
+    3,
+    10,
+    12,
+    13,
+    14,
+    15,
+    16
+   ],
+   "atlas_sources": [
+    {
+     "cell": 1,
+     "source_piece": "SM_BerlinFurn_01_Wardrobe",
+     "material": "interior",
+     "feature": null,
+     "faces": 2
+    },
+    {
+     "cell": 3,
+     "source_piece": "SM_BerlinFurn_03_KitchenTable",
+     "material": "enamel",
+     "feature": null,
+     "faces": 16
+    },
+    {
+     "cell": 10,
+     "source_piece": "SM_BerlinFurn_10_ChestOfDrawers",
+     "material": "ceramic",
+     "feature": null,
+     "faces": 1
+    },
+    {
+     "cell": 10,
+     "source_piece": "SM_BerlinFurn_10_ChestOfDrawers",
+     "material": "interior",
+     "feature": null,
+     "faces": 4
+    },
+    {
+     "cell": 12,
+     "source_piece": "SM_BerlinFurn_12_KitchenDresser",
+     "material": "interior",
+     "feature": null,
+     "faces": 2
+    },
+    {
+     "cell": 13,
+     "source_piece": "SM_BerlinFurn_13_Desk",
+     "material": "ceramic",
+     "feature": null,
+     "faces": 1
+    },
+    {
+     "cell": 14,
+     "source_piece": "SM_BerlinFurn_14_Washstand",
+     "material": "ceramic",
+     "feature": null,
+     "faces": 8
+    },
+    {
+     "cell": 14,
+     "source_piece": "SM_BerlinFurn_14_Washstand",
+     "material": "interior",
+     "feature": null,
+     "faces": 1
+    },
+    {
+     "cell": 14,
+     "source_piece": "SM_BerlinFurn_14_Washstand",
+     "material": "marble",
+     "feature": null,
+     "faces": 27
+    },
+    {
+     "cell": 15,
+     "source_piece": "SM_BerlinFurn_15_ClockFallen",
+     "material": "wood_red",
+     "feature": null,
+     "faces": 145
+    },
+    {
+     "cell": 16,
+     "source_piece": "SM_BerlinFurn_16_Radiator",
+     "material": "brass",
+     "feature": null,
+     "faces": 12
+    }
+   ],
+   "sound_group": "WoodCabinet",
+   "sound_note": "no glass cue; the glass is already gone",
+   "tall": true,
+   "fbx": "FBX/SM_BerlinFurn_28_Vitrine.FBX"
+  },
+  {
+   "name": "SM_BerlinFurn_29_LampAndRug",
+   "label": "Standing lamp with a fringed ochre shade fallen across a red rug, rug end rolled up",
+   "size_cm": [
+    167.6,
+    104.8,
+    57.1
+   ],
+   "tris": 216,
+   "hulls": 2,
+   "bounds_min_cm": [
+    -96.8,
+    -64.7,
+    0.0
+   ],
+   "bounds_max_cm": [
+    70.8,
+    40.1,
+    57.1
+   ],
+   "body_size_cm": [
+    159.0,
+    97.9,
+    64.6
+   ],
+   "footprint_half_extents_cm": [
+    79.5,
+    49.0
+   ],
+   "suggested_health": 40,
+   "where_it_fits": "room ruin floor, or dragged into a street; lies flat",
+   "collision_hull_bounds_unreal_cm": [
+    {
+     "min": [
+      -79.5,
+      -49.0,
+      14.1
+     ],
+     "max": [
+      24.8,
+      22.4,
+      58.0
+     ]
+    },
+    {
+     "min": [
+      15.9,
+      -8.7,
+      -6.7
+     ],
+     "max": [
+      79.5,
+      49.0,
+      44.5
+     ]
+    }
+   ],
+   "atlas_cells_used": [
+    2,
+    6,
+    9,
+    11,
+    14,
+    15,
+    16
+   ],
+   "atlas_sources": [
+    {
+     "cell": 2,
+     "source_piece": "SM_BerlinFurn_02_IronBed",
+     "material": "linen",
+     "feature": null,
+     "faces": 1
+    },
+    {
+     "cell": 6,
+     "source_piece": "SM_BerlinFurn_06_Sofa",
+     "material": "fabric_red",
+     "feature": null,
+     "faces": 19
+    },
+    {
+     "cell": 9,
+     "source_piece": "SM_BerlinFurn_09_Piano",
+     "material": "fabric_ochre",
+     "feature": null,
+     "faces": 12
+    },
+    {
+     "cell": 9,
+     "source_piece": "SM_BerlinFurn_09_Piano",
+     "material": "wood_black",
+     "feature": null,
+     "faces": 12
+    },
+    {
+     "cell": 11,
+     "source_piece": "SM_BerlinFurn_11_BookshelfFallen",
+     "material": "book_red",
+     "feature": null,
+     "faces": 6
+    },
+    {
+     "cell": 14,
+     "source_piece": "SM_BerlinFurn_14_Washstand",
+     "material": "linen",
+     "feature": null,
+     "faces": 2
+    },
+    {
+     "cell": 15,
+     "source_piece": "SM_BerlinFurn_15_ClockFallen",
+     "material": "brass",
+     "feature": null,
+     "faces": 6
+    },
+    {
+     "cell": 16,
+     "source_piece": "SM_BerlinFurn_16_Radiator",
+     "material": "brass",
+     "feature": null,
+     "faces": 26
+    }
+   ],
+   "sound_group": "WoodSmall",
+   "sound_note": "nothing fits well (thin brass pole, cloth shade); WoodSmall is the nearest",
+   "tall": false,
+   "fbx": "FBX/SM_BerlinFurn_29_LampAndRug.FBX"
+  },
+  {
+   "name": "SM_BerlinFurn_30_BarrelAndCrates",
+   "label": "Oak barrel with iron hoops, a crate of green bottles, an empty crate on its side and a sack",
+   "size_cm": [
+    130.3,
+    114.0,
+    76.0
+   ],
+   "tris": 368,
+   "hulls": 2,
+   "bounds_min_cm": [
+    -50.1,
+    -52.9,
+    0.0
+   ],
+   "bounds_max_cm": [
+    80.2,
+    61.1,
+    76.0
+   ],
+   "body_size_cm": [
+    51.0,
+    107.5,
+    76.0
+   ],
+   "footprint_half_extents_cm": [
+    25.5,
+    53.8
+   ],
+   "suggested_health": 120,
+   "where_it_fits": "cellar or pub ruin, courtyard, kerb",
+   "collision_hull_bounds_unreal_cm": [
+    {
+     "min": [
+      -25.5,
+      -53.8,
+      0.0
+     ],
+     "max": [
+      25.5,
+      -2.8,
+      76.0
+     ]
+    },
+    {
+     "min": [
+      -20.0,
+      13.8,
+      0.0
+     ],
+     "max": [
+      20.0,
+      53.8,
+      27.0
+     ]
+    }
+   ],
+   "atlas_cells_used": [
+    2,
+    3,
+    4,
+    8,
+    10,
+    11,
+    12,
+    13,
+    14
+   ],
+   "atlas_sources": [
+    {
+     "cell": 2,
+     "source_piece": "SM_BerlinFurn_02_IronBed",
+     "material": "iron",
+     "feature": null,
+     "faces": 4
+    },
+    {
+     "cell": 2,
+     "source_piece": "SM_BerlinFurn_02_IronBed",
+     "material": "linen",
+     "feature": null,
+     "faces": 2
+    },
+    {
+     "cell": 3,
+     "source_piece": "SM_BerlinFurn_03_KitchenTable",
+     "material": "wood_light",
+     "feature": null,
+     "faces": 14
+    },
+    {
+     "cell": 4,
+     "source_piece": "SM_BerlinFurn_04_ChairFallen",
+     "material": "wood_mid",
+     "feature": null,
+     "faces": 48
+    },
+    {
+     "cell": 8,
+     "source_piece": "SM_BerlinFurn_08_TiledStove",
+     "material": "iron",
+     "feature": null,
+     "faces": 24
+    },
+    {
+     "cell": 10,
+     "source_piece": "SM_BerlinFurn_10_ChestOfDrawers",
+     "material": "wood_mid",
+     "feature": null,
+     "faces": 1
+    },
+    {
+     "cell": 11,
+     "source_piece": "SM_BerlinFurn_11_BookshelfFallen",
+     "material": "book_green",
+     "feature": null,
+     "faces": 42
+    },
+    {
+     "cell": 12,
+     "source_piece": "SM_BerlinFurn_12_KitchenDresser",
+     "material": "wood_light",
+     "feature": null,
+     "faces": 10
+    },
+    {
+     "cell": 13,
+     "source_piece": "SM_BerlinFurn_13_Desk",
+     "material": "interior",
+     "feature": null,
+     "faces": 1
+    },
+    {
+     "cell": 14,
+     "source_piece": "SM_BerlinFurn_14_Washstand",
+     "material": "interior",
+     "feature": null,
+     "faces": 9
+    },
+    {
+     "cell": 14,
+     "source_piece": "SM_BerlinFurn_14_Washstand",
+     "material": "linen",
+     "feature": null,
+     "faces": 4
+    },
+    {
+     "cell": 14,
+     "source_piece": "SM_BerlinFurn_14_Washstand",
+     "material": "wood_mid",
+     "feature": null,
+     "faces": 1
+    }
+   ],
+   "sound_group": "WoodCabinet",
+   "sound_note": "",
+   "tall": false,
+   "fbx": "FBX/SM_BerlinFurn_30_BarrelAndCrates.FBX"
+  },
+  {
+   "name": "SM_BerlinFurn_31_DoorLeafFallen",
+   "label": "Cream panelled room door lying flat with pieces of its frame, lower panel kicked out, resting on masonry chunks",
+   "size_cm": [
+    259.9,
+    150.1,
+    24.0
+   ],
+   "tris": 216,
+   "hulls": 1,
+   "bounds_min_cm": [
+    -151.2,
+    -85.2,
+    0.0
+   ],
+   "bounds_max_cm": [
+    108.7,
+    64.9,
+    24.0
+   ],
+   "body_size_cm": [
+    203.5,
+    90.0,
+    24.0
+   ],
+   "footprint_half_extents_cm": [
+    101.7,
+    45.0
+   ],
+   "suggested_health": 60,
+   "where_it_fits": "anywhere flat: floors, rubble, street; lies flat",
+   "collision_hull_bounds_unreal_cm": [
+    {
+     "min": [
+      -101.7,
+      -45.0,
+      0.0
+     ],
+     "max": [
+      101.7,
+      45.0,
+      24.0
+     ]
+    }
+   ],
+   "atlas_cells_used": [
+    2,
+    3,
+    7,
+    8,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16
+   ],
+   "atlas_sources": [
+    {
+     "cell": 2,
+     "source_piece": "SM_BerlinFurn_02_IronBed",
+     "material": "iron",
+     "feature": null,
+     "faces": 3
+    },
+    {
+     "cell": 3,
+     "source_piece": "SM_BerlinFurn_03_KitchenTable",
+     "material": "paint_cream",
+     "feature": null,
+     "faces": 37
+    },
+    {
+     "cell": 7,
+     "source_piece": "SM_BerlinFurn_07_Bathtub",
+     "material": "iron",
+     "feature": null,
+     "faces": 8
+    },
+    {
+     "cell": 8,
+     "source_piece": "SM_BerlinFurn_08_TiledStove",
+     "material": "iron",
+     "feature": null,
+     "faces": 4
+    },
+    {
+     "cell": 8,
+     "source_piece": "SM_BerlinFurn_08_TiledStove",
+     "material": "plaster",
+     "feature": null,
+     "faces": 1
+    },
+    {
+     "cell": 11,
+     "source_piece": "SM_BerlinFurn_11_BookshelfFallen",
+     "material": "interior",
+     "feature": null,
+     "faces": 1
+    },
+    {
+     "cell": 12,
+     "source_piece": "SM_BerlinFurn_12_KitchenDresser",
+     "material": "paint_cream",
+     "feature": null,
+     "faces": 22
+    },
+    {
+     "cell": 12,
+     "source_piece": "SM_BerlinFurn_12_KitchenDresser",
+     "material": "paint_cream",
+     "feature": "panel",
+     "faces": 2
+    },
+    {
+     "cell": 13,
+     "source_piece": "SM_BerlinFurn_13_Desk",
+     "material": "iron",
+     "feature": null,
+     "faces": 3
+    },
+    {
+     "cell": 13,
+     "source_piece": "SM_BerlinFurn_13_Desk",
+     "material": "plaster",
+     "feature": null,
+     "faces": 5
+    },
+    {
+     "cell": 14,
+     "source_piece": "SM_BerlinFurn_14_Washstand",
+     "material": "interior",
+     "feature": null,
+     "faces": 1
+    },
+    {
+     "cell": 15,
+     "source_piece": "SM_BerlinFurn_15_ClockFallen",
+     "material": "brass",
+     "feature": null,
+     "faces": 2
+    },
+    {
+     "cell": 16,
+     "source_piece": "SM_BerlinFurn_16_Radiator",
+     "material": "brass",
+     "feature": null,
+     "faces": 4
+    },
+    {
+     "cell": 16,
+     "source_piece": "SM_BerlinFurn_16_Radiator",
+     "material": "brick",
+     "feature": null,
+     "faces": 9
+    },
+    {
+     "cell": 16,
+     "source_piece": "SM_BerlinFurn_16_Radiator",
+     "material": "plaster",
+     "feature": null,
+     "faces": 3
+    }
+   ],
+   "sound_group": "WoodCabinet",
+   "sound_note": "a flat wooden leaf; WoodSmall would also do",
+   "tall": false,
+   "fbx": "FBX/SM_BerlinFurn_31_DoorLeafFallen.FBX"
+  },
+  {
+   "name": "SM_BerlinFurn_32_HandCart",
+   "label": "Leiterwagen: wooden hand cart with ladder sides, one wheel off, loaded with a sack, a suitcase and a blanket roll",
+   "size_cm": [
+    234.0,
+    105.2,
+    70.3
+   ],
+   "tris": 496,
+   "hulls": 1,
+   "bounds_min_cm": [
+    -80.1,
+    -34.8,
+    0.0
+   ],
+   "bounds_max_cm": [
+    153.9,
+    70.3,
+    70.3
+   ],
+   "body_size_cm": [
+    107.5,
+    70.6,
+    72.6
+   ],
+   "footprint_half_extents_cm": [
+    53.8,
+    35.3
+   ],
+   "suggested_health": 70,
+   "where_it_fits": "street, kerb, courtyard",
+   "collision_hull_bounds_unreal_cm": [
+    {
+     "min": [
+      -53.8,
+      -35.3,
+      -5.3
+     ],
+     "max": [
+      53.8,
+      35.3,
+      67.3
+     ]
+    }
+   ],
+   "atlas_cells_used": [
+    2,
+    3,
+    4,
+    5,
+    8,
+    10,
+    12,
+    14,
+    15
+   ],
+   "atlas_sources": [
+    {
+     "cell": 2,
+     "source_piece": "SM_BerlinFurn_02_IronBed",
+     "material": "iron",
+     "feature": null,
+     "faces": 4
+    },
+    {
+     "cell": 2,
+     "source_piece": "SM_BerlinFurn_02_IronBed",
+     "material": "linen",
+     "feature": null,
+     "faces": 1
+    },
+    {
+     "cell": 2,
+     "source_piece": "SM_BerlinFurn_02_IronBed",
+     "material": "wool",
+     "feature": null,
+     "faces": 10
+    },
+    {
+     "cell": 3,
+     "source_piece": "SM_BerlinFurn_03_KitchenTable",
+     "material": "wood_light",
+     "feature": null,
+     "faces": 4
+    },
+    {
+     "cell": 4,
+     "source_piece": "SM_BerlinFurn_04_ChairFallen",
+     "material": "wood_mid",
+     "feature": null,
+     "faces": 161
+    },
+    {
+     "cell": 5,
+     "source_piece": "SM_BerlinFurn_05_Armchair",
+     "material": "linen",
+     "feature": null,
+     "faces": 1
+    },
+    {
+     "cell": 8,
+     "source_piece": "SM_BerlinFurn_08_TiledStove",
+     "material": "iron",
+     "feature": null,
+     "faces": 8
+    },
+    {
+     "cell": 10,
+     "source_piece": "SM_BerlinFurn_10_ChestOfDrawers",
+     "material": "wood_mid",
+     "feature": null,
+     "faces": 11
+    },
+    {
+     "cell": 12,
+     "source_piece": "SM_BerlinFurn_12_KitchenDresser",
+     "material": "wood_light",
+     "feature": null,
+     "faces": 2
+    },
+    {
+     "cell": 14,
+     "source_piece": "SM_BerlinFurn_14_Washstand",
+     "material": "linen",
+     "feature": null,
+     "faces": 4
+    },
+    {
+     "cell": 14,
+     "source_piece": "SM_BerlinFurn_14_Washstand",
+     "material": "wood_mid",
+     "feature": null,
+     "faces": 8
+    },
+    {
+     "cell": 15,
+     "source_piece": "SM_BerlinFurn_15_ClockFallen",
+     "material": "wood_red",
+     "feature": null,
+     "faces": 6
+    }
+   ],
+   "sound_group": "WoodSmall",
+   "sound_note": "",
+   "tall": false,
+   "fbx": "FBX/SM_BerlinFurn_32_HandCart.FBX"
   }
- ]
+ ],
+ "second_set": {
+  "generator": "Model/generate_furniture_2.py",
+  "pieces": "SM_BerlinFurn_17 .. SM_BerlinFurn_32",
+  "total_tris": 5508,
+  "textures": "none of its own: UV0 of every face lies inside an island that already exists in the atlas of pieces 01-16 (at least 2 px inside its edge). The three textures are unchanged.",
+  "atlas_cells_used": "1-based cell numbers = number of the first-set piece the region was painted for",
+  "tall_rule": "tall = true when the piece reads as standing furniture or a fixed installation that belongs inside a building, whatever its height (17 toilet, 18 range, 19 sideboard, 22 sewing table, 23 gramophone, 25 hall stand, 26 cellar shelf, 28 display cabinet); false for pieces that lie flat or tipped over (20, 29, 31) and for things that belong in a yard or were carried into the street (21 pram, 24 trunk and cases, 27 wash tub and mangle, 30 barrel and crates, 32 hand cart)",
+  "sound_group": "closest existing crush cue by material; sound_note says where nothing fits well",
+  "glass": "the atlas has no glass: glazed doors are empty frames, the hall-stand mirror and the shards use the grey veined marble region",
+  "mapping_warnings": [
+   "SM_BerlinFurn_19_Sideboard: wood_red face class 1 on island class 0",
+   "SM_BerlinFurn_23_Gramophone: brass face 25 x 26 cm magnified 2.2x (cell 15 island 14 x 14)",
+   "SM_BerlinFurn_23_Gramophone: brass face 26 x 27 cm magnified 2.3x (cell 15 island 14 x 14)",
+   "SM_BerlinFurn_23_Gramophone: brass face class 0 on island class 2"
+  ],
+  "stand_ins": [
+   "glass: the atlas has none. Vitrine doors are empty frames; the hall-stand mirror, the Vitrine shelves and the shards on the floor use the grey veined marble (cell 14)",
+   "washboard (27): mattress ticking stripes (cell 2) stand in for the ribbed zinc",
+   "record sleeves in the gramophone cabinet (23): book spines (cell 11)",
+   "pram basket (21): pine boards (cells 3 / 12) stand in for wicker; hood and blanket are the grey wool (cell 2)",
+   "toilet floor scrap (17) and the stoneware crocks (26): brown stove tiles (cell 8)",
+   "toilet bowl (17), jars (26), cups, vase and pots: chipped tub enamel (cell 7)",
+   "suitcases (24, 32): plain wood regions (wood_mid cell 10 / 14, wood_red cell 15) stand in for leather",
+   "mantel clock on the sideboard (19): the fallen clock's face (cell 15), which was painted dusty (it faces up there)",
+   "gramophone horn (23): one 14 cm brass patch (pendulum bob, cell 15) magnified about 2.3x per facet",
+   "thin brass and iron rods, rails and pipes stretch a small patch along their length (structureless materials only)",
+   "white range tiles (18): the washstand splashback (cell 14), the only white tile field",
+   "wood_light side faces (cellar shelf, crates, trunk): the dark underside of the pine boards, because the atlas has no clean pine side larger than 3 cm"
+  ],
+  "rerun_warning": "generate_furniture.py (first set) deletes every FBX in FBX/ and rewrites this table when it is run; run generate_furniture_2.py again afterwards"
+ },
+ "tall_note_unreal_copy": "This copy (Source/Tools/BerlinMap/furniture) adds tall true/false to the first 16 entries (true for Wardrobe, TiledStove, KitchenDresser, Piano, Washstand); the modeller's table has the flag only on 17-32. Everything else is the modeller's file of 2026-11-14 unchanged."
 }

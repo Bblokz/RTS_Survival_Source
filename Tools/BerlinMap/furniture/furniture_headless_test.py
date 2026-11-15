@@ -13,9 +13,23 @@ All 16 pieces stand in a row along world X at y = 0 (1200 cm apart).
 4. DEATH  two pieces take lethal damage (apply_damage): mesh hidden, collision off, life span set, actor gone later;
           the log has the RTS_WALL_HOLES collapse line with the number of pieces thrown.
 Results: Saved/Berlin/furniture/test_result.json and close-up PNGs (piece_*.png before, after_*.png holed).
+
+Batch 2 (pieces 17-32, 2026-11-14): furniture_run.sh <logname> <timeout_s> 2. The pieces and their roles are picked
+from Saved/Berlin/furniture/build_report.json (two upright and two low pieces are crushed, the three sturdiest are
+shelled, the next three get debug hits, the next two are killed). The run also reads its own log (LogAudio
+VeryVerbose) and checks that each crushed or killed piece's own cue started at its place ("New ActiveSound <cue>").
+Results: test_result_batch2.json, piece2_*.png, after2_*.png.
 """
 import json
+import math
+import os
+import re
+import sys
+
 import unreal
+
+sys.path.insert(0, 'D:/UE5Projects/RTS_Survival/Source/Tools/BerlinMap/furniture/sounds')
+import furniture_sound_table as sounds  # noqa: E402
 
 ROOT = 'D:/UE5Projects/RTS_Survival/Saved/Berlin/furniture/'
 OUT = ROOT + 'test_result.json'
@@ -31,6 +45,33 @@ CRUSH = ['01_Wardrobe', '12_KitchenDresser', '11_BookshelfFallen', '14_Washstand
 SHELL = ['08_TiledStove', '07_Bathtub', '09_Piano']
 DEBUG_HITS = ['02_IronBed']
 KILL = ['05_Armchair', '13_Desk']
+BATCH = int(os.environ.get('FURN_BATCH', '1'))
+PIC = 'piece_' if BATCH == 1 else 'piece2_'
+PIC_AFTER = 'after_' if BATCH == 1 else 'after2_'
+SHOTS = ['01_Wardrobe', '06_Sofa', '09_Piano', '08_TiledStove', '02_IronBed']
+if BATCH == 2:
+    OUT = ROOT + 'test_result_batch2.json'
+    _built = json.load(open(ROOT + 'build_report.json'))['pieces']
+    _rows = sorted(((k[len('SM_BerlinFurn_'):], v) for k, v in _built.items()
+                    if int(k[len('SM_BerlinFurn_'):].split('_')[0]) >= 17), key=lambda r: r[0])
+    NAMES = [r[0] for r in _rows]
+    X = {name: -9000 + index * 1200 for index, name in enumerate(NAMES)}
+    # The three sturdiest are shelled (a 75 mm hit takes about 220 health: only they can survive one and show a hole).
+    SHELL = [r[0] for r in sorted(_rows, key=lambda r: -r[1]['health'])[:3]]
+    _up = [n for n, v in _rows if v['upright'] and n not in SHELL]
+    _low = [n for n, v in _rows if not v['upright'] and n not in SHELL]
+    CRUSH = (_up[:2] + _low[:2] + _up[2:] + _low[2:])[:4]
+    _rest = sorted((r for r in _rows if r[0] not in CRUSH + SHELL), key=lambda r: -r[1]['health'])
+    DEBUG_HITS = [r[0] for r in _rest[:3]]
+    _rest = _rest[3:] + _rest[:3]
+    KILL = [r[0] for r in _rest[:2]]
+    # The pieces whose cue is checked stand together in the middle of the row, under the camera (the audio listener):
+    # a sound farther than 60 m (Att_Collapse) is "out of range", and one of 1 s or less is then not started at all.
+    _heard = CRUSH + KILL
+    _others = [n for n in NAMES if n not in _heard]
+    NAMES = _others[:5] + _heard + _others[5:]
+    X = {name: -9000 + index * 1200 for index, name in enumerate(NAMES)}
+    SHOTS = CRUSH + SHELL[:1]
 CRUSH_Y = 2000.0
 TANK_Y = 3200.0
 ACTION_SECONDS = 50.0
@@ -276,14 +317,59 @@ def watch_shells():
             log(f'{name}: under fire {"dead" if state is None else key}')
 
 
+def audio_starts():
+    """[(cue, x, y)] of every 'New ActiveSound' line of a furniture cue in this run's own log."""
+    match = re.search(r'-abslog=(\S+)', unreal.SystemLibrary.get_command_line(), re.IGNORECASE)
+    if not match:
+        return None
+    started = []
+    with open(match.group(1).strip('"'), 'r', errors='ignore') as handle:
+        for line in handle:
+            if 'Cue_BerlinFurn_Crush_' not in line:
+                continue
+            hit = re.search(r'New ActiveSound (\S+) Comp: .*Loc: X=([-\d.]+) Y=([-\d.]+)', line)
+            if hit:
+                started.append((hit.group(1), float(hit.group(2)), float(hit.group(3))))
+    return started
+
+
+def move_listener(names):
+    """Camera and player pawn over the middle of these pieces, so their sounds are in range (audible to 60 m)."""
+    centre = sum(X[n] for n in names) / len(names)
+    z = S['origins'][names[0]].z
+    aim_camera(unreal.Vector(centre, 900, z + 1500), unreal.Vector(centre, 0, z))
+    controller = unreal.GameplayStatics.get_player_controller(game_world(), 0)
+    pawn = controller.get_controlled_pawn() if hasattr(controller, 'get_controlled_pawn') else None
+    if pawn is not None:
+        pawn.set_actor_location(unreal.Vector(centre, 900, z + 1500), False, True)
+    log(f'listener over x={centre:.0f} for {names} (pawn moved {pawn is not None})')
+
+
+def cue_check(names):
+    """Did each piece's own cue start within 4 m of where it stood? {name: dict(expected, started_here, ok)}."""
+    started = audio_starts()
+    out = {}
+    for name in names:
+        expected = sounds.cue_name(sounds.PIECE_CUE[name])
+        if started is None:
+            out[name] = dict(expected=expected, ok=None, note='no -abslog')
+            continue
+        here = sorted(set(c for c, x, y in started if math.hypot(x - X[name], y) < 400.0))
+        out[name] = dict(expected=expected, started_here=here, ok=bool(here == [expected]))
+    return out
+
+
 def debug_hits(name):
     piece = S['pieces'][name]
     mesh, holes = mesh_of(piece), holes_of(piece)
     before = (holes.get_hole_count(), mesh.get_material(0).get_name())
     origin = piece.get_actor_location()
     removed = []
+    top = mesh.get_editor_property('static_mesh').get_bounding_box().max.z
     for index, calibre in enumerate((75.0, 37.0, 88.0)):
         target = origin + unreal.Vector(-60 + 60 * index, 0, 45)
+        if BATCH == 2:   # unknown shapes: aim at the body's middle height, 20 cm apart
+            target = origin + unreal.Vector(-20 + 20 * index, 0, max(top * 0.5, 12.0))
         start = target + unreal.Vector(100 * (index - 1), 1500, 200)
         direction = (target - start).normal()
         hit = mesh.line_trace_component(start, start + direction * 4000, False, False, False)
@@ -327,7 +413,7 @@ def tick(delta):
             if (nav_building(world) and S['t'] - S['mark'] < 40.0) or S['t'] - S['mark'] < 4.0:
                 return
             if S.get('shots') is None:
-                S['shots'] = [close_up(n) for n in ('01_Wardrobe', '06_Sofa', '09_Piano', '08_TiledStove', '02_IronBed')]
+                S['shots'] = [close_up(n, PIC) for n in SHOTS]
             if run_shots():
                 return
             S['result']['setup'] = {k: setup_report(k) for k in NAMES if k in S['pieces']}
@@ -336,6 +422,8 @@ def tick(delta):
                 log(f'{name} setup {json.dumps(S["result"]["setup"].get(name), default=str)}')
                 log(f'{name} nav {json.dumps(S["result"]["nav"].get(name))}')
             S['order_time'] = S['t']
+            if BATCH == 2:
+                move_listener(CRUSH + KILL)
             for name, tank in S['crushers'].items():
                 target = unreal.Vector(X[name], -CRUSH_Y, S['origins'][name].z + 20)
                 log(f'{name}: light tank MoveToLocation -> {tank.move_to_location(target, True, unreal.Rotator(0, 0, -90), False)}')
@@ -375,6 +463,14 @@ def tick(delta):
                 # The main gun often misses pieces this small and MG rounds make no hole (under the minimum radius):
                 # the check is that real shells holed at least one piece and that every hole swapped the material.
                 S['result']['shells_passed'] = any(r['holed'] for r in shells.values())
+                if BATCH == 2:
+                    # The second set is light (150-260 health but for the range): a 75 mm hit usually kills outright
+                    # and a killing hit leaves no hole. The requirement there is holes on three pieces by a shell or a
+                    # debug hit; the real-shell result is reported, not required.
+                    holed = [n for n, r in shells.items() if r['holed']] +                         [n for n, r in S['result']['debug_hits'].items() if r['after'][0] > 0]
+                    S['result']['holed_pieces'] = holed
+                    S['result']['real_shell_holed'] = S['result']['shells_passed']
+                    S['result']['shells_passed'] = len(holed) >= 3
                 kills = {}
                 for name in KILL:
                     piece = S['pieces'][name]
@@ -390,7 +486,7 @@ def tick(delta):
             world = game_world()
             if S.get('late_shots') is None:
                 S['late_shots'] = True
-                S['shots'] = [close_up(n, 'after_') for n in DEBUG_HITS + SHELL if alive(S['pieces'][n])]
+                S['shots'] = [close_up(n, PIC_AFTER) for n in DEBUG_HITS + SHELL if alive(S['pieces'][n])]
             if run_shots():
                 return
             for name in KILL:
@@ -407,10 +503,21 @@ def tick(delta):
             log(f'untouched alive {S["result"]["untouched_alive"]}')
             nav_ok = all(not r['character']['through'] and r['light_tank']['through'] for r in S['result']['nav'].values())
             S['result']['nav_passed'] = nav_ok
-            S['result']['all_passed'] = bool(nav_ok and all(r['passed'] for r in S['result']['crush'].values()) and
+            cues = cue_check(CRUSH + KILL)
+            S['result']['cues'] = cues
+            # Batch 1 spreads its pieces over 156 m with no listener move: its cue result is informational only
+            # (sounds/furniture_sound_test.py is the cue test of the first 16).
+            S['result']['cues_passed'] = BATCH != 2 or all(c['ok'] is True for c in cues.values())
+            S['result']['roles'] = dict(crush=CRUSH, shell=SHELL, debug_hits=DEBUG_HITS, kill=KILL)
+            log(f'cues {json.dumps(cues)}')
+            debug_ok = all(r['after'][0] > 0 and r['after'][1] == 'MI_BerlinFurniture_Holes'
+                           for r in S['result']['debug_hits'].values())
+            S['result']['debug_hits_passed'] = debug_ok
+            S['result']['all_passed'] = bool(nav_ok and debug_ok and S['result']['cues_passed'] and all(r['passed'] for r in S['result']['crush'].values()) and
                                              S['result']['shells_passed'] and
                                              all(r['passed'] for r in S['kills'].values()))
-            log(f'NAV PASSED {nav_ok} SHELLS PASSED {S["result"]["shells_passed"]} ALL PASSED {S["result"]["all_passed"]}')
+            log(f'NAV PASSED {nav_ok} SHELLS PASSED {S["result"]["shells_passed"]} DEBUG HITS PASSED {debug_ok} '
+                f'CUES PASSED {S["result"]["cues_passed"]} ALL PASSED {S["result"]["all_passed"]}')
             S['phase'], S['mark'] = 'closing', S['t']
         elif phase == 'closing' and S['t'] - S['mark'] > 3.0:   # lets the last screenshot reach the disk
             finish()
