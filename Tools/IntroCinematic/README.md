@@ -1,0 +1,90 @@
+# Intro cinematic 1976: build tools
+
+Brief: `Source/Docs/Campaign/IntroCinematicScript.md` (script + build ledger at the end).
+
+## How the film is put together
+
+- Map `/Game/RTS_Survival/Maps/Cinematics/RTS_IntroCinematic_1976`. Streamed, hidden sublevels: the mission maps
+  `Ger_Berlin`, `SM_Desert_01`, `Ger_2ndOreMountains`, `Ger_PripyatMe410`, the old `RTS_IntroCinematic` (its V2 pad,
+  Soviet pad and hangar are reused as sets) and the cinematic's own sets under
+  `/Game/RTS_Survival/Maps/Cinematics/Intro1976/` (`Intro_Bunker` at world x = 600000, ...).
+- Master `/Game/RTS_Survival/Cinematics/Intro1976/LS_Intro1976_Master`: shot track with one subsequence per shot
+  (`Sequences/LS_Intro_<id>`), narrator audio track, fade track. Each shot shows its levels with a Level Visibility
+  track.
+- C++ (`Source/RTS_Survival/Cinematics/IntroCinematic/`): `UIntroCinematicSubsystem` wakes up only in this map; it
+  shows `UW_IntroCinematicHud` (portrait, cards, stamps, labels, notice; rows of `Data/DT_IntroCues`, pure function of
+  sequence time) and the subtitles (`UW_IntroCinematicSubtitles`, a `UW_CinematicOverlay` under the portrait, table
+  `Data/DT_IntroTranscripts` while the voice is scratch TTS), switches the fog of war post process off and hides
+  listed gameplay actors. `AIntroCinematicGameMode` = map and MRQ game mode.
+  Flags for a plain `-game` run: `-IntroCinematicAutoQuit`, `-IntroCinematicShotEvery=<s>`.
+- Global animation goes through `Materials/MPC_Intro` (Archive, Flash, Darken, Stain, StainOpacity, Heat) with a
+  Material Parameter Collection track; `M_Intro_Grade` (unbound post process volume in the map) mixes the archive and
+  present grades from `Archive`.
+
+## Tools
+
+| File | Use |
+|---|---|
+| `intro_editor_server.py` / `intro_cmd.py` | throwaway editor that runs python request files (`python intro_cmd.py file.py`) |
+| `intro_lib.py` | `safe_save` (refuses packages outside the cinematic folders), `make_persistent_current` |
+| `intro_narration.py` / `make_scratch_vo.py` | narration rows; free offline TTS scratch waves + word timings |
+| `make_text_textures.py` | PIL text textures (tags, date line, pencil label) |
+| `intro_materials.py` | MPC, grade, map paper, burn ring, stain, text materials |
+| `intro_sets.py` | set sublevels (bunker + map table; map helper `map_local(lat, lon)`) |
+| `intro_build.py` | voice import, tables, master + shot sequences, map setup, MRQ presets |
+| `intro_scout.py` / `scout_sheet.py` | editor stills through candidate cameras + contact sheet |
+| `render.sh <preset>` | headless MRQ render -> `Saved/IntroCinematic/Render/<preset>/` |
+| `game_run.sh` | headless plain `-game` playthrough with auto-quit and UI screenshots |
+| `contact_sheet.py` | contact sheet from rendered frames |
+
+Launch the throwaway editor (never the shared one):
+
+    UnrealEditor.exe RTS_Survival.uproject -ini:Engine:[/Script/EngineSettings.GameMapsSettings]:EditorStartupMap=/Game/RTS_Survival/Maps/Cinematics/RTS_IntroCinematic_1976
+        "-ExecCmds=py D:/UE5Projects/RTS_Survival/Source/Tools/IntroCinematic/intro_editor_server.py"
+        -unattended -nosplash -DisablePlugins=Fab,BpGeneratorUltimate -NoLiveCoding
+
+## Rules learned the hard way
+
+- `EditorLevelUtils.add_level_to_world` and `create_new_streaming_level` make that sublevel the CURRENT level.
+  Never call `save_current_level` or `save_dirty_packages`; the mission maps show up dirty in the throwaway editor
+  (navmesh rebuild) and must never be saved. Use `intro_lib.safe_save`.
+- A Custom material node body is a function: helper functions must live in a local struct (see `VNOISE`).
+- Deleting a material asset nulls it on placed actors: rebuild in place.
+- Movie Render Queue draws UMG at scale 1 (designed for 1080p); preview renders at lower sizes show the UI too large.
+- A C++ change needs the throwaway editor closed (it locks the Development DLL), then `Build.bat RTS_SurvivalEditor
+  Win64 Development`.
+
+## Rebuild from scratch (order)
+
+1. `python make_scratch_vo.py` and `python make_text_textures.py` (outside the editor).
+2. `bash launch_editor.sh` (throwaway editor, autosave off, command server).
+3. Send a request with `intro_cmd.py` that calls, in this order: `intro_build.import_vo()`, `build_transcripts()`,
+   `intro_materials.import_textures()`, `intro_materials.build_all(seed uvs)`, `intro_materials.build_notice_material()`,
+   `intro_import.import_all()` (Blender kits from `Saved/IntroCinematic/import/`), `intro_sets.build_bunker()`,
+   `intro_sets2.build_all()`, `intro_sets2.build_ural()`, `intro_shots.build_film(intro_manifest.shots(), cues)`,
+   `intro_sound.add_sounds(...)`, `intro_build.setup_map()`, `intro_build.build_render_preset(...)`.
+   (`build_request.py` is the request used during the build; its STEPS list selects the parts.)
+4. `bash render.sh MRQ_Final` (or `MRQ_Preview`, 5 fps), `python section_sheets.py <frames> <fps>`,
+   `python check_cuts.py <frames> <fps>`, `python mix_audio.py --mux <frames> <fps> <out.mp4>`.
+5. `bash game_run.sh` for the plain `-game` playthrough.
+
+More files: `intro_manifest.py` (every shot as data), `intro_shots.py` (shot builder, master tracks, tank mesh kits),
+`intro_sets2.py` (the other sets), `intro_sound.py` (one sound list for the sequence and the offline mix),
+`intro_import.py` (FBX + texture import), `check_cuts.py` (junk frames at cuts), `blender/` (kit scripts).
+
+More rules learned:
+- `MovieSceneParameterSection.add_scalar_parameter_key` takes TICKS (24000/s); channel `add_key` takes display frames.
+- Unit Blueprints (tanks) ignore a transform track: use their meshes (`TANK_KITS` in `intro_shots.py`).
+- Shot sections get 6 pre-roll frames and the subsystem lifts the level-streaming time slice, or cuts show a junk frame.
+- `LS_RTS_Logo` loads the menu map through its event track at about 16 s: keep the logo shot shorter.
+- A texture parameter's default texture must match its sampler type (sRGB colour vs masks / linear). A mismatch
+  compiles in the editor but fails in the render process: every instance draws as the grey default material. After a
+  render: `grep "Failed to compile Material" Saved/IntroCinematic/render_<preset>.log | grep Intro1976` must be empty.
+- Rebuilding `M_Intro_PBR` needs the kits re-imported in the same request (`kits` step of `build_request.py`).
+- `M_Intro_Grade` works after tone mapping: strong emissive is already white when it arrives. Dark sets lock their
+  exposure with `intro_sets2.fixed_exposure`.
+- Camera feel lives in the manifest: two-key moves are linear, `"move": "ease"` and `"handheld": <degrees>` per shot.
+- Weather is two MPC scalars of the grade (`Rain`, `Sand`), keyed per shot under `"mpc"`.
+- Shot lists in the manifest: a list comprehension must be its own `[...]`; join with `] + [`.
+- `MPC_Intro` scalars are only ever appended (`build_mpc`): replacing the list changes their ids and breaks every
+  material that reads the collection. `render.sh` prints "broken cinematic materials:"; it must be empty.
