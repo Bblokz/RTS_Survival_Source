@@ -1,0 +1,2 @@
+T_Rus_Squad_MosinBazooka=T_Rus_Squad_MosinBazooka_FrontRight_idle.png
+T_Rus_Squad_HazmatEngineers=T_Rus_Squad_HazmatEngineers_FrontRight_idle.png

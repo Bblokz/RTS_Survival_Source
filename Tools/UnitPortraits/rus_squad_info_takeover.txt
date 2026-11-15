@@ -1,0 +1,2 @@
+T_Rus_Squad_MosinBazooka=/Game/RTS_Survival/Blueprints/Squads/SoloInfantry/Rus/BP_Solo_Rus_Bazooka.BP_Solo_Rus_Bazooka_C
+T_Rus_Squad_HazmatEngineers=/Game/RTS_Survival/Blueprints/Squads/SoloInfantry/Rus/BP_Solo_Rus_Hazmat.BP_Solo_Rus_Hazmat_C
