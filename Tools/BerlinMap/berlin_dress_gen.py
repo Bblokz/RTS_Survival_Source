@@ -1657,7 +1657,9 @@ class Dress:
             table = json.load(handle)
         pieces = table["pieces"] if isinstance(table.get("pieces"), list) else list(table["pieces"].values())
         names = [e["name"].replace("SM_BerlinFurn_", "") for e in pieces]
-        low = [n for n in names if not n.endswith(self.FURN_TALL)]
+        # "tall" (stands like indoor furniture: plots only) comes from the table; older tables go by name
+        tall = {n for n, e in zip(names, pieces) if e.get("tall", n.endswith(self.FURN_TALL))}
+        low = [n for n in names if n not in tall]
         rng = np.random.default_rng(4711)
         heaps = [(f[1], f[2], 520.0 if f[0].endswith("_L") else 380.0) for f in self.feet if "CollapseHeap" in f[0]]
         spots = []
@@ -1687,7 +1689,7 @@ class Dress:
             if rng.random() < 0.7:
                 ang, dist = rng.uniform(0.0, 2.0 * math.pi), rng.uniform(40.0, 150.0)
                 dx, dy = x + math.cos(ang) * dist, y + math.sin(ang) * dist
-                self.decals.append({"mat": self.FURN_DEBRIS, "kind": "furndebris", "cell": int(name[:2]) - 1,
+                self.decals.append({"mat": self.FURN_DEBRIS, "kind": "furndebris", "cell": (int(name[:2]) - 1) % 16,
                                     "x": round(dx, 1), "y": round(dy, 1), "z": round(self.z(dx, dy), 1),
                                     "size": round(float(rng.uniform(280.0, 440.0)), 1),
                                     "yaw": round(float(rng.uniform(0.0, 360.0)), 1)})
@@ -1695,7 +1697,7 @@ class Dress:
 
         in_plots = 0
         for mesh, x, y, z, yaw, scale, bucket in list(self.feet):
-            if not ("SlabPlot" in mesh or "StubHeap" in mesh) or rng.random() > 0.55:
+            if not ("SlabPlot" in mesh or "StubHeap" in mesh) or rng.random() > 0.68:
                 continue
             ca, sa = math.cos(math.radians(yaw)), math.sin(math.radians(yaw))
             for _ in range(int(rng.integers(1, 4))):
@@ -1703,7 +1705,7 @@ class Dress:
                 u, v = rng.uniform(-300.0, 300.0), rng.uniform(-480.0, 480.0)
                 name = names[int(rng.integers(len(names)))]
                 # tall pieces keep their back to a wall line; the rest lie anyhow
-                turn = yaw + (0.0 if u < 0 else 180.0) + rng.uniform(-12.0, 12.0) if name.endswith(self.FURN_TALL)                     else rng.uniform(0.0, 360.0)
+                turn = yaw + (0.0 if u < 0 else 180.0) + rng.uniform(-12.0, 12.0) if name in tall                     else rng.uniform(0.0, 360.0)
                 in_plots += put(name, x + u * ca - v * sa, y + u * sa + v * ca, turn)
         loose = 0
         for mesh, x, y, z, yaw, scale, bucket in list(self.feet):
@@ -1726,7 +1728,7 @@ class Dress:
             i = int(rng.integers(30, 90))
             while i < len(samples) - 8:
                 pt, t = samples[i]
-                i += int(rng.integers(55, 110))
+                i += int(rng.integers(45, 95))
                 if self.district(pt[0], pt[1]) in ("park", "blast", "rail") or not self.clear_spot(pt[0], pt[1]):
                     continue
                 n = np.array([-t[1], t[0]]) * (1.0 if rng.random() < 0.5 else -1.0)

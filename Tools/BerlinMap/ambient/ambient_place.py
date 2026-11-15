@@ -26,7 +26,7 @@ import ambient_gen
 AMBIENT_FILE = ambient_gen.OUT_FILE
 DRESS_FILE = ambient_gen.DRESS_FILE
 ROOT = "/Game/RTS_Survival/Blueprints/Environment/Berlin/Ambient/"
-LITTER_SYSTEM = ROOT + "Litter/NS_BerlinStreetLitter"
+LITTER_SYSTEM = ROOT + "Litter/NS_BerlinStreetLitter_B"      # _B since 2026-11-14 (soft wisps, pause-and-resume cull)
 DRESSING = ROOT + "Dressing/"
 CROW_MESH = DRESSING + "SM_BerlinAmb_CrowPerched"
 CROW_FLOCK_BP = "/Game/RTS_Survival/Blueprints/Environment/Animated/Birds/DesertFlocks/BP_BirdFlock_Crow"

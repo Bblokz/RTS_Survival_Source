@@ -108,5 +108,6 @@ void USecondaryWeapon::SetCollisionSettings()
 		M_OwnerSecondaryWeaponMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 		M_OwnerSecondaryWeaponMesh->SetGenerateOverlapEvents(false);
 		M_OwnerSecondaryWeaponMesh->SetCanEverAffectNavigation(false);
+		M_OwnerSecondaryWeaponMesh->SetReceivesDecals(false);
 	}
 }

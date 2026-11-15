@@ -162,7 +162,7 @@ def material_stats():
     paths = {
         "MI_BerlinAmb_Cloth": ambient_place.DRESSING + "MI_BerlinAmb_Cloth", "MI_BerlinAmb_Wire": ambient_place.DRESSING + "MI_BerlinAmb_Wire",
         "MI_BerlinAmb_Rigid": ambient_place.DRESSING + "MI_BerlinAmb_Rigid", "M_BerlinAmbient_Crow": ambient_place.DRESSING + "M_BerlinAmbient_Crow",
-        "M_BerlinAmbient_Litter": ambient_place.ROOT + "Litter/M_BerlinAmbient_Litter", "M_BerlinAmbient_Wisp": ambient_place.ROOT + "Litter/M_BerlinAmbient_Wisp",
+        "M_BerlinAmbient_Litter": ambient_place.ROOT + "Litter/M_BerlinAmbient_Litter", "M_BerlinAmbient_WispPuff": ambient_place.ROOT + "Litter/M_BerlinAmbient_WispPuff",
         "compare MI_BF_Trim_Flutter": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/Bunkers/BreakthroughShared/Motion/MI_BF_Trim_Flutter",
         "compare MI_Crow_VAT": "/Game/RTS_Survival/Blueprints/Environment/Animated/Birds/DesertFlocks/Crow/MI_Crow_VAT",
         "compare MI_BerlinRuin_Wall": "/Game/RTS_Survival/Blueprints/Environment/Berlin/RuinKit/Materials/MI_BerlinRuin_Wall",

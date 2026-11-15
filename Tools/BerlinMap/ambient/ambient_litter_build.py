@@ -5,9 +5,12 @@
 Builds, under /Game/RTS_Survival/Blueprints/Environment/Berlin/Ambient/Litter:
   T_BerlinAmbient_Litter      4x4 atlas from ambient_textures_gen.py (12 tumbling paper frames, 4 ash flakes)
   M_BerlinAmbient_Litter      masked, lit sprite material (base pass, no blending, no overdraw cost)
-  M_BerlinAmbient_Wisp        lit translucent dust wisp on the project's T_AmbientDust_Puffs
-  NET_BerlinAmbient           Niagara effect type: instances further than CULL_DISTANCE from the camera are put to sleep
-  NS_BerlinStreetLitter       ONE system of three stateless ("lightweight") emitters: Paper, Ash, Wisp. Stateless emitters
+  M_BerlinAmbient_WispPuff    lit translucent dust wisp on the project's T_AmbientDust_Puffs (density in R)
+  (2026-11-14: the three assets below got new names. The first ones, M_BerlinAmbient_Wisp, NET_BerlinAmbient and
+   NS_BerlinStreetLitter, were wrong (wisps drew as squares, culled litter never came back) and were held by the open
+   editor; a Niagara system rebuilt under an editor that has it loaded never activates again. They are no longer used.)
+  NET_BerlinAmbient_Pause     Niagara effect type: instances further than CULL_DISTANCE from the camera are paused
+  NS_BerlinStreetLitter_B     ONE system of three stateless ("lightweight") emitters: Paper, Ash, Wisp. Stateless emitters
                               keep no particle state: positions are a closed-form function of age evaluated on the GPU.
 The system is made by the project's own RTS.ImpactVfx.BuildFromRecipe (stateless recipe key); the recipe is written to
 Saved/Berlin/ambient/street_litter_recipe.json. One system asset; ambient_place.py puts one component per lane stretch,
@@ -25,8 +28,9 @@ TEXTURE_DIR = "D:/UE5Projects/RTS_Survival/Saved/Berlin/ambient/textures"
 RECIPE_FILE = "D:/UE5Projects/RTS_Survival/Saved/Berlin/ambient/street_litter_recipe.json"
 FOUNTAIN = "/Niagara/DefaultAssets/Templates/Systems/FountainLightweight.FountainLightweight"
 PUFFS = "/Game/RTS_Survival/Blueprints/Environment/AmbientFx/T_AmbientDust_Puffs"
-SYSTEM = FOLDER + "/NS_BerlinStreetLitter"
-EFFECT_TYPE = FOLDER + "/NET_BerlinAmbient"
+SYSTEM = FOLDER + "/NS_BerlinStreetLitter_B"
+EFFECT_TYPE = FOLDER + "/NET_BerlinAmbient_Pause"
+WISP_MATERIAL = "M_BerlinAmbient_WispPuff"
 
 STRETCH_LENGTH = 3000.0     # cm, local X; ambient_place.py spaces the components to match
 STRETCH_WIDTH = 700.0       # cm, local Y (component scale Y widens it for the 9 m lanes)
@@ -127,21 +131,29 @@ def build_litter_material(texture):
 
 def build_wisp_material():
     """Low dust wisps: lit translucency in the cheapest lit mode (volumetric non-directional), soft against the ground."""
-    m = fresh_material("M_BerlinAmbient_Wisp")
+    m = fresh_material(WISP_MATERIAL)
     m.set_editor_property("blend_mode", unreal.BlendMode.BLEND_TRANSLUCENT)
     m.set_editor_property("shading_model", unreal.MaterialShadingModel.MSM_DEFAULT_LIT)
     m.set_editor_property("translucency_lighting_mode", unreal.TranslucencyLightingMode.TLM_VOLUMETRIC_NON_DIRECTIONAL)
     m.set_editor_property("two_sided", True)
     m.set_editor_property("used_with_niagara_sprites", True)
-    sample = node(m, "ParticleSubUV", -900, 0, texture=unreal.load_asset(PUFFS), blend=False)
+    # T_AmbientDust_Puffs is a mask texture: R = density (the puff's shape), G = the darker inner billow. Its alpha is
+    # 1 everywhere: reading it drew every wisp as a flat square (the first version of this material did).
+    sample = node(m, "ParticleSubUV", -900, 0, texture=unreal.load_asset(PUFFS), blend=False,
+                  sampler_type=unreal.MaterialSamplerType.SAMPLERTYPE_MASKS)
     color = node(m, "ParticleColor", -900, 300)
     alpha = node(m, "Multiply", -600, 250)
-    link(sample, "A", alpha, "A")
+    link(sample, "R", alpha, "A")
     link(color, "A", alpha, "B")
+    shade = node(m, "LinearInterpolate", -600, 0, const_a=1.0, const_b=0.75)
+    link(sample, "G", shade, "Alpha")
+    shaded = node(m, "Multiply", -400, 50)
+    link(color, "RGB", shaded, "A")
+    link(shade, "", shaded, "B")
     fade = node(m, "DepthFade", -400, 250, fade_distance_default=60.0)
     if not MEL.connect_material_expressions(alpha, "", fade, "Opacity"):
         link(alpha, "", fade, "InOpacity")
-    MEL.connect_material_property(color, "RGB", unreal.MaterialProperty.MP_BASE_COLOR)
+    MEL.connect_material_property(shaded, "", unreal.MaterialProperty.MP_BASE_COLOR)
     MEL.connect_material_property(fade, "", unreal.MaterialProperty.MP_OPACITY)
     MEL.recompile_material(m)
     save(m)
@@ -150,15 +162,17 @@ def build_wisp_material():
 
 # ---- effect type -------------------------------------------------------------------------------------------------------
 def build_effect_type():
-    """Distance culling for every Berlin ambient Niagara component: beyond CULL_DISTANCE an instance sleeps (no tick,
-    no draw) and wakes when the camera returns."""
+    """Distance culling for every Berlin ambient Niagara component: beyond CULL_DISTANCE an instance is PAUSED and
+    resumes when the camera returns. Pause, not deactivate: a stateless emitter deactivated by the cull never spawns
+    again when the camera comes back (first found on the atmosphere layer, reproduced for the litter in
+    ambient_cull_test.py)."""
     if ASSETS.does_asset_exist(EFFECT_TYPE):
         effect_type = unreal.load_asset(EFFECT_TYPE)
     else:
-        effect_type = TOOLS.create_asset("NET_BerlinAmbient", FOLDER, unreal.NiagaraEffectType, unreal.NiagaraEffectTypeFactoryNew())
+        effect_type = TOOLS.create_asset(EFFECT_TYPE.rsplit("/", 1)[1], FOLDER, unreal.NiagaraEffectType, unreal.NiagaraEffectTypeFactoryNew())
     try:
         effect_type.set_editor_property("update_frequency", unreal.NiagaraScalabilityUpdateFrequency.MEDIUM)
-        effect_type.set_editor_property("cull_reaction", unreal.NiagaraCullReaction.DEACTIVATE_IMMEDIATE_RESUME)
+        effect_type.set_editor_property("cull_reaction", unreal.NiagaraCullReaction.PAUSE_RESUME)
         settings = effect_type.get_editor_property("system_scalability_settings")
         log("effect type settings before: " + settings.export_text())
         text = ("(Settings=((Platforms=(QualityLevelMask=31),bCullByDistance=True,bCullMaxInstanceCount=False,"
@@ -283,7 +297,7 @@ def layer(name, material, sub_image, frames, rate, bursts, loop, lifetime, size,
 
 def write_recipe():
     litter = FOLDER + "/M_BerlinAmbient_Litter"
-    wisp = FOLDER + "/M_BerlinAmbient_Wisp"
+    wisp = FOLDER + "/" + WISP_MATERIAL
     grow_shrink = [(0, 0.0), (0.06, 1.0), (0.9, 1.0), (1, 0.0)]     # masked sprites cannot fade: they grow in and shrink out
     layers = [
         # paper: frames 0-11 of the atlas tumble in a loop; about 22 sheets alive per stretch, 45 in a gust
@@ -305,7 +319,7 @@ def write_recipe():
         layer("Wisp", wisp, (2, 2), 4, rate=0.32, bursts=[(1.9, 1, 2)], loop=(11, 17),
               lifetime=(7, 10), size=(260, 430), color_low=(0.36, 0.35, 0.33, 1), color_high=(0.50, 0.48, 0.45, 1),
               speed=(220, 380), lift=(2, 10), curl=0, rotation_rate=(-12, 12),
-              size_curve=[(0, 0.55), (1, 1.5)], alpha_curve=[(0, 0.0), (0.25, 0.34), (0.7, 0.22), (1, 0.0)],
+              size_curve=[(0, 0.55), (1, 1.5)], alpha_curve=[(0, 0.0), (0.25, 0.62), (0.7, 0.42), (1, 0.0)],
               height=(40, 110),
               sub_uv={"AnimationMode": "Random", "RandomChangeInterval": "100"}, sort=False),
     ]
@@ -333,8 +347,12 @@ def build_system(effect_type):
 
 
 def run():
-    texture = import_texture("T_BerlinAmbient_Litter")
-    build_litter_material(texture)
+    # the paper atlas and its material are right as they are (the atlas has its own alpha) and an open editor that has
+    # the map loaded holds them: only made when missing. Delete them first to force a rebuild.
+    if not ASSETS.does_asset_exist(FOLDER + "/M_BerlinAmbient_Litter"):
+        build_litter_material(import_texture("T_BerlinAmbient_Litter"))
+    else:
+        log("kept T_BerlinAmbient_Litter and M_BerlinAmbient_Litter")
     build_wisp_material()
     effect_type = build_effect_type()
     build_system(effect_type)
