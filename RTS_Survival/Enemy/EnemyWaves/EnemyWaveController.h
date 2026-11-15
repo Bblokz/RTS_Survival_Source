@@ -200,6 +200,18 @@ public:
 		const int32 MaxTriesFindNavPointForHelpOffset,
 		const float ProjectionScale);
 
+	/**
+	 * @brief Starts a wave described entirely by data, so data-driven callers (placed wave spawners) share the timers,
+	 * wave supply, owning-building checks and formations of every other wave instead of running their own.
+	 * @param Request Units, movement kind, iteration count, owning building and callbacks of the wave.
+	 * @return The wave ID, or INDEX_NONE when the request is invalid. With an instant start the wave may already have
+	 * ended (its OnWaveEnded fired) by the time this returns.
+	 */
+	int32 StartWaveFromRequest(const FAttackWaveRequest& Request);
+
+	/** @brief Removes the wave and its timer and fires its OnWaveEnded; units it already spawned keep their orders. */
+	void StopWave(const int32 WaveID);
+
 	void InitWaveController(
 		AEnemyController* EnemyController);
 
@@ -302,7 +314,25 @@ private:
 		const bool bIsRandomPatrolWithAttackMoveWave = false,
 		const FRandomPatrolWithAttackMoveSettings& RandomPatrolWithAttackMoveSettings = {});
 
-	bool CreateAttackWaveTimer(FAttackWave* AttackWave, bool bInstantStart);
+	/**
+	 * @param AttackWave Wave whose next iteration is scheduled.
+	 * @param bInstantStart Runs the iteration now instead of on a timer.
+	 * @param OverrideDelay When > 0, used instead of the interval for this one timer (first delay of request waves).
+	 * @return False when the world is gone or the wave is null.
+	 */
+	bool CreateAttackWaveTimer(FAttackWave* AttackWave, bool bInstantStart, const float OverrideDelay = -1.f);
+
+	/**
+	 * @brief Counts one finished iteration of a repeating wave and removes the wave once its count ran out.
+	 * @return True when the wave was removed.
+	 */
+	bool ConsumeIterationAndRemoveIfExhausted(const int32 WaveID);
+
+	// Gives the wave's OnUnitsSpawned callback the units that were just handed to their formation.
+	void NotifyWaveUnitsSpawned(
+		const FAttackWave& CompletedWave,
+		const TArray<ASquadController*>& WaveSquads,
+		const TArray<ATankMaster*>& WaveTanks) const;
 	// Uses the interval as well as the variance fractions to randomly get the wave iteration time.
 	// If the wave depends on generator buildings then the timer factor for those is also going to be included.
 	float GetIterationTimeForWave(FAttackWave* AttackWave) const;
@@ -437,6 +467,7 @@ private:
 		const TArray<FAttackWaveElement>& WaveElements,
 		const TArray<FVector>& Waypoints,
 		AActor* WaveCreator) const;
+	bool GetIsValidWaveRequest(const FAttackWaveRequest& Request, AActor* WaveCreator) const;
 	bool GetIsValidAttackMoveWaveSettings(
 		const float HelpOffsetRadiusMltMax,
 		const float HelpOffsetRadiusMltMin,

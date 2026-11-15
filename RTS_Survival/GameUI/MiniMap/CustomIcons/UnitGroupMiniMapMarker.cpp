@@ -35,7 +35,8 @@ namespace
 }
 
 void RTSUnitGroupMiniMapMarker::AddIcons(const UObject* WorldContext, const FName IconId, const FVector& Location,
-                                         const float HeadingYaw)
+                                         const float HeadingYaw, const EMinimapIconType HeadingIconType,
+                                         const EMinimapIconType BadgeIconType)
 {
 	AFowManager* FowManager = FRTS_Statics::GetFowManager(WorldContext);
 	if (not IsValid(FowManager))
@@ -44,10 +45,13 @@ void RTSUnitGroupMiniMapMarker::AddIcons(const UObject* WorldContext, const FNam
 	}
 	const FMinimapIconTextPayload NoText{};
 	const FVector DrawLocation = GetDrawLocation(FowManager, Location);
-	FowManager->AddCustomMiniMapIcon(IconId, EMinimapIconType::IncomingWave, DrawLocation,
-	                                 FRotator(0.f, HeadingYaw, 0.f), NoText);
-	FowManager->AddCustomMiniMapIcon(GetBadgeIconId(IconId), EMinimapIconType::IncomingWaveBadge, DrawLocation,
-	                                 FRotator::ZeroRotator, NoText);
+	FowManager->AddCustomMiniMapIcon(IconId, HeadingIconType, DrawLocation, FRotator(0.f, HeadingYaw, 0.f), NoText);
+	if (BadgeIconType == EMinimapIconType::None)
+	{
+		return;
+	}
+	FowManager->AddCustomMiniMapIcon(GetBadgeIconId(IconId), BadgeIconType, DrawLocation, FRotator::ZeroRotator,
+	                                 NoText);
 }
 
 void RTSUnitGroupMiniMapMarker::MoveIcons(const UObject* WorldContext, const FName IconId, const FVector& Location,

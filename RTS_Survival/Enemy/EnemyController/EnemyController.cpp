@@ -374,6 +374,24 @@ void AEnemyController::CreateSingleRandomPatrolWithAttackMoveWave(
 		ProjectionScale);
 }
 
+int32 AEnemyController::StartWaveFromRequest(const FAttackWaveRequest& Request)
+{
+	if (not GetIsValidWaveController())
+	{
+		return INDEX_NONE;
+	}
+	return M_WaveController->StartWaveFromRequest(Request);
+}
+
+void AEnemyController::StopWave(const int32 WaveID)
+{
+	if (not GetIsValidWaveController())
+	{
+		return;
+	}
+	M_WaveController->StopWave(WaveID);
+}
+
 void AEnemyController::CreateFieldConstructionOrder(
 	const TArray<ASquadController*>& SquadControllers,
 	const TArray<FVector>& ConstructionLocations,

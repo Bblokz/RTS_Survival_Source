@@ -19,6 +19,7 @@ class UTrainerComponent;
 struct FTrainingOption;
 struct FAttackWaveElement;
 struct FAttackMoveWaveSettings;
+struct FAttackWaveRequest;
 enum class EEnemyWaveType : uint8;
 enum class EPostRetreatCounterStrategy : uint8;
 class UEnemyWaveController;
@@ -260,6 +261,17 @@ public:
 		const int32 MaxTriesFindNavPointForHelpOffset = 3,
 		const float ProjectionScale = 1.f);
 
+
+	/**
+	 * @brief Starts a wave configured entirely by data (placed AEnemyWaveSpawner actors) on this controller's wave
+	 * controller, so it shares wave supply, owning-building checks, formations and the direct-control handoff.
+	 * @param Request Units, movement kind, iteration count, owning building and callbacks of the wave.
+	 * @return The wave ID, or INDEX_NONE when the request is invalid or the wave controller is missing.
+	 */
+	int32 StartWaveFromRequest(const FAttackWaveRequest& Request);
+
+	/** @brief Stops a wave started with StartWaveFromRequest; units it already spawned keep their orders. */
+	void StopWave(const int32 WaveID);
 
 	/**
 	 * @brief Assigns squads to construct field constructions at provided locations.

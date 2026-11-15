@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "MinimapIconTypes.h"
 
 /**
  * @brief Draws one group of units on the minimap the way survival waves are shown: a chevron along the group's heading
@@ -21,8 +22,12 @@ namespace RTSUnitGroupMiniMapMarker
 	 * @param IconId Base ID of the two icons.
 	 * @param Location World location of the group.
 	 * @param HeadingYaw World yaw the chevron points along.
+	 * @param HeadingIconType Icon turned to the heading (the survival wave chevron by default).
+	 * @param BadgeIconType Upright icon drawn on top; None draws no badge.
 	 */
-	void AddIcons(const UObject* WorldContext, const FName IconId, const FVector& Location, const float HeadingYaw);
+	void AddIcons(const UObject* WorldContext, const FName IconId, const FVector& Location, const float HeadingYaw,
+	              const EMinimapIconType HeadingIconType = EMinimapIconType::IncomingWave,
+	              const EMinimapIconType BadgeIconType = EMinimapIconType::IncomingWaveBadge);
 
 	/**
 	 * @brief Moves both icons of a marker added with AddIcons.

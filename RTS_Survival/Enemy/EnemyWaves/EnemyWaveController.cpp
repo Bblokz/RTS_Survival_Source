@@ -396,6 +396,72 @@ void UEnemyWaveController::StartSingleRandomPatrolWithAttackMoveWave(
 	}
 }
 
+int32 UEnemyWaveController::StartWaveFromRequest(const FAttackWaveRequest& Request)
+{
+	AActor* WaveCreator = Request.WaveCreator.Get();
+	if (not GetIsValidWaveRequest(Request, WaveCreator))
+	{
+		return INDEX_NONE;
+	}
+	if (not GetIsValidAsyncSpawner() || not EnsureEnemyControllerIsValid())
+	{
+		RTSFunctionLibrary::ReportError(
+			"Invalid async spawner or enemy controller for enemy wave controller. Cannot start wave from request.");
+		return INDEX_NONE;
+	}
+
+	const int32 UniqueWaveID = GetUniqueWaveID();
+	const bool bIsSingleWave = Request.IterationCount == 1;
+	const bool bIsAttackMoveWave = Request.Movement == EAttackWaveMovement::AttackMove;
+	const bool bIsPatrolWave = Request.Movement == EAttackWaveMovement::RandomPatrolWithAttackMove;
+	if (not CreateNewAttackWaveStruct(
+		UniqueWaveID,
+		Request.WaveType,
+		Request.WaveElements,
+		Request.WaveInterval,
+		Request.IntervalVarianceFraction,
+		Request.Waypoints,
+		Request.FinalWaypointDirection,
+		Request.MaxFormationWidth,
+		WaveCreator,
+		Request.WaveTimerAffectingBuildings,
+		Request.PerAffectingBuildingTimerFraction,
+		bIsSingleWave,
+		Request.FormationOffsetMultiplier,
+		bIsAttackMoveWave,
+		Request.AttackMoveSettings,
+		bIsPatrolWave,
+		Request.PatrolSettings))
+	{
+		RTSFunctionLibrary::ReportError("failed to create struct for wave from request!");
+		return INDEX_NONE;
+	}
+
+	FAttackWave* AttackWave = GetAttackWaveByID(UniqueWaveID);
+	if (not AttackWave)
+	{
+		return INDEX_NONE;
+	}
+	AttackWave->RemainingIterations = Request.IterationCount;
+	AttackWave->OnUnitsSpawned = Request.OnUnitsSpawned;
+	AttackWave->OnWaveEnded = Request.OnWaveEnded;
+
+	// An instant start runs the first iteration inside this call; AttackWave may be removed after it.
+	const bool bInstantStart = Request.FirstIterationDelay <= 0.f;
+	if (not CreateAttackWaveTimer(AttackWave, bInstantStart, Request.FirstIterationDelay))
+	{
+		RTSFunctionLibrary::ReportError("Failed to start the timer of a wave from request, will remove the struct!");
+		RemoveAttackWaveByIDAndInvalidateTimer(FindAttackWaveByID(UniqueWaveID));
+		return INDEX_NONE;
+	}
+	return UniqueWaveID;
+}
+
+void UEnemyWaveController::StopWave(const int32 WaveID)
+{
+	RemoveAttackWaveByIDAndInvalidateTimer(FindAttackWaveByID(WaveID));
+}
+
 void UEnemyWaveController::InitWaveController(AEnemyController* EnemyController)
 {
 	M_EnemyController = EnemyController;
@@ -491,12 +557,15 @@ void UEnemyWaveController::RemoveAttackWaveByIDAndInvalidateTimer(FAttackWave* A
 	}
 	FTimerHandle TimerHandle = AttackWave->WaveTimerHandle;
 	const int32 UniqueID = AttackWave->UniqueWaveID;
+	// Copied before the removal; the callback may start or stop other waves and so mutate M_AttackWaves.
+	const FOnAttackWaveEnded OnWaveEnded = AttackWave->OnWaveEnded;
 	M_AttackWaves.RemoveAll([UniqueID](const FAttackWave& Wave) { return Wave.UniqueWaveID == UniqueID; });
 	const UWorld* World = GetWorld();
 	if (World && TimerHandle.IsValid())
 	{
 		World->GetTimerManager().ClearTimer(TimerHandle);
 	}
+	OnWaveEnded.ExecuteIfBound(UniqueID);
 }
 
 FAttackWave* UEnemyWaveController::GetAttackWaveByID(const int32 UniqueID)
@@ -568,7 +637,8 @@ bool UEnemyWaveController::CreateNewAttackWaveStruct(const int32 UniqueID, const
 	return true;
 }
 
-bool UEnemyWaveController::CreateAttackWaveTimer(FAttackWave* AttackWave, const bool bInstantStart)
+bool UEnemyWaveController::CreateAttackWaveTimer(FAttackWave* AttackWave, const bool bInstantStart,
+                                                 const float OverrideDelay)
 {
 	UWorld* World = GetWorld();
 	if (not World || not AttackWave)
@@ -618,10 +688,11 @@ bool UEnemyWaveController::CreateAttackWaveTimer(FAttackWave* AttackWave, const 
 		World->GetTimerManager().ClearTimer(AttackWave->WaveTimerHandle);
 	}
 	// If we do not want to start the wave immediately then we set a timer for the first iteration.
+	const float IterationDelay = OverrideDelay > 0.f ? OverrideDelay : GetIterationTimeForWave(AttackWave);
 	World->GetTimerManager().SetTimer(
 		AttackWave->WaveTimerHandle,
 		AttackWave->WaveDelegate,
-		GetIterationTimeForWave(AttackWave),
+		IterationDelay,
 		false // Do not loop, we will set the next iteration time in the delegate.
 	);
 	return true;
@@ -913,6 +984,10 @@ void UEnemyWaveController::FinalizeWaveIterationWithoutSpawnedUnits(const int32 
 		RemoveAttackWaveByIDAndInvalidateTimer(AttackWave);
 		return;
 	}
+	if (ConsumeIterationAndRemoveIfExhausted(WaveID))
+	{
+		return;
+	}
 
 	constexpr bool bInstantStart = false;
 	if (not CreateAttackWaveTimer(AttackWave, bInstantStart))
@@ -946,6 +1021,10 @@ void UEnemyWaveController::FinishWaveAfterFormationStarted(const int32 WaveID, c
 		RemoveAttackWaveByIDAndInvalidateTimer(CurrentWave);
 		return;
 	}
+	if (ConsumeIterationAndRemoveIfExhausted(WaveID))
+	{
+		return;
+	}
 
 	constexpr bool bInstantStartWave = false;
 	if (not CreateAttackWaveTimer(CurrentWave, bInstantStartWave))
@@ -956,6 +1035,44 @@ void UEnemyWaveController::FinishWaveAfterFormationStarted(const int32 WaveID, c
 	}
 }
 
+
+bool UEnemyWaveController::ConsumeIterationAndRemoveIfExhausted(const int32 WaveID)
+{
+	FAttackWave* AttackWave = FindAttackWaveByID(WaveID);
+	if (not AttackWave || AttackWave->RemainingIterations == INDEX_NONE)
+	{
+		return false;
+	}
+	AttackWave->RemainingIterations--;
+	if (AttackWave->RemainingIterations > 0)
+	{
+		return false;
+	}
+	RemoveAttackWaveByIDAndInvalidateTimer(AttackWave);
+	return true;
+}
+
+void UEnemyWaveController::NotifyWaveUnitsSpawned(
+	const FAttackWave& CompletedWave,
+	const TArray<ASquadController*>& WaveSquads,
+	const TArray<ATankMaster*>& WaveTanks) const
+{
+	if (not CompletedWave.OnUnitsSpawned.IsBound())
+	{
+		return;
+	}
+	TArray<AActor*> WaveUnits;
+	WaveUnits.Reserve(WaveSquads.Num() + WaveTanks.Num());
+	for (ASquadController* EachSquad : WaveSquads)
+	{
+		WaveUnits.Add(EachSquad);
+	}
+	for (ATankMaster* EachTank : WaveTanks)
+	{
+		WaveUnits.Add(EachTank);
+	}
+	CompletedWave.OnUnitsSpawned.ExecuteIfBound(CompletedWave.UniqueWaveID, WaveUnits);
+}
 
 void UEnemyWaveController::OnWaveCompletedSpawn(FAttackWave* Wave)
 {
@@ -1001,6 +1118,7 @@ void UEnemyWaveController::OnWaveCompletedSpawn(FAttackWave* Wave)
 	const TArray<int32> FormationHistoryIDsBefore = ShippingTest_GetFormationHistoryIDs();
 #endif
 	StartMovementForCompletedWave(CompletedWave, WaveSquads, WaveTanks, AverageSpawnLocation);
+	NotifyWaveUnitsSpawned(CompletedWave, WaveSquads, WaveTanks);
 #if defined(RTS_WITH_ENEMY_AI_SHIPPING_TESTS) && RTS_WITH_ENEMY_AI_SHIPPING_TESTS
 	ShippingTest_RecordFormationHandoff(
 		CompletedWave,
@@ -1354,6 +1472,57 @@ bool UEnemyWaveController::GetIsValidSingleAttackWave(
 		return false;
 	}
 	return true;
+}
+
+bool UEnemyWaveController::GetIsValidWaveRequest(const FAttackWaveRequest& Request, AActor* WaveCreator) const
+{
+	if (Request.WaveType == EEnemyWaveType::Wave_None)
+	{
+		RTSFunctionLibrary::ReportError("Invalid enemy wave request: Wave type is set to None.");
+		return false;
+	}
+	if (not GetAreWaveElementsValid(Request.WaveElements) || not GetAreWavePointsValid(Request.Waypoints))
+	{
+		return false;
+	}
+	if (Request.Movement == EAttackWaveMovement::RandomPatrolWithAttackMove && Request.Waypoints.Num() < 2)
+	{
+		RTSFunctionLibrary::ReportError("Invalid enemy wave request: a patrol wave needs at least two patrol points.");
+		return false;
+	}
+	if (Request.IterationCount == 0 || Request.IterationCount < INDEX_NONE)
+	{
+		RTSFunctionLibrary::ReportError("Invalid enemy wave request: iteration count must be INDEX_NONE or >= 1.");
+		return false;
+	}
+	const bool bRepeats = Request.IterationCount != 1;
+	if (bRepeats && (Request.WaveInterval <= 0.f || Request.IntervalVarianceFraction < 0.f
+		|| Request.IntervalVarianceFraction >= 1.f))
+	{
+		RTSFunctionLibrary::ReportError("Invalid enemy wave request: interval or variance fraction not set correctly:"
+			"\n wave interval: " + FString::SanitizeFloat(Request.WaveInterval) +
+			"\n interval variance fraction: " + FString::SanitizeFloat(Request.IntervalVarianceFraction));
+		return false;
+	}
+	if (Request.Movement != EAttackWaveMovement::Formation)
+	{
+		const FAttackMoveWaveSettings& AttackMoveSettings = Request.Movement == EAttackWaveMovement::AttackMove
+			                                                    ? Request.AttackMoveSettings
+			                                                    : Request.PatrolSettings.AttackMoveSettings;
+		if (not GetIsValidAttackMoveWaveSettings(
+			AttackMoveSettings.HelpOffsetRadiusMltMax,
+			AttackMoveSettings.HelpOffsetRadiusMltMin,
+			AttackMoveSettings.MaxTriesFindNavPointForHelpOffset,
+			AttackMoveSettings.ProjectionScale))
+		{
+			return false;
+		}
+	}
+	return GetIsValidWaveType(
+		Request.WaveType,
+		WaveCreator,
+		Request.WaveTimerAffectingBuildings,
+		Request.PerAffectingBuildingTimerFraction);
 }
 
 bool UEnemyWaveController::GetIsValidAttackMoveWaveSettings(
