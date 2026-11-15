@@ -725,6 +725,31 @@ protected:
 	UFUNCTION()
 	static TArray<FName> GetVehicleInfoTakeoverNames();
 
+	/**
+	 * @brief Pauses the game with the squad info takeover of a prefab from the squad library
+	 * (GameUI/InfoTakeover/DT_SquadInfoTakeovers), so one write-up can be reused in any mission.
+	 * @param Squad A squad controller or a solo infantry unit; its soldiers, health and weapons are read off it.
+	 * @param LibraryEntry Row of the library to show.
+	 * @return False when the player turned info takeovers off or the squad or row is missing. Waits in a queue
+	 * while another takeover or a cinematic holds the screen.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|Info Takeover")
+	bool ShowSquadInfoTakeover(AActor* Squad,
+	                           UPARAM(meta = (GetOptions = "GetSquadInfoTakeoverNames")) FName LibraryEntry);
+
+	/**
+	 * @brief As ShowSquadInfoTakeover with the text written on the node instead of in the library.
+	 * @param Squad A squad controller or a solo infantry unit; its soldiers, health and weapons are read off it.
+	 * @param Info Description, service year ("????" when fictional), and optional name and picture.
+	 * @return False when the player turned info takeovers off or the squad is missing.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|Info Takeover")
+	bool ShowCustomSquadInfoTakeover(AActor* Squad, const FSquadInfoTakeoverEntry& Info);
+
+	// Options of the LibraryEntry dropdown of ShowSquadInfoTakeover; static so a graph pin can call it without a mission.
+	UFUNCTION()
+	static TArray<FName> GetSquadInfoTakeoverNames();
+
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Cinematics")
 	bool OnCinematicTakeOverFromMission(const bool bCinematicStarted) const;

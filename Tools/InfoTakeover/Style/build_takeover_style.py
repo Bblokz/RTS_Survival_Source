@@ -55,7 +55,8 @@ GLASS_MASTER = '/Game/RTS_Survival/Textures/GameUI/Skins/_Shared/M_UI_GlassPane'
 BLUEPRINTS = [TAKEOVERS + '/WBP_VehicleInfoTakeover', TAKEOVERS + '/WBP_CameraControlsTakeover',
               TAKEOVERS + '/Cover/WBP_CoverTakeover', TAKEOVERS + '/SpacedArmour/WBP_SpacedArmourTakeover',
               TAKEOVERS + '/NomadicConversion/WBP_NomadicConversionTakeover',
-              TAKEOVERS + '/BxpPackUp/WBP_BxpPackUpTakeover']
+              TAKEOVERS + '/BxpPackUp/WBP_BxpPackUpTakeover', TAKEOVERS + '/VulturesAt/WBP_VulturesAtTakeover',
+              TAKEOVERS + '/RattleFeed/WBP_RattleFeedTakeover']
 # The live asset names stay the same whichever option is applied; only the art behind them changes.
 TEXTURES = {'T_InfoTakeover_Plate': 'T_TKO_%s_Plate' % OPTION,
             'T_InfoTakeover_Button_n': 'T_TKO_%s_Button_n' % OPTION,

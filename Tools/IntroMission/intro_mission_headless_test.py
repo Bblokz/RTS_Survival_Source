@@ -194,6 +194,25 @@ def player_soldiers(world):
     return out
 
 
+VULTURE_LANDED_MAX_Z = 600.0
+VULTURE_LANDED_HOLD = 3.0
+
+
+def vultures_landed(world):
+    """True once player soldiers exist and all of them have stood on the ground (low and slow) for a few seconds."""
+    soldiers = player_soldiers(world)
+    grounded = bool(soldiers) and all(
+        s.get_actor_location().z < VULTURE_LANDED_MAX_Z and s.get_velocity().z > -50.0 for s in soldiers)
+    if not grounded:
+        S.pop('vultures_grounded_since', None)
+        return False
+    since = S.setdefault('vultures_grounded_since', S['t'])
+    if S['t'] - since < VULTURE_LANDED_HOLD:
+        return False
+    log(f'{len(soldiers)} Vultures landed by {round(S["t"], 1)} s')
+    return True
+
+
 def teleport_soldiers(world, spot):
     # Soldiers walk back to their squad controller, so the controllers go along.
     for controller in actors_of(world, 'Squad_Ger_HazmatVultures_C'):
@@ -347,6 +366,19 @@ def note_voice_lines(world):
         if name.startswith('IntroMission_') and name not in heard:
             heard[name] = round(S['t'], 1)
             log(f'voice line playing: {name}')
+
+
+# Mission_Intro_MoveTo queues the three Briefing lines after the welcome line (camera takeover On Closed).
+BRIEFING_VOICE_ORDER = ['IntroMission_AdvisorWelcome', 'IntroMission_SovietStrongholds',
+                        'IntroMission_ClearStronghold', 'IntroMission_TreadCarefully']
+
+
+def briefing_voice_check():
+    """The welcome line, then the three briefing lines, each starting after the one before has finished."""
+    heard = S.get('voice', {})
+    times = [heard.get(n) for n in BRIEFING_VOICE_ORDER]
+    ok = all(t is not None for t in times) and all(b - a >= 5.0 for a, b in zip(times, times[1:]))
+    check('briefing_voice_lines_in_order', ok, str(dict(zip(BRIEFING_VOICE_ORDER, times))))
 
 
 def patrol_voice_check():
@@ -767,8 +799,10 @@ def tick(delta):
                 S['phase'], S['mark'] = 'pie_up', S['t']
         elif phase == 'pie_up':
             world = game_world()
-            if True:
-                unreal.GameplayStatics.set_game_paused(world, False)
+            # Since 2026-11-15 the Vultures parachute in from aircraft (DropVultures global ability) instead of being
+            # placed: wait until they have all landed before teleporting them, or 60 s at most.
+            unreal.GameplayStatics.set_game_paused(world, False)
+            if vultures_landed(world) or elapsed > 60.0:
                 log(f'pie up; soldiers {len(player_soldiers(world))} mosin squads '
                     f'{len(actors_of(world, "Rus_Squad_Mosin_C"))} triggers '
                     f'{len(actors_of(world, "BP_TriggerArea_Rectangle_C"))} missions '
@@ -893,6 +927,7 @@ def tick(delta):
             S['phase'], S['mark'] = 'wait_end', S['t']
         elif phase == 'wait_end' and elapsed > 6.0:
             patrol_voice_check()
+            briefing_voice_check()
             panzer_takeover_checks()
             world = game_world()
             check('t26_mission_completed', mission_complete(world, 'Mission_Intro_HangarT26s_C') is True)

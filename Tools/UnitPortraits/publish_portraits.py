@@ -22,6 +22,8 @@ FOLDER_BY_PREFIX = {
     "T_Rus_LightTank_": "RusTanks/Light/NoIcon",
     "T_Rus_MediumTank_": "RusTanks/Medium/NoIcon",
     "T_Rus_HeavyTank_": "RusTanks/Heavy/NoIcon",
+    # Soviet infantry (squad info takeovers, 2026-11-15).
+    "T_Rus_Squad_": "RusSquads/NoIcon",
 }
 
 
