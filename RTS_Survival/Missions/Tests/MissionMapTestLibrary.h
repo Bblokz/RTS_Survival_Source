@@ -6,6 +6,7 @@
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "RTS_Survival/GameUI/TrainingUI/TrainingOptions/TrainingOptions.h"
 #include "RTS_Survival/Player/Abilities.h"
+#include "RTS_Survival/GameUI/LocationIntro/LocationIntroTypes.h"
 
 #include "MissionMapTestLibrary.generated.h"
 
@@ -65,4 +66,27 @@ public:
 	/** @return True when the unit's command card holds the ability. */
 	UFUNCTION(BlueprintCallable, Category = "Mission|MapTests")
 	static bool MapTest_HasAbility(AActor* Unit, EAbilityID Ability);
+
+	/**
+	 * @brief Runs UMissionBase::ShowLocationIntro on a fresh mission activated on the map's mission manager.
+	 * @param bCompleteMissionRightAway Give the mission a next mission and complete it right after the node, as a
+	 * mission whose only job is the intro would.
+	 * @return False without a mission manager or when the intro was refused.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Mission|MapTests", meta = (WorldContext = "WorldContextObject"))
+	static bool MapTest_StartLocationIntro(const UObject* WorldContextObject, FLocationIntroTexts Texts,
+	                                       ELocationIntroDriftAxis DriftAxis, float DriftDistance,
+	                                       float DurationSeconds, bool bPanCamera,
+	                                       FLocationIntroPanSettings PanSettings,
+	                                       FLocationIntroPresentation Presentation,
+	                                       bool bCompleteMissionRightAway);
+
+	/**
+	 * @brief State a location intro test checks: whether the intro still runs, whether the screen is handed back
+	 * (no takeover active, so the HUD shows and the camera takes input) and the camera pawn pose.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Mission|MapTests", meta = (WorldContext = "WorldContextObject"))
+	static void MapTest_GetLocationIntroState(const UObject* WorldContextObject, bool& bOutIntroPlaying,
+	                                          bool& bOutScreenHandedBack, FVector& OutCameraLocation,
+	                                          FRotator& OutCameraRotation);
 };

@@ -184,6 +184,18 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Camera")
 	void MoveCameraOverTime(const FMovePlayerCamera& NewMove);
 
+	/** @return False when there is no camera pawn (menu maps). */
+	bool GetCameraPawnPose(FVector& OutLocation, FRotator& OutRotation) const;
+
+	// True while a MoveCameraOverTime move runs or waits in the queue; it places the pawn every frame until done.
+	bool GetIsMovingOverTime() const { return bM_IsCameraMoving || M_CameraMoveQueue.Num() > 0; }
+
+	/**
+	 * @brief Scripted camera shots (mission location intros) place the pawn every frame while player input is locked.
+	 * The move keeps to the camera bounds, so it stops at a boundary instead of leaving the playable area.
+	 */
+	void ApplyScriptedCameraPose(const FVector& Location, const FRotator& Rotation);
+
 
 	virtual void BeginPlay() override;
 	virtual void PostInitProperties() override;

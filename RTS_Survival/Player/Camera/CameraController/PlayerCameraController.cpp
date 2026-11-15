@@ -492,12 +492,39 @@ void UPlayerCameraController::MoveCameraOverTime(const FMovePlayerCamera& NewMov
 		M_MoveStartTime = World->GetTimeSeconds();
 		// The move duration is the max of TimeToMove and TimeCameraInputDisabled.
 		M_MoveDuration = FMath::Max(M_CurrentMove.TimeToMove, M_CurrentMove.TimeCameraInputDisabled);
+		if (M_MoveDuration <= 0.0f)
+		{
+			// An instant move: a timer with a zero rate never fires, which would leave the move running forever.
+			OnCameraMoveComplete();
+			return;
+		}
 		// Start the timer; when it completes, consider the move finished.
 		World->GetTimerManager().SetTimer(M_MoveCameraTimerHandle, this,
 		                                                       &UPlayerCameraController::OnCameraMoveComplete,
 		                                                       M_MoveDuration,
 		                                                       false);
 	}
+}
+
+bool UPlayerCameraController::GetCameraPawnPose(FVector& OutLocation, FRotator& OutRotation) const
+{
+	if (not GetIsValidCameraPawn())
+	{
+		return false;
+	}
+	OutLocation = M_PlayerCamera->GetActorLocation();
+	OutRotation = M_PlayerCamera->GetActorRotation();
+	return true;
+}
+
+void UPlayerCameraController::ApplyScriptedCameraPose(const FVector& Location, const FRotator& Rotation)
+{
+	if (not GetIsValidCameraPawn())
+	{
+		return;
+	}
+	TryMoveCameraToLocation(Location);
+	M_PlayerCamera->SetActorRotation(Rotation);
 }
 
 void UPlayerCameraController::OnCameraMoveComplete()

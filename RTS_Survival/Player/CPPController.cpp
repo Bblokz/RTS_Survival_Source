@@ -3649,6 +3649,13 @@ bool ACPPController::GetIsClickedUnitSelectable(AActor* ClickedActor) const
 		{
 			return false;
 		}
+		// Units that are not the player's to command (supply trucks, scripted aircraft) ignore clicks like they
+		// ignore the marquee.
+		const USelectionComponent* PawnSelectionComponent = SelectablePawn->GetSelectionComponent();
+		if (IsValid(PawnSelectionComponent) && not PawnSelectionComponent->GetCanBeSelected())
+		{
+			return false;
+		}
 		return SelectablePawn->GetRTSComponent()->GetOwningPlayer() == 1;
 	}
 	if (ClickedActor->IsA(ASelectableActorObjectsMaster::StaticClass()))

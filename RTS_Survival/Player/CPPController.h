@@ -325,6 +325,8 @@ class RTS_SURVIVAL_API ACPPController : public APlayerController
 	friend struct FAllGlobalAbilitiesTestAccess;
 	// Map test that selects an apartment and presses its Exit Cargo button the way a click would.
 	friend class UApartmentDestructionTestSubsystem;
+	// -SupplyPointValidate checks that a supply truck cannot be click-selected.
+	friend class FSupplyPointMapTest;
 	// For calling StartGameAtLocation with the picked location by the Start Location UI / Mngr.
 	friend class RTS_SURVIVAL_API UPlayerStartLocationManager;
 	// Survival mode starts the game at the picked start location and registers the air-dropped HQ.
