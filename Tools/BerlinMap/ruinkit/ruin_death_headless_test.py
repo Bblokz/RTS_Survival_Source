@@ -12,9 +12,10 @@ Placed before PIE along world X (y = 0, yaw 90 so the street front faces the sun
   player Pz IV G shoots it dead, apply_damage only if it survives STUB_FIRE_SECONDS),
   B2_Facade2St_B dressed through the ambient module (curtain, lamp, crow group; tags BerlinAmbient / BerlinCrowPerch),
   and a control BP_BerlinCoverHeap_Collapse_S placed like a map heap (its cover registers at map start).
-E1, E3 and B3 are large: they must end as a sunken, tilted remnant that stays (dead: more damage, point damage and
-TriggerDestroyActor are thrown at it; its kept nav boxes must still block). The others must sink away and be destroyed.
-Second set (third launcher argument "large2"): B7, E2, B5 and B4, the other large pieces, pictures of heap and remnant.
+Since 2026-11-14 every piece must end as a lowered, turned remnant that stays (dead: more damage, point damage and
+TriggerDestroyActor are thrown at it; its kept nav boxes must still block). The set is one piece per death class
+(stub, one-storey slab, shell, two-storey facade, half house, hero), all shot from the same game camera.
+Second set (third launcher argument "large2"): B7, E3, E2, B5, B3 and a stub ring, pictures of heap and remnant.
 Each ruin is killed in turn (apply_damage, i.e. the TakeDamage path). Sampled every tick with the world clock:
 mesh z, actor tilt, nav boxes left, dressing still visible, Niagara components of the death dust, heap actors.
 Pictures from an RTS-like camera before and 0.5 / 2 / 5 s after the death and once the dust thins.
@@ -35,18 +36,19 @@ BP_DIR = '/Game/RTS_Survival/Blueprints/Environment/Berlin/RuinKit/Blueprints/'
 HEAP_DIR = '/Game/RTS_Survival/Blueprints/Environment/Berlin/RuinKit/Cover/'
 FOOTPRINTS = 'D:/UE5Projects/RTS_Survival/Source/Tools/BerlinMap/ruinkit/footprint_table.json'
 TANK = '/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Medium/PanzerIV/Ger_Vehicle_PanzerIV_G.Ger_Vehicle_PanzerIV_G_C'
-# key: (x position, camera eye offset, look offset). The game camera is about 28 m up; the two 20 m pieces are shot
-# from a little further so the whole event is in frame.
+# key: (x position, camera eye offset, look offset). The game camera: 28 m up, the same framing for every piece so the
+# sizes of the events compare.
+GAME_EYE = (200, 1900, 2800)
 RUINS = {
-    'E1_CornerTower': (-9500, (300, 3000, 3600), (150, -150, 500)),
-    'E7_HalfHouse_A': (-5500, (200, 1900, 2800), (0, 0, 200)),
-    'E3_CoreRow': (-1500, (300, 3000, 3600), (0, 0, 300)),
-    'B3_Facade4St': (2500, (200, 1900, 2800), (0, 0, 300)),
-    'E4_StubRing_A': (5500, (200, 1900, 2800), (0, 0, 100)),
-    'B2_Facade2St_B': (8500, (200, 1900, 2800), (0, 0, 300)),
+    'E1_CornerTower': (-9500, GAME_EYE, (150, -150, 200)),
+    'E7_HalfHouse_A': (-5500, GAME_EYE, (0, 0, 200)),
+    'E5_Shell1St_A': (-2000, GAME_EYE, (0, 0, 200)),
+    'B1_Facade1St_A': (1500, GAME_EYE, (0, 0, 200)),
+    'B6_Stub_A': (5000, GAME_EYE, (0, 0, 200)),
+    'B2_Facade2St_B': (8500, GAME_EYE, (0, 0, 200)),
 }
-KILL_ORDER = ['B3_Facade4St', 'E7_HalfHouse_A', 'E3_CoreRow', 'E1_CornerTower', 'B2_Facade2St_B', 'E4_StubRing_A']
-TANK_KILL = 'E4_StubRing_A'
+KILL_ORDER = ['B1_Facade1St_A', 'E7_HalfHouse_A', 'E5_Shell1St_A', 'E1_CornerTower', 'B2_Facade2St_B', 'B6_Stub_A']
+TANK_KILL = 'B6_Stub_A'
 DRESSED = 'B2_Facade2St_B'
 CONTROL_HEAP_X = 11500
 TANK_Y = 3500.0
@@ -55,10 +57,12 @@ STUB_FIRE_SECONDS = 70.0
 # No tank and no dressing; results go to result_large2.json and the pictures get the same names.
 if os.environ.get('RUIN_DEATH_SET') == 'large2':
     RUINS = {
-        'B7_WallCore': (-8000, (200, 2300, 3000), (0, 0, 200)),
-        'E2_Courtyard': (-3500, (300, 3000, 3600), (75, 0, 300)),
-        'B5_CornerL': (1500, (200, 1900, 2800), (0, 0, 200)),
-        'B4_Firewall': (5500, (200, 1900, 2800), (0, 0, 300)),
+        'B7_WallCore': (-9000, GAME_EYE, (0, 0, 200)),
+        'E3_CoreRow': (-5000, GAME_EYE, (0, 0, 200)),
+        'E2_Courtyard': (-500, GAME_EYE, (75, 0, 200)),
+        'B5_CornerL': (3500, GAME_EYE, (0, 0, 200)),
+        'B3_Facade4St': (6500, GAME_EYE, (0, 0, 200)),
+        'E4_StubRing_A': (9500, GAME_EYE, (0, 0, 200)),
     }
     KILL_ORDER = list(RUINS)
     TANK_KILL = None
@@ -66,7 +70,7 @@ if os.environ.get('RUIN_DEATH_SET') == 'large2':
     OUT = ROOT + 'result_large2.json'
 PICTURE_TIMES = [0.5, 2.0, 5.0]
 CAMERA_SETTLE = 3.0
-EFFECTS = ('NS_RTSDebrisExplosion_Huge',)
+EFFECTS = ('NS_RTSDebrisExplosion_Huge', 'NS_Artillery_StoneImpact')
 S = {'phase': 'wait_load', 't': 0.0, 'mark': 0.0, 'log': [], 'ruins': {}, 'tanks': {}, 'result': {}, 'pre': {},
      'known_heaps': set()}
 
@@ -211,7 +215,8 @@ def find_runtime(world):
 def report_setup(key, actor):
     holes = actor.get_component_by_class(unreal.WallHoleDamageComponent)
     values = {}
-    for name in ('SinkOnDeath', 'LeaveRemnant', 'SinkDeltaZ', 'SinkTime', 'SinkMinTilt', 'SinkMaxTilt', 'SinkMaxYaw', 'HeapDustDelay',
+    for name in ('SinkOnDeath', 'LeaveRemnant', 'SinkDeltaZ', 'SinkTime', 'SinkMinTilt', 'SinkMaxTilt', 'SinkMinYaw', 'SinkMaxYaw',
+                 'DeathDustSpeed', 'HeapDustDelay',
                  'HeapDustLead', 'DustPulseInterval', 'DustSpreadX', 'DustSpreadY', 'DeathVfxOffset', 'DeathDustScale',
                  'DeathHeapDustScale', 'DeathDustVfx', 'DeathSound'):
         value = actor.get_editor_property(name)
@@ -422,6 +427,7 @@ def expected_heaps(key, transform):
 
 def effects_alive(world):
     found = {}
+    seen = S.setdefault('dust_seen', {})
     for comp in unreal.ObjectIterator(unreal.NiagaraComponent):
         try:
             if comp.get_world() != world:
@@ -430,6 +436,11 @@ def effects_alive(world):
             name = asset.get_name() if asset else ''
             if name in EFFECTS and comp.is_active():
                 found[name] = found.get(name, 0) + 1
+                try:
+                    origin, extent = unreal.SystemLibrary.get_component_bounds(comp)[:2]
+                except Exception:  # noqa: BLE001
+                    origin, extent = comp.get_world_location(), unreal.Vector(0, 0, 0)
+                seen[comp.get_name()] = (name, origin, extent, comp.get_world_scale().x)
         except Exception:  # noqa: BLE001
             continue
     return found
@@ -449,6 +460,7 @@ def prepare_death(key):
 
 def start_death(world, key, how):
     b = S['before']
+    S['dust_seen'] = {}
     d = dict(key=key, how=how, t0=now(world), samples=[], pictures=list(PICTURE_TIMES), heaps=[], heap_seen_at=None,
              gone_at=None, effects_at=None, effects_max=0, dressing_hidden_at=None, boxes_gone_at=None, after_done=False,
              sink_time=b['sink_time'], heap_delay=b['heap_delay'], z0=b['z0'], dressing=b['dressing'], listed=False,
@@ -502,7 +514,7 @@ def tick_death(world):
         at = d['pictures'].pop(0)
         picture(f'death_{key}_{str(at).replace(".", "_")}s')
         log(f'{key}: picture {at} s requested at {t:.2f} s')
-    after_at = max(d['sink_time'] + 3.5, 8.5)
+    after_at = d['sink_time'] + 4.0
     if not d['after_done'] and t >= after_at:
         d['after_done'] = True
         picture(f'death_{key}_after')
@@ -590,7 +602,15 @@ def end_death(world, t):
                            second_damage=d['second'])
         else:
             remnant = dict(actor_valid=False)
-    info = dict(how=d['how'], remnant=remnant, actor_valid_after=alive(ruin), gone_at_s=d['gone_at'], sink_time=d['sink_time'],
+    mesh_box = S['mesh_boxes'].get(key)
+    centre = pre['transform'].translation
+    reach = 0.0
+    for _name, origin, extent, _scale in S.get('dust_seen', {}).values():
+        reach = max(reach, abs(origin.x - centre.x) + extent.x, abs(origin.y - centre.y) + extent.y)
+    dust = dict(bursts=len(S.get('dust_seen', {})), effects=sorted(set(v[0] for v in S.get('dust_seen', {}).values())),
+                scales=sorted(set(round(v[3], 2) for v in S.get('dust_seen', {}).values())),
+                effect_bounds_reach_cm=round(reach), footprint_cm=mesh_box)
+    info = dict(how=d['how'], dust=dust, remnant=remnant, actor_valid_after=alive(ruin), gone_at_s=d['gone_at'], sink_time=d['sink_time'],
                 final_sample=samples[-1] if samples else None, samples_t_z_pitch_roll_boxes_dressing_meshvisible=thin,
                 nav_boxes_before=d['nav_boxes_before'], nav_boxes_gone_at_s=d['boxes_gone_at'], effects_first=d['effects_at'],
                 dust_clouds_alive_at_once_max=d['effects_max'], heap_seen_at_s=d['heap_seen_at'],
@@ -631,8 +651,11 @@ def tick(delta):
                 unreal.GameplayStatics.set_game_paused(world, False)
                 unreal.SystemLibrary.execute_console_command(world, 'ShowFlag.PostProcessMaterial 0')
                 find_runtime(world)
+                S['mesh_boxes'] = {}
                 for key, ruin in S['ruins'].items():
                     report_setup(key, ruin)
+                    box = mesh_of(ruin).static_mesh.get_bounding_box()
+                    S['mesh_boxes'][key] = [round(box.max.x - box.min.x), round(box.max.y - box.min.y), round(box.max.z)]
                 S['phase'], S['mark'] = 'nav_wait', S['t']
             elif S['t'] - S['mark'] > 150.0:
                 log('pie never started')

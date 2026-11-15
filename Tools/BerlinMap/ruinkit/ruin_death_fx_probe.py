@@ -1,30 +1,42 @@
 """Throwaway-editor look at dust / collapse effect candidates for the ruin death (not a test; a contact sheet).
 Launch: ruin_death_run.sh <logname> [timeout_s] fx      (the third argument picks this script)
-Spawns every candidate Niagara system in PIE on RTS_ToCopySmall in groups of four, 16 m apart, next to a 10 m ruin
-slab for scale, and takes pictures 0.4 / 1.5 / 3 / 5 / 8 s after the spawn from the RTS camera height. Logs which
-components are still active 11 s after the spawn (a looping system never ends: unusable as a one-shot death effect).
+Spawns the variants below in PIE on RTS_ToCopySmall in groups of three, 10 m apart, behind a one-storey slab
+(B1_Facade1St_A, 7 m wide, 5 m tall) for scale, and takes pictures 0.4 / 1.2 / 2.5 / 4 s after the spawn from the game
+camera height (28 m, the framing of the death test). Logs which components are still active 8 s after the spawn (a
+looping system never ends: unusable as a one-shot death effect).
+A variant is (label, system, component scale, {user parameter: float or (r, g, b, a)}).
 Pictures: Saved/Berlin/ruin_death_test/fx_<group>_<t>s.png, order left to right = the logged order.
+First sheet of 2026-11-13 (twelve systems at scale 1.5): the white NS_DestructionSmoke(_Large) reads as steam, the
+NS_RTS_GroundDust* / NS_RTS_DustSmoke_07 / NS_RTS_StaticDust_22 / NS_DebriDust / NS_DustSmoke_03 systems loop, the
+NS_Deploy_* dusts are too faint.
 """
 import unreal
 
 ROOT = 'D:/UE5Projects/RTS_Survival/Saved/Berlin/ruin_death_test/'
-CANDIDATES = [
-    '/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/Effects/NS_DestructionSmoke_Large',
-    '/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/Effects/NS_DestructionSmoke',
-    '/Game/RTS_Survival/ImpactSfxVfx/4SuperHeavyCalibre/Stone/NS_RTSDebrisExplosion_Huge',
-    '/Game/RTS_Survival/SpecialEffects/Dust/NS_RTS_DustSmoke_07',
-    '/Game/RTS_Survival/SpecialEffects/Dust/NS_RTS_GroundDust16',
-    '/Game/RTS_Survival/SpecialEffects/Dust/NS_RTS_GroundDust20',
-    '/Game/RTS_Survival/SpecialEffects/Dust/NS_RTS_GroundDust_12',
-    '/Game/RTS_Survival/SpecialEffects/Dust/StaticDust/NS_RTS_StaticDust_22',
-    '/Game/RTS_Survival/Blueprints/GroundVehicles/BaseAndNomadic/NomadicDeploy/FX/NS_Deploy_HeavyDust',
-    '/Game/RTS_Survival/Blueprints/GroundVehicles/BaseAndNomadic/NomadicDeploy/FX/NS_Deploy_LandDust',
-    '/Game/DustAndSandStorm/SandStorm/Niagara/NS_DebriDust',
-    '/Game/DustAndSandStorm/SandStorm/Niagara/NS_DustSmoke_03',
+STONE = '/Game/RTS_Survival/ImpactSfxVfx/'
+HUGE = STONE + '4SuperHeavyCalibre/Stone/NS_RTSDebrisExplosion_Huge'
+MEDIUM = STONE + '2MediumCalibre/Stone/NS_MediumCaliber_StoneHit'
+HEAVY = STONE + '3HeavyCalibre/Stone/NS_HeavyCaliber_StoneImpact'
+SUPER = STONE + '4SuperHeavyCalibre/Stone/NS_SuperHeavyCaliber_StoneImpact'
+ARTY = STONE + '5Artillery/Stone/NS_Artillery_StoneImpact'
+DUSTY = (0.30, 0.27, 0.23, 1.0)
+TINT = {'Color Smoke': DUSTY, 'GroundSmokeColor': DUSTY, 'Color': DUSTY}
+VARIANTS = [
+    ('artillery', ARTY, 1.0, {}),
+    ('artillery Scale 2', ARTY, 1.0, {'Scale': 2.0}),
+    ('artillery Scale 3 life 2', ARTY, 1.0, {'Scale': 3.0, 'LifetimeMlt': 2.0, 'LifetimeMult': 2.0}),
+    ('artillery component x2.5', ARTY, 2.5, {}),
+    ('artillery Scale 2 count 0.3 tint', ARTY, 1.0, dict(TINT, Scale=2.0, **{'Spawn Count': 0.3})),
+    ('artillery Scale 2 velocity 0.4 life 2', ARTY, 1.0, {'Scale': 2.0, 'Velocity Speed Mlt': 0.4, 'LifetimeMlt': 2.0, 'LifetimeMult': 2.0}),
+    ('huge 0.5 tint velocity 0.3', HUGE, 0.5, dict(TINT, **{'Velocity Speed Mlt': 0.3})),
+    ('huge 0.5 tint velocity 0.1', HUGE, 0.5, dict(TINT, **{'Velocity Speed Mlt': 0.1})),
+    ('huge 1.0 tint velocity 0.4', HUGE, 1.0, dict(TINT, **{'Velocity Speed Mlt': 0.4})),
+    ('huge 1.0 tint calibre 0.5', HUGE, 1.0, dict(TINT, NormalizedWeaponCalibre=0.5)),
+    ('huge 1.0 tint calibre 2', HUGE, 1.0, dict(TINT, NormalizedWeaponCalibre=2.0)),
+    ('huge 0.7 tint life 1.5 velocity 0.3', HUGE, 0.7, dict(TINT, LifetimeMlt=1.5, **{'Velocity Speed Mlt': 0.3})),
 ]
-SCALE = 1.5
-SPACING = 1600.0
-TIMES = [0.4, 1.5, 3.0, 5.0, 8.0]
+SPACING = 1000.0
+TIMES = [0.4, 1.2, 2.5, 4.0]
 S = {'phase': 'wait_load', 't': 0.0, 'mark': 0.0, 'group': 0}
 
 
@@ -54,8 +66,8 @@ def tick(delta):
             world = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_editor_world()
             S['z'] = ground_z(world, 0, 0)
             cls = unreal.load_class(None, '/Game/RTS_Survival/Blueprints/Environment/Berlin/RuinKit/Blueprints/'
-                                          'BP_BerlinRuin_B2_Facade2St_B.BP_BerlinRuin_B2_Facade2St_B_C')
-            actors.spawn_actor_from_class(cls, unreal.Vector(-4000, 0, S['z']), unreal.Rotator(0, 0, 90))
+                                          'BP_BerlinRuin_B1_Facade1St_A.BP_BerlinRuin_B1_Facade1St_A_C')
+            actors.spawn_actor_from_class(cls, unreal.Vector(0, -700, S['z']), unreal.Rotator(0, 0, 90))
             actors.spawn_actor_from_class(unreal.CameraActor, unreal.Vector(0, 6000, 2000))
             unreal.get_editor_subsystem(unreal.LevelEditorSubsystem).editor_request_begin_play()
             S['phase'], S['mark'] = 'wait_pie', S['t']
@@ -65,8 +77,8 @@ def tick(delta):
             unreal.SystemLibrary.execute_console_command(world, 'ShowFlag.PostProcessMaterial 0')
             cams = unreal.GameplayStatics.get_all_actors_of_class(world, unreal.CameraActor)
             camera = min(cams, key=lambda c: (c.get_actor_location() - unreal.Vector(0, 6000, 2000)).length())
-            eye = unreal.Vector(-800, 2600, S['z'] + 2800)
-            look = unreal.Vector(-800, 0, S['z'] + 100)
+            eye = unreal.Vector(200, 1900, S['z'] + 2800)
+            look = unreal.Vector(0, 0, S['z'] + 200)
             camera.root_component.set_mobility(unreal.ComponentMobility.MOVABLE)
             camera.set_actor_location(eye, False, True)
             camera.set_actor_rotation(unreal.MathLibrary.find_look_at_rotation(eye, look), True)
@@ -78,20 +90,25 @@ def tick(delta):
             S['phase'], S['mark'] = 'spawn', S['t']
         elif S['phase'] == 'spawn' and S['t'] - S['mark'] > 2.5:
             world = game_world()
-            group = CANDIDATES[S['group'] * 4:S['group'] * 4 + 4]
+            group = VARIANTS[S['group'] * 3:S['group'] * 3 + 3]
             if not group:
                 unreal.SystemLibrary.quit_editor()
                 S['phase'] = 'done'
                 return
             S['comps'] = []
-            for index, path in enumerate(group):
+            for index, (label, path, scale, params) in enumerate(group):
                 system = unreal.load_asset(path)
-                location = unreal.Vector(-2400 + index * SPACING, 0, S['z'] + 100)
+                location = unreal.Vector(-SPACING + index * SPACING, 0, S['z'] + 60)
                 comp = unreal.NiagaraFunctionLibrary.spawn_system_at_location(
-                    world, system, location, unreal.Rotator(0, 0, 0), unreal.Vector(SCALE, SCALE, SCALE), True, True) if system else None
-                S['comps'].append((path.rsplit('/', 1)[1], comp))
-            log(f'group {S["group"]} left to right at scale {SCALE}: {[n for n, _ in S["comps"]]} (missing: '
-                f'{[n for n, c in S["comps"] if c is None]})')
+                    world, system, location, unreal.Rotator(0, 0, 0), unreal.Vector(scale, scale, scale), True, True) if system else None
+                if comp is not None:
+                    for name, value in params.items():
+                        if isinstance(value, tuple):
+                            comp.set_variable_linear_color(name, unreal.LinearColor(*value))
+                        else:
+                            comp.set_variable_float(name, float(value))
+                S['comps'].append((label, comp))
+            log(f'group {S["group"]} left to right: {[n for n, _ in S["comps"]]} (missing: {[n for n, c in S["comps"] if c is None]})')
             S['t0'] = unreal.GameplayStatics.get_time_seconds(world)
             S['times'] = list(TIMES)
             S['phase'] = 'shoot'
@@ -102,14 +119,14 @@ def tick(delta):
                 at = S['times'].pop(0)
                 unreal.AutomationLibrary.take_high_res_screenshot(
                     1600, 900, f'{ROOT}fx_{S["group"]}_{str(at).replace(".", "_")}s.png', camera=S['camera'])
-            elif not S['times'] and t > 11.0:
+            elif not S['times'] and t > 8.0:
                 state = []
                 for name, comp in S['comps']:
                     try:
                         state.append((name, bool(comp is not None and unreal.SystemLibrary.is_valid(comp) and comp.is_active())))
                     except Exception:  # noqa: BLE001
                         state.append((name, False))
-                log(f'group {S["group"]} still active after 11 s: {state}')
+                log(f'group {S["group"]} still active after 8 s: {state}')
                 for _, comp in S['comps']:
                     try:
                         comp.destroy_component(comp)
@@ -121,7 +138,7 @@ def tick(delta):
         log(f'ERROR {error!r}')
         unreal.SystemLibrary.quit_editor()
         S['phase'] = 'done'
-    if S['t'] > 200.0 and S['phase'] != 'done':
+    if S['t'] > 220.0 and S['phase'] != 'done':
         unreal.SystemLibrary.quit_editor()
         S['phase'] = 'done'
 

@@ -46,54 +46,82 @@ COLLAPSE_CUE = '/Game/RTS_Survival/StarterContent/Audio/Collapse_Cue'
 COLLAPSE_ATT = '/Game/RTS_Survival/Sounds/Settings/Collapse/Att_Collapse'
 COLLAPSE_CONC = '/Game/RTS_Survival/Sounds/Settings/Collapse/SC_Collapse'
 FOOTPRINT_TABLE = 'D:/UE5Projects/RTS_Survival/Source/Tools/BerlinMap/ruinkit/footprint_table.json'
-# One-shot brown dust cloud with a few stones, about 6.5 m across at scale 1 and gone after 2.5 s. It is the only death
-# effect: once at the death, then as pulses over the footprint while the ruin sinks, and on each heap spot. (The white
-# NS_DestructionSmoke(_Large) reads as steam on these ruins; the NS_RTS_GroundDust* systems loop and never end.)
-DEATH_DUST = '/Game/RTS_Survival/ImpactSfxVfx/4SuperHeavyCalibre/Stone/NS_RTSDebrisExplosion_Huge'
-DUST_DIAMETER = 650.0
+# ---------------------------------------------------------------- the death, one table
+# Owner, 2026-11-14: no ruin vanishes. Every piece ends as a dead remnant that stays: lowered and turned. Small and
+# medium pieces go down "a bit" (25-40 % of their height) with a clear yaw; large ones keep the deep sink (55-65 %).
+# Dust and thrown debris are sized to the piece: a stub gets one low puff and a handful of stones, a hero the big event.
+#
+# The two dust effects (both one-shot; scale = component scale):
+#   PUFF  NS_Artillery_StoneImpact: a brown dust plume without stones, about 6 m across at scale 1, gone after 1.5 s.
+#   CLOUD NS_RTSDebrisExplosion_Huge: a ring of rolling smoke, about 7 m across at scale 1, 2.5 s, that also throws
+#         about 25 large stones 10-15 m. The stones do NOT shrink with the scale, so it is for the large classes only.
+# Both are tinted by the graph (DeathDustColor) to grey-brown masonry dust; untinted the cloud reads white on Ger_Berlin.
+PUFF = '/Game/RTS_Survival/ImpactSfxVfx/5Artillery/Stone/NS_Artillery_StoneImpact'
+CLOUD = '/Game/RTS_Survival/ImpactSfxVfx/4SuperHeavyCalibre/Stone/NS_RTSDebrisExplosion_Huge'
+DUST_COLOR = (0.30, 0.27, 0.23, 1.0)
+# Death class per piece id (the part of the mesh suffix before the first underscore).
+DEATH_CLASS_OF = {'E1': 'hero', 'E2': 'hero', 'E3': 'core', 'B7': 'core', 'B3': 'tall', 'B4': 'tall', 'B5': 'tall',
+                  'B2': 'two_storey', 'E7': 'two_storey', 'B1': 'one_storey', 'E5': 'one_storey', 'E6': 'one_storey',
+                  'B6': 'stub', 'E4': 'stub', 'B8': 'bed'}
+# Per death class:
+#   sink      share of the mesh height that goes into the ground
+#   time      seconds the sink takes
+#   tilt      (min, max) pitch/roll degrees     yaw  (min, max) degrees; the C++ picks size, direction and sign at random
+#   fx        dust effect, fx_scale its scale, bursts how many (the first at the death, the rest spread over the sink
+#             at random spots of the footprint), fx_speed the effect's "Velocity Speed Mlt" (PUFF: lower = lower, rounder puff)
+#   heap_fx   scale of the dust on a heap spot just before the heap appears
+#   debris    most kit debris pieces thrown off the wall (38-68 cm each), debris_speed how hard
+#   heap      False: no collapse heap even if the footprint table has one (it would bury what still stands)
+DEATH = {
+    'hero':       dict(sink=0.62, time=6.0, tilt=(2.0, 4.0), yaw=(1.0, 3.0), fx=CLOUD, fx_scale=1.4, bursts=6, fx_speed=1.0,
+                       heap_fx=1.2, debris=70, debris_speed=0.8, heap=True),
+    'core':       dict(sink=0.58, time=5.0, tilt=(2.0, 4.0), yaw=(1.0, 3.0), fx=CLOUD, fx_scale=1.2, bursts=4, fx_speed=1.0,
+                       heap_fx=1.1, debris=50, debris_speed=0.7, heap=True),
+    'tall':       dict(sink=0.62, time=4.0, tilt=(2.0, 4.0), yaw=(2.0, 5.0), fx=PUFF, fx_scale=1.6, bursts=4, fx_speed=0.65,
+                       heap_fx=1.3, debris=28, debris_speed=0.7, heap=True),
+    'two_storey': dict(sink=0.35, time=2.2, tilt=(1.0, 3.0), yaw=(3.0, 7.0), fx=PUFF, fx_scale=1.3, bursts=3, fx_speed=0.6,
+                       heap_fx=1.2, debris=16, debris_speed=0.6, heap=True),
+    'one_storey': dict(sink=0.30, time=1.8, tilt=(1.0, 3.0), yaw=(3.0, 7.0), fx=PUFF, fx_scale=1.0, bursts=2, fx_speed=0.6,
+                       heap_fx=1.1, debris=10, debris_speed=0.6, heap=True),
+    'stub':       dict(sink=0.35, time=1.2, tilt=(1.0, 3.0), yaw=(3.0, 8.0), fx=PUFF, fx_scale=0.7, bursts=2, fx_speed=0.6,
+                       heap_fx=0.8, debris=5, debris_speed=0.5, heap=False),
+    'bed':        dict(sink=0.30, time=1.5, tilt=(0.0, 1.5), yaw=(2.0, 5.0), fx=PUFF, fx_scale=0.9, bursts=2, fx_speed=0.55,
+                       heap_fx=0.8, debris=6, debris_speed=0.5, heap=False),
+}
+# Per piece exceptions to the class row (suffix -> changed keys).
+#   E6 heap fins stand on their own modelled heap: a second heap would bury the fin.
+#   E3 and B7 are a little shallower / deeper than their class so 7.3 m and 5.2 m stay standing.
+DEATH_PIECE = {
+    'E6_HeapFin_A': dict(heap=False), 'E6_HeapFin_B': dict(heap=False),
+    'E2_Courtyard': dict(sink=0.60), 'E3_CoreRow': dict(sink=0.60), 'B7_WallCore': dict(sink=0.55),
+    'B3_Facade4St': dict(sink=0.65), 'B4_Firewall': dict(sink=0.65), 'B5_CornerL': dict(sink=0.60),
+}
+# Heap spots that differ from footprint_table.json (suffix -> {index of the "dead" entry: (x, y)}).
+#   B7 is one wall line; the table's heap at the centre lay astride the wall stump. It now lies in front of it.
+HEAP_SPOT = {'B7_WallCore': {0: (400.0, 0.0)}}
 HEAP_MESH_TO_ARRAY = {'SM_BerlinFoot_CollapseHeap_S': 'DeathHeapsSmall', 'SM_BerlinFoot_CollapseHeap_L': 'DeathHeapsLarge'}
-# Dust scale on a heap spot, per heap size (times the heap's own scale): the cloud must hide a 9 m / 14 m heap.
-HEAP_DUST_SCALE = {'SM_BerlinFoot_CollapseHeap_S': 1.6, 'SM_BerlinFoot_CollapseHeap_L': 2.3}
 # The variables the death graph of BP_BerlinRuin_Base reads. When one is missing the base has no death graph (or an
 # older one): the children then keep the hole component's own chunk death and the report says so.
-DEATH_VARIABLES = ('SinkOnDeath', 'LeaveRemnant', 'SinkDeltaZ', 'SinkTime', 'SinkMinTilt', 'SinkMaxTilt', 'SinkMaxYaw', 'HeapDustDelay',
-                   'HeapDustLead', 'DustPulseInterval', 'DustSpreadX', 'DustSpreadY', 'DeathVfxOffset', 'DeathDustScale',
-                   'DeathHeapDustScale', 'DeathDustVfx', 'DeathSound', 'DeathHeapsSmall', 'DeathHeapsLarge')
-# Death per size class: sink seconds, tilt range and yaw (degrees; tall pieces lean less, their tops travel far),
-# heap_at = share of the sink time after which the collapse heaps are spawned (dust starts on their spots
-# HEAP_DUST_LEAD seconds earlier), pulse = seconds between dust pulses, dust = (min, max) scale of one pulse; the
-# scale itself makes a cloud about DUST_CLOUD_SHARE of the piece's shorter ground side.
-DEATH = {
-    'hero':   dict(time=6.0, tilt=(1.0, 2.5), yaw=1.0, heap_at=0.30, pulse=0.45, dust=(1.2, 2.2)),
-    'core':   dict(time=5.0, tilt=(1.0, 3.0), yaw=1.0, heap_at=0.30, pulse=0.45, dust=(1.2, 2.2)),
-    'slab':   dict(time=4.0, tilt=(2.0, 4.0), yaw=2.0, heap_at=0.30, pulse=0.5, dust=(0.9, 1.6)),
-    'filler': dict(time=3.5, tilt=(2.0, 5.0), yaw=2.0, heap_at=0.30, pulse=0.5, dust=(0.9, 1.5)),
-    'stub':   dict(time=2.5, tilt=(2.0, 6.0), yaw=3.0, heap_at=0.36, pulse=0.5, dust=(0.7, 1.1)),
-    'rubble': dict(time=2.5, tilt=(0.0, 2.0), yaw=0.0, heap_at=0.36, pulse=0.5, dust=(0.7, 1.2)),
-}
-# LARGE / SMALL split (owner, 2026-11-13): a large ruin does not vanish. Its sink stops with the given share of its
-# height in the ground, slightly tilted, and the dead actor stays as a remnant (no destroy, nothing ticks). A small
-# piece sinks completely and is destroyed. suffix -> (share of the mesh height that goes into the ground,
-# (min, max) pitch/roll degrees, max yaw degrees). The C++ sink picks the tilt size, its direction and the yaw sign at
-# random per death, so a row of dead ruins does not lean alike. Every piece not listed here is small.
-REMNANTS = {
-    'E1_CornerTower': (0.62, (2.0, 4.0), 2.0),     # hero, 20.8 m -> about 7.9 m left standing
-    'E2_Courtyard':   (0.60, (2.0, 4.0), 2.0),     # hero, 16.0 m -> 6.4 m
-    'E3_CoreRow':     (0.60, (2.0, 4.0), 2.0),     # wall core row, 18.4 m -> 7.3 m
-    'B7_WallCore':    (0.55, (2.0, 4.0), 2.0),     # wall core, 11.5 m -> 5.2 m
-    'B3_Facade4St':   (0.65, (3.0, 5.0), 3.0),     # lone four-storey facade, 15.5 m -> 5.4 m
-    'B4_Firewall':    (0.65, (3.0, 5.0), 3.0),     # lone firewall, 16.7 m -> 5.9 m
-    'B5_CornerL':     (0.60, (3.0, 5.0), 3.0),     # corner of two facades, 11.1 m -> 4.4 m
-}
+DEATH_VARIABLES = ('SinkOnDeath', 'LeaveRemnant', 'SinkDeltaZ', 'SinkTime', 'SinkMinTilt', 'SinkMaxTilt', 'SinkMinYaw',
+                   'SinkMaxYaw', 'HeapDustDelay', 'HeapDustLead', 'DustPulseInterval', 'DustSpreadX', 'DustSpreadY',
+                   'DeathVfxOffset', 'DeathDustScale', 'DeathHeapDustScale', 'DeathDustColor', 'DeathDustSpeed',
+                   'DeathDustVfx', 'DeathSound', 'DeathHeapsSmall', 'DeathHeapsLarge')
 # A NavBlock box stays (tag REMNANT_NAV_TAG; the death graph detaches it so it keeps standing at ground level while the
 # actor sinks) when the hulls it was made from still stand at least this high after the sink; lower ones are destroyed.
 REMNANT_NAV_TAG = 'RemnantNav'
-REMNANT_NAV_MIN_STAND = 150.0
-HEAP_DUST_LEAD = 0.45        # s between the dust on a heap spot and the heap itself
-DUST_CLOUD_SHARE = 0.75
-DUST_SPREAD_SHARE = 0.32     # pulses are scattered this share of each ground side around the footprint centre
-SINK_MARGIN = 80.0           # cm under the ground beyond the mesh top (the tilt lifts one side)
-SINK_SCALE_ALLOWANCE = 1.15  # fillers may be placed scaled up to 1.15; the sink depth is not scaled with the actor
+REMNANT_NAV_MIN_STAND = 50.0
+HEAP_AT = 0.30               # the heaps appear after this share of the sink time ...
+HEAP_DUST_LEAD = 0.35        # ... and this many seconds after the dust on their spot
+DUST_SPREAD_SHARE = 0.30     # later bursts are scattered this share of each ground side around the footprint centre
+
+
+def death_row(suffix):
+    """The death values of one piece: its class row with the piece's exceptions."""
+    kind = DEATH_CLASS_OF.get(suffix.split('_')[0], 'one_storey')
+    row = dict(DEATH[kind], kind=kind)
+    row.update(DEATH_PIECE.get(suffix, {}))
+    return row
+
 
 # Size classes. Lengths are mesh cm (kit meshes stand at scale 1; fillers may be scaled up to 1.15, never below 1).
 #   radius/mm: hole radius per mm calibre (75 mm -> 75 x value cm); max: largest hole; min: smallest hole worth a slot.
@@ -422,72 +450,71 @@ def base_death_ready(base):
     return not missing
 
 
-def death_heaps(suffix):
+def death_heaps(suffix, row):
     """({'DeathHeapsSmall': [Transform], 'DeathHeapsLarge': [Transform]}, list for the report) from the "dead" entries
     of the footprint table: actor-relative (x, y, 0), yaw added to the piece yaw, uniform scale. Pieces without an
-    entry leave no heap."""
+    entry, and classes with heap False, leave no heap. HEAP_SPOT moves single heaps."""
     with open(FOOTPRINT_TABLE, 'r') as handle:
         table = json.load(handle)['pieces']
     out = {'DeathHeapsSmall': [], 'DeathHeapsLarge': []}
     listed = []
-    for entry in table.get(suffix, {}).get('dead', []):
+    if not row['heap']:
+        return out, listed
+    for index, entry in enumerate(table.get(suffix, {}).get('dead', [])):
         scale = float(entry.get('scale', 1.0))
-        transform = unreal.Transform(unreal.Vector(entry['x'], entry['y'], 0.0),
-                                     unreal.Rotator(roll=0.0, pitch=0.0, yaw=entry['yaw']),
+        x, y = HEAP_SPOT.get(suffix, {}).get(index, (entry['x'], entry['y']))
+        transform = unreal.Transform(unreal.Vector(x, y, 0.0), unreal.Rotator(roll=0.0, pitch=0.0, yaw=entry['yaw']),
                                      unreal.Vector(scale, scale, scale))
         out[HEAP_MESH_TO_ARRAY[entry['mesh']]].append(transform)
-        listed.append([entry['mesh'].rsplit('_', 1)[1], entry['x'], entry['y'], entry['yaw'], scale])
+        listed.append([entry['mesh'].rsplit('_', 1)[1], x, y, entry['yaw'], scale])
     return out, listed
 
 
-def death_defaults(suffix, kind, mesh):
-    """Class defaults the death graph reads, from the mesh size, the size class and the footprint table."""
-    d = DEATH[kind]
+def death_defaults(suffix, mesh):
+    """Class defaults the death graph reads, from the mesh size, the DEATH table and the footprint table."""
+    d = death_row(suffix)
     box = mesh.get_bounding_box()
     size_x, size_y = box.max.x - box.min.x, box.max.y - box.min.y
-    heaps, listed = death_heaps(suffix)
-    remnant = REMNANTS.get(suffix)
-    tilt, yaw = d['tilt'], d['yaw']
-    if remnant:
-        # Measured from the mesh top, so the share is of what stands above the ground.
-        sink = round(box.max.z * remnant[0])
-        tilt, yaw = remnant[1], remnant[2]
-    else:
-        sink = round((box.max.z + SINK_MARGIN) * SINK_SCALE_ALLOWANCE)
-    dust = round(min(max(DUST_CLOUD_SHARE * min(size_x, size_y) / DUST_DIAMETER, d['dust'][0]), d['dust'][1]), 2)
-    heap_dust = round(max([HEAP_DUST_SCALE['SM_BerlinFoot_CollapseHeap_' + h[0]] * h[4] for h in listed] or [1.5]), 2)
-    heap_time = d['time'] * d['heap_at']
+    heaps, listed = death_heaps(suffix, d)
+    sink = round(box.max.z * d['sink'])
+    # Bursts: the first at the death, the others on a looping timer that the end of the sink stops.
+    pulse = round(d['time'] / (d['bursts'] - 0.5), 2) if d['bursts'] > 1 else round(d['time'] * 3.0, 2)
+    heap_dust = round(d['heap_fx'] * max([h[4] for h in listed] or [1.0]), 2)
+    heap_time = d['time'] * HEAP_AT
     values = {
         'SinkOnDeath': True,
-        'LeaveRemnant': bool(remnant),
+        'LeaveRemnant': True,
         'SinkDeltaZ': float(sink),
         'SinkTime': d['time'],
-        'SinkMinTilt': tilt[0], 'SinkMaxTilt': tilt[1], 'SinkMaxYaw': yaw,
-        'HeapDustDelay': round(max(heap_time - HEAP_DUST_LEAD, 0.2), 2),
+        'SinkMinTilt': d['tilt'][0], 'SinkMaxTilt': d['tilt'][1], 'SinkMinYaw': d['yaw'][0], 'SinkMaxYaw': d['yaw'][1],
+        'HeapDustDelay': round(max(heap_time - HEAP_DUST_LEAD, 0.1), 2),
         'HeapDustLead': HEAP_DUST_LEAD,
-        'DustPulseInterval': d['pulse'],
+        'DustPulseInterval': pulse,
         'DustSpreadX': round(size_x * DUST_SPREAD_SHARE), 'DustSpreadY': round(size_y * DUST_SPREAD_SHARE),
-        # The dust is centred on the middle of the mesh footprint, 1 m up (local space; the graph turns it with the actor).
-        'DeathVfxOffset': unreal.Vector(round((box.min.x + box.max.x) * 0.5), round((box.min.y + box.max.y) * 0.5), 100.0),
-        'DeathDustScale': unreal.Vector(dust, dust, dust),
+        # The dust is centred on the middle of the mesh footprint, 60 cm up (local space; the graph turns it with the actor).
+        'DeathVfxOffset': unreal.Vector(round((box.min.x + box.max.x) * 0.5), round((box.min.y + box.max.y) * 0.5), 60.0),
+        'DeathDustScale': unreal.Vector(d['fx_scale'], d['fx_scale'], d['fx_scale']),
         'DeathHeapDustScale': unreal.Vector(heap_dust, heap_dust, heap_dust),
-        'DeathDustVfx': unreal.load_asset(DEATH_DUST),
+        'DeathDustColor': unreal.LinearColor(*DUST_COLOR),
+        'DeathDustSpeed': d['fx_speed'],
+        'DeathDustVfx': unreal.load_asset(d['fx']),
         'DeathSound': unreal.load_asset(COLLAPSE_CUE),
         'DeathHeapsSmall': heaps['DeathHeapsSmall'],
         'DeathHeapsLarge': heaps['DeathHeapsLarge'],
     }
-    info = {'remnant': bool(remnant), 'top_cm': round(box.max.z), 'stands_after_cm': round(box.max.z - sink) if remnant else 0,
-            'tilt_deg': list(tilt), 'yaw_deg': yaw,
-            'sink_cm': sink, 'sink_s': d['time'], 'heap_dust_s': values['HeapDustDelay'],
-            'heap_spawn_s': round(values['HeapDustDelay'] + HEAP_DUST_LEAD, 2), 'heaps': listed,
-            'dust_scale': dust, 'heap_dust_scale': heap_dust, 'dust_pulse_s': d['pulse'],
-            'dust_spread': [values['DustSpreadX'], values['DustSpreadY']],
-            'fx_offset': [values['DeathVfxOffset'].x, values['DeathVfxOffset'].y, 100.0]}
+    info = {'class': d['kind'], 'top_cm': round(box.max.z), 'sink_share': d['sink'], 'sink_cm': sink,
+            'stands_after_cm': round(box.max.z - sink), 'sink_s': d['time'], 'tilt_deg': list(d['tilt']), 'yaw_deg': list(d['yaw']),
+            'fx': d['fx'].rsplit('/', 1)[1], 'fx_scale': d['fx_scale'], 'bursts': d['bursts'], 'pulse_s': pulse,
+            'heap_dust_scale': heap_dust, 'heap_spawn_s': round(values['HeapDustDelay'] + HEAP_DUST_LEAD, 2), 'heaps': listed,
+            'debris': d['debris'], 'footprint_cm': [round(size_x), round(size_y)],
+            'dust_spread': [values['DustSpreadX'], values['DustSpreadY']]}
     return values, info
 
 
-def setup_holes_template(comp, kind, is_rubble_only, pieces, graph_death=False):
+def setup_holes_template(comp, kind, is_rubble_only, pieces, graph_death=False, suffix=''):
     c = CLASSES[kind]
+    # With the death graph the debris of the death comes from the DEATH table (sized to the piece), not from CLASSES.
+    row = death_row(suffix) if graph_death else None
     comp.set_editor_property('WallMeshComponentName', 'StaticMesh')
     comp.set_editor_property('DamagedMaterials', [] if is_rubble_only else [unreal.load_asset(HOLES_MI)])
     comp.set_editor_property('DebrisMeshes', pieces)
@@ -501,14 +528,14 @@ def setup_holes_template(comp, kind, is_rubble_only, pieces, graph_death=False):
     grid.set_editor_property('min_hole_radius', float(c['min']))
     grid.set_editor_property('area_per_debris_piece', float(c['area']))
     grid.set_editor_property('max_pieces_per_hit', c['max_hit'])
-    grid.set_editor_property('max_collapse_pieces', c['collapse'])
+    grid.set_editor_property('max_collapse_pieces', row['debris'] if row else c['collapse'])
     comp.set_editor_property('GridSettings', grid)
     collapse = comp.get_editor_property('CollapseSettings')
     # With the death graph in the base, the graph calls CollapseIntoPieces(false) and sinks the ruin; the component's
     # own death would hide the mesh at once and the sink would never show.
     collapse.set_editor_property('collapse_into_chunks_on_death', not graph_death)
     collapse.set_editor_property('destroy_owner_delay_seconds', 4.5)
-    collapse.set_editor_property('death_speed_scale', c['speed'])
+    collapse.set_editor_property('death_speed_scale', row['debris_speed'] if row else c['speed'])
     collapse.set_editor_property('collapse_sound', unreal.load_asset(COLLAPSE_CUE))
     collapse.set_editor_property('collapse_attenuation', unreal.load_asset(COLLAPSE_ATT))
     collapse.set_editor_property('collapse_concurrency', unreal.load_asset(COLLAPSE_CONC))
@@ -516,12 +543,9 @@ def setup_holes_template(comp, kind, is_rubble_only, pieces, graph_death=False):
 
 
 def remnant_nav_flags(suffix, mesh, hulls, boxes):
-    """Per nav box: True when it must stay under a remnant (some hull inside it still stands REMNANT_NAV_MIN_STAND above
-    the ground after the sink). All False for a small piece."""
-    remnant = REMNANTS.get(suffix)
-    if not remnant:
-        return [False] * len(boxes)
-    sink = mesh.get_bounding_box().max.z * remnant[0]
+    """Per nav box: True when it must stay under the remnant (some hull inside it still stands REMNANT_NAV_MIN_STAND
+    above the ground after the sink)."""
+    sink = mesh.get_bounding_box().max.z * death_row(suffix)['sink']
     flags = []
     for b in boxes:
         tops = [h[5] for h in hulls if h[2] < NAV_MAX_BOTTOM and h[0] >= b[0] - 1 and h[1] >= b[1] - 1
@@ -561,7 +585,7 @@ def build_one(mesh, pieces, base, graph_death=False):
     bp, created = get_or_create_blueprint(name, base)
     named = ensure_components(bp, len(boxes))
     setup_mesh_template(named['StaticMesh'][1], mesh)
-    setup_holes_template(named['WallHoleDamage'][1], kind, is_rubble_only, pieces, graph_death)
+    setup_holes_template(named['WallHoleDamage'][1], kind, is_rubble_only, pieces, graph_death, suffix)
     keep = remnant_nav_flags(suffix, mesh, hulls, boxes)
     for index, box in enumerate(boxes):
         setup_nav_box(named['NavBlock_%02d' % index][1], box, keep[index] and graph_death)
@@ -572,7 +596,7 @@ def build_one(mesh, pieces, base, graph_death=False):
     cdo.set_editor_property('aim_offset_points', aims)
     death_info = {'graph': False}
     if graph_death:
-        values, death_info = death_defaults(suffix, kind, mesh)
+        values, death_info = death_defaults(suffix, mesh)
         for key, value in values.items():
             cdo.set_editor_property(key, value)
         death_info['graph'] = True

@@ -43,6 +43,24 @@ PIECE_CUE = {
     '14_Washstand': 'Washstand',
     '15_ClockFallen': 'Clock',
     '16_Radiator': 'Radiator',
+    # Second set (2026-11-14): no new cues; each piece plays the closest existing one. The modeller's table suggests a
+    # group per piece (sound_group in furniture_table.json); all are taken as suggested except 31.
+    '17_Toilet': 'Washstand',              # glazed ceramic bowl: the basin shatter
+    '18_KitchenRange': 'TiledStove',       # tiled body, iron top
+    '19_Sideboard': 'WoodCabinet',
+    '20_RoundTableTipped': 'WoodCabinet',  # heavy table with a plate; WoodSmall would also do
+    '21_Pram': 'WoodSmall',                # weak fit: wicker on a light iron chassis
+    '22_SewingTable': 'IronBed',           # cast-iron frame and flywheel under a wooden top
+    '23_Gramophone': 'WoodCabinet',        # the brass horn has no cue
+    '24_TrunkAndSuitcases': 'WoodCabinet', # hollow trunk; the cue's crockery is a stretch
+    '25_CoatStand': 'WoodCabinet',         # bench chest and mirror
+    '26_CellarShelf': 'WoodCabinet',       # jars, crocks and bottles
+    '27_WashTubMangle': 'Bathtub',         # weak fit: a zinc tub and a wooden mangle get the cast-iron boom
+    '28_Vitrine': 'WoodCabinet',           # crockery on the shelves
+    '29_LampAndRug': 'WoodSmall',          # weak fit: thin brass pole and a cloth shade
+    '30_BarrelAndCrates': 'WoodCabinet',   # barrel and a crate of bottles
+    '31_DoorLeafFallen': 'WoodSmall',      # suggested WoodCabinet; a flat door leaf has nothing hollow or breakable in it
+    '32_HandCart': 'WoodSmall',
 }
 
 
