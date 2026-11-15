@@ -59,9 +59,9 @@ namespace Round5FixesTestPrivate
 	constexpr float CameraTraceLength = 500000.f;
 	constexpr float LandscapeEdgeMargin = 2500.f;
 
-	// Range step. The leFH 18 reaches HowitzerArtilleryRange (8800); the target lies between the two ranges.
-	constexpr float ExpectedLeFH18Range = 8800.f;
-	constexpr float BeyondLeFHTargetDistance = 9700.f;
+	// Range step. The leFH 18 reaches HowitzerArtilleryRange (9680); the target lies between the two ranges.
+	constexpr float ExpectedLeFH18Range = 9680.f;
+	constexpr float BeyondLeFHTargetDistance = 10650.f;
 	constexpr float LeFHControlFraction = 0.6f;
 	constexpr float GunSpawnTimeoutSeconds = 60.f;
 	constexpr float GunSettleSeconds = 8.f;
@@ -691,7 +691,7 @@ void URound5FixesTestSubsystem::TickGunsSettling()
 	       IsValid(Sfh18Weapon) ? Sfh18Weapon->GetRange() : -1.f, LeFH18Range,
 	       IsValid(LeFH18Weapon) ? LeFH18Weapon->GetRange() : -1.f);
 	Check(FMath::IsNearlyEqual(LeFH18Range, ExpectedLeFH18Range, 50.f),
-	      TEXT("lefh18_range_is_8800"), FString::Printf(TEXT("%.0f"), LeFH18Range));
+	      TEXT("lefh18_range_is_9680"), FString::Printf(TEXT("%.0f"), LeFH18Range));
 	Check(Sfh18Range > BeyondLeFHTargetDistance && Sfh18Range > LeFH18Range, TEXT("sfh18_range_beyond_lefh18"),
 	      FString::Printf(TEXT("sfh18=%.0f lefh18=%.0f target=%.0f"), Sfh18Range, LeFH18Range,
 	                      BeyondLeFHTargetDistance));

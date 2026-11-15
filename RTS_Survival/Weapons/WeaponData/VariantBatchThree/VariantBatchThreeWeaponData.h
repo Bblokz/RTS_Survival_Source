@@ -20,6 +20,9 @@ namespace VariantBatchThreeWeapons
 	// The sniper deals this many base Puma (KwK 39/1) shots in one beam.
 	constexpr float RadixiteSniperDamageInPumaShots = 3.f;
 
+	/** @return The autocannon range before its direct-fire boost, with the artillery boost; shared with the test. */
+	float GetBunkerMortarRange();
+
 	/** @param WeaponDataMap The player weapon map, already filled by the category initializers. */
 	void AddWeapons(TMap<EWeaponName, FWeaponData>& WeaponDataMap);
 

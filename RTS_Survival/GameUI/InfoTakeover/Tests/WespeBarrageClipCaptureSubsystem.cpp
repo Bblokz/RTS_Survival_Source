@@ -47,7 +47,7 @@ namespace WespeBarrageClipPrivate
 	// One Wespe fires a shell about every 5 s even in a barrage, so a battery of three makes the clip read as one.
 	const TArray<FVector> WespeOffsets = {FVector(0.f, -450.f, 0.f), FVector(-150.f, 0.f, 0.f), FVector(0.f, 450.f, 0.f)};
 	const FRotator WespeRotation(0.f, 0.f, 0.f);
-	// The target area, far inside the leFH 18's 8800 range; the barrage spreads shells over a 1500 radius around it.
+	// The target area, far inside the leFH 18's 9680 range; the barrage spreads shells over a 1500 radius around it.
 	const FVector TargetCenterOffset(4500.f, 0.f, 0.f);
 	const FVector T26Offset(0.f, -250.f, 0.f);
 	const FVector SquadOffset(150.f, 300.f, 0.f);

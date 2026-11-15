@@ -1047,33 +1047,50 @@ namespace DeveloperSettings
 			// own range so the range shown to the player stays the ground range.
 			inline constexpr float AntiAirRangeMlt = 4.f;
 			inline constexpr float GameRangeMlt = 0.4f;
-			inline constexpr float BasicSmallArmsRange = RoundToNearestMultipleOfFive(8000.f * GameRangeMlt);
-			inline constexpr float SmallArmsRifleRange = RoundToNearestMultipleOfFive(8400.f * GameRangeMlt);
-			inline constexpr float SmallArmsSniperRange = RoundToNearestMultipleOfFive(8700.f * GameRangeMlt);
-			inline constexpr float AircraftSmallArmsRange = RoundToNearestMultipleOfFive(8000);
+			// Range boost for every weapon that is not artillery (small arms, cannons, lasers, flame, aircraft guns).
+			// Literal ranges outside this namespace multiply by it too.
+			inline constexpr float DirectFireRangeMlt = 1.33f;
+			// Range boost for mortars, rocket artillery, howitzers and arcing guns; the *ArtilleryRange constants.
+			inline constexpr float ArtilleryRangeMlt = 1.1f;
+			inline constexpr float BasicSmallArmsRange = RoundToNearestMultipleOfFive(
+				8000.f * GameRangeMlt * DirectFireRangeMlt);
+			inline constexpr float SmallArmsRifleRange = RoundToNearestMultipleOfFive(
+				8400.f * GameRangeMlt * DirectFireRangeMlt);
+			inline constexpr float SmallArmsSniperRange = RoundToNearestMultipleOfFive(
+				8700.f * GameRangeMlt * DirectFireRangeMlt);
+			inline constexpr float AircraftSmallArmsRange = RoundToNearestMultipleOfFive(8000 * DirectFireRangeMlt);
 
-			inline constexpr float LightCannonRange = RoundToNearestMultipleOfFive(8700.f * GameRangeMlt);
-			inline constexpr float LightAssaultCannonRange = RoundToNearestMultipleOfFive(9800.f * GameRangeMlt);
-			inline constexpr float MediumCannonRange = RoundToNearestMultipleOfFive(9200.f * GameRangeMlt);
-			inline constexpr float MediumAssaultCannonRange = RoundToNearestMultipleOfFive(10600.f * GameRangeMlt);
-			inline constexpr float HeavyCannonRange = RoundToNearestMultipleOfFive(9200.f * GameRangeMlt);
-			inline constexpr float HeavyAssaultCannonRange = RoundToNearestMultipleOfFive(10600.f * GameRangeMlt);
+			inline constexpr float LightCannonRange = RoundToNearestMultipleOfFive(
+				8700.f * GameRangeMlt * DirectFireRangeMlt);
+			inline constexpr float LightAssaultCannonRange = RoundToNearestMultipleOfFive(
+				9800.f * GameRangeMlt * DirectFireRangeMlt);
+			inline constexpr float MediumCannonRange = RoundToNearestMultipleOfFive(
+				9200.f * GameRangeMlt * DirectFireRangeMlt);
+			inline constexpr float MediumAssaultCannonRange = RoundToNearestMultipleOfFive(
+				10600.f * GameRangeMlt * DirectFireRangeMlt);
+			inline constexpr float HeavyCannonRange = RoundToNearestMultipleOfFive(
+				9200.f * GameRangeMlt * DirectFireRangeMlt);
+			inline constexpr float HeavyAssaultCannonRange = RoundToNearestMultipleOfFive(
+				10600.f * GameRangeMlt * DirectFireRangeMlt);
 
 			// Medium artillery range ~105 mm howitzers
-			inline constexpr float LightArtilleryRange = RoundToNearestMultipleOfFive(14000.f * GameRangeMlt);
-			inline constexpr float MediumArtilleryRange = 17000.f * GameRangeMlt;
-			inline constexpr float HeavyArtilleryRange = 19000.f * GameRangeMlt;
+			inline constexpr float LightArtilleryRange = RoundToNearestMultipleOfFive(
+				14000.f * GameRangeMlt * ArtilleryRangeMlt);
+			inline constexpr float MediumArtilleryRange = 17000.f * GameRangeMlt * ArtilleryRangeMlt;
+			inline constexpr float HeavyArtilleryRange = 19000.f * GameRangeMlt * ArtilleryRangeMlt;
 
 			// Static artillery range  /  howitzers
-			inline constexpr float HowitzerArtilleryRange = 22000.f * GameRangeMlt;
-			inline constexpr float RailwayArtilleryRange = 30000.f * GameRangeMlt;
+			inline constexpr float HowitzerArtilleryRange = 22000.f * GameRangeMlt * ArtilleryRangeMlt;
+			inline constexpr float RailwayArtilleryRange = 30000.f * GameRangeMlt * ArtilleryRangeMlt;
 
-			// Laser weapons
+			// Laser weapons; MediumCannonRange already carries DirectFireRangeMlt.
 			inline constexpr float MediumLaserWeaponRange = RoundToNearestMultipleOf(MediumCannonRange * 1.2f, 100);
 
 			// Flame weapons
-			inline constexpr float LightFlameRange = RoundToNearestMultipleOf(1800 * GameRangeMlt, 5);
-			inline constexpr float MediumFlameRange = RoundToNearestMultipleOf(3000 * GameRangeMlt, 5);
+			inline constexpr float LightFlameRange = RoundToNearestMultipleOf(
+				1800 * GameRangeMlt * DirectFireRangeMlt, 5);
+			inline constexpr float MediumFlameRange = RoundToNearestMultipleOf(
+				3000 * GameRangeMlt * DirectFireRangeMlt, 5);
 		}
 
 		namespace VisionRadii

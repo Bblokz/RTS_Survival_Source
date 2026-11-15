@@ -119,8 +119,9 @@ namespace VariantBatchThreeWeaponsPrivate
 		                     Calibre * ShrapnelAmountPerMM,
 		                     Calibre * ShrapnelPenPerMM);
 		MortarData.DamageFlux = DamageFluxPercentage;
-		// The user: "the same range" as the autocannon.
-		MortarData.Range = LightCannonRange;
+		// The user: "the same range" as the autocannon, but as a mortar it takes the artillery range boost
+		// instead of the direct-fire one the autocannon range carries.
+		MortarData.Range = VariantBatchThreeWeapons::GetBunkerMortarRange();
 		MortarData.MagCapacity = 3;
 		MortarData.ReloadSpeed = 7.f;
 		MortarData.BaseCooldown = 1.5f;
@@ -429,6 +430,14 @@ namespace VariantBatchThreeWeaponsPrivate
 	}
 }
 
+float VariantBatchThreeWeapons::GetBunkerMortarRange()
+{
+	using namespace DeveloperSettings::GameBalance::Ranges;
+	constexpr int32 RangeRoundingMultiple = 10;
+	return RTSFunctionLibrary::RoundToNearestMultipleOf(
+		LightCannonRange / DirectFireRangeMlt * ArtilleryRangeMlt, RangeRoundingMultiple);
+}
+
 void VariantBatchThreeWeapons::AddWeapons(TMap<EWeaponName, FWeaponData>& WeaponDataMap)
 {
 	using namespace VariantBatchThreeWeaponsPrivate;
@@ -459,7 +468,7 @@ void VariantBatchThreeWeapons::AddRocketData(TMap<ERocketAbility, FAttachedRocke
 	IncendiaryRockets.WeaponCalibre = 320;
 	IncendiaryRockets.Damage = 180.f;
 	IncendiaryRockets.ArmorPen = 20.f;
-	IncendiaryRockets.Range = 9000.f;
+	IncendiaryRockets.Range = 9000.f * DeveloperSettings::GameBalance::Ranges::ArtilleryRangeMlt;
 	IncendiaryRockets.ProjectileSpeed = 3500.f;
 	IncendiaryRockets.ProjectileAccelerationFactor = 1.5f;
 	IncendiaryRockets.Cooldown = 0.5f;
@@ -477,7 +486,7 @@ void VariantBatchThreeWeapons::AddRocketData(TMap<ERocketAbility, FAttachedRocke
 	GuidedMissiles.WeaponCalibre = 180;
 	GuidedMissiles.Damage = 280.f;
 	GuidedMissiles.ArmorPen = 170.f;
-	GuidedMissiles.Range = 11000.f;
+	GuidedMissiles.Range = 11000.f * DeveloperSettings::GameBalance::Ranges::ArtilleryRangeMlt;
 	GuidedMissiles.ProjectileSpeed = 3000.f;
 	GuidedMissiles.ProjectileAccelerationFactor = 2.f;
 	GuidedMissiles.Cooldown = 0.9f;

@@ -61,7 +61,7 @@ ACPPGameState::ACPPGameState()
 	// Init default fallback weapon.
 	DefaultWeapon.BaseDamage = 7 * DeveloperSettings::GameBalance::Weapons::DamagePerMM;
 	DefaultWeapon.DamageFlux = 10;
-	DefaultWeapon.Range = 7000;
+	DefaultWeapon.Range = 7000 * DeveloperSettings::GameBalance::Ranges::DirectFireRangeMlt;
 	DefaultWeapon.ArmorPen = 12;
 	DefaultWeapon.MagCapacity = 80;
 	DefaultWeapon.ReloadSpeed = 7;
@@ -2661,7 +2661,8 @@ void ACPPGameState::InitAllGameSmallArmsWeapons()
 	WeaponData.BaseDamage = DamagePerMM * WeaponData.WeaponCalibre
 		+ WeaponData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams;
 	WeaponData.DamageFlux = DamageFluxPercentage;
-	WeaponData.Range = SmallArmsRifleRange + 500;
+	WeaponData.Range = RTSFunctionLibrary::RoundToNearestMultipleOf(
+		SmallArmsRifleRange + 500 * DeveloperSettings::GameBalance::Ranges::DirectFireRangeMlt, 5);
 	WeaponData.ArmorPen = 143;
 	WeaponData.ArmorPenMaxRange = 130;
 	WeaponData.MagCapacity = 3;
@@ -3249,7 +3250,7 @@ void ACPPGameState::InitAllGameRailGunData()
 	// projectile speed up and damage down when firing: the best pen of its class, with little falloff, for a slow reload.
 	{
 		constexpr float SniperFiredDamage = 100.f;
-		constexpr float SniperRange = 5600.f;
+		constexpr float SniperRange = 5600.f * DeveloperSettings::GameBalance::Ranges::DirectFireRangeMlt;
 		FWeaponData RailSniperData = {};
 		RailSniperData.WeaponName = EWeaponName::GerRailSniper20MM;
 		RailSniperData.DamageType = ERTSDamageType::Kinetic;
@@ -3474,7 +3475,8 @@ void ACPPGameState::InitAllGameLightWeapons()
 	WeaponData.TNTExplosiveGrams = 0;
 	WeaponData.BaseDamage = 20 * DamagePerMM;
 	WeaponData.DamageFlux = DamageFluxPercentage;
-	WeaponData.Range = BasicSmallArmsRange + 250;
+	WeaponData.Range = RTSFunctionLibrary::RoundToNearestMultipleOf(
+		BasicSmallArmsRange + 250 * DeveloperSettings::GameBalance::Ranges::DirectFireRangeMlt, 5);
 	WeaponData.ArmorPen = 28;
 	WeaponData.ArmorPenMaxRange = 14;
 	WeaponData.MagCapacity = 24;
@@ -3525,7 +3527,8 @@ void ACPPGameState::InitAllGameLightWeapons()
 	WeaponData.TNTExplosiveGrams = 0;
 	WeaponData.BaseDamage = 23 * DamagePerMM + 4;
 	WeaponData.DamageFlux = DamageFluxPercentage;
-	WeaponData.Range = BasicSmallArmsRange + 250;
+	WeaponData.Range = RTSFunctionLibrary::RoundToNearestMultipleOf(
+		BasicSmallArmsRange + 250 * DeveloperSettings::GameBalance::Ranges::DirectFireRangeMlt, 5);
 	WeaponData.ArmorPen = 45;
 	WeaponData.ArmorPenMaxRange = 38;
 	WeaponData.MagCapacity = 10;
@@ -3550,7 +3553,8 @@ void ACPPGameState::InitAllGameLightWeapons()
 	WeaponData.TNTExplosiveGrams = 0.f;
 	WeaponData.BaseDamage = 30.f;
 	WeaponData.DamageFlux = DamageFluxPercentage;
-	WeaponData.Range = BasicSmallArmsRange + 250.f;
+	WeaponData.Range = RTSFunctionLibrary::RoundToNearestMultipleOf(
+		BasicSmallArmsRange + 250 * DeveloperSettings::GameBalance::Ranges::DirectFireRangeMlt, 5);
 	WeaponData.ArmorPen = 90.f;
 	WeaponData.ArmorPenMaxRange = 80.f;
 	WeaponData.MagCapacity = 12;
@@ -5241,7 +5245,7 @@ void ACPPGameState::InitAllGameHeavyWeapons()
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::sIG_33_150MM, WeaponData);
 
 	// Towed sFH 18 (team weapon and the sFH 18 pit): the sIG 33's 15 cm shell from a long barrel. It outranges the
-	// leFH 18 (HowitzerArtilleryRange, 8800) like the real guns (about 13.3 km against 10.7 km), by the same 20% as
+	// leFH 18 (HowitzerArtilleryRange, 9680) like the real guns (about 13.3 km against 10.7 km), by the same 20% as
 	// the ML-20 pit: 10600. Only the range differs from the sIG 33; the JagdPanther Bollwerk sets its own range.
 	constexpr float Sfh18RangeOverLeFH18 = 1.2f;
 	FWeaponData Sfh18TowedData = WeaponData;
@@ -5508,8 +5512,11 @@ void ACPPGameState::InitAllGameHeavyWeapons()
 	WeaponData.TNTExplosiveGrams = 1062;
 	WeaponData.BaseDamage = DamagePerMM * WeaponData.WeaponCalibre
 		+ GetCannonDamageTNTGrams(WeaponData.TNTExplosiveGrams) * DamagePerTNTEquivalentGrams;
+	// The SU-152 takes the direct-fire range boost instead of the artillery one its base constant carries.
 	WeaponData.Range = RTSFunctionLibrary::RoundToNearestMultipleOf(
-		DeveloperSettings::GameBalance::Ranges::HeavyArtilleryRange * 1.2, 100);
+		DeveloperSettings::GameBalance::Ranges::HeavyArtilleryRange * 1.2
+		/ DeveloperSettings::GameBalance::Ranges::ArtilleryRangeMlt
+		* DeveloperSettings::GameBalance::Ranges::DirectFireRangeMlt, 100);
 	WeaponData.ArmorPen = 161;
 	WeaponData.ArmorPenMaxRange = 152;
 	WeaponData.MagCapacity = 1;
@@ -5690,7 +5697,7 @@ void ACPPGameState::InitAllGameRocketData()
 	RocketData.DamageType = ERTSDamageType::Kinetic;
 	RocketData.Cooldown = 2.5f;
 	RocketData.Damage = 300.f;
-	RocketData.Range = 10000.f;
+	RocketData.Range = 10000.f * DeveloperSettings::GameBalance::Ranges::DirectFireRangeMlt;
 	RocketData.ArmorPen = 110.f;
 	RocketData.ProjectileSpeed = 5000.f;
 	RocketData.ProjectileAccelerationFactor = 1.f;
@@ -5706,7 +5713,7 @@ void ACPPGameState::InitAllGameRocketData()
 	RocketData.DamageType = ERTSDamageType::Kinetic;
 	RocketData.Cooldown = 0.33f;
 	RocketData.Damage = 150.f;
-	RocketData.Range = 10000.f;
+	RocketData.Range = 10000.f * DeveloperSettings::GameBalance::Ranges::DirectFireRangeMlt;
 	RocketData.ArmorPen = 100.f;
 	RocketData.ProjectileSpeed = 5000.f;
 	RocketData.ProjectileAccelerationFactor = 2.f;
@@ -5723,7 +5730,7 @@ void ACPPGameState::InitAllGameRocketData()
 	RocketData.DamageType = ERTSDamageType::Kinetic;
 	RocketData.Cooldown = 0.33f;
 	RocketData.Damage = 120.f;
-	RocketData.Range = 10000.f;
+	RocketData.Range = 10000.f * DeveloperSettings::GameBalance::Ranges::DirectFireRangeMlt;
 	RocketData.ArmorPen = 80.f;
 	RocketData.ProjectileSpeed = 5000.f;
 	RocketData.ProjectileAccelerationFactor = 2.f;
@@ -5741,7 +5748,7 @@ void ACPPGameState::InitAllGameRocketData()
 	RocketData.DamageType = ERTSDamageType::Kinetic;
 	RocketData.Cooldown = 0.45f;
 	RocketData.Damage = 260.f;
-	RocketData.Range = 10000.f;
+	RocketData.Range = 10000.f * DeveloperSettings::GameBalance::Ranges::DirectFireRangeMlt;
 	RocketData.ArmorPen = 160.f;
 	RocketData.ProjectileSpeed = 4500.f;
 	RocketData.ProjectileAccelerationFactor = 2.f;
