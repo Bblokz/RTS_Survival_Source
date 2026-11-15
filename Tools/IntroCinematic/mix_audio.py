@@ -15,7 +15,10 @@ import sys
 
 ROOT = "D:/UE5Projects/RTS_Survival/Saved/IntroCinematic"
 TIMELINE = ROOT + "/timeline.json"
-VO = ROOT + "/vo_scratch/vo_scratch.json"
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import intro_narration
+
+VO = intro_narration.vo_json()
 SFX = ROOT + "/audio/sfx.json"
 OUT = ROOT + "/audio/intro_mix.wav"
 VOICE_GAIN_DB = 0.0

@@ -64,7 +64,24 @@ ROWS = [
 ]
 
 VO_SCRATCH_DIR = "D:/UE5Projects/RTS_Survival/Saved/IntroCinematic/vo_scratch"
-VO_ASSET_DIR = "/Game/RTS_Survival/Cinematics/Intro1976/Audio/VO_Scratch"
+VO_SCRATCH_ASSET_DIR = "/Game/RTS_Survival/Cinematics/Intro1976/Audio/VO_Scratch"
+# The picked announcer takes (ElevenLabs + VoiceChanger AnnouncerFilter): make_final_vo.py writes VO_FINAL_JSON.
+VO_FINAL_DIR = "D:/UE5Projects/RTS_Survival/VoiceLines/IntroCinematic1976"
+VO_FINAL_JSON = VO_FINAL_DIR + "/vo_final.json"
+VO_FINAL_ASSET_DIR = "/Game/RTS_Survival/Cinematics/Intro1976/Audio/VO"
+
+
+def has_final_voice():
+    import os
+    return os.path.exists(VO_FINAL_JSON)
+
+
+def vo_json():
+    """The voice the film is cut against: the picked announcer takes once they exist, the scratch voice before."""
+    return VO_FINAL_JSON if has_final_voice() else VO_SCRATCH_DIR + "/vo_scratch.json"
+
+
+VO_ASSET_DIR = VO_FINAL_ASSET_DIR if has_final_voice() else VO_SCRATCH_ASSET_DIR
 
 
 def wave_name(row_id):

@@ -13,6 +13,9 @@ importlib.reload(shots)
 import intro_manifest as manifest
 importlib.reload(manifest)
 STEPS = "__STEPS__".split(",")
+if "vo" in STEPS:
+    b.import_vo()
+    b.build_transcripts()
 if "mats" in STEPS:
     mats.import_textures()
     mats.build_grade()

@@ -22,7 +22,7 @@ MASTER = lib.ROOT + "/LS_Intro1976_Master"
 DATA_DIR = lib.ROOT + "/Data"
 CUES_TABLE = DATA_DIR + "/DT_IntroCues"
 TRANSCRIPTS_TABLE = DATA_DIR + "/DT_IntroTranscripts"
-VO_JSON = narration.VO_SCRATCH_DIR + "/vo_scratch.json"
+VO_JSON = narration.vo_json()
 TIMELINE_JSON = "D:/UE5Projects/RTS_Survival/Saved/IntroCinematic/timeline.json"
 
 eal = unreal.EditorAssetLibrary
