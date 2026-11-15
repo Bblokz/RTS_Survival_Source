@@ -91,6 +91,14 @@ class Builder:
             f.material_index = SLOT.get(mode, 1)
         return faces
 
+    def _fix_winding(self, verts):
+        """B() mirrors Y (Unreal -> Blender), which turns the primitives' outward winding inward; recalc outward.
+        recalc_face_normals reads the cached face normals, so refresh them after moving the verts first."""
+        faces = list({f for v in verts for f in v.link_faces})
+        for f in faces:
+            f.normal_update()
+        bmesh.ops.recalc_face_normals(self.bm, faces=faces)
+
     def box(self, lo, hi, mode='concrete'):
         lo, hi = Vector(lo), Vector(hi)
         res = bmesh.ops.create_cube(self.bm, size=1.0)
@@ -98,6 +106,7 @@ class Builder:
         s = hi - lo
         for v in res['verts']:
             v.co = B(Vector((c.x + v.co.x * s.x, c.y + v.co.y * s.y, c.z + v.co.z * s.z)))
+        self._fix_winding(res['verts'])
         return self._tag(res['verts'], mode)
 
     def frustum(self, lo, hi, top_half, mode='concrete'):
@@ -112,6 +121,7 @@ class Builder:
             else:
                 p = Vector((c.x + v.co.x * s.x, c.y + v.co.y * s.y, lo.z))
             v.co = B(p)
+        self._fix_winding(res['verts'])
         return self._tag(res['verts'], mode)
 
     def beam(self, a, b, w, h, mode='tube', up=(0, 1, 0)):
@@ -127,7 +137,7 @@ class Builder:
         for v in res['verts']:
             p = c + x * (v.co.x * d.length) + y * (v.co.y * h) + z * (v.co.z * w)
             v.co = B(p)
-        bmesh.ops.recalc_face_normals(self.bm, faces=list({f for v in res['verts'] for f in v.link_faces}))
+        self._fix_winding(res['verts'])
         return self._tag(res['verts'], mode)
 
     def cyl(self, centre, axis, r, length, mode='dark', segs=16, cap_mode=None):
@@ -141,7 +151,7 @@ class Builder:
             elif axis == 'y':
                 p = Vector((p.x, p.z, p.y))
             v.co = B(Vector(centre) + p)
-        bmesh.ops.recalc_face_normals(self.bm, faces=list({f for v in res['verts'] for f in v.link_faces}))
+        self._fix_winding(res['verts'])
         faces = self._tag(res['verts'], mode)
         if cap_mode:
             for f in faces:
@@ -301,22 +311,22 @@ def gate_a():
         for za, zb in ((z0, z0 + 8), (128, 136), (z1 - 8, z1)):
             leaf.box((xl + 8, -14, za), (xr - 8, -6, zb), 'tube')
         # plate (both faces get the plate texture)
-        leaf.box((xl + 8, -11, z0 + 8), (xr - 8, -9, z1 - 8), 'plate')
+        leaf.box((xl + 8, -12, z0 + 8), (xr - 8, -8, z1 - 8), 'plate')
         # inside diagonal brace (+Y side), from low near corner to high far corner
         nx = near - sgn * 8
         fx = far + sgn * 8
         leaf.beam((nx, -5.5, 140), (fx, -5.5, z1 - 12), 7, 5, 'tube', up=(0, 0, 1))
-        leaf.box((xl + 8, -9, 290), (xr - 8, -4, 297), 'tube')  # inside mid rail
+        leaf.box((xl + 8, -8.5, 290), (xr - 8, -4, 297), 'tube')  # inside mid rail
         # roundel on the outside
         xc = (xl + xr) / 2
-        leaf.cyl((xc, -11, 292), 'y', 100, -1.8, 'tube', segs=40, cap_mode='roundel')
+        leaf.cyl((xc, -11.5, 292), 'y', 100, -4.5, 'tube', segs=40, cap_mode='roundel')
         # hinge knuckles + straps (rotate with the leaf about the knuckle axis)
         for z in (101.0, 419.0):
             leaf.cyl((hinge, -10, z), 'z', 5, 28, 'dark', segs=10)
             hx0, hx1 = sorted((hinge - sgn * 4, near))
             leaf.box((hx0, -13.5, z + 4), (hx1, -6.5, z + 24), 'dark')
             sx0, sx1 = sorted((near, near - sgn * 60))
-            leaf.box((sx0, -15, z + 6), (sx1, -14, z + 22), 'dark')
+            leaf.box((sx0, -16.5, z + 6), (sx1, -13, z + 22), 'dark')
         if pid == 0:  # drop bolt + latch on the meeting stile
             leaf.cyl((far + 5, -17, z0 - 5), 'z', 2.5, 90, 'dark', segs=8)
             leaf.box((far + 2, -19, 60), (far + 9, -14, 66), 'dark')
@@ -361,10 +371,10 @@ def gate_c():
     frame.box((-910, -115, 1100), (-160, 135, 1125))
     frame.box((-910, -98, 990), (-160, 118, 1004))
     for xs in ((-600, -592), (-478, -470)):
-        frame.box((xs[0], -94, 1010), (xs[1], -90, 1090))
+        frame.box((xs[0], -96, 1010), (xs[1], -89, 1090))
     for zs in ((1010, 1018), (1082, 1090)):
-        frame.box((-600, -94, zs[0]), (-470, -90, zs[1]))
-    frame.cyl((-535, -90, 1050), 'y', 32, -2.5, 'tube', segs=32, cap_mode='roundel')
+        frame.box((-600, -96, zs[0]), (-470, -89, zs[1]))
+    frame.cyl((-535, -89, 1050), 'y', 32, -5.0, 'tube', segs=32, cap_mode='roundel')
     # guide channels (U section) on the inner tower faces
     for web_x0, web_x1, fl_x0, fl_x1 in ((-165, -160, -178, -165), (-910, -905, -905, -892)):
         frame.box((web_x0, -42, 0), (web_x1, 22, 1000), 'dark')
@@ -386,8 +396,8 @@ def gate_c():
     leaf.box((-175, -29, 0), (-167, 9, 470), 'tube')
     leaf.box((-903, -32, 470), (-167, 12, 495), 'tube')
     for z in (150, 320):
-        leaf.box((-895, -30, z), (-175, -27, z + 12), 'dark')
-        leaf.box((-895, 7, z), (-175, 10, z + 12), 'dark')
+        leaf.box((-895, -31, z), (-175, -26, z + 12), 'dark')
+        leaf.box((-895, 6, z), (-175, 11, z + 12), 'dark')
     for lx in (-720, -350):
         leaf.box((lx - 8, -16, 495), (lx + 8, -4, 525), 'dark')
         leaf.cyl((lx - 12, -10, 515), 'x', 3, 24, 'dark', segs=8)

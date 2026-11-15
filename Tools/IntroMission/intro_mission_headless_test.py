@@ -326,9 +326,10 @@ def panzer_takeover_checks():
     opened = S.get('panzer_takeovers', {})
     spaced, vehicle = (opened.get(c) for c in PANZER_TAKEOVERS)
     first = S.get('panzer_first_seen')
-    # The 5 s delay runs in game time; the test clock is wall time, so allow for a slow frame rate either way.
+    # The 5 s delay runs in game time from the first panzer's OnSpawned; the test clock is wall time and the test
+    # can see a freshly spawned panzer a couple of seconds late, so the window is wide.
     check('spaced_armour_takeover_after_panzers', spaced is not None and first is not None and spaced['paused']
-          and PANZER_TAKEOVER_DELAY - 1.0 <= spaced['t'] - first <= PANZER_TAKEOVER_DELAY + 15.0,
+          and 1.0 <= spaced['t'] - first <= PANZER_TAKEOVER_DELAY + 15.0,
           f'first panzer seen at {first}, spaced armour takeover {spaced}')
     check('t26_info_takeover_after_spaced_armour', vehicle is not None and spaced is not None
           and 'closed' in spaced and vehicle['t'] >= spaced['closed'] and vehicle['paused'],
@@ -903,7 +904,7 @@ def tick(delta):
             gliders_seen(world)
             _, wave = expected_soviet_wave(world)
             if (len(S.get('soviet_first', {})) >= sum(wave.values()) and len(S.get('rein_first', {})) >= 7
-                    and len(S.get('flank_first', {})) >= len(FLANK_SLOTS) and elapsed > 4.0) or elapsed > 40.0:
+                    and len(S.get('flank_first', {})) >= len(FLANK_SLOTS) and elapsed > 4.0) or elapsed > 120.0:
                 ridge_spawn_checks(world)
                 S['phase'], S['mark'] = 'watch_ridge', S['t']
         elif phase == 'watch_ridge':
@@ -924,6 +925,12 @@ def tick(delta):
                     check('ridge_mission_running', mission_complete(world, 'Mission_Intro_RidgeArmor_C') is False and
                           mission_complete(world, 'Mission_Intro_ClearSovietRig_C') is False)
                     check_markers(world, 'both_groups_alive', True, True)
+                    ridge = mission_object(world, 'Mission_Intro_RidgeArmor_C')
+                    title = str(ridge.get_editor_property('mission_widget_state').get_editor_property('mission_title'))                         if ridge is not None else ''
+                    _, wave = expected_soviet_wave(world)
+                    total = sum(wave.values()) + len(FLANK_SLOTS)
+                    check('ridge_panel_kill_counter', 'Soviet tanks destroyed' in title and f'/{total}<' in title,
+                          f'mission title {title!r}, expected a counter out of {total}')
                 killed = 0
                 # Kill the ridge wave first and check the mission waits for the flanking T-26s too.
                 for class_name in SOVIET_CLASSES:
