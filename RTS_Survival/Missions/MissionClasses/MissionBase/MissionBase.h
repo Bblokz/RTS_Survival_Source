@@ -22,6 +22,7 @@
 #include "RTS_Survival/Game/UserSettings/RTSGameUserSettings.h"
 #include "RTS_Survival/Missions/NomadicAirDelivery/NomadicAirDeliveryTypes.h"
 #include "RTS_Survival/GameUI/InfoTakeover/InfoTakeoverTypes.h"
+#include "RTS_Survival/GameUI/LocationIntro/LocationIntroTypes.h"
 #include "MissionBase.generated.h"
 
 enum class ERTSFaction : uint8;
@@ -44,6 +45,8 @@ struct FTrainingOption;
 class ARTSAsyncSpawner;
 class UMissionTrigger;
 class UMissionCinematicTakeOverSession;
+class UMissionLocationIntroSession;
+enum class ELocationIntroSessionEnd : uint8;
 class UInfoTakeoverSubsystem;
 class UMovieSceneSequencePlayer;
 class UW_Mission;
@@ -259,6 +262,9 @@ class RTS_SURVIVAL_API UMissionBase : public UObject
 	// to call on spawn complete for bp.
 	friend struct FMissionSpawnCommandQueueState;
 	friend class UMissionCinematicTakeOverSession;
+	friend class UMissionLocationIntroSession;
+	// Headless tests start a location intro on a throwaway mission.
+	friend class UMissionMapTestLibrary;
 
 
 public:
@@ -1175,6 +1181,54 @@ protected:
 	void MoveCamera(FMovePlayerCamera CameraMove);
 
 	/**
+	 * @brief Cinematic introduction of a place: the HUD hides, the player camera drifts (and optionally turns) while
+	 * the location appears top centre and the date types out bottom left; then the HUD comes back.
+	 * When a cinematic, info takeover, tech tree or archive holds the screen, or a MoveCamera move is still under way,
+	 * the intro waits until that is over.
+	 * Stops a playing portrait and mutes regular voice lines for its length, like a cinematic takeover.
+	 * @param Location Large, top centre, in capitals (e.g. "Berlin").
+	 * @param Date Typed bottom left (e.g. "21 April 1945").
+	 * @param DriftAxis World axis the camera moves along.
+	 * @param DriftDistance Units moved along DriftAxis over the whole intro; negative moves the other way. The move
+	 * stops early at a camera boundary.
+	 * @param DurationSeconds Real seconds the intro takes; the texts fade out at its end. Zero or less uses 7; it is
+	 * lengthened when the texts would not have time to type out before the fade.
+	 * @param bPanCamera Also turn the camera (PanSettings), an orbit around the point it looks at.
+	 * @param PanSettings Turn angles and whether the camera turns back before the intro ends.
+	 * @param ID Handed back in BP_OnLocationIntroFinished.
+	 * @param LocationSubtitle Optional smaller line under the location.
+	 * @param TimeOfDay Optional line typed under the date (e.g. "05:40 hrs").
+	 * @param Presentation Cinema bars, fade from black, timings and sounds; the defaults are the tuned look.
+	 * @return False when this mission already runs an intro (or the player camera is missing); BP_OnLocationIntroFinished
+	 * then still fires next frame with bWasShown false, so a chain on it never stalls.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|Camera",
+		meta = (AdvancedDisplay = "ID,LocationSubtitle,TimeOfDay,Presentation", AutoCreateRefTerm =
+			"Location,Date,PanSettings,LocationSubtitle,TimeOfDay,Presentation", CPP_Default_DriftAxis = "WorldX",
+			CPP_Default_DriftDistance = "1500.000000", CPP_Default_DurationSeconds = "7.000000"))
+	bool ShowLocationIntro(const FText& Location,
+	                       const FText& Date,
+	                       const ELocationIntroDriftAxis DriftAxis,
+	                       const float DriftDistance,
+	                       const float DurationSeconds,
+	                       const bool bPanCamera,
+	                       const FLocationIntroPanSettings& PanSettings,
+	                       const int32 ID,
+	                       const FText& LocationSubtitle,
+	                       const FText& TimeOfDay,
+	                       const FLocationIntroPresentation& Presentation);
+
+	/** @return True from ShowLocationIntro until BP_OnLocationIntroFinished (waiting for the screen included). */
+	UFUNCTION(BlueprintPure, NotBlueprintable, Category = "Mission|Camera")
+	bool GetIsLocationIntroPlaying() const;
+
+	// The location intro of ShowLocationIntro ended and the HUD is back. bWasShown is false when it never showed (the
+	// screen stayed busy for 45 s, or another intro of this mission ran). Not fired when the intro is cut short by
+	// the mission failing or by a cinematic started over it.
+	UFUNCTION(BlueprintImplementableEvent, Category = "Mission|Camera")
+	void BP_OnLocationIntroFinished(const int32 ID, const bool bWasShown);
+
+	/**
 	 * @brief Registers an additional camera blocking boundary through mission blueprint logic.
 	 * @param BoundaryRegistrationParams Boundary registration payload forwarded to the player camera controller.
 	 * @return True if the boundary registration succeeded.
@@ -1392,6 +1446,17 @@ private:
 	// Keeps the returned cinematic handle alive until it broadcasts completion or gets cancelled.
 	UPROPERTY()
 	TObjectPtr<UMissionCinematicTakeOverSession> M_ActiveCinematicTakeOverSession = nullptr;
+
+	// The running ShowLocationIntro; it hides the HUD, so every way out of the mission must cancel it.
+	UPROPERTY()
+	TObjectPtr<UMissionLocationIntroSession> M_ActiveLocationIntroSession = nullptr;
+
+	// Ends a running location intro early (HUD back, camera input back) without firing BP_OnLocationIntroFinished.
+	void CancelActiveLocationIntro();
+	// Called by the session once it handed the screen back.
+	void OnLocationIntroSessionEnded(const UMissionLocationIntroSession* Session, const int32 ID,
+	                                 const ELocationIntroSessionEnd EndReason);
+	void LocationIntro_ReportSkippedNextFrame(const int32 ID);
 
 	// Tracks actor validity transitions so each tracked element increments at most once.
 	UPROPERTY()

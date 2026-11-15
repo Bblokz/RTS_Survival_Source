@@ -22,4 +22,6 @@ enum class ERTSPortraitTypes :uint8
 	SovietMosin,
 	// Tiger I loader in red battle light holding an 8.8 cm round (head-nod + engine-tremor portrait material).
 	GermanTigerLoader,
+	// Scavenger in the open hatch of a speeding Panzer II Luchs (ride jolt + background flow + head-nod material).
+	GermanLuchsScavenger,
 };

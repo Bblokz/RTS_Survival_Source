@@ -8,7 +8,11 @@
 #include "RTS_Survival/GameUI/TrainingUI/TrainingMenuManager.h"
 #include "RTS_Survival/GameUI/TrainingUI/TrainerComponent/TrainerComponent.h"
 #include "RTS_Survival/GameUI/TrainingUI/TrainingLayout/TrainingLayoutTypes.h"
+#include "EngineUtils.h"
 #include "RTS_Survival/Interfaces/Commands.h"
+#include "RTS_Survival/Missions/MissionClasses/MoveCamera/MoveCameraMission.h"
+#include "RTS_Survival/Missions/MissionManager/MissionManager.h"
+#include "RTS_Survival/Player/Camera/CameraController/PlayerCameraController.h"
 #include "RTS_Survival/Player/CPPController.h"
 #include "RTS_Survival/Units/Tanks/WheeledTank/BaseTruck/NomadicVehicle.h"
 #include "RTS_Survival/Utils/RTSMapTests/RTSMapTests.h"
@@ -125,6 +129,78 @@ int32 UMissionMapTestLibrary::MapTest_ConvertNomadicAt(ANomadicVehicle* NomadicT
 	return bNeededBuildRadius ? Result + NeededBuildRadiusFlag : Result;
 #else
 	return 0;
+#endif
+}
+
+namespace MissionMapTestLocationIntro
+{
+	// The throwaway mission of the last MapTest_StartLocationIntro; the mission manager keeps it alive.
+	TWeakObjectPtr<UMissionBase> TestMission;
+}
+
+bool UMissionMapTestLibrary::MapTest_StartLocationIntro(const UObject* WorldContextObject,
+                                                       const FLocationIntroTexts Texts,
+                                                       const ELocationIntroDriftAxis DriftAxis,
+                                                       const float DriftDistance,
+                                                       const float DurationSeconds,
+                                                       const bool bPanCamera,
+                                                       const FLocationIntroPanSettings PanSettings,
+                                                       const FLocationIntroPresentation Presentation,
+                                                       const bool bCompleteMissionRightAway)
+{
+#if RTS_WITH_MAP_TESTS
+	UWorld* const World = IsValid(WorldContextObject) ? WorldContextObject->GetWorld() : nullptr;
+	if (World == nullptr)
+	{
+		return false;
+	}
+	TActorIterator<AMissionManager> ManagerIterator(World);
+	AMissionManager* const MissionManager = ManagerIterator ? *ManagerIterator : nullptr;
+	if (not IsValid(MissionManager))
+	{
+		return false;
+	}
+	UMoveCameraMission* const Mission = NewObject<UMoveCameraMission>(MissionManager);
+	MissionManager->ActivateNewMission(Mission);
+	MissionMapTestLocationIntro::TestMission = Mission;
+	constexpr int32 TestIntroId = 1;
+	const bool bAccepted = Mission->ShowLocationIntro(Texts.Location, Texts.Date, DriftAxis, DriftDistance,
+	                                                  DurationSeconds, bPanCamera, PanSettings, TestIntroId,
+	                                                  Texts.LocationSubtitle, Texts.TimeOfDay, Presentation);
+	if (bCompleteMissionRightAway)
+	{
+		Mission->NextMission = NewObject<UMoveCameraMission>(MissionManager);
+		Mission->OnMissionComplete();
+	}
+	return bAccepted;
+#else
+	return false;
+#endif
+}
+
+void UMissionMapTestLibrary::MapTest_GetLocationIntroState(const UObject* WorldContextObject,
+                                                          bool& bOutIntroPlaying,
+                                                          bool& bOutScreenHandedBack,
+                                                          FVector& OutCameraLocation,
+                                                          FRotator& OutCameraRotation)
+{
+	bOutIntroPlaying = false;
+	bOutScreenHandedBack = false;
+	OutCameraLocation = FVector::ZeroVector;
+	OutCameraRotation = FRotator::ZeroRotator;
+#if RTS_WITH_MAP_TESTS
+	if (MissionMapTestLocationIntro::TestMission.IsValid())
+	{
+		bOutIntroPlaying = MissionMapTestLocationIntro::TestMission->GetIsLocationIntroPlaying();
+	}
+	const ACPPController* const PlayerController = FRTS_Statics::GetRTSController(WorldContextObject);
+	bOutScreenHandedBack = IsValid(PlayerController) && PlayerController->GetCanStartScreenTakeover();
+	const UPlayerCameraController* const CameraController = FRTS_Statics::GetPlayerCameraController(
+		WorldContextObject);
+	if (IsValid(CameraController))
+	{
+		CameraController->GetCameraPawnPose(OutCameraLocation, OutCameraRotation);
+	}
 #endif
 }
 

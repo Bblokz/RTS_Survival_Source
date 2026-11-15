@@ -20,6 +20,7 @@
 #include "RTS_Survival/GameUI/MiniMap/CombatPings/RTSCombatPingSubsystem.h"
 #include "RTS_Survival/Game/UserSettings/RTSGameUserSettings.h"
 #include "RTS_Survival/Missions/MissionClasses/MissionBase/MissionCinematicTakeOverSession.h"
+#include "RTS_Survival/Missions/MissionClasses/MissionBase/MissionLocationIntroSession.h"
 #include "RTS_Survival/Missions/MissionManager/MissionManager.h"
 #include "RTS_Survival/Missions/TriggerAreas/TriggerArea.h"
 #include "RTS_Survival/Missions/MissionTrigger/MissionTrigger.h"
@@ -142,6 +143,8 @@ void UMissionBase::ActivateNextMissionIfConfigured()
 void UMissionBase::OnMissionFailed()
 {
 	MissionState.bIsMissionComplete = true;
+	// End the intro now, so it does not hand the HUD back later over the defeat screen.
+	CancelActiveLocationIntro();
 	if (UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().ClearTimer(M_AbilityCooldownPollingTimerHandle);
@@ -611,6 +614,7 @@ void UMissionBase::OnCleanUpMission()
 	{
 		M_ActiveCinematicTakeOverSession->RequestCancel();
 	}
+	CancelActiveLocationIntro();
 
 	Tracking_ClearState();
 	EnemyInBuilding_ClearTracking();
@@ -647,6 +651,7 @@ void UMissionBase::BeginDestroy()
 	{
 		M_ActiveCinematicTakeOverSession->RequestCancel();
 	}
+	CancelActiveLocationIntro();
 
 	Tracking_ClearState();
 	EnemyInBuilding_ClearTracking();
@@ -1025,6 +1030,14 @@ UInfoTakeoverSubsystem* UMissionBase::GetInfoTakeoverSubsystem() const
 
 bool UMissionBase::OnCinematicTakeOverFromMission(const bool bCinematicStarted) const
 {
+	// A showing location intro would hand the screen back in the middle of the cinematic, so it gives way; a waiting
+	// one shows after the cinematic. The session clears M_ActiveLocationIntroSession through
+	// OnLocationIntroSessionEnded.
+	if (bCinematicStarted && M_ActiveLocationIntroSession != nullptr
+		&& M_ActiveLocationIntroSession->GetIsHoldingScreen())
+	{
+		M_ActiveLocationIntroSession->RequestCancel();
+	}
 	if (not GetIsValidMissionManager())
 	{
 		RTSFunctionLibrary::ReportError("Mission cinematic take over failed!");
