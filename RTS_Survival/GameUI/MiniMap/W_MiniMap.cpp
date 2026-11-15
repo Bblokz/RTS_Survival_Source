@@ -483,13 +483,18 @@ void UW_MiniMap::DrawCustomMiniMapTextureIcon(const FRTSMinimapCustomIconDrawDat
 	const FPaintGeometry IconGeometry = AllottedGeometry.ToPaintGeometry(
 		IconSize,
 		FSlateLayoutTransform(IconTopLeftInWidget));
+	// Upright pictures cancel the rotation of the minimap widget itself (maps that do not start facing east),
+	// like the minimap text does; every other icon turns with its world yaw.
+	const float IconRotationDegrees = Global_GetIsUprightMinimapIcon(IconDrawData.M_IconType)
+		                                  ? -GetRenderTransformAngle()
+		                                  : IconDrawData.M_RotationDegrees;
 	FSlateDrawElement::MakeRotatedBox(
 		OutDrawElements,
 		LayerId,
 		IconGeometry,
 		IconBrush,
 		ESlateDrawEffect::None,
-		FMath::DegreesToRadians(IconDrawData.M_RotationDegrees),
+		FMath::DegreesToRadians(IconRotationDegrees),
 		TOptional<FVector2D>(IconSize * 0.5f),
 		FSlateDrawElement::RelativeToElement,
 		FLinearColor::White);

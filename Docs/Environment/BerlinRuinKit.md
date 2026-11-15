@@ -36,7 +36,7 @@ All are in `/Game/RTS_Survival/Blueprints/Environment/Berlin/RuinKit/Blueprints/
   graph, in the base, was authored through a throwaway editor (see "Death").
 - **`B8_DebrisBed`** is rubble only. It uses the same destructible setup with empty `DamagedMaterials`:
   - hits never show a hole, but they throw a few chips;
-  - on death it sinks with dust like the others, leaves no heap, and frees the navmesh.
+  - on death it settles 30 % with a small dust puff and stays, like every other piece (see "Death").
 
   It was not made a plain static mesh because it blocks navigation, and a static mesh never stops doing so.
 
@@ -85,10 +85,9 @@ geometry would keep blocking after the ruin is gone.
   - `NavArea_Null` is a hard block for every agent, so the wall cores (E3, B7, whose mound fills the whole footprint)
     are reliable blockers.
   - They are invisible in the editor too; tick `Visible` on a `NavBlock` to see it.
-  - A death destroys them in its first frame (the death graph), before the ruin starts to sink: one tile rebuild,
-    not one per sink step. They are runtime modifiers, so only the tiles under the ruin are rebuilt. The collapse
-    heaps that appear a second or two later bring their own `NavArea_Null` boxes.
-    - Before 2026-11-13 (chunk death) they went with the actor, 4.5 s after the death.
+  - At a death the boxes of what still stands are kept: the death graph detaches them, so they stay at ground level
+    under the lowered walls. Boxes of rubble that goes under are destroyed in the first frame (see "What a remnant is
+    for the game"). They are runtime modifiers, so only the tiles under the ruin are rebuilt.
 - **Rebuild the navmesh after placing (required).** The boxes are cut into the navmesh when it is built. On `Ger_Berlin`,
   rebuild navigation after placing the ruins and save the map. `BerlinMap.md`'s build already saves after the navmesh finishes.
   - In the test, ruins placed in the editor without a rebuild did not block at all in PIE, and neither did the
@@ -101,151 +100,139 @@ geometry would keep blocking after the ruin is gone.
   - A `NavModifierComponent` only sees the collision of a component that also exports itself as geometry.
 - **Counts:** 1-14 boxes per Blueprint, 94 for the 22 Blueprints (average 4.3).
 
-## Death (2026-11-13: sink, dust, collapse heap, remnant)
+## Death (remnants; last change 2026-11-14)
 
-A ruin that dies sinks into the ground inside a dust cloud and leaves the collapse heap that was modelled for its
-footprint. The heap is a cover Blueprint, so a destroyed ruin becomes new cover (but see "Cover of the spawned heaps").
-
-**Large ruins do not vanish** (owner, 2026-11-13). Their sink stops with 55-65 % of their height in the ground and a
-tilt of a few degrees, and the dead actor stays as a remnant. Small pieces sink completely and are destroyed. The
-split and the values are one table, `REMNANTS` in `ruin_blueprints_build.py`, repeated under "Large and small".
+**No ruin vanishes** (owner, 2026-11-14). A ruin that dies throws a little debris, goes down in a dust puff sized to
+the piece, turns a few degrees, and stays where it is as a dead remnant. Small and medium pieces go down "a bit"
+(30-35 % of their height); the large ones keep the deep sink (55-65 %). Most pieces with a modelled collapse heap
+leave it inside or beside the remnant. The heap is a cover Blueprint (but see "Cover of the spawned heaps").
 
 - **Where it lives:** one graph in `BP_BerlinRuin_Base`; the 22 children have none. The values it reads are class
-  defaults that `ruin_blueprints_build.py` sets per child (`DEATH`, `death_defaults()`), from the mesh size, the size
-  class and `footprint_table.json`.
+  defaults that `ruin_blueprints_build.py` sets per child from **one table, `DEATH`** (one row per death class, with
+  per-piece exceptions in `DEATH_PIECE` and moved heap spots in `HEAP_SPOT`), the mesh size and
+  `footprint_table.json`. The table is repeated below.
 - **The graph was authored through UECP** (`synthesize_graph`) in a throwaway editor. The calls are kept in
   `Tools/BerlinMap/ruinkit/ruin_death_graph_uecp.json`, in replay order, with the pitfalls that were hit.
+- **History:** 2026-11-13 first version (everything sank away under large dust clouds), then large pieces kept as
+  remnants; 2026-11-14 every piece a remnant and the dust cut down after the owner saw it in play.
 
 ### What happens
 
 `BP_OnUnitDies` (any death type; the ruins are not crushable) -> if `SinkOnDeath`:
 
 1. **`StartRuinDeath`**, in the frame of the death:
-   - stores the actor transform (`DeathStartTransform`): the sink moves and tilts the actor, and the heaps and the dust
+   - stores the actor transform (`DeathStartTransform`): the sink moves and turns the actor, and the heaps and the dust
      are placed against where it stood;
    - hides every component tagged `BerlinAmbient` or `BerlinCrowPerch` (curtains, wires, lamps, crows);
-   - destroys the `NavBlock_NN` boxes. On a remnant (`LeaveRemnant`) the boxes tagged `RemnantNav` are detached
-     instead (keep world): they stay at ground level and keep blocking while the actor sinks away from them;
-   - `WallHoleDamage.CollapseIntoPieces(false)`: the standing surface flies off as kit debris, the mesh stays;
-   - `VerticalDestruction`: the actor sinks `SinkDeltaZ` in `SinkTime` seconds with a small random tilt and yaw,
-     `bDestroyPostVerticalCollapse` = not `LeaveRemnant`. Its `CollapseFX` starts the first dust cloud and plays `DeathSound`
-     (`Collapse_Cue`, with `Att_Collapse` and `SC_Collapse`);
+   - `NavBlock_NN` boxes tagged `RemnantNav` are detached (keep world), so they stay at ground level and keep blocking
+     while the actor sinks away from them; the others are destroyed;
+   - `WallHoleDamage.CollapseIntoPieces(false)`: a few kit debris pieces fly off the wall, the mesh stays;
+   - `SpawnDust`: the first dust burst, at the middle of the footprint;
+   - `VerticalDestruction`: the actor sinks `SinkDeltaZ` in `SinkTime` seconds, with a random tilt between
+     `SinkMinTilt` and `SinkMaxTilt` and a random yaw between `SinkMinYaw` and `SinkMaxYaw` to either side;
+     `bDestroyPostVerticalCollapse` = not `LeaveRemnant` (true on every piece now). Its `CollapseFX` only plays
+     `DeathSound` (`Collapse_Cue`, with `Att_Collapse` and `SC_Collapse`);
    - starts a looping timer on `DustPulse`.
-2. **`DustPulse`**, every `DustPulseInterval` seconds until the actor is gone: one more dust cloud at a random spot of
-   the footprint (`DeathVfxOffset` +- `DustSpreadX/Y`, local space).
-3. After `HeapDustDelay`: **`DustAtHeaps`**, a dust cloud on every spot where a heap will stand.
+2. **`DustPulse`**, every `DustPulseInterval` seconds until the sink ends: one more burst at a random spot of the
+   footprint (`DeathVfxOffset` +- `DustSpreadX/Y`, local space). The builder sets the interval so that the wanted
+   number of bursts fits into the sink time.
+3. After `HeapDustDelay`: **`DustAtHeaps`**, a burst on every spot where a heap will stand.
 4. `HeapDustLead` later: **`SpawnDeathHeaps`** spawns `BP_BerlinCoverHeap_Collapse_S` for every transform in
    `DeathHeapsSmall` and `BP_BerlinCoverHeap_Collapse_L` for every one in `DeathHeapsLarge` (actor-relative, composed
-   with `DeathStartTransform`), inside that dust.
-5. At `SinkTime`:
-   - **small piece:** the C++ destroys the actor. The last dust pulses outlive it by about 2 s; when they thin, the
-     heap is what is left.
-   - **remnant:** the C++ stops its sink timer and calls `BP_OnVerticalDestructionComplete`, which clears the
-     `DustPulse` timer. The actor stays where the sink ended.
-   The footprint skirt (an instanced mesh of the map) is not touched.
+   with `DeathStartTransform`).
+5. At `SinkTime` the C++ stops its sink timer and calls `BP_OnVerticalDestructionComplete`, which clears the
+   `DustPulse` timer. The actor stays where the sink ended.
 
-Nothing ticks before the death. During it there is the C++ sink timer, one Blueprint timer and two delays. They end
-with the actor or, on a remnant, at the end of the sink: a remnant has no tick and no timer.
+- **`SpawnDust(location, scale)`** is the one place a dust effect is spawned. It tints it (`DeathDustColor` into the
+  user parameters `Color Smoke`, `GroundSmokeColor` and `Color`; an effect ignores the ones it does not have) and
+  sets `Velocity Speed Mlt` from `DeathDustSpeed`.
+- **Ticking:** nothing ticks before the death. During it there is the C++ sink timer, one Blueprint timer and two
+  delays; all end with the sink. A remnant has no tick and no timer.
+- The footprint skirt (an instanced mesh of the map) is not touched.
 
-### Large and small (`REMNANTS`)
+### The two dust effects
 
-| Piece | Side | Height | In the ground | Left standing | Tilt (pitch/roll) | Yaw | Nav boxes kept |
-|---|---|---|---|---|---|---|---|
-| E1_CornerTower (hero) | large | 20.8 m | 62 % = 12.9 m | 7.9 m | 2-4 deg | up to 2 deg | 7 of 11 |
-| E2_Courtyard (hero) | large | 16.0 m | 60 % = 9.6 m | 6.4 m | 2-4 deg | up to 2 deg | 10 of 14 |
-| E3_CoreRow (wall core) | large | 18.4 m | 60 % = 11.0 m | 7.3 m | 2-4 deg | up to 2 deg | 2 of 4 |
-| B7_WallCore (wall core) | large | 11.5 m | 55 % = 6.3 m | 5.2 m | 2-4 deg | up to 2 deg | 1 of 1 |
-| B3_Facade4St (lone slab) | large | 15.5 m | 65 % = 10.1 m | 5.4 m | 3-5 deg | up to 3 deg | 4 of 4 |
-| B4_Firewall (lone slab) | large | 16.7 m | 65 % = 10.9 m | 5.9 m | 3-5 deg | up to 3 deg | 4 of 4 |
-| B5_CornerL (slab corner) | large | 11.1 m | 60 % = 6.7 m | 4.4 m | 3-5 deg | up to 3 deg | 2 of 3 |
-| B1, B2 (one and two storeys, 5.0-8.4 m), B6 stubs, B8 bed | small | | all of it | nothing | class value | | none |
-| E4 stub rings, E5 shells (4.3-4.6 m), E6 heap fins (6 m), E7 half houses (8 m) | small | | all of it | nothing | class value | | none |
+| Name in the builder | Asset | Look | Used for |
+|---|---|---|---|
+| `PUFF` | `NS_Artillery_StoneImpact` | brown dust plume, no stones, about 6 m across at scale 1 and speed 1, gone after 1.5 s; a lower speed makes it lower and rounder | stubs, slabs, shells, half houses, tall slabs |
+| `CLOUD` | `NS_RTSDebrisExplosion_Huge` | ring of rolling smoke, about 7 m across at scale 1, 2.5 s, and about 25 large stones thrown 10-15 m | wall cores and heroes only |
 
-- **Where the line is:** every piece 11 m or taller is large. That is the heroes and wall cores the owner named, plus
-  the three tall slabs: a sunken, tilted stump of a four-storey facade or firewall reads well (see the B3 pictures of
-  the test). The E5 shells and E7 half houses were left small: 60 % of an 8 m half house leaves a 3 m rim that is
-  mostly inside its own collapse heap. To move a piece, add or remove its line in `REMNANTS` and re-run the builder.
-- **Tilt:** the C++ sink picks the size in the range, a random direction and the yaw sign per death, so a row of dead
-  ruins does not lean alike (two runs of the same three pieces: B3 pitch 3.6 / roll -2.8, then 1.7 / 2.5; E3 2.4 / 0.8,
-  then -1.3 / 3.3; E1 -3.0 / -0.4, then 2.6 / 2.0). It is random, not derived
-  from the position; a deterministic lean would need a C++ change or per-actor values.
-- **What a remnant is for the game:**
-  - **Dead.** `IsUnitAlive` is false: more damage does nothing but lower `Health` further. Tested: 10,000 more damage,
-    point damage and `TriggerDestroyActor` gave no second death, no new heap or dust, no hole, no movement. Hits are
-    not forwarded to the hole component any more, so a remnant takes no new shell holes (the old ones stay).
-  - **Still solid.** The mesh keeps its collision: it blocks shells, weapon traces and line of sight where it now
-    stands (sunken and tilted, exactly the visible mesh).
-  - **Still blocks movement, by its wall lines.** The kept nav boxes stand at ground level under the walls that still
-    stick out; boxes of low hulls that went under are destroyed (a kept box is one whose hulls still stand 1.5 m or
-    more after the sink). They are the upright footprints from before the death: the few degrees of tilt are not
-    followed, which moves a wall top by 0.3-0.5 m at most. Test: 0 of 19 / 22 / 49 points in the kept boxes of B3 /
-    E3 / E1 were on the navmesh, and the path across each remnant was as long as before the death.
-  - **No cover sockets** (the ruins never had any). The heap inside or beside it is the cover.
-  - **Still accepts an attack order.** `AttackActor` on a remnant returns no error (the command does not ask whether
-    an environment actor is alive), so a player can waste shells on it. Refusing it is a C++ change in the attack
-    command; switching the weapon trace channels off on the mesh would stop it too, but then shots would fly through
-    the walls that are still visible.
-- **Heap and remnant:** the heap spots of the table lie inside the wall ring (E1, E2, B5) or along the middle of the
-  row (E3, B7), so the heap fills the shell and the walls stand around it. No offset was changed. On E3 and B7 the
-  heap's foot is wider than the row is deep and spills 0.5-1 m through the foot of the front wall; it reads as rubble
-  that ran out through the ground floor (picture `death_E3_CoreRow_after.png`). Seen for all six large pieces with a
-  heap: E1, E2 and B5 hold their heap inside the walls; E3's two heaps fill the shell. **B7 is the weak one:** it is a
-  single wall line, and its heap (scale 0.9, centred on the piece) lies astride it, so the 5 m wall stump stands up
-  through the middle of the mound (`death_B7_WallCore_remnant_plus10s.png`). It reads as a wall in its own rubble, not
-  as a heap inside a wall, but if it should lie in front, give B7 its own heap offset in the builder (about +350 cm
-  in x, towards the street) instead of the table's centre; the heap then no longer sits centred on the plot's skirt.
-- **Cost of remnants:** a remnant is the dead actor with its mesh, the hole component (idle) and the kept boxes; no
-  tick, no timer. It costs what the living ruin cost to draw, with less of it on screen.
+- **Why two:** the stones of `CLOUD` do not shrink with the component scale, so on a small piece it throws
+  hero-sized rocks out of a tiny ring. That, at scale 0.7-2.1 with 6-13 clouds alive at once, was what the owner saw
+  filling the view.
+- **Tint:** untinted, `CLOUD` reads white-grey on Ger_Berlin. `DeathDustColor` (0.30, 0.27, 0.23) makes it grey-brown.
+- **Not usable:** the white `NS_DestructionSmoke(_Large)` (steam); `NS_RTS_GroundDust*`, `NS_RTS_DustSmoke_07`,
+  `NS_RTS_StaticDust_22` (they loop and never end); the Medium / Heavy / SuperHeavy stone impacts (pale 2 m splashes).
+- Contact sheets: `ruin_death_run.sh <log> 260 fx` (`ruin_death_fx_probe.py`, three variants per picture behind a
+  one-storey slab, game camera). Kept sheets: `Saved/Berlin/ruin_death_test/fx_sheet1/`, `fx_sheet2/` and `fx_*.png`.
 
-### The dust
+### The table (`DEATH` in `ruin_blueprints_build.py`)
 
-`NS_RTSDebrisExplosion_Huge`: a one-shot grey-brown cloud with a few flying stones, about 6.5 m across at scale 1,
-gone after about 2.5 s. It is the only effect; the size of the event comes from its scale, how far the pulses are
-spread and how long the sink lasts.
+| Death class | Pieces | In the ground | Sink time | Tilt | Yaw | Dust: effect, scale, bursts, speed | Thrown debris | Heap |
+|---|---|---|---|---|---|---|---|---|
+| hero | E1, E2 | 62 % (E2 60 %) | 6.0 s | 2-4 deg | 1-3 deg | CLOUD 1.4 x 6, speed 1 | up to 70 | yes |
+| core | E3, B7 | 60 % / 55 % | 5.0 s | 2-4 deg | 1-3 deg | CLOUD 1.2 x 4, speed 1 | up to 50 | yes |
+| tall | B3, B4, B5 | 65 % (B5 60 %) | 4.0 s | 2-4 deg | 2-5 deg | PUFF 1.6 x 4, speed 0.65 | up to 28 | B5 only (table) |
+| two_storey | B2, E7 | 35 % | 2.2 s | 1-3 deg | 3-7 deg | PUFF 1.3 x 3, speed 0.6 | up to 16 | E7 (table) |
+| one_storey | B1, E5, E6 | 30 % | 1.8 s | 1-3 deg | 3-7 deg | PUFF 1.0 x 2, speed 0.6 | up to 10 | E5; not E6 |
+| stub | B6, E4 | 35 % | 1.2 s | 1-3 deg | 3-8 deg | PUFF 0.7 x 2, speed 0.6 | up to 5 | no |
+| bed | B8 | 30 % | 1.5 s | 0-1.5 deg | 2-5 deg | PUFF 0.9 x 2, speed 0.55 | up to 6 | no |
 
-- The white `NS_DestructionSmoke` / `_Large` (what the crushed cover pieces use) reads as steam on these ruins; it was
-  tried first and dropped.
-- The `NS_RTS_GroundDust*`, `NS_RTS_DustSmoke_07` and `NS_RTS_StaticDust_22` systems loop: spawned once they never
-  end. Do not put a looping system in `DeathDustVfx`.
-- Contact sheet of the candidates: `ruin_death_run.sh <log> 240 fx` (`ruin_death_fx_probe.py`), pictures
-  `Saved/Berlin/ruin_death_test/fx_<group>_<t>s.png`.
+- **In the ground** is a share of the mesh height. Left standing: E1 7.9 m, E2 6.4 m, E3 7.3 m, B7 5.2 m, B3 5.4 m,
+  B4 5.9 m, B5 4.4 m, B2 5.1-5.5 m, E7 5.2 m, B1 3.5-3.8 m, E5 3.0-3.2 m, E6 4.1-4.3 m, stubs 0.75-1.0 m, B8 1.7 m.
+- **Tilt and yaw** are picked by the C++ sink per death: a random size in the range, a random tilt direction, a
+  random yaw sign. A row of dead ruins does not lean alike. It is not derived from the actor position.
+- **Bursts:** the first at the death in the middle of the footprint, the others spread over the sink time and over
+  +-30 % of each ground side. One more burst (scale `heap_fx` x heap scale, 0.8-1.3) on each heap spot.
+- **Thrown debris** is the hole component's death burst (`max_collapse_pieces`, `death_speed_scale`): kit pieces of
+  38-68 cm. `CLOUD` adds its own stones on cores and heroes.
+- **B8 debris bed** is a remnant like the rest: it settles 30 % (75 cm) with a small turn and keeps the nav boxes of
+  the parts still 50 cm high (4 of 6). It was not kept as the one piece that disappears: a bed that vanished would
+  leave a hole in the plot it anchors.
 
-### Per class and per piece
+### Heaps: which piece leaves one
 
-| Class | Sink time | Tilt / yaw | Heaps appear at | Dust pulse every | Dust scale (min-max) |
-|---|---|---|---|---|---|
-| hero | 6.0 s | 1-2.5 / 1 deg | 1.8 s | 0.45 s | 1.2-2.2 |
-| core | 5.0 s | 1-3 / 1 deg | 1.5 s | 0.45 s | 1.2-2.2 |
-| slab | 4.0 s | 2-4 / 2 deg | 1.2 s | 0.5 s | 0.9-1.6 |
-| filler | 3.5 s | 2-5 / 2 deg | 1.05 s | 0.5 s | 0.9-1.5 |
-| stub | 2.5 s | 2-6 / 3 deg | 0.9 s | 0.5 s | 0.7-1.1 |
-| rubble (B8) | 2.5 s | 0-2 / 0 deg | - | 0.5 s | 0.7-1.2 |
+Spots are the `dead` entries of `footprint_table.json` (x, y in cm in the piece's local space, yaw added to the piece
+yaw, uniform scale), except where `HEAP_SPOT` moves one.
 
-- **Sink depth of a small piece:** (mesh top + 80 cm) x 1.15, so a filler placed at scale 1.15 still goes under:
-  224 cm (E4 stub ring) to 1063 cm (B2). The depth is not scaled with the actor. Large pieces: see the table above;
-  they keep their class's sink time, so they sink slower.
-- **Dust scale:** a cloud about 75 % of the piece's shorter ground side, clamped per class. Pulses are scattered over
-  +-32 % of each ground side. E1: scale 2.14, about 13 clouds alive at once; a stub: 0.7-1.1, about 6.
-- **Heaps** (from the `dead` entries of `footprint_table.json`; x, y in cm in the piece's local space, yaw added to the
-  piece yaw, uniform scale; the dust on a heap spot is 1.6 x scale for S and 2.3 x scale for L):
+| Piece | Heap | Why |
+|---|---|---|
+| E1_CornerTower | L at (150, -150) | inside the wall ring |
+| E2_Courtyard | L at (620, 0), S at (-650, 560) | inside the two courts |
+| E3_CoreRow | L at (0, 750), L at (0, -750) | fill the shell; spill 0.5-1 m through the front wall foot |
+| B7_WallCore | L x 0.9 at (**400**, 0) | moved 4 m to the street side (`HEAP_SPOT`): at the table's centre it lay astride the wall stump |
+| B5_CornerL | S at (0, 0) | in the inner corner |
+| E5_Shell1St_A/B | S at (0, 0) | inside the shell, walls 3 m around it |
+| E7_HalfHouse_A/B | S x 0.8 at (0, 0) | inside the half house |
+| E6_HeapFin_A/B | none (table has one) | the fin already stands on its own modelled heap; a second one buried it |
+| E4_StubRing_A/B | none (table has one) | a 2 m heap would bury a ring of 0.8 m stubs that now stays |
+| B1-B4, B6, B8 | none | no entry in the table |
 
-| Piece | Heaps |
-|---|---|
-| E1_CornerTower | L at (150, -150), yaw 180 |
-| E2_Courtyard | L at (620, 0), yaw 270; S at (-650, 560), yaw 0 |
-| E3_CoreRow | L at (0, 750), yaw 270; L at (0, -750), yaw 270 |
-| B7_WallCore | L at (0, 0), yaw 270, scale 0.9 |
-| B5_CornerL | S at (0, 0), yaw 180 |
-| E4_StubRing_A/B, E5_Shell1St_A/B, E6_HeapFin_A/B | S at (0, 0), yaw 180 |
-| E7_HalfHouse_A/B | S at (0, 0), yaw 180, scale 0.8 |
-| B1, B2, B3, B4 (lone slabs), B6 stubs, B8 debris bed | none |
+- The heap appears 30 % into the sink (0.54-1.8 s), 0.35 s after the dust on its spot. With the smaller dust it is
+  no longer fully hidden when it appears: on the small classes the puff covers the middle of the heap, not its rim.
+- The table's `B_PLOT` / `B_PLOT_STUB` heaps belong to a whole plot, not to one actor; no piece spawns them.
 
-- **Pieces without a heap** (B1-B4, B6, B8) only sink in their dust; B1, B2, B6 and B8 are gone, B3 and B4 leave
-  their stump. On a full plot they stand on a B8
-  bed inside a footprint skirt, so the plot keeps its rubble; the bed has its own health and dies separately. The
-  table's `B_PLOT` / `B_PLOT_STUB` heaps belong to a whole plot, not to one actor, so no single piece spawns them: a
-  plot whose slabs and bed are all shot away ends as its skirt. If that should leave a heap, give the B8 bed the
-  plot's heap (it is the plot's anchor in the table); the builder would need to know which bed stands on a stub plot.
+### What a remnant is for the game
+
+- **Dead.** `IsUnitAlive` is false: more damage only lowers `Health` further. Tested on every class: 10,000 more
+  damage, point damage and `TriggerDestroyActor` gave no second death, no new heap or dust, no hole, no movement.
+  Hits are no longer forwarded to the hole component: a remnant takes no new shell holes (the old ones stay).
+- **Still solid.** The mesh keeps its collision: it blocks shells, weapon traces and line of sight where it now
+  stands, lowered and turned, exactly as drawn.
+- **Still blocks movement.** A nav box is kept when the hulls it was made from still stand 50 cm or more after the
+  sink (`REMNANT_NAV_MIN_STAND`), so every lowered wall, including a 0.8 m stub, blocks as before; only boxes of
+  rubble that went under are dropped (E1 keeps 8 of 11, E2 11 of 14, E3 2 of 4, E4 4-6 of 7, E5 4 of 5, E7 2 of 3,
+  B5 2 of 3, B8 4 of 6; all others keep all). The kept boxes are the upright footprints from before the death: they
+  do not follow the turn. With 3-8 degrees of yaw the end of a 10 m wall moves 0.3-0.7 m off its box, so a unit can
+  clip that corner or be held 0.5 m off it. Following the turn needs the boxes to be re-placed after the sink, which
+  the graph could do in `BP_OnVerticalDestructionComplete`; not done.
+- **A piece that could be walked around still can; what was open stays open.** Doorways and gaps are where they were.
+- **No cover sockets** (the ruins never had any). The heap is the cover.
+- **Still accepts an attack order.** `AttackActor` on a remnant returns no error (the command does not ask whether
+  an environment actor is alive), so a player can waste shells on it. Refusing it is a C++ change in the attack
+  command.
+- **Cost:** a remnant is the dead actor with its mesh, the idle hole component and the kept boxes; no tick, no timer.
+  A map where everything has been shot still has all 725 actors.
 
 ### Cover of the spawned heaps (not working: needs C++)
 
@@ -262,28 +249,23 @@ heap 0 of 8.
   (build the socket points, `RegisterAuthoredCoverProvider`, add to `M_SocketCoverProviders`) and does nothing before
   the one-time pass. `ADestructableActorHealth::BeginPlay` (or `BP_NaturalCover`) calls it, so every natural cover
   spawned at runtime registers, not only these heaps. The removal on destruction is already there
-  (`RemoveSocketCoverOfDestroyedActors`). The sockets are projected onto the navmesh at registration; the ruin's own
-  nav boxes are gone by then (step 1), but the navmesh tiles may still be rebuilding, so the call should use the retry
-  that `RefreshCoverSocketsOfActor` has for points that are off the navmesh.
-- No Blueprint-only detour was built (for example child heaps with an `RTSCoverProviderComponent` holding copies of
-  the socket points): it would double the heap Blueprints for something one function fixes.
+  (`RemoveSocketCoverOfDestroyedActors`). The call should use the retry that `RefreshCoverSocketsOfActor` has for
+  points that are off the navmesh, because the tiles under a fresh remnant may still be rebuilding.
 
 ### Other limits
 
 - **Heap tint:** the map's heaps get the lot's tint as custom primitive data. A spawned heap has the material's
   default tint; Blueprint cannot read the ruin's custom primitive data to pass it on.
-- **The sink is a lift.** The mesh goes down in one piece. The dust hides most of it from the game camera, the
-  thrown debris helps, but a close look shows a building sliding into the ground.
-- **Collision during the sink:** the sinking mesh still blocks shells and traces until the actor is gone (a
-  remnant's keeps blocking).
+- **The sink is a lift.** The mesh goes down in one piece. With the small dust this is now plainly visible on the
+  large pieces: a building sliding 10-13 m into the ground while it turns.
 - **Pure-node loops:** `K2_GetComponentsByClass` is const, so its Blueprint node is pure and a `ForEach` re-evaluates
   it on every pass. Destroying components in such a loop skips every second one. The graph copies the boxes into
   `DeathNavBoxes` first.
 
 ### Changing the death
 
-- **Values** (times, scales, heaps): edit `DEATH` and the constants around it in `ruin_blueprints_build.py`, re-run
-  `run()`. No graph work.
+- **Values** (depth, times, turn, dust, debris, heaps): edit `DEATH`, `DEATH_PIECE` or `HEAP_SPOT` in
+  `ruin_blueprints_build.py`, re-run `run()` (headless commandlet). No graph work.
 - **Graph:** replay or edit the calls of `ruin_death_graph_uecp.json` against a UECP-enabled throwaway editor
   (`-DisablePlugins=Fab` only, its own port from `%LOCALAPPDATA%/UECP/instances/<pid>.json`), compile, save the base,
   then `run()`. The builder checks that the base has every variable in `DEATH_VARIABLES`; if one is missing it builds
@@ -408,86 +390,83 @@ heap 0 of 8.
     - The whole ruin, mound included, vanished in one frame. 100-120 small pieces (at most 82 cm) burst outward and
       shrank away; there was no dust and nothing stayed.
 
-## Death test (`ruin_death_headless_test.py`, 2026-11-13)
+## Death test (`ruin_death_headless_test.py`)
 
 - **Run:** `Tools/BerlinMap/ruinkit/ruin_death_run.sh <logname> [timeout_s]`: a throwaway editor on `RTS_ToCopySmall`
   (never Ger_Berlin), log, `result.json` and pictures in `Saved/Berlin/ruin_death_test/`. About 6 minutes.
-- **Placed before play** (yaw 90, then `RebuildNavigation`): E1_CornerTower, E3_CoreRow and B3_Facade4St (large),
-  E7_HalfHouse_A (small, heap at 0.8), E4_StubRing_A (small, heap; killed by a player Pz IV G's shells), B2_Facade2St_B
-  dressed through `ambient_place.py` (curtain, lamp, four crows), and a control `BP_BerlinCoverHeap_Collapse_S` placed
-  like a map heap.
+  Third argument `large2`: the second set (`result_large2.json`); `fx`: the effect contact sheet.
+- **Placed before play** (yaw 90, then `RebuildNavigation`), one piece per death class: B6_Stub_A (killed by a player
+  Pz IV G's shells), B1_Facade1St_A, E5_Shell1St_A, B2_Facade2St_B (dressed through `ambient_place.py`: curtain, lamp,
+  four crows), E7_HalfHouse_A, E1_CornerTower, and a control `BP_BerlinCoverHeap_Collapse_S` placed like a map heap.
+  Second set: B7, E3, E2, B5, B3 and E4_StubRing_A.
+- **Camera:** the game camera for every piece (28 m up, 19 m back, the same framing), so the sizes compare.
 - **Per death** (`apply_damage`, the TakeDamage path; the stub by real shells): samples every tick on the world clock
-  (mesh z, tilt, nav boxes, dressing, live dust systems, heap actors), pictures before and 0.5 / 2 / 5 s after, once
-  the dust has thinned, and for a remnant 10 s after that. On a remnant: more damage, point damage,
-  `TriggerDestroyActor` and an attack order.
-- **Afterwards:** heap transforms against `footprint_table.json` and the transform before the death, navmesh points
+  (mesh z, tilt, nav boxes, dressing, live dust systems, heap actors), pictures before and 0.5 / 2 / 5 s after, 4 s
+  after the sink ended, and 10 s after that. Then more damage, point damage, `TriggerDestroyActor` and an attack
+  order on the remnant.
+- **Afterwards:** heap transforms against the builder's values and the transform before the death, navmesh points
   and paths, cover points at the heap sockets.
-- **Fresh-load check:** `ruin_death_compile_check.py` (commandlet) loads and compiles all 23 Blueprints from disk.
+- **Fresh-load check:** `ruin_death_compile_check.py` (commandlet) loads and compiles all 23 Blueprints from disk; the
+  verdict is 0 `LogBlueprint: Error` lines.
 - **Reading the navmesh numbers:** a point count only means something when the two open-ground path ends read True
-  and the box points of the living ruin read False in the same run (they do in the result below). The first two runs
-  of the day used a projection call that does not exist in Python and reported every point as blocked.
+  and the box points of the living ruin read False in the same run (they do below).
+- **Dust size in the table** is the reach of the effects' bounds from the piece's centre, as the engine reports them;
+  Niagara bounds are generous, so read it with the pictures.
 
-### Result (run6, from disk after the install, `Saved/Berlin/ruin_death_test/run6.log`, pictures also in `run6_final/`)
+### Result (run9, 2026-11-14, from disk after a headless build, `Saved/Berlin/ruin_death_test/run9.log`, pictures also in `run9_final/`; burst counts include the one on each heap spot)
 
-| Piece | Death by | Sink (cm / s) | Ends | Tilt pitch / roll / yaw | Nav boxes at death | Heaps (at s) | Dust clouds at once |
+| Piece (footprint, height cm) | Death by | Drop (cm) | Pitch / roll / yaw (deg) | Nav boxes kept | Heaps (at s) | Dust bursts, effect, scale | Dust bounds reach (cm) |
 |---|---|---|---|---|---|---|---|
-| B3_Facade4St | damage | 1010 / 4.0 | remnant, z -1010 cm | 1.7 / 2.5 / 0.7 | 4 -> 4 kept | none | 8 |
-| E7_HalfHouse_A | damage | 1007 / 3.5 | destroyed at 3.87 s | 1.9 / 3.2 (last sample) | 3 -> 0 at 0.13 s | S (1.41, set 1.05) | 9 |
-| E3_CoreRow | damage | 1102 / 5.0 | remnant, z -1102 cm | -1.3 / 3.3 / -1.8 | 4 -> 2 kept | L, L (1.54, set 1.50) | 11 |
-| E1_CornerTower | damage | 1289 / 6.0 | remnant, z -1289 cm | 2.6 / 2.0 / 0.6 | 11 -> 7 kept | L (1.86, set 1.80) | 15 |
-| B2_Facade2St_B | damage | 1063 / 4.0 | destroyed at 4.01 s | -1.5 / 2.3 (last sample) | 4 -> 0 at 0.03 s | none | 8 |
-| E4_StubRing_A | tank shells | 224 / 2.5 | destroyed at 2.52 s | 2.8 / 1.8 (last sample) | 7 -> 0 at 0.02 s | S (0.92, set 0.90) | 7 |
+| B1_Facade1St_A (410 x 700, 496) | damage | 149 | -1.4 / 0.0 / -6.2 | 3 of 3 | none | 2, PUFF, 1.0 | 609 |
+| E7_HalfHouse_A (662 x 850, 796) | damage | 278 | -1.8 / 0.7 / 3.2 | 2 of 3 | S (1.02, set 0.66) | 4, PUFF, 0.96 / 1.3 | 866 |
+| E5_Shell1St_A (1055 x 1261, 460) | damage | 138 | -1.1 / -1.9 / 6.0 | 4 of 5 | S (0.93, set 0.54) | 3, PUFF, 1.0 / 1.1 | 2204 |
+| E1_CornerTower (1855 x 2155, 2080) | damage | 1289 | 2.0 / -0.0 / 1.9 | 8 of 11 | L (2.06, set 1.80) | 7, CLOUD, 1.2 / 1.4 | 1385 |
+| B2_Facade2St_B (466 x 1304, 844) | damage | 295 | 0.6 / 1.2 / 5.8 | 4 of 4 | none | 3, PUFF, 1.3 | 3027 |
+| B6_Stub_A (489 x 1000, 124) | tank shells | 44 | -0.1 / 2.6 / 8.0 | 1 of 1 | none | 2, PUFF, 0.7 | 1069 |
 
-- **Sink:** the mesh z falls linearly to the set depth (samples in `result.json`). A small piece's actor is invalid at
-  the sink time; a remnant's z did not change in any later sample and its rotation is the tilt in the table.
-- **Effect and sound:** the first dust system was alive in the first sample after the death on every piece. That
-  sample came 0.02-0.03 s after the death on three pieces and 0.13-0.40 s on B3 (the first death of the run), E7 and
-  E1: the death frame itself is a hitch in this editor (in three runs E1 gave 0.02, 0.25 and 0.28 s; it throws 120
-  debris pieces). Not profiled in a packaged game. `ListWaves` 0.25 s after each death listed `Collapse01` (the cue's wave) on 6 of 6 deaths (`Collapse01` or `Collapse02`, the cue picks one).
-- **Heaps:** every expected heap was found with 0.0 cm location error, 0.0 degrees yaw error and the table's scale
-  (E7 0.8), 0.02-0.36 s after the set time (frame steps and the hitch above). Each has its 5-6 nav boxes.
-- **Remnants (E1, E3, B3):** actor valid, mesh visible with query-and-physics collision, actor tick off, no ticking
-  component, no dust system left. After 10,000 damage, point damage and `TriggerDestroyActor`: same z, same hole
-  count, no new heap, no dust; only `Health` went further down. The attack order returned no error (see "What a
-  remnant is for the game").
+- **Sink:** the mesh z falls linearly to the set depth and does not change in any later sample; every actor is still
+  valid at the end, with actor tick off, no ticking component and no dust system left.
+- **Dead:** after 10,000 damage, point damage and `TriggerDestroyActor` on each remnant: same z, same hole count, no
+  new heap, no dust; only `Health` went further down. The attack order returned no error (see "What a remnant is for
+  the game").
+- **Sound:** `ListWaves` 0.25 s after each death listed a collapse wave on 5 of 6 deaths (`Collapse01` or `Collapse02`; the probe of the first death, B1, caught nothing).
+- **Heaps:** every expected heap was found at 0.0 cm location error and 0.0 degrees yaw error with its scale. They
+  appeared 0.26-0.39 s later than set (frame steps of this editor around the death).
 - **Navigation** (Character navmesh, HeavyTank in brackets; path from 4 m in front to 4 m behind):
-  - B3_Facade4St: alive 0/19 of its box points on the navmesh, path 2156 (2683) against 1360 straight. After: 0 box points free, 19 under heap or remnant boxes, 0 still blocked for no reason; heap and remnant box points on the navmesh 0/19; path 2156 (2683); open ends on.
-  - E7_HalfHouse_A: alive 0/17 of its box points on the navmesh, path 1829 (2251) against 1455 straight. After: 6 box points free, 11 under heap or remnant boxes, 0 still blocked for no reason; heap and remnant box points on the navmesh 0/23; path 1753 (2261); open ends on.
-  - E3_CoreRow: alive 0/28 of its box points on the navmesh, path 4729 (5333) against 2335 straight. After: 0 box points free, 28 under heap or remnant boxes, 0 still blocked for no reason; heap and remnant box points on the navmesh 0/84; path 4729 (5333); open ends on.
-  - E1_CornerTower: alive 0/79 of its box points on the navmesh, path 3993 (4504) against 2901 straight. After: 15 box points free, 64 under heap or remnant boxes, 0 still blocked for no reason; heap and remnant box points on the navmesh 0/80; path 3993 (4504); open ends on.
-  - B2_Facade2St_B: alive 0/17 of its box points on the navmesh, path 2155 (2678) against 1360 straight. After: 17 box points free, 0 under heap or remnant boxes, 0 still blocked for no reason; heap and remnant box points on the navmesh 0/0; path 1360 (1360); open ends on.
-  - E4_StubRing_A: alive 0/37 of its box points on the navmesh, path 2360 (2881) against 1750 straight. After: 21 box points free, 16 under heap or remnant boxes, 0 still blocked for no reason; heap and remnant box points on the navmesh 0/28; path 2094 (2642); open ends on.
+  - B1_Facade1St_A: alive 0/12 of its box points on the navmesh, path 1637 (2025) against 1300 straight. After: 0/12 kept-box points on the navmesh, 0 old box points free, 12 under heap or kept boxes, 0 blocked for no reason; path 1637 (2025); open ends on.
+  - E7_HalfHouse_A: alive 0/17 of its box points on the navmesh, path 1829 (2251) against 1455 straight. After: 0/12 kept-box points on the navmesh, 0 old box points free, 17 under heap or kept boxes, 0 blocked for no reason; path 1839 (2278); open ends on.
+  - E5_Shell1St_A: alive 0/42 of its box points on the navmesh, path 2675 (3185) against 1855 straight. After: 0/36 kept-box points on the navmesh, 0 old box points free, 42 under heap or kept boxes, 0 blocked for no reason; path 2675 (3185); open ends on.
+  - E1_CornerTower: alive 0/79 of its box points on the navmesh, path 3993 (4504) against 2901 straight. After: 0/60 kept-box points on the navmesh, 6 old box points free, 73 under heap or kept boxes, 0 blocked for no reason; path 3993 (4504); open ends on.
+  - B2_Facade2St_B: alive 0/17 of its box points on the navmesh, path 2155 (2678) against 1360 straight. After: 0/17 kept-box points on the navmesh, 0 old box points free, 17 under heap or kept boxes, 0 blocked for no reason; path 2155 (2678); open ends on.
+  - B6_Stub_A: alive 0/8 of its box points on the navmesh, path 1844 (2343) against 1280 straight. After: 0/8 kept-box points on the navmesh, 0 old box points free, 8 under heap or kept boxes, 0 blocked for no reason; path 1844 (2343); open ends on.
 - **Cover:** control heap 8 of 8 sockets published at the start and at the end; spawned heaps 0 of 8 each (see
   "Cover of the spawned heaps").
-- **Dressing:** 3 of 3 tagged components visible before the death of B2, all hidden in the first sample (0.03 s).
-- **Small pieces gone:** no `BP_BerlinRuin_*` actor was left except the three remnants.
-- **Holes still work:** `ruin_holes_run.sh run7_after_death` after the change: 19 direct shell hits; holes after 36 s of fire E1 2, E3 2, B3 5, B7 3, E5 1 (3 after debug hits), slot 0 swapped to `MI_BerlinRuin_Wall_Holes` on each; its kills left E3 and B7 as remnants that still block (path 47.2 m and 32.0 m, as alive) and removed E5 and B8 (B8's 24 of 24 box points back on the navmesh; E5 31 of 42, the rest under its new heap).
-- **Pictures** (`Saved/Berlin/ruin_death_test/`): `death_<piece>_before`, `_0_5s`, `_2_0s`, `_5_0s`, `_after`, and
-  `_remnant_plus10s` for E1, E3 and B3. Earlier looks are kept in `run4_vanish_all/` (everything vanishing, before the
-  remnant rule) and `run5_inmemory_remnant/`; `fx_*.png` is the effect contact sheet.
-- **How it looks:** a grey-brown cloud grows over the whole footprint within half a second and is fed for the length
-  of the sink, with stones flying out of it; the building goes down inside it. From the game camera a hero is fully
-  hidden for 5-6 s. When the dust thins (2-3 s after the sink) a small piece has left its heap; a large one stands as
-  a low, leaning shell with the heap inside it. The heaps were never seen appearing: they spawn under the dust.
+- **Dressing:** 3 of 3 tagged components visible before the death of B2, all hidden in the first sample (0.04 s).
+- **Holes still work:** not re-run on 2026-11-14 (the hole settings were not touched, only the death debris counts). Last run `ruin_holes_run.sh run7_after_death` on 2026-11-13: 19 direct shell hits, holes E1 2, E3 2, B3 5, B7 3, E5 1, slot 0 swapped to `MI_BerlinRuin_Wall_Holes` on each. In run9 the stub took a hole from the tank before it died (hole count 1).
+- **Second set:** `run10_large2.log`, `result_large2.json`: B7 drop 630 cm (yaw -2.6), E3 1102 (2.0), E2 962 (1.0), B5 666 (4.2), B3 1010 (4.6), E4 stub ring 40 (-6.3); kept boxes 1/1, 2/4, 11/14, 2/3, 4/4, 4/7 with 0 points on the navmesh; B7's heap found 400 cm from the table's spot (the moved spot), E4 without a heap, as set; every remnant still and dead afterwards.
+- **Pictures** (`Saved/Berlin/ruin_death_test/`): `death_<piece>_before`, `_0_5s`, `_2_0s`, `_5_0s`, `_after`,
+  `_remnant_plus10s`, and the comparison sheet `death_comparison_sheet.png` (six pieces x 0.5 s, 2 s, after). Older
+  looks: `run4_vanish_all/`, `run5_inmemory_remnant/`, `run6_final/` (2026-11-13: big dust, small pieces vanish).
+- **How it looks:** a stub gives a low brown puff no wider than the wall and a few stones, and settles half a metre.
+  A one-storey slab or shell: two puffs, the wall drops a good metre and turns. A two-storey facade or half house:
+  three puffs along it, well inside the view. A hero: six grey-brown ring clouds over six seconds with stones flying,
+  the building visible through them the whole time while it goes down 13 m.
 
 ### Not covered, or weaker than asked
 
-- Tested on the unit-test map only: flat ground, no footprint skirt under the heaps, orange light. Not on Ger_Berlin.
-- The other four large pieces were killed in a second, shorter run (`ruin_death_run.sh run7_large2 500 large2`,
-  `result_large2.json`, pictures `death_<piece>_*`): B7 z -630, E2 -962, B5 -666, B4 -1089 cm, tilts 3.5 / 3.2 / 4.2 /
-  4.2 degrees, kept boxes 1 of 1, 10 of 14, 2 of 3, 4 of 4 with 0 of 12 / 77 / 10 / 17 points on the navmesh, heaps
-  at 0.0 cm error, each remnant still and dead afterwards. The small B and E variants not named above were built and
-  compile but were not killed in a test.
-- The remnant tilt is random per death, not derived from the actor position.
-- A remnant can still be given an attack order; spawned heaps publish no cover and have no lot tint (all above).
-- A ruin placed scaled up (fillers, up to 1.15) spawns its heap scaled with it; no test killed a scaled ruin.
-- The death of a ruin while the game is paused, or two neighbours dying into each other's heaps, was not tried.
+- Tested on the unit-test map only: flat ground, no footprint skirt under the heaps, orange light. Not on Ger_Berlin,
+  where the owner saw the first version read white; the tint was chosen on this map.
+- The dust bounds are engine bounds, not measured smoke; the comparison is the pictures.
+- The kept nav boxes do not follow the remnant's yaw (up to 0.7 m off at the end of a long wall).
+- A heap is not hidden by dust when it appears on the small classes.
+- A remnant can still be given an attack order; spawned heaps publish no cover and have no lot tint.
+- B4, the B variants and E6 were built and compile but were not killed in a test. No scaled ruin was killed.
 
 ## Known weak spots
 
-- **Death:** since 2026-11-13 the ruin sinks in dust and leaves its collapse heap (see "Death"). Open: the spawned
-  heaps publish no cover points until the cover finder gets a registration call for actors spawned at runtime (C++),
-  and they do not take the lot's tint.
+- **Death:** every piece ends as a lowered, turned remnant (see "Death"). Open: the spawned heaps publish no cover
+  points until the cover finder gets a registration call for actors spawned at runtime (C++); they do not take the
+  lot's tint; a remnant still accepts an attack order; its kept nav boxes do not follow its yaw.
 - **`AttackActor` barely engages the two big heroes (gameplay finding, cause not found):**
   - Over five runs the tanks ordered to `AttackActor` E1 (18 x 21 m, 21 m tall) and E3 (30 m row) did not move or turn,
     and hit their ruin 0-2 times each run.

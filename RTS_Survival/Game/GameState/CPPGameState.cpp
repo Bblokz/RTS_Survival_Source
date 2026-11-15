@@ -6373,6 +6373,31 @@ void ACPPGameState::InitAllGameArmoredCarData()
 		TankData.Abilities = BasicTankAbilities;
 		M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_GAZMM_72K, TankData);
 	}
+
+	// Opel supply truck: unarmed and not controllable; it only needs to move, so no card beyond the basics.
+	{
+		constexpr float OpelSupplyTruckHealthMlt = 0.9f;
+		constexpr float OpelSupplyTruckRotationSpeed = 35.f;
+		constexpr float OpelSupplyTruckMaxSpeedKmh = 50.f;
+		constexpr float OpelSupplyTruckReverseSpeedKmh = 20.f;
+		constexpr float OpelSupplyTruckExpWorthMlt = 0.8f;
+
+		TankData.MaxHealth = RTSFunctionLibrary::RoundToNearestMultipleOf(
+			ArmoredCarHealthBase * OpelSupplyTruckHealthMlt, 5);
+		TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIArmoredCarResistances(TankData.MaxHealth);
+		TankData.VehicleRotationSpeed = OpelSupplyTruckRotationSpeed * TankTurnRateMultiplier;
+		TankData.VehicleMaxSpeedKmh = OpelSupplyTruckMaxSpeedKmh;
+		TankData.VehicleReverseSpeedKmh = OpelSupplyTruckReverseSpeedKmh;
+		TankData.VisionRadius = ArmoredCarVisionRadius;
+		TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(
+			BaseArmoredCarExp * OpelSupplyTruckExpWorthMlt, 5);
+		// Never trained: the HQ sends it for free.
+		TankData.Cost = FUnitCost();
+		TankData.ExperienceLevels = GetArmoredCarExpLevels();
+		TankData.ExperienceMultiplier = 1.0f;
+		TankData.Abilities = BasicTankAbilities;
+		M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_OpelSupplyTruck, TankData);
+	}
 }
 
 void ACPPGameState::InitAllGameLightTankData()

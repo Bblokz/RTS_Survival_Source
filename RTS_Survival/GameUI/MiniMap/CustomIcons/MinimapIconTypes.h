@@ -21,7 +21,34 @@ enum class EMinimapIconType : uint8
 	// Survival waves: a chevron drawn pointing along +X that rotates with the wave's heading, and an upright badge.
 	IncomingWave UMETA(DisplayName = "Incoming Wave"),
 	IncomingWaveBadge UMETA(DisplayName = "Incoming Wave Badge"),
+	// Supply runs: an upright side view of the supply truck, and one upright flag per faction that can hold a
+	// supply point (the point shows the flag of its holder).
+	SupplyTruck UMETA(DisplayName = "Supply Truck"),
+	SupplyFlag_DirectorOfShield UMETA(DisplayName = "Supply Flag Director of Shield"),
+	SupplyFlag_DirectorOfForge UMETA(DisplayName = "Supply Flag Director of Forge"),
+	SupplyFlag_DirectorOfHarvest UMETA(DisplayName = "Supply Flag Director of Harvest"),
+	SupplyFlag_GerBreakthrough UMETA(DisplayName = "Supply Flag Ger Breakthrough"),
+	SupplyFlag_GerStrikeDivision UMETA(DisplayName = "Supply Flag Ger Strike Division"),
+	SupplyFlag_GerItalian UMETA(DisplayName = "Supply Flag Ger Italian"),
 };
+
+/** @return True for icons drawn as upright pictures (side views, flags): they must not turn with the minimap. */
+inline bool Global_GetIsUprightMinimapIcon(const EMinimapIconType IconType)
+{
+	switch (IconType)
+	{
+	case EMinimapIconType::SupplyTruck:
+	case EMinimapIconType::SupplyFlag_DirectorOfShield:
+	case EMinimapIconType::SupplyFlag_DirectorOfForge:
+	case EMinimapIconType::SupplyFlag_DirectorOfHarvest:
+	case EMinimapIconType::SupplyFlag_GerBreakthrough:
+	case EMinimapIconType::SupplyFlag_GerStrikeDivision:
+	case EMinimapIconType::SupplyFlag_GerItalian:
+		return true;
+	default:
+		return false;
+	}
+}
 
 USTRUCT(BlueprintType)
 struct FMinimapIcon
