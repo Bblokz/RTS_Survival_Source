@@ -59,6 +59,7 @@ namespace InfoTakeoverValidateConstants
 	const FName DifficultyButtonName(TEXT("M_NormalDifficultyButton"));
 	const TCHAR* const LongTextLabel = TEXT("Layout_LongText");
 	const TCHAR* const ShortTextLabel = TEXT("Layout_ShortText");
+	const TCHAR* const FieldManualLabel = TEXT("FieldManual_Cover");
 }
 
 bool UInfoTakeoverValidateSubsystem::ShouldCreateSubsystem(UObject* Outer) const
@@ -246,6 +247,8 @@ void UInfoTakeoverValidateSubsystem::LogAndQueueTakeovers()
 	if (not M_Vehicles.IsEmpty() && IsValid(M_Vehicles[0]))
 	{
 		QueueCustomLayoutTakeovers(*M_Vehicles[0]);
+		M_UnitTakeoverCount = M_TakeoverLabels.Num();
+		QueueBehindNeverShowAgain(*InfoTakeovers, *M_Vehicles[0]);
 	}
 	UE_LOG(LogTemp, Display, TEXT("INFO_TAKEOVER queued %d takeovers; %d waiting behind the open one"),
 	       M_TakeoverLabels.Num(), InfoTakeovers->GetQueuedTakeoverCount());
@@ -305,6 +308,25 @@ void UInfoTakeoverValidateSubsystem::QueueCustomLayoutTakeovers(ATankMaster& Veh
 	}
 }
 
+void UInfoTakeoverValidateSubsystem::QueueBehindNeverShowAgain(UInfoTakeoverSubsystem& InfoTakeovers,
+                                                               ATankMaster& Vehicle)
+{
+	using namespace InfoTakeoverValidateConstants;
+	if (InfoTakeovers.QueueCoverTakeover() == INDEX_NONE)
+	{
+		Fail(TEXT("the cover field manual could not be queued"));
+		return;
+	}
+	M_TakeoverLabels.Add(FieldManualLabel);
+	// Not in M_TakeoverLabels: "never show again" on the last unit takeover must drop it.
+	FVehicleInfoTakeoverEntry DroppedEntry;
+	DroppedEntry.Description = FText::FromString(TEXT("Queued behind never show again; must not open."));
+	if (not InfoTakeovers.QueueVehicleTakeover(&Vehicle, DroppedEntry))
+	{
+		Fail(TEXT("the unit takeover behind the field manual could not be queued"));
+	}
+}
+
 void UInfoTakeoverValidateSubsystem::TickWatchingTakeovers()
 {
 	using namespace InfoTakeoverValidateConstants;
@@ -348,8 +370,14 @@ void UInfoTakeoverValidateSubsystem::StartWatching(UW_InfoTakeover& Takeover)
 	{
 		Fail(FString::Printf(TEXT("%s opened without pausing the game"), *M_WatchedLabel));
 	}
-	// The last takeover ticks "never show again", as the player would.
-	if (M_OpenedTakeoverCount == M_TakeoverLabels.Num())
+	const bool bIsUnitTakeover = M_OpenedTakeoverCount <= M_UnitTakeoverCount;
+	if (Takeover.GetOffersNeverShowAgain() != bIsUnitTakeover)
+	{
+		Fail(FString::Printf(TEXT("%s: the never-show box must show on unit takeovers only (shown=%d)"),
+		                     *M_WatchedLabel, Takeover.GetOffersNeverShowAgain() ? 1 : 0));
+	}
+	// The last unit takeover ticks "never show again", as the player would; the field manual behind it must still open.
+	if (M_OpenedTakeoverCount == M_UnitTakeoverCount)
 	{
 		Takeover.SetNeverShowAgainChecked(true);
 	}
@@ -469,6 +497,15 @@ void UInfoTakeoverValidateSubsystem::CheckNeverShowAgainAndStartDeferral()
 	{
 		Fail(TEXT("a takeover was queued while the setting is off"));
 	}
+	if (M_OpenedTakeoverCount != M_TakeoverLabels.Num())
+	{
+		Fail(FString::Printf(TEXT("%d takeovers opened, expected %d: the unit takeover behind \"never show again\" "
+			"must be dropped and the field manual kept"), M_OpenedTakeoverCount, M_TakeoverLabels.Num()));
+	}
+	if (InfoTakeovers != nullptr)
+	{
+		CheckFieldManualWhileTurnedOff(*InfoTakeovers);
+	}
 	URTSSettingsMenuSubsystem* const SettingsSubsystem = GetWorld()->GetGameInstance()->GetSubsystem<
 		URTSSettingsMenuSubsystem>();
 	if (SettingsSubsystem != nullptr)
@@ -483,6 +520,25 @@ void UInfoTakeoverValidateSubsystem::CheckNeverShowAgainAndStartDeferral()
 	}
 	UE_LOG(LogTemp, Display, TEXT("INFO_TAKEOVER never-show check done"));
 	StartDeferralCheck();
+}
+
+void UInfoTakeoverValidateSubsystem::CheckFieldManualWhileTurnedOff(UInfoTakeoverSubsystem& InfoTakeovers)
+{
+	// Called with the setting off: a field manual queued now must still open, and closing it leaves the setting off.
+	const int32 RequestId = InfoTakeovers.QueueCoverTakeover();
+	UW_InfoTakeover* const FieldManual = InfoTakeovers.GetActiveTakeover();
+	UE_LOG(LogTemp, Display, TEXT("INFO_TAKEOVER field manual while off: request=%d opened=%d"), RequestId,
+	       IsValid(FieldManual) ? 1 : 0);
+	if (RequestId == INDEX_NONE || not IsValid(FieldManual))
+	{
+		Fail(TEXT("a field manual queued while unit intel is off did not open"));
+		return;
+	}
+	FieldManual->OnClickedContinue();
+	if (UInfoTakeoverSubsystem::GetAreInfoTakeoversEnabled() || IsValid(InfoTakeovers.GetActiveTakeover()))
+	{
+		Fail(TEXT("closing the field manual changed the setting or left a takeover open"));
+	}
 }
 
 void UInfoTakeoverValidateSubsystem::StartDeferralCheck()
@@ -601,8 +657,8 @@ void UInfoTakeoverValidateSubsystem::TickArchiveOpen()
 void UInfoTakeoverValidateSubsystem::CheckArchiveEntries()
 {
 	// One per distinct vehicle name: the six rows and the long-name layout test; the other custom takeovers fall back
-	// to "T-26" and must not be archived twice.
-	constexpr int32 ExpectedCustomEntries = 7;
+	// to "T-26" and must not be archived twice. Plus one for the cover field manual (opened twice, archived once).
+	constexpr int32 ExpectedCustomEntries = 8;
 	TArray<UUserWidget*> ArchiveItems;
 	UWidgetBlueprintLibrary::GetAllWidgetsOfClass(GetWorld(), ArchiveItems, UW_ArchiveItem::StaticClass(), false);
 	int32 CustomEntryCount = 0;

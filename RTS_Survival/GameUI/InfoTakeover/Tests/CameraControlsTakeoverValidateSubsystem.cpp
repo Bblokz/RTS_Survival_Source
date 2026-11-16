@@ -252,6 +252,57 @@ void UCameraControlsTakeoverValidateSubsystem::CheckPageControls(const UW_Camera
 	}
 }
 
+void UCameraControlsTakeoverValidateSubsystem::CheckPageLampLayout(const UW_CameraControlsTakeover& Takeover)
+{
+	// The lamps sit in the title placard's lamp seat: row right edge 40 (panel padding) + 10 in from the plate's
+	// right, top 30 + 17 down; lamps are 24 units, so their centres are at y 59. Plate units are the 1080p reference
+	// units at every resolution and aspect ratio (UI scale = shortest side).
+	constexpr float PlateWidth = 1240.f;
+	constexpr float ExpectedRowRight = PlateWidth - 50.f;
+	constexpr float ExpectedRowTop = 47.f;
+	constexpr float ExpectedLampCentreY = 59.f;
+	constexpr float LampPitch = 30.f;
+	constexpr float LayoutTolerance = 0.75f;
+	FBox2D RowRect(ForceInit);
+	FVector2D LitCentre;
+	if (not Takeover.GetPageLampLayout(RowRect, LitCentre))
+	{
+		Fail(TEXT("the page lamp row has no layout yet"));
+		return;
+	}
+	const int32 LitLamp = Takeover.GetLitPageLampIndex();
+	const int32 LampCount = Takeover.GetPageLampCount();
+	const float ExpectedLitCentreX = ExpectedRowRight - (LampCount - 1 - LitLamp) * LampPitch - 12.f;
+	FViewport* const Viewport = GEngine && GEngine->GameViewport ? GEngine->GameViewport->Viewport : nullptr;
+	const FIntPoint ViewportSize = Viewport ? Viewport->GetSizeXY() : FIntPoint::ZeroValue;
+	FString Powers;
+	for (int32 LampIndex = 0; LampIndex < LampCount; ++LampIndex)
+	{
+		Powers += FString::Printf(TEXT("%s%.2f"), LampIndex == 0 ? TEXT("") : TEXT(","),
+		                          Takeover.GetPageLampPower(LampIndex));
+	}
+	UE_LOG(LogTemp, Display, TEXT("CAMERA_TAKEOVER page lamps (%dx%d): halos=%d row=(%.2f,%.2f)-(%.2f,%.2f) "
+		       "lit lamp %d centre=(%.2f,%.2f) expected=(%.2f,%.2f) power=[%s]"), ViewportSize.X, ViewportSize.Y,
+	       Takeover.GetHasPageLampHalos() ? 1 : 0, RowRect.Min.X, RowRect.Min.Y, RowRect.Max.X, RowRect.Max.Y,
+	       LitLamp + 1, LitCentre.X, LitCentre.Y, ExpectedLitCentreX, ExpectedLampCentreY, *Powers);
+	const bool bRowInSeat = FMath::IsNearlyEqual(RowRect.Max.X, ExpectedRowRight, LayoutTolerance)
+		&& FMath::IsNearlyEqual(RowRect.Min.Y, ExpectedRowTop, LayoutTolerance);
+	const bool bLitInPlace = FMath::IsNearlyEqual(LitCentre.X, ExpectedLitCentreX, LayoutTolerance)
+		&& FMath::IsNearlyEqual(LitCentre.Y, ExpectedLampCentreY, LayoutTolerance);
+	if (not bRowInSeat || not bLitInPlace)
+	{
+		Fail(TEXT("the page lamps are not in the title placard's lamp seat"));
+	}
+	if (not Takeover.GetHasPageLampHalos())
+	{
+		Fail(TEXT("the page lamps have no halos (UIndicatorLampSettings::PageLampMaterial not set?)"));
+	}
+	if (not FMath::IsNearlyEqual(Takeover.GetPageLampPower(LitLamp), 1.f))
+	{
+		Fail(TEXT("the lit page lamp has not warmed up to full power"));
+	}
+}
+
 void UCameraControlsTakeoverValidateSubsystem::PressPreviousOnLastPage(UW_CameraControlsTakeover& Takeover)
 {
 	bM_HasPressedPrevious = true;
@@ -409,6 +460,7 @@ bool UCameraControlsTakeoverValidateSubsystem::TickPageShots(UW_CameraControlsTa
 	if (not bM_HasTitleShot && SecondsOpen >= TitleShotSeconds)
 	{
 		bM_HasTitleShot = true;
+		CheckPageLampLayout(Takeover);
 		Capture(GetShotPrefix(Takeover) + TEXT("0_typing"));
 	}
 	if (M_NextFrameShot < FrameShotCount && SecondsOpen >= FirstShotSeconds + ShotInterval * M_NextFrameShot)

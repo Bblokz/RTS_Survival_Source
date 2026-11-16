@@ -28,8 +28,8 @@ enum class ECoverTakeoverValidatePhase : uint8
  * @brief Headless check of the cover takeover, started with -CoverTakeoverValidate (best with -game -RenderOffscreen
  * on a unit test map): calls the Show Cover Takeover node before the start button, checks it waits, screenshots the
  * typing, the finished panel and the HUD after closing to Saved/InfoTakeover/Cover/, checks that all three preview
- * screenshots loaded, that On Closed fires once after UNDERSTOOD with the game unpaused and at once while the takeovers
- * are off. Grep COVER_TAKEOVER. Restores the setting and quits.
+ * screenshots loaded, that On Closed fires once after UNDERSTOOD with the game unpaused and that it still opens
+ * (without the never-show box) and closes as shown while unit intel is turned off. Grep COVER_TAKEOVER. Restores the setting and quits.
  */
 UCLASS()
 class RTS_SURVIVAL_API UCoverTakeoverValidateSubsystem : public UTickableWorldSubsystem
@@ -80,7 +80,7 @@ private:
 
 	void CallMainNode();
 	void StartWatching(UW_CoverTakeover& Takeover);
-	void CheckTurnedOffNode();
+	void CheckShowsWhileTurnedOff();
 
 	UFUNCTION()
 	void HandleMainClosed(bool bWasShown);
