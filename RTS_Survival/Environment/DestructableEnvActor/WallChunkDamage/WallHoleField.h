@@ -17,8 +17,14 @@ namespace WallHoleFieldConstants
 	// Field values are stored as f in [-1, 1] -> byte (f * 0.5 + 0.5) * 255; f > 0 is removed.
 	inline constexpr float FieldMin = -1.f;
 	inline constexpr float FieldMax = 1.f;
-	// A hole's rim reaches to 1.5 radii (f = -0.5); the rest of the field stays at its minimum.
-	inline constexpr float HoleRimReachShare = 1.5f;
+	// Shell holes store f = (radius - distance) / HoleEdgeScale: distance from the edge in cm, not a share of the
+	// radius, so the shader's edge noise and scorch ring are the same few cm on every hole. A share of the radius made
+	// big holes wobble by most of a metre and ringed them in a metre of soot (they read as melted, not broken).
+	inline constexpr float HoleEdgeScale = 40.f;
+	// Shell holes are jittered polygons (seeded by the hole's spot, so a field rebuild draws the same shape): broken
+	// concrete has straight-ish fracture edges and corners, not a circle.
+	inline constexpr int32 HolePolygonCorners = 7;
+	inline constexpr float HolePolygonJitter = 0.24f;
 	// Material parameter names (Tools/WallChunks/make_wall_field_holes_material.py).
 	inline const FName TextureParameter = TEXT("WallFieldTexture");
 	inline const FName PathAParameter = TEXT("WallFieldPathA");
@@ -51,6 +57,20 @@ struct FWallHoleFieldHole
 	float Z = 0.f;
 	float FrontRadius = 0.f;
 	float BackRadius = 0.f;
+};
+
+/** Wall left hanging in the air once holes and breaches cut it off from the ground (texel indices of the field). */
+struct FWallHoleFieldIsland
+{
+	TArray<int32> Texels;
+	float CentreU = 0.f;
+	float CentreZ = 0.f;
+	float Area = 0.f;
+	// Thin slivers and tongues still joined to the wall (no debris: their texels are scattered).
+	bool bIsSlivers = false;
+	// Next to a tank breach: it fell with the breach. Written as breach (it does not use up the shell hole budget, and
+	// weapon blocks treat it as open), not as shell holes.
+	bool bTouchesBreach = false;
 };
 
 /**
@@ -147,6 +167,15 @@ public:
 	 */
 	float GetRemovedArea(bool bIncludeBreaches = true) const;
 
+	/**
+	 * @brief Wall no longer joined to the foot of the wall: cut loose by holes and breaches, or held only by bridges
+	 * thinner than the hole edge's noise (they read as floating chunks or melted drips). Nothing is written.
+	 * @param OutIslands Receives every unsupported piece.
+	 */
+	void FindUnsupportedIslands(TArray<FWallHoleFieldIsland>& OutIslands) const;
+	/** Removes an island on both faces. */
+	void RemoveIsland(const FWallHoleFieldIsland& Island);
+
 	/** @return Face area of the unrolled wall, cm². */
 	float GetFaceArea() const { return M_PathLength * (M_ZMax - M_ZMin); }
 
@@ -163,10 +192,16 @@ public:
 
 private:
 	void BuildPath(const TArray<FVector2D>& InPathPoints);
+	// Texels are allocated on the first write: hundreds of wall pieces on a map are never damaged.
+	void EnsureTexels();
+	/** @return True when a texel within Reach texels (4 directions) of this one is in a breach. */
+	bool GetIsNearBreach(int32 TexelIndex, int32 Reach) const;
 	// Writes max(existing, f) into one channel for every texel in the U/Z rectangle, f from the callback.
 	template <typename FieldFunction>
 	void WriteMax(int32 Channel, float UFrom, float UTo, float ZFrom, float ZTo, FieldFunction&& GetField);
-	void WriteHoleChannel(int32 Channel, float U, float Z, float Radius);
+	void WriteHoleChannel(int32 Channel, float U, float Z, float Radius, uint32 ShapeSeed);
+	/** @return Mesh-space height above the ground where a breach's V starts (lower on a wall barely taller than the hull). */
+	float GetBreachVStart(const FWallHoleFieldBreach& Breach) const;
 	float GetTexelU(int32 Column) const { return M_UMin + (Column + 0.5f) * M_TexelSize; }
 	float GetTexelZ(int32 Row) const { return M_ZMin + (Row + 0.5f) * M_TexelSize; }
 	uint8 GetChannel(int32 Column, int32 Row, int32 Channel) const;

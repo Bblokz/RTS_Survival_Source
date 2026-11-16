@@ -11,6 +11,16 @@ namespace WallHoleFieldPrivate
 	constexpr float MinTexelSize = 1.f;
 	constexpr int32 BytesPerTexel = 4;
 	constexpr uint8 EncodedRemovedThreshold = 128;
+	// Support test: a texel this close outside a hole edge (f > -0.35: 14 cm, about the shader's edge noise) already
+	// counts as broken.
+	constexpr uint8 EncodedSupportThreshold = 83;
+	// Rows at the foot that stand on the ground.
+	constexpr int32 SupportRows = 2;
+	// A solid texel with broken-through texels within this many texels on two opposite sides is a sliver (under
+	// about 18 cm at 6 cm texels): concrete that thin does not hang on, it falls with the hole.
+	constexpr int32 SliverReachTexels = 2;
+	// The V of a breach starts at this share of the wall's height when that is lower than BreachVStartShare x hull.
+	constexpr float BreachVStartWallShare = 0.5f;
 	// Breach top edge and foot stub use a narrower jag band than the sides.
 	constexpr float BreachTopBandShare = 0.5f;
 	constexpr float BreachStubBandShare = 0.35f;
@@ -35,8 +45,8 @@ void FWallHoleField::Init(const TArray<FVector2D>& InPathPoints, const float InT
 	M_TexelSize = FMath::Max(M_TexelSize, MinTexelSize);
 	M_Width = FMath::Clamp(FMath::CeilToInt32(M_PathLength / M_TexelSize), 2, TexelCap);
 	M_Height = FMath::Clamp(FMath::CeilToInt32((M_ZMax - M_ZMin) / M_TexelSize), 2, TexelCap);
-	M_Texels.SetNumZeroed(M_Width * M_Height);
-	Clear();
+	// Allocated on the first write (EnsureTexels); until then every reader sees intact wall.
+	M_Texels.Reset();
 }
 
 void FWallHoleField::BuildPath(const TArray<FVector2D>& InPathPoints)
@@ -196,6 +206,7 @@ template <typename FieldFunction>
 void FWallHoleField::WriteMax(const int32 Channel, const float UFrom, const float UTo, const float ZFrom,
                               const float ZTo, FieldFunction&& GetField)
 {
+	EnsureTexels();
 	const int32 ColumnFrom = FMath::Clamp(FMath::FloorToInt32((UFrom - M_UMin) / M_TexelSize), 0, M_Width - 1);
 	const int32 ColumnTo = FMath::Clamp(FMath::CeilToInt32((UTo - M_UMin) / M_TexelSize), 0, M_Width - 1);
 	const int32 RowFrom = FMath::Clamp(FMath::FloorToInt32((ZFrom - M_ZMin) / M_TexelSize), 0, M_Height - 1);
@@ -214,30 +225,70 @@ void FWallHoleField::WriteMax(const int32 Channel, const float UFrom, const floa
 	}
 }
 
-void FWallHoleField::WriteHoleChannel(const int32 Channel, const float U, const float Z, const float Radius)
+void FWallHoleField::WriteHoleChannel(const int32 Channel, const float U, const float Z, const float Radius,
+                                      const uint32 ShapeSeed)
 {
+	using namespace WallHoleFieldConstants;
 	if (Radius <= 0.f)
 	{
 		return;
 	}
-	const float Reach = Radius * WallHoleFieldConstants::HoleRimReachShare;
-	WriteMax(Channel, U - Reach, U + Reach, Z - Reach, Z + Reach, [U, Z, Radius](const float TexelU, const float TexelZ)
+	// Corners of the jittered polygon (unit radius), the same for both faces of one hole.
+	const FRandomStream Stream(static_cast<int32>(ShapeSeed));
+	const float Rotation = Stream.FRand() * UE_TWO_PI;
+	TStaticArray<FVector2D, HolePolygonCorners> Corners;
+	for (int32 CornerIndex = 0; CornerIndex < HolePolygonCorners; ++CornerIndex)
 	{
-		return 1.f - FMath::Sqrt(FMath::Square(TexelU - U) + FMath::Square(TexelZ - Z)) / Radius;
-	});
+		const float Angle = Rotation + UE_TWO_PI * CornerIndex / HolePolygonCorners;
+		const float CornerRadius = 1.f + Stream.FRandRange(-HolePolygonJitter, HolePolygonJitter);
+		Corners[CornerIndex] = FVector2D(FMath::Cos(Angle), FMath::Sin(Angle)) * CornerRadius;
+	}
+	// f reaches its minimum (-1) one edge scale outside the widest corner.
+	const float Reach = Radius * (1.f + HolePolygonJitter) + HoleEdgeScale;
+	WriteMax(Channel, U - Reach, U + Reach, Z - Reach, Z + Reach,
+	         [U, Z, Radius, Rotation, Corners](const float TexelU, const float TexelZ)
+	         {
+		         const FVector2D Offset(TexelU - U, TexelZ - Z);
+		         const double Distance = Offset.Size();
+		         if (Distance < KINDA_SMALL_NUMBER)
+		         {
+			         return FieldMax;
+		         }
+		         // The polygon edge in this direction: the ray from the centre meets the side between two corners.
+		         const FVector2D Direction = Offset / Distance;
+		         const float Angle = FMath::Fmod(FMath::Atan2(Direction.Y, Direction.X) - Rotation + 2.f * UE_TWO_PI,
+		                                         UE_TWO_PI);
+		         const int32 Side = FMath::Clamp(FMath::FloorToInt32(Angle / (UE_TWO_PI / HolePolygonCorners)), 0,
+		                                         HolePolygonCorners - 1);
+		         const FVector2D& From = Corners[Side];
+		         const FVector2D Edge = Corners[(Side + 1) % HolePolygonCorners] - From;
+		         const double Denominator = FVector2D::CrossProduct(Direction, Edge);
+		         const double EdgeRadius = FMath::Abs(Denominator) > KINDA_SMALL_NUMBER
+			                                   ? FVector2D::CrossProduct(From, Edge) / Denominator
+			                                   : From.Size();
+		         return static_cast<float>((Radius * EdgeRadius - Distance) / HoleEdgeScale);
+	         });
 }
 
 void FWallHoleField::AddHole(const FWallHoleFieldHole& Hole, const bool bIsFrontSide)
 {
 	using namespace WallHoleFieldConstants;
-	WriteHoleChannel(bIsFrontSide ? FrontChannel : BackChannel, Hole.U, Hole.Z, Hole.FrontRadius);
-	WriteHoleChannel(bIsFrontSide ? BackChannel : FrontChannel, Hole.U, Hole.Z, Hole.BackRadius);
+	const uint32 ShapeSeed = HashCombine(GetTypeHash(FMath::RoundToInt32(Hole.U * 10.f)),
+	                                     GetTypeHash(FMath::RoundToInt32(Hole.Z * 10.f)));
+	WriteHoleChannel(bIsFrontSide ? FrontChannel : BackChannel, Hole.U, Hole.Z, Hole.FrontRadius, ShapeSeed);
+	WriteHoleChannel(bIsFrontSide ? BackChannel : FrontChannel, Hole.U, Hole.Z, Hole.BackRadius, ShapeSeed);
+}
+
+float FWallHoleField::GetBreachVStart(const FWallHoleFieldBreach& Breach) const
+{
+	using namespace WallHoleFieldPrivate;
+	return FMath::Min(Breach.HullHeight * BreachVStartShare, (M_ZMax - Breach.GroundZ) * BreachVStartWallShare);
 }
 
 float FWallHoleField::GetBreachTopHalfWidth(const FWallHoleFieldBreach& Breach) const
 {
 	const float BaseHalfWidth = FMath::Max((Breach.UMax - Breach.UMin) * 0.5f, 1.f);
-	const float VStart = Breach.HullHeight * WallHoleFieldPrivate::BreachVStartShare;
+	const float VStart = GetBreachVStart(Breach);
 	return BaseHalfWidth + FMath::Max(0.f, M_ZMax - Breach.GroundZ - VStart) * Breach.VSlope;
 }
 
@@ -248,7 +299,7 @@ void FWallHoleField::AddBreach(const FWallHoleFieldBreach& Breach)
 	const float BaseHalfWidth = FMath::Max((Breach.UMax - Breach.UMin) * 0.5f, 1.f);
 	const float EdgeBand = FMath::Max(Breach.EdgeBand, 1.f);
 	const float WallTop = M_ZMax - Breach.GroundZ;
-	const float VStart = Breach.HullHeight * BreachVStartShare;
+	const float VStart = GetBreachVStart(Breach);
 	const float TopHalfWidth = BaseHalfWidth + FMath::Max(0.f, WallTop - VStart) * Breach.VSlope * Breach.TopCollapse;
 	const bool bHasTopFallen = Breach.TopCollapse > 0.f;
 	auto GetBreachField = [=](const float TexelU, const float TexelZ)
@@ -267,8 +318,201 @@ void FWallHoleField::AddBreach(const FWallHoleFieldBreach& Breach)
 	         M_ZMin, M_ZMax, GetBreachField);
 }
 
+void FWallHoleField::EnsureTexels()
+{
+	if (M_Texels.Num() == M_Width * M_Height)
+	{
+		return;
+	}
+	M_Texels.SetNumZeroed(M_Width * M_Height);
+	Clear();
+}
+
+void FWallHoleField::FindUnsupportedIslands(TArray<FWallHoleFieldIsland>& OutIslands) const
+{
+	using namespace WallHoleFieldPrivate;
+	OutIslands.Reset();
+	if (not GetIsInitialised() || M_Texels.Num() != M_Width * M_Height)
+	{
+		return;
+	}
+	const int32 TexelCount = M_Width * M_Height;
+	// Solid for support: not broken through on both faces and not in a breach, with a margin beyond the hole edge so
+	// a bridge the shader's edge noise eats away does not hold anything up.
+	TBitArray<> Solid(false, TexelCount);
+	for (int32 Index = 0; Index < TexelCount; ++Index)
+	{
+		const FColor& Texel = M_Texels[Index];
+		const bool bIsThrough = Texel.R >= EncodedSupportThreshold && Texel.G >= EncodedSupportThreshold;
+		Solid[Index] = not bIsThrough && Texel.B < EncodedSupportThreshold;
+	}
+	// Slivers: solid texels with broken-through texels close by on two opposite sides fall even while still joined.
+	FWallHoleFieldIsland Slivers;
+	Slivers.bIsSlivers = true;
+	FWallHoleFieldIsland BreachSlivers;
+	BreachSlivers.bIsSlivers = true;
+	BreachSlivers.bTouchesBreach = true;
+	const TBitArray<> SolidBefore = Solid;
+	const auto IsOpenAt = [this, &SolidBefore](const int32 Column, const int32 Row)
+	{
+		// Outside the field is wall that is not drawn here (ends, the top): it holds, it is not open.
+		return Column >= 0 && Column < M_Width && Row >= 0 && Row < M_Height
+			&& not SolidBefore[Column + Row * M_Width];
+	};
+	for (int32 Index = 0; Index < TexelCount; ++Index)
+	{
+		if (not SolidBefore[Index])
+		{
+			continue;
+		}
+		const int32 Column = Index % M_Width;
+		const int32 Row = Index / M_Width;
+		bool bOpenLeft = false;
+		bool bOpenRight = false;
+		bool bOpenBelow = false;
+		bool bOpenAbove = false;
+		for (int32 Step = 1; Step <= SliverReachTexels; ++Step)
+		{
+			bOpenLeft = bOpenLeft || IsOpenAt(Column - Step, Row);
+			bOpenRight = bOpenRight || IsOpenAt(Column + Step, Row);
+			bOpenBelow = bOpenBelow || IsOpenAt(Column, Row - Step);
+			bOpenAbove = bOpenAbove || IsOpenAt(Column, Row + Step);
+		}
+		if ((bOpenLeft && bOpenRight) || (bOpenBelow && bOpenAbove))
+		{
+			Solid[Index] = false;
+			(GetIsNearBreach(Index, SliverReachTexels) ? BreachSlivers : Slivers).Texels.Add(Index);
+		}
+	}
+	Slivers.Area = Slivers.Texels.Num() * FMath::Square(M_TexelSize);
+	BreachSlivers.Area = BreachSlivers.Texels.Num() * FMath::Square(M_TexelSize);
+	TBitArray<> Reached(false, TexelCount);
+	TArray<int32> Stack;
+	const auto Flood = [this, &Solid, &Reached, &Stack](TArray<int32>* const OutTexels)
+	{
+		while (not Stack.IsEmpty())
+		{
+			const int32 Index = Stack.Pop(EAllowShrinking::No);
+			if (OutTexels != nullptr)
+			{
+				OutTexels->Add(Index);
+			}
+			const int32 Column = Index % M_Width;
+			const int32 Row = Index / M_Width;
+			const int32 Neighbours[4] = {
+				Column > 0 ? Index - 1 : INDEX_NONE, Column < M_Width - 1 ? Index + 1 : INDEX_NONE,
+				Row > 0 ? Index - M_Width : INDEX_NONE, Row < M_Height - 1 ? Index + M_Width : INDEX_NONE
+			};
+			for (const int32 Neighbour : Neighbours)
+			{
+				if (Neighbour != INDEX_NONE && Solid[Neighbour] && not Reached[Neighbour])
+				{
+					Reached[Neighbour] = true;
+					Stack.Add(Neighbour);
+				}
+			}
+		}
+	};
+	// Held up from the foot: the lowest rows stand on the ground.
+	for (int32 Row = 0; Row < FMath::Min(SupportRows, M_Height); ++Row)
+	{
+		for (int32 Column = 0; Column < M_Width; ++Column)
+		{
+			const int32 Index = Column + Row * M_Width;
+			if (Solid[Index] && not Reached[Index])
+			{
+				Reached[Index] = true;
+				Stack.Add(Index);
+			}
+		}
+	}
+	Flood(nullptr);
+	for (int32 Index = 0; Index < TexelCount; ++Index)
+	{
+		if (not Solid[Index] || Reached[Index])
+		{
+			continue;
+		}
+		FWallHoleFieldIsland& Island = OutIslands.AddDefaulted_GetRef();
+		Reached[Index] = true;
+		Stack.Add(Index);
+		Flood(&Island.Texels);
+		double SumU = 0.0;
+		double SumZ = 0.0;
+		for (const int32 TexelIndex : Island.Texels)
+		{
+			SumU += GetTexelU(TexelIndex % M_Width);
+			SumZ += GetTexelZ(TexelIndex / M_Width);
+		}
+		const int32 Count = FMath::Max(Island.Texels.Num(), 1);
+		Island.CentreU = static_cast<float>(SumU / Count);
+		Island.CentreZ = static_cast<float>(SumZ / Count);
+		Island.Area = Island.Texels.Num() * FMath::Square(M_TexelSize);
+		constexpr int32 IslandBreachReach = 1;
+		Island.bTouchesBreach = Island.Texels.ContainsByPredicate([this](const int32 TexelIndex)
+		{
+			return GetIsNearBreach(TexelIndex, IslandBreachReach);
+		});
+	}
+	if (not Slivers.Texels.IsEmpty())
+	{
+		OutIslands.Add(MoveTemp(Slivers));
+	}
+	if (not BreachSlivers.Texels.IsEmpty())
+	{
+		OutIslands.Add(MoveTemp(BreachSlivers));
+	}
+}
+
+void FWallHoleField::RemoveIsland(const FWallHoleFieldIsland& Island)
+{
+	for (const int32 TexelIndex : Island.Texels)
+	{
+		if (M_Texels.IsValidIndex(TexelIndex))
+		{
+			M_Texels[TexelIndex].R = MAX_uint8;
+			M_Texels[TexelIndex].G = MAX_uint8;
+			if (Island.bTouchesBreach)
+			{
+				M_Texels[TexelIndex].B = MAX_uint8;
+			}
+		}
+	}
+}
+
+bool FWallHoleField::GetIsNearBreach(const int32 TexelIndex, const int32 Reach) const
+{
+	using namespace WallHoleFieldPrivate;
+	if (not M_Texels.IsValidIndex(TexelIndex))
+	{
+		return false;
+	}
+	const int32 Column = TexelIndex % M_Width;
+	const int32 Row = TexelIndex / M_Width;
+	for (int32 Step = 1; Step <= Reach; ++Step)
+	{
+		const int32 Neighbours[4][2] = {{Column - Step, Row}, {Column + Step, Row}, {Column, Row - Step},
+		                                {Column, Row + Step}};
+		for (const int32* const Neighbour : Neighbours)
+		{
+			const bool bIsInField = Neighbour[0] >= 0 && Neighbour[0] < M_Width && Neighbour[1] >= 0
+				&& Neighbour[1] < M_Height;
+			if (bIsInField && M_Texels[Neighbour[0] + Neighbour[1] * M_Width].B >= EncodedRemovedThreshold)
+			{
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
 uint8 FWallHoleField::GetChannel(const int32 Column, const int32 Row, const int32 Channel) const
 {
+	if (M_Texels.Num() != M_Width * M_Height)
+	{
+		// Never damaged: intact everywhere.
+		return EncodeField(WallHoleFieldConstants::FieldMin);
+	}
 	const FColor& Texel = M_Texels[FMath::Clamp(Column, 0, M_Width - 1) + FMath::Clamp(Row, 0, M_Height - 1) * M_Width];
 	return Channel == WallHoleFieldConstants::FrontChannel
 		       ? Texel.R
@@ -307,7 +551,8 @@ float FWallHoleField::GetRemovedArea(const bool bIncludeBreaches) const
 	for (const FColor& Texel : M_Texels)
 	{
 		const bool bIsBreach = Texel.B >= EncodedRemovedThreshold;
-		const bool bIsHole = Texel.R >= EncodedRemovedThreshold;
+		// Either face: a back-face hole that did not go through is as much damage as a front one.
+		const bool bIsHole = Texel.R >= EncodedRemovedThreshold || Texel.G >= EncodedRemovedThreshold;
 		if (bIncludeBreaches ? (bIsHole || bIsBreach) : (bIsHole && not bIsBreach))
 		{
 			++RemovedTexels;
@@ -319,7 +564,7 @@ float FWallHoleField::GetRemovedArea(const bool bIncludeBreaches) const
 void FWallHoleField::Upload(TObjectPtr<UTexture2D>& InOutTexture) const
 {
 	using namespace WallHoleFieldPrivate;
-	if (not GetIsInitialised())
+	if (not GetIsInitialised() || M_Texels.Num() != M_Width * M_Height)
 	{
 		return;
 	}

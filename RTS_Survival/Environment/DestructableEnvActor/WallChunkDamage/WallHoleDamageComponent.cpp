@@ -24,6 +24,9 @@ namespace WallHoleDamageConstants
 {
 	// A Voronoi chunk fills about this share of its bounding box; used to estimate a debris mesh's face area.
 	constexpr float DebrisMeshFillShare = 0.7f;
+	// Wall cut loose from the ground falls; pieces bigger than this (cm2) throw debris, up to this radius (cm).
+	constexpr float MinIslandAreaForDebris = 400.f;
+	constexpr float MaxIslandDebrisRadius = 120.f;
 	constexpr float MinPieceScale = 0.15f;
 	constexpr float MaxPieceScale = 1.2f;
 	constexpr float MinPieceScaleJitter = 0.75f;
@@ -341,7 +344,8 @@ float UWallHoleDamageComponent::ApplyHit(const FVector& WorldHit, const FVector&
 	if (GetIsFieldMode())
 	{
 		FVector ExitNormal = FVector::ZeroVector;
-		const float FieldRemoved = CutFieldHole(SurfacePoint, ShotDirection, CappedRadius, Pieces, ExitNormal);
+		float FieldRemoved = CutFieldHole(SurfacePoint, ShotDirection, CappedRadius, Pieces, ExitNormal);
+		FieldRemoved += RemoveFieldIslands(&Pieces);
 		if (FieldRemoved > 0.f)
 		{
 			SwapToDamagedMaterials();
@@ -1167,6 +1171,28 @@ void UWallHoleDamageComponent::RebuildField()
 	{
 		M_Field.AddBreach(Breach);
 	}
+	// The islands are not stored: they follow from the holes and breaches again.
+	(void)RemoveFieldIslands(nullptr);
+}
+
+float UWallHoleDamageComponent::RemoveFieldIslands(TArray<FWallDebrisPiece>* const OutPieces)
+{
+	using namespace WallHoleDamageConstants;
+	TArray<FWallHoleFieldIsland> Islands;
+	M_Field.FindUnsupportedIslands(Islands);
+	float Removed = 0.f;
+	for (const FWallHoleFieldIsland& Island : Islands)
+	{
+		if (OutPieces != nullptr && not Island.bIsSlivers && Island.Area >= MinIslandAreaForDebris)
+		{
+			// Debris before the island goes: pieces only start on wall that still stands.
+			const float IslandRadius = FMath::Min(FMath::Sqrt(Island.Area / UE_PI), MaxIslandDebrisRadius);
+			AddFieldRingPieces(Island.CentreU, Island.CentreZ, true, 0.f, IslandRadius, *OutPieces);
+		}
+		M_Field.RemoveIsland(Island);
+		Removed += Island.Area;
+	}
+	return Removed;
 }
 
 float UWallHoleDamageComponent::ApplyBreach(int32& InOutBreachIndex, const FWallHoleFieldBreach& Breach,
@@ -1213,6 +1239,8 @@ float UWallHoleDamageComponent::ApplyBreach(int32& InOutBreachIndex, const FWall
 		FVector FaceNormal;
 		AddPiece(M_Field.GetMeshPoint(Candidate.X, Candidate.Y, 0.f, FaceNormal), FMath::Square(PieceSpacing), Pieces);
 	}
+	// Tongues and slivers the breach left beside holes fall now, not with the next shell somewhere else on the wall.
+	const float IslandsRemoved = RemoveFieldIslands(&Pieces);
 	SwapToDamagedMaterials();
 	WriteMask();
 	const FVector Travel = FVector(WorldTravelDirection.X, WorldTravelDirection.Y, 0.0).GetSafeNormal();
@@ -1224,7 +1252,7 @@ float UWallHoleDamageComponent::ApplyBreach(int32& InOutBreachIndex, const FWall
 		                     FaceNormal));
 	WallDamageShared::ThrowDebrisPieces(*GetOwner(), M_LoadedDebrisSystem, DebrisMeshes, Pieces,
 	                                    MeshTransform.GetRotation(), BreachCentre, Travel, DebrisSpeedScale, Travel);
-	return Removed;
+	return Removed + IslandsRemoved;
 }
 
 TArray<FVector2D> UWallHoleDamageComponent::GetStandingBreachCandidates(const FWallHoleFieldBreach& Breach,

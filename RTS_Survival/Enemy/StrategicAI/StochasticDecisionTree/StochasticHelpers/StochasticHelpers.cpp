@@ -10,6 +10,7 @@
 #include "RTS_Survival/Enemy/StrategicAI/StrategicActions/StrategicActions.h"
 #include "RTS_Survival/Units/SquadController.h"
 #include "RTS_Survival/Units/Tanks/TankMaster.h"
+#include "RTS_Survival/Environment/DestructableEnvActor/WallGate/WallGateNavigation.h"
 
 namespace
 {
@@ -506,10 +507,13 @@ namespace StochasticHelpers
 		}
 
 		UObject* WorldContextObject = const_cast<UObject*>(Params.WorldContextObject);
+		// Breachable walls closed: AI units cannot break them, so a waypoint path must not run through one.
 		UNavigationPath* NavigationPath = UNavigationSystemV1::FindPathToLocationSynchronously(
 			WorldContextObject,
 			Params.StartLocation,
-			Params.TargetLocation);
+			Params.TargetLocation,
+			nullptr,
+			URTSClosedBreachableWallsQueryFilter::StaticClass());
 		if (not IsValid(NavigationPath) || NavigationPath->PathPoints.Num() < 2)
 		{
 			return PathPoints;

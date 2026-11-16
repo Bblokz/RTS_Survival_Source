@@ -422,6 +422,12 @@ private:
 	void AddFieldRingPieces(float U, float Z, bool bIsFrontSide, float InnerRadius, float OuterRadius,
 	                        TArray<FWallDebrisPiece>& OutPieces) const;
 	void RebuildField();
+	/**
+	 * @brief Drops wall the holes and breaches cut loose from the ground (floating chunks, thin drips).
+	 * @param OutPieces Receives debris for each piece that falls; null when nothing should fly (a field rebuild).
+	 * @return Face area removed, cm².
+	 */
+	float RemoveFieldIslands(TArray<FWallDebrisPiece>* OutPieces);
 	/** @return Jittered points of wall still standing around a breach (debris starts), none inside the hull zone. */
 	TArray<FVector2D> GetStandingBreachCandidates(const FWallHoleFieldBreach& Breach, float PieceSpacing,
 	                                              const FBox2D& NoDebrisZone) const;
