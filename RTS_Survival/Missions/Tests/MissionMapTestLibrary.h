@@ -63,6 +63,15 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Mission|MapTests")
 	static int32 MapTest_ConvertNomadicAt(ANomadicVehicle* NomadicTruck, FVector Location);
 
+	/**
+	 * @brief Spawns any actor class in the game world (python cannot: the deferred-spawn nodes are internal-only), e.g.
+	 * a player tank Blueprint for a trigger test. Collision: adjust if possible, always spawn.
+	 * @return The spawned actor or null.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Mission|MapTests", meta = (WorldContext = "WorldContextObject"))
+	static AActor* MapTest_SpawnActor(const UObject* WorldContextObject, TSubclassOf<AActor> ActorClass,
+	                                  FVector Location, FRotator Rotation);
+
 	/** @return True when the unit's command card holds the ability. */
 	UFUNCTION(BlueprintCallable, Category = "Mission|MapTests")
 	static bool MapTest_HasAbility(AActor* Unit, EAbilityID Ability);

@@ -204,6 +204,20 @@ void UMissionMapTestLibrary::MapTest_GetLocationIntroState(const UObject* WorldC
 #endif
 }
 
+AActor* UMissionMapTestLibrary::MapTest_SpawnActor(const UObject* WorldContextObject,
+                                                   const TSubclassOf<AActor> ActorClass, const FVector Location,
+                                                   const FRotator Rotation)
+{
+	UWorld* const World = IsValid(WorldContextObject) ? WorldContextObject->GetWorld() : nullptr;
+	if (World == nullptr || ActorClass == nullptr)
+	{
+		return nullptr;
+	}
+	FActorSpawnParameters Params;
+	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
+	return World->SpawnActor<AActor>(ActorClass, Location, Rotation, Params);
+}
+
 bool UMissionMapTestLibrary::MapTest_HasAbility(AActor* Unit, const EAbilityID Ability)
 {
 	ICommands* Commands = Cast<ICommands>(Unit);

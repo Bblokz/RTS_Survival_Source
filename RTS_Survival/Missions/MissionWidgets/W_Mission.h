@@ -33,6 +33,13 @@ public:
 
 	inline bool GetIsFreeWidget() const { return not bM_IsInUse; };
 
+	/** The title and description last shown; the tactical map lists in-use missions with them. */
+	const FMissionWidgetState& GetShownWidgetState() const { return M_ShownWidgetState; }
+
+	/** The text blocks whose styles the tactical map's mission cards copy, so rich text tags look the same. */
+	URichTextBlock* GetRichTitleBlock() const { return M_RichTitle; }
+	URichTextBlock* GetRichDescriptionBlock() const;
+
 	// IRTSUIElement
 	virtual void OnHideAllGameUI(const bool bHide) override; 
 
@@ -67,6 +74,10 @@ private:
 
 	UPROPERTY()
 	TWeakObjectPtr<UMissionBase> M_AssociatedMission;
+
+	// Title and description of the last init or refresh.
+	UPROPERTY()
+	FMissionWidgetState M_ShownWidgetState;
 
 	// In-use (allocated in list) vs free (pooled).
 	UPROPERTY()

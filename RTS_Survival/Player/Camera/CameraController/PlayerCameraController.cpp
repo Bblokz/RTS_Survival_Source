@@ -527,6 +527,26 @@ void UPlayerCameraController::ApplyScriptedCameraPose(const FVector& Location, c
 	M_PlayerCamera->SetActorRotation(Rotation);
 }
 
+bool UPlayerCameraController::GetScriptedCameraArmState(float& OutArmLength, FRotator& OutArmRelativeRotation) const
+{
+	if (not IsValid(M_PlayerCamera) || not IsValid(M_SpringArmComponent))
+	{
+		return false;
+	}
+	OutArmLength = M_SpringArmComponent->TargetArmLength;
+	OutArmRelativeRotation = M_SpringArmComponent->GetRelativeRotation();
+	return true;
+}
+
+void UPlayerCameraController::ApplyScriptedCameraArmLength(const float ArmLength) const
+{
+	if (not GetIsValidSpringArmComponent())
+	{
+		return;
+	}
+	M_SpringArmComponent->TargetArmLength = FMath::Max(0.f, ArmLength);
+}
+
 void UPlayerCameraController::OnCameraMoveComplete()
 {
 	// Ensure the camera is exactly at the target location.
