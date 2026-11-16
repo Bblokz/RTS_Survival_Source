@@ -389,15 +389,20 @@ float3 col = lerp(Tex, Tex * float3(0.42, 0.27, 0.13), scorch);
 col = lerp(col, float3(0.012, 0.01, 0.008), smoothstep(0.0, 0.06, behind));
 float rim = saturate(1.0 - abs(behind) * 16.0) * step(0.02, Char) * step(Char, 0.98);
 // ash: well behind the front the paper crumbles away in holes
-float ash = step(0.3 + 0.5 * vnoise(UV * 17.0 + 3.0), behind);
-// the flat tag gives way to the curled one (a separate mesh spawned by the shot) once the burn has taken it
-float gone = step(VanishAt, Char);
+float ash = step(0.3 + 0.5 * vnoise(UV * 17.0 + 3.0) + AshShift, behind);
+// long-burnt paper greys to ash where it still holds together
+col = lerp(col, float3(0.05, 0.047, 0.043), smoothstep(0.3, 0.9, behind) * 0.6 * step(0.001, AshShift));
+// The flat tag gives way to the curled one at the same Char on the same clock: VanishAt >= 0 hides the flat tag
+// from that Char on, a negative VanishAt shows the curled tag only from -VanishAt on (spawned for the whole shot,
+// so it never pops in late or smears with spawn motion blur).
+float gone = VanishAt >= 0.0 ? step(VanishAt, Char) : step(Char, -VanishAt);
 return float4(col, rim - (ash + gone) * 2.0);
 """
     custom = _custom(opaque, code, [("Tex", texture, "RGB"), ("Char", char, ""), ("UV", uv, ""),
                                     ("Delay", _scalar(opaque, "Delay", 9999.0, 500), ""),
                                     ("C42", _collection(opaque, "Rings42", 600), ""),
-                                    ("VanishAt", _scalar(opaque, "VanishAt", 9.0, 700), "")])
+                                    ("VanishAt", _scalar(opaque, "VanishAt", 9.0, 700), ""),
+                                    ("AshShift", _scalar(opaque, "AshShift", 0.0, 800), "")])
     mel.connect_material_property(_mask(opaque, custom, "rgb"), "", unreal.MaterialProperty.MP_BASE_COLOR)
     glow = mel.create_material_expression(opaque, unreal.MaterialExpressionMultiply, -150, 300)
     ember = mel.create_material_expression(opaque, unreal.MaterialExpressionConstant3Vector, -400, 400)
@@ -745,6 +750,28 @@ def build_all(seed_uvs):
     extras()
 
 
+def build_contact_shadow():
+    """M_Intro_ContactShadow: a soft translucent black blob on the ground under a tank (a plane just above the
+    ground under the hull). Far from the camera the sun's shadow map leaves a lit strip between the tracks and their
+    shadow, so the tanks read as hovering; this grounds them, darkest under the belly and along the track lines."""
+    material = _new_material("M_Intro_ContactShadow", blend=unreal.BlendMode.BLEND_TRANSLUCENT,
+                             shading=unreal.MaterialShadingModel.MSM_UNLIT)
+    uv = mel.create_material_expression(material, unreal.MaterialExpressionTextureCoordinate, -900, 0)
+    code = """
+float2 p = abs(UV - 0.5) * 2.0;
+// dark right out to near the edge: the lit strip the shadow-map bias leaves lies in the outer band, between
+// the tracks and the (pushed out) real shadow
+return Dark * (1.0 - smoothstep(0.78, 1.0, p.x)) * (1.0 - smoothstep(0.8, 1.0, p.y));
+"""
+    custom = _custom(material, code, [("UV", uv, ""), ("Dark", _scalar(material, "Dark", 0.66, 200), "")],
+                     output_type=unreal.CustomMaterialOutputType.CMOT_FLOAT1)
+    black = mel.create_material_expression(material, unreal.MaterialExpressionConstant3Vector, -300, -200)
+    black.set_editor_property("constant", unreal.LinearColor(0.0, 0.0, 0.0, 1.0))
+    mel.connect_material_property(black, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+    mel.connect_material_property(custom, "", unreal.MaterialProperty.MP_OPACITY)
+    _finish(material)
+
+
 def extras():
     """Material instances that only need textures or tints."""
     T = lib.ROOT + "/Textures/"
@@ -759,8 +786,9 @@ def extras():
         # flat tag: vanishes at Char 0.545 (1.2 s into its burn); the curled tag (same paper) takes over then
         instance("MI_Intro_Tag_" + name, paper, textures={"Texture": unreal.load_asset(T + "T_Intro_Tag_" + name)},
                  scalars={"Delay": 3.6 + index * 1.7, "VanishAt": 0.545})
+        # curled tag: shown from Char 0.545 on; less ash so the curl still reads once it has burnt through
         instance("MI_Intro_TagCurled_" + name, paper, textures={"Texture": unreal.load_asset(T + "T_Intro_Tag_" + name)},
-                 scalars={"Delay": 3.6 + index * 1.7, "VanishAt": 9.0})
+                 scalars={"Delay": 3.6 + index * 1.7, "VanishAt": -0.545, "AshShift": 0.45})
     instance("MI_Intro_Dirt", flat, vectors={"Tint": (0.075, 0.055, 0.04, 1.0)}, scalars={"Roughness": 0.95})
     instance("MI_Intro_Mould", flat, vectors={"Tint": (0.16, 0.02, 0.22, 1.0)}, scalars={"Roughness": 0.22})
     instance("MI_Intro_DarkStone", flat, vectors={"Tint": (0.05, 0.05, 0.055, 1.0)}, scalars={"Roughness": 0.9})

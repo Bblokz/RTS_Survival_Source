@@ -101,3 +101,11 @@ More rules learned:
 - Tanks: `"snap"` seats every key on the ground under the four track corners (height, pitch, roll; a corner trace
   far off the others is replaced by the median); `"drive": <play rate>` plays the forward track animation and
   pans the track material (the game sets `PlayRate` at run time). Two-key moves are densified first.
+  `"trace_from"` starts the ground traces low (under a gateway lintel). `"contact": True` adds a soft black blob
+  under the hull (`M_Intro_ContactShadow`): far from the world origin the sun's shadow starts behind the tracks and
+  the tank reads as hovering even when the geometry sits on the ground.
+- Swapping a mesh mid-shot: spawn both for the whole shot and hand over in the material on the same clock (the
+  paper tags: `VanishAt` >= 0 hides from that Char on, < 0 shows from -VanishAt on). A spawnable that appears
+  mid-shot pops late and smears with motion blur on its first frame.
+- `extras()` (material instances) is separate from `build_text_material()`: run it after any parent rebuild that
+  adds a parameter, or the new instance values do not stick.

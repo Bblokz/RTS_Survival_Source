@@ -767,3 +767,19 @@ re-framing, 4.1 graticule, 0.2 film-burn rework, 3.4b cloud swap, 9.4 sentry pos
   `tags_curl` spawnables in 4.2, 4.3, 9.2).
 - 5.2 growth without the bright "fresh front" tint; 5.4 stain bruise-dark (not pastel) with the coastlines showing
   through.
+
+**Final-frame review** (a fresh reviewer graded the final render's frames against the owner's requests). Fixed:
+- 6.3 tanks still read as hovering: the track geometry sits on the ground (measured), but the sun's shadow map,
+  10 km from the world origin, starts the shadow well behind the tracks and the contact shadows did not close it.
+  Tanks with `"contact": True` get a soft translucent black blob on the ground under the hull
+  (`M_Intro_ContactShadow`, a plane about 2 m past the hull and 1.8 m past each track) that bridges the lit strip
+  into the real shadow.
+- US tags popped: the flat tag vanished half a second before the curled tag spawned, which then smeared with spawn
+  motion blur. The curled tag now exists for the whole shot and the two materials hand over on the same burn clock
+  (`MI_Intro_Tag_*` VanishAt 0.545 hides the flat tag, `MI_Intro_TagCurled_*` VanishAt -0.545 shows the curled
+  one); the curled tag keeps more of its charred paper (`AshShift`) so the curl still reads.
+- Purple Death veins were flat neon ribbons: the tubes are now plum-black wet vessels (albedo ~0.02, wetter
+  specular) with a thin glowing core where they face the camera, light pumping along it; the vessel lines on the
+  mats are thinner and sharper; the growth front is less ragged so no island of mould appears ahead of the body.
+Weak passes left as they are: scorch rings are all the same shape, the MP 40 magazines are plain blocks, 9.2 does
+not show the US map.

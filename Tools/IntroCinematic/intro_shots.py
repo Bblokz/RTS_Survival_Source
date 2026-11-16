@@ -259,6 +259,16 @@ def add_tank(sequence, spec, seconds):
             part["play_rate"] = float(spec["drive"])
             part["slot_mats"] = {slot: _drive_track_material(drive[1], float(spec["drive"])) for slot in drive[2]}
         bindings.append(add_actor(sequence, part, seconds))
+    if spec.get("contact") and footprint:
+        # A soft dark blob on the ground under the hull (M_Intro_ContactShadow): grounds a tank that stands far from
+        # the camera, where the shadow map alone leaves a lit strip under the tracks.
+        part = dict(spec)
+        part.update({"kind": "mesh", "asset": "/Engine/BasicShapes/Plane", "mats": mats.MAT_DIR + "/M_Intro_ContactShadow",
+                     "local_offset": (-12.0, 0.0, TANK_SINK + 2.0), "shadow": False, "anim": None,
+                     # reaches ~2 m past the hull and ~1.8 m past each track: the lit strip the shadow-map bias leaves at this distance
+                     "_scale": (footprint[0] * 2.0 * 2.2 / 100.0, footprint[1] * 2.0 * 2.8 / 100.0, 1.0),
+                     "label": "%s_contact" % spec.get("label", "Tank")})
+        bindings.append(add_actor(sequence, part, seconds))
     return bindings
 
 

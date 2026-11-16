@@ -154,8 +154,8 @@ US_SITES = ("LosAlamos", "OakRidge", "Hanford")
 
 def tags_curl(curl_at):
     """The paper tags on the US pins curl once the burn has taken them: the kit's curled tag spawns where the flat
-    tag lies (whose material vanishes it at the same moment, MI_Intro_Tag_* VanishAt). curl_at: per site, fraction
-    of the shot (<= 0 already curled, >= 1 not yet)."""
+    tag lies, for the whole shot; the two materials hand over on the same burn clock (MI_Intro_Tag_* VanishAt 0.545,
+    MI_Intro_TagCurled_* -0.545). curl_at: per site, fraction of the shot (>= 1: not curled within it, left out)."""
     actors = []
     for index, site in enumerate(US_SITES):
         f = curl_at[index]
@@ -165,7 +165,7 @@ def tags_curl(curl_at):
         where = at("Intro_Bunker", x - 9.0, y + 3.0, sets.TABLE_TOP_Z + 0.4 + 0.5 + 0.5)
         actors.append({"kind": "mesh", "asset": "SM_Intro_PaperTag_Curled", "label": "TagCurled_" + site,
                        "mats": sets.M + "MI_Intro_TagCurled_" + site, "shadow": False,
-                       "spawn": (max(f, 0.0), 1.0), "keys": [(0.0, where, (0, 96 + index * 5, 0), 1.8)]})
+                       "spawn": (0.0, 1.0), "keys": [(0.0, where, (0, 96 + index * 5, 0), 1.8)]})
     return actors
 
 
@@ -384,6 +384,7 @@ def shots():
                  (1.0, at("Intro_Ural", -8900, -1300, 1500), {"at": at("Intro_Ural", -900, 0, 1900)})],
          "actors": [
              {"kind": "class", "asset": T34, "label": "T34_%d" % index, "drive": 2.0, "snap": 0.0, "trace_from": 600.0,
+              "contact": True,
               "keys": [(0.0, at("Intro_Ural", -7600 - index * 1200, 0, 0), (0, 0, 0)),
                        (0.62, at("Intro_Ural", 700 - index * 1200, 0, 0), (0, 0, 0)),
                        (1.0, at("Intro_Ural", 4200 - index * 1200, 0, 0), (0, 0, 0))]} for index in range(4)] + [
