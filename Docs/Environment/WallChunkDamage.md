@@ -871,6 +871,77 @@ At66 / At33 / destroyed meshes. Script: `Tools/RusFactoryA2/ue_rusfactory_a2_hol
 - **Open:** aim points still the class default; a front hit at the bastion's corner (mesh x -600) struck the
   collision ~1.5 m behind the face (no visible hole).
 
+## Field holes and tank breaches on the Rus concrete walls (2026-11-16)
+
+The 9 Rus concrete walls (`Rus_Wall_Concrete_Corner`, `_CornerNoFlag` (+`_Soviet`), `_Long` (+`_Soviet`, `_Holes`),
+`_LongSandBags` (+`_Soviet`), `_LongSandBagsNoFlag`) no longer use the 6-slot custom-primitive-data mask. With 6 slots,
+a wall shot many times merged its oldest holes (no grid) or baked them into 1.5 m cells (grid), which read as big odd
+shapes. All other users of `UWallHoleDamageComponent` keep the slot mode unchanged.
+
+### Field mode (`MaskStorage = FieldTexture`)
+
+- `FWallHoleField` (`WallHoleField.h`) keeps the wall face, unrolled along its centre line (`FieldSettings.
+  WallPathPoints`, 2 or 3 points; empty = long axis of the bounds), as a small CPU-written BGRA8 texture, 6 cm per
+  texel: R front face, G back face, B tank breach. Each texel stores `f = 1 - distance / radius` (f > 0 = gone), as the
+  maximum over all holes, so there are no slots and nothing merges. 
+- A shell hole is a circle on the struck face. It reaches the other face as `sqrt(R² - thickness²)` when it is wider
+  than the wall is thick (20 cm concrete: almost always; 112 cm sandbag wall: only big shells).
+- A hit inside an existing opening is a shell through the hole (collision has no holes): deep inside, it widens that
+  hole by a quarter of its own radius (aimed fire keeps biting at its aim points); near the rim it bites its own
+  circle out of the edge. A cluster of hits leaves a ragged, lobed opening, not one inflated round hole.
+  Over `FieldSettings.MaxHoles` (160) the nearest hole grows instead.
+- The first damage creates the texture (transient, `NAME_None`: a name unique in the component collided in the
+  transient package and two walls shared one texture) and a dynamic instance per damaged slot; full repair puts the
+  opaque materials back. Repair closes holes, then breaches, newest first, and rebuilds the field.
+- Removed area, the health cap and the collapse sampling read the field, so overlaps are not counted twice.
+- Materials: `Tools/WallChunks/make_wall_field_holes_material.py` builds `M_RusBunker_Concrete_WallHolesField` and
+  `MM_Rus_SandBag_01_WallHolesField` from the opaque masters, and `<WallHoles MI>Field` instances (two-sided, darkened
+  back faces, `WallFieldRebar` 1 on concrete, 0 on sandbags). One texture sample + two noise samples: PS 424 / 413
+  instructions against 438 / 427 for the slot masters.
+
+### Tank breaches (`UWallTankBreachComponent`)
+
+- **Who breaks what:** only the human player's (player 1) medium and heavy tanks break walls, and only walls of the AI
+  side (the Soviet walls). A Soviet tank never breaks, damages or plans through its own wall; a missing RTS component
+  means no breach. The breachable Rus walls also ignore all damage from their own side (`AWallActor::TakeDamage`:
+  shells, splash, bombs, abilities; the attacker is the projectile's shooter, else the causer's or instigator's RTS
+  component), and a point hit inside a fallen breach does nothing (the shell flies through the gap).
+- **Nav:** at setup the wall's own blockers (actor nav modifier, nav-blocker child actors) switch off and boxes along the
+  wall's centre line (1.8 m half depth) take over in `UNavArea_BreachableWallEnemyOwned` (`..._PlayerOwned` on a
+  player wall: nobody plans through it). `URTSWallGateNavQueryFilter` builds the filter per querier: player medium and
+  heavy tanks get the area at cost 1 plus a 3 m entering cost (a gap or gate right beside them wins); everyone else
+  excludes it. Unfiltered queries (convoy routes, survival planners) see an obstacle's cost. The 4 `RTS_NavFilter_*`
+  Blueprints were reparented onto that filter (2026-11-16); without it the walls block every unit (`NavArea_Null`).
+  Fallen breaches are left open for everyone (30 cm inset per side).
+- **The break:** the hull's footprint (width from the tank's nav radius, length from its colliding bounds) is clipped
+  against the centre line every 0.05 s; the breach is the union of what it covered plus 25 cm per side, from the ground
+  (a ragged 18 cm stub stays) to the hull's height. A step that cuts nothing new is skipped; a tank through an existing
+  gap breaks nothing, plays nothing and is not slowed.
+- **The fall:** 0.45 s after the first break the slab over the hull drops and the edges crumble out to a V
+  (0.45 cm per cm of height) over 0.3 s. A stretch between the V and a free wall end narrower than 0.6 x the wall height
+  falls too. Dust rises, rubble (22 pieces of the wall's debris meshes, 0.7-1.7 m, no collision) lands at the gap
+  edges, mostly on the exit side, a rubble decal stays, and flags or poles on that stretch of the wall topple along the
+  tank's travel and drop to the ground (0.7 s), where they stay.
+  Broken rebar (one mat, bars of random length into the gap) stays in the edge band; the rim is pale fresh fracture.
+  Under fog of war only the dust and sound are left out.
+- Debris only comes from wall that was standing and outside the hull, falls along the tank's travel (push 0.45, fall
+  0.2 speed). The wall loses `removed share x max health` (applied after the update loop, it can kill the wall); a
+  wall without health collapses as from a kinetic hit. Breaches do not use up the shell hole budget.
+- While its hull pushes through, a medium tank is held to 40 % travel speed (heavy 60 %), half turn rate and
+  acceleration (`ATankMaster::SetMobilityRestriction`, source = the breach component), released once it is clear.
+- Setup: `RTS.WallBreach.ConfigureRusWall` (`WallTankBreachAuthoring.cpp`) via `Tools/WallChunks/Breach/
+  wall_breach_setup.py`. Child walls only get their own damaged materials; field mode, breach and nav are inherited.
+- Test: `sh Tools/WallChunks/Breach/run_breach_test.sh <run>` (throwaway DebugGame editor on `RTS_ToCopySmall`;
+  walls owned by player 2): player Pz IV through the long wall and the corner, player Tiger through the sandbag wall,
+  player Luchs round, a Soviet Pz IV against (and teleported onto) its own wall, friendly fire and a shot into a breach,
+  all 9 Blueprints, 45 + 28 debug hits, per-querier paths before and after, lethal damage after a breach. Pictures come
+  from a scene capture in the PIE world. Results in `Saved/WallChunks/Breach/<run>`.
+- Collision gap: once a breach has fallen, the mesh stops blocking projectiles, weapon traces and visibility; query-only
+  boxes along the standing stretches (the mesh's own responses, no tank channels) block them instead, rebuilt per breach
+  and switched off when the wall dies. Shells and sight lines pass the gap; the mesh keeps the tank overlap.
+- Not done: sandbag walls are cut like concrete (their rubble is sandbag pieces, but no slumped bag pile); rubble has no
+  collision (it lies at the gap edges and would otherwise snag units the nav does not know about).
+
 ## Open points
 
 - The collapse reads as a blast, not a falling wall. Tune `CollapseSettings.DeathSpeedScale`, or add a slumping
@@ -882,6 +953,8 @@ At66 / At33 / destroyed meshes. Script: `Tools/RusFactoryA2/ue_rusfactory_a2_hol
 - Other walls: `SM_Wall_13` (corner, two slabs) needs its own run of the script (two slabs, its own outline). The
   sandbag wall and the refinery walls need a different cut.
 - Save/load does not restore holes. Environment walls do not heal.
+- Rus walls (fixed 2026-11-16): the original nav blockers stopped about 1.8 m short of the wall's end at the actor
+  origin, so infantry and light vehicles pathed through there. The breach component's boxes now cover the full length.
 - **Debris sizing (fixed 2026-11-09).** `BuildLayoutFromMesh` compared a chunk's triangle area, which counts every
   surface the chunk spans, with a debris piece's one-sided bounds area. So nearly every chunk got the largest piece,
   at up to 2×.

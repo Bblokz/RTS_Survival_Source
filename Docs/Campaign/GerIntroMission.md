@@ -23,8 +23,82 @@ again (`rewire()` then save the map; `describe()` prints the layout).
 | 2 | `Mission_Intro_SovietPatrols` | Cover takeover. When it closes: combat music, the advisor's "Soviet infantry spotted" line, then (queued after it) the Mosin rifleman's Russian radio line `IntroMission_MosinGermansSpotted` on the `SovietMosin` portrait, with English subtitles (see `VoiceLines/AGENTS.md`). Three Mosin squads are tracked. | All three squads are dead, or the player crosses the sandbag line (trigger 2). |
 | 3 | `Mission_Intro_HangarT26s` | Three T-26s leave the hangar mouths with attack-move orders. Four spaced-armour panzers arrive (Pz II F for the Strike Division, Luchs otherwise). As each spawns, `SendPanzerBehindVultures` attack-moves it to a line `PanzerBehindVulturesDistance` (1500) behind the Vulture soldiers' centre, away from the hangars, 500 apart, facing the hangars. The `IntroMission_LightPanzerSupport` line ("Kommandant soviet light panzers have been spotted!...", ElevenLabs take 3 of 3, 2026-11-12) plays. 5 s after the first panzer arrives (`OnPanzerSupportSpawned` -> `ShowSpacedArmourThenT26`: Delay 5 with the mission manager as world context) the spaced armour takeover opens; its On Closed calls `ShowT26InfoTakeover`, which opens the vehicle info takeover (library row `T26`) on the first living hangar T-26 (`TryShowT26InfoTakeover`). When no T-26 has spawned yet it sets `bT26TakeoverPending`, and the last hangar spawn opens it (`ShowT26TakeoverIfPending`). | The T-26s are destroyed. |
 | 4 | `Mission_Intro_RidgeArmor` | Soviet armour comes out of the ridge gate, eight T-26s flank from the convoy's map edge, and German heavy reinforcements arrive from the west map edge (below). The `IntroMission_HeavyArmorApproaching` line plays (take 4, 16.7 s). | Both Soviet groups are destroyed: the ridge wave (5 on Normal, 6 on Hard, 7 on Brutal and Ironman) and the 8 T-26s. Each group shows as a survival-style division marker on the minimap until its last tank dies. |
-| 5 | `Mission_Intro_ClearSovietRig` | Placeholder for the user's ridge cinematic: it completes at once. A comment box in its graph marks where the cinematic goes (`PlayClearSovietRigCinematic`, finishing in `OnClearSovietRigCinematicFinished`). | At once, for now. |
-| 6 | `Mission_Intro_BaseBuilding` | The base-building tutorial (below). | The barracks and forge are deployed. |
+| 5 | `Mission_Intro_ClearSovietRig` ("Secure the Line", a `USecureBaseMission`, 2026-11-16) | The ridge tanks are dead but the Soviet base on the ridge still stands. The fog lifts over the base for 60 s, destroy markers and minimap icons go on its 7 buildings (both cooling towers, both barracks, both MG guard towers, the long camo bunker), the base comes alive (4 Mosin squads and 1 PTRS squad marching, a Zil fuel truck driving up to the rear wall where a crane unloads it) and a 30 s camera tour shows each target with a caption. Then the objective counts the destroyed buildings. See below. | All 7 buildings are destroyed. |
+| 6 | `Mission_Intro_BaseBuilding` | The base-building tutorial (below). Its trigger waits for ClearSovietRig, so the HQ glider and the "ridgeline is secured" line only come once the Soviet base is destroyed. | The barracks and forge are deployed. |
+
+## Mission_Intro_ClearSovietRig: secure the line
+
+`Mission_Intro_ClearSovietRig` is reparented (2026-11-16) to the C++ mission class `USecureBaseMission`
+(`Source/Docs/Missions/MissionCameraTour.md`); its old placeholder graph (complete at once) is gone. All its values are
+class defaults written by `Source/Tools/IntroMission/setup_secure_line_mission.py`, so the map was not re-saved:
+
+- **Targets:** actors of `Rus_Building_CoolingTowers`, `Rus_Building_Barracks`, `Rus_BXP_GuardTowerMG` and
+  `Rus_BXP_LongCamoBunker` (the placed ones are the `_Concrete` children) inside the base box (x -2750..4250, y -4400..5400):
+  7 buildings. Trim `TargetClasses` (or the box) to change which ones count. `BP_Hint_DestroyTarget` ("Destroy") floats
+  over each one and an attack icon sits on the minimap; both go when it dies.
+- **Objective:** "Secure the Line": "Destroy the Soviet ridge base: its cooling towers, barracks, MG guard towers and
+  the long camo bunker. N/7 destroyed." No voice line yet (`ObjectiveVoiceLine` is empty).
+- **Reveal:** 9 vision bubbles of 24 m over the base and the rear slope, 60 s.
+- **Base life:** Mosin squads march on four lanes (west of the barracks, between the barracks and the fuel storage,
+  behind the west wall and gate, behind the north cooling towers) and a PTRS squad between cooling towers 2 and the rear
+  wall. A `Rus_ArmoredCar_ZilFuel` spawns behind the crest south of the rear wall (4640,-5200) 17 s after the tour starts,
+  drives straight north along the outside of the east wall and parks parallel to it by the long bunker (~27 s into the
+  tour, during the bunker shot); `BP_MissionFuelCrane` (3650,-1850, inside the wall) then lifts its barrel pallets over
+  the wall onto a stack (`Source/Docs/Missions/MissionFuelCrane.md`). The crane only reaches a truck parked parallel
+  within about a metre of (4640,-1717); arriving from the east the truck stopped nose-in and out of reach.
+- **Tour (6 shots, 34 s + 2 s back):** the base from the west, the MG guard towers, the barracks, cooling towers 1,
+  cooling towers 2, the long bunker from the rear with the truck and crane, then back to the player's view. Captions name
+  each target.
+- **Done:** when the last of the 7 is dead the mission completes and `Mission_Intro_BaseBuilding` starts (HQ glider).
+- The placed Soviet tanks inside the base (two MS-1, T-50, BT-7) and the marching squads are not targets; the player
+  fights them on the way in.
+
+### Assault response (ramp trigger, 2026-11-16)
+
+`USecureBaseMission::AssaultResponse` (`FSecureBaseAssaultResponse`). Its values are written by
+`Source/Tools/IntroMission/setup_assault_response.py`, kept separate from `setup_secure_line_mission.py`.
+
+1. **Trigger:** the trigger arms when the camera tour ends. Every 0.5 s it polls for a living player-owned pawn in a
+   box centred at (-4300, 0, 500) with half extent (900, 1900, 700). That box covers x -5200..-3400 and
+   y -1900..1900: the top of the west ramp (ground about 140 at x -6800, rising to the 590 plateau at x -4400),
+   20-30 m in front of the `Rus_BXP_53KSectorPit` (-2184, -506) and the dug-in `Rus_Vehicle_T34E` (-1200, 989).
+   A unit already standing there when the tour ends fires it at once. The response fires once.
+   `StartAssaultResponse()` fires it by hand.
+2. **Alarm:** `IntroMission_MosinBaseUnderAttack` plays on the `SovietMosin` portrait. The voice is Vlasov speaking
+   Russian through the Broken transmitter chain; the subtitle is the English text "Resistance forces are attacking the
+   base; bring in reinforcements! DESTROY THEM ALL!!".
+3. **Soviet air drops:** each one is an `AEnemyAirDrop` spawned at runtime (`InitRuntimeAirDrop`), with
+   `bWarnPlayer` off so the generic paratrooper warning does not talk over the scripted lines.
+   - Two `GA_SovietParatroopers` transports: one lands at (300, -1750) after 2 s, the other at (1900, 4450) after 4 s.
+     Each drops a Mosin squad and a PTRS (Okhotnik) squad, plus one more Mosin squad on Hard and above.
+   - One `GA_SovietT34Drop` cargo plane (PE-8) brings a T-26 **on ropes**: the new `bRopeSlungVehicles` option, which
+     sets `UGA_AircraftDrop::bRopeSlungTanks`. It lowers the tank at (1950, -1550), between the barracks and the fuel
+     storage.
+   - The landing spots were chosen from an actor-bounds survey: each is at least 7 m clear of every structure taller
+     than the floor slabs.
+   - The landed units join the enemy AI's direct control.
+4. **Air support:** after 7.5 s, `IntroMission_StukaSupport` plays on the advisor portrait ("Verdammt! Zeir position
+   is tougher zan expected! HQ provides two Ju-87 ground attack aircraft zu aid in bringing zat base down!"). After 9 s
+   a copy of `GA_Ju87Strafing` is flown at the base centre (800, 500). `SetMissionStrafeOverrides` sets 2 aircraft,
+   60 s, and `bAirSupportStaysOnTarget`.
+   - Without that last option the strafe ability makes one run and then hunts the nearest enemies anywhere. With it,
+     the new opt-in `FStrafeAircraftSettings::bRepeatRunsOverTarget` (`AAircraftMaster::OnAttackMoveCompleted`) keeps
+     every run over the target until the 60 s are up.
+
+Audition takes are in BlenderTanks `Announcer/AAAGerMissions/IntroMission/Audition_RampAssault/`, takes A/B/C for
+each line. The user picked take A of both (2026-11-16); B and C were deleted.
+
+Test: `assault_response_headless_test.py`, run in a throwaway DebugGame editor. It cuts the chain to ClearSovietRig,
+applies the defaults to the map instance, or uses the saved Blueprint values with `ASSAULT_TEST_USE_SAVED=1`. It
+spawns a Pz IV F1 below the ramp with `MapTest_SpawnActor`, checks there is no response, then moves the tank onto the
+ramp. Run of 2026-11-16 with repeat runs on:
+- the trigger fired 0.27 s after the tank reached the ramp, and 3 Soviet transports flew in;
+- the T-26 hung 12 m under the PE-8 and set down at z 534 inside the base; no sling errors in the log;
+- 4-8 paratroopers stood near each landing point 30-50 s after the trigger;
+- 2 Ju 87s passed over the base about every 20 s. Deep-base damage was 320 / 1356 / 244 in the 20 s windows from
+  t+15, 6 Soviet actors died, and the aircraft stayed within 105 m of the target.
+
+Distances in this section are Unreal units (cm) unless they say m.
 
 ## Mission_Intro_RidgeArmor
 
@@ -232,6 +306,29 @@ The objective text changes at every step through `SetObjective`, a wrapper aroun
       - `panzers_drove_behind_vultures` (the unchanged T-26 mission) also fails.
     - An earlier Breakthrough/Hard run is void: someone stopped and restarted its PIE by hand in the test editor's
       window. Throwaway test editors always run with `-DisablePlugins=Fab,BpGeneratorUltimate` (UECP off).
+- `Source/Tools/IntroMission/secure_line_headless_test.py` covers mission 5 ("Secure the line"). It cuts the chain in the
+  editor world to [ClearSovietRig without its trigger, BaseBuilding with its trigger] (not saved) and checks: the tour
+  (all 6 shots, the bars/caption overlay up during it and gone after, about 34-42 s wall clock, camera back to the
+  player's rotation; position within 25 m because the unattended editor's cursor edge-scrolls the camera the moment
+  control returns), 7 targets with 7 markers over them, the 9 reveal bubbles (gone by the end), 4 Mosin + 1 PTRS squads
+  inside the walls with the march order, the fuel truck parked parallel within 2.5 m of (4640,-1717) during the bunker
+  shot and the crane unloading it, then no glider for 15 s, then the targets killed one by one through
+  `ApplyDamage` (marker count and destroyed count follow, no glider before the last), ClearSovietRig completes and the
+  Mammut glider comes. It takes a `HighResShot` per tour shot (scene only: PIE screenshots leave out UMG).
+  - It also checks the crane takes the truck's own pallets (visible `Cargo*` parts drop), the objective panel reads
+    "Secure the Line" / "1/7 destroyed" after the first kill, and takes `shot showui` pictures on their own ticks (these
+    do include UMG: bars + caption mid-tour, HUD + objective after).
+  - 2026-11-16 (Development build, heavy machine load): 28/28 PASS; truck parked 25.9 s into the tour (bunker shot),
+    parallel to the wall. The pose trace after the tour shows the edge-scroll drift (+X+Y every frame).
+  - Known: the tour runs on real time, the truck's timer and drive on game time. When frames hitch badly (a run at
+    ~2 fps) game time falls behind and the truck parks after the bunker shot; at normal frame rates they match.
+  - Full chain (`intro_mission_headless_test.py`, Strike/Normal, 2026-11-16): 58/63, every ridge and secure-line check
+    passes; the 5 FAILs are the usual load ones (4 convoy checks, `panzers_drove_behind_vultures`). A first attempt
+    died of a GPU device-removed (VRAM full with other sessions' editors); `-dpcvars=r.Streaming.PoolSize=900` helped.
+- `intro_mission_headless_test.py` (the whole chain) now expects ClearSovietRig to run its tour and wait after the
+  ridge, kills its targets, and only then waits for the glider (`secure_line_running_after_ridge`,
+  `secure_line_tour_played`, `no_glider_while_base_stands`, `clear_rig_completed`). Its convoy checks ignore the base's
+  own fuel truck (x > 2500).
 - `Source/Tools/IntroMission/base_building_headless_test.py` covers mission 6. It finds the base mission in any
   `Missions[]` entry, drops its trigger and makes it the only mission in the editor world, without saving. It plays the player's part through the UI code paths, using
   `UMissionMapTestLibrary` (`Missions/Tests/`, map-test builds only):

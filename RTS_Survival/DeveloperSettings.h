@@ -1049,7 +1049,7 @@ namespace DeveloperSettings
 			inline constexpr float GameRangeMlt = 0.4f;
 			// Range boost for every weapon that is not artillery (small arms, cannons, lasers, flame, aircraft guns).
 			// Literal ranges outside this namespace multiply by it too.
-			inline constexpr float DirectFireRangeMlt = 1.33f;
+			inline constexpr float DirectFireRangeMlt = 1.1f;
 			// Range boost for mortars, rocket artillery, howitzers and arcing guns; the *ArtilleryRange constants.
 			inline constexpr float ArtilleryRangeMlt = 1.1f;
 			inline constexpr float BasicSmallArmsRange = RoundToNearestMultipleOfFive(
@@ -1115,21 +1115,24 @@ namespace DeveloperSettings
 
 			namespace UnitVision
 			{
-				inline constexpr float T1TankVisionRadius = 4000.f;
-				inline constexpr float OpenTopVehicleVisionRadius = 4800.f;
-				inline constexpr float ArmoredCarVisionRadius = 5500;
-				inline constexpr float T2TankVisionRadius = 4500.f;
-				inline constexpr float T3TankVisionRadius = 5000.f;
-				inline constexpr float SuperHeavyTankVision = 5000.f;
-				inline constexpr float TrainVisionRadius = 12000.f;
+				// Sight boost applied to every unit's vision radius; buildings and expansions keep theirs.
+				inline constexpr float UnitVisionMlt = 1.1f;
 
-				inline constexpr float InfantryVisionRadius = 4500.f;
-				inline constexpr float MachineGunTeamWeaponVisionRadius = 5000.f;
-				inline constexpr float AntiTankGunTeamWeaponVisionRadius = 5800.f;
-				inline constexpr float MortarTeamWeaponVisionRadius = 6500.f;
-				inline constexpr float FlakTeamWeaponVisionRadius = 6200.f;
-				inline constexpr float ArtilleryTeamWeaponVisionRadius = 7000.f;
-				inline constexpr float AircraftVisionRadius = 12000.f;
+				inline constexpr float T1TankVisionRadius = 4000.f * UnitVisionMlt;
+				inline constexpr float OpenTopVehicleVisionRadius = 4800.f * UnitVisionMlt;
+				inline constexpr float ArmoredCarVisionRadius = 5500 * UnitVisionMlt;
+				inline constexpr float T2TankVisionRadius = 4500.f * UnitVisionMlt;
+				inline constexpr float T3TankVisionRadius = 5000.f * UnitVisionMlt;
+				inline constexpr float SuperHeavyTankVision = 5000.f * UnitVisionMlt;
+				inline constexpr float TrainVisionRadius = 12000.f * UnitVisionMlt;
+
+				inline constexpr float InfantryVisionRadius = 4500.f * UnitVisionMlt;
+				inline constexpr float MachineGunTeamWeaponVisionRadius = 5000.f * UnitVisionMlt;
+				inline constexpr float AntiTankGunTeamWeaponVisionRadius = 5800.f * UnitVisionMlt;
+				inline constexpr float MortarTeamWeaponVisionRadius = 6500.f * UnitVisionMlt;
+				inline constexpr float FlakTeamWeaponVisionRadius = 6200.f * UnitVisionMlt;
+				inline constexpr float ArtilleryTeamWeaponVisionRadius = 7000.f * UnitVisionMlt;
+				inline constexpr float AircraftVisionRadius = 12000.f * UnitVisionMlt;
 			}
 		}
 
@@ -1727,6 +1730,66 @@ namespace DeveloperSettings
 				// This damage reduction struct applies to all types of damage
 				inline constexpr FDamageReductionSettings DamageReduction(25, 0.7f);
 			};
+		}
+
+		// Soviet base buildings take their health from a number of medium tank shots instead of a flat value.
+		// Reference shot: the Pz IV's KwK 40 L48 firing APHE (the default shell) as a direct hit, ~221 damage.
+		// Buildings carry no armor calculation and projectile damage has no flux, so shots to kill are exact; HE
+		// (x1.6) needs fewer shots. Splash ignores the directly hit actor, so it does not add to the count.
+		namespace SovietBuildingShotHealth
+		{
+			inline constexpr float MediumTankShotCalibreMM = 75.f;
+			inline constexpr float MediumTankShotTNTGrams = 73.f;
+			inline constexpr float MediumTankShotDamage =
+				Weapons::DamagePerMM * MediumTankShotCalibreMM
+				+ Weapons::DamagePerTNTEquivalentGrams * MediumTankShotTNTGrams;
+			inline constexpr float HealthRoundingStep = 10.f;
+			// Health sits half a shot below the kill threshold so small damage tweaks do not change the count.
+			inline constexpr float ShotBracketCentreOffset = 0.5f;
+
+			/**
+			 * @brief Health that dies to exactly this many reference shots against the given armor reduction.
+			 * @param ShotsToKill Reference shots that destroy the building; one fewer leaves it standing.
+			 * @param Reduction The armor preset's damage reduction (multiplier first, then flat points).
+			 * @return Health rounded to a multiple of ten, centred in the shot bracket.
+			 */
+			constexpr float GetHealthForMediumTankShots(const int32 ShotsToKill,
+			                                            const FDamageReductionSettings& Reduction)
+			{
+				const float DamagePerShot = MediumTankShotDamage * Reduction.DamageReductionMlt
+					- Reduction.DamageReduction;
+				const float CentredHealth = (ShotsToKill - ShotBracketCentreOffset) * DamagePerShot;
+				return static_cast<int32>(CentredHealth / HealthRoundingStep + 0.5f) * HealthRoundingStep;
+			}
+
+			constexpr float BasicHealthForShots(const int32 ShotsToKill)
+			{
+				return GetHealthForMediumTankShots(ShotsToKill, UnitResistances::BasicBuildingArmor::DamageReduction);
+			}
+
+			constexpr float ReinforcedHealthForShots(const int32 ShotsToKill)
+			{
+				return GetHealthForMediumTankShots(ShotsToKill, UnitResistances::ReinforcedArmor::DamageReduction);
+			}
+
+			// Basic building armor.
+			inline constexpr int32 FuelStorageSmallShots = 3;
+			inline constexpr int32 AmmoStorageShots = 3;
+			inline constexpr int32 BarracksShots = 4;
+			inline constexpr int32 AntennaShots = 4;
+			// Also used by the supplies storage, which shares the large fuel storage's data.
+			inline constexpr int32 FuelStorageLargeShots = 5;
+			inline constexpr int32 WarehouseShots = 5;
+			inline constexpr int32 CoolingTowersShots = 6;
+			// Reinforced armor.
+			inline constexpr int32 AquirfierVerticalShots = 8;
+			inline constexpr int32 AquirfierShots = 10;
+			inline constexpr int32 ResearchCenterShots = 8;
+			inline constexpr int32 IndustrialRefineryShots = 10;
+			inline constexpr int32 ChemicalPlantShots = 12;
+			// The large factories stay sturdier than the rest of the base.
+			inline constexpr int32 FactoryShots = 12;
+			inline constexpr int32 PlatformFactoryShots = 16;
 		}
 
 

@@ -55,8 +55,8 @@ is game art or plain UMG:
 The widgets are rebuilt by `Source/Tools/InfoTakeover/camera_controls_illustrations.py` (UECP script).
 
 CONTINUE swaps the page and types the new title and description; the game stays paused and locked. Enter, Space and
-Escape act like the button. "Never show these info widgets again" is the same footer checkbox on every page, and it is
-read when the last page closes. Pages follow `ECameraControlsTakeoverPage`; `TryShowNextPage` steps to the next one
+Escape act like the button. As a game-mechanic field manual it has no "never show these info widgets again" box and
+always shows, even when the player switched unit info off. Pages follow `ECameraControlsTakeoverPage`; `TryShowNextPage` steps to the next one
 until the last.
 
 What the rotation page teaches is taken from `RTS_BP_PlayerController` and `IMC_RTSDefault`:
@@ -77,16 +77,13 @@ What the marquee page teaches is taken from the code:
 
 - **On Closed (Was Shown):** fires once, after UNDERSTOOD on the last page, with the game unpaused. CONTINUE does not
   fire it. Play the announcer lines from this pin.
-- Was Shown is false when the panel never opened:
-  - the player turned info takeovers off, so On Closed fires in the same frame;
-  - "never show again" was ticked on an earlier takeover while this one waited in the queue;
-  - the widget could not be created.
+- Was Shown is false only when the widget could not be created. The "never show again" setting does not apply: it
+  only hides unit intel (vehicles, squads), and this field manual still opens when it is off.
 - If the world ends first, On Closed does not fire.
 - It queues with the vehicle takeovers and waits for cinematics, like they do. All info takeovers also wait while the
   start-game screen (`UPlayerStartGameControl`) waits for the player, so the node can be called on the mission's
   first frame.
-- It is archived under Game Mechanics ("Camera Controls") when it closes, or when the node runs while the takeovers are
-  off.
+- It is archived under Game Mechanics ("Camera Controls") when it closes.
 
 The bindings it teaches come from the real input: `MoveForward`/`MoveRight` axis mappings on the arrow keys
 (DefaultInput.ini, `RTS_BP_PlayerController` → `ForwardRightMovement`). W, A, S and D are action buttons in
@@ -140,7 +137,7 @@ preview, each with a screenshot of the real preview, and UNDERSTOOD.
 Controls Takeover:
 - it queues with the other takeovers;
 - it waits for the start screen, cinematics, the tech tree and the archive;
-- it respects "never show";
+- it ignores "never show again" (field manuals always show) and has no checkbox;
 - it fires once after close, with the game unpaused.
 
 Both nodes are subclasses of `UAsyncShowInfoTakeoverBase` (`AsyncShowInfoTakeover.h`). A subclass only names which
@@ -598,6 +595,41 @@ UnrealEditor-Win64-DebugGame-Cmd.exe RTS_Survival.uproject -run=pythonscript   -
 - Frames 385-387 of `FramesWide/` show the first T-26's wreck swapping in with flat white quads, so the clip skips them
   (`/N` in `--segments` keeps every N-th frame of one range).
 
+## Wall Breach takeover (field manual)
+
+One page titled "Crushing Walls" under "MEDIUM AND HEAVY TANKS - SOVIET WALLS". Left: a clip of a player Tiger H1
+driving through a Soviet `Rus_Wall_Concrete_Long`: its turret over the wall as it comes in, the wall bursting out
+towards the camera with debris and dust, the Tiger driving off and the gap left open. Right: WHICH TANKS (medium and
+heavy only; light tanks and infantry go round or through an open gap), THE PUSH (slower while the hull pushes through,
+heavy less than medium; the slab falls, the edges crumble) and THE GAP (the wall loses health; open to everyone, shells
+and sight pass). The rules are `UWallTankBreachComponent`'s, see `Environment/WallChunkDamage.md` "Tank breaches";
+the text stays qualitative so a balance pass does not make it wrong.
+
+Node `Show Wall Breach Takeover` (`UAsyncShowWallBreachTakeover`, kind `WallBreach`), archive key
+`InfoTakeover.WallBreach`. Clip `GameUI/InfoTakeover/WallBreach/T_WallBreach_ClipAtlas`, 85 frames in 8 x 11 cells.
+
+```
+sh Source/Tools/InfoTakeover/WallBreach/capture_clip.sh
+python Source/Tools/InfoTakeover/VulturesAt/make_clip_atlas.py --clip WallBreach --segments "40-96/4,98-236/2"
+UnrealEditor-Win64-DebugGame-Cmd.exe RTS_Survival.uproject -run=pythonscript \
+  -script=Source/Tools/InfoTakeover/WallBreach/create_wall_breach_takeover.py -unattended -nullrhi \
+  -DisablePlugins=Fab,BpGeneratorUltimate
+```
+
+- Unlike the other clips, the recording is pure Python (`capture_clip.py`), no C++ capture subsystem: a throwaway
+  DebugGame editor (`-benchmark -fps=24`, CPU throttle off) on `RTS_ToCopySmall` places the wall (owner 2), the Tiger
+  (owner 1) and three `SceneCapture2D` actors in the editor world, rebuilds the navmesh, starts PIE, and after a 3 s
+  settle orders `MoveToLocation` to 26 m past the wall. Every 1/24 s of game time it exports `Frames/` (exit side,
+  three-quarter), `FramesEntry/` (entry side) and `FramesWide/` (high view) at 1280 x 720 until the Tiger is 13 m
+  past the wall plus 2 s. Nothing is saved. Grep `WALL_BREACH_CLIP` in `Saved/Logs/WallBreachClip.log`; the event
+  frames are also in `Saved/InfoTakeover/WallBreach/capture.json`.
+- On `RTS_ToCopySmall` the sun lights the wall's +Y face, so the Tiger starts on -Y (`WALL_BREACH_START=-1900`, the
+  default) and bursts out of the lit face. The first run went the other way and the exit face was nearly black.
+- The 2026-11-16 recording: 256 frames over 10.6 s, every tick exactly 1/24 s; first breach at frame 102 (hull 3.2 m
+  short of the wall line), hull through at 152, clear at 208; the wall kept 1105 of 1400 health (21 % of its face
+  gone). The clip uses the exit camera only: the approach at double speed (every 4th frame of 40-96), then every 2nd
+  frame of 98-236.
+
 ## The library
 
 `Content/RTS_Survival/Blueprints/GameUI/InfoTakeover/DT_VehicleInfoTakeovers`, one row (`FVehicleInfoTakeoverEntry`)
@@ -658,7 +690,8 @@ under Units, keyed `InfoTakeover.Squad.<name>`.
   - Add-on panels are shown as `(+N add-on)`.
 - **Weapons:** the variant selection screen's weapon icon and its damage, penetration, reload and magazine pip bars
   (shared code in `UnitVariantWeaponWidgets`).
-- **Footer:** "Never show these info widgets again" (off by default) and UNDERSTOOD.
+- **Footer:** "Never show these info widgets again" (off by default) and UNDERSTOOD. Only unit takeovers (this widget)
+  have the box; field manuals show UNDERSTOOD alone.
   - Enter, Space or Escape finishes the typing; pressed again, it acts as Understood.
 
 ## Look: "Rotsignal" (black oxide, signal red)
@@ -786,9 +819,14 @@ Archive item!" pop-up with the picture:
 
 ## The setting
 
-- **One switch for every kind:** `URTSGameUserSettings::bM_ShowInfoTakeovers` (config) covers vehicles, buildings and
-  squads.
-- **The checkbox:** ticking "never show again" and pressing Understood saves it off at once
+- **Unit intel only:** `URTSGameUserSettings::bM_ShowInfoTakeovers` (config) covers vehicles, squads and (later)
+  buildings: `InfoTakeoverKinds::GetIsUnitIntel`. While it is off, those calls archive the entry and return false.
+- **Game mechanics always show:** every other kind (camera controls, cover, spaced armour, nomadic conversion, BXP
+  pack-up, the ability clips, and any new field manual by default) ignores the setting. They have no checkbox
+  (`UW_InfoTakeover::GetOffersNeverShowAgain` is false; only `UW_VehicleInfoTakeover` returns true), closing them never
+  writes the setting, and ticking the box on a unit takeover drops only the unit intel waiting in the queue; field
+  manuals queued behind it keep their place and still open.
+- **The checkbox:** ticking "never show again" on a unit takeover and pressing Understood saves it off at once
   (`URTSSettingsMenuSubsystem::SetShowInfoTakeoversImmediately`).
 - **Turning it back on:** Escape menu > Settings > Gameplay > "Show unit info pop-ups" (`M_CheckShowInfoTakeovers`
   in `BP_W_EscapeMenuSettings`).
@@ -812,6 +850,7 @@ Archive item!" pop-up with the picture:
 | `UW_AdrenalineShotTakeover`, `UAsyncShowAdrenalineShotTakeover` | The Adrenaline Shot field manual (clip, three facts) and its node. |
 | `UW_WespeBarrageTakeover`, `UAsyncShowWespeBarrageTakeover` | The Wespe Barrage field manual (two-camera clip, three facts) and its node. |
 | `UW_DigInTakeover`, `UAsyncShowDigInTakeover` | The Dig In field manual (two-camera clip, three facts) and its node. |
+| `UW_WallBreachTakeover`, `UAsyncShowWallBreachTakeover` | The Wall Breach field manual (Tiger through a Soviet wall clip, three facts) and its node. |
 | `UW_VehicleInfoTakeover` | The vehicle body, and the squad body (`SetupSquad`). Blueprint child `WBP_VehicleInfoTakeover` holds `M_Style`; its skin is copied from `BP_W_UnitVariantSelectionMenu`. |
 | `UPauseSafeProtoRichTextBlock` | Proto's typewriter driven on real time. Proto uses world timers, which stop while the game is paused. |
 | `UInfoTakeoverSubsystem` | Queue, setting check, library lookup. |
@@ -830,7 +869,9 @@ The Proto text styles are `DT_InfoTakeoverTitleText` and `DT_InfoTakeoverBodyTex
 4. Add a queue branch in `UInfoTakeoverSubsystem::CreateTakeoverWidget` (keyed by `EInfoTakeoverKind`).
 5. Add a mission node.
 
-The pause, typewriter, sounds and the shared "never show" switch come from the base.
+The pause, typewriter and sounds come from the base. A new unit kind must also return true from
+`GetOffersNeverShowAgain` and be listed in `InfoTakeoverKinds::GetIsUnitIntel`; anything else is a field manual that
+always shows.
 
 ## Validation
 
@@ -839,8 +880,12 @@ Run with `-InfoTakeoverValidate`, best with `-game -RenderOffscreen`. Grep the l
 - Spawns every row's reference vehicle and logs the content.
 - Opens all rows, plus a very long and a very short custom takeover.
 - Screenshots the title, the typing and the finished state to `Saved/InfoTakeover/<height>p/`.
-- Ticks "never show again" on the last takeover and checks that the setting turned off and that the settings menu
-  follows it.
+- Checks that unit takeovers show the "never show again" box and the field manual does not.
+- Ticks "never show again" on the last unit takeover, with the cover field manual and one more unit takeover queued
+  behind it. The field manual must still open; the unit takeover must be dropped. Checks that the setting turned off
+  and that the settings menu follows it.
+- With the setting off, queues another cover field manual and checks that it opens and that closing it leaves the
+  setting off.
 - Restores the setting and quits.
 
 Run with `-CameraControlsTakeoverValidate` for the camera controls takeover. Grep the log for `CAMERA_TAKEOVER`. The run:
@@ -862,8 +907,8 @@ Run with `-CameraControlsTakeoverValidate` for the camera controls takeover. Gre
   yet. Shots of later pages are named `CameraControls_page<n>_*` (page 2 is panning, page 3 is marquee).
 - Checks that On Closed fires once, with the game unpaused, after UNDERSTOOD on the last page.
 - Result on 2026-11-12, with the panning page, Development build, 1080p: PASS.
-- Checks that On Closed fires at once while the takeovers are off.
-- Checks the queue-drop path: ticking "never show again" on a takeover releases a second one waiting behind it.
+- With unit intel turned off, calls the node again and checks that it still opens without the never-show box, then
+  queues two more behind it: all three must open in turn and close as shown (`CAMERA_TAKEOVER kept queue`).
 - Restores the setting and quits.
 
 Run with `-CoverTakeoverValidate` for the cover takeover. Grep the log for `COVER_TAKEOVER`. The run:
@@ -872,7 +917,8 @@ Run with `-CoverTakeoverValidate` for the cover takeover. Grep the log for `COVE
 - Checks that the three preview screenshots loaded.
 - Screenshots the typing, the finished panel and the HUD after closing to `Saved/InfoTakeover/Cover/<height>p/`.
 - Presses UNDERSTOOD and checks that On Closed fires once, with the game unpaused.
-- Checks that On Closed fires at once while the takeovers are off.
+- With unit intel turned off, calls the node again and checks that it still opens without the never-show box and
+  closes once as shown.
 
 Run with `-SpacedArmourTakeoverValidate` for the spaced armour takeover. Grep the log for `SPACED_ARMOUR_TAKEOVER`. It
 runs the same checks as the cover run, and also checks that the Blueprint child (not the unstyled C++ widget) opened
@@ -896,7 +942,7 @@ and 720p on 2026-11-12 with both pages (Development).
 Run with `-BxpPackUpTakeoverValidate` for the building expansion pack-up takeover. Grep the log for
 `BXP_PACKUP_TAKEOVER`. It runs the nomadic run's checks (start-screen wait, Blueprint child opened, illustration
 `WBP_BxpPack_Loop` loaded, game paused, eight frames 1.5 s apart that must differ while paused, typewriter wait, On
-Closed once and unpaused, at once while turned off), and also:
+Closed once and unpaused, still opening while unit intel is off), and also:
 - checks that the three slot legend pictures loaded;
 - then restarts the loop at each beat (0.4, 2, 3, 4.6, 5.6, 7.8, 9.3, 10.6 s) for a still, `BxpPackUp_beat_<s>s`.
   The shot is taken three frames after the jump, so the widgets show the new time.
@@ -906,7 +952,7 @@ and 720p: PASS.
 
 Run with `-VulturesAtTakeoverValidate` for the Vultures AT takeover. Grep the log for `VULTURES_AT_TAKEOVER`. It runs
 the spaced armour run's checks (start-screen wait, Blueprint child opened, game paused, typewriter wait, On Closed once
-and unpaused, at once while turned off), and also checks that the clip atlas loaded and that the clip changes frame at
+and unpaused, still opening while unit intel is off), and also checks that the clip atlas loaded and that the clip changes frame at
 least 20 times while the game is paused, with two clip shots at 2 s and 3.6 s (`VulturesAt_clip_<n>_frame<cell>`).
 Screenshots go to `Saved/InfoTakeover/VulturesAt/<height>p/`. Result on 2026-11-15, DebugGame, `RTS_ToCopySmall`: PASS
 at 720p (96 frame changes in 10 s) and with `-ResX=1920 -ResY=1080`, which got a 500p offscreen viewport on this
@@ -923,3 +969,7 @@ DebugGame, `RTS_ToCopySmall`, 720p: both PASS (66 and 57 frame changes in 10 s w
 
 Run with `-DigInTakeoverValidate` (`DIGIN_TAKEOVER`) for the Dig In takeover; same checks. Result on 2026-11-15,
 DebugGame, `RTS_ToCopySmall`, 720p: PASS (104 frame changes in 10 s while paused).
+
+Run with `-WallBreachTakeoverValidate` (`WALL_BREACH_TAKEOVER`, `UWallBreachTakeoverValidateSubsystem`) for the Wall
+Breach takeover; same checks as the Dig In run. Result on 2026-11-16, DebugGame, `RTS_ToCopySmall`, 720p: PASS (101
+frame changes in 10 s while paused). Screenshots in `Saved/InfoTakeover/WallBreach/720p/`.

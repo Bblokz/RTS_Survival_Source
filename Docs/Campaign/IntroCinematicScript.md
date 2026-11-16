@@ -821,3 +821,10 @@ continuous growth with tapering tips is out of reach for this toolchain; the gro
 Blind vs the 18-stage version: real 3-0 for the 44-stage one, scary and detailed 2-1 for the 18-stage one; the owner
 chose the 44-stage version ("more real"). Still noted by reviewers: the mound's lower half falls to near-black, its
 silhouette is a smooth blob, the ground tendrils read a little ribbon-flat.
+
+**Vein tips + last checklist.** Every vessel now tapers to about 2% of its radius over its last 22 cm (a cut one to
+3% over 20 cm): the old 10-12% tips closed with a flat cap that read as a sliced-off end under the glow. Checklist
+on the shipped look: nothing floating, no L-shaped or right-angled glow left, tips taper, growth advances without
+receding. Left: one vein ends where it runs into the growing mould sheet (3903-3918, reads as a cut), a straight
+shadow edge on the ground beside the growing mound (3830-3885), the mound reads as a smooth matte blob, and the
+first ~2 s of 5.2 and last ~2 s of 5.3 barely change.
