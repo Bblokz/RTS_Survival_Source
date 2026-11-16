@@ -152,7 +152,7 @@ def build_flame_material():
     mel.connect_material_property(mats._mask(material, custom, "rgb"), "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
     # The card meets the paper in a soft fade, not a hard horizontal cut.
     fade = mel.create_material_expression(material, unreal.MaterialExpressionDepthFade, -200, 250)
-    fade.set_editor_property("fade_distance_default", 0.6)
+    fade.set_editor_property("fade_distance_default", 2.5)    # fades wherever the paper is just behind the flame
     mel.connect_material_expressions(mats._mask(material, custom, "a", y=150), "", fade, "Opacity")
     mel.connect_material_property(fade, "", unreal.MaterialProperty.MP_OPACITY)
     return mats._finish(material)

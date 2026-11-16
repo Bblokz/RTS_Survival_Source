@@ -745,7 +745,8 @@ Not taken (bigger builds): Berlin skyline and cloud remodel (3.3/3.4), Ural Shie
   ridged multifractal: long branching vessels, no cells.
 - Hard rule risks: the 5.4 stain's north-eastern front was in frame (framed further west now, and the stain runs on
   to 0.9 at the cut); four eastern Svarog rings stood in a north-south row (three moved east or west).
-- Map fires: flames rise out of the char with a tall soft base; the light pool is smaller and weaker; each scorch is
+- Map fires: flames rise out of the char (depth fade 2.5 cm: the flame dissolves wherever the paper is just behind
+  it, so its base follows the scorch, no straight cut); the light pool is smaller and weaker; each scorch is
   turned and sized differently; the red-hot pins glow dull, not orange lollipops.
 - Soviet star pin pressed in (head a few mm over the paper), no hard shadow (it read as a second star).
 - Trench helmets: field-grey paint at 0.02 albedo (this set is exposed for very dark surfaces; 0.07 still read as
