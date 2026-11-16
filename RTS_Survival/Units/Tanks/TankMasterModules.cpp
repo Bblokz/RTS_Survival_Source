@@ -323,7 +323,24 @@ void ATankMaster::DestroyAndSpawnActors(const FDestroySpawnActorsParameters& Spa
 		DestroyAndSpawnActorsWithRegularDeath(SpawnParams, CollapseFX);
 		return;
 	}
-	Super::DestroyAndSpawnActors(SpawnParams, CollapseFX);
+	// Same as AHpPawnMaster::DestroyAndSpawnActors, plus the wreck hook.
+	FRTS_Collapse::OnDestroySpawnActors(this, SpawnParams, CollapseFX, MakeWreckSpawnedCallback(nullptr));
+}
+
+TFunction<void(AActor*)> ATankMaster::MakeWreckSpawnedCallback(TFunction<void(AActor*)> Inner) const
+{
+	if (not M_WreckSpawnedHook)
+	{
+		return Inner;
+	}
+	return [Inner = MoveTemp(Inner), Hook = M_WreckSpawnedHook](AActor* SpawnedActor)
+	{
+		if (Inner)
+		{
+			Inner(SpawnedActor);
+		}
+		Hook(SpawnedActor);
+	};
 }
 
 void ATankMaster::DestroyAndSpawnActorsWithRegularDeath(const FDestroySpawnActorsParameters& SpawnParams,
@@ -340,10 +357,11 @@ void ATankMaster::DestroyAndSpawnActorsWithRegularDeath(const FDestroySpawnActor
 	const USkeletalMeshComponent* ChassisMesh = GetTankMesh();
 	Request.bHasTrackWheels = IsValid(ChassisMesh) && IsValid(ChassisMesh->GetAnimInstance())
 		&& ChassisMesh->GetAnimInstance()->IsA<UTrackedAnimationInstance>();
-	FRTS_Collapse::OnDestroySpawnActors(this, SpawnParams, CollapseFX, [Request](AActor* SpawnedActor)
-	{
-		FWreckRegularDeath::StartOnWreck(SpawnedActor, Request);
-	});
+	FRTS_Collapse::OnDestroySpawnActors(this, SpawnParams, CollapseFX,
+	                                    MakeWreckSpawnedCallback([Request](AActor* SpawnedActor)
+	                                    {
+		                                    FWreckRegularDeath::StartOnWreck(SpawnedActor, Request);
+	                                    }));
 }
 
 ERegularDeathVariant ATankMaster::DrawRegularDeathVariant()
@@ -418,7 +436,7 @@ void ATankMaster::DestroyAndSpawnActorsWithDeathEffects(const FDestroySpawnActor
 		EngineFireRequest.bIsAmmoCookOffDeath = bTossTurret;
 	}
 
-	FRTS_Collapse::OnDestroySpawnActors(this, SpawnParams, CollapseFX,
+	FRTS_Collapse::OnDestroySpawnActors(this, SpawnParams, CollapseFX, MakeWreckSpawnedCallback(
 	                                    [TossSettings, LiveTurretYawOffset, EngineFireRequest, bTossTurret,
 		                                    bExplodeFuel](AActor* SpawnedActor)
 	                                    {
@@ -432,7 +450,7 @@ void ATankMaster::DestroyAndSpawnActorsWithDeathEffects(const FDestroySpawnActor
 			                                    TankWreckTurretToss::StartOnWreck(
 				                                    SpawnedActor, TossSettings, LiveTurretYawOffset);
 		                                    }
-	                                    });
+	                                    }));
 }
 
 FVector ATankMaster::GetEngineWorldLocation() const

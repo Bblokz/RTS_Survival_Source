@@ -368,6 +368,13 @@ public:
 	UFUNCTION(BlueprintCallable, Category="Death|Debug")
 	void Debug_DieRegularDeath(ERegularDeathVariant Variant, FVector KillShotDirection);
 
+	/**
+	 * @brief Runs for every actor this tank's death spawns (its wreck), after the death effects started on it.
+	 * The hook is copied when the death starts, so it still runs if the tank is gone before the wreck loads.
+	 * @param Hook Called with each spawned actor; pass an empty function to clear it.
+	 */
+	void SetWreckSpawnedHook(TFunction<void(AActor*)> Hook) { M_WreckSpawnedHook = MoveTemp(Hook); }
+
 	/** @brief Records the travel direction of a killing projectile for the regular death's debris. */
 	virtual float TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator,
 	                         AActor* DamageCauser) override;
@@ -995,6 +1002,12 @@ private:
 	void DestroyAndSpawnActorsWithRegularDeath(const FDestroySpawnActorsParameters& SpawnParams,
 	                                           const FCollapseFX& CollapseFX);
 	ERegularDeathVariant DrawRegularDeathVariant();
+
+	// Optional per-instance reaction to the spawned wreck (see SetWreckSpawnedHook).
+	TFunction<void(AActor*)> M_WreckSpawnedHook;
+
+	/** @return Callback for FRTS_Collapse::OnDestroySpawnActors: runs Inner, then a copy of M_WreckSpawnedHook. */
+	TFunction<void(AActor*)> MakeWreckSpawnedCallback(TFunction<void(AActor*)> Inner) const;
 
 	/** @brief Throws crew ragdolls out of the top of the vehicle; runs before the Blueprint can destroy it. */
 	void OnUnitDies_ThrowCrewBodies(ERTSDeathType DeathType) const;

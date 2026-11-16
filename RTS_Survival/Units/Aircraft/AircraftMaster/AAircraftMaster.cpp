@@ -1749,6 +1749,12 @@ void AAircraftMaster::OnAttackMoveCompleted()
 	}
 	if (M_StrafeState.bM_IsStrafing)
 	{
+		if (M_StrafeState.bM_RepeatRunsOverTarget)
+		{
+			Strafe_PrepareNextAttackRun();
+			Strafe_StartAttackRun();
+			return;
+		}
 		Strafe_CompleteInitialRunAndEnableAggro();
 		return;
 	}
@@ -2610,6 +2616,7 @@ void AAircraftMaster::StrafeLocation(const FStrafeAircraftSettings& StrafeAircra
 	M_StrafeState.bM_IsLerpingStrafePoint = false;
 	M_StrafeState.bM_IsFirstAttackRun = true;
 	M_StrafeState.bM_IsRetreatingToDestroy = false;
+	M_StrafeState.bM_RepeatRunsOverTarget = StrafeAircraftSettings.bRepeatRunsOverTarget;
 
 	M_AircraftAttackData.TargetActor = nullptr;
 	M_AircraftAttackData.TargetLocation = M_StrafeState.StrafeStartLocation;

@@ -33,4 +33,9 @@ struct FStrafeAircraftSettings
 	float TotalStrafeTime = 0.f;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FVector PostStrafeMoveToLocation = FVector::ZeroVector;
+
+	// On: every attack run goes over the strafe target until TotalStrafeTime ends. Off: after the first run the
+	// aircraft hunts nearby enemies on its own (aggressive stance) for the rest of the time.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	bool bRepeatRunsOverTarget = false;
 };

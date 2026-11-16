@@ -637,6 +637,8 @@ private:
 		bool bM_IsLerpingStrafePoint = false;
 		bool bM_IsFirstAttackRun = true;
 		bool bM_IsRetreatingToDestroy = false;
+		// Keeps attacking the authored target instead of switching to aggro after the first run.
+		bool bM_RepeatRunsOverTarget = false;
 		FTimerHandle StrafeTimerHandle;
 
 		void ResetRuntime()
