@@ -29,6 +29,9 @@
 #include "RTS_Survival/GameUI/Resources/PlayerEnergyBar/W_PlayerEnergyBar.h"
 #include "RTS_Survival/GameUI/GameDifficultyPicker/W_GameDifficultyPicker.h"
 #include "RTS_Survival/GameUI/MainGameUI.h"
+#include "RTS_Survival/Missions/MissionClasses/KillActorsMission/KillActorsMission.h"
+#include "RTS_Survival/Missions/MissionWidgets/W_Mission.h"
+#include "RTS_Survival/Missions/MissionWidgets/MissionWidgetManager/W_MissionWidgetManager.h"
 #include "RTS_Survival/Behaviours/UI/BehaviourDescription/W_BehaviourDescription.h"
 #include "RTS_Survival/GameUI/MiniMap/FullMapView/W_FullMapView.h"
 #include "RTS_Survival/GameUI/MiniMap/FullMapView/W_TacticalMapMissionCard.h"
@@ -118,6 +121,7 @@ namespace UISnapshotConstants
 	const FName FullMapCloseButtonName(TEXT("CloseButton"));
 	// Hovers this card of the tactical map's mission panel (0 = top); -UISnapshotTacticalMissionSweep=P holds its
 	// light band at progress P.
+	const TCHAR* const PreviewMissionsSwitch = TEXT("UISnapshotPreviewMissions");
 	const TCHAR* const HoverTacticalMissionSwitch = TEXT("UISnapshotHoverTacticalMission=");
 	const TCHAR* const TacticalMissionSweepSwitch = TEXT("UISnapshotTacticalMissionSweep=");
 	const TCHAR* const CombatPingsSwitch = TEXT("UISnapshotCombatPings");
@@ -762,6 +766,7 @@ void UUISnapshotSubsystem::ApplyCurrentStep()
 	}
 	StartWeaponReloads();
 	CollapseMissionOnce();
+	PreviewMissionsOnce();
 	// Filters first, so the tactical map's toggles show the modes when it opens.
 	ShowMapObjectFiltersForStep();
 	ToggleFullMapForStep();
@@ -979,6 +984,62 @@ void UUISnapshotSubsystem::ToggleFullMapForStep()
 		{
 			UE_LOG(LogTemp, Display, TEXT("UISNAPSHOT pressed the full map close button"));
 		}
+	}
+}
+
+void UUISnapshotSubsystem::PreviewMissionsOnce()
+{
+	if (bM_HasPreviewedMissions || not FParse::Param(FCommandLine::Get(), UISnapshotConstants::PreviewMissionsSwitch))
+	{
+		return;
+	}
+	TArray<UUserWidget*> MainGameUIs;
+	UWidgetBlueprintLibrary::GetAllWidgetsOfClass(GetWorld(), MainGameUIs, UMainGameUI::StaticClass(), false);
+	const UMainGameUI* const MainGameUI = MainGameUIs.Num() > 0 ? Cast<UMainGameUI>(MainGameUIs[0]) : nullptr;
+	UW_MissionWidgetManager* const MissionWidgetManager = IsValid(MainGameUI)
+		                                                      ? MainGameUI->GetMissionManagerWidget()
+		                                                      : nullptr;
+	if (not IsValid(MissionWidgetManager))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("UISNAPSHOT no mission widget manager for the preview missions"));
+		return;
+	}
+	bM_HasPreviewedMissions = true;
+	struct FPreviewMission
+	{
+		const TCHAR* Title;
+		const TCHAR* Description;
+		bool bStartCollapsed;
+	};
+	const FPreviewMission PreviewMissions[] = {
+		{
+			TEXT("Secure the Line"),
+			TEXT("Destroy the Soviet rig crane and the fuel trucks before the HQ glider lands. "
+				"<Text_Armor>2/7</> targets destroyed."),
+			false
+		},
+		{
+			TEXT("Hold the Ridge"),
+			TEXT("Dig in along the ridge north of the village and hold it until the relief column arrives. Soviet "
+				"armour is expected from the east; keep your anti-tank guns covering the road."),
+			true
+		},
+		{TEXT("Don't lose your HQ"), TEXT("If your headquarters is destroyed the operation fails."), true},
+	};
+	for (const FPreviewMission& PreviewMission : PreviewMissions)
+	{
+		UW_Mission* const MissionWidget = MissionWidgetManager->GetFreeMissionWidget();
+		if (not IsValid(MissionWidget))
+		{
+			break;
+		}
+		// Never started: only gives the widget the valid mission it requires.
+		UKillActorsMission* const PlaceholderMission = NewObject<UKillActorsMission>(this);
+		FMissionWidgetState WidgetState;
+		WidgetState.MissionTitle = FText::FromString(PreviewMission.Title);
+		WidgetState.MissionDescription = FText::FromString(PreviewMission.Description);
+		MissionWidget->InitMissionWidget(WidgetState, PlaceholderMission, false, PreviewMission.bStartCollapsed);
+		UE_LOG(LogTemp, Display, TEXT("UISNAPSHOT preview mission: %s"), PreviewMission.Title);
 	}
 }
 

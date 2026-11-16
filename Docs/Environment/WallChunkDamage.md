@@ -970,7 +970,7 @@ vehicles can drive through those walls; right now they avoid them".
   remnant is never breached again; a ruin killed before any tank came keeps the kit's full nav.
 - **Test:** `BREACH_SCRIPT=berlin_ruin_breach_test.py sh run_breach_test.sh <run>`: Tigers through B1, B2, B3, B5,
   B6 (paths through before: heavy only), a Pz IV round B2, a Tiger round a dead B4, then B6 killed after its breach
-  (paths through for all four agent types). Passed in run `berlin4` (before the whole-wall death and the heap drop).
+  (paths through for all four agent types). Passed in run `berlin6`; the Rus wall test passed again after (`r20`).
 - **Maps:** the B pieces on Ger_Berlin need no map change (the mesh never carved the navmesh; the boxes switch at play).
 
 ## Open points

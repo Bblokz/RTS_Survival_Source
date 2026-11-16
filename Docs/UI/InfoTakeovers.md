@@ -711,7 +711,7 @@ Every takeover, all six, has the same look. On 2026-11-12 it went through two ro
 | UNDERSTOOD / CONTINUE / PREVIOUS | `Skin.ConfirmButton` (n, h, p) | `MI_InfoTakeover_Button_n`, `_h`, `_p` |
 | Body panes | `Skin.VariantSectionGlass` | `MI_InfoTakeover_PaneGlass` |
 | Glass over every picture | `PictureGlass` | `MI_InfoTakeover_PictureGlass` |
-| Page lamps | `PageLampLit`, `PageLampUnlit` | `Textures/T_InfoTakeover_PageLamp_On`, `_Off` |
+| Page lamps | `MI_InfoTakeover_PageLamp` (project setting, see below); fallback `PageLampLit` / `PageLampUnlit` | `MI_InfoTakeover_PageLamp`; fallback `Textures/T_InfoTakeover_PageLamp_On`, `_Off` |
 
 - **Panel background:** a black-oxide plate (`#0f1112`) with a chrome rim, dome bolts and a few bright nicks.
   - The title sits on a raised gunmetal plate (`#25282b`) with a knurled right end cap. One dull red index tab sits
@@ -728,7 +728,9 @@ Every takeover, all six, has the same look. On 2026-11-12 it went through two ro
 - **Glass over pictures:** gauge glass with a reflection streak, rim and scratches, also an instance of
   `M_UI_GlassPane`.
 - **Hover tint:** a faint red, `HoverTint` (0.85, 0.30, 0.25, 0.4), on every glass instance.
-- **Page lamps:** a steel ring with a dull red pilot lamp when lit, and dark red glass when unlit.
+- **Page lamps:** signal pilot lamps drawn by a shader (see "Page lamp shader" below): a knurled steel bezel around
+  domed red fresnel glass. Lit, the glass glows with a hot filament core and a halo lights the title placard around
+  it; unlit, it is dark red glass with a window reflection.
 - **In-picture colours are not part of the look:** the camera illustrations' cyan HUD bits and the cover page's
   green / yellow / red labels stay as they are.
 - **The master is unchanged.** Both glass instances only set parameters of the shared `M_UI_GlassPane`.
@@ -750,9 +752,36 @@ Every takeover, all six, has the same look. On 2026-11-12 it went through two ro
 
 Every takeover has them, from the base class:
 - **Page lamps:** one lamp per page in the title placard's top right (`UW_InfoTakeover::BuildPageLampRow`, 24 units
-  each, 6 apart). The lamp of the page that shows is lit (cyan, `PageLampLit`); the others are dark amber glass
-  (`PageLampUnlit`). A one-page takeover shows one lit lamp. The lamps were baked into the plate art before
-  2026-11-12; they are widgets now, so the art has none.
+  each, 6 apart; the row's right edge is 50 units in from the plate's right, its top 47 down, so lamp centres sit at
+  y 59 in the placard's lamp seat). The lamp of the page that shows is lit; the others are dark. A one-page takeover
+  shows one lit lamp. The lamps were baked into the plate art before 2026-11-12; they are widgets now, so the art
+  has none.
+
+### Page lamp shader
+
+Since 2026-11-16 every takeover's page lamps come from one project setting, not from the Blueprints:
+- **Setting:** Project Settings > Game > Indicator Lamps > Info Takeover Page Lamps (`UIndicatorLampSettings`,
+  `Config/DefaultGame.ini`): `PageLampMaterial` = `Style/MI_InfoTakeover_PageLamp`, `PageLampHaloScale` 3,
+  `PageLampFadeSeconds` 0.15. Empty material = the old flat `PageLampLit` / `PageLampUnlit` brushes, no halo.
+- **Material:** `/Game/RTS_Survival/Textures/GameUI/Skins/_Shared/AnalogGauges/M_UI_SignalLamp`, a UI material in
+  AlphaComposite (premultiplied) blend. One master, two passes (`Pass` scalar):
+  - pass 0, the lamp: knurled steel bezel with a raised crest and a dark seat, domed red glass with fresnel rings
+    (faded out where they would alias), a caustic and window streak when dark, a hot core and coiled filament when
+    lit, and red spill on the inner bevel;
+  - pass 1, the halo, on a quad `HaloScale` times the lamp: a soft contact shadow of the bezel (alpha) plus additive
+    red light (rgb, alpha 0), so the plate and title around a lit lamp light up. It fades to zero before its edge.
+  - `Power` 0..1 fades both; the clock ignores pause, so the filament flickers faintly on the paused takeover.
+- **Widgets (C++):** `FPanelSignalLamp` (`GameUI/IndicatorLamps/PanelSignalLamp.h`) builds the lamp image and the
+  halo image, each with its own dynamic instance, and ramps `Power` over `PageLampFadeSeconds` of real time.
+  `UW_InfoTakeover` puts the halos in their own row under the lamp row (same boxes and padding), so a halo never
+  depends on which neighbour draws first. The halo is scaled up by a render transform: it never moves the layout,
+  and no ancestor clips it.
+- **Build:** `Source/Tools/InfoTakeover/Style/build_page_lamps.sh` (headless Development commandlet running
+  `build_page_lamps.py`; never run that script nested inside UECP `execute_python`, it crashed the editor).
+- **Check:** `Source/Tools/InfoTakeover/Style/run_page_lamp_check.sh 1920x1080 2560x1080 ...` runs
+  `-CameraControlsTakeoverValidate` per resolution (`-ForceRes` + `r.SetRes`, else the offscreen viewport drops to
+  500p). Each page logs `CAMERA_TAKEOVER page lamps (<W>x<H>)` with the row rect and lit lamp centre in plate units
+  against the expected seat, the halo flag and each lamp's power; shots land in `Saved/InfoTakeover/PageLamps/<WxH>/`.
 - **PREVIOUS:** left of CONTINUE / UNDERSTOOD, in the same button style. It shows from page two on and is collapsed
   on page one. It goes back one page and never closes the takeover or fires On Closed. Enter, Space and Escape still
   act only as the footer button (`PressConfirmButton`).

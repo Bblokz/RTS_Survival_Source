@@ -298,9 +298,18 @@ void UCameraControlsTakeoverValidateSubsystem::CheckPageLampLayout(const UW_Came
 	{
 		Fail(TEXT("the page lamps have no halos (UIndicatorLampSettings::PageLampMaterial not set?)"));
 	}
-	if (not FMath::IsNearlyEqual(Takeover.GetPageLampPower(LitLamp), 1.f))
+	// The shot can land while the filament still warms (slow headless frames), so the lit lamp only has to be the
+	// brightest and past half power.
+	constexpr float MinLitPower = 0.5f;
+	const float LitPower = Takeover.GetPageLampPower(LitLamp);
+	bool bLitIsBrightest = LitPower > MinLitPower;
+	for (int32 LampIndex = 0; LampIndex < LampCount; ++LampIndex)
 	{
-		Fail(TEXT("the lit page lamp has not warmed up to full power"));
+		bLitIsBrightest &= LampIndex == LitLamp || Takeover.GetPageLampPower(LampIndex) < LitPower;
+	}
+	if (not bLitIsBrightest)
+	{
+		Fail(TEXT("the lit page lamp is not warming up while the others go dark"));
 	}
 }
 

@@ -65,6 +65,7 @@ private:
 	bool bM_HasAddedGallery = false;
 	bool bM_HasFinishedTruckAnims = false;
 	bool bM_HasCollapsedMission = false;
+	bool bM_HasPreviewedMissions = false;
 	bool bM_HasOpenedFullMap = false;
 	bool bM_HasAssignedControlGroups = false;
 	// -UISnapshotPressControlGroup holds the mouse button down on the hovered slot once per capture step.
@@ -126,6 +127,8 @@ private:
 	void StartWeaponReloads() const;
 	// -UISnapshotCollapseMission: collapses the mission dialog to its title once (captures the collapsed state).
 	void CollapseMissionOnce();
+	// -UISnapshotPreviewMissions: fills free HUD mission widgets with sample missions on maps without any.
+	void PreviewMissionsOnce();
 	// -UISnapshotControlGroups: fills control groups 1-4 once (all units, one pawn, a few pawns, the squads), so the
 	// bar shows occupied slots next to empty ones.
 	void AssignControlGroupsOnce();

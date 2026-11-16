@@ -99,6 +99,11 @@ geometry would keep blocking after the ruin is gone.
   - `bHasCustomNavigableGeometry` isn't reachable from Python.
   - A `NavModifierComponent` only sees the collision of a component that also exports itself as geometry.
 - **Counts:** 1-14 boxes per Blueprint, 94 for the 22 Blueprints (average 4.3).
+- **Wall pieces B1-B6 (2026-11-16):** heavy tanks drive through them. At play their boxes switch from `NavArea_Null` to
+  `UNavArea_BreachableWallHeavyOnly` (player heavies only; everyone else still goes round) and a
+  `UWallTankBreachComponent` cuts the gap; a ruin killed before any tank came keeps `NavArea_Null`. See
+  `WallChunkDamage.md`, "Berlin ruin walls: heavy tanks only". `ruin_blueprints_build.run()` re-applies that setup at its
+  end.
 
 ## Death (remnants; last change 2026-11-14)
 

@@ -122,8 +122,8 @@ dark += LensDark.rgb * 1.5 * ringLine * saturate(-dot(normalize(c + 1e-5), L));
 // lit: saturated red, a hot core with the coiled filament across it, rings glowing along their steps
 float core = exp(-rn * rn * 4.0);
 float filament = exp(-(c.x * c.x) / 0.09 - (c.y * c.y) / 0.010) * (0.75 + 0.25 * sin(c.x * 60.0));
-float3 lit = lamp * (0.42 + 0.58 * (1.0 - rn * rn)) * ringShade;
-lit += HotColor.rgb * (core * 0.45 + filament * 0.40);
+float3 lit = lamp * (0.28 + 0.72 * (1.0 - rn * rn)) * ringShade;
+lit += HotColor.rgb * (core * 0.55 + filament * 0.45);
 lit += lamp * ringLine * 0.35;
 float3 lens = lerp(dark, lit, on);
 // the bezel shades the glass at its top left rim; light leaving the dome glints at the bottom right rim
@@ -147,11 +147,11 @@ return float4(col * cover, cover) * VertexAlpha;
 SCALARS = {
     'Pass': 0.0, 'Power': 1.0, 'HaloScale': 3.0, 'TimeOffset': 0.0, 'FlickerAmount': 0.04,
     'LensRadius': 0.335, 'CrestRadius': 0.425, 'Knurls': 40.0, 'Rings': 4.0, 'SpecIntensity': 1.0, 'Brightness': 1.0,
-    'GlowIntensity': 0.055, 'GlowFalloff': 0.11, 'GlowWide': 0.62,
+    'GlowIntensity': 0.11, 'GlowFalloff': 0.15, 'GlowWide': 0.80,
     'ShadowStrength': 0.55, 'ShadowX': 0.03, 'ShadowY': 0.05,
 }
 VECTORS = {
-    'LampColor': (0.80, 0.075, 0.030, 1.0),
+    'LampColor': (0.78, 0.060, 0.024, 1.0),
     'HotColor': (1.00, 0.52, 0.30, 1.0),
     'LensDark': (0.050, 0.0055, 0.0040, 1.0),
     'GlowColor': (1.00, 0.20, 0.07, 1.0),
