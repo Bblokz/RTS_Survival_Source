@@ -18,8 +18,9 @@ class UW_Mission;
 /**
  * @brief One active mission in the tactical map's mission panel: the mission's title and full description on a pane
  * of the faction button glass (the shared M_UI_GlassPane shader). Hovering lights the glass, sends one light band
- * across it and brightens the accent bar on the left. The texts copy the rich text styles of the mission widget they
- * mirror, so tags such as <Text_Armor> look the same as in the HUD. UW_FullMapView pools these; builds its own tree.
+ * across it and brightens the accent bar on the left. The texts use the map panels' fonts and DT_RichText for tags
+ * such as <Text_Armor>; copying the HUD's typewriter (proto) styles drew missing-glyph boxes here.
+ * UW_FullMapView pools these; builds its own tree.
  */
 UCLASS()
 class RTS_SURVIVAL_API UW_TacticalMapMissionCard : public UUserWidget
@@ -34,7 +35,7 @@ public:
 	void SetupMissionCard(const int32 CardIndex);
 
 	/**
-	 * @brief Shows the mission a HUD mission widget shows; copies that widget's text styles on the first call.
+	 * @brief Shows the mission a HUD mission widget shows; takes that widget's inline decorators on the first call.
 	 * @param MissionWidget An in-use mission widget of the mission widget manager.
 	 */
 	void ShowMission(const UW_Mission& MissionWidget);
@@ -70,7 +71,7 @@ private:
 	UPROPERTY()
 	TObjectPtr<UVerticalBox> M_TextColumn;
 
-	// Created on the first ShowMission with the class and styles of the mission widget's text blocks.
+	// Created on the first ShowMission with the decorators of the mission widget's text blocks.
 	UPROPERTY()
 	TObjectPtr<URichTextBlock> M_TitleText;
 
@@ -93,14 +94,14 @@ private:
 	void BuildContent(UOverlay& CardOverlay);
 
 	/**
-	 * @brief Creates a text block of the source's class with the source's style set, decorators and default style.
+	 * @brief Creates a rich text block in the panel's look with the source's inline decorators.
 	 * @param Source The mission widget's title or description block.
-	 * @param bIsTitle Adds the gap below the title on the description only.
+	 * @param bIsTitle Title font, or the description font with a gap above it.
 	 * @return The new block in the text column, or null when the column is missing.
 	 */
-	URichTextBlock* CreateTextLike(const URichTextBlock& Source, const bool bIsTitle);
+	URichTextBlock* CreateText(const URichTextBlock& Source, const bool bIsTitle);
 
-	static void CopyRichTextLook(const URichTextBlock& Source, URichTextBlock& Target);
+	static void CopyDecorators(const URichTextBlock& Source, URichTextBlock& Target);
 
 	void SetTextIfChanged(URichTextBlock* TextBlock, FText& InOutShownText, const FText& NewText) const;
 

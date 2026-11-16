@@ -15,7 +15,8 @@
 #include "Components/VerticalBoxSlot.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
-#include "ProtoRichTextBlock.h"
+#include "Engine/DataTable.h"
+#include "Styling/CoreStyle.h"
 #include "RTS_Survival/Missions/MissionWidgets/W_Mission.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 
@@ -31,6 +32,15 @@ namespace TacticalMapMissionCardLayout
 	const FMargin DescriptionPadding(0.f, 4.f, 0.f, 0.f);
 	const FLinearColor AccentColor(0.0f, 0.9f, 1.0f, 1.0f);
 	constexpr float AccentIdleOpacity = 0.4f;
+
+	// The tactical map's panel fonts (UW_FullMapView); tags come from the game's shared rich text table.
+	const TCHAR* const RichTextStylePath =
+		TEXT("/Game/RTS_Survival/Blueprints/GameUI/WeaponUI/AmmoButtonWidgets/DT_RichText.DT_RichText");
+	constexpr int32 TitleFontSize = 14;
+	constexpr int32 DescriptionFontSize = 12;
+	constexpr int32 TextOutlineSize = 1;
+	const FLinearColor TitleColor(0.86f, 0.93f, 0.96f, 1.0f);
+	const FLinearColor DescriptionColor(0.68f, 0.75f, 0.79f, 1.0f);
 }
 
 namespace TacticalMapMissionCardGlass
@@ -164,11 +174,11 @@ void UW_TacticalMapMissionCard::ShowMission(const UW_Mission& MissionWidget)
 	}
 	if (not IsValid(M_TitleText))
 	{
-		M_TitleText = CreateTextLike(*SourceTitle, true);
+		M_TitleText = CreateText(*SourceTitle, true);
 	}
 	if (not IsValid(M_DescriptionText))
 	{
-		M_DescriptionText = CreateTextLike(*SourceDescription, false);
+		M_DescriptionText = CreateText(*SourceDescription, false);
 	}
 	const FMissionWidgetState& WidgetState = MissionWidget.GetShownWidgetState();
 	SetTextIfChanged(M_TitleText, M_ShownTitle, WidgetState.MissionTitle);
@@ -181,65 +191,59 @@ void UW_TacticalMapMissionCard::ShowMission(const UW_Mission& MissionWidget)
 	}
 }
 
-URichTextBlock* UW_TacticalMapMissionCard::CreateTextLike(const URichTextBlock& Source, const bool bIsTitle)
+URichTextBlock* UW_TacticalMapMissionCard::CreateText(const URichTextBlock& Source, const bool bIsTitle)
 {
+	using namespace TacticalMapMissionCardLayout;
 	if (not IsValid(M_TextColumn))
 	{
 		return nullptr;
 	}
 	URichTextBlock* const TextBlock = WidgetTree->ConstructWidget<URichTextBlock>(
-		Source.GetClass(), bIsTitle ? TEXT("MissionTitle") : TEXT("MissionDescription"));
-	CopyRichTextLook(Source, *TextBlock);
+		URichTextBlock::StaticClass(), bIsTitle ? TEXT("MissionTitle") : TEXT("MissionDescription"));
+	UDataTable* const RichTextStyle = LoadObject<UDataTable>(nullptr, RichTextStylePath);
+	if (IsValid(RichTextStyle))
+	{
+		TextBlock->SetTextStyleSet(RichTextStyle);
+	}
+	else
+	{
+		RTSFunctionLibrary::ReportError(FString::Printf(
+			TEXT("The tactical map mission card could not load its rich text style %s."
+				"\nAt function: UW_TacticalMapMissionCard::CreateText"), RichTextStylePath));
+	}
+	CopyDecorators(Source, *TextBlock);
+	// Untagged text takes the map panel's font, not the style set's default.
+	TextBlock->SetDefaultFont(FCoreStyle::GetDefaultFontStyle(bIsTitle ? TEXT("Bold") : TEXT("Regular"),
+	                                                          bIsTitle ? TitleFontSize : DescriptionFontSize,
+	                                                          FFontOutlineSettings(TextOutlineSize)));
+	TextBlock->SetDefaultColorAndOpacity(bIsTitle ? TitleColor : DescriptionColor);
+	TextBlock->SetAutoWrapText(true);
+	TextBlock->SetJustification(ETextJustify::Left);
 	TextBlock->SetVisibility(ESlateVisibility::HitTestInvisible);
 	UVerticalBoxSlot* const TextSlot = M_TextColumn->AddChildToVerticalBox(TextBlock);
 	TextSlot->SetHorizontalAlignment(HAlign_Fill);
 	if (not bIsTitle)
 	{
-		TextSlot->SetPadding(TacticalMapMissionCardLayout::DescriptionPadding);
+		TextSlot->SetPadding(DescriptionPadding);
 	}
 	return TextBlock;
 }
 
-void UW_TacticalMapMissionCard::CopyRichTextLook(const URichTextBlock& Source, URichTextBlock& Target)
+void UW_TacticalMapMissionCard::CopyDecorators(const URichTextBlock& Source, URichTextBlock& Target)
 {
-	Target.SetTextStyleSet(Source.GetTextStyleSet());
-	// The decorator list and the override flag have no public getters; read them by reflection.
-	if (const FArrayProperty* const DecoratorsProperty = FindFProperty<FArrayProperty>(
-		URichTextBlock::StaticClass(), TEXT("DecoratorClasses")))
+	// Inline images and similar decorators the mission texts may use; the list has no public getter.
+	const FArrayProperty* const DecoratorsProperty = FindFProperty<FArrayProperty>(
+		URichTextBlock::StaticClass(), TEXT("DecoratorClasses"));
+	if (DecoratorsProperty == nullptr)
 	{
-		const TArray<TSubclassOf<URichTextBlockDecorator>>* const SourceDecorators =
-			DecoratorsProperty->ContainerPtrToValuePtr<TArray<TSubclassOf<URichTextBlockDecorator>>>(&Source);
-		if (SourceDecorators != nullptr)
-		{
-			Target.SetDecorators(*SourceDecorators);
-		}
+		return;
 	}
-	const FBoolProperty* const OverrideProperty = FindFProperty<FBoolProperty>(
-		URichTextBlock::StaticClass(), TEXT("bOverrideDefaultStyle"));
-	const FStructProperty* const OverrideStyleProperty = FindFProperty<FStructProperty>(
-		URichTextBlock::StaticClass(), TEXT("DefaultTextStyleOverride"));
-	if (OverrideProperty != nullptr && OverrideStyleProperty != nullptr
-		&& OverrideProperty->GetPropertyValue_InContainer(&Source))
+	const TArray<TSubclassOf<URichTextBlockDecorator>>* const SourceDecorators =
+		DecoratorsProperty->ContainerPtrToValuePtr<TArray<TSubclassOf<URichTextBlockDecorator>>>(&Source);
+	if (SourceDecorators != nullptr && SourceDecorators->Num() > 0)
 	{
-		const FTextBlockStyle* const OverrideStyle =
-			OverrideStyleProperty->ContainerPtrToValuePtr<FTextBlockStyle>(&Source);
-		if (OverrideStyle != nullptr)
-		{
-			Target.SetDefaultTextStyle(*OverrideStyle);
-		}
+		Target.SetDecorators(*SourceDecorators);
 	}
-	// The mission description types in letter by letter on a proto text block; the card shows it at once.
-	const UProtoRichTextBlock* const SourceProto = Cast<UProtoRichTextBlock>(&Source);
-	UProtoRichTextBlock* const TargetProto = Cast<UProtoRichTextBlock>(&Target);
-	if (IsValid(SourceProto) && IsValid(TargetProto))
-	{
-		TargetProto->WidgetSet = SourceProto->WidgetSet;
-		TargetProto->ImageSet = SourceProto->ImageSet;
-		TargetProto->SetProtoTextStyleSet(SourceProto->ProtoTextStyleSet);
-	}
-	// The panel is narrower than the HUD's mission column: always wrap, left aligned.
-	Target.SetAutoWrapText(true);
-	Target.SetJustification(ETextJustify::Left);
 }
 
 void UW_TacticalMapMissionCard::SetTextIfChanged(URichTextBlock* TextBlock, FText& InOutShownText,

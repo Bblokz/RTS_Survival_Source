@@ -124,6 +124,8 @@ namespace UISnapshotConstants
 	const TCHAR* const PreviewMissionsSwitch = TEXT("UISnapshotPreviewMissions");
 	const TCHAR* const HoverTacticalMissionSwitch = TEXT("UISnapshotHoverTacticalMission=");
 	const TCHAR* const TacticalMissionSweepSwitch = TEXT("UISnapshotTacticalMissionSweep=");
+	// Moves the Slate cursor over this card instead of forcing the hover (needs the map laid out: step 1 or later).
+	const TCHAR* const MouseHoverTacticalMissionSwitch = TEXT("UISnapshotMouseHoverTacticalMission=");
 	const TCHAR* const CombatPingsSwitch = TEXT("UISnapshotCombatPings");
 	const TCHAR* const MapFiltersSwitch = TEXT("UISnapshotMapFilters");
 	const TCHAR* const MapFiltersRevealAllSwitch = TEXT("UISnapshotMapFiltersRevealAll");
@@ -236,6 +238,7 @@ void UUISnapshotSubsystem::TickSettling()
 	HideGlassPanes();
 	HoldEnergyPreview();
 	HoverPortrait();
+	MouseHoverTacticalMission();
 	ClickControlGroupSlotOncePerStep();
 	if (GetSecondsInPhase() >= UISnapshotConstants::SettleSeconds)
 	{
@@ -783,6 +786,7 @@ void UUISnapshotSubsystem::CaptureCurrentStep() const
 	const FString StepName = PickerPrefix + GetCurrentStepName();
 	const FString ScreenshotPath = FPaths::ProjectSavedDir() / TEXT("UISnapshot") / (StepName + TEXT(".png"));
 	LogMapObjectFilterCounts();
+	LogTacticalMapMissionHover();
 	FScreenshotRequest::RequestScreenshot(ScreenshotPath, true, false);
 	IConsoleManager::Get().ProcessUserConsoleInput(UISnapshotConstants::ReflectorSnapshotCommand, *GLog, GetWorld());
 	UE_LOG(LogTemp, Display, TEXT("UISNAPSHOT capture %s -> %s"), *StepName, *ScreenshotPath);
@@ -1072,6 +1076,64 @@ void UUISnapshotSubsystem::ShowTacticalMapMissionsForStep() const
 			MissionCard->SetForcedHover(bHover, bHover ? FrozenSweep : -1.f);
 			UE_LOG(LogTemp, Display, TEXT("UISNAPSHOT tactical map mission %d%s: %s"), CardIndex,
 			       bHover ? TEXT(" (hovered)") : TEXT(""), *MissionCard->GetShownTitle());
+		}
+	}
+}
+
+void UUISnapshotSubsystem::MouseHoverTacticalMission() const
+{
+	int32 MouseCardIndex = INDEX_NONE;
+	if (not FSlateApplication::IsInitialized()
+		|| not FParse::Value(FCommandLine::Get(), UISnapshotConstants::MouseHoverTacticalMissionSwitch, MouseCardIndex))
+	{
+		return;
+	}
+	TArray<UUserWidget*> FullMapViews;
+	UWidgetBlueprintLibrary::GetAllWidgetsOfClass(GetWorld(), FullMapViews, UW_FullMapView::StaticClass(), false);
+	for (UUserWidget* const FullMapViewWidget : FullMapViews)
+	{
+		const UW_FullMapView* const FullMapView = Cast<UW_FullMapView>(FullMapViewWidget);
+		if (not IsValid(FullMapView) || not FullMapView->IsVisible())
+		{
+			continue;
+		}
+		TArray<UW_TacticalMapMissionCard*> MissionCards;
+		FullMapView->GetShownMissionCards(MissionCards);
+		if (not MissionCards.IsValidIndex(MouseCardIndex))
+		{
+			continue;
+		}
+		const FGeometry& CardGeometry = MissionCards[MouseCardIndex]->GetCachedGeometry();
+		if (CardGeometry.GetLocalSize().X > 1.0)
+		{
+			MoveSlateCursorTo(CardGeometry.GetAbsolutePositionAtCoordinates(FVector2D(0.5, 0.5)));
+			return;
+		}
+	}
+}
+
+void UUISnapshotSubsystem::LogTacticalMapMissionHover() const
+{
+	if (not FParse::Param(FCommandLine::Get(), UISnapshotConstants::OpenFullMapSwitch))
+	{
+		return;
+	}
+	TArray<UUserWidget*> FullMapViews;
+	UWidgetBlueprintLibrary::GetAllWidgetsOfClass(GetWorld(), FullMapViews, UW_FullMapView::StaticClass(), false);
+	for (UUserWidget* const FullMapViewWidget : FullMapViews)
+	{
+		const UW_FullMapView* const FullMapView = Cast<UW_FullMapView>(FullMapViewWidget);
+		if (not IsValid(FullMapView) || not FullMapView->IsVisible())
+		{
+			continue;
+		}
+		TArray<UW_TacticalMapMissionCard*> MissionCards;
+		FullMapView->GetShownMissionCards(MissionCards);
+		for (int32 CardIndex = 0; CardIndex < MissionCards.Num(); ++CardIndex)
+		{
+			UE_LOG(LogTemp, Display, TEXT("UISNAPSHOT tactical map mission %d glass hover %.2f (mouse over: %s)"),
+			       CardIndex, MissionCards[CardIndex]->GetGlassHoverAmount(),
+			       MissionCards[CardIndex]->IsHovered() ? TEXT("yes") : TEXT("no"));
 		}
 	}
 }

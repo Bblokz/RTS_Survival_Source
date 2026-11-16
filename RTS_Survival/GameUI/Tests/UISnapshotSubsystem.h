@@ -147,6 +147,10 @@ private:
 	void ToggleFullMapForStep();
 	// -UISnapshotHoverTacticalMission=N: logs the tactical map's mission cards and hovers card N.
 	void ShowTacticalMapMissionsForStep() const;
+	// Logs every shown mission card's glass hover at capture time (proves real mouse hover lights the glass).
+	void LogTacticalMapMissionHover() const;
+	// -UISnapshotMouseHoverTacticalMission=N: keeps the Slate cursor on card N while the step settles.
+	void MouseHoverTacticalMission() const;
 	// -UISnapshotCombatPings: every player unit reports a hit (the throttled path, logged) and preview pings at
 	// different ages are spread over the map, so the minimap and tactical map show the combat ping.
 	void ShowCombatPingsForStep() const;

@@ -335,6 +335,26 @@ sizing in `MainGameUI_HUD`.
   discovered counts. `-UISnapshotMapFiltersRevealAll` also sets the console variable
   `RTS.MapObjectFilters.RevealAll 1` (non-shipping), which treats everything as discovered.
 
+## Tactical map mission panel (active missions)
+
+- **Panel:** `UW_FullMapView` builds an "ACTIVE MISSIONS" panel right of the frame (360 units wide, top aligned
+  with the frame, capped at its height; longer lists scroll). The frame reserves room for the wider of the two side
+  panels on both sides, so the map stays centred. The HUD's mission widgets are hidden while the map is open; this
+  panel lists the same missions.
+- **Data:** the in-use `UW_Mission` widgets of `UW_MissionWidgetManager::GetMissionWidgetsInUse` (so trigger-gated
+  missions without UI stay hidden), polled every 0.25 s while the map is open. Titles and descriptions come from
+  `UW_Mission::GetShownWidgetState`, so tracking titles update live.
+- **Cards:** `UW_TacticalMapMissionCard` (`GameUI/MiniMap/FullMapView`), pooled. Each card is a pane of
+  `MI_FactionButton_Glass` (M_UI_GlassPane) with its own ScratchSeed; `FGlassHoverAnimator` drives Hover,
+  HoverSweep and the rim, streak and edge tint like the commander ability rows; a cyan accent bar brightens with the
+  hover. Texts are plain rich text in the map panels' fonts with `DT_RichText` for tags (copying the HUD's proto
+  typewriter styles drew missing-glyph boxes in a capture, so the cards do not use them).
+- **Captures:** `-UISnapshotPreviewMissions` fills three free HUD mission widgets with sample missions (maps without
+  a mission manager). With `-UISnapshotOpenFullMap`, `-UISnapshotHoverTacticalMission=N` hovers card N and
+  `-UISnapshotTacticalMissionSweep=P` holds its light band at progress P; the log lists the cards.
+  `-UISnapshotMouseHoverTacticalMission=N` instead keeps the real Slate cursor on card N and logs each card's glass
+  hover and IsHovered at capture time.
+
 ## Dead space on the minimap and tactical map (`ui_minimap_material.py`)
 
 - **Where the dead space is:** where the terrain capture hit nothing (alpha 1), outside the playable area.
