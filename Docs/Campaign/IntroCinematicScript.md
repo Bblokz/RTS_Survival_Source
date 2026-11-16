@@ -783,3 +783,15 @@ re-framing, 4.1 graticule, 0.2 film-burn rework, 3.4b cloud swap, 9.4 sentry pos
   mats are thinner and sharper; the growth front is less ragged so no island of mould appears ahead of the body.
 Weak passes left as they are: scorch rings are all the same shape, the MP 40 magazines are plain blocks, 9.2 does
 not show the US map.
+
+**Purple Death, last review** (fresh reviewers on the final render). The T-34s pass in 6.1 and 6.3 (every track in
+a continuous contact shadow). Against the pre-task look (`Saved/IntroCinematic/review/sheets/section_5.jpg`, smooth
+lilac blobs and neon hoses) the committed 5.2 / 5.3 is judged clearly scarier and more detailed, only a little more
+real. Still failing an objective check: mask-cut edges and loose specks where the growth mask cuts through geometry
+that stands off the ground (3760-3810), the hero vein bundle does not taper, the helmets read as clay, the mats read as
+a smooth tarp with painted lines. A material-only pass (bumped normal, mouldy steel, ClipZ) and a geometry pass
+(vessels raised out of a denser mat grid + a baked relief mask on the mats' UVs) were both tried and judged worse than
+the committed version in A/B, so both were reverted. Lessons: an opacity-mask edge may only fall where the mesh lies
+on the ground; on a denser mat grid the blanket relax needs ~70 passes, not 3, or the sheet stands up the wall as a
+fin. The right next step is a modelled mould (sculpted folds, fibrous edges, tapered branching roots grown into the
+soil, growth by baked stages handed over on the Mould clock), not more shader tuning.
