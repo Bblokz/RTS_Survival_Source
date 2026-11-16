@@ -9,6 +9,7 @@
 
 class ACPPController;
 class ATankMaster;
+class UInfoTakeoverSubsystem;
 class UW_InfoTakeover;
 
 enum class EInfoTakeoverValidatePhase : uint8
@@ -30,8 +31,9 @@ enum class EInfoTakeoverValidatePhase : uint8
  * @brief Headless check of the vehicle info takeovers, started with -InfoTakeoverValidate (best with -game
  * -RenderOffscreen): spawns every library row's reference vehicle hidden below the map, logs the content each would
  * show, queues them all plus a very long and a very short custom one, screenshots the typing stages to
- * Saved/InfoTakeover/, ticks "never show again" on the last and checks the switch, a locked screen and the archive entries. Grep INFO_TAKEOVER. Restores the
- * player's setting and quits. Not created in shipping.
+ * Saved/InfoTakeover/, ticks "never show again" on the last unit one and checks the switch: a field manual queued
+ * behind it must still open (without the box) while a unit takeover queued after it is dropped. Then checks a locked
+ * screen and the archive entries. Grep INFO_TAKEOVER. Restores the player's setting and quits. Not created in shipping.
  */
 UCLASS()
 class RTS_SURVIVAL_API UInfoTakeoverValidateSubsystem : public UTickableWorldSubsystem
@@ -67,7 +69,10 @@ private:
 	bool bM_HasCapturedArchive = false;
 	bool bM_HasCapturedPopups = false;
 
+	// The takeovers expected to open, in order: the unit ones, then the field manual.
 	TArray<FString> M_TakeoverLabels;
+	// The unit takeovers at the front of M_TakeoverLabels; the last of them ticks "never show again".
+	int32 M_UnitTakeoverCount = 0;
 	int32 M_OpenedTakeoverCount = 0;
 	int32 M_Failures = 0;
 	bool bM_OriginalSettingValue = true;
@@ -84,6 +89,9 @@ private:
 	void LogAndQueueTakeovers();
 	void LogVehicleContent(const FName RowName, const ATankMaster& Vehicle) const;
 	void QueueCustomLayoutTakeovers(ATankMaster& Vehicle);
+	/** Queues a field manual and then one more unit takeover behind the unit ones, for the "never show again" check. */
+	void QueueBehindNeverShowAgain(UInfoTakeoverSubsystem& InfoTakeovers, ATankMaster& Vehicle);
+	void CheckFieldManualWhileTurnedOff(UInfoTakeoverSubsystem& InfoTakeovers);
 
 	void StartWatching(UW_InfoTakeover& Takeover);
 	void WatchActiveTakeover(UW_InfoTakeover& Takeover);

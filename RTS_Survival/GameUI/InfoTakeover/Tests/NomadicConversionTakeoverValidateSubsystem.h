@@ -33,7 +33,8 @@ enum class ENomadicConversionTakeoverValidatePhase : uint8
  * checks it waits, screenshots per page (conversion, then build radius after CONTINUE) the typing, eight frames of the
  * looping illustration and the finished panel, and the HUD after closing to Saved/InfoTakeover/NomadicConversion/;
  * checks that each illustration animates while the game is paused, the page lamps and PREVIOUS on the second page,
- * that On Closed fires once after UNDERSTOOD with the game unpaused and at once while the takeovers are off. Grep
+ * that On Closed fires once after UNDERSTOOD with the game unpaused and that it still opens
+ * (without the never-show box) and closes as shown while unit intel is turned off. Grep
  * NOMADIC_TAKEOVER. Restores the setting and quits.
  */
 UCLASS()
@@ -123,7 +124,7 @@ private:
 	void CaptureAnimationFrame(const UW_NomadicConversionTakeover& Takeover);
 	static float GetIllustrationSignature(const UUserWidget& Illustration);
 	void CheckIllustrationAnimated();
-	void CheckTurnedOffNode();
+	void CheckShowsWhileTurnedOff();
 
 	UFUNCTION()
 	void HandleMainClosed(bool bWasShown);
