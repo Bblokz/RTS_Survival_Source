@@ -22,8 +22,10 @@ are destroyed and the T-26 mission must complete.
 Ridge mission: the Soviet wave (2 T-34/76 + 3 BT-7, +1 T-34/76 on Hard+, +1 T-34/85 on Brutal+) must spawn on its slots
 west of the ridge gate without overlaps and drive towards the player units' centre; the faction's 7 reinforcements must
 spawn in their 800 cm square at the road crossing and drive towards the same centre; the heavy-armor line must play; no
-glider may come before the Soviet tanks die. The Soviet tanks are destroyed: the ridge mission completes, ClearSovietRig
-completes, and BaseBuilding starts (its Mammut glider appears).
+glider may come before the Soviet tanks die. The Soviet tanks are destroyed: the ridge mission completes. Since 2026-11-16
+ClearSovietRig is "Secure the line" (USecureBaseMission): its camera tour must play, no glider may come while its 7 base
+buildings stand; the test kills them through the damage path, ClearSovietRig completes and BaseBuilding starts (its
+Mammut glider appears). secure_line_headless_test.py covers that mission in detail.
 Fuel convoy (started by Mission_Intro_MoveTo when the camera takeover closes): one Zil fuel truck + one Mosin squad
 marching behind it must spawn at the left map edge on the two-track path, cross the main road and drive on up the hill.
 The run waits for the convoy after the missions end and logs when it crossed the road (seconds after the takeover).
@@ -53,6 +55,13 @@ TWO_TRACK = [(-5780, -24760), (-5780, -23261), (-5780, -21762), (-5780, -20260),
              (-640, 790)]
 ROAD_CROSSING = unreal.Vector(-15389, -1355, 175)
 CONVOY_TRUCK = 'Rus_ArmoredCar_ZilFuel_C'
+# Mission_Intro_ClearSovietRig ("Secure the line", 2026-11-16) brings its own Zil fuel truck to the base's rear wall
+# (x > 3000); the convoy never gets east of its hilltop exit (-640, 790).
+BASE_REAR_MIN_X = 2500.0
+
+
+def convoy_trucks(world):
+    return [t for t in actors_of(world, CONVOY_TRUCK) if t.get_actor_location().x < BASE_REAR_MIN_X]
 S = {'phase': 'wait_load', 't': 0.0, 'mark': 0.0, 'log': [], 'checks': {}, 'samples': {}}
 
 
@@ -96,7 +105,7 @@ def watch_convoy(world):
     if convoys and 'convoy_seen' not in S:
         S['convoy_seen'] = since
         log(f'convoy actor seen {since:.1f} s after the camera takeover closed')
-    trucks = actors_of(world, CONVOY_TRUCK)
+    trucks = convoy_trucks(world)
     if trucks and 'convoy_truck' not in S:
         S['convoy_truck'] = trucks[0].get_name()
         S['convoy_truck_first'] = loc(trucks[0])
@@ -152,7 +161,7 @@ def convoy_checks(world):
     check('convoy_crossed_road', 'convoy_crossed' in S, f"{S.get('convoy_crossed')} s after the camera takeover")
     last = S.get('convoy_truck_last')
     far = last is not None and route_distance(unreal.Vector(*last[1]))[0] > 40000
-    gone = 'convoy_crossed' in S and not actors_of(world, CONVOY_TRUCK)
+    gone = 'convoy_crossed' in S and not convoy_trucks(world)
     check('convoy_climbed_hill', far or gone, f'last truck sample {last} gone={gone}')
     # AConvoy despawns its units once the trucks are within ExitRadius of the route end (the hilltop).
     check('convoy_left_at_exit', gone, f'truck gone={gone}, last sample {last}')
@@ -1003,8 +1012,45 @@ def tick(delta):
         elif phase == 'wait_ridge_end' and elapsed > 6.0:
             world = game_world()
             check('ridge_mission_completed', mission_complete(world, 'Mission_Intro_RidgeArmor_C') is True)
-            check('clear_rig_completed', mission_complete(world, 'Mission_Intro_ClearSovietRig_C') is True)
-            S['phase'], S['mark'] = 'wait_base_start', S['t']
+            # Since 2026-11-16 ClearSovietRig is "Secure the line": a camera tour over the Soviet base, then the
+            # player must destroy its 7 buildings before BaseBuilding (and its glider) may start.
+            check('secure_line_running_after_ridge',
+                  mission_complete(world, 'Mission_Intro_ClearSovietRig_C') is False and 'glider_seen' not in S,
+                  f"clear complete={mission_complete(world, 'Mission_Intro_ClearSovietRig_C')}, "
+                  f"glider {S.get('glider_seen')}")
+            S['phase'], S['mark'] = 'secure_tour', S['t']
+        elif phase == 'secure_tour':
+            world = game_world()
+            gliders_seen(world)
+            secure = mission_object(world, 'Mission_Intro_ClearSovietRig_C')
+            if secure is not None and secure.call_method('GetHasTourFinished'):
+                check('secure_line_tour_played', True, f'{round(elapsed, 1)} s after the ridge ended')
+                check('secure_line_targets', secure.call_method('GetTargetCount') == 7,
+                      f"{secure.call_method('GetTargetCount')} targets")
+                S['phase'], S['mark'] = 'secure_hold', S['t']
+            elif elapsed > 120.0:
+                check('secure_line_tour_played', False, 'no finished tour 120 s after the ridge ended')
+                S['phase'], S['mark'] = 'secure_hold', S['t']
+        elif phase == 'secure_hold' and elapsed > 12.0:
+            world = game_world()
+            gliders_seen(world)
+            check('no_glider_while_base_stands', 'glider_seen' not in S
+                  and mission_complete(world, 'Mission_Intro_ClearSovietRig_C') is False,
+                  f"glider {S.get('glider_seen')}")
+            secure = mission_object(world, 'Mission_Intro_ClearSovietRig_C')
+            targets = (secure.call_method('GetLivingTargets') or []) if secure is not None else []
+            for target in targets:
+                unreal.GameplayStatics.apply_damage(target, 1.0e7, None, None, unreal.DamageType)
+            log(f'damaged {len(targets)} Soviet base targets to death')
+            S['ridge_killed'] = S['t']
+            S['phase'], S['mark'] = 'secure_end', S['t']
+        elif phase == 'secure_end':
+            world = game_world()
+            note_completions(world)
+            if mission_complete(world, 'Mission_Intro_ClearSovietRig_C') is True or elapsed > 20.0:
+                check('clear_rig_completed', mission_complete(world, 'Mission_Intro_ClearSovietRig_C') is True,
+                      f'{round(elapsed, 1)} s after the targets died')
+                S['phase'], S['mark'] = 'wait_base_start', S['t']
         elif phase == 'wait_base_start':
             # Mission_Intro_BaseBuilding starts once ClearSovietRig completes: it calls the HQ in by Mammut glider.
             world = game_world()
@@ -1029,7 +1075,7 @@ def tick(delta):
                 log(f'closing {later[0].get_class().get_name()} (press {S["base_takeover_presses"]})')
                 later[0].call_method('HandleUnderstoodClicked')
             last = S.get('convoy_truck_last')
-            gone = 'convoy_crossed' in S and not actors_of(world, CONVOY_TRUCK)
+            gone = 'convoy_crossed' in S and not convoy_trucks(world)
             if gone or S['t'] - S.get('camera_closed', S['t']) > 330.0:
                 convoy_checks(world)
                 reinforcement_arrival_check(world)

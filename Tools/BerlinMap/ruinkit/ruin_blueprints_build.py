@@ -635,6 +635,12 @@ def run(only=None):
         except Exception as error:  # noqa: BLE001 - report every piece, keep going
             report['blueprints'][suffix] = {'error': repr(error)}
             log(f'{suffix}: ERROR {error!r}')
+    # The wall pieces (B1-B6) carry tank breaches and field holes (Tools/WallChunks/Breach/berlin_ruin_breach_setup.py);
+    # the build above resets their hole component, so the breach setup runs again after it.
+    breach_setup = {'__name__': 'berlin_breach_library'}
+    exec(open('D:/UE5Projects/RTS_Survival/Source/Tools/WallChunks/Breach/berlin_ruin_breach_setup.py').read(),
+         breach_setup)
+    breach_setup['configure_ruin_walls'](only)
     with open(REPORT, 'w') as handle:
         json.dump(report, handle, indent=1)
     log(f'done: {len(report["blueprints"])} blueprints, report {REPORT}')

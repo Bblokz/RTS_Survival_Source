@@ -140,8 +140,9 @@ def build_vein_stages():
         k = np.linspace(0.0, 1.0, len(Q))
         rr = np.interp(k, np.linspace(0.0, 1.0, len(rad)), rad)
         cum = np.concatenate([[0.0], np.cumsum(np.linalg.norm(np.diff(Q, axis=0), axis=1))])
-        # every vessel ends in a fine point: only its last 18 cm taper (the whole length thinned the capillaries away)
-        rr = rr * (0.12 + 0.88 * np.clip((cum[-1] - cum) / 0.18, 0.0, 1.0) ** 0.7)
+        # every vessel ends in a needle point: only its last 22 cm taper (the whole length thinned the capillaries away);
+        # a tip left at a tenth of the radius closed with a flat cap that read as a sliced-off end under the glow
+        rr = rr * (0.02 + 0.98 * np.clip((cum[-1] - cum) / 0.22, 0.0, 1.0) ** 0.8)
         paths.append((Q, rr, start, cum, max(rad)))
         longest = max(longest, start + cum[-1])
     out = []
@@ -156,8 +157,8 @@ def build_vein_stages():
             r = rr[:n].copy()
             if n < len(Q):                                     # cut by this stage: taper to a point at the cut
                 left = reach - (start + cum[:n])
-                tip = np.clip(left / 0.15, 0.0, 1.0) ** 0.7
-                r = r * (0.1 + 0.9 * tip)
+                tip = np.clip(left / 0.2, 0.0, 1.0) ** 0.8
+                r = r * (0.03 + 0.97 * tip)
             tube(acc, [tuple(p) for p in Q[:n]], list(r), 7 if rmax > 0.009 else 5, 'Mould', uscale=1.0, vspan=1.0,
                  u0=start)
         out.append(acc.build(origin=(ROOT[0], ROOT[1], float(Hm(*ROOT))), smooth_angle=80.0))
@@ -223,7 +224,11 @@ def build_pustule_stages():
 def main():
     C.setup_scene()
     C.make_material('Mould', 'T_Intro_Mould')
-    obs = build_mat_stages() + build_vein_stages() + build_pustule_stages()
+    # optional: -- veins | mats | pustules (rebuild one kind only)
+    only = sys.argv[sys.argv.index('--') + 1:] if '--' in sys.argv else []
+    obs = ((build_mat_stages() if not only or 'mats' in only else []) +
+           (build_vein_stages() if not only or 'veins' in only else []) +
+           (build_pustule_stages() if not only or 'pustules' in only else []))
     for ob in obs:
         st = C.ob_stats(ob)
         C.export_fbx(ob)
