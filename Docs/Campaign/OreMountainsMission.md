@@ -316,9 +316,29 @@ no Radixite origin, no cryo, no reason for Berlin).
 | ConvoyRoad | ambush corridor below the ridge | (-2814, 1842) | 20 m | nobody has lived on that ridge for thirty years (irony) |
 | PeatBog | smouldering peat bog (west) | (-2211, -24120) | 18 m | the bog has burned for thirty years |
 
-Triggers placed and play-tested 2026-11-16 (`ore_intercept_trigger_test.py`, 19/19), still without lines. Three takes
-per spot are in `VoiceLines/VoiceChanger/Output/OreInterceptAudition` for the owner to pick; then
-`ore_clues.build_intercepts({spot: SoundWave})` sets them. **(open)** the picks.
+Lines picked by the owner on 2026-11-16 (from three takes per spot in
+`VoiceLines/VoiceChanger/Output/OreInterceptAudition`) and set on the map. All are SoundWaves
+`OreMountains_Intercept_<Spot>` in `.../AAAGerMissions/OreMountains`, with subtitles in `DT_CinematicTranscripts`:
+
+| Spot | English subtitle |
+|---|---|
+| Checkpoint | "Overweight again! Who loaded this, a blind man? Take off two crates, or you're not going any further." |
+| Checkpoint, 2nd line (`_B`) | "Weighbridge here. Convoy's through, all twelve weighed. Putting the kettle on." |
+| BaseA | "Yard here, over. Third convoy is loaded, waiting on the drivers. Where have they wandered off to now?" |
+| BaseA, 2nd line (`_B`) | "Shells in the lead trucks, fuel at the back! How many times do I have to say it?" |
+| BaseB | "I sit over an old mine shaft and watch the road. I've got a gun, and nobody to shoot." |
+| Battery | "The shell trucks are on their way! Once we unload, we'll blanket the whole ridge." |
+| Viaduct | "Old autobahn bridge, half of it gone. The convoy waits until every truck squeezes through." |
+| SurveyPost | "The Forge takes samples, Shield stands guard. The cases are stamped "Berlin". We're not supposed to know more." |
+| AmmoRoute | "Third run this week. Without us the battery is helpless, and nobody ever says thanks." |
+| ConvoyRoad | "Convoy, over. Ridge is clear, forest is dead, not a soul up there. Same as always." |
+| PeatBog | "The peat burns underground, where you can't see it. Step wrong and you fall through. I hate this post." |
+
+Checkpoint and BaseA each have a second trigger (`ORE_Intercept_<Spot>_2`) at the same centre with half the radius.
+Its line plays when the player pushes into the site, and the portrait manager queues it if the first line is still
+playing. The picks are in `ore_clues.INTERCEPT_PICKS`. To rebuild, run
+`ore_clues.build_intercepts(ore_clues.INTERCEPT_PICKS)`. Play test `ore_intercept_trigger_test.py`: 34/34 pass. The
+UI shots show the Rifleman portrait with the English subtitle; the test presses the map's "Press To Start" first.
 
 ## Mission structure
 

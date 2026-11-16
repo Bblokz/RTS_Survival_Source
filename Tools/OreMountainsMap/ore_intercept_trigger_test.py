@@ -40,6 +40,16 @@ def _defer():
         unreal.GameplayStatics.set_game_paused(gw, False)
     now = unreal.GameplayStatics.get_time_seconds(gw)
     if _s["stage"] == "boot":
+        if not _s.get("started"):
+            # the map boots behind the "Press To Start" widget, which hides the portrait in the UI shots: press it
+            start_cls = unreal.load_class(None, "/Script/RTS_Survival.W_StartGameWidget")
+            for w in unreal.WidgetLibrary.get_all_widgets_of_class(gw, start_cls, False):
+                try:
+                    w.call_method("OnStartGameButtonClicked")
+                    _s["started"] = True
+                    print("pressed start on", w.get_name())
+                except Exception as error:
+                    print("start press failed:", error)
         if now < 10.0:
             return False
         mine = [a for a in unreal.GameplayStatics.get_all_actors_of_class(gw, AREA)
