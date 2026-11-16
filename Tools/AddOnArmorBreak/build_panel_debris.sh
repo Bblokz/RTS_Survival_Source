@@ -20,11 +20,36 @@ declare -A PANEL_ARGS=(
   [SM_PantherII_Strike_Hull_AddOnPanels]="Panel=2"
   [SM_T-34E_Hull_AddOnPanels]="Panel=2"
   [SM_T-34E_Hull_Soviet_AddOnPanels]="Panel=2"
+  [SM_T34_76_Forge_Hull_AddOnPanels]="Panel=2"
+  [SM_T34_85_Forge_Hull_AddOnPanels]="Panel=1"
+  [SM_T34_100_Forge_Hull_AddOnPanels]="Panel=2"
+  [SM_T34_AA_Forge_Hull_AddOnPanels]="Panel=1"
+  [SM_IS2_Soviet_Armor_R_05_AddOnPanels]="Panel=2"
+  [SM_KV1_Forge_Hull_AddOnPanels]="Panel=2"
+  [SM_BT7_Forge_Hull_AddOnPanels]="Panel=1"
+  [SM_KV1Arc_Forge_Hull_AddOnPanels]="Panel=1"
+  [SM_T70_Forge_Hull_AddOnPanels]="Panel=1"
+  [SM_BT74_Forge_Hull_AddOnPanels]="Panel=1"
+  [SM_GAZMM_Forge_Hull_AddOnPanels]="Panel=2"
+  [SM_IS6_Forge_Hull_AddOnPanels]="Panel=2"
+  [SM_BM13_Forge_Hull_AddOnPanels]="Panel=1"
 )
 # End plates shaped unlike the shared panel: each is cut out as its own debris mesh (-OwnPanel, any side).
 declare -A OWN_PANELS=(
   [SM_T-34E_Hull_AddOnPanels]="0 5 6 11"
   [SM_T-34E_Hull_Soviet_AddOnPanels]="0 5 6 11"
+  [SM_T34_76_Forge_Hull_AddOnPanels]="0 4 5 9"
+  [SM_T34_85_Forge_Hull_AddOnPanels]="0 3 4 7"
+  [SM_T34_100_Forge_Hull_AddOnPanels]="0 5 6 11"
+  [SM_T34_AA_Forge_Hull_AddOnPanels]="0 2 3 5"
+  [SM_IS2_Soviet_Armor_R_05_AddOnPanels]="0 5 6 11"
+  [SM_KV1_Forge_Hull_AddOnPanels]="0 4 5 9"
+  [SM_BT7_Forge_Hull_AddOnPanels]="0 3 4 7"
+  [SM_KV1Arc_Forge_Hull_AddOnPanels]="0 3 4 7"
+  [SM_BT74_Forge_Hull_AddOnPanels]="0 1 2 3 4 5"
+  [SM_GAZMM_Forge_Hull_AddOnPanels]="0 1 2 3 4 5 6 7 8 9"
+  [SM_IS6_Forge_Hull_AddOnPanels]="0 4 5 9"
+  [SM_BM13_Forge_Hull_AddOnPanels]="0 3 4 7"
 )
 
 COMMANDS=()

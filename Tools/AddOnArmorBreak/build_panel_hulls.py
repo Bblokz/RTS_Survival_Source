@@ -67,6 +67,49 @@ HULLS = {
         ['Rus_Vehicle_Su85_Soviet'], SU_SKIRT_ARGS),
     'Rus_Medium/Su100/Meshes/SM_SU100_Soviet_SpacedArmor_Hull': (
         ['Rus_Vehicle_Su100_Soviet'], SU_SKIRT_ARGS),
+    # Director of Forge T-34s (2026-11-16): one Blender kit per vehicle (_HullVariants/T34_*_Forge) appended to
+    # SM_T34_Hull by GeometryScript (_HullVariants/ForgeSkirts/install_forge_skirts.py). Hangers, standoffs, rails and
+    # the AA lattice stay inboard of MinAbsY (or are longer than MaxIslandLength) and stay hull. Debris: see
+    # build_panel_debris.sh (shared middle plate + own end plates).
+    # Forge IS-2 (Rus_Vehicle_IS-2_Soviet): the 6 existing bolt-on plates per side of its separate `Armor` mesh
+    # (component on TrackMesh, like the IS-1/IS-2 Harvest) become panels; the hull stays stock. Target name differs
+    # from <source>_AddOnPanels, so rebuild it with Target= by hand:
+    # BuildPanelHull Source=.../Meshes/SM_IS_1_Armor_R_05 Target=.../IS2_Forge/SM_IS2_Soviet_Armor_R_05_AddOnPanels
+    # 'MinAbsY=100 MinZ=0 MaxZ=200 MinPanelArea=3000 MaxIslandLength=250'
+    'Rus_Medium/T34/ForgeSkirts/SM_T34_76_Forge_Hull': (
+        ['Rus_Vehicle_T3476_Soviet'], 'MinAbsY=155.2 MinZ=40 MaxZ=112 MinPanelArea=5000 MaxIslandLength=115'),
+    'Rus_Medium/T34/ForgeSkirts/SM_T34_85_Forge_Hull': (
+        ['Rus_Vehicle_T3485_Soviet'], 'MinAbsY=155.7 MinZ=30 MaxZ=135 MinPanelArea=5000 MaxIslandLength=125'),
+    'Rus_Medium/T34/ForgeSkirts/SM_T34_100_Forge_Hull': (
+        ['Rus_Vehicle_T34100_Soviet'], 'MinAbsY=153.5 MinZ=45 MaxZ=130 MinPanelArea=4000 MaxIslandLength=120'),
+    'Rus_Medium/T34/ForgeSkirts/SM_T34_AA_Forge_Hull': (
+        ['Rus_Vehicle_T34AA_Soviet'], 'MinAbsY=155.2 MinZ=45 MaxZ=140 MinPanelArea=5000 MaxIslandLength=185'),
+    'Rus_Light/BT-7/ForgeSkirts/SM_BT7_Forge_Hull': (
+        ['Rus_Vehicle_BT-7_Soviet'], 'MinAbsY=118.8 MinZ=65 MaxZ=130 MinPanelArea=4000 MaxIslandLength=100'),
+    'Rus_Light/BT-7/ForgeSkirts/SM_BT74_Forge_Hull': (
+        ['Rus_Vehicle_BT-7-4_Soviet'], 'MinAbsY=118.8 MinZ=55 MaxZ=125 MinPanelArea=4000 MaxIslandLength=135'),
+    # BM-13 Forge: 3 bed plates + 1 door plate per side, band z 97..166 above the launcher crank. The stock BM-13 has no
+    # ArmorCalculation; the Forge BP adds one plus a SetupArmor function (unit boxes, front 8 / sides + rear 5).
+    'Rus_ArmoredCar/BM13/ForgeArmor/SM_BM13_Forge_Hull': (
+        ['Rus_ArmoredCar_BM13_Forge'], 'MinAbsY=113.5 MinZ=97 MaxZ=166 MinPanelArea=2000 MaxIslandLength=100'),
+    # IS-6: Rus_Vehicle_IS6 is the Forge-camo variant (Director of Forge override); its child Rus_Vehicle_IS6_Green
+    # (the base unit) restores SM_IS6_Hull and destroys the inherited AddOnArmorPanels in its construction script.
+    'Rus_Heavy/IS6/ForgeSkirts/SM_IS6_Forge_Hull': (
+        ['Rus_Vehicle_IS6'], 'MinAbsY=179.5 MinZ=25 MaxZ=160 MinPanelArea=8000 MaxIslandLength=135'),
+    # GAZ-MM 72-K Forge truck: 5 splinter plates per side (bed rear/mid/front, rear-wheel skirt, cab door). The kit's
+    # camo is sampled on UV channel 1 (like the stock hull); lightmap generation stays off. The Forge BP overrides
+    # SetupArmor with unit-scale side boxes (_HullVariants/ForgeSkirts/make_gazmm_forge_setup_armor.py).
+    'Rus_ArmoredCar/GAZMM_72K/ForgeArmor/SM_GAZMM_Forge_Hull': (
+        ['Rus_ArmoredCar_GAZMM72K_Forge'], 'MinAbsY=103.5 MinZ=30 MaxZ=165 MinPanelArea=4000 MaxIslandLength=120'),
+    # T-70: the Hull component is scaled (1, 0.8, 1); args are in mesh space. Kit on slot 0 (frame camo).
+    'Rus_Light/T70/ForgeSkirts/SM_T70_Forge_Hull': (
+        ['Rus_Vehicle_T-70_Soviet'], 'MinAbsY=140.2 MinZ=-10 MaxZ=80 MinPanelArea=3000 MaxIslandLength=100'),
+    # KV-1 Arc (KV-1E hull): slot 1 carries the paint (5,900 of 5,931 tris), so the kit is baked into slot 1;
+    # the source hull's slots already hold the Forge materials (MI_KV_1_Soviet, M_KV-1E_Hull_Soviet).
+    'Rus_Heavy/KV1Arc/ForgeSkirts/SM_KV1Arc_Forge_Hull': (
+        ['Rus_Vehicle_KV-1Arc_Soviet'], 'MinAbsY=176.5 MinZ=55 MaxZ=160 MinPanelArea=8000 MaxIslandLength=150'),
+    'Rus_Heavy/KV1/ForgeSkirts/SM_KV1_Forge_Hull': (
+        ['Rus_Vehicle_KV-1_L11_Soviet'], 'MinAbsY=174 MinZ=44 MaxZ=148 MinPanelArea=8000 MaxIslandLength=140'),
     # Soviet BA-11 / BA-14 (shared hull): two fender skirts over the rear wheels (|Y| 121.5) and one belly plate
     # (|Y| 100) per side. MinAbsY 99 keeps the spare wheels (|Y| from 86.2), the fender L-brackets and the belly
     # standoffs (both reach in past |Y| 99) on the hull. Debris = panel 1, the left front skirt.

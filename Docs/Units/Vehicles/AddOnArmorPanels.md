@@ -374,6 +374,24 @@ side at the five rivet seams (x -192, -121, -48, 25, 96), where the mesh already
 - **Not changed:** the wreck and `SM_TrainingPreview_T34E` still show the skirts. The old `SM_T-34E_Hull` is no longer
   used by a Blueprint.
 
+## Director of Forge units (all 21 converted, 2026-11-16)
+
+Every unit in `DA_Directoriate_UnitOverrides` -> `M_DirectorOfForgeOverrides` now has shoot-off panels. The 13 added on
+2026-11-16 each got a Blender kit (`Content/RTS_Survival/Blueprints/_HullVariants/<Unit>_Forge/`). Each kit is
+appended to a copy of the stock hull, then `BuildPanelHull` and `ExtractPanelDebris` are run, then
+`ConvertBlueprint HullComponent=Hull` with the default 15 zones. The table, special cases and the Unreal recipe are in
+`_HullVariants/ForgeSkirts/README.md`. Special cases:
+- The FieldKit T-34/76 and the green IS-6 inherit from a converted Forge BP. They keep their own hull and destroy the
+  inherited `AddOnArmorPanels` in their UCS.
+- IS-2: the Forge override now points at `Rus_Vehicle_IS-2_Soviet`. Its existing `SM_IS_1_Armor_R_05` plates became
+  panels on the `Armor` component. Its `SetupArmor` override uses the IS-1 Soviet fitted side boxes.
+- KV-1 Arc (KV-1E hull): slot 1 carries the paint, so the kit is baked into slot 1.
+- GAZ-MM 72-K: the legacy side boxes are only ~1.3 cm thick (scale 0.2 squared). The Forge child overrides
+  `SetupArmor` with unit-scale side boxes, as on the BA-11.
+- BM-13: the stock BM-13 has no ArmorCalculation. The Forge child adds one and a `SetupArmor` function, called after
+  the parent BeginPlay.
+- Not run in PIE or the validator.
+
 ## Prepared vehicles
 
 Hulls built by `Tools/AddOnArmorBreak/build_panel_hulls.py`: `<hull>_AddOnPanels` next to each source mesh. Only the
