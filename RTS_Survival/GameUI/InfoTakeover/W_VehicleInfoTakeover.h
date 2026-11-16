@@ -30,6 +30,9 @@ public:
 	/** Builds the squad body for Content; call before OpenTakeover. */
 	void SetupSquad(const FSquadInfoTakeoverContent& Content);
 
+	// Unit intel: the player may switch these off.
+	virtual bool GetOffersNeverShowAgain() const override { return true; }
+
 private:
 	// What the body shows; for a squad only the parts both kinds share (name, text, picture, weapons) are filled.
 	UPROPERTY()

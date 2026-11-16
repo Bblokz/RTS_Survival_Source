@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "InfoTakeoverStyle.h"
 #include "InfoTakeoverTypes.h"
+#include "RTS_Survival/GameUI/IndicatorLamps/PanelSignalLamp.h"
 #include "RTS_Survival/GameUI/TutorialOvertakeWidget/W_TutorialOvertake.h"
 
 #include "W_InfoTakeover.generated.h"
@@ -16,6 +17,7 @@ class UCheckBox;
 class UHorizontalBox;
 class UImage;
 class UMaterialInstanceDynamic;
+class UMaterialInterface;
 class UPauseSafeProtoRichTextBlock;
 class UTextBlock;
 class UVerticalBox;
@@ -86,9 +88,10 @@ struct FInfoTakeoverGlassElement
 };
 
 /**
- * @brief Base of the info takeovers (vehicles now, buildings and squads later): a paused, full-screen panel whose
- * title and description type in with the mission text sounds, with "never show these info widgets again" and
- * Understood. UInfoTakeoverSubsystem creates, queues and opens them; subclasses fill the body.
+ * @brief Base of the info takeovers (unit intel and game-mechanic field manuals): a paused, full-screen panel whose
+ * title and description type in with the mission text sounds, with Understood and, on unit intel only (see
+ * GetOffersNeverShowAgain), "never show these info widgets again". UInfoTakeoverSubsystem creates, queues and opens
+ * them; subclasses fill the body.
  * @note Fill M_Style in the Blueprint child's class defaults (UISkins: the variant selection skin).
  */
 UCLASS(Abstract)
@@ -106,8 +109,14 @@ public:
 
 	EInfoTakeoverTypingPhase GetTypingPhase() const { return M_TypingPhase; }
 
-	// For tests and tools: the same as the player ticking the box.
+	// For tests and tools: the same as the player ticking the box; does nothing on takeovers without the box.
 	void SetNeverShowAgainChecked(const bool bIsChecked) const;
+
+	/**
+	 * @return True for unit intel (vehicles, squads), which shows "never show these info widgets again". Game-mechanic
+	 * field manuals keep the default false: no box, and closing them never touches the setting.
+	 */
+	virtual bool GetOffersNeverShowAgain() const { return false; }
 
 	// For tests and tools: the same as the player clicking the footer button (next page, or close on the last page).
 	void PressConfirmButton();
@@ -130,6 +139,20 @@ public:
 
 	/** @return The index of the one lit page lamp; INDEX_NONE when none or more than one is lit. */
 	int32 GetLitPageLampIndex() const;
+
+	/** @return True when the page lamps draw the signal lamp material with halos (not the flat fallback brushes). */
+	bool GetHasPageLampHalos() const;
+
+	/**
+	 * @brief For tests: where the page lamp row and the lit lamp's halo sit, in units of the panel plate.
+	 * @param OutRowRect Lamp row: left, top, width, height from the plate's top left.
+	 * @param OutLitLampCentre Centre of the lit lamp in the same units; (-1, -1) when none is lit.
+	 * @return False before the first layout pass.
+	 */
+	bool GetPageLampLayout(FBox2D& OutRowRect, FVector2D& OutLitLampCentre) const;
+
+	/** @return 0 dark .. 1 fully lit; -1 for an invalid index. */
+	float GetPageLampPower(const int32 LampIndex) const;
 
 	int32 GetGlassElementCount() const { return M_GlassElements.Num(); }
 
@@ -228,12 +251,25 @@ private:
 	UPROPERTY()
 	TObjectPtr<UWidget> M_PreviousButtonBox;
 
+	// The panel plate; tests measure the page lamps against it.
+	UPROPERTY()
+	TObjectPtr<UBorder> M_Plate;
+
 	// Top right of the title placard; one lamp per page.
 	UPROPERTY()
 	TObjectPtr<UHorizontalBox> M_PageLampRow;
 
+	// Same layout as M_PageLampRow, drawn under it: each lamp's halo, so a halo lights its neighbours' bezels evenly
+	// instead of depending on which lamp draws first.
 	UPROPERTY()
-	TArray<TObjectPtr<UImage>> M_PageLamps;
+	TObjectPtr<UHorizontalBox> M_PageLampHaloRow;
+
+	UPROPERTY()
+	TArray<FPanelSignalLamp> M_PageLamps;
+
+	// Loaded once from UIndicatorLampSettings::PageLampMaterial; null keeps the style's flat lamp brushes.
+	UPROPERTY()
+	TObjectPtr<UMaterialInterface> M_PageLampMaterial;
 
 	UPROPERTY()
 	TArray<FInfoTakeoverGlassElement> M_GlassElements;
@@ -283,6 +319,8 @@ private:
 	bool TryShowPreviousPage();
 	UWidget* BuildPageLampRow();
 	void RebuildPageLamps(const int32 LampCount);
+	void AddPageLamp(const int32 LampIndex);
+	void TickPageLamps(const float DeltaSeconds);
 
 	/** Gives a footer button the glass hover on its own dynamic instances of its n / h / p materials. */
 	void RegisterGlassButton(UButton& Button, const FName ElementName);

@@ -7,6 +7,10 @@
 #include "Components/Image.h"
 #include "Components/Overlay.h"
 #include "Components/OverlaySlot.h"
+#include "Components/HorizontalBox.h"
+#include "Components/HorizontalBoxSlot.h"
+#include "Components/ScrollBox.h"
+#include "Components/ScrollBoxSlot.h"
 #include "Components/SizeBox.h"
 #include "Components/TextBlock.h"
 #include "Components/VerticalBox.h"
@@ -22,9 +26,12 @@
 #include "RTS_Survival/GameUI/MainGameUI.h"
 #include "RTS_Survival/GameUI/GlassButtons/W_GlassIconButton.h"
 #include "RTS_Survival/GameUI/MiniMap/W_MiniMap.h"
+#include "RTS_Survival/GameUI/MiniMap/FullMapView/W_TacticalMapMissionCard.h"
 #include "RTS_Survival/GameUI/MiniMap/MapObjectFilters/RTSMapObjectFilterSettings.h"
 #include "RTS_Survival/GameUI/MiniMap/MapObjectFilters/RTSMapObjectFilterSubsystem.h"
 #include "RTS_Survival/GameUI/MiniMap/MapObjectFilters/W_MapObjectFilterToggle.h"
+#include "RTS_Survival/Missions/MissionWidgets/W_Mission.h"
+#include "RTS_Survival/Missions/MissionWidgets/MissionWidgetManager/W_MissionWidgetManager.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 
 namespace FullMapViewConstants
@@ -76,6 +83,13 @@ namespace FullMapViewConstants
 	constexpr int32 FilterTitleFontSize = 13;
 	constexpr int32 FilterTitleLetterSpacing = 220;
 
+	// Mission panel right of the frame, top aligned with it; wider than the filters for the mission descriptions.
+	constexpr float MissionPanelWidth = 360.0f;
+	constexpr float MissionCardGap = 10.0f;
+	constexpr float MissionListTopGap = 12.0f;
+	constexpr float MissionScrollBarThickness = 4.0f;
+	constexpr float MissionRefreshSeconds = 0.25f;
+
 	const FName CameraFrameTopParameter(TEXT("P1P2"));
 	const FName CameraFrameBottomParameter(TEXT("P3P4"));
 	const FName ActiveVisionParameter(TEXT("Active"));
@@ -98,6 +112,7 @@ void UW_FullMapView::InitFullMapView(UW_MiniMap* SmallMiniMap, UMainGameUI* Owni
 	MirrorCameraFrame();
 	SetIsTacticalMapOpenForFilters(true);
 	RefreshFilterToggles();
+	RefreshMissionPanel();
 }
 
 void UW_FullMapView::OnFullMapViewClosed() const
@@ -117,6 +132,7 @@ void UW_FullMapView::NativeTick(const FGeometry& MyGeometry, const float InDelta
 	FitFrameToViewport(MyGeometry.GetLocalSize());
 	// The camera pawn only updates the minimap's frustum; the large map follows it.
 	MirrorCameraFrame();
+	TickMissionPanel(InDeltaTime);
 }
 
 FReply UW_FullMapView::NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
@@ -151,6 +167,7 @@ void UW_FullMapView::BuildWidgetTree()
 	BuildBackdrop(*RootOverlay);
 	BuildFrame(*RootOverlay);
 	BuildFilterPanel(*RootOverlay);
+	BuildMissionPanel(*RootOverlay);
 }
 
 void UW_FullMapView::BuildBackdrop(UOverlay& RootOverlay)
@@ -221,27 +238,15 @@ void UW_FullMapView::BuildFilterPanel(UOverlay& RootOverlay)
 	PanelSlot->SetHorizontalAlignment(HAlign_Left);
 	PanelSlot->SetVerticalAlignment(VAlign_Center);
 
-	UBorder* const PanelBorder = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass(), TEXT("FilterPanel"));
-	FSlateRoundedBoxBrush PanelBrush(FilterPanelFill, FilterPanelCornerRadius);
-	PanelBrush.OutlineSettings.Color = FilterPanelOutline;
-	PanelBrush.OutlineSettings.Width = FilterPanelOutlineWidth;
-	PanelBorder->SetBrush(PanelBrush);
-	PanelBorder->SetPadding(FMargin(FilterPanelPadding));
+	UBorder* const PanelBorder = CreatePanelBorder(TEXT("FilterPanel"));
 	PanelSizeBox->SetContent(PanelBorder);
 
 	UVerticalBox* const PanelBox = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass(),
 	                                                                         TEXT("FilterPanelBox"));
 	PanelBorder->SetContent(PanelBox);
 
-	UTextBlock* const TitleText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(),
-	                                                                      TEXT("FilterTitle"));
-	FSlateFontInfo TitleFont = FCoreStyle::GetDefaultFontStyle(TEXT("Bold"), FilterTitleFontSize,
-	                                                           FFontOutlineSettings(TextOutlineSize));
-	TitleFont.LetterSpacing = FilterTitleLetterSpacing;
-	TitleText->SetFont(TitleFont);
-	TitleText->SetColorAndOpacity(FSlateColor(GridLabelColor));
-	TitleText->SetText(NSLOCTEXT("FullMapView", "FilterTitle", "MAP FILTERS"));
-	PanelBox->AddChildToVerticalBox(TitleText);
+	PanelBox->AddChildToVerticalBox(CreatePanelTitle(TEXT("FilterTitle"),
+	                                                 NSLOCTEXT("FullMapView", "FilterTitle", "MAP FILTERS")));
 
 	UTextBlock* const SubtitleText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(),
 	                                                                         TEXT("FilterSubtitle"));
@@ -253,6 +258,172 @@ void UW_FullMapView::BuildFilterPanel(UOverlay& RootOverlay)
 	SubtitleSlot->SetPadding(FMargin(0.0f, FilterSubtitleGap, 0.0f, 0.0f));
 
 	AddFilterToggles(*PanelBox);
+}
+
+UBorder* UW_FullMapView::CreatePanelBorder(const FName Name) const
+{
+	using namespace FullMapViewConstants;
+	UBorder* const PanelBorder = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass(), Name);
+	FSlateRoundedBoxBrush PanelBrush(FilterPanelFill, FilterPanelCornerRadius);
+	PanelBrush.OutlineSettings.Color = FilterPanelOutline;
+	PanelBrush.OutlineSettings.Width = FilterPanelOutlineWidth;
+	PanelBorder->SetBrush(PanelBrush);
+	PanelBorder->SetPadding(FMargin(FilterPanelPadding));
+	return PanelBorder;
+}
+
+UTextBlock* UW_FullMapView::CreatePanelTitle(const FName Name, const FText& Title) const
+{
+	using namespace FullMapViewConstants;
+	UTextBlock* const TitleText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), Name);
+	FSlateFontInfo TitleFont = FCoreStyle::GetDefaultFontStyle(TEXT("Bold"), FilterTitleFontSize,
+	                                                           FFontOutlineSettings(TextOutlineSize));
+	TitleFont.LetterSpacing = FilterTitleLetterSpacing;
+	TitleText->SetFont(TitleFont);
+	TitleText->SetColorAndOpacity(FSlateColor(GridLabelColor));
+	TitleText->SetText(Title);
+	return TitleText;
+}
+
+void UW_FullMapView::BuildMissionPanel(UOverlay& RootOverlay)
+{
+	using namespace FullMapViewConstants;
+	M_MissionPanel = WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass(), TEXT("MissionPanelSizeBox"));
+	M_MissionPanel->SetWidthOverride(MissionPanelWidth);
+	UOverlaySlot* const PanelSlot = RootOverlay.AddChildToOverlay(M_MissionPanel);
+	PanelSlot->SetHorizontalAlignment(HAlign_Left);
+	PanelSlot->SetVerticalAlignment(VAlign_Top);
+
+	UBorder* const PanelBorder = CreatePanelBorder(TEXT("MissionPanel"));
+	M_MissionPanel->SetContent(PanelBorder);
+	UVerticalBox* const PanelBox = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass(),
+	                                                                         TEXT("MissionPanelBox"));
+	PanelBorder->SetContent(PanelBox);
+
+	UHorizontalBox* const HeaderRow = WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass(),
+	                                                                             TEXT("MissionHeaderRow"));
+	PanelBox->AddChildToVerticalBox(HeaderRow);
+	UHorizontalBoxSlot* const TitleSlot = HeaderRow->AddChildToHorizontalBox(
+		CreatePanelTitle(TEXT("MissionPanelTitle"), NSLOCTEXT("FullMapView", "MissionTitle", "ACTIVE MISSIONS")));
+	TitleSlot->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
+	TitleSlot->SetVerticalAlignment(VAlign_Center);
+	M_MissionCountText = CreatePanelTitle(TEXT("MissionCount"), FText::GetEmpty());
+	UHorizontalBoxSlot* const CountSlot = HeaderRow->AddChildToHorizontalBox(M_MissionCountText);
+	CountSlot->SetVerticalAlignment(VAlign_Center);
+
+	UTextBlock* const SubtitleText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(),
+	                                                                         TEXT("MissionSubtitle"));
+	SubtitleText->SetFont(FCoreStyle::GetDefaultFontStyle(TEXT("Regular"), HintFontSize));
+	SubtitleText->SetColorAndOpacity(FSlateColor(HintColor));
+	SubtitleText->SetText(NSLOCTEXT("FullMapView", "MissionSubtitle", "Your current objectives"));
+	SubtitleText->SetAutoWrapText(true);
+	PanelBox->AddChildToVerticalBox(SubtitleText)->SetPadding(FMargin(0.0f, FilterSubtitleGap, 0.0f, 0.0f));
+
+	M_NoMissionsText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("NoMissions"));
+	M_NoMissionsText->SetFont(FCoreStyle::GetDefaultFontStyle(TEXT("Italic"), HintFontSize + 1));
+	M_NoMissionsText->SetColorAndOpacity(FSlateColor(HintColor));
+	M_NoMissionsText->SetText(NSLOCTEXT("FullMapView", "NoMissions", "No active missions"));
+	PanelBox->AddChildToVerticalBox(M_NoMissionsText)->SetPadding(FMargin(0.0f, MissionListTopGap, 0.0f, 0.0f));
+
+	M_MissionScrollBox = WidgetTree->ConstructWidget<UScrollBox>(UScrollBox::StaticClass(), TEXT("MissionScrollBox"));
+	M_MissionScrollBox->SetScrollbarThickness(FVector2D(MissionScrollBarThickness, MissionScrollBarThickness));
+	M_MissionScrollBox->SetAlwaysShowScrollbar(false);
+	UVerticalBoxSlot* const ScrollSlot = PanelBox->AddChildToVerticalBox(M_MissionScrollBox);
+	// Fill: when the panel hits its height cap the list shrinks and scrolls instead of overflowing the border.
+	ScrollSlot->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
+	ScrollSlot->SetPadding(FMargin(0.0f, MissionListTopGap, 0.0f, 0.0f));
+}
+
+void UW_FullMapView::TickMissionPanel(const float DeltaSeconds)
+{
+	M_SecondsUntilMissionRefresh -= DeltaSeconds;
+	if (M_SecondsUntilMissionRefresh > 0.0f)
+	{
+		return;
+	}
+	RefreshMissionPanel();
+}
+
+void UW_FullMapView::RefreshMissionPanel()
+{
+	M_SecondsUntilMissionRefresh = FullMapViewConstants::MissionRefreshSeconds;
+	if (not IsValid(M_MissionPanel) || not IsValid(M_MissionScrollBox))
+	{
+		return;
+	}
+	// Silent: maps without a mission manager simply show no missions; this runs four times a second.
+	TArray<UW_Mission*> MissionWidgets;
+	const UW_MissionWidgetManager* const MissionWidgetManager = M_MainGameUI.IsValid()
+		                                                            ? M_MainGameUI->GetMissionManagerWidget()
+		                                                            : nullptr;
+	if (IsValid(MissionWidgetManager))
+	{
+		MissionWidgetManager->GetMissionWidgetsInUse(MissionWidgets);
+	}
+	for (int32 CardIndex = 0; CardIndex < MissionWidgets.Num(); ++CardIndex)
+	{
+		UW_TacticalMapMissionCard* const MissionCard = GetOrCreateMissionCard(CardIndex);
+		if (not IsValid(MissionCard))
+		{
+			continue;
+		}
+		MissionCard->ShowMission(*MissionWidgets[CardIndex]);
+		MissionCard->SetVisibility(ESlateVisibility::Visible);
+	}
+	for (int32 CardIndex = MissionWidgets.Num(); CardIndex < M_MissionCards.Num(); ++CardIndex)
+	{
+		if (IsValid(M_MissionCards[CardIndex]))
+		{
+			M_MissionCards[CardIndex]->SetVisibility(ESlateVisibility::Collapsed);
+		}
+	}
+	if (M_ShownMissionCount == MissionWidgets.Num() && IsValid(M_MissionCountText)
+		&& not M_MissionCountText->GetText().IsEmpty())
+	{
+		return;
+	}
+	M_ShownMissionCount = MissionWidgets.Num();
+	const bool bHasMissions = M_ShownMissionCount > 0;
+	if (IsValid(M_MissionCountText))
+	{
+		M_MissionCountText->SetText(FText::AsNumber(M_ShownMissionCount));
+	}
+	if (IsValid(M_NoMissionsText))
+	{
+		M_NoMissionsText->SetVisibility(bHasMissions ? ESlateVisibility::Collapsed : ESlateVisibility::HitTestInvisible);
+	}
+	M_MissionScrollBox->SetVisibility(bHasMissions ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+}
+
+UW_TacticalMapMissionCard* UW_FullMapView::GetOrCreateMissionCard(const int32 CardIndex)
+{
+	if (M_MissionCards.IsValidIndex(CardIndex))
+	{
+		return M_MissionCards[CardIndex];
+	}
+	UW_TacticalMapMissionCard* const MissionCard = WidgetTree->ConstructWidget<UW_TacticalMapMissionCard>(
+		UW_TacticalMapMissionCard::StaticClass());
+	MissionCard->SetupMissionCard(CardIndex);
+	UScrollBoxSlot* const CardSlot = Cast<UScrollBoxSlot>(M_MissionScrollBox->AddChild(MissionCard));
+	if (IsValid(CardSlot))
+	{
+		CardSlot->SetHorizontalAlignment(HAlign_Fill);
+		CardSlot->SetPadding(FMargin(0.0f, CardIndex == 0 ? 0.0f : FullMapViewConstants::MissionCardGap, 0.0f, 0.0f));
+	}
+	M_MissionCards.Add(MissionCard);
+	return MissionCard;
+}
+
+void UW_FullMapView::GetShownMissionCards(TArray<UW_TacticalMapMissionCard*>& OutCards) const
+{
+	OutCards.Reset();
+	for (UW_TacticalMapMissionCard* const MissionCard : M_MissionCards)
+	{
+		if (IsValid(MissionCard) && MissionCard->GetVisibility() != ESlateVisibility::Collapsed)
+		{
+			OutCards.Add(MissionCard);
+		}
+	}
 }
 
 void UW_FullMapView::AddFilterToggles(UVerticalBox& PanelBox)
@@ -350,8 +521,8 @@ void UW_FullMapView::FitFrameToViewport(const FVector2D& ViewportSize)
 	}
 	M_SizedForViewport = ViewportSize;
 	using namespace FullMapViewConstants;
-	// Room for the filter panel on both sides keeps the map centred.
-	const float FilterPanelReserve = 2.0f * (FilterPanelWidth + FilterPanelGap);
+	// Room for the widest side panel on both sides keeps the map centred.
+	const float FilterPanelReserve = 2.0f * (FMath::Max(FilterPanelWidth, MissionPanelWidth) + FilterPanelGap);
 	constexpr float MinFrameSide = 200.0f;
 	const float FrameSide = FMath::Max(MinFrameSide, FMath::Min(ViewportSize.Y * M_ScreenHeightShare,
 	                                                            ViewportSize.X * MaxScreenWidthShare
@@ -365,6 +536,18 @@ void UW_FullMapView::FitFrameToViewport(const FVector2D& ViewportSize)
 		const float FrameLeft = (ViewportSize.X - FrameSide) * 0.5f;
 		const float PanelLeft = FMath::Max(FilterPanelMinScreenMargin, FrameLeft - FilterPanelGap - FilterPanelWidth);
 		FilterPanelSlot->SetPadding(FMargin(FMath::RoundToFloat(PanelLeft), 0.0f, 0.0f, 0.0f));
+	}
+
+	UOverlaySlot* const MissionPanelSlot = IsValid(M_MissionPanel) ? Cast<UOverlaySlot>(M_MissionPanel->Slot) : nullptr;
+	if (IsValid(MissionPanelSlot))
+	{
+		const float FrameLeft = (ViewportSize.X - FrameSide) * 0.5f;
+		const float FrameTop = (ViewportSize.Y - FrameSide) * 0.5f;
+		const float PanelLeft = FMath::Min(FrameLeft + FrameSide + FilterPanelGap,
+		                                   ViewportSize.X - FilterPanelMinScreenMargin - MissionPanelWidth);
+		MissionPanelSlot->SetPadding(FMargin(FMath::RoundToFloat(PanelLeft), FMath::RoundToFloat(FrameTop), 0.0f,
+		                                     0.0f));
+		M_MissionPanel->SetMaxDesiredHeight(FMath::RoundToFloat(FrameSide));
 	}
 }
 

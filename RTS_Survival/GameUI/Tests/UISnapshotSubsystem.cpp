@@ -31,6 +31,7 @@
 #include "RTS_Survival/GameUI/MainGameUI.h"
 #include "RTS_Survival/Behaviours/UI/BehaviourDescription/W_BehaviourDescription.h"
 #include "RTS_Survival/GameUI/MiniMap/FullMapView/W_FullMapView.h"
+#include "RTS_Survival/GameUI/MiniMap/FullMapView/W_TacticalMapMissionCard.h"
 #include "RTS_Survival/GameUI/MiniMap/CombatPings/RTSCombatPingSubsystem.h"
 #include "RTS_Survival/GameUI/MiniMap/MapObjectFilters/RTSMapObjectFilterSubsystem.h"
 #include "RTS_Survival/FOWSystem/FowManager/FowManager.h"
@@ -115,6 +116,10 @@ namespace UISnapshotConstants
 	const TCHAR* const CloseFullMapAtStepSwitch = TEXT("UISnapshotCloseFullMapAtStep=");
 	const FName OpenFullMapButtonName(TEXT("M_OpenFullMapButton"));
 	const FName FullMapCloseButtonName(TEXT("CloseButton"));
+	// Hovers this card of the tactical map's mission panel (0 = top); -UISnapshotTacticalMissionSweep=P holds its
+	// light band at progress P.
+	const TCHAR* const HoverTacticalMissionSwitch = TEXT("UISnapshotHoverTacticalMission=");
+	const TCHAR* const TacticalMissionSweepSwitch = TEXT("UISnapshotTacticalMissionSweep=");
 	const TCHAR* const CombatPingsSwitch = TEXT("UISnapshotCombatPings");
 	const TCHAR* const MapFiltersSwitch = TEXT("UISnapshotMapFilters");
 	const TCHAR* const MapFiltersRevealAllSwitch = TEXT("UISnapshotMapFiltersRevealAll");
@@ -760,6 +765,7 @@ void UUISnapshotSubsystem::ApplyCurrentStep()
 	// Filters first, so the tactical map's toggles show the modes when it opens.
 	ShowMapObjectFiltersForStep();
 	ToggleFullMapForStep();
+	ShowTacticalMapMissionsForStep();
 	ShowCombatPingsForStep();
 }
 
@@ -972,6 +978,39 @@ void UUISnapshotSubsystem::ToggleFullMapForStep()
 		if (ClickGlassButtonIn(FullMapView, UISnapshotConstants::FullMapCloseButtonName))
 		{
 			UE_LOG(LogTemp, Display, TEXT("UISNAPSHOT pressed the full map close button"));
+		}
+	}
+}
+
+void UUISnapshotSubsystem::ShowTacticalMapMissionsForStep() const
+{
+	if (not FParse::Param(FCommandLine::Get(), UISnapshotConstants::OpenFullMapSwitch))
+	{
+		return;
+	}
+	int32 HoverCardIndex = INDEX_NONE;
+	FParse::Value(FCommandLine::Get(), UISnapshotConstants::HoverTacticalMissionSwitch, HoverCardIndex);
+	float FrozenSweep = -1.f;
+	FParse::Value(FCommandLine::Get(), UISnapshotConstants::TacticalMissionSweepSwitch, FrozenSweep);
+	TArray<UUserWidget*> FullMapViews;
+	UWidgetBlueprintLibrary::GetAllWidgetsOfClass(GetWorld(), FullMapViews, UW_FullMapView::StaticClass(), false);
+	for (UUserWidget* const FullMapViewWidget : FullMapViews)
+	{
+		const UW_FullMapView* const FullMapView = Cast<UW_FullMapView>(FullMapViewWidget);
+		if (not IsValid(FullMapView) || not FullMapView->IsVisible())
+		{
+			continue;
+		}
+		TArray<UW_TacticalMapMissionCard*> MissionCards;
+		FullMapView->GetShownMissionCards(MissionCards);
+		UE_LOG(LogTemp, Display, TEXT("UISNAPSHOT tactical map mission cards: %d"), MissionCards.Num());
+		for (int32 CardIndex = 0; CardIndex < MissionCards.Num(); ++CardIndex)
+		{
+			UW_TacticalMapMissionCard* const MissionCard = MissionCards[CardIndex];
+			const bool bHover = CardIndex == HoverCardIndex;
+			MissionCard->SetForcedHover(bHover, bHover ? FrozenSweep : -1.f);
+			UE_LOG(LogTemp, Display, TEXT("UISNAPSHOT tactical map mission %d%s: %s"), CardIndex,
+			       bHover ? TEXT(" (hovered)") : TEXT(""), *MissionCard->GetShownTitle());
 		}
 	}
 }
