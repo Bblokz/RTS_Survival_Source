@@ -721,3 +721,20 @@ The owner asked for four fixes, then two rounds of a fresh adversarial reviewer 
   rotation), the column follows the valley road itself, and the tracks drive (forward animation and panning track
   material). 6.1 looks down the road toward the ruined arches, a wreck at the roadside. Resource pickups of the Ore
   map (glassy bubbles beside the road) are hidden.
+
+**Adversarial round 1** (fresh reviewer on the full render, 2026-11-16). Fixed:
+- Hard rule: a scrap of Ger_Berlin's blowing street litter read as a purple speck in the 3.5 sky. New MPC scalar
+  `PurpleKeep` (appended; 1 by default): the archive grade keeps purple only where it is 1. 3.5 sets it to 0.
+- Purple Death: less glow (only thick veins, faintly), low specular, the vein tubes read as continuous vessels with
+  a soft pulse; helmets and mess tins in painted field grey (`MI_Intro_FieldGrey`) instead of polished steel.
+  (A subsurface shading model was tried and dropped: the low sun shone through and turned the flesh hot pink.)
+- Map fires: flames about 40 % lower, card bottoms fade into the paper (depth fade), burn rings are textured char
+  with a dull ember edge instead of a white "sparkler" ring, the burnt tags cast no detached shadow.
+- 1.1: the phone and MP40 no longer cut through the radio and each other (phone moved past the ammunition).
+- 4.1: the strings are thin twine (0.09 cm), not rods.
+- 5.4: the stain is opaque, its veins darker than the body (no pale veil); framed west so its eastern edge is never
+  in frame.
+- 6.1: lower camera (1.65 m), ash on the wind (grade `Sand`), three distant artillery flashes beyond the arches.
+- Archive grade: scratches rarer, of varied width and strength.
+Not taken (bigger builds): Berlin skyline and cloud remodel (3.3/3.4), Ural Shield remodel and gate motion
+(6.3/6.4), 6.2 nuke shockwave dome, hangar re-dress (2.3/9.1), hand and camera flash (2.2), 9.3b HQ materials.

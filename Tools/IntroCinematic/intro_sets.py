@@ -255,11 +255,12 @@ def build_bunker():
 
     # Props on the officer's side of the table.
     s.mesh("Prop_MP40", "/Game/RTS_Survival/Blueprints/Squads/InfantryWeapons/German/MP40/Mesh/SM_Ger_InfWeapon_MP40",
-           (-92, -118, TABLE_TOP_Z + 4.5), rotation=(0, 64, 90))
+           (-96, -128, TABLE_TOP_Z + 4.5), rotation=(0, 64, 90))
     s.mesh("Prop_Radio", "/Game/UVB80/Assets/UVB80/Items/SM_Radio", (-88, -52, TABLE_TOP_Z + 0.3), rotation=(0, -168, 0))
     s.mesh("Prop_Mug", "/Game/UVB80/Assets/UVB80/Items/SM_Cup", (-98, -8, TABLE_TOP_Z + 0.3), rotation=(0, 40, 0))
-    s.mesh("Prop_Phone", "/Game/UVB80/Assets/UVB80/Items/SM_OldPhone", (-108, -128, TABLE_TOP_Z + 0.3), rotation=(0, 20, 0))
-    # Ammunition by the MP40: three stick magazines, an opened 9 mm box and loose rounds (Blender prop AmmoSpread),
+    # (Phone past the ammunition, MP40 clear of the radio: they cut through each other before.)
+    s.mesh("Prop_Phone", "/Game/UVB80/Assets/UVB80/Items/SM_OldPhone", (-106, 70, TABLE_TOP_Z + 0.3), rotation=(0, -25, 0))
+    # Ammunition for the MP40: three stick magazines, an opened 9 mm box and loose rounds (Blender prop AmmoSpread),
     # on the officer's side of the date line.
     ammo_mesh = _first_existing([lib.ROOT + "/Props/SM_Intro_AmmoSpread"])
     if ammo_mesh:
@@ -373,14 +374,14 @@ def build_map(s):
         tag_material = M + "MI_Intro_Tag_" + site
         if tag_mesh:
             s.mesh("Tag_" + site, tag_mesh, (x - 9.0, y + 3.0, z + 0.5), rotation=(0, 96 + index * 5, 0),
-                   scale=(1.8, 1.8, 1.8), materials=tag_material, mobile=True)
+                   scale=(1.8, 1.8, 1.8), materials=tag_material, mobile=True, shadow=False)
         else:
             s.plane("Tag_" + site, (x - 6.0, y + 1.5, z + 0.5), (4.5, 9.0), tag_material, yaw=8.0 * (index - 1), mobile=True)
     hub = place("Moscow", 1.6)
     pin("Pin_Moscow", "Moscow", 0.8)
     for site in ("LosAlamos", "OakRidge", "Hanford"):
         end = place(site, 2.6)
-        s.rod("String_" + site, hub, end, 0.22, M + "MI_Intro_String")
+        s.rod("String_" + site, hub, end, 0.09, M + "MI_Intro_String")
     pin("Pin_SovietStar", (50.2, 20.5), 1.5, star=True)
     # Operation Svarog (6.2b): scattered strikes on Soviet-held Europe.
     for index, strike in enumerate(SVAROG_STRIKES):

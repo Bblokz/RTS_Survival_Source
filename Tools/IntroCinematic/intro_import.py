@@ -244,3 +244,16 @@ def import_all():
     build_pbr_material()
     import_kit("Props", lib.ROOT + "/Props", _prop_rule)
     import_kit("UralShield", lib.ROOT + "/UralShield", lambda mesh, slot: "T_UralShield")
+
+
+def tune_trench_steel():
+    """The trench props' steel (helmets, mess tins) as painted field-grey, not the shared polished MI_Intro_Steel
+    (helmets read as mirror chrome in 5.2 / 5.3)."""
+    flat = unreal.load_asset(mats.MAT_DIR + "/M_Intro_Flat")
+    mi = mats.instance("MI_Intro_FieldGrey", flat, vectors={"Tint": (0.07, 0.075, 0.065, 1.0)},
+                       scalars={"Roughness": 0.8, "Metallic": 0.1})
+    mesh = unreal.load_asset(lib.ROOT + "/Sets/SM_Intro_TrenchProps")
+    for index, slot in enumerate(mesh.static_materials):
+        if str(slot.material_slot_name) == "Steel":
+            mesh.set_material(index, mi)
+    lib.safe_save([mesh.get_outermost()])

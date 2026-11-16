@@ -50,12 +50,14 @@ col = lerp(col, float3(0.07, 0.005, 0.09), fresh * 0.3);
 col = lerp(col, float3(0.075, 0.005, 0.1), vein * 0.6);       // the vein tubes read as one continuous vessel
 // wet and glistening only in the veins and at the fresh front; the flesh between is dull and spongy
 float rough = saturate(lerp(0.82, 0.32, saturate(v * 0.8 + vein * 0.5)) - fresh * 0.15 + (mf - 0.5) * 0.2);
-float3 glow = (vb * (0.1 + 0.9 * beat) * 0.09 + vein * (0.05 + pump * 0.16) + fresh * 0.04) * float3(0.32, 0.015, 0.48) * Glow;
+float3 glow = (vb * (0.1 + 0.9 * beat) * 0.045 + vein * (0.03 + pump * 0.1) + fresh * 0.02) * float3(0.32, 0.015, 0.48) * Glow;
 """
 
 
 def build_material():
-    material = mats._new_material("M_Intro_PurpleDeath", blend=unreal.BlendMode.BLEND_MASKED)
+    # Default lit: a subsurface model let the trench's low sun shine through the flesh and turned it hot pink.
+    material = mats._new_material("M_Intro_PurpleDeath", blend=unreal.BlendMode.BLEND_MASKED,
+                                  shading=unreal.MaterialShadingModel.MSM_DEFAULT_LIT)
     world = mel.create_material_expression(material, unreal.MaterialExpressionWorldPosition, -1400, -600)
     local = mel.create_material_expression(material, unreal.MaterialExpressionTransformPosition, -1200, -500)
     local.set_editor_property("transform_source_type", unreal.MaterialPositionTransformSource.TRANSFORMPOSSOURCE_WORLD)
@@ -79,6 +81,7 @@ def build_material():
     specular = mel.create_material_expression(material, unreal.MaterialExpressionConstant, -200, 600)
     specular.set_editor_property("r", 0.18)
     mel.connect_material_property(specular, "", unreal.MaterialProperty.MP_SPECULAR)
+
     return mats._finish(material)
 
 

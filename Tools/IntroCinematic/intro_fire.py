@@ -53,7 +53,7 @@ float Y = UV.y * H / Size;                   // up from the paper, in ring sizes
 float S = Seed * 17.31;
 float tt = Time;
 float bw = 0.16 + 0.5 * Burn;                // flame base half-width follows the scorch front
-float Hf = (1.3 + 0.8 * Burn) * flare;       // flame height
+float Hf = (0.75 + 0.45 * Burn) * flare;     // flame height (a strike is a city, not a state)
 float yy = Y / max(Hf, 0.05);
 // Domain-warped turbulence, advected upward: separate licks that tear off at the top.
 float2 q = float2(X * 2.6 + S, Y * 1.5 - tt * 2.6);
@@ -150,7 +150,11 @@ def build_flame_material():
         ("Size", mats._scalar(material, "Size", 2.0, 150), ""), ("Seed", mats._scalar(material, "Seed", 0.0, 200), ""),
         ("Bright", mats._scalar(material, "Bright", 1.0, 250), "")] + _clock_inputs(material))
     mel.connect_material_property(mats._mask(material, custom, "rgb"), "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
-    mel.connect_material_property(mats._mask(material, custom, "a", y=150), "", unreal.MaterialProperty.MP_OPACITY)
+    # The card meets the paper in a soft fade, not a hard horizontal cut.
+    fade = mel.create_material_expression(material, unreal.MaterialExpressionDepthFade, -200, 250)
+    fade.set_editor_property("fade_distance_default", 0.6)
+    mel.connect_material_expressions(mats._mask(material, custom, "a", y=150), "", fade, "Opacity")
+    mel.connect_material_property(fade, "", unreal.MaterialProperty.MP_OPACITY)
     return mats._finish(material)
 
 

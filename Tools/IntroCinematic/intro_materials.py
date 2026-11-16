@@ -34,6 +34,7 @@ MPC_SCALARS = {
     "Banner": 0.0,        # banners unrolled, 0..1
     "Rain": 0.0,          # weather drawn by the grade: slanted rain streaks and a wet haze, 0..1
     "Sand": 0.0,          # weather drawn by the grade: wind-driven sand streaming across the frame, 0..1
+    "PurpleKeep": 1.0,    # 1 = the archive grade keeps purple at full colour; 0 in Berlin (no purple there, doc)
 }
 
 # HLSL has no nested functions and a Custom node body is itself a function, so the noise lives in a local struct.
@@ -225,7 +226,7 @@ float luma = dot(c, float3(0.299, 0.587, 0.114));
 float3 sepia = luma * float3(1.07, 0.93, 0.74);
 float cmax = max(c.r, max(c.g, c.b));
 // Only purple survives the archive grade (the doc wants "it is purple" to land in 1945), and hot orange glow.
-float purple = smoothstep(0.06, 0.26, (min(c.r, c.b) - c.g) / max(cmax, 0.001)) * smoothstep(0.03, 0.15, cmax);
+float purple = smoothstep(0.06, 0.26, (min(c.r, c.b) - c.g) / max(cmax, 0.001)) * smoothstep(0.03, 0.15, cmax) * PurpleKeep;
 float ember = smoothstep(0.55, 0.9, (c.r - c.b) / max(cmax, 0.001)) * smoothstep(0.85, 1.0, cmax)
               * smoothstep(0.18, 0.32, c.g / max(c.r, 0.001)) * 0.7;   // orange glow stays, pure red (pencil, string) does not
 float3 arch = lerp(c, sepia, 0.84 * (1.0 - max(0.85 * purple, ember)));
@@ -241,9 +242,10 @@ arch += grain * (0.6 + 0.4 * (1.0 - luma));
 float st = floor(t / 3.0);
 for (int k = 0; k < 3; k++) {
   float sx = H2(float2(st, k * 5.1 + 0.37));
-  float on = step(0.55, H2(float2(st * 1.7, k + 9.0)));
+  float on = step(0.8 + 0.06 * k, H2(float2(st * 1.7, k + 9.0)));
   float seg = step(H2(float2(st, k + 3.0)), uv.y + 0.4) * step(uv.y - 0.5, H2(float2(st, k + 4.0)));
-  arch += on * seg * smoothstep(0.0011, 0.0, abs(uv.x - sx)) * 0.16;
+  float w = 0.0005 + 0.0012 * H2(float2(st, k + 6.0));
+  arch += on * seg * smoothstep(w, 0.0, abs(uv.x - sx)) * (0.05 + 0.11 * H2(float2(st, k + 7.0)));
 }
 // Flicker of the projector lamp.
 arch *= 1.0 + (H2(float2(t, 4.2)) - 0.5) * 0.05;
@@ -269,7 +271,7 @@ def build_grade():
     uv = mel.create_material_expression(material, unreal.MaterialExpressionScreenPosition, -900, 0)
     time = mel.create_material_expression(material, unreal.MaterialExpressionTime, -900, 100)
     inputs = [("Scene", scene, "Color"), ("UV", uv, "ViewportUV"), ("Time", time, "")]
-    for index, name in enumerate(("Archive", "Flash", "Darken", "Heat", "Rain", "Sand")):
+    for index, name in enumerate(("Archive", "Flash", "Darken", "Heat", "Rain", "Sand", "PurpleKeep")):
         inputs.append((name, _collection(material, name, 200 + index * 90), ""))
     custom = _custom(material, GRADE_CODE, inputs)
     mel.connect_material_property(_mask(material, custom, "rgb"), "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
@@ -401,9 +403,10 @@ float edge = r + (n - 0.5) * 0.36;
 float burnt = smoothstep(reach, reach - 0.10, edge);
 float hole = smoothstep(0.34 * Burn, 0.20 * Burn, edge);
 float ember = saturate(1.0 - abs(edge - reach) / 0.09) * step(0.01, Burn) * (1.0 - smoothstep(0.75, 1.0, Burn));
-float3 col = lerp(float3(0.07, 0.045, 0.03), float3(0.012, 0.01, 0.008), saturate(1.0 - edge / max(reach, 0.01)));
-float alpha = saturate(burnt * (0.92 - 0.25 * hole) + ember);
-return float4(col + float3(7.0, 1.9, 0.25) * ember, alpha);
+float3 col = lerp(float3(0.09, 0.06, 0.035), float3(0.012, 0.01, 0.008), saturate(1.0 - edge / max(reach, 0.01)));
+col *= 0.7 + 0.6 * vnoise(UV * 60.0);                       // charred paper, not a flat puck
+float alpha = saturate(burnt * (0.97 - 0.3 * hole) + ember * 0.8);
+return float4(col + float3(2.2, 0.62, 0.03) * ember * (0.6 + 0.4 * n), alpha);
 """
 
 
@@ -443,9 +446,9 @@ float net = PD.veins(q);
 float fine = PD.veins(q * 2.4 + 4.0);
 float ahead = saturate(1.0 - max(field, 0.0) / (0.05 + 0.05 * Stain)) * step(0.0, field + 0.02);
 float tendril = saturate(net * 1.2 + fine * 0.5 * ahead) * ahead * ahead * (1.0 - body) * step(0.005, Stain);
-col = lerp(col, float3(0.16, 0.02, 0.24), net * 0.55 * body);
+col = lerp(col, float3(0.03, 0.005, 0.06), net * 0.6 * body);   // veins through the body darker, not a pale veil
 col = lerp(col, float3(0.05, 0.008, 0.09), tendril);
-float alpha = saturate(body * 0.93 + veins + tendril * 0.95) * Opacity * step(0.002, Stain);
+float alpha = saturate(body * 0.98 + veins + tendril * 0.95) * Opacity * step(0.002, Stain);
 return float4(col, alpha);
 """
 

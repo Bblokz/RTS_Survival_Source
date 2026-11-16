@@ -259,7 +259,8 @@ def shots():
          "cam": [(0.0, (72, -5200, 250), (5, -90, 0)), (1.0, (72, -5950, 235), (6, -90, 0))],
          "actors": [{"kind": "niagara", "asset": "P_Rain_Converted", "label": "Sleet",
                      "keys": [(0.0, (72, -5900, 700), (0, 0, 0), 2.0), (1.0, (72, -6650, 700), (0, 0, 0), 2.0)]}],
-         "mpc": {"Rain": [(0.0, 0.7)]},
+         # Berlin has no purple (doc): the grade drains it here (a scrap of the map's street litter read as purple).
+         "mpc": {"Rain": [(0.0, 0.7)], "PurpleKeep": [(0.0, 0.0)]},
          "cues": [stamp("CONFIRMED", (0.80, 0.30), -7.0, 0, 0.2, 2.4)]},
         {"id": "3.6", "levels": ["Intro_Bunker"], "vo": ["3_6"], "pre": 1.0, "min": 8.2, "fov": 38,
          "cam": [(0.0, on_map(*germany, back=27, up=30), (-48, 0, 0)), (1.0, on_map(*germany, back=23, up=26), (-49, 0, 0))],
@@ -313,7 +314,8 @@ def shots():
          # Time-lapse: it takes the trench (the growth front crawls outward, the veins pump).
          "mpc": {"Mould": [(0.0, 0.22), (0.12, 0.3), (0.92, 1.0), (1.0, 1.0)]}},
         {"id": "5.4", "levels": ["Intro_Bunker"], "vo": ["5_4"], "pre": 0.6, "post": 0.2, "fov": 55,
-         "cam": [(0.0, on_map(*europe, back=78, up=92), (-50, 0, 0)), (1.0, on_map(*europe, back=70, up=84), (-50, 0, 0))],
+         # framed west of centre: the stain's eastern edge stays out of frame (it must never read as where it stops)
+         "cam": [(0.0, on_map(51.5, 15.5, back=78, up=92), (-50, 0, 0)), (1.0, on_map(51.5, 15.5, back=70, up=84), (-50, 0, 0))],
          "mpc": {"Stain": [(0.0, 0.02), (1.0, 0.8)], "StainOpacity": [(0.0, 1.0)], "Pencil": [(0.0, 0.0), (0.45, 0.0), (0.6, 1.0)],
                  "Rings36": [(0.0, 60.0)], "Rings42": [(0.0, 60.0)], "Rings62": [(0.0, 0.0)]}},
         {"id": "5.5", "levels": ["Ger_PripyatMe410"], "min": 6.5, "fov": 58, "cam_snap": 230.0,
@@ -324,11 +326,19 @@ def shots():
         # ---- Section 6: 1946-1947, Operation Svarog and the Ural Shield --------------------------------------------
         # Behind the column on the valley road, looking down it to the ruined arches; a wreck lies at the roadside.
         # The tanks follow the road's curve, sit on the ground under their tracks and their tracks turn.
-        {"id": "6.1", "handheld": 0.22, "levels": [ORE], "vo": ["6_1"], "pre": 1.4, "min": 7.6, "fov": 40, "cam_snap": 230.0,
+        {"id": "6.1", "handheld": 0.22, "levels": [ORE], "vo": ["6_1"], "pre": 1.4, "min": 7.6, "fov": 40, "cam_snap": 165.0,
          # Pitch at most -4 at this lens: something high in the map's sky draws as a dark square above -4 degrees.
          "cam": [(0.0, (2790, -17560, 0), (-4, 101, 0)), (1.0, (2782, -17300, 0), (-4, 103, 0))],
          # (No falling-dust Niagara here: in this view it draws as a dark square over the sky.)
-         "actors": road_column(54250, 3600, 4, 1500, 150.0, 1.5),
+         "actors": road_column(54250, 3600, 4, 1500, 150.0, 1.5) + [
+             # Artillery beyond the ridge: three distant flashes light the haze behind the arches.
+             {"kind": "point", "label": "Artillery_%d" % k, "intensity": 60000.0, "color": (1.0, 0.72, 0.42, 1.0),
+              "radius": 30000.0, "snap": 900.0, "spawn": (at_, at_ + 0.035), "keys": [(0.0, position, (0, 0, 0))]}
+             for k, (at_, position) in enumerate(((0.27, (-2500, -4000, 0)), (0.53, (3500, -1500, 0)), (0.8, (-6000, -6500, 0))))],
+         # Ash on the wind (drawn by the grade) and the flashes' glow on the whole frame.
+         "mpc": {"Sand": [(0.0, 0.32)],
+                 "Flash": [(0.0, 0.0), (0.27, 0.0), (0.28, 0.07), (0.31, 0.0), (0.53, 0.0), (0.54, 0.06), (0.57, 0.0),
+                           (0.8, 0.0), (0.81, 0.08), (0.84, 0.0)]},
          "cues": [card("1946 - 1947", "OPERATION SVAROG", 0.5, 5.6)]},
         {"id": "6.2", "levels": [ORE], "vo": ["6_2"], "pre": 0.5, "post": 0.8, "fov": 62, "cam_snap": 620.0,
          "cam": [(0.0, (-11900, 2500, 0), (-4, -138, 0)), (0.3, (-11900, 2500, 0), (-4, -128, 0)), (0.45, (-11900, 2500, 0), (-3, -92, 0)),
