@@ -5,6 +5,7 @@
 #include "Engine/World.h"
 #include "NavFilters/NavigationQueryFilter.h"
 #include "NavigationSystem.h"
+#include "RTS_Survival/Environment/DestructableEnvActor/WallGate/WallGateNavigation.h"
 
 namespace ConvoyRouteConstants
 {
@@ -207,7 +208,8 @@ bool UConvoyRouteLibrary::FindChainedVehiclePath(const UWorld* World, const FVec
 	for (int32 Hop = 0; Hop < MaxPathHopsPerLeg; ++Hop)
 	{
 		const FPathFindingQuery Query(nullptr, *NavData, Current, Goal,
-		                              UNavigationQueryFilter::GetQueryFilter(*NavData, nullptr, nullptr));
+		                              UNavigationQueryFilter::GetQueryFilter(*NavData, nullptr,
+		                                                                     URTSClosedBreachableWallsQueryFilter::StaticClass()));
 		const FPathFindingResult Path = NavigationSystem->FindPathSync(Agent, Query);
 		if (not Path.IsSuccessful() or not Path.Path.IsValid() or Path.Path->GetPathPoints().IsEmpty())
 		{

@@ -246,6 +246,83 @@ and add some to this map.
   (`RTS.AmbientFx.BakeSandMask`): 583 flat sand cells, so devils no longer form on rock, scrub or asphalt paint.
   Rebake after repainting the landscape.
 
+## SandStreak masked rework (2026-11-16)
+
+Owner: the 21 `ORE_Fx_SandStreak_Streak_nn` use translucency with "crazy overdraw that is too expensive"; make them
+masked (no dither AA), design textures for a similar look, and optimise `NS_SandPush`.
+
+- **What made it expensive.** `NS_SandPush` (Fab pack, used only by this map and the pack's demo `BP_Sand`) has four
+  GPU emitters, all lit translucent and depth-sorted: smoke A/B sprites of 13-26 m (500-1000 cm x
+  `ParticleSmokeSizeScale` 2.6) at 35/s each (about 90 + 50 alive per streak), 1-3 m sand sheets on `SM_Sand`/`SM_Sand2`
+  at 110/s (about 275 alive), and 3-5 cm grains at 2000/s. Shader complexity over a streak was solid white.
+- **Technique: stochastic coverage, not blending.** New master `M_SandStreak_Masked` (masked, clip 0.5, two-sided,
+  default lit with a world-up normal so the sand is lit like the ground, decal response none, no DitherTemporalAA).
+  It computes the pack's own opacity, `c = pow(ParticleAlpha * D, Dyn.A) * pow(|N.V|, DotPower)`, boosts it for the
+  lower particle count, `c' = 1 - (1 - c)^Boost`, and draws the pixel only where `c'` beats a clumped grain noise. The
+  drawn fraction of an area is then `c'`, and overlapping sprites cover `1 - prod(1 - c'_i)`: the same expected value
+  translucent alpha accumulates to, but every pixel is shaded once and nothing is sorted. Fades thin the grains
+  instead of popping. The dynamic parameters keep the pack's meaning (R phase, G add-white, B emissive, A power).
+- **Textures** (`ore_sandstreak_textures.py`, linear, mips with alpha-coverage scaling on the noise channel):
+  `T_SandStreak_Wave` 512x256 (R/G = the two pack sheet flipbooks' alpha, B = noise), `T_SandStreak_Puff` 2048x2048
+  BC7 (R/G = alpha of the HDR smoke flipbooks `T_C_Cam09`/`T_C_Cam05`, B = noise), `T_SandStreak_Grain` (disc),
+  `T_SandStreak_GrainNoise` 256x256 tiling grain noise (round 2). They replace 2 x 4096x2048 DXT5 + 2 x 4096x4096 HDR.
+- **System edits** (UECP, on `NS_SandPush` itself): renderer materials -> `MI_SandStreak_WaveA` (mesh override slot 0;
+  both sand meshes have one material slot, so the stale slot-1 entry `MI_SandPush_Inst2` is never drawn, as in the pack),
+  `MI_SandStreak_PuffA/PuffB`, `MI_SandStreak_Grain`; SortMode None on all four; SpawnRate inputs unbound from the user
+  parameters and set to literals: sheets 40/s, smoke A 10/s, smoke B 6/s, grains 400/s. The actors' four `*SpawnRate`
+  overrides are now dead values (noted in `ore_fx_gen.py`). The pack's own materials and MIs are untouched
+  (`MI_Ribon_Inst` feeds 17 systems).
+- **Build tools:** `ore_sandstreak_survey.py` / `_survey2.py` (read-only exports), `ore_sandstreak_textures.py`
+  (`--preview` composes the old and new look over an in-game shot), `ore_sandstreak_build.py` (headless import + master +
+  MIs; its DynamicParameter links need the UECP step in its docstring), `ore_sandstreak_round2.py` (grain-noise branch +
+  MI retune, run in the main editor), `ore_sandstreak_ab.py` (A/B run, private command folder
+  `Saved/OreMountains/sandstreak/cmd` via `sand_server.py`/`sand_cmd.py` there). Shots in `Saved/OreMountains/sandstreak/ab`.
+- **Round 1 result:** shader complexity over a streak went from solid white (many translucent layers) to one green
+  masked layer. ProfileGPU dumps from the throwaway editor were not usable (some profile the level editor viewport).
+  The look was wrong: grains were 10-30 px blobs (noise baked per flipbook texel on 20 m sprites) that boiled frame to
+  frame, the core was ~0.49 covered against ~0.23 effective for the old haze, and the sand rendered near white over the
+  tanks. Round 2: tiling grain noise at `NoiseTiling` 3 (puffs) / 0.3 (sheets), Boost 2.5 / 3.5 / 2.0, `ColourGain`
+  0.7, `EmissiveScale` 0.3.
+- **Round 2 result** (`Saved/OreMountains/sandstreak/sandstreak_before_after.jpg`): warm, fine-grained sand plumes
+  along the wind, shader complexity still one green layer. Against the old haze it reads as a narrower band of
+  blowing sand rather than a soft wide veil (the faint outer haze becomes sparse grains), and grain patches still
+  shift from frame to frame where many sprites overlap. Tuning knobs, all on the MIs: `Boost` (density),
+  `NoiseTiling` (grain size), `ColourGain` / `EmissiveScale` (brightness), `Erode` (global thinning).
+- **Open:** the scratch A/B copy was deleted after the run; the mesh renderer still lists the unused pack MI in
+  override slot 1 (the bridge tool can only write slot 0); the BEFORE/AFTER GPU timing is not measured; nothing is
+  committed.
+
+### Round 3: few large drift sheets (2026-11-16, evening)
+
+Owner after round 2: "too many small pieces, which makes it look very flaky and fake ... larger particles with more
+detail ... efficiently using more of the UV space". Rounds 1-2 are superseded on the map (their MIs stay assigned to
+the now silent emitters).
+- **System (`NS_SandPush`):** only Smoke_Emitter_A draws: 1.2 sprites/s, lifetime 5-7.5 s (about 7 alive per streak),
+  lying flat (own Set Parameters module `Particles.SpriteFacing` (0,0,1); the pack's facing module was removed because
+  the bridge cannot change its value) and aligned with the 35 degree wind (Set Parameters `Particles.SpriteAlignment`
+  (0.819, 0.574, 0), world space), FacingMode CustomFacingVector, fixed bounds +-30 m. Smoke B, the sheets and the
+  grains spawn 0. Renderer material `MI_SandDrift_A`.
+- **Atlas (`ore_sanddrift_atlas.py`):** `T_SandDrift_Atlas` 2048 2x2: R = density of large sand tongues whose rows end at
+  random lengths downwind (frayed fingers), G = body shade; `T_SandDrift_Detail` 1024 tileable: normal XY + lineation
+  shade, scrolled downwind (`PanSpeed`). Coverage is a plain clip of the smooth density (no grain noise).
+- **Material (`M_SandDrift_Masked`, `ore_sanddrift_build.py` + main-editor edits listed in its docstring):** cell picked
+  by Particle Random; fade from particle age (`FadeIn` / `FadeOut`), not particle alpha (the pack's alpha is tiny);
+  colour = `SandTint` x `ColourGain` (Smoke A's particle colour renders white); WPO lifts the sheet (`LiftCm` 70) and
+  scales each quad about its particle (`SizeMult` 3: the emitter's size comes from a nested random range the bridge
+  cannot reach). Two-sided, masked, decal response none.
+- **Look check** (`ore_sanddrift_look.py`, MI brackets in memory, shots in `Saved/OreMountains/sandstreak/drift`,
+  sheet `Saved/OreMountains/sandstreak/sanddrift_before_after.jpg`): large wind-aligned sheets with frayed fingers,
+  tanks stand above them. Traps found on the way: sprites first stood vertical (facing value never written), then
+  vanished (alignment module added with a zero vector), then were white (particle colour). After the last shots the
+  tint was warmed to (0.66, 0.48, 0.29) and ShadeContrast 0.6 / NormalStrength 1.0 set.
+- **Polish (owner: "Keep, polish it" - the ground-sheet look stays):** look check with brackets ColourGain 0.42 / 0.5 /
+  0.6 and a detail bracket (shots `Saved/OreMountains/sandstreak/polish`, sheet `sanddrift_polished.jpg`). The warm
+  tint matches the ground hue at ColourGain 0.5 (0.6 reads as pasted paper, 0.42 slightly dull); stronger inner detail
+  (ShadeContrast 0.95, NormalStrength 1.7) turns the flat fill into wind-brushed sand lineation, so those were saved
+  on MI_SandDrift_A. Sheet heads are rounded (atlas cells are empty at their borders: no quad-edge cuts). Motion
+  frames 0.75 s apart show sheets growing in and thinning out over their life, no popping.
+- **Open:** GPU cost not measured (one masked layer, ~7 quads per streak). Nothing committed.
+
 ## Mid-map relief and the dead forest (2026-11-13, evening)
 
 Owner: "work on the dead foliage for this map, use what we already have ... make sure there are some interesting

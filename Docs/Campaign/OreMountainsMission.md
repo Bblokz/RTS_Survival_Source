@@ -98,6 +98,77 @@ Tuning (amounts, positions, how far they sit from the base) comes later. **(open
 - **One special convoy carries sealed cases that connect to the Forge survey: sample canisters and documents marked for
   Berlin.** Wiping it out and **recovering the cargo is the Berlin hook**, and it is a good **climax** for the mission.
   **(open)** which convoy is the special one (it could be the heavy last convoy), and how the cargo is recovered.
+- The convoy is **not the first time the player sees the Berlin crates.** An early clue comes from the radio outpost (see
+  "Radio outpost with the Berlin crates" below), so the special convoy pays off something the player already knows about.
+
+### Capturing convoy trucks (decided 2026-11-16)
+
+This is the core loop of the mission. It answers "why do the convoys matter to *us*": the resistance needs what is on
+those trucks, and the base grows from the raids.
+
+- **Kill the escort and the trucks stop and surrender.** A truck that surrenders is no longer a Soviet unit.
+- **A captured truck drives itself to the mine adit** (the "mine adit drop-off" by the Gamma Facility in the sketch) and
+  **pays out its cargo when it arrives**: fuel, vehicle parts or Radixite, by the convoy's cargo type. The player cannot
+  steer it. It pays **only on arrival**, so it can still be lost on the way (Soviet response forces, the battery barrage).
+- **The choice on every convoy: a fast kill or slower, riskier loot.**
+  - **Destroy:** each dead truck already drops a scavengeable cargo cache (existing convoy behaviour,
+    `FConvoyCargoSettings::CacheClass`: about 5 minutes before it is gone, about 12 s for a squad to scavenge). Fast and
+    safe, but the player gets a share and has to send squads into the kill zone to pick it up.
+  - **Capture:** the full cargo, but the player has to kill the escort **without** killing the trucks, then cover the
+    trucks while they drive up to the adit.
+- A captured truck counts as **stopped** for the convoy objective and does **not** fill the "Soviet supply delivered"
+  meter.
+- **The power fantasy grows from the raids.** Keep the starting resources low so that captured cargo is what pays for
+  the base expansion and the tanks.
+
+**Implementation requirement: a new derived class for cargo trucks that can surrender.**
+
+- We want a **new C++ class derived from the class the convoy trucks use today** (convoy trucks are `ATankMaster`
+  children, spawned from `FConvoyTruckSpec::TruckClass`). Working name `ASurrenderingCargoTruck` **(open)**.
+- **Only trucks of this class can surrender.** The Ore Mountains convoy definitions point their `TruckClass` at Blueprint
+  children of this class.
+- **No other cargo truck in the game gets this feature.** The intro mission's fuel convoy (`DA_Convoy_IntroFuel`), other
+  convoys, survival-mode convoys and the supply point's Opel truck (`BP_Ger_OpelSupplyTruck`) keep their current
+  behaviour. Do **not** add a switch on `AConvoy` or `UConvoyDefinition` that turns surrender on for every convoy; the
+  class is the switch.
+- **Hand-off after surrender:** the truck changes owner to the player, and `AConvoy` releases it (it is no longer a
+  member, and it does not count as lost or escaped). It then reuses the supply-point truck logic (`USupplyTruckComponent`:
+  drive to a target, pay the cargo on arrival), with the mine adit as the target instead of the HQ.
+- **(open)** what exactly triggers the surrender (all escorts of that convoy dead, or no living escort within a set
+  distance of the truck), whether a damaged truck can still surrender, whether the Soviets try to destroy or retake a
+  captured truck, what shows the surrender (white flag, voice line, minimap icon change), the payout per truck, and the
+  truck's route up the main ramp to the adit.
+
+### Convoy line-up (first three decided 2026-11-16)
+
+Each convoy is a different problem, not the same ambush with a bigger escort.
+
+1. **Light fuel run: a guided first ambush.** A few fuel trucks and a light escort (a car or two). The mission guides the
+   player through it: where to set the ambush, and that killing the escort makes the trucks surrender. This is where
+   capture versus destroy is taught.
+2. **The weighbridge convoy: a set-piece window.** This convoy **stops at the weighbridge checkpoint** for an inspection,
+   which gives the player a fixed time and place to strike. The checkpoint guards and towers join the fight. **(open)**
+   how long it stops, and what happens if the player strikes early or late. Note: the weighbridge, booth and towers are
+   still placeholders on the map, and the checkpoint has no collision yet.
+3. **The ammo convoy that splits: two targets, pick one.** Part of the column (the **ammo trucks**) turns off toward the
+   **artillery battery** in the north-east, while the rest drives on west. The player chooses: stop the ammo trucks and
+   deny the barrage, or stop the supply trucks and protect the meter. **(open)** whether the battery still gets other
+   ammo trucks on their own route as well, and whether captured ammo trucks pay out something the player can use.
+
+Convoys 4 to 6 are **(open)**. The last one is still the heavy convoy (see "Escort" above).
+
+### Radio outpost with the Berlin crates (decided 2026-11-16)
+
+A **small Soviet outpost with a radio antenna** that holds **some crates marked for Berlin**. It is the **early clue** for the
+Berlin hook: the player finds the crates before the special convoy, so the climax pays off something already set up.
+
+- **Guards: only a few infantry.** A few **Mosin squads** (`Squad_Rus_Mosin`) and **one bazooka hazmat squad**
+  (`Squad_Rus_HazmatBazooka`), **and that is it**: no vehicles, no guns, no bunkers. It is meant as a small, early side
+  target, not a third base.
+- **(open)** where it sits on the map, what the player gets from the crates (a manifest, a voice line, a takeover), and
+  whether the radio does anything in play (for example warning the convoys while it stands).
+- Check before building: the survival-mode base docs say `Squad_Rus_HazmatBazooka` is **not** in that mode's base spawner
+  map. Confirm that the placement actor used here (for example `AEnemyStrongpoint`) can spawn it.
 
 ### Soviet bases (secondary targets)
 
@@ -163,6 +234,92 @@ now **dead or blackened standing trunks and fallen timber, not a healthy forest.
 **(open)** the rest of the environment ideas (erosion gullies, contaminated stream, Radixite dead ground, hazy sky and
 dust, newer Soviet additions against 30-year-old ruins) are not decided yet.
 
+## Act 1 clues (decided and placed 2026-11-16)
+
+This mission only **raises a question** about the Purple Death: why would a weapon meant for people kill a whole
+mountain forest, down to the roots? It does not answer it. Berlin's Demeter pod stays the first famine clue.
+
+Rules for every clue here:
+- No in-game text or line says Phytophage, Demeter, defoliant, wheat, crops, farms or famine.
+- Nothing links the roots or the Purple Death to Radixite: no root framed with crystals, no purple mould in the shafts
+  (adit 2 has a Radixite seep beside it), and no Forge cases holding roots or soil.
+- Nothing spends a later mission's material. Oder-Warthe owns the tunnel-mouth mould and the 1946 papers.
+- The survey post's cryo rack is **not** an Act 1 clue. Berlin is the first look at cryo tech, and cryo is the Act 3
+  mechanism, so the rack is at most unexplained set dressing here. **(open)** keep it as dressing or leave it out.
+
+Both clues fire from a **trigger area only**: the first player unit that comes near plays one portrait line, once.
+They use `BP_ScriptTrigger_PortraitLine` (`/Game/RTS_Survival/Blueprints/Missions/TriggerAreas/`), a Blueprint child of
+`AScriptedTriggerActor` with instance settings `TriggerPoints` (sphere centres relative to the actor; empty = the actor
+itself), `TriggerRadius` (cm), `PortraitType` and `VoiceLine` (empty = nothing plays). No C++ and no mission manager.
+
+### A. Fossil roots: "the forest died standing"
+
+- **Where:** all five fossil-root gullies (`ORE_Roots_*`). One trigger actor (`ORE_ClueA_Trigger_FossilRoots`) has a
+  15 m sphere at each gully; the line plays at whichever gully a player unit reaches first, then all five spheres go.
+- **Speaker:** a Scavenger (`GermanScavengers` portrait). Line picked 2026-11-16 (take 4 of 5): "Kicked one of these
+  roots once. Broke my toe. What kind of plague does that to a tree?" SoundWave `OreMountains_ScavFossilRoots`.
+  Voice: ElevenLabs "Christian - Stadium announcer" (the old "German Football Stadium" Scavenger voice), eleven_v3,
+  stability 0.69, similarity 0.71, speed 1.05, through the Scavenger radio band rebuilt from the old Audacity projects
+  (scripts in `VoiceLines/VoiceChanger/Output/OreRootsAudition/_tools`).
+- **Look:** the root masses are now charcoal-black and stone-hard (`MI_OreClue_FossilRoots`, a darkened copy of the
+  dead-forest wood) and twice as dense (a second rib set across the first, and one running up to the root plate), with
+  a soot stain under them. A shattered stump stands on each root plate, and three blackened standing trunks per gully
+  splay their roots down into the cut. Labels `ORE_ClueA_<n>_*`.
+
+### B. The miners' shelter: the old Wismut shaft
+
+- **Where:** adit 3, the east shaft of the player's ridge base (about 66 m from the HQ). The grey placeholder box of
+  adit 3 was removed: this spot builds its own portal. One trigger actor (`ORE_ClueB_Trigger_MinersShelter`), 13 m
+  sphere on the apron.
+- **Speaker:** the announcer / Advisor (`GermanAnnouncer` portrait). Content: these are the old Wismut shafts; in 1946
+  the miners sealed themselves in while the Purple Death passed overhead; the ones who stayed below lived. Line picked
+  2026-11-16 (take 2 of 5): "Glück auf, says ze sign. In forty-six ze miners bolted zis door and let ze Purple Death
+  walk overhead. Ze ones who stayed below outlived everyone up top." SoundWave `OreMountains_MinersShelter`
+  (`make_mission_lines.py`, the standard announcer chain).
+- **Look:** a plank bulkhead in a spruce-timber portal frame, with the steel air door standing open; "GLÜCK AUF /
+  SCHUTZRAUM 1946" painted on the planks and rows of tally marks (days below ground) beside the door; a dim warm lamp
+  just inside the doorway (somebody still keeps a light down there: a quiet hint at the people who went underground,
+  never named); sandbags, stores, a first-aid box and a tipped mine cart on the apron; and a row of six stone-cairn
+  graves with plank crosses for the ones who went up. Labels `ORE_ClueB_*`.
+
+**Build:** `Source/Tools/OreMountainsMap/ore_clues.py` (`build_all()`, re-runnable in the map's throwaway editor),
+decal textures from `gen_clue_decals.py`, assets under `/Game/RTS_Survival/Blueprints/Environment/OreMountains/ClueSpots`.
+In-game check shots: `ore_clue_shots.py` (writes `Saved/OreMountains/clues`).
+
+**Lines in place (2026-11-16):** both SoundWaves are under
+`/Game/RTS_Survival/Sounds/VoiceLines/GerFaction/Anouncer/AAAGerMissions/OreMountains` (sound class
+`RTS_SClass_CinematicAndTransmissions`; sources in `BlenderTanks/VoiceLines/Announcer/AAAGerMissions/OreMountains` with
+dry take, script and timing sidecar), subtitles are in `DT_CinematicTranscripts`, and each trigger actor's
+`VoiceLine` is set in the saved map.
+
+**Play test:** `Source/Tools/OreMountainsMap/ore_clue_trigger_test.py` (throwaway editor, via `ore_cmd.py`). It slides a
+start-force tank into root gully 3 and onto the shelter apron, and checks six spheres (5 x 15 m + 13 m), that each
+line fires at the sphere edge and plays once, and that the spheres go afterwards. 9/9 passed on 2026-11-16, and the UI
+screenshots showed the Scavenger and Advisor portraits with their subtitles.
+
+### Intercepted Soviet radio (9 spots, added 2026-11-16)
+
+Same trigger-only setup as clues A and B: one `BP_ScriptTrigger_PortraitLine` per Soviet site, `SovietMosin` portrait
+("Rifleman"), Russian line through the Mosin voice chain with an English subtitle, played once when the first player
+unit comes near. Each line teaches the site or seeds lore that is safe this early (the same rules as the clues above;
+no Radixite origin, no cryo, no reason for Berlin).
+
+| Spot | Trigger (`ORE_Intercept_*`) | Centre (cm) | Radius | What the line is about |
+|---|---|---|---|---|
+| Checkpoint | weighbridge on the road | (133, 7705) | 20 m | guards weighing every truck for the western outposts |
+| BaseA | Wismut yard, convoy staging | (2010, 24120) | 25 m | loading and dispatching the columns |
+| BaseB | below the knoll's AT guns | (7705, -6030) | 22 m | the gunners watch the whole road from the shaft |
+| Battery | artillery battery (NE) | (18760, 13400) | 25 m | out of range until the ammo trucks arrive (teaches the mechanic) |
+| Viaduct | broken A4 viaduct gap | (3685, -2948) | 18 m | one truck at a time through the gap (chokepoint) |
+| SurveyPost | Forge survey post | (-5628, 11658) | 18 m | sealed sample cases stamped for Berlin; don't ask (Berlin hook) |
+| AmmoRoute | ammo trucks' road | (9045, 22445) | 18 m | "why shells, the Germans are dead?" |
+| ConvoyRoad | ambush corridor below the ridge | (-2814, 1842) | 20 m | nobody has lived on that ridge for thirty years (irony) |
+| PeatBog | smouldering peat bog (west) | (-2211, -24120) | 18 m | the bog has burned for thirty years |
+
+Triggers placed and play-tested 2026-11-16 (`ore_intercept_trigger_test.py`, 19/19), still without lines. Three takes
+per spot are in `VoiceLines/VoiceChanger/Output/OreInterceptAudition` for the owner to pick; then
+`ore_clues.build_intercepts({spot: SoundWave})` sets them. **(open)** the picks.
+
 ## Mission structure
 
 **(open)** not yet designed beyond the beats above. Likely: hold the ridge, ambush the first lightly escorted convoys,
@@ -190,3 +347,8 @@ discover and hit the bases, then escalate to the heavy last convoy and the speci
 5. How much of the rest of the base-building kit is available this early.
 6. The artillery battery: ammo truck route and frequency, how long the supplied state lasts, what the barrage targets,
    whether it is a third site, and how it is defended.
+7. Truck surrender: the exact trigger, how it is shown, the payout per truck, and whether the Soviets go after captured
+   trucks.
+8. Convoys 4 to 6 (beyond "the last one is heavy").
+9. The radio outpost: location, and what the Berlin crates give the player.
+10. Whether the survey post keeps its cryo rack as unexplained dressing or drops it.

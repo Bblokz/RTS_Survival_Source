@@ -936,6 +936,11 @@ shapes. All other users of `UWallHoleDamageComponent` keep the slot mode unchang
   player Luchs round, a Soviet Pz IV against (and teleported onto) its own wall, friendly fire and a shot into a breach,
   all 9 Blueprints, 45 + 28 debug hits, per-querier paths before and after, lethal damage after a breach. Pictures come
   from a scene capture in the PIE world. Results in `Saved/WallChunks/Breach/<run>`.
+- Mission replay (2026-11-16, run `mission2`): `BREACH_SCRIPT=mission_wall_replay.py BREACH_MAP=/Game/RTS_Survival/Maps/
+  GerMissions/Ger_IntroMission sh run_breach_test.sh <run>` opens the map in a throwaway editor (never saved), lists
+  every Rus wall's runtime setup (all 11 there: owner 2, breach component, breachable nav area) and sends a player
+  Tiger, placed before play, through a Soviet wall with open ground on both sides: it broke through
+  `Rus_Wall_Concrete_LongSandBagsNoFlag` (21 % of the face removed) and came out 14 m behind it.
 - Collision gap: once a breach has fallen, the mesh stops blocking projectiles, weapon traces and visibility; query-only
   boxes along the standing stretches (the mesh's own responses, no tank channels) block them instead, rebuilt per breach
   and switched off when the wall dies. Shells and sight lines pass the gap; the mesh keeps the tank overlap.
@@ -972,6 +977,129 @@ vehicles can drive through those walls; right now they avoid them".
   B6 (paths through before: heavy only), a Pz IV round B2, a Tiger round a dead B4, then B6 killed after its breach
   (paths through for all four agent types). Passed in run `berlin6`; the Rus wall test passed again after (`r20`).
 - **Maps:** the B pieces on Ger_Berlin need no map change (the mesh never carved the navmesh; the boxes switch at play).
+
+### Adversarial reviews after completion (2026-11-16)
+
+Two read-only reviews of the finished work (code, logs, pictures). What changed:
+
+- **Free ends:** the free-standing minimum is capped at `MaxFreeStandingWidth` (250 cm), and an end touching another
+  wall piece (`ADestructableEnvActor` within 40 cm beyond the path end) counts as held up: a breach 3.5 m from the joint
+  of two chained long walls stops short of the joint and leaves the neighbour untouched (test lane `H_chain_medium`).
+- **Tall walls:** the top's fall lasts `TopCollapseDuration` per 2 m of wall over the hull. Berlin ruins use `VSlope`
+  0.15 (setup arg; brick over a ragged hole holds nearer vertical): B2 now keeps both ends (46 % removed instead of
+  98 %); B1 (7 m) and B5's legs still come down whole and die (any fallen breach over 95 % of the face kills the wall).
+- **Lanes:** each crossing records the stretch its hull cut (`M_TankLanes`). Kit nav boxes switch off only in a lane
+  (heaps beside it keep blocking), and death heaps are dropped only over a lane. Rubble grows with the fallen run (up to
+  3x `RubblePieces`).
+- **Nav gap:** `NavGapInset` is -25 (blocks stop 25 cm short of the jagged edge). The engine grows every block by the
+  agent radius, so the old +30 left a Pz IV gap (310 cm) narrower than a medium agent (320): a Soviet medium now paths
+  through a gap a Pz IV broke (checked on lanes A, D, H).
+- **Ruin cost:** player heavies pay 1.05 per cm in the ruin area (the area grown by the agent radius on both sides).
+  1.15 already made B5 (a corner with a 6 m rubble core) a detour, which the owner asked against.
+- **Weapon blocks** follow the fallen V in 50 cm columns (tops merged within 20 cm); shells and sight lines pass over
+  its shoulders. Shell holes still block (as before the breach).
+- **Back-face holes** count as removed area (front or back channel), so a shell on the far face of a thick sandbag wall
+  swaps the material, writes the mask and counts against the health cap (test `back_face`).
+- **Hanging wall:** after each hit and every field rebuild, `FWallHoleField::FindUnsupportedIslands` flood-fills from
+  the two foot rows; wall held only by bridges inside 20 % of a hole radius beyond its edge, or by nothing, is removed
+  on both faces and thrown as debris (pieces over 400 cm²).
+- **Re-entrancy:** a new crossing only arms the update timer; overlaps raised during the update loop are queued.
+- **Tests:** all passed on the finished state: `r23` (Rus walls, incl. back face, chained walls, pier, Soviet medium
+  through a gap), `berlin12` (Berlin), `mission10` (Ger_IntroMission: a player Tiger through a Soviet sandbag wall).
+- **Hole edges in cm:** shell holes store `f = (radius - distance) / 40 cm` (`HoleEdgeScale`) instead of
+  `1 - distance / radius`. The shader is unchanged, but its edge noise (about +-15 cm) and scorch ring (about 12 cm) are
+  now the same on every hole; before they scaled with the radius, so big holes wobbled by most of a metre and wore a
+  metre of soot (the melted look). No material asset changed. The support test for hanging wall uses 14 cm.
+- **Piers:** when a breach's top starts and again when it finishes falling, a stretch between it and a breach that has
+  already fallen, narrower than the free-standing minimum, falls with it (test lane `J_pier_medium`: two Pz IVs 5.6 m
+  apart; a sight line through the middle of the pier passes afterwards).
+- **Unfiltered planners:** the strategic AI waypoints (`StochasticHelpers`), convoy routes, survival POI/base/start
+  checks and wanderers query with `URTSClosedBreachableWallsQueryFilter` (every breachable wall area excluded, all else
+  the navmesh's defaults), so they never route through an intact wall. A cost threshold was tried first and dropped:
+  `NavArea_Obstacle` (scorched city) has the same 1e6 cost.
+
+### Post-completion review rounds (2026-11-16, on the finished build)
+
+Round 1 (on `r23`/`berlin12`/`mission10`), acted on:
+- **Hole shapes:** shell holes are jittered 7-corner polygons (corner radius +-24 %, rotation and jitter seeded by the
+  hole's spot, so a field rebuild draws the same shape) instead of circles: straight fracture edges and corners.
+- **Slivers:** a solid texel with broken-through texels within 2 texels on two opposite sides (under about 18 cm) falls
+  with the hole even while still joined (no debris for slivers).
+- **V start:** the V starts at the lower of 0.8 x hull height and half the wall's height, so a wall barely taller than
+  the hull no longer gets a straight-sided doorway.
+- **Hull height:** clamped to the tank's nav agent height (the colliding bounds include gun, antennas and hatches:
+  Pz IV 375 cm, now 250; Tiger 300).
+- **Chained walls:** only a living wall piece with a hole component holds an end up (not a dead one, a crate, a fence).
+- **Ruin death heaps:** a missing `DeathHeapsSmall/Large` array is reported (`ReportError`) instead of skipped quietly.
+- **Planners:** the cost threshold replaced by `URTSClosedBreachableWallsQueryFilter` (see above).
+- **Mission replay:** the broken route read and the nav-build probe (it fired an engine ensure from Python) are gone;
+  a player Luchs 8 m along the wall is the negative control (it must not drive straight through; at 3 m vehicle
+  avoidance pushed the Tiger aside). Ger_IntroMission `mission12`: Tiger through within 183 cm of its line, 24 % of the
+  sandbag wall removed, the Luchs never crossed.
+- **Ger_Berlin replay** (`berlin_map1`: `BREACH_MAP=/Game/RTS_Survival/Maps/GerMissions/Ger_Berlin
+  BREACH_WALL_PREFIX=BP_BerlinRuin_B BREACH_ACROSS=forward`, never saved): a player Tiger ordered 30 m across a ruin
+  block drove through `BP_BerlinRuin_B1_Facade1St_A` and the B1 piece chained to it (the chained ends kept both gaps
+  partial: 39 % and 58 % removed) and then through a B2 (63 %), crossing after 6 s; the Luchs went round (43 m off its
+  line). The replay's verdict is now "crossed and the picked wall breached"; the drift off the straight line (5.7 m
+  here, round the city's rubble) is kept as information.
+Round 2 (on `r24`/`berlin13`/`mission12`/`berlin_map1`), acted on; then `r25` and `berlin14` passed (one run each):
+- **Splash:** weapon blocks are `ECC_WorldDynamic`, not the mesh's destructible type: area damage queries that type
+  and hits every component, so a breached wall took splash once per block. Shells and sight find blocks by channel.
+- **Late widening:** a hull that keeps cutting after the top fell (oblique crossings) widens its lane; when it leaves
+  the wall the free ends are checked again and nav, weapon blocks and flags catch up (`RefreshAfterLateWidening`).
+  Flags never start a second fall.
+- **Breach islands:** breach steps run the hanging-wall/sliver pass too (before, the next shell anywhere on the wall
+  dropped them).
+- **Memory:** a field's texels are allocated on its first write; until then every reader sees intact wall (hundreds
+  of Berlin pieces are never damaged).
+- **Infantry at walls:** nav blocks reach the wall's half thickness + 40 cm (at most `NavBlockHalfDepth`); the engine
+  grows them by each agent's radius. Infantry now path 0.8-1.1 m from a Rus wall's centre (was over 2 m).
+- **Own breach:** the pier check skips its own breach by index, not by float equality.
+- **Rubble instanced** (owner's request, 2026-11-16): each wall keeps one `UInstancedStaticMeshComponent` per debris
+  mesh (no collision, no nav, world-space instances, not attached, so a sinking remnant leaves them); a breach adds
+  instances instead of up to 66 components (`r26`: wall A's rubble is 7 instanced components). `r26` and `berlin15`
+  passed.
+- Larger follow-up, not done: put the heavy-only area on the ruin kit's `NavBlock` boxes at authoring time instead
+  of switching 426 pieces when Ger_Berlin starts (measure first).
+Final-state reviews A and B (2026-11-16, read-only, on the `r26`/`berlin15` build; nothing changed after them). Open
+pointers, for the owner to pick:
+- Look: shader edge noise (+-15 cm) is not in the CPU field, so the island/sliver pass misses the lacy threads the
+  shader draws; move the noise to the CPU write, keep about +-3 cm in the shader (medium). Rebar draws 20 cm cell
+  outlines: draw bars across the edge only (small; the field masters are dedicated copies, so editing them is safe).
+  First contact cuts the whole hull outline at once: grow the cut with the push (medium).
+- Correctness: islands that fall during a breach are written as shell holes (R/G, not B): they count against the
+  shell budget and weapon blocks treat them as standing (small). A chained neighbour holds an end up even where it has
+  a fallen breach at the joint (small). Rubble is sized from `M_TankLanes.Last()` instead of the crossing's lane (small).
+  Dead Rus walls keep their nav blocks for 4.5 s while invisible (small). Cover finder still offers cover across a
+  fallen gap (the mesh stays `ECC_Destructible` with full collision) (medium).
+- Persistence and performance: rubble and toppled flags vanish with the wall actor (world subsystem, medium). Walls
+  overlap Soviet units for nothing (overlap player objects only, small). Breach steps re-scan and re-upload the whole
+  field every 0.05 s (dirty regions, medium). Ger_Berlin sets up 423 ruins' nav in one frame (measure; baking the area
+  into the kit needs `CollectKitObstacleBoxes` to keep Null as the kit's own area).
+- Design and authoring: no per-instance "unbreachable" switch for mission walls (small). Setup re-runs replace the
+  whole settings struct (tuned Blueprint values lost), save Blueprints with a missing material, resave unconditionally,
+  and the Berlin setup execs an absolute path (small). The Rus 3 m entering cost understates the slowdown (small).
+- Checks: Lumen/distance fields may still darken the gap (check in the Lumen view). AGENTS.md: a few raw `IsValid` on
+  members, a const function that edits the owner by reflection, two functions over 60 lines, one-line lambdas.
+- Tests: `real_fire` is not part of `all_passed`; captures are too dark to judge the look.
+Owner-picked fixes from the final-state reviews (2026-11-16; `r28` and `berlin16` passed):
+- **Wall falling with a breach is breach:** an island or sliver next to breach texels is removed on all three channels
+  (R, G and B), so it no longer uses up the shell hole budget and weapon blocks treat it as open air.
+- **Chained ends:** a neighbour only holds an end up where its own field is not in a breach at the probe point.
+- **Rubble per crossing:** rubble is sized from the crossing's own lane (`LaneIndex`), not the last lane added.
+- **Dead Rus walls:** their nav blocks are destroyed at death (the wall is hidden at once; the actor lives 4.5 s);
+  ruins keep the remnant handling.
+- **Overlap events:** the wall overlaps the human player's objects only; an AI-side overlap response becomes ignore.
+- Verification: `r27` did not finish (PIE at about 4 s per frame while a game and the intro cinematic render ran on
+  the machine); re-run once the machine was free: `r28` (Rus walls) and `berlin16` (Berlin pieces) passed.
+- Not taken: making ruin breaches costlier (the owner asked for heavies to drive through); spall-coloured rim, rebar
+  in shell holes and one-sided breach noise (shader asset changes on shared masters); rubble as ISM and in the wall's
+  colour; fog-of-war and 160-hole stress runs. The Python nav-build probe in the RTS_ToCopySmall tests still fires one
+  handled engine ensure per run (a static Blueprint call on the class default object), harness only.
+- **Mission replay:** Python's synchronous path queries return nothing on Ger_IntroMission (even 6 m from any wall),
+  and the tank's own path following does not expose its route to Python. The replay therefore judges the drive: a
+  tank only drives where its route goes, so the Tiger must cross the wall line within 3 m of the straight line front
+  -> back (run `mission10`: crossed after 10 s, 196 cm off the line at most, 21 % of the sandbag wall removed).
 
 ## Open points
 
