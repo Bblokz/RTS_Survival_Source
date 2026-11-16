@@ -9,6 +9,7 @@
 #include "RTS_Survival/RTSComponents/ExperienceComponent/ExperienceComponent.h"
 #include "RTS_Survival/RTSComponents/ExperienceComponent/ExperienceInterface/ExperienceInterface.h"
 #include "RTS_Survival/Units/Aircraft/AircraftReloadManager/AircraftReloadManager.h"
+#include "RTS_Survival/Units/Aircraft/AircraftTerrainFollow/AircraftTerrainFollow.h"
 #include "RTS_Survival/Weapons/BombComponent/BombComponent.h"
 
 #include "AAircraftMaster.generated.h"
@@ -125,6 +126,18 @@ public:
 
 	/** @return Current landed state enum (routing hint for animation/weapon/movement). */
 	inline EAircraftLandingState GetLandedState() const { return M_LandedState; }
+
+	/** @return Height between the landed position and the airborne position after a vertical take-off. */
+	float GetTakeOffHeight() const { return M_AircraftMovementSettings.TakeOffHeight; }
+
+	/** @return Terrain following state, for map tests and debugging. */
+	const FAircraftTerrainFollow& GetTerrainFollow() const { return M_TerrainFollow; }
+
+	/** @return Whether the aircraft flies into or out of an attack dive, where terrain following must not act. */
+	bool GetIsFlyingAttackDive() const
+	{
+		return M_MovementState == EAircraftMovementState::AttackMove && M_AircraftAttackData.Path.GetIsFlyingDiveSegment();
+	}
 
 	/** @brief Blueprint hook for weapon fire montage per index/mode; owned by aircraft animation pipeline. */
 	UFUNCTION(BlueprintImplementableEvent)
@@ -410,6 +423,53 @@ private:
 	// as airborne.
 	UPROPERTY()
 	FAircraftLandedData M_AircraftLandedData;
+
+	/**
+	 * @brief The only way to set the cruise height from outside terrain following: the clearance above the ground is
+	 * then captured again from the new height.
+	 * @param NewTargetAirborneHeight Cruise height (world Z) to fly at from now on.
+	 */
+	void SetTargetAirborneHeight(const float NewTargetAirborneHeight);
+
+	// Moves the cruise height (TargetAirborneHeight) with the terrain below; see Tick_TerrainFollow.
+	FAircraftTerrainFollow M_TerrainFollow;
+
+	/** @brief Starts the ground samples of this aircraft at a random moment so aircraft do not all trace together. */
+	void BeginPlay_InitTerrainFollow();
+
+	/**
+	 * @brief Samples the ground at an interval and eases the cruise height, the aircraft and its current path up or
+	 * down with it. Skipped while the aircraft aims (dives, bomb runs) or flies a height planned elsewhere.
+	 */
+	void Tick_TerrainFollow(const float DeltaTime);
+
+	/** @return Whether the current flight may change height with the terrain. */
+	bool TerrainFollow_GetIsAllowed() const;
+
+	/** @brief Traces the ground below the aircraft and along its flight ahead, and hands it to M_TerrainFollow. */
+	void TerrainFollow_SampleGround();
+
+	/** @brief Moves the aircraft, its cruise height and the path it flies by DeltaZ, keeping all of them in step. */
+	void TerrainFollow_ShiftCruiseHeight(const float DeltaZ);
+
+	/** @return Nose pitch (degrees) that shows the current terrain climb or descent. */
+	float TerrainFollow_GetClimbPitch() const;
+
+	/**
+	 * @brief Ability flights spawn at a height chosen for their target, often far off over other ground: keep the
+	 * cruise height's clearance above the target's ground instead of above the spawn point.
+	 * @param TargetLocation XY whose ground the clearance is measured from.
+	 */
+	void TerrainFollow_CaptureClearanceAboveTarget(const FVector& TargetLocation);
+
+	/**
+	 * @brief Traces down to the landscape at one XY location; movable things that block the landscape channel (team
+	 * weapons) are skipped so aircraft do not hop over them.
+	 * @param Location XY to sample; Z is the centre of the trace.
+	 * @param OutGroundZ Ground height when hit.
+	 * @return Whether the landscape was hit.
+	 */
+	bool TraceLandscapeGroundZ(const FVector& Location, float& OutGroundZ) const;
 
 	/** @brief Idle circling parameters (center, angle, grace-steering). */
 	UPROPERTY()
@@ -755,14 +815,6 @@ private:
 
 	/** @return Highest ground Z sampled on the straight line from the aircraft to the drop point. */
 	float AircraftDrop_GetHighestGroundZAlongApproach() const;
-
-	/**
-	 * @brief Traces down to the landscape at one XY location.
-	 * @param Location XY to sample; Z is the centre of the trace.
-	 * @param OutGroundZ Ground height when hit.
-	 * @return Whether the landscape was hit.
-	 */
-	bool AircraftDrop_TraceGroundZ(const FVector& Location, float& OutGroundZ) const;
 
 	void AircraftDrop_StartRopeSlingDescent();
 	void AircraftDrop_OnRopeSlingPayloadGrounded();

@@ -68,7 +68,8 @@ void UAircraftMovement::OnVerticalTakeOffCompleted()
 	Velocity.Z = 0.f;
 }
 
-void UAircraftMovement::TickMovement_Homing(const FAircraftPathPoint& TargetPoint, const float DeltaTime)
+void UAircraftMovement::TickMovement_Homing(const FAircraftPathPoint& TargetPoint, const float DeltaTime,
+                                           const float ClimbPitch)
 {
 	if(not PawnOwner)
 	{
@@ -78,6 +79,8 @@ void UAircraftMovement::TickMovement_Homing(const FAircraftPathPoint& TargetPoin
 	TargetRot.Roll = TargetPoint.Roll;
     const FVector ForwardDir = TargetRot.Vector().GetSafeNormal();
     AddInputVector(ForwardDir);
+	// Only the nose follows the terrain climb: the height itself moves with the path, not through the input vector.
+	TargetRot.Pitch += ClimbPitch;
 	UpdateOwnerRotation(TargetRot, DeltaTime);
 	if constexpr (DeveloperSettings::Debugging::GAircraftMovement_Compile_DebugSymbols)
 	{

@@ -8,6 +8,7 @@
 #include "NavigationData.h"
 #include "NavigationSystem.h"
 #include "NavFilters/NavigationQueryFilter.h"
+#include "RTS_Survival/Environment/DestructableEnvActor/WallGate/WallGateNavigation.h"
 
 namespace SurvivalStartContentPlannerConstants
 {
@@ -1007,7 +1008,8 @@ bool FSurvivalStartContentPlanner::GetIsReachable(const FVector& Location) const
 		return false;
 	}
 	const FPathFindingQuery Query(nullptr, *NavData, M_ReachDeploy, Projected.Location,
-	                              UNavigationQueryFilter::GetQueryFilter(*NavData, nullptr, nullptr));
+	                              UNavigationQueryFilter::GetQueryFilter(*NavData, nullptr,
+	                                                                     URTSClosedBreachableWallsQueryFilter::StaticClass()));
 	const FPathFindingResult Path = NavigationSystem->FindPathSync(Query);
 	return Path.IsSuccessful() and Path.Path.IsValid() and not Path.IsPartial()
 		and FVector::Dist2D(Path.Path->GetPathPoints().Last().Location, Projected.Location) <= ReachArriveTolerance;

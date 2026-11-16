@@ -6,6 +6,7 @@
 #include "RTS_Survival/Units/Aircraft/AircraftDeath/AircraftDeathComponent.h"
 #include "RTS_Survival/Units/RTSDeathType/RTSDeathType.h"
 #include "Components/DecalComponent.h"
+#include "Components/PrimitiveComponent.h"
 #include "RTS_Survival/Weapons/AircraftWeapon/AircraftWeapon.h"
 #include "RTS_Survival/RTSComponents/RTSTargetAcquisition/AircraftTargetAcquisition/AircraftTargetAcquisition.h"
 #include "Kismet/GameplayStatics.h"
@@ -70,7 +71,26 @@ namespace
 		constexpr float MinHoverSecondsAfterRetract = 0.5f;
 		// Ground samples on the straight approach line used to pick a cruise height that clears hills.
 		constexpr int32 ApproachGroundSamples = 12;
-		constexpr float GroundTraceHalfHeight = 200000.0f;
+	}
+
+	namespace AircraftGroundTrace
+	{
+		// Starts far above the aircraft so hills higher than the aircraft are found too.
+		constexpr float HalfHeight = 200000.0f;
+		// Movable blockers (team weapon meshes) skipped before giving up on finding the ground below.
+		constexpr int32 MaxSkippedMovableHits = 3;
+
+		bool GetIsStaticGroundHit(const FHitResult& Hit)
+		{
+			const UPrimitiveComponent* HitComponent = Hit.GetComponent();
+			return IsValid(HitComponent) && HitComponent->Mobility != EComponentMobility::Movable;
+		}
+	}
+
+	namespace AircraftTerrainFollowSampling
+	{
+		// Ground samples spread evenly over the look-ahead distance, besides the one right below the aircraft.
+		constexpr int32 LookAheadSamples = 4;
 	}
 }
 
@@ -120,6 +140,7 @@ void AAircraftMaster::BeginPlay()
 	// Make sure the aircraft weapon knows if we are airborne or landed.
 	BeginPlay_PropagateStateToWpAndAnimInst();
 	BeginPlay_SetupWeaponHitCollision();
+	BeginPlay_InitTerrainFollow();
 	if (ensure(GetIsValidTargetAcquisition()))
 	{
 		M_TargetAcquisition->ActivateAcquisition();
@@ -305,7 +326,7 @@ void AAircraftMaster::PostInitializeComponents()
 		// Do not use the function as we wait for references to be set before propagating the state.
 		/** @See BeginPlay_PropagateStateToWpAndAnimInst */
 		M_LandedState = EAircraftLandingState::Airborne;
-		M_AircraftLandedData.TargetAirborneHeight = GetActorLocation().Z;
+		SetTargetAirborneHeight(GetActorLocation().Z);
 		UpdateFowVisionRadiusForLandedState();
 	}
 
@@ -407,6 +428,7 @@ void AAircraftMaster::Tick(float DeltaTime)
 
 	if (M_StraightRunState.bM_IsActive)
 	{
+		Tick_TerrainFollow(DeltaTime);
 		Tick_StraightRun(DeltaTime);
 		return;
 	}
@@ -431,6 +453,7 @@ void AAircraftMaster::Tick(float DeltaTime)
 		Tick_WaitingForBayOpening(DeltaTime);
 		return;
 	}
+	Tick_TerrainFollow(DeltaTime);
 	if (M_MovementState == EAircraftMovementState::MovingTo)
 	{
 		CarpetBombing_UpdateBombTargetLocation();
@@ -825,7 +848,7 @@ void AAircraftMaster::StartVto()
 	const float Apex = M_AircraftMovementSettings.TakeOffHeight;
 	const float GroundZ = M_AircraftLandedData.LandedPosition.Z;
 
-	M_AircraftLandedData.TargetAirborneHeight = GroundZ + Apex;
+	SetTargetAirborneHeight(GroundZ + Apex);
 	M_AircraftLandedData.LandedRotation = GetActorRotation();
 
 	// Kick the usual prepare timer path
@@ -1092,6 +1115,11 @@ void AAircraftMaster::PostInit_InitWeaponInitAnim()
 void AAircraftMaster::UpdateLandedState(const EAircraftLandingState NewState)
 {
 	M_LandedState = NewState;
+	if (NewState != EAircraftLandingState::Airborne)
+	{
+		// Terrain following does not run in these states; no climb may carry over into the next flight.
+		M_TerrainFollow.Suspend();
+	}
 	UpdateFowVisionRadiusForLandedState();
 	UpdateAircraftWeaponWithLandedState();
 	UpdateAircraftAnimationWithLandedState();
@@ -1166,7 +1194,7 @@ FVector AAircraftMaster::OnMoveStartGetLocationAndRotation(
 		RTSFunctionLibrary::ReportError(
 			"Target Airborne Height is zero in AAircraftMaster::OnMoveStartGetLocationAndRotation. "
 			"Ensure to set the target airborne height before calling this function.");
-		M_AircraftLandedData.TargetAirborneHeight = M_AircraftMovementSettings.TakeOffHeight;
+		SetTargetAirborneHeight(M_AircraftMovementSettings.TakeOffHeight);
 	}
 	const float DeltaZ = M_AircraftLandedData.TargetAirborneHeight - CurrentLocation.Z;
 	FVector OutLocation;
@@ -1442,7 +1470,7 @@ void AAircraftMaster::Tick_IdleCircling(float DeltaTime)
 	// Build desired rotation
 	FRotator DesiredRot;
 	DesiredRot.Yaw = Dir.Rotation().Yaw;
-	DesiredRot.Pitch = 0.f;
+	DesiredRot.Pitch = TerrainFollow_GetClimbPitch();
 
 	// Gracefully ramp roll toward signed idle bank
 	const float TargetRoll = (M_AircraftMovementSettings.IdleBankAngle * TurnSign) * SteerScale;
@@ -1567,7 +1595,7 @@ void AAircraftMaster::Tick_MoveTo(const float DeltaTime)
 	}
 
 	const FAircraftPathPoint NextPoint = Points[CurrentPathIndex + 1];
-	M_AircraftMovement->TickMovement_Homing(NextPoint, DeltaTime);
+	M_AircraftMovement->TickMovement_Homing(NextPoint, DeltaTime, TerrainFollow_GetClimbPitch());
 }
 
 void AAircraftMaster::Tick_AttackMove(const float DeltaTime)
@@ -1616,7 +1644,7 @@ void AAircraftMaster::Tick_AttackMove(const float DeltaTime)
 		return;
 	}
 	const FAircraftPathPoint NextPoint = Points[CurrentPathIndex + 1];
-	M_AircraftMovement->TickMovement_Homing(NextPoint, DeltaTime);
+	M_AircraftMovement->TickMovement_Homing(NextPoint, DeltaTime, TerrainFollow_GetClimbPitch());
 }
 
 void AAircraftMaster::AttackMove_IssueActionForNewTargetPoint(const FAircraftPathPoint& NextPoint)
@@ -1645,6 +1673,11 @@ void AAircraftMaster::AttackMove_IssueActionForNewTargetPoint(const FAircraftPat
 		break;
 	}
 	StopIssuedActionForNewType(NewPointType);
+	if (NextPoint.IsDivePoint() || NextPoint.IsDiveRecoveryPoint())
+	{
+		// The dive aims from this frame on: no terrain climb may carry into it.
+		M_TerrainFollow.Suspend();
+	}
 }
 
 void AAircraftMaster::StopIssuedActionForNewType(const EAirPathPointType NewType)
@@ -2266,7 +2299,7 @@ void AAircraftMaster::OnOwnerDies_ResetToIdleAirborne()
 	// Clear landing cache
 	M_AircraftLandedData.LandedPosition = FVector::ZeroVector;
 	M_AircraftLandedData.LandedRotation = FRotator::ZeroRotator;
-	M_AircraftLandedData.TargetAirborneHeight = GetActorLocation().Z;
+	SetTargetAirborneHeight(GetActorLocation().Z);
 
 	M_AircraftMoveData.Reset();
 	M_AircraftAttackData.Reset();
@@ -2634,6 +2667,7 @@ void AAircraftMaster::StrafeLocation(const FStrafeAircraftSettings& StrafeAircra
 		return;
 	}
 
+	TerrainFollow_CaptureClearanceAboveTarget(M_StrafeState.StrafeStartLocation);
 	Strafe_StartAttackRun();
 }
 
@@ -2842,6 +2876,7 @@ void AAircraftMaster::CarpetBombing(
 	M_CarpetBombingState.EndCarpetLocation = EndCarpetLocation;
 	M_CarpetBombingState.RetreatLocation = RetreatLocation;
 	M_CarpetBombingState.Phase = EAircraftCarpetBombingPhase::MovingToStart;
+	TerrainFollow_CaptureClearanceAboveTarget(StartCarpetLocation);
 	CarpetBombing_MoveToLocation(StartCarpetLocation);
 }
 
@@ -3008,7 +3043,8 @@ void AAircraftMaster::OrderStraightFlightRun(const FVector& PassOverLocation, co
 	M_StraightRunState.bM_HasPassedPoint = false;
 	M_StraightRunState.bM_HoldAtEnd = false;
 	M_StraightRunState.bM_IsActive = true;
-	M_AircraftLandedData.TargetAirborneHeight = GetActorLocation().Z;
+	SetTargetAirborneHeight(GetActorLocation().Z);
+	TerrainFollow_CaptureClearanceAboveTarget(PassOverLocation);
 	SetActorRotation(Direction.Rotation());
 	StraightRun_ApplyFullSpeed();
 }
@@ -3030,13 +3066,16 @@ void AAircraftMaster::StraightRun_ApplyFullSpeed() const
 
 void AAircraftMaster::Tick_StraightRun(const float DeltaTime)
 {
-	// Re-applied every frame so no other system can bend or slow the run; the height stays at the start height.
+	// Re-applied every frame so no other system can bend or slow the run; the height stays at the start height,
+	// which terrain following moves with the ground below.
 	StraightRun_ApplyFullSpeed();
 	const FVector FromStart = GetActorLocation() - M_StraightRunState.StartLocation;
 	const float DistanceAlongRun = FVector::DotProduct(FromStart, M_StraightRunState.Direction);
 	FVector OnLineLocation = M_StraightRunState.StartLocation + M_StraightRunState.Direction * DistanceAlongRun;
 	OnLineLocation.Z = M_StraightRunState.StartLocation.Z;
-	SetActorLocationAndRotation(OnLineLocation, M_StraightRunState.Direction.Rotation());
+	FRotator RunRotation = M_StraightRunState.Direction.Rotation();
+	RunRotation.Pitch = TerrainFollow_GetClimbPitch();
+	SetActorLocationAndRotation(OnLineLocation, RunRotation);
 
 	if (not M_StraightRunState.bM_HasPassedPoint && DistanceAlongRun >= M_StraightRunState.PassOverDistance)
 	{
@@ -3070,7 +3109,8 @@ void AAircraftMaster::AircraftDrop_MoveToDropLocation()
 		M_AircraftDropRequest.ExecuteLocation.X,
 		M_AircraftDropRequest.ExecuteLocation.Y,
 		CruiseZ);
-	M_AircraftLandedData.TargetAirborneHeight = FlightTarget.Z;
+	SetTargetAirborneHeight(FlightTarget.Z);
+	TerrainFollow_CaptureClearanceAboveTarget(M_AircraftDropRequest.ExecuteLocation);
 	M_AircraftMoveData.SetTargetPoint(FlightTarget);
 	StartMoveTo();
 }
@@ -3489,7 +3529,7 @@ FVector AAircraftMaster::AircraftDrop_GetProjectedSquadSpawnLocation(const int32
 	// that is inside the ground, past the landscape edge there is nothing below. Either way the squad falls out of
 	// the world, so it stands on the landscape below the point, or at the drop point when there is none.
 	float GroundZ = 0.0f;
-	if (AircraftDrop_TraceGroundZ(DesiredLocation, GroundZ))
+	if (TraceLandscapeGroundZ(DesiredLocation, GroundZ))
 	{
 		return FVector(DesiredLocation.X, DesiredLocation.Y, GroundZ);
 	}
@@ -3559,7 +3599,7 @@ float AAircraftMaster::AircraftDrop_GetHighestGroundZAlongApproach() const
 	{
 		const float Alpha = static_cast<float>(SampleIndex) / static_cast<float>(SampleCount);
 		float GroundZ = 0.f;
-		if (AircraftDrop_TraceGroundZ(FMath::Lerp(ApproachStart, ApproachEnd, Alpha), GroundZ))
+		if (TraceLandscapeGroundZ(FMath::Lerp(ApproachStart, ApproachEnd, Alpha), GroundZ))
 		{
 			HighestGroundZ = FMath::Max(HighestGroundZ, GroundZ);
 		}
@@ -3567,7 +3607,7 @@ float AAircraftMaster::AircraftDrop_GetHighestGroundZAlongApproach() const
 	return HighestGroundZ;
 }
 
-bool AAircraftMaster::AircraftDrop_TraceGroundZ(const FVector& Location, float& OutGroundZ) const
+bool AAircraftMaster::TraceLandscapeGroundZ(const FVector& Location, float& OutGroundZ) const
 {
 	const UWorld* World = GetWorld();
 	if (not IsValid(World))
@@ -3575,20 +3615,29 @@ bool AAircraftMaster::AircraftDrop_TraceGroundZ(const FVector& Location, float& 
 		return false;
 	}
 
-	const FVector TraceStart(Location.X, Location.Y, Location.Z + AircraftRopeSlingFlight::GroundTraceHalfHeight);
-	const FVector TraceEnd(Location.X, Location.Y, Location.Z - AircraftRopeSlingFlight::GroundTraceHalfHeight);
-	FCollisionQueryParams TraceParams(FName(TEXT("RopeSlingCruiseGroundTrace")), false, this);
+	const FVector TraceStart(Location.X, Location.Y, Location.Z + AircraftGroundTrace::HalfHeight);
+	const FVector TraceEnd(Location.X, Location.Y, Location.Z - AircraftGroundTrace::HalfHeight);
+	FCollisionQueryParams TraceParams(FName(TEXT("AircraftLandscapeGroundTrace")), false, this);
 	if (M_AircraftDropRequest.AttachedTank.IsValid())
 	{
 		TraceParams.AddIgnoredActor(M_AircraftDropRequest.AttachedTank.Get());
 	}
-	FHitResult GroundHit;
-	if (not World->LineTraceSingleByChannel(GroundHit, TraceStart, TraceEnd, COLLISION_TRACE_LANDSCAPE, TraceParams))
+	for (int32 TraceIndex = 0; TraceIndex <= AircraftGroundTrace::MaxSkippedMovableHits; ++TraceIndex)
 	{
-		return false;
+		FHitResult GroundHit;
+		if (not World->LineTraceSingleByChannel(GroundHit, TraceStart, TraceEnd, COLLISION_TRACE_LANDSCAPE,
+		                                        TraceParams))
+		{
+			return false;
+		}
+		if (AircraftGroundTrace::GetIsStaticGroundHit(GroundHit))
+		{
+			OutGroundZ = GroundHit.ImpactPoint.Z;
+			return true;
+		}
+		TraceParams.AddIgnoredActor(GroundHit.GetActor());
 	}
-	OutGroundZ = GroundHit.ImpactPoint.Z;
-	return true;
+	return false;
 }
 
 void AAircraftMaster::AircraftDrop_StartRopeSlingDescent()
@@ -3706,7 +3755,7 @@ void AAircraftMaster::Tick_RopeSlingClimb(const float DeltaTime)
 	{
 		return;
 	}
-	M_AircraftLandedData.TargetAirborneHeight = GetActorLocation().Z;
+	SetTargetAirborneHeight(GetActorLocation().Z);
 	AircraftDrop_OnVtoCompleted();
 }
 
@@ -3731,4 +3780,142 @@ bool AAircraftMaster::AircraftDrop_ShouldEnablePayloadPhysics(const ATankMaster*
 	}
 	// In building form the chassis is hidden without collision; simulating it would let it fall through the world.
 	return NomadicVehicle->GetIsInTruckMode();
+}
+
+// -------------------------------------------------------------
+// ----------------------- Terrain Follow -----------------------
+// -------------------------------------------------------------
+
+void AAircraftMaster::SetTargetAirborneHeight(const float NewTargetAirborneHeight)
+{
+	M_AircraftLandedData.TargetAirborneHeight = NewTargetAirborneHeight;
+	M_TerrainFollow.ResetClearance();
+}
+
+void AAircraftMaster::BeginPlay_InitTerrainFollow()
+{
+	const float SampleInterval = M_AircraftMovementSettings.TerrainFollowSettings.SampleInterval;
+	M_TerrainFollow.SetSamplePhase(FMath::FRandRange(0.f, SampleInterval));
+}
+
+void AAircraftMaster::Tick_TerrainFollow(const float DeltaTime)
+{
+	const FAircraftTerrainFollowSettings& Settings = M_AircraftMovementSettings.TerrainFollowSettings;
+	if (not Settings.bEnabled)
+	{
+		return;
+	}
+	if (not TerrainFollow_GetIsAllowed())
+	{
+		M_TerrainFollow.Suspend();
+		return;
+	}
+	if (M_TerrainFollow.TickSampleTimer(DeltaTime, Settings.SampleInterval))
+	{
+		TerrainFollow_SampleGround();
+	}
+	const float DeltaZ = M_TerrainFollow.AdvanceFlightHeight(
+		DeltaTime, M_AircraftLandedData.TargetAirborneHeight, Settings);
+	if (FMath::IsNearlyZero(DeltaZ))
+	{
+		return;
+	}
+	TerrainFollow_ShiftCruiseHeight(DeltaZ);
+}
+
+bool AAircraftMaster::TerrainFollow_GetIsAllowed() const
+{
+	if (M_StraightRunState.bM_IsActive)
+	{
+		return true;
+	}
+	if (M_LandedState != EAircraftLandingState::Airborne)
+	{
+		return false;
+	}
+	// A slung payload's cruise height is already planned to clear the highest ground on the way in.
+	const bool bIsRopeSlungApproach = M_AircraftDropRequest.bRopeSlungPayload
+		&& M_AircraftDropRequest.State == EAircraftDropRequestState::MovingToDropLocation;
+	if (bIsRopeSlungApproach || AircraftDrop_GetIsRopeSlingFlightActive())
+	{
+		return false;
+	}
+	// Carpet bombs are aimed below the aircraft from the height the run was planned at.
+	const bool bIsCarpetBombingRun = M_CarpetBombingState.Phase == EAircraftCarpetBombingPhase::BombingToEnd
+		|| M_CarpetBombingState.Phase == EAircraftCarpetBombingPhase::BombingToStart;
+	if (bIsCarpetBombingRun)
+	{
+		return false;
+	}
+	// The dive and its recovery aim the guns and bombs: they keep the exact heights of the attack path.
+	const bool bIsAttackDive = M_MovementState == EAircraftMovementState::AttackMove
+		&& M_AircraftAttackData.Path.GetIsFlyingDiveSegment();
+	return not bIsAttackDive;
+}
+
+void AAircraftMaster::TerrainFollow_SampleGround()
+{
+	const FVector AircraftLocation = GetActorLocation();
+	float GroundBelowZ = 0.f;
+	if (not TraceLandscapeGroundZ(AircraftLocation, GroundBelowZ))
+	{
+		// Past the landscape edge there is nothing to follow; keep the current height.
+		return;
+	}
+
+	float HighestGroundZ = GroundBelowZ;
+	const FVector FlightDirection = GetVelocity().GetSafeNormal2D();
+	// At cruise speed at least: an aircraft still speeding up after an order would otherwise look too short ahead.
+	const float LookAheadSpeed = FMath::Max(GetVelocity().Size2D(), M_AircraftMovementSettings.MaxMoveSpeed);
+	const FVector LookAheadOffset = FlightDirection * LookAheadSpeed
+		* M_AircraftMovementSettings.TerrainFollowSettings.LookAheadSeconds;
+	if (not LookAheadOffset.IsNearlyZero())
+	{
+		const int32 SampleCount = AircraftTerrainFollowSampling::LookAheadSamples;
+		for (int32 SampleIndex = 1; SampleIndex <= SampleCount; ++SampleIndex)
+		{
+			const float Alpha = static_cast<float>(SampleIndex) / static_cast<float>(SampleCount);
+			float GroundAheadZ = 0.f;
+			if (TraceLandscapeGroundZ(AircraftLocation + LookAheadOffset * Alpha, GroundAheadZ))
+			{
+				HighestGroundZ = FMath::Max(HighestGroundZ, GroundAheadZ);
+			}
+		}
+	}
+	M_TerrainFollow.OnGroundSampled(GroundBelowZ, HighestGroundZ, M_AircraftLandedData.TargetAirborneHeight,
+	                                M_AircraftMovementSettings.TerrainFollowSettings.MinGroundClearance);
+}
+
+void AAircraftMaster::TerrainFollow_ShiftCruiseHeight(const float DeltaZ)
+{
+	AddActorWorldOffset(FVector(0.f, 0.f, DeltaZ));
+	M_AircraftLandedData.TargetAirborneHeight += DeltaZ;
+	M_StraightRunState.StartLocation.Z += DeltaZ;
+	// The path moves with the aircraft, so homing keeps its shape and the segment progress stays exact.
+	if (M_MovementState == EAircraftMovementState::MovingTo)
+	{
+		M_AircraftMoveData.Path.ShiftHeight(DeltaZ);
+	}
+	else if (M_MovementState == EAircraftMovementState::AttackMove)
+	{
+		M_AircraftAttackData.Path.ShiftHeight(DeltaZ);
+	}
+}
+
+void AAircraftMaster::TerrainFollow_CaptureClearanceAboveTarget(const FVector& TargetLocation)
+{
+	float TargetGroundZ = 0.f;
+	if (not TraceLandscapeGroundZ(TargetLocation, TargetGroundZ))
+	{
+		// No landscape at the target: the ground below the aircraft sets the clearance on the next sample.
+		return;
+	}
+	M_TerrainFollow.CaptureClearance(TargetGroundZ, M_AircraftLandedData.TargetAirborneHeight,
+	                                 M_AircraftMovementSettings.TerrainFollowSettings.MinGroundClearance);
+}
+
+float AAircraftMaster::TerrainFollow_GetClimbPitch() const
+{
+	return M_TerrainFollow.GetClimbPitch(GetVelocity().Size2D(),
+	                                     M_AircraftMovementSettings.TerrainFollowSettings.MaxClimbPitch);
 }
