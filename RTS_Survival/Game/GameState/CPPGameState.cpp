@@ -5512,11 +5512,8 @@ void ACPPGameState::InitAllGameHeavyWeapons()
 	WeaponData.TNTExplosiveGrams = 1062;
 	WeaponData.BaseDamage = DamagePerMM * WeaponData.WeaponCalibre
 		+ GetCannonDamageTNTGrams(WeaponData.TNTExplosiveGrams) * DamagePerTNTEquivalentGrams;
-	// The SU-152 takes the direct-fire range boost instead of the artillery one its base constant carries.
 	WeaponData.Range = RTSFunctionLibrary::RoundToNearestMultipleOf(
-		DeveloperSettings::GameBalance::Ranges::HeavyArtilleryRange * 1.2
-		/ DeveloperSettings::GameBalance::Ranges::ArtilleryRangeMlt
-		* DeveloperSettings::GameBalance::Ranges::DirectFireRangeMlt, 100);
+		DeveloperSettings::GameBalance::Ranges::HeavyArtilleryRange * 1.2, 100);
 	WeaponData.ArmorPen = 161;
 	WeaponData.ArmorPenMaxRange = 152;
 	WeaponData.MagCapacity = 1;
@@ -8840,6 +8837,7 @@ void ACPPGameState::InitAllGameBxpData()
 	using namespace DeveloperSettings::GameBalance::UnitCosts::Bxps;
 	using namespace DeveloperSettings::GameBalance::VisionRadii::BxpVision;
 	using namespace DeveloperSettings::GameBalance::UnitHealth;
+	namespace SovietBuildingShotHealth = DeveloperSettings::GameBalance::SovietBuildingShotHealth;
 
 
 	TArray<FUnitAbilityEntry> ArmedBxpAbilities = FAbilityHelpers::ConvertAbilityIdsToEntries({
@@ -8973,7 +8971,7 @@ void ACPPGameState::InitAllGameBxpData()
 		},
 	});
 	BxpData.Abilities = ArmedBxpAbilities;
-	BxpData.Health = RTSFunctionLibrary::RoundToNearestMultipleOf(T3NomadicBuildingHealth * 5, 10);
+	BxpData.Health = SovietBuildingShotHealth::ReinforcedHealthForShots(SovietBuildingShotHealth::FactoryShots);
 	BxpData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIReinforcedArmorResistances(BxpData.Health);
 	M_TPlayerBxpDataHashMap.Add(EBuildingExpansionType::BTX_RusFactory, BxpData);
 
@@ -9005,7 +9003,7 @@ void ACPPGameState::InitAllGameBxpData()
 		},
 	});
 	BxpData.Abilities = ArmedBxpAbilities;
-	BxpData.Health = RTSFunctionLibrary::RoundToNearestMultipleOf(T3NomadicBuildingHealth * 7, 10);
+	BxpData.Health = SovietBuildingShotHealth::ReinforcedHealthForShots(SovietBuildingShotHealth::PlatformFactoryShots);
 	BxpData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIReinforcedArmorResistances(BxpData.Health);
 	M_TPlayerBxpDataHashMap.Add(EBuildingExpansionType::BTX_RusPlatformFactory, BxpData);
 
@@ -9036,7 +9034,7 @@ void ACPPGameState::InitAllGameBxpData()
 		},
 	});
 	BxpData.Abilities = ArmedBxpAbilities;
-	BxpData.Health = RTSFunctionLibrary::RoundToNearestMultipleOf(T2NomadicBuildingHealth * 2, 10);
+	BxpData.Health = SovietBuildingShotHealth::ReinforcedHealthForShots(SovietBuildingShotHealth::ResearchCenterShots);
 	BxpData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIReinforcedArmorResistances(BxpData.Health);
 	M_TPlayerBxpDataHashMap.Add(EBuildingExpansionType::BTX_RusResearchCenter, BxpData);
 
@@ -9056,7 +9054,7 @@ void ACPPGameState::InitAllGameBxpData()
 		},
 	});
 	BxpData.Abilities = ArmedBxpAbilities;
-	BxpData.Health = RTSFunctionLibrary::RoundToNearestMultipleOf(T2NomadicBuildingHealth * 2, 10);
+	BxpData.Health = SovietBuildingShotHealth::ReinforcedHealthForShots(SovietBuildingShotHealth::IndustrialRefineryShots);
 	BxpData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIReinforcedArmorResistances(BxpData.Health);
 	M_TPlayerBxpDataHashMap.Add(EBuildingExpansionType::BTX_RusIndustrialRefinery, BxpData);
 
@@ -9076,7 +9074,7 @@ void ACPPGameState::InitAllGameBxpData()
 		},
 	});
 	BxpData.Abilities = ArmedBxpAbilities;
-	BxpData.Health = RTSFunctionLibrary::RoundToNearestMultipleOf(T2NomadicBuildingHealth * 2, 10);
+	BxpData.Health = SovietBuildingShotHealth::BasicHealthForShots(SovietBuildingShotHealth::CoolingTowersShots);
 	BxpData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIBasicBuildingArmorResistances(BxpData.Health);
 	M_TPlayerBxpDataHashMap.Add(EBuildingExpansionType::BTX_RusCoolingTowers, BxpData);
 
@@ -9096,7 +9094,7 @@ void ACPPGameState::InitAllGameBxpData()
 		},
 	});
 	BxpData.Abilities = ArmedBxpAbilities;
-	BxpData.Health = RTSFunctionLibrary::RoundToNearestMultipleOf(T1NomadicBuildingHealth * 1, 10);
+	BxpData.Health = SovietBuildingShotHealth::BasicHealthForShots(SovietBuildingShotHealth::BarracksShots);
 	BxpData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIBasicBuildingArmorResistances(BxpData.Health);
 	M_TPlayerBxpDataHashMap.Add(EBuildingExpansionType::BTX_RusBarracks, BxpData);
 
@@ -9202,7 +9200,7 @@ void ACPPGameState::InitAllGameBxpData()
 		},
 	});
 	BxpData.Abilities = ArmedBxpAbilities;
-	BxpData.Health = RTSFunctionLibrary::RoundToNearestMultipleOf(T1BxpHealth * 1, 10);
+	BxpData.Health = SovietBuildingShotHealth::BasicHealthForShots(SovietBuildingShotHealth::AmmoStorageShots);
 	BxpData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIBasicBuildingArmorResistances(BxpData.Health);
 	M_TPlayerBxpDataHashMap.Add(EBuildingExpansionType::BTX_RusAmmoStorage, BxpData);
 
@@ -9222,7 +9220,7 @@ void ACPPGameState::InitAllGameBxpData()
 		},
 	});
 	BxpData.Abilities = ArmedBxpAbilities;
-	BxpData.Health = RTSFunctionLibrary::RoundToNearestMultipleOf(T1BxpHealth * 0.8, 10);
+	BxpData.Health = SovietBuildingShotHealth::BasicHealthForShots(SovietBuildingShotHealth::FuelStorageSmallShots);
 	BxpData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIBasicBuildingArmorResistances(BxpData.Health);
 	M_TPlayerBxpDataHashMap.Add(EBuildingExpansionType::BTX_RusFuelStorage1, BxpData);
 
@@ -9243,7 +9241,7 @@ void ACPPGameState::InitAllGameBxpData()
 		},
 	});
 	BxpData.Abilities = ArmedBxpAbilities;
-	BxpData.Health = RTSFunctionLibrary::RoundToNearestMultipleOf(T1BxpHealth * 2.5, 10);
+	BxpData.Health = SovietBuildingShotHealth::BasicHealthForShots(SovietBuildingShotHealth::FuelStorageLargeShots);
 	BxpData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIBasicBuildingArmorResistances(BxpData.Health);
 	M_TPlayerBxpDataHashMap.Add(EBuildingExpansionType::BTX_RusFuelStorage2, BxpData);
 	M_TPlayerBxpDataHashMap.Add(EBuildingExpansionType::BTX_Rus_SuppliesStorage, BxpData);
