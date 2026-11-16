@@ -850,3 +850,9 @@ always (`MI_Intro_PD_Encrusted`; the clay-looking helmets / heads finding is cle
 20 / 24 cm instead of 30 / 44 cm and the relief fades out over twice as many rows from the rim. Still open, accepted by
 the owner: the far right lobe's crest is a smooth rounded outline against the wall, and the left lobe has a
 flat-ish top with a jagged rim; both need the mats re-sculpted (a modelling task), not more tuning.
+
+**Mat re-sculpt (clearing the last review's b1 / f1).** `build_mat` gained `spokes`, `edge_noise` and `lumps`
+(defaults keep the original trench build): the stage mats use 128 spokes (the 64-spoke rim left a sawtooth), a
+scalloped rim (`edge_noise` 0.07) and knobbly bulges about 10 cm across in the thickness (`lumps` 0.7 x T). Re-check:
+the balloon lobe (f1) now has folds and an indent (cleared, still soft-shaded); "scary, detailed, real" borderline
+pass; left (b1): a smaller sharp fold where the sheet creases against the trench wall (3936-4008) remains.

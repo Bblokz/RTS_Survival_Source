@@ -434,14 +434,18 @@ def sec_point(x0, dirx, s, y):
     return float(np.interp(abs(s), arc, xs)), float(y), float(np.interp(abs(s), arc, zs))
 
 
-def build_mat(name, x0, dirx, y0, s_c, Rs, Rt, T, seed, lobes, bumps=(), corner=0.0):
+def build_mat(name, x0, dirx, y0, s_c, Rs, Rt, T, seed, lobes, bumps=(), corner=0.0, spokes=64, edge_noise=0.0,
+              lumps=0.0):
+    """edge_noise: fine scalloping of the rim (a smooth rounded outline read as a balloon); lumps: knobbly bulges ~10 cm
+    across in the thickness, as a fraction of T (a smooth crest read as CG); spokes: finer rim (64 left a sawtooth)."""
     rings = [0.12, 0.25, 0.38, 0.5, 0.61, 0.71, 0.8, 0.87, 0.93, 0.975, 1.0]
-    spokes = 64
     pivot = sec_point(x0, dirx, s_c, y0)
     verts, st, nrm = [], [], []
 
     def point(rho, th):
         rm = 1.0 + 0.15 * float(C.ang_noise(th, seed + 5, 2, 7))
+        if edge_noise:
+            rm += edge_noise * float(C.ang_noise(th, seed + 9, 10, 40))
         for (lt, la, lw) in lobes:
             dth = (th - lt + math.pi) % (2 * math.pi) - math.pi
             rm += la * math.exp(-(dth / lw) ** 2)
@@ -454,6 +458,8 @@ def build_mat(name, x0, dirx, y0, s_c, Rs, Rt, T, seed, lobes, bumps=(), corner=
         for (bs, bt, ba, br) in bumps:
             thk += ba * math.exp(-((math.hypot(s - bs, t - bt)) / br) ** 4) * min(prof, 1.0)
         thk += corner * math.exp(-((s) / 0.22) ** 2) * prof
+        if lumps:
+            thk += lumps * T * max(float(sn(s, t, seed + 3, 5.0, 2)), 0.0) * min(prof, 1.0)
         off = 0.006 if rho >= 1.0 else 0.02 + max(thk, 0.01)
         verts.append(tuple(P + n * off))
         st.append((s, t))
