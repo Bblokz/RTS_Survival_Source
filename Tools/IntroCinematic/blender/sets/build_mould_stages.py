@@ -94,7 +94,8 @@ def raise_relief(ob, offset, levels):
     st = np.array([[sum(lp[uvl].uv[k] for lp in v.link_loops) / len(v.link_loops) for k in (0, 1)] for v in verts]) - 0.5
     fade = np.clip(np.array([dist.get(v.index, 99) for v in verts], float) / fade_rows, 0.0, 1.0)
     fade = fade * fade * (3.0 - 2.0 * fade)
-    rise = (0.014 * MF.vessels(st[:, 0], st[:, 1]) + 0.008 * MF.nodules(st[:, 0], st[:, 1])) * fade * C.CM
+    # proud enough to break the silhouette and shade at camera distance (half this read as a smooth blob)
+    rise = (0.026 * MF.vessels(st[:, 0], st[:, 1]) + 0.017 * MF.nodules(st[:, 0], st[:, 1])) * fade * C.CM
     moves = [(v, v.normal.copy() * float(r)) for v, r in zip(verts, rise)]
     for v, d in moves:
         v.co += d

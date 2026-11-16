@@ -332,7 +332,7 @@ def shots():
               "keys": [(0.0, at("Intro_Trench", 0, -300, 210), (0, 0, 0))]}] +
              # The first of it: small, already there when we arrive (its first growth stage, MPC Mould).
              mould_actors(),
-         "mpc": {"Mould": [(0.0, 0.05), (1.0, 0.22)]}},
+         "mpc": {"Mould": [(0.0, 0.09), (1.0, 0.24)]}},
         {"id": "5.3", "levels": ["Intro_Trench"], "vo": ["5_3"], "pre": 0.6, "post": 1.4, "fov": 55,
          "cam": [(0.0, at("Intro_Trench", -52, 96, 118), {"at": at("Intro_Trench", 100, -150, 62)}),
                  (1.0, at("Intro_Trench", -30, 30, 104), {"at": at("Intro_Trench", 100, -160, 66)})],
@@ -340,7 +340,8 @@ def shots():
              {"kind": "point", "label": "PurpleHaze", "intensity": 0.7, "color": (0.62, 0.2, 0.95, 1.0), "radius": 1300.0,
               "keys": [(0.0, at("Intro_Trench", 0, -300, 210), (0, 0, 0))]}],
          # Time-lapse: it takes the trench (the growth front crawls outward, the veins pump).
-         "mpc": {"Mould": [(0.0, 0.22), (0.12, 0.3), (0.92, 1.0), (1.0, 1.0)]}},
+         # it keeps growing to the cut (a held last stretch read as the growth having stopped)
+         "mpc": {"Mould": [(0.0, 0.24), (0.12, 0.3), (1.0, 1.0)]}},
         {"id": "5.4", "levels": ["Intro_Bunker"], "vo": ["5_4"], "pre": 0.6, "post": 0.2, "fov": 55,
          # framed west of centre: the stain's eastern edge stays out of frame (it must never read as where it stops)
          "cam": [(0.0, on_map(50.5, 7.5, back=70, up=80), (-50, 0, 0)), (1.0, on_map(50.5, 7.5, back=62, up=72), (-50, 0, 0))],

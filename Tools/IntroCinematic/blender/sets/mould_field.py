@@ -42,5 +42,7 @@ def vessels(s, t):
 
 
 def nodules(s, t):
-    """0..1: swollen nodules scattered over the flesh."""
-    return np.clip((sn(s, t, 934, 4.0, 2) - 1.0) / 0.8, 0.0, 1.0)
+    """0..1: swollen nodules scattered over the flesh (two sizes)."""
+    big = np.clip((sn(s, t, 934, 4.0, 2) - 0.7) / 0.8, 0.0, 1.0)
+    small = np.clip((sn(s + 2.2, t - 0.9, 936, 9.0, 1) - 1.1) / 0.6, 0.0, 1.0) * 0.6
+    return np.maximum(big, small)

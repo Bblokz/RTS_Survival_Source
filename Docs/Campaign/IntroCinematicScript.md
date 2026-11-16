@@ -828,3 +828,8 @@ on the shipped look: nothing floating, no L-shaped or right-angled glow left, ti
 receding. Left: one vein ends where it runs into the growing mould sheet (3903-3918, reads as a cut), a straight
 shadow edge on the ground beside the growing mound (3830-3885), the mound reads as a smooth matte blob, and the
 first ~2 s of 5.2 and last ~2 s of 5.3 barely change.
+
+**Mat relief x2, growth to the cut.** The mats' raised vessels (2.6 cm) and nodules (1.7 cm, two sizes, about
+twice as many) now break the silhouette and shade at camera distance (half that read as a smooth matte blob); 5.2
+opens with the growth already on the helmet (Mould 0.09 -> 0.24) and 5.3 keeps growing to the cut (0.24 -> 1.0, no
+held end).
