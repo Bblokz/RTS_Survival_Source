@@ -29,7 +29,8 @@ enum class ESpacedArmourTakeoverValidatePhase : uint8
  * -RenderOffscreen on a unit test map): calls the Show Spaced Armour Takeover node before the start button, checks it
  * waits, screenshots the typing, the finished panel and the HUD after closing to Saved/InfoTakeover/SpacedArmour/,
  * checks that the plate render loaded and the game paused, that On Closed fires once after UNDERSTOOD with the game
- * unpaused and at once while the takeovers are off. Grep SPACED_ARMOUR_TAKEOVER. Restores the setting and quits.
+ * unpaused and that it still opens
+ * (without the never-show box) and closes as shown while unit intel is turned off. Grep SPACED_ARMOUR_TAKEOVER. Restores the setting and quits.
  */
 UCLASS()
 class RTS_SURVIVAL_API USpacedArmourTakeoverValidateSubsystem : public UTickableWorldSubsystem
@@ -84,7 +85,7 @@ private:
 
 	void CallMainNode();
 	void StartWatching(UW_SpacedArmourTakeover& Takeover);
-	void CheckTurnedOffNode();
+	void CheckShowsWhileTurnedOff();
 
 	UFUNCTION()
 	void HandleMainClosed(bool bWasShown);

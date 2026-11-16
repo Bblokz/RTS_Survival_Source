@@ -140,6 +140,8 @@ private:
 
 	/** Checks the page lamps (one per page, the shown one lit) and that PREVIOUS shows from page two on. */
 	void CheckPageControls(const UW_CameraControlsTakeover& Takeover, const TCHAR* Context);
+	// Lamp row in the placard's lamp seat (plate units), halos built, lit lamp at full power.
+	void CheckPageLampLayout(const UW_CameraControlsTakeover& Takeover);
 	void PressPreviousOnLastPage(UW_CameraControlsTakeover& Takeover);
 
 	/**
