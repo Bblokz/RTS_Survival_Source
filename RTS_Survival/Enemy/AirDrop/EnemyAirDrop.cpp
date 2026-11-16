@@ -71,6 +71,20 @@ namespace
 	}
 }
 
+void AEnemyAirDrop::InitRuntimeAirDrop(const FName InAirDropId, const FEnemyAirDropUnits& InUnits,
+                                       const FEnemyAirDropDeliverySettings& InDelivery, const float FirstDropDelay)
+{
+	AirDropId = InAirDropId;
+	LandingPoints = {FVector::ZeroVector};
+	Units = InUnits;
+	Delivery = InDelivery;
+	Timing = FEnemyAirDropTiming();
+	Timing.bStartOnBeginPlay = true;
+	Timing.Repeat = EEnemyWaveSpawnerRepeat::Once;
+	Timing.FirstDropDelay = FMath::Max(0.f, FirstDropDelay);
+	Link = FEnemyAirDropLink();
+}
+
 AEnemyAirDrop::AEnemyAirDrop()
 {
 	LandingPoints = {FVector::ZeroVector};
@@ -393,6 +407,7 @@ UGA_AircraftDrop* AEnemyAirDrop::CreateCargoPlaneCopy(const TArray<ETankSubtype>
 		return nullptr;
 	}
 	Copy->SetDropPayload(Vehicles, Squads);
+	Copy->SetRopeSlungTanks(Delivery.bRopeSlungVehicles);
 	return Copy;
 }
 

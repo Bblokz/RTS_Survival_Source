@@ -5,6 +5,8 @@
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
 #include "GameFramework/Actor.h"
+#include "Engine/Texture2D.h"
+#include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
 #include "NiagaraSystem.h"
 #include "PhysicsEngine/BodySetup.h"
@@ -40,6 +42,15 @@ namespace WallHoleDamageConstants
 	// Pieces sampled per side of a knocked-out cell.
 	constexpr int32 CellPiecesPerSide = 2;
 	constexpr float SquareCentimetresPerSquareMetre = 10000.f;
+	// Field mode: a point this close to the centre line takes its face from the shot instead of its offset.
+	constexpr float FieldFaceOffsetTolerance = 1.f;
+	// Field mode: a hit this share of its own radius (or more) inside an opening's rim flies through it.
+	constexpr float FieldPassThroughRimShare = 0.85f;
+	// Breach debris: candidate spacing as a share of one piece's side, and the most pieces one breach step throws.
+	constexpr float BreachPieceSpacingShare = 1.2f;
+	constexpr int32 MaxBreachPiecesPerStep = 60;
+	// Breach debris candidates sit on a grid jittered by this share of the spacing.
+	constexpr float PieceJitterShare = 0.3f;
 }
 
 UWallHoleDamageComponent::UWallHoleDamageComponent()
@@ -57,6 +68,10 @@ void UWallHoleDamageComponent::BeginPlay()
 		return;
 	}
 	CacheWallShape();
+	if (GetIsFieldMode())
+	{
+		InitField();
+	}
 	BeginPlay_CacheDebrisAreas();
 	BeginPlay_BindOwnerDeath();
 	BeginPlay_BindOwnerHealing();
@@ -130,8 +145,17 @@ void UWallHoleDamageComponent::EnsureWallShapeIsCurrent()
 	// Damage on the old mesh does not map onto the new one.
 	M_Holes.Reset();
 	M_CellOrder.Reset();
+	M_Breaches.Reset();
 	FMemory::Memzero(M_CellWords);
 	CacheWallShape();
+	if (GetIsFieldMode())
+	{
+		// The new mesh unrolls to another size: a new texture and new dynamic materials on the next damage.
+		RestoreIntactMaterials();
+		M_FieldTexture = nullptr;
+		M_FieldMaterials.Reset();
+		InitField();
+	}
 	WriteMask();
 }
 
@@ -235,12 +259,20 @@ void UWallHoleDamageComponent::OnOwnerHealed(const float HealthAfter, const floa
 	const float AllowedArea = GetAllowedRemovedArea(M_MaxOwnerHealth > 0.f ? HealthAfter / M_MaxOwnerHealth : 1.f);
 	bool bChanged = false;
 	// Newest damage closes first: holes, then the cells they were baked into.
-	while (GetRemovedAreaEstimate() > AllowedArea && (not M_Holes.IsEmpty() || not M_CellOrder.IsEmpty()))
+	while (GetRemovedAreaEstimate() > AllowedArea
+		&& (not M_Holes.IsEmpty() || not M_CellOrder.IsEmpty() || not M_Breaches.IsEmpty()))
 	{
 		bChanged = true;
 		if (not M_Holes.IsEmpty())
 		{
 			M_Holes.Pop(EAllowShrinking::No);
+			RebuildField();
+			continue;
+		}
+		if (not M_Breaches.IsEmpty())
+		{
+			M_Breaches.Pop(EAllowShrinking::No);
+			RebuildField();
 			continue;
 		}
 		const int32 CellIndex = M_CellOrder.Pop(EAllowShrinking::No);
@@ -252,7 +284,7 @@ void UWallHoleDamageComponent::OnOwnerHealed(const float HealthAfter, const floa
 	}
 	WriteMask();
 	// Fully repaired: back to the opaque materials, so an intact wall pays nothing for the mask again.
-	if (M_Holes.IsEmpty() && M_CellOrder.IsEmpty())
+	if (M_Holes.IsEmpty() && M_CellOrder.IsEmpty() && M_Breaches.IsEmpty())
 	{
 		RestoreIntactMaterials();
 	}
@@ -281,7 +313,9 @@ float UWallHoleDamageComponent::ApplyHit(const FVector& WorldHit, const FVector&
 	EnsureWallShapeIsCurrent();
 	const FTransform MeshTransform = M_WallMesh->GetComponentTransform();
 	const FVector MeshSpaceHit = MeshTransform.InverseTransformPosition(WorldHit);
-	const float AvailableArea = AllowedArea - GetRemovedAreaEstimate();
+	// Tank breaches already cost health; they do not use up the shell hole budget.
+	constexpr bool bIncludeBreaches = false;
+	const float AvailableArea = AllowedArea - GetRemovedAreaEstimate(bIncludeBreaches);
 	// Splash past the wall reaches nothing.
 	if (HoleRadius <= 0.f || AvailableArea <= 0.f
 		|| M_MeshBounds.ComputeSquaredDistanceToPoint(MeshSpaceHit) > FMath::Square(HoleRadius))
@@ -304,6 +338,19 @@ float UWallHoleDamageComponent::ApplyHit(const FVector& WorldHit, const FVector&
 		return 0.f;
 	}
 	TArray<FWallDebrisPiece> Pieces;
+	if (GetIsFieldMode())
+	{
+		FVector ExitNormal = FVector::ZeroVector;
+		const float FieldRemoved = CutFieldHole(SurfacePoint, ShotDirection, CappedRadius, Pieces, ExitNormal);
+		if (FieldRemoved > 0.f)
+		{
+			SwapToDamagedMaterials();
+			WriteMask();
+		}
+		WallDamageShared::ThrowDebrisPieces(*GetOwner(), M_LoadedDebrisSystem, DebrisMeshes, Pieces,
+		                                    MeshTransform.GetRotation(), WorldHit, ShotDirection, 1.f, ExitNormal);
+		return FieldRemoved;
+	}
 	const FWallHolePieceAnchor Anchor = MakePieceAnchor(SurfacePoint, MeshTransform, ShotDirection);
 	const float Removed = CutHole(HoleCentre, CappedRadius, Anchor, Pieces);
 	if (Removed > 0.f)
@@ -622,6 +669,13 @@ int32 UWallHoleDamageComponent::GetHiddenCellCount() const
 
 bool UWallHoleDamageComponent::GetIsMeshPointRemoved(const FVector& MeshPoint) const
 {
+	if (GetIsFieldMode())
+	{
+		float U = 0.f;
+		float Offset = 0.f;
+		M_Field.ProjectToPath(MeshPoint, U, Offset);
+		return M_Field.GetIsRemoved(U, static_cast<float>(MeshPoint.Z), Offset >= 0.f);
+	}
 	if (GetHasGrid() && GetIsCellHidden(GetCellIndexAt(MeshPoint)))
 	{
 		return true;
@@ -636,8 +690,13 @@ bool UWallHoleDamageComponent::GetIsMeshPointRemoved(const FVector& MeshPoint) c
 	return false;
 }
 
-float UWallHoleDamageComponent::GetRemovedAreaEstimate() const
+float UWallHoleDamageComponent::GetRemovedAreaEstimate(const bool bIncludeBreaches) const
 {
+	// The field counts what is really gone: overlapping holes and breaches are not counted twice.
+	if (GetIsFieldMode() && M_Field.GetIsInitialised())
+	{
+		return M_Field.GetRemovedArea(bIncludeBreaches);
+	}
 	float Area = 0.f;
 	for (const int32 CellIndex : M_CellOrder)
 	{
@@ -655,6 +714,10 @@ float UWallHoleDamageComponent::GetRemovedAreaEstimate() const
 
 float UWallHoleDamageComponent::GetFaceArea() const
 {
+	if (GetIsFieldMode() && M_Field.GetIsInitialised())
+	{
+		return M_Field.GetFaceArea();
+	}
 	const FVector Size = M_MeshBounds.GetSize();
 	if (GridSettings.GridAxis == EWallHoleGridAxis::AlongX)
 	{
@@ -674,11 +737,20 @@ float UWallHoleDamageComponent::GetAllowedRemovedArea(const float HealthFraction
 	return LostHealth01 * HoleSettings.MaxHiddenShareWhileAlive * GetFaceArea();
 }
 
-void UWallHoleDamageComponent::WriteMask() const
+void UWallHoleDamageComponent::WriteMask()
 {
 	using namespace WallHoleMask;
 	if (not GetIsValidWallMesh())
 	{
+		return;
+	}
+	if (GetIsFieldMode())
+	{
+		// The texture exists once the first damage swapped the field materials in; an intact wall has none.
+		if (IsValid(M_FieldTexture))
+		{
+			M_Field.Upload(M_FieldTexture);
+		}
 		return;
 	}
 	for (int32 Word = 0; Word < MaxGridFloats; ++Word)
@@ -707,6 +779,11 @@ void UWallHoleDamageComponent::SwapToDamagedMaterials()
 	{
 		return;
 	}
+	if (GetIsFieldMode())
+	{
+		SwapToFieldMaterials();
+		return;
+	}
 	M_IntactMaterials.SetNum(FMath::Max(M_IntactMaterials.Num(), DamagedMaterials.Num()));
 	for (int32 SlotIndex = 0; SlotIndex < DamagedMaterials.Num(); ++SlotIndex)
 	{
@@ -728,8 +805,14 @@ void UWallHoleDamageComponent::RestoreIntactMaterials()
 	for (int32 SlotIndex = 0; SlotIndex < M_IntactMaterials.Num(); ++SlotIndex)
 	{
 		UMaterialInterface* const Intact = M_IntactMaterials[SlotIndex];
-		const bool bShowsDamaged = DamagedMaterials.IsValidIndex(SlotIndex)
-			&& M_WallMesh->GetMaterial(SlotIndex) == DamagedMaterials[SlotIndex];
+		const UMaterialInterface* const ShownDamaged = GetIsFieldMode()
+			                                                ? (M_FieldMaterials.IsValidIndex(SlotIndex)
+				                                                   ? M_FieldMaterials[SlotIndex].Get()
+				                                                   : nullptr)
+			                                                : (DamagedMaterials.IsValidIndex(SlotIndex)
+				                                                   ? DamagedMaterials[SlotIndex].Get()
+				                                                   : nullptr);
+		const bool bShowsDamaged = ShownDamaged != nullptr && M_WallMesh->GetMaterial(SlotIndex) == ShownDamaged;
 		// A slot the owner re-skinned since (construction, unpacking) keeps its new material.
 		if (IsValid(Intact) && bShowsDamaged)
 		{
@@ -818,13 +901,18 @@ void UWallHoleDamageComponent::CollapseIntoPieces(const bool bHideAndDestroyOwne
 	TArray<FWallDebrisPiece> Pieces;
 	TArray<FBox> SampleBoxes;
 	TArray<float> SampleWeights;
+	if (GetIsFieldMode())
+	{
+		AddFieldCollapsePieces(PieceBudget, PieceArea, Pieces);
+	}
 	GetCollapseSampleBoxes(SampleBoxes, SampleWeights);
 	float TotalWeight = 0.f;
 	for (const float Weight : SampleWeights)
 	{
 		TotalWeight += Weight;
 	}
-	for (int32 SampleIndex = 0; SampleIndex < PieceBudget; ++SampleIndex)
+	const int32 BoxSampleCount = GetIsFieldMode() ? 0 : PieceBudget;
+	for (int32 SampleIndex = 0; SampleIndex < BoxSampleCount; ++SampleIndex)
 	{
 		// Walls: a jittered spread over the face; other shapes: inside a collision element, by its side area.
 		float Pick = FMath::FRand() * TotalWeight;
@@ -870,6 +958,403 @@ void UWallHoleDamageComponent::CollapseIntoPieces(const bool bHideAndDestroyOwne
 	WallDamageShared::PlayCollapseSound(*GetOwner(), CollapseSettings, Centre);
 	GetOwner()->SetLifeSpan(FMath::Max(CollapseSettings.DestroyOwnerDelaySeconds, UE_KINDA_SMALL_NUMBER));
 }
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Field mode: any number of holes and tank breaches in a CPU-written texture of the unrolled wall (WallHoleField.h).
+// ---------------------------------------------------------------------------------------------------------------------
+
+bool UWallHoleDamageComponent::GetIsWorldPointInBreach(const FVector& WorldPoint) const
+{
+	if (not GetIsFieldMode() || M_Breaches.IsEmpty() || not M_Field.GetIsInitialised() || not IsValid(M_WallMesh))
+	{
+		return false;
+	}
+	float U = 0.f;
+	float Offset = 0.f;
+	const FVector MeshPoint = M_WallMesh->GetComponentTransform().InverseTransformPosition(WorldPoint);
+	M_Field.ProjectToPath(MeshPoint, U, Offset);
+	return M_Field.GetIsInBreach(U, static_cast<float>(MeshPoint.Z));
+}
+
+float UWallHoleDamageComponent::GetRemovedFaceShare() const
+{
+	const float FaceArea = GetFaceArea();
+	return FaceArea > 0.f ? FMath::Clamp(GetRemovedAreaEstimate() / FaceArea, 0.f, 1.f) : 0.f;
+}
+
+void UWallHoleDamageComponent::InitField()
+{
+	const FVector Size = M_MeshBounds.GetSize();
+	const FVector Centre = M_MeshBounds.GetCenter();
+	TArray<FVector2D> PathPoints = FieldSettings.WallPathPoints;
+	// No authored centre line: a straight wall along the long side of its bounds.
+	if (PathPoints.Num() < 2)
+	{
+		PathPoints.Reset();
+		const bool bRunsAlongX = Size.X >= Size.Y;
+		PathPoints.Add(bRunsAlongX ? FVector2D(M_MeshBounds.Min.X, Centre.Y) : FVector2D(Centre.X, M_MeshBounds.Min.Y));
+		PathPoints.Add(bRunsAlongX ? FVector2D(M_MeshBounds.Max.X, Centre.Y) : FVector2D(Centre.X, M_MeshBounds.Max.Y));
+	}
+	const float Thickness = FieldSettings.WallThickness > 0.f
+		                        ? FieldSettings.WallThickness
+		                        : static_cast<float>(FMath::Min(Size.X, Size.Y));
+	M_Field.Init(PathPoints, Thickness, static_cast<float>(M_MeshBounds.Min.Z), static_cast<float>(M_MeshBounds.Max.Z),
+	             FieldSettings.TexelSize, FieldSettings.MaxTexels);
+}
+
+float UWallHoleDamageComponent::CutFieldHole(const FVector& MeshSurfacePoint, const FVector& ShotDirection,
+                                             const float Radius, TArray<FWallDebrisPiece>& OutPieces,
+                                             FVector& OutExitNormal)
+{
+	using namespace WallHoleDamageConstants;
+	float U = 0.f;
+	float Offset = 0.f;
+	M_Field.ProjectToPath(MeshSurfacePoint, U, Offset);
+	const float Z = static_cast<float>(MeshSurfacePoint.Z);
+	OutExitNormal = GetFieldExitNormal(U, ShotDirection);
+	// The struck face: the side of the centre line the hit lies on, else the side the shell came from.
+	bool bIsFrontSide = Offset >= 0.f;
+	if (FMath::Abs(Offset) < FieldFaceOffsetTolerance && not OutExitNormal.IsNearlyZero())
+	{
+		FVector FrontNormal;
+		(void)M_Field.GetMeshPoint(U, Z, 0.f, FrontNormal);
+		const FVector WorldFront = M_WallMesh->GetComponentTransform().TransformVectorNoScale(FrontNormal);
+		bIsFrontSide = FVector::DotProduct(WorldFront, ShotDirection) < 0.0;
+	}
+	// The collision has no gap where a tank broke through: a shell "hitting" the breach flies through it.
+	if (M_Field.GetIsInBreach(U, Z))
+	{
+		return 0.f;
+	}
+	const float AreaBefore = M_Field.GetRemovedArea();
+	const int32 StruckHole = FindFieldHoleAt(U, Z, bIsFrontSide);
+	if (StruckHole != INDEX_NONE)
+	{
+		// The collision has no holes: a hit "inside" a hole is a shell through the opening. Deep inside, it widens that
+		// hole a little; near the rim it bites its own circle out of the edge, so a cluster of hits leaves a ragged
+		// opening instead of one inflated round hole.
+		const FWallHole& Hole = M_Holes[StruckHole];
+		const float FaceRadius = Hole.bIsFrontSide == bIsFrontSide ? Hole.Radius : M_Field.GetThroughRadius(Hole.Radius);
+		const float RimGap = FaceRadius - FMath::Sqrt(FMath::Square(U - Hole.U) + FMath::Square(Z - Hole.Z));
+		if (RimGap >= Radius * FieldPassThroughRimShare)
+		{
+			// Aimed fire lands on the same spots: a shell through the opening still clips its edge and widens it a
+			// little, so a wall under fire keeps visibly losing concrete where it is hit.
+			GrowFieldHole(StruckHole, Hole.Radius + Radius * MinGrowShareOfHit, OutPieces);
+			return FMath::Max(0.f, M_Field.GetRemovedArea() - AreaBefore);
+		}
+	}
+	if (M_Holes.Num() >= FieldSettings.MaxHoles)
+	{
+		// Very many holes: the nearest one takes the hit instead of a new hole.
+		const int32 NearestHole = FindNearestFieldHole(U, Z, bIsFrontSide);
+		if (NearestHole != INDEX_NONE)
+		{
+			GrowFieldHole(NearestHole, M_Holes[NearestHole].Radius + Radius * MinGrowShareOfHit, OutPieces);
+		}
+	}
+	else
+	{
+		FWallHole& NewHole = M_Holes.AddDefaulted_GetRef();
+		NewHole.Centre = MeshSurfacePoint;
+		NewHole.Radius = Radius;
+		NewHole.U = U;
+		NewHole.Z = Z;
+		NewHole.bIsFrontSide = bIsFrontSide;
+		// Debris first: it only comes from wall that is still standing (a rim bite overlaps the old opening).
+		AddFieldRingPieces(U, Z, bIsFrontSide, 0.f, Radius, OutPieces);
+		M_Field.AddHole(MakeFieldHole(NewHole), bIsFrontSide);
+	}
+	return FMath::Max(0.f, M_Field.GetRemovedArea() - AreaBefore);
+}
+
+int32 UWallHoleDamageComponent::FindFieldHoleAt(const float U, const float Z, const bool bIsFrontSide) const
+{
+	for (int32 HoleIndex = 0; HoleIndex < M_Holes.Num(); ++HoleIndex)
+	{
+		const FWallHole& Hole = M_Holes[HoleIndex];
+		// On the other face a hole is only as wide as the part that went through.
+		const float FaceRadius = Hole.bIsFrontSide == bIsFrontSide ? Hole.Radius : M_Field.GetThroughRadius(Hole.Radius);
+		if (FMath::Square(U - Hole.U) + FMath::Square(Z - Hole.Z) < FMath::Square(FaceRadius))
+		{
+			return HoleIndex;
+		}
+	}
+	return INDEX_NONE;
+}
+
+int32 UWallHoleDamageComponent::FindNearestFieldHole(const float U, const float Z, const bool bIsFrontSide) const
+{
+	int32 NearestHole = INDEX_NONE;
+	float NearestRimDistance = TNumericLimits<float>::Max();
+	for (int32 HoleIndex = 0; HoleIndex < M_Holes.Num(); ++HoleIndex)
+	{
+		const FWallHole& Hole = M_Holes[HoleIndex];
+		if (Hole.bIsFrontSide != bIsFrontSide && M_Field.GetThroughRadius(Hole.Radius) <= 0.f)
+		{
+			continue;
+		}
+		const float RimDistance = FMath::Sqrt(FMath::Square(U - Hole.U) + FMath::Square(Z - Hole.Z)) - Hole.Radius;
+		if (RimDistance < NearestRimDistance)
+		{
+			NearestRimDistance = RimDistance;
+			NearestHole = HoleIndex;
+		}
+	}
+	return NearestHole;
+}
+
+void UWallHoleDamageComponent::GrowFieldHole(const int32 HoleIndex, const float NewRadius,
+                                             TArray<FWallDebrisPiece>& OutPieces)
+{
+	FWallHole& Hole = M_Holes[HoleIndex];
+	const float OldRadius = Hole.Radius;
+	Hole.Radius = FMath::Clamp(NewRadius, OldRadius, FMath::Max(OldRadius, HoleSettings.MaxHoleRadius));
+	if (Hole.Radius <= OldRadius)
+	{
+		return;
+	}
+	AddFieldRingPieces(Hole.U, Hole.Z, Hole.bIsFrontSide, OldRadius, Hole.Radius, OutPieces);
+	// The field keeps the maximum per texel, so the wider hole is written over the old one.
+	M_Field.AddHole(MakeFieldHole(Hole), Hole.bIsFrontSide);
+}
+
+FWallHoleFieldHole UWallHoleDamageComponent::MakeFieldHole(const FWallHole& Hole) const
+{
+	FWallHoleFieldHole FieldHole;
+	FieldHole.U = Hole.U;
+	FieldHole.Z = Hole.Z;
+	FieldHole.FrontRadius = Hole.Radius;
+	FieldHole.BackRadius = M_Field.GetThroughRadius(Hole.Radius);
+	return FieldHole;
+}
+
+void UWallHoleDamageComponent::AddFieldRingPieces(const float U, const float Z, const bool bIsFrontSide,
+                                                  const float InnerRadius, const float OuterRadius,
+                                                  TArray<FWallDebrisPiece>& OutPieces) const
+{
+	const float RingArea = UE_PI * (FMath::Square(OuterRadius) - FMath::Square(InnerRadius));
+	const int32 PieceCount = FMath::Clamp(FMath::RoundToInt32(RingArea / FMath::Max(GridSettings.AreaPerDebrisPiece, 1.f)),
+	                                      1, GridSettings.MaxPiecesPerHit);
+	const float FaceSide = bIsFrontSide ? 1.f : -1.f;
+	for (int32 PieceIndex = 0; PieceIndex < PieceCount; ++PieceIndex)
+	{
+		const float Angle = FMath::FRandRange(0.f, UE_TWO_PI);
+		const float Distance = FMath::Sqrt(FMath::FRandRange(FMath::Square(InnerRadius), FMath::Square(OuterRadius)));
+		const float PieceU = FMath::Clamp(U + Distance * FMath::Cos(Angle), 0.f, M_Field.GetPathLength());
+		const float PieceZ = FMath::Clamp(Z + Distance * FMath::Sin(Angle), M_Field.GetZMin(), M_Field.GetZMax());
+		if (M_Field.GetIsRemoved(PieceU, PieceZ, bIsFrontSide))
+		{
+			continue;
+		}
+		FVector FaceNormal;
+		AddPiece(M_Field.GetMeshPoint(PieceU, PieceZ, FaceSide, FaceNormal), RingArea / PieceCount, OutPieces);
+	}
+}
+
+void UWallHoleDamageComponent::RebuildField()
+{
+	if (not GetIsFieldMode() || not M_Field.GetIsInitialised())
+	{
+		return;
+	}
+	M_Field.Clear();
+	for (const FWallHole& Hole : M_Holes)
+	{
+		M_Field.AddHole(MakeFieldHole(Hole), Hole.bIsFrontSide);
+	}
+	for (const FWallHoleFieldBreach& Breach : M_Breaches)
+	{
+		M_Field.AddBreach(Breach);
+	}
+}
+
+float UWallHoleDamageComponent::ApplyBreach(int32& InOutBreachIndex, const FWallHoleFieldBreach& Breach,
+                                            const FVector& WorldTravelDirection, const float DebrisSpeedScale,
+                                            const FBox2D& NoDebrisZone)
+{
+	using namespace WallHoleDamageConstants;
+	if (not GetIsFieldMode() || bM_HasCollapsed || not GetIsValidWallMesh() || not M_Field.GetIsInitialised())
+	{
+		return 0.f;
+	}
+	EnsureWallShapeIsCurrent();
+	// Debris candidates: a jittered grid over the breach's reach that is still standing before this step.
+	const float PieceSpacing = FMath::Sqrt(FMath::Max(GridSettings.AreaPerDebrisPiece, 1.f)) * BreachPieceSpacingShare;
+	const TArray<FVector2D> StandingCandidates = GetStandingBreachCandidates(Breach, PieceSpacing, NoDebrisZone);
+	const float AreaBefore = M_Field.GetRemovedArea();
+	const bool bIsNewBreach = not M_Breaches.IsValidIndex(InOutBreachIndex);
+	M_Field.AddBreach(Breach);
+	const float Removed = FMath::Max(0.f, M_Field.GetRemovedArea() - AreaBefore);
+	// A tank through an existing gap breaks nothing: no breach is kept for it.
+	if (bIsNewBreach && Removed <= 0.f)
+	{
+		return 0.f;
+	}
+	if (bIsNewBreach)
+	{
+		InOutBreachIndex = M_Breaches.Add(Breach);
+	}
+	else
+	{
+		M_Breaches[InOutBreachIndex] = Breach;
+	}
+	if (Removed <= 0.f)
+	{
+		return 0.f;
+	}
+	TArray<FWallDebrisPiece> Pieces;
+	for (const FVector2D& Candidate : StandingCandidates)
+	{
+		if (Pieces.Num() >= MaxBreachPiecesPerStep || not M_Field.GetIsRemoved(Candidate.X, Candidate.Y, true))
+		{
+			continue;
+		}
+		FVector FaceNormal;
+		AddPiece(M_Field.GetMeshPoint(Candidate.X, Candidate.Y, 0.f, FaceNormal), FMath::Square(PieceSpacing), Pieces);
+	}
+	SwapToDamagedMaterials();
+	WriteMask();
+	const FVector Travel = FVector(WorldTravelDirection.X, WorldTravelDirection.Y, 0.0).GetSafeNormal();
+	M_LastShotDirection = Travel.IsNearlyZero() ? M_LastShotDirection : Travel;
+	const FTransform MeshTransform = M_WallMesh->GetComponentTransform();
+	FVector FaceNormal;
+	const FVector BreachCentre = MeshTransform.TransformPosition(
+		M_Field.GetMeshPoint((Breach.UMin + Breach.UMax) * 0.5f, Breach.GroundZ + Breach.HullHeight * 0.5f, 0.f,
+		                     FaceNormal));
+	WallDamageShared::ThrowDebrisPieces(*GetOwner(), M_LoadedDebrisSystem, DebrisMeshes, Pieces,
+	                                    MeshTransform.GetRotation(), BreachCentre, Travel, DebrisSpeedScale, Travel);
+	return Removed;
+}
+
+TArray<FVector2D> UWallHoleDamageComponent::GetStandingBreachCandidates(const FWallHoleFieldBreach& Breach,
+                                                                        const float PieceSpacing,
+                                                                        const FBox2D& NoDebrisZone) const
+{
+	using namespace WallHoleDamageConstants;
+	const float Reach = Breach.EdgeBand + (M_Field.GetZMax() - Breach.GroundZ) * Breach.VSlope;
+	const float UFrom = FMath::Max(0.f, Breach.UMin - Reach);
+	const float UTo = FMath::Min(M_Field.GetPathLength(), Breach.UMax + Reach);
+	TArray<FVector2D> Candidates;
+	for (float CandidateZ = M_Field.GetZMin() + PieceSpacing * 0.5f; CandidateZ < M_Field.GetZMax();
+	     CandidateZ += PieceSpacing)
+	{
+		for (float CandidateU = UFrom + PieceSpacing * 0.5f; CandidateU < UTo; CandidateU += PieceSpacing)
+		{
+			const FVector2D Candidate(CandidateU + FMath::FRandRange(-PieceJitterShare, PieceJitterShare) * PieceSpacing,
+			                          CandidateZ + FMath::FRandRange(-PieceJitterShare, PieceJitterShare) * PieceSpacing);
+			// Wall inside the hull is pushed over by it, not thrown: no piece would show.
+			const bool bIsInsideHull = NoDebrisZone.bIsValid && NoDebrisZone.IsInside(Candidate);
+			if (not bIsInsideHull && not M_Field.GetIsRemoved(Candidate.X, Candidate.Y, true))
+			{
+				Candidates.Add(Candidate);
+			}
+		}
+	}
+	return Candidates;
+}
+
+void UWallHoleDamageComponent::AddFieldCollapsePieces(const int32 PieceBudget, const float PieceArea,
+                                                      TArray<FWallDebrisPiece>& OutPieces) const
+{
+	using namespace WallHoleDamageConstants;
+	const float Length = M_Field.GetPathLength();
+	const float Height = M_Field.GetZMax() - M_Field.GetZMin();
+	const int32 Columns = FMath::Max(1, FMath::RoundToInt32(FMath::Sqrt(PieceBudget * Length / FMath::Max(Height, 1.f))));
+	const int32 Rows = FMath::Max(1, FMath::DivideAndRoundUp(PieceBudget, Columns));
+	const float ColumnStep = Length / Columns;
+	const float RowStep = Height / Rows;
+	for (int32 SampleIndex = 0; SampleIndex < Columns * Rows; ++SampleIndex)
+	{
+		const float U = (SampleIndex % Columns + 0.5f + FMath::FRandRange(-CollapseJitterShare, CollapseJitterShare))
+			* ColumnStep;
+		const float Z = M_Field.GetZMin() + (SampleIndex / Columns + 0.5f
+			+ FMath::FRandRange(-CollapseJitterShare, CollapseJitterShare)) * RowStep;
+		if (M_Field.GetIsRemoved(U, Z, true))
+		{
+			continue;
+		}
+		FVector FaceNormal;
+		AddPiece(M_Field.GetMeshPoint(U, Z, 0.f, FaceNormal), PieceArea, OutPieces);
+	}
+}
+
+FVector UWallHoleDamageComponent::GetFieldExitNormal(const float U, const FVector& WorldDirection) const
+{
+	if (WorldDirection.IsNearlyZero())
+	{
+		return FVector::ZeroVector;
+	}
+	FVector FrontNormal;
+	(void)M_Field.GetMeshPoint(U, M_Field.GetZMin(), 0.f, FrontNormal);
+	const FVector WorldFront = M_WallMesh->GetComponentTransform().TransformVectorNoScale(FrontNormal).GetSafeNormal();
+	return FVector::DotProduct(WorldFront, WorldDirection) >= 0.0 ? WorldFront : -WorldFront;
+}
+
+void UWallHoleDamageComponent::SwapToFieldMaterials()
+{
+	// The materials read the texture, so it exists before the first one is shown.
+	if (not IsValid(M_FieldTexture))
+	{
+		M_Field.Upload(M_FieldTexture);
+	}
+	M_IntactMaterials.SetNum(FMath::Max(M_IntactMaterials.Num(), DamagedMaterials.Num()));
+	M_FieldMaterials.SetNum(FMath::Max(M_FieldMaterials.Num(), DamagedMaterials.Num()));
+	for (int32 SlotIndex = 0; SlotIndex < DamagedMaterials.Num(); ++SlotIndex)
+	{
+		UMaterialInterface* const Damaged = DamagedMaterials[SlotIndex];
+		if (not IsValid(Damaged))
+		{
+			continue;
+		}
+		if (not IsValid(M_FieldMaterials[SlotIndex]))
+		{
+			M_FieldMaterials[SlotIndex] = UMaterialInstanceDynamic::Create(Damaged, this);
+			SetFieldMaterialParameters(M_FieldMaterials[SlotIndex]);
+		}
+		UMaterialInstanceDynamic* const FieldMaterial = M_FieldMaterials[SlotIndex];
+		if (IsValid(FieldMaterial) && M_WallMesh->GetMaterial(SlotIndex) != FieldMaterial)
+		{
+			M_IntactMaterials[SlotIndex] = M_WallMesh->GetMaterial(SlotIndex);
+			M_WallMesh->SetMaterial(SlotIndex, FieldMaterial);
+		}
+	}
+}
+
+void UWallHoleDamageComponent::SetFieldMaterialParameters(UMaterialInstanceDynamic* const FieldMaterial) const
+{
+	if (not IsValid(FieldMaterial))
+	{
+		return;
+	}
+	using namespace WallHoleFieldConstants;
+	FieldMaterial->SetTextureParameterValue(TextureParameter, M_FieldTexture);
+	FieldMaterial->SetVectorParameterValue(PathAParameter, M_Field.GetPathAParameter());
+	FieldMaterial->SetVectorParameterValue(PathBParameter, M_Field.GetPathBParameter());
+	FieldMaterial->SetVectorParameterValue(MapParameter, M_Field.GetMapParameter());
+}
+
+#if WITH_EDITOR
+void UWallHoleDamageComponent::Editor_SetFieldMode(const TArray<UMaterialInterface*>& InDamagedMaterials,
+                                                   const TArray<FVector2D>& PathPoints, const float Thickness)
+{
+	Modify();
+	MaskStorage = EWallHoleMaskStorage::FieldTexture;
+	FieldSettings.WallPathPoints = PathPoints;
+	FieldSettings.WallThickness = FMath::Max(0.f, Thickness);
+	Editor_SetDamagedMaterials(InDamagedMaterials);
+}
+
+void UWallHoleDamageComponent::Editor_SetDamagedMaterials(const TArray<UMaterialInterface*>& InDamagedMaterials)
+{
+	Modify();
+	DamagedMaterials.Reset();
+	for (UMaterialInterface* const Material : InDamagedMaterials)
+	{
+		DamagedMaterials.Add(Material);
+	}
+}
+#endif
 
 bool UWallHoleDamageComponent::GetIsValidWallMesh() const
 {

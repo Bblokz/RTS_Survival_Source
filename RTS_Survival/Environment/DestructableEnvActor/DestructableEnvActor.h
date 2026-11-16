@@ -84,6 +84,13 @@ public:
 	
 	virtual void GetAimOffsetPoints(TArray<FVector>& OutLocalOffsets) const override;
 
+	/**
+	 * @brief Health lost to a tank driving through (UWallTankBreachComponent). Bypasses TakeDamage so no shell hole is
+	 * cut on top of the breach; a wall left without health dies as from a kinetic hit.
+	 * @param DamageAmount Health to remove; the damage reduction does not apply (the hull breaks the wall, no shell).
+	 */
+	void ApplyCrushBreachDamage(float DamageAmount);
+
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;

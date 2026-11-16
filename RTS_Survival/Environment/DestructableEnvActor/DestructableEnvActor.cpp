@@ -110,6 +110,19 @@ void ADestructableEnvActor::SetupCrushDestructionOverlap(UPrimitiveComponent* Ov
 	}
 }
 
+void ADestructableEnvActor::ApplyCrushBreachDamage(const float DamageAmount)
+{
+	if (not IsUnitAlive() || DamageAmount <= 0.f)
+	{
+		return;
+	}
+	Health -= DamageAmount;
+	if (Health <= 0.f)
+	{
+		OnUnitDies(ERTSDeathType::Kinetic);
+	}
+}
+
 void ADestructableEnvActor::GetAimOffsetPoints(TArray<FVector>& OutLocalOffsets) const
 {
 	// Move into outlocaloffsets.

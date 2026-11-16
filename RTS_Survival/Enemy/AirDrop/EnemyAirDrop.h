@@ -108,6 +108,11 @@ struct FEnemyAirDropDeliverySettings
 		meta = (EditCondition = "Delivery == EEnemyAirDropDelivery::Parachute", EditConditionHides))
 	EGlobalAbility ParachuteAbility = EGlobalAbility::GA_SovietParatroopers;
 
+	// Vehicles hang on ropes below the cargo plane and are lowered to the ground while it hovers, instead of riding
+	// under it to a landing.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Delivery")
+	bool bRopeSlungVehicles = false;
+
 	// The announcer warns the player as when the enemy AI sends the same ability (silent for abilities it has no
 	// line for).
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Delivery")
@@ -199,6 +204,13 @@ public:
 	 */
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Air Drop")
 	void StartAirDrop();
+
+	/**
+	 * @brief Sets up an air drop a mission spawns at runtime (SpawnActorDeferred, call before FinishSpawning): one
+	 * drop on the actor's own location, FirstDropDelay seconds after the enemy AI is ready.
+	 */
+	void InitRuntimeAirDrop(const FName InAirDropId, const FEnemyAirDropUnits& InUnits,
+	                        const FEnemyAirDropDeliverySettings& InDelivery, const float FirstDropDelay);
 
 	/** @brief No new drop starts; flying aircraft still deliver and the air drop finishes once they are gone. */
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Air Drop")
