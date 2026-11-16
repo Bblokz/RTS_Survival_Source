@@ -10,6 +10,7 @@
 #include "W_IdleUnitButton.generated.h"
 
 class UButton;
+class UImage;
 class UOverlay;
 class UTextBlock;
 class UTexture2D;
@@ -72,6 +73,7 @@ private:
 
 	void BuildWidgetTree();
 	void BuildIdleLamp(UOverlay& Overlay);
+	void AddIdleLampLayer(UOverlay& Overlay, UImage& Layer, const FMargin& LampPadding);
 	FButtonStyle MakeGlassButtonStyle() const;
 	FSlateBrush MakeGlassBrush(UTexture2D* Texture, const FLinearColor& Tint) const;
 

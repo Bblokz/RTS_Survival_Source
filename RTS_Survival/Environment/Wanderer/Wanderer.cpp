@@ -11,6 +11,7 @@
 #include "RTS_Survival/Units/RTSDeathType/RTSDeathType.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/CollisionSetup/FRTS_CollisionSetup.h"
+#include "RTS_Survival/Environment/DestructableEnvActor/WallGate/WallGateNavigation.h"
 
 namespace WandererConstants
 {
@@ -378,7 +379,7 @@ bool AWanderer::BuildPathTo(const FVector& Destination)
 		return true;
 	}
 	const UNavigationPath* Path = UNavigationSystemV1::FindPathToLocationSynchronously(
-		GetWorld(), GetActorLocation(), Destination, this);
+		GetWorld(), GetActorLocation(), Destination, this, URTSClosedBreachableWallsQueryFilter::StaticClass());
 	if (not Path || not Path->IsValid() || Path->IsPartial() || Path->PathPoints.Num() < 2)
 	{
 		return false;

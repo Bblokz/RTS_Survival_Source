@@ -12,6 +12,13 @@ namespace IndicatorLampConstants
 {
 	const FName PowerParameter(TEXT("Power"));
 	const FName BlinkModeParameter(TEXT("BlinkMode"));
+	const FName HaloScaleParameter(TEXT("HaloScale"));
+	const FName LampColorParameter(TEXT("LampColor"));
+	// The lamp parameters the halo copies, so its light pulses in step with the jewel.
+	const FName SharedScalarParameters[] = {
+		FName(TEXT("TimeOffset")), FName(TEXT("BlinkMode")), FName(TEXT("BlinkHz")), FName(TEXT("BlinkPhase")),
+		FName(TEXT("Duty")), FName(TEXT("MinOn"))
+	};
 	constexpr float SteadyBlinkMode = 0.f;
 	constexpr float DarkPower = 0.001f;
 }
@@ -57,6 +64,41 @@ UImage* FIndicatorLamp::Build(UWidgetTree& WidgetTree, UMaterialInterface* LampM
 	return M_Image;
 }
 
+UImage* FIndicatorLamp::BuildHalo(UWidgetTree& WidgetTree, UMaterialInterface* HaloMaterial, const float HaloScale)
+{
+	if (not GetIsBuilt() || not IsValid(HaloMaterial))
+	{
+		return nullptr;
+	}
+	M_HaloImage = WidgetTree.ConstructWidget<UImage>(UImage::StaticClass());
+	M_HaloMaterial = UMaterialInstanceDynamic::Create(HaloMaterial, M_HaloImage);
+	M_HaloMaterial->SetScalarParameterValue(IndicatorLampConstants::HaloScaleParameter, HaloScale);
+	CopyLampLookToHalo();
+	FSlateBrush Brush;
+	Brush.SetResourceObject(M_HaloMaterial);
+	Brush.ImageSize = M_Image->GetBrush().ImageSize;
+	M_HaloImage->SetBrush(Brush);
+	// Laid out like the lamp and centred on it; the scale only changes where it draws.
+	M_HaloImage->SetRenderTransform(FWidgetTransform(FVector2D::ZeroVector, FVector2D(HaloScale, HaloScale),
+	                                                 FVector2D::ZeroVector, 0.f));
+	M_HaloImage->SetRenderTransformPivot(FVector2D(0.5f, 0.5f));
+	M_HaloImage->SetVisibility(ESlateVisibility::HitTestInvisible);
+	ApplyPower();
+	return M_HaloImage;
+}
+
+void FIndicatorLamp::CopyLampLookToHalo() const
+{
+	using namespace IndicatorLampConstants;
+	// Every M_UI_IndicatorLamp instance has these parameters (its master defines them all).
+	for (const FName& Parameter : SharedScalarParameters)
+	{
+		M_HaloMaterial->SetScalarParameterValue(Parameter, M_Material->K2_GetScalarParameterValue(Parameter));
+	}
+	M_HaloMaterial->SetVectorParameterValue(LampColorParameter,
+	                                        M_Material->K2_GetVectorParameterValue(LampColorParameter));
+}
+
 void FIndicatorLamp::SetIsLit(const bool bIsLit)
 {
 	bM_IsLit = bIsLit || GetIsForcedLitForCapture();
@@ -88,7 +130,13 @@ void FIndicatorLamp::ApplyPower() const
 	}
 	M_Material->SetScalarParameterValue(IndicatorLampConstants::PowerParameter, M_Power);
 	const bool bShow = not bM_HideWhenOff || M_Power > IndicatorLampConstants::DarkPower;
-	M_Image->SetVisibility(bShow ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
+	const ESlateVisibility Visibility = bShow ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed;
+	M_Image->SetVisibility(Visibility);
+	if (IsValid(M_HaloImage) && IsValid(M_HaloMaterial))
+	{
+		M_HaloMaterial->SetScalarParameterValue(IndicatorLampConstants::PowerParameter, M_Power);
+		M_HaloImage->SetVisibility(Visibility);
+	}
 }
 
 bool FIndicatorLamp::GetIsBuilt() const
