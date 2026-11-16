@@ -258,9 +258,14 @@ def build_trench():
     print("corpse poses", len(poses))
     for k, (x, y, yaw) in enumerate(((24, -330, 75), (-26, -640, 200), (30, -930, 120))):
         if poses:
-            s.mesh("Trench_Body_%d" % k, poses[(k * 5) % len(poses)], (x, y, 9), rotation=(0, yaw, 0))
+            # matte rotting field-grey (M_Intro_MouldSteel): the game's soldier material caught a broad sheen under
+            # this set's fixed exposure and read as grey clay
+            s.mesh("Trench_Body_%d" % k, poses[(k * 5) % len(poses)], (x, y, 9), rotation=(0, yaw, 0),
+                   materials=M + "M_Intro_MouldSteel")
     # Low sun from behind the camera side, raking down the trench; the far end stays in shade.
-    sun(s, "Trench_Sun", -19, -62, 2.4, (1.0, 0.7, 0.44, 1.0))
+    trench_sun = sun(s, "Trench_Sun", -19, -62, 2.4, (1.0, 0.7, 0.44, 1.0))
+    # a wider sun disc: the growing mould's shadow on the trench floor had a ruler-straight edge (5.3)
+    trench_sun.get_component_by_class(unreal.DirectionalLightComponent).set_editor_property("light_source_angle", 2.5)
     sky_light(s, "Trench_Sky", 0.22, (0.45, 0.52, 0.72, 1.0))
     fixed_exposure(s, "Trench_Exposure", 0.13)
     s.mesh("Trench_SkyDome", SPHERE, (0, 0, 0), scale=(900.0,) * 3, materials=M + "MI_Intro_Sky_Ash", shadow=False)

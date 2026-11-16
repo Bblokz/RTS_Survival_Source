@@ -833,3 +833,10 @@ first ~2 s of 5.2 and last ~2 s of 5.3 barely change.
 twice as many) now break the silhouette and shade at camera distance (half that read as a smooth matte blob); 5.2
 opens with the growth already on the helmet (Mould 0.09 -> 0.24) and 5.3 keeps growing to the cut (0.24 -> 1.0, no
 held end).
+
+**Last fixes after sign-off.** The mound's camera-facing half was a flat black blob under the low back sun: 5.3 has a
+soft cold fill (`MouldFill`) from the camera side. The trench corpses use `M_Intro_MouldSteel` (the game's soldier
+material read as grey clay under the fixed exposure). Vein roots emerge dark from the mould and light up further
+out; the trench sun has a 2.5 deg disc (softer shadow edges); 5.2 opens with the growth further along (Mould 0.14).
+Reviewer leftovers, accepted by the owner: one lobe with a flat top, a smooth right lobe, slightly glossy tubes, one
+vein that runs under the sheet, near-static first 1.5 s of 5.2.

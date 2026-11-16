@@ -66,14 +66,17 @@ float facing = saturate(dot(N, V));
 float core = pow(facing, 7.0);
 float along = smoothstep(0.0, 1.6, UV.x * 100.0 / 100.0);
 float3 tube = lerp(float3(0.008, 0.001, 0.011), float3(0.026, 0.003, 0.036), along) * lerp(0.45, 1.0, facing);
-col = lerp(col, tube, vein);
+col = lerp(col, tube * lerp(0.45, 1.0, smoothstep(0.03, 0.32, UV.x)), vein);
 // wet in the veins, but not a glossy hose; the flesh between is dull and spongy
 float rough = saturate(lerp(0.92, 0.3, vein) - v * 0.25 * (1.0 - vein) + (mf - 0.5) * 0.15 * (1.0 - vein));
 // Almost no specular on the flesh: on the smooth, subdivided stage meshes the trench's raking sun laid a broad
 // sheen over the dark mould under this set's fixed exposure and it read as pale lilac upholstery (as the helmets
 // read as clay). The vessels and nodules carry the form in the diffuse instead.
 float spec = lerp(0.04, 0.55, vein);
-float3 glow = (vb * (0.1 + 0.9 * beat) * 0.03 * (1.0 - vein) + vein * core * (0.05 + pump * 0.22))
+// A vein emerges dark from the mould it grew out of and only lights up further out: a bright core right at the root
+// made the line where the mould sheet crosses the vein read as a sliced-off end.
+float rootDark = smoothstep(0.03, 0.32, UV.x);
+float3 glow = (vb * (0.1 + 0.9 * beat) * 0.03 * (1.0 - vein) + vein * core * (0.05 + pump * 0.22) * rootDark)
             * float3(0.32, 0.015, 0.48) * Glow;
 """
 
