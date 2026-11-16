@@ -844,3 +844,9 @@ vein that runs under the sheet, near-static first 1.5 s of 5.2.
 **Final blind check of the committed build** (Source 47a42f02 / main 2435b1b6e, MRQ_Final): three fresh judges, A/B
 in random order, no hint which is which, majority per adjective fixed beforehand, the owner's own terms ("more scary
 and more detailed and real") against the pre-task 5.2 / 5.3: scary 3-0, detailed 3-0, real 3-0 for the final build.
+
+**Last round (re-check of the final review's findings).** The trench steel and the dead carry the Purple Death
+always (`MI_Intro_PD_Encrusted`; the clay-looking helmets / heads finding is cleared); the domes over the helmets are
+20 / 24 cm instead of 30 / 44 cm and the relief fades out over twice as many rows from the rim. Still open, accepted by
+the owner: the far right lobe's crest is a smooth rounded outline against the wall, and the left lobe has a
+flat-ish top with a jagged rim; both need the mats re-sculpted (a modelling task), not more tuning.

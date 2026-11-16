@@ -45,8 +45,9 @@ MAT_ARGS = {
     'SM_Intro_Mould_Mat_B': lambda: dict(x0=1.10, dirx=1.0, y0=1.2, s_c=-0.08, Rs=0.80, Rt=1.15, T=0.075, seed=311,
                                          lobes=[(3.0, 0.40, 0.13), (3.6, 0.3, 0.10), (2.5, 0.35, 0.12), (1.3, 0.2, 0.2),
                                                 (4.9, 0.2, 0.2)],
-                                         bumps=[(HELMETS[0][0] - 1.10, HELMETS[0][1] - 1.2, 0.30, 0.25),
-                                                (HELMETS[1][0] - 1.10, HELMETS[1][1] - 1.2, 0.44, 0.27)]),
+                                         # just over the helmets (16 cm): 30 / 44 cm domes read as smooth balloons
+                                         bumps=[(HELMETS[0][0] - 1.10, HELMETS[0][1] - 1.2, 0.20, 0.25),
+                                                (HELMETS[1][0] - 1.10, HELMETS[1][1] - 1.2, 0.24, 0.27)]),
     'SM_Intro_Mould_Mat_C': lambda: dict(x0=wall_foot(0.4, 1.0, 7.6), dirx=1.0, y0=7.6, s_c=0.05, Rs=0.5, Rt=2.0,
                                          T=0.085, seed=321,
                                          lobes=[(2.2, 0.5, 0.10), (3.2, 0.6, 0.08), (4.0, 0.5, 0.10), (0.8, 0.4, 0.10),
@@ -88,7 +89,7 @@ def raise_relief(ob, offset, levels):
                     dist[o] = dist[i] + 1
                     nxt.append(o)
         front = nxt
-    fade_rows = 1.5 * 2 ** levels
+    fade_rows = 3.0 * 2 ** levels                  # a spiky fringe where the relief reached the thin rim
     bm.normal_update()
     verts = [v for v in bm.verts if v.link_loops]
     st = np.array([[sum(lp[uvl].uv[k] for lp in v.link_loops) / len(v.link_loops) for k in (0, 1)] for v in verts]) - 0.5

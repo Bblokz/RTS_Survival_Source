@@ -152,6 +152,19 @@ def build_steel_material():
     lib.safe_save([mesh.get_outermost()])
 
 
+def build_encrusted():
+    """MI_Intro_PD_Encrusted: the Purple Death already caked on the trench's steel and the dead (pustule mode, always
+    shown). Bare, they read as grey clay heads next to the mould under this set's fixed exposure."""
+    parent = unreal.load_asset(M + "M_Intro_PurpleDeath")
+    mi = mats.instance("MI_Intro_PD_Encrusted", parent, scalars={"Mode": 2.0, "Seed": 1.3, "StageLo": 0.0, "StageHi": 9.0})
+    mesh = unreal.load_asset(lib.ROOT + "/Sets/SM_Intro_TrenchProps")
+    for index, slot in enumerate(mesh.static_materials):
+        if str(slot.material_slot_name) == "Steel":
+            mesh.set_material(index, mi)
+    lib.safe_save([mesh.get_outermost()])
+    return mi
+
+
 def build_instances(meshes):
     """One instance per growth stage of each trench mould mesh (SM_<piece>_S<n>): Mode, Seed and its Mould window.
     Returns {mesh: MI path prefix} (a stage's instance is the prefix + "_S<n>")."""

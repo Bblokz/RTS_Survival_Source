@@ -258,10 +258,10 @@ def build_trench():
     print("corpse poses", len(poses))
     for k, (x, y, yaw) in enumerate(((24, -330, 75), (-26, -640, 200), (30, -930, 120))):
         if poses:
-            # matte rotting field-grey (M_Intro_MouldSteel): the game's soldier material caught a broad sheen under
-            # this set's fixed exposure and read as grey clay
+            # the dead are caked in the Purple Death (MI_Intro_PD_Encrusted): the game's soldier material, and then a
+            # matte field-grey, read as grey clay under this set's fixed exposure
             s.mesh("Trench_Body_%d" % k, poses[(k * 5) % len(poses)], (x, y, 9), rotation=(0, yaw, 0),
-                   materials=M + "M_Intro_MouldSteel")
+                   materials=M + "MI_Intro_PD_Encrusted")
     # Low sun from behind the camera side, raking down the trench; the far end stays in shade.
     trench_sun = sun(s, "Trench_Sun", -19, -62, 2.4, (1.0, 0.7, 0.44, 1.0))
     # a wider sun disc: the growing mould's shadow on the trench floor had a ruler-straight edge (5.3)
