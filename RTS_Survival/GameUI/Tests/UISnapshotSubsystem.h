@@ -142,6 +142,8 @@ private:
 	// -UISnapshotOpenFullMap: presses the minimap's map button once; -UISnapshotCloseFullMapAtStep=N presses the
 	// full map's close button when step N starts (both through the real buttons' OnClicked).
 	void ToggleFullMapForStep();
+	// -UISnapshotHoverTacticalMission=N: logs the tactical map's mission cards and hovers card N.
+	void ShowTacticalMapMissionsForStep() const;
 	// -UISnapshotCombatPings: every player unit reports a hit (the throttled path, logged) and preview pings at
 	// different ages are spread over the map, so the minimap and tactical map show the combat ping.
 	void ShowCombatPingsForStep() const;

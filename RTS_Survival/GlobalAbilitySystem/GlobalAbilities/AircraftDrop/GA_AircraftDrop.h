@@ -66,6 +66,11 @@ struct FAircraftDropGlobalAbilitySettings
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0.0"))
 	float BetweenAircraftRectangleOffset = 1000.0f;
 
+	// Vehicles hang on ropes far below the aircraft (AircraftRopeSling::DefaultHangDistance) and are lowered to the
+	// ground while it hovers, instead of riding just under it to a landing. TankAttachZOffset is ignored then.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	bool bRopeSlungTanks = false;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TObjectPtr<USoundBase> DropOffSound = nullptr;
 
@@ -95,6 +100,9 @@ public:
 	 * @param SquadSubtypes AmountInfantryPerAircraft squads share one aircraft.
 	 */
 	void SetDropPayload(const TArray<ETankSubtype>& TankSubtypes, const TArray<ESquadSubtype>& SquadSubtypes);
+
+	/** @brief On a copy: vehicles hang on ropes and are lowered while the aircraft hovers (see bRopeSlungTanks). */
+	void SetRopeSlungTanks(const bool bRopeSlung) { M_AircraftDropSettings.bRopeSlungTanks = bRopeSlung; }
 
 private:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (AllowPrivateAccess = "true"))

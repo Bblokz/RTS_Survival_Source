@@ -157,8 +157,17 @@ void UGA_AircraftDrop::SpawnTankDropAircraft(
 		EAircraftDropPayloadType::Tank,
 		AircraftIndex);
 	DropRequest.TankAttachZOffset = TankWithOffset.TankAttachZOffset;
+	FVector SpawnLocation = BuildAircraftSpawnLocation(ExecuteLocation, AircraftIndex);
+	if (M_AircraftDropSettings.bRopeSlungTanks)
+	{
+		DropRequest.TankAttachZOffset = -AircraftRopeSling::DefaultHangDistance;
+		DropRequest.bRopeSlungPayload = true;
+		// The vehicle spawns hanging below the aircraft: start high enough that it is not spawned into the ground.
+		SpawnLocation.Z = FMath::Max(SpawnLocation.Z,
+		                             AircraftRopeSling::GetMinCruiseZ(ExecuteLocation.Z,
+		                                                              AircraftRopeSling::DefaultHangDistance));
+	}
 
-	const FVector SpawnLocation = BuildAircraftSpawnLocation(ExecuteLocation, AircraftIndex);
 	AAircraftMaster* SpawnedAircraft = GlobalAbilityHelpers::SpawnAircraftAtLocation(
 		this,
 		AircraftClass,
@@ -184,7 +193,7 @@ void UGA_AircraftDrop::SpawnTankDropAircraft(
 		EAllUnitType::UNType_Tank,
 		static_cast<uint8>(TankWithOffset.TankSubtype));
 	TWeakObjectPtr<AAircraftMaster> WeakAircraft(SpawnedAircraft);
-	const FVector TankSpawnLocation = SpawnLocation + FVector(0.0f, 0.0f, TankWithOffset.TankAttachZOffset);
+	const FVector TankSpawnLocation = SpawnLocation + FVector(0.0f, 0.0f, DropRequest.TankAttachZOffset);
 	const auto OnTankSpawned = [WeakAircraft, DropRequest](const FTrainingOption&, AActor* SpawnedActor, const int32)
 	{
 		if (not WeakAircraft.IsValid())
