@@ -55,7 +55,9 @@ namespace CameraControlsValidateConstants
 	constexpr double BeforeStartWaitSeconds = 1.5;
 	constexpr double SettleAfterCloseSeconds = 0.5;
 	constexpr double NextCheckAfterCloseSeconds = 1.0;
-	constexpr double NeverShowAgainTickSeconds = 1.5;
+	// Real seconds each field manual of the kept-queue check stays open.
+	constexpr double KeptQueueOpenSeconds = 1.5;
+	constexpr int32 KeptQueueRequestCount = 3;
 	constexpr float MinSignatureChange = 0.01f;
 	const FName DifficultyButtonName(TEXT("M_NormalDifficultyButton"));
 	const FName ContinueFunctionName(TEXT("OnClickedContinue"));
@@ -105,8 +107,8 @@ void UCameraControlsTakeoverValidateSubsystem::Tick(float DeltaTime)
 	case ECameraControlsValidatePhase::CheckingClosed:
 		TickCheckingClosed();
 		break;
-	case ECameraControlsValidatePhase::WatchingDroppedQueue:
-		TickWatchingDroppedQueue();
+	case ECameraControlsValidatePhase::WatchingKeptQueue:
+		TickWatchingKeptQueue();
 		break;
 	default:
 		break;
@@ -599,7 +601,7 @@ void UCameraControlsTakeoverValidateSubsystem::TickCheckingClosed()
 		if (GetSecondsInPhase() >= CameraControlsValidateConstants::NextCheckAfterCloseSeconds)
 		{
 			CheckTurnedOffRequest();
-			StartDroppedQueueCheck();
+			StartKeptQueueCheck();
 		}
 		return;
 	}
@@ -621,80 +623,99 @@ void UCameraControlsTakeoverValidateSubsystem::TickCheckingClosed()
 
 void UCameraControlsTakeoverValidateSubsystem::CheckTurnedOffRequest()
 {
+	// "Never show again" only hides unit intel: the camera field manual must still open, and without the box. It stays
+	// open as the first takeover of the kept-queue check.
 	SetTakeoversEnabled(false);
 	StartRequest(M_TurnedOffRequest)->OnClosed.AddDynamic(
 		this, &UCameraControlsTakeoverValidateSubsystem::HandleTurnedOffClosed);
 	M_TurnedOffRequest.Action->Activate();
-	const bool bOpened = GetActiveCameraTakeover() != nullptr;
-	UE_LOG(LogTemp, Display, TEXT("CAMERA_TAKEOVER turned off: closed %d times at once, shown=%d, opened=%d"),
-	       M_TurnedOffRequest.ClosedCount, M_TurnedOffRequest.bWasShown ? 1 : 0, bOpened ? 1 : 0);
-	if (M_TurnedOffRequest.ClosedCount != 1 || M_TurnedOffRequest.bWasShown || bOpened)
+	const UW_CameraControlsTakeover* const Takeover = GetActiveCameraTakeover();
+	const bool bOpened = Takeover != nullptr;
+	const bool bOffersNeverShowAgain = bOpened && Takeover->GetOffersNeverShowAgain();
+	UE_LOG(LogTemp, Display, TEXT("CAMERA_TAKEOVER turned off: opened=%d, closed %d times at once, never-show box=%d"),
+	       bOpened ? 1 : 0, M_TurnedOffRequest.ClosedCount, bOffersNeverShowAgain ? 1 : 0);
+	if (not bOpened || M_TurnedOffRequest.ClosedCount != 0 || bOffersNeverShowAgain)
 	{
-		Fail(TEXT("with the takeovers off, On Closed must fire at once with Was Shown false"));
+		Fail(TEXT("with unit intel off, the field manual must still open, without the never-show box"));
 	}
-	SetTakeoversEnabled(true);
 }
 
-void UCameraControlsTakeoverValidateSubsystem::StartDroppedQueueCheck()
+void UCameraControlsTakeoverValidateSubsystem::StartKeptQueueCheck()
 {
+	// Queued behind the open one while unit intel is off: closing each takeover runs the queue's unit-intel drop, which
+	// must keep these field manuals.
 	StartRequest(M_FirstQueuedRequest)->OnClosed.AddDynamic(
 		this, &UCameraControlsTakeoverValidateSubsystem::HandleFirstQueuedClosed);
-	StartRequest(M_DroppedRequest)->OnClosed.AddDynamic(
-		this, &UCameraControlsTakeoverValidateSubsystem::HandleDroppedClosed);
+	StartRequest(M_KeptRequest)->OnClosed.AddDynamic(
+		this, &UCameraControlsTakeoverValidateSubsystem::HandleKeptClosed);
 	M_FirstQueuedRequest.Action->Activate();
-	M_DroppedRequest.Action->Activate();
+	M_KeptRequest.Action->Activate();
 	M_WatchedTakeover = nullptr;
-	EnterPhase(ECameraControlsValidatePhase::WatchingDroppedQueue);
+	M_KeptQueueOpenedCount = 0;
+	EnterPhase(ECameraControlsValidatePhase::WatchingKeptQueue);
 }
 
-void UCameraControlsTakeoverValidateSubsystem::TickWatchingDroppedQueue()
+void UCameraControlsTakeoverValidateSubsystem::TickWatchingKeptQueue()
 {
 	using namespace CameraControlsValidateConstants;
-	if (not bM_HasDroppedQueueTakeoverOpened)
+	UW_CameraControlsTakeover* const ActiveTakeover = GetActiveCameraTakeover();
+	if (ActiveTakeover == nullptr)
 	{
-		UW_CameraControlsTakeover* const OpenedTakeover = WaitForTakeoverToOpen(TEXT("the first queued takeover"));
-		if (OpenedTakeover == nullptr)
+		if (M_KeptQueueOpenedCount >= KeptQueueRequestCount)
 		{
+			CheckKeptQueueClosed();
 			return;
 		}
-		bM_HasDroppedQueueTakeoverOpened = true;
-		M_WatchedTakeover = OpenedTakeover;
-		M_WatchedOpenSeconds = FPlatformTime::Seconds();
-		return;
-	}
-	const double SecondsOpen = FPlatformTime::Seconds() - M_WatchedOpenSeconds;
-	if (M_FirstQueuedRequest.ClosedCount == 0)
-	{
-		if (SecondsOpen < NeverShowAgainTickSeconds)
+		if (GetSecondsInPhase() > OpenTimeoutSeconds)
 		{
-			return;
-		}
-		UW_CameraControlsTakeover* const FirstTakeover = M_WatchedTakeover.Get();
-		if (FirstTakeover == nullptr)
-		{
-			Fail(TEXT("the first queued takeover vanished before it was closed"));
+			Fail(FString::Printf(TEXT("only %d of %d queued field manuals opened with unit intel off"),
+			                     M_KeptQueueOpenedCount, KeptQueueRequestCount));
 			Finish();
-			return;
 		}
-		FirstTakeover->SetNeverShowAgainChecked(true);
-		CloseTakeover(*FirstTakeover);
 		return;
 	}
-	if (SecondsOpen < NeverShowAgainTickSeconds + SettleAfterCloseSeconds)
+	if (ActiveTakeover != M_WatchedTakeover.Get())
+	{
+		StartWatchingKeptQueueTakeover(*ActiveTakeover);
+		return;
+	}
+	if (FPlatformTime::Seconds() - M_WatchedOpenSeconds < KeptQueueOpenSeconds)
 	{
 		return;
 	}
-	const bool bAnotherOpened = GetActiveCameraTakeover() != nullptr;
-	UE_LOG(LogTemp, Display, TEXT("CAMERA_TAKEOVER queue drop: first closed %d shown=%d; dropped closed %d shown=%d; "
-		       "another opened=%d"), M_FirstQueuedRequest.ClosedCount, M_FirstQueuedRequest.bWasShown ? 1 : 0,
-	       M_DroppedRequest.ClosedCount, M_DroppedRequest.bWasShown ? 1 : 0, bAnotherOpened ? 1 : 0);
-	if (M_FirstQueuedRequest.ClosedCount != 1 || not M_FirstQueuedRequest.bWasShown)
+	CloseTakeover(*ActiveTakeover);
+	// Restarts the open timeout for the next field manual.
+	EnterPhase(ECameraControlsValidatePhase::WatchingKeptQueue);
+}
+
+void UCameraControlsTakeoverValidateSubsystem::StartWatchingKeptQueueTakeover(UW_CameraControlsTakeover& Takeover)
+{
+	++M_KeptQueueOpenedCount;
+	M_WatchedTakeover = &Takeover;
+	M_WatchedOpenSeconds = FPlatformTime::Seconds();
+	const bool bOffersNeverShowAgain = Takeover.GetOffersNeverShowAgain();
+	UE_LOG(LogTemp, Display, TEXT("CAMERA_TAKEOVER kept queue: field manual %d opened, never-show box=%d"),
+	       M_KeptQueueOpenedCount, bOffersNeverShowAgain ? 1 : 0);
+	if (bOffersNeverShowAgain)
 	{
-		Fail(TEXT("the first queued request did not close as shown"));
+		Fail(TEXT("a field manual offered the never-show box"));
 	}
-	if (M_DroppedRequest.ClosedCount != 1 || M_DroppedRequest.bWasShown || bAnotherOpened)
+	// The test hook must do nothing here: no box, and closing must not write the setting.
+	Takeover.SetNeverShowAgainChecked(true);
+}
+
+void UCameraControlsTakeoverValidateSubsystem::CheckKeptQueueClosed()
+{
+	UE_LOG(LogTemp, Display, TEXT("CAMERA_TAKEOVER kept queue: turned-off closed %d shown=%d; first closed %d shown=%d; "
+		       "kept closed %d shown=%d"), M_TurnedOffRequest.ClosedCount, M_TurnedOffRequest.bWasShown ? 1 : 0,
+	       M_FirstQueuedRequest.ClosedCount, M_FirstQueuedRequest.bWasShown ? 1 : 0, M_KeptRequest.ClosedCount,
+	       M_KeptRequest.bWasShown ? 1 : 0);
+	const bool bAllShownOnce = M_TurnedOffRequest.ClosedCount == 1 && M_TurnedOffRequest.bWasShown
+		&& M_FirstQueuedRequest.ClosedCount == 1 && M_FirstQueuedRequest.bWasShown
+		&& M_KeptRequest.ClosedCount == 1 && M_KeptRequest.bWasShown;
+	if (not bAllShownOnce)
 	{
-		Fail(TEXT("the request dropped by never show again did not finish once as not shown"));
+		Fail(TEXT("with unit intel off, every queued field manual must open and close once as shown"));
 	}
 	Finish();
 }
@@ -723,9 +744,9 @@ void UCameraControlsTakeoverValidateSubsystem::HandleFirstQueuedClosed(bool bWas
 	RecordClosed(M_FirstQueuedRequest, bWasShown);
 }
 
-void UCameraControlsTakeoverValidateSubsystem::HandleDroppedClosed(bool bWasShown)
+void UCameraControlsTakeoverValidateSubsystem::HandleKeptClosed(bool bWasShown)
 {
-	RecordClosed(M_DroppedRequest, bWasShown);
+	RecordClosed(M_KeptRequest, bWasShown);
 }
 
 void UCameraControlsTakeoverValidateSubsystem::RecordClosed(FCameraControlsValidateRequest& Request,

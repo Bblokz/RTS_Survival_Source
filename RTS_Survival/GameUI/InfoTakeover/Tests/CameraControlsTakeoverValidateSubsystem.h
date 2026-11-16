@@ -26,8 +26,8 @@ enum class ECameraControlsValidatePhase : uint8
 	WatchingLaterPage,
 	// Understood was pressed; On Closed must have fired with the game unpaused.
 	CheckingClosed,
-	// Two requests at once; the first ticks "never show again", so the queued second must finish as not shown.
-	WatchingDroppedQueue,
+	// With unit intel turned off, three field manual requests queue up; each must open in turn and close as shown.
+	WatchingKeptQueue,
 	Done
 };
 
@@ -50,7 +50,8 @@ struct FCameraControlsValidateRequest
  * -RenderOffscreen on a unit test map): calls the Show Camera Controls Takeover node, screenshots the typing and eight
  * frames of each page's looping illustrations to Saved/InfoTakeover/CameraControls/, presses CONTINUE on every page and
  * UNDERSTOOD on the last, and checks that the illustrations animate while paused, that On Closed waits for the last page and fires once, at
- * once while the takeovers are off, and for a request dropped from the queue by "never show again". Grep
+ * that with unit intel turned off the field manual still opens (without the never-show box) and queued
+ * field manuals keep their place. Grep
  * CAMERA_TAKEOVER. Restores the setting and quits.
  */
 UCLASS()
@@ -88,7 +89,8 @@ private:
 	double M_WatchedOpenSeconds = 0.0;
 	int32 M_NextFrameShot = 0;
 	bool bM_HasTitleShot = false;
-	bool bM_HasDroppedQueueTakeoverOpened = false;
+	// How many field manuals of the kept-queue check have opened.
+	int32 M_KeptQueueOpenedCount = 0;
 	bool bM_HasCapturedAfterClose = false;
 
 	// Per illustration of the page being watched: the animated values summed at every frame shot; they must change
@@ -108,7 +110,7 @@ private:
 	FCameraControlsValidateRequest M_FirstQueuedRequest;
 
 	UPROPERTY()
-	FCameraControlsValidateRequest M_DroppedRequest;
+	FCameraControlsValidateRequest M_KeptRequest;
 
 	int32 M_Failures = 0;
 	bool bM_OriginalSettingValue = true;
@@ -152,7 +154,9 @@ private:
 	static int32 FindGlassElement(const UW_CameraControlsTakeover& Takeover, const FString& NamePrefix);
 	static bool GetIsLastPage(const UW_CameraControlsTakeover& Takeover);
 	void TickCheckingClosed();
-	void TickWatchingDroppedQueue();
+	void TickWatchingKeptQueue();
+	void StartWatchingKeptQueueTakeover(UW_CameraControlsTakeover& Takeover);
+	void CheckKeptQueueClosed();
 
 	void CaptureAnimationFrame(const UW_CameraControlsTakeover& Takeover);
 	void RecordIllustrationSignatures(const UW_CameraControlsTakeover& Takeover);
@@ -162,7 +166,7 @@ private:
 	void CloseTakeover(UW_CameraControlsTakeover& Takeover) const;
 
 	void CheckTurnedOffRequest();
-	void StartDroppedQueueCheck();
+	void StartKeptQueueCheck();
 
 	UAsyncShowCameraControlsTakeover* StartRequest(FCameraControlsValidateRequest& Request);
 
@@ -176,7 +180,7 @@ private:
 	void HandleFirstQueuedClosed(bool bWasShown);
 
 	UFUNCTION()
-	void HandleDroppedClosed(bool bWasShown);
+	void HandleKeptClosed(bool bWasShown);
 
 	void RecordClosed(FCameraControlsValidateRequest& Request, const bool bWasShown) const;
 	void SetTakeoversEnabled(const bool bEnabled) const;

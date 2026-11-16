@@ -31,7 +31,8 @@ enum class EBxpPackUpTakeoverValidatePhase : uint8
  * -game -RenderOffscreen on a unit test map): calls the Show Building Expansion Pack Up Takeover node before the start
  * button, checks it waits, screenshots the typing, eight frames of the looping illustration, the finished panel and the
  * HUD after closing to Saved/InfoTakeover/BxpPackUp/, checks that the illustration animates while the game is paused,
- * that On Closed fires once after UNDERSTOOD with the game unpaused and at once while the takeovers are off. Grep
+ * that On Closed fires once after UNDERSTOOD with the game unpaused and that it still opens
+ * (without the never-show box) and closes as shown while unit intel is turned off. Grep
  * BXP_PACKUP_TAKEOVER. Restores the setting and quits.
  */
 UCLASS()
@@ -124,7 +125,7 @@ private:
 	void JumpToBeat(const UW_BxpPackUpTakeover& Takeover, const float AnimationSeconds);
 	static float GetIllustrationSignature(const UUserWidget& Illustration);
 	void CheckIllustrationAnimated();
-	void CheckTurnedOffNode();
+	void CheckShowsWhileTurnedOff();
 
 	UFUNCTION()
 	void HandleMainClosed(bool bWasShown);
