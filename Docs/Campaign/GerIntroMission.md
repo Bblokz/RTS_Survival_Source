@@ -26,6 +26,9 @@ again (`rewire()` then save the map; `describe()` prints the layout).
 | 5 | `Mission_Intro_ClearSovietRig` ("Secure the Line", a `USecureBaseMission`, 2026-11-16) | The ridge tanks are dead but the Soviet base on the ridge still stands. The fog lifts over the base for 60 s, destroy markers and minimap icons go on its 7 buildings (both cooling towers, both barracks, both MG guard towers, the long camo bunker), the base comes alive (4 Mosin squads and 1 PTRS squad marching, a Zil fuel truck driving up to the rear wall where a crane unloads it) and a 30 s camera tour shows each target with a caption. Then the objective counts the destroyed buildings. See below. | All 7 buildings are destroyed. |
 | 6 | `Mission_Intro_BaseBuilding` | The base-building tutorial (below). Its trigger waits for ClearSovietRig, so the HQ glider and the "ridgeline is secured" line only come once the Soviet base is destroyed. | The barracks and forge are deployed. |
 
+The ground behind the Soviet base (three curved roads, the train station on its ridge, the concrete depot behind the
+depot ridge, ponds, and the 60 m map extension) is described in [IntroMissionRear.md](IntroMissionRear.md).
+
 ## Mission_Intro_ClearSovietRig: secure the line
 
 `Mission_Intro_ClearSovietRig` is reparented (2026-11-16) to the C++ mission class `USecureBaseMission`
