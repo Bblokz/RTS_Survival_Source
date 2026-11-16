@@ -43,6 +43,9 @@ def sun(s, label, pitch, yaw, intensity, color=(1.0, 0.95, 0.88, 1.0)):
     component.set_mobility(unreal.ComponentMobility.MOVABLE)
     component.set_intensity(intensity)
     component.set_light_color(unreal.LinearColor(*color))
+    # Screen-space contact shadows: these sets stand far from the world origin, where the shadow bias alone left
+    # a lit strip under the tanks at the Ural gate (they looked as if they hovered).
+    component.set_editor_property("contact_shadow_length", 0.06)
     return actor
 
 

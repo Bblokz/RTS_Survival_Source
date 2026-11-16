@@ -204,7 +204,7 @@ TANK_DRIVE = {
 }
 
 
-def _ground_fit(location, rotation, footprint, extra_z):
+def _ground_fit(location, rotation, footprint, extra_z, z_from=50000.0):
     """Seats a tank on uneven ground: height, pitch and roll from the ground under its four track corners. A corner
     trace that lands on a prop (far off the others) is replaced by the median, so a rock does not tip the hull."""
     yaw = math.radians(rotation[1])
@@ -213,7 +213,7 @@ def _ground_fit(location, rotation, footprint, extra_z):
     length, width = footprint
     corners = {}
     for name, (a, c) in {"fl": (length, -width), "fr": (length, width), "bl": (-length, -width), "br": (-length, width)}.items():
-        z = scout.ground_z(location[0] + fx * a + rx * c, location[1] + fy * a + ry * c)
+        z = scout.ground_z(location[0] + fx * a + rx * c, location[1] + fy * a + ry * c, z_from=z_from)
         corners[name] = z
     known = sorted(z for z in corners.values() if z is not None)
     if not known:
@@ -241,7 +241,8 @@ def add_tank(sequence, spec, seconds):
     if spec.get("snap") is not None and footprint:
         fitted = []
         for key in _densify(spec["keys"], 12):
-            location, rotation = _ground_fit(key[1], key[2], footprint, key[1][2])
+            # trace_from: start the traces low where a structure stands over the path (the Ural gateway)
+            location, rotation = _ground_fit(key[1], key[2], footprint, key[1][2], spec.get("trace_from", 50000.0))
             fitted.append((key[0], location, rotation) + tuple(key[3:]))
         spec["keys"] = fitted
         spec["snap"] = None

@@ -173,7 +173,9 @@ def build_glow_material():
 
 def build_pin_material():
     """M_Intro_PinBurn: the map pin's own textures; red-hot in the fire, then charred black."""
-    material = mats._new_material("M_Intro_PinBurn")
+    # Masked: an Operation Svarog pin (group 2) is only on the map from half a second before its strike, so the
+    # 1946-47 strikes are not marked on the map in the 1945 shots.
+    material = mats._new_material("M_Intro_PinBurn", blend=unreal.BlendMode.BLEND_MASKED)
 
     def sample(name, y, sampler, default):
         node = mel.create_material_expression(material, unreal.MaterialExpressionTextureSampleParameter2D, -700, y)
@@ -204,6 +206,9 @@ return float4(col, lerp(ORM.g, 0.92, State.y));
     mel.connect_material_property(glow, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
     mel.connect_material_property(normal, "RGB", unreal.MaterialProperty.MP_NORMAL)
     mel.connect_material_property(orm, "R", unreal.MaterialProperty.MP_AMBIENT_OCCLUSION)
+    placed = mats._custom(material, LIFE + "return Group < 1.5 ? 1.0 : step(Delay - 0.5, clock);",
+                          _clock_inputs(material, 1500), output_type=unreal.CustomMaterialOutputType.CMOT_FLOAT1, y=900)
+    mel.connect_material_property(placed, "", unreal.MaterialProperty.MP_OPACITY_MASK)
     return mats._finish(material)
 
 

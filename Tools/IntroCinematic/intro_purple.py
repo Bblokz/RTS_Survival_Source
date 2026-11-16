@@ -46,11 +46,10 @@ float vb = PD.big(p.yz) * an.x + PD.big(p.xz) * an.y + PD.big(p.xy) * an.z;
 float3 col = lerp(float3(0.004, 0.001, 0.005), float3(0.02, 0.0025, 0.028), smoothstep(0.4, 0.8, m1));
 col = lerp(col, float3(0.045, 0.035, 0.046), smoothstep(0.64, 0.8, mf) * 0.45 * (1.0 - vein));
 col = lerp(col, float3(0.045, 0.003, 0.06), saturate(v * 0.5 + vein * 0.35));
-col = lerp(col, float3(0.07, 0.005, 0.09), fresh * 0.3);
 col = lerp(col, float3(0.075, 0.005, 0.1), vein * 0.6);       // the vein tubes read as one continuous vessel
 // wet and glistening only in the veins and at the fresh front; the flesh between is dull and spongy
 float rough = saturate(lerp(0.82, 0.32, saturate(v * 0.8 + vein * 0.5)) - fresh * 0.15 + (mf - 0.5) * 0.2);
-float3 glow = (vb * (0.1 + 0.9 * beat) * 0.045 + vein * (0.03 + pump * 0.1) + fresh * 0.02) * float3(0.32, 0.015, 0.48) * Glow;
+float3 glow = (vb * (0.1 + 0.9 * beat) * 0.045 + vein * (0.03 + pump * 0.1)) * float3(0.32, 0.015, 0.48) * Glow;
 """
 
 

@@ -149,6 +149,26 @@ def road_column(tail_start, travel, count, spacing, lateral, drive):
     return specs
 
 
+US_SITES = ("LosAlamos", "OakRidge", "Hanford")
+
+
+def tags_curl(curl_at):
+    """The paper tags on the US pins curl once the burn has taken them: the kit's curled tag spawns where the flat
+    tag lies (whose material vanishes it at the same moment, MI_Intro_Tag_* VanishAt). curl_at: per site, fraction
+    of the shot (<= 0 already curled, >= 1 not yet)."""
+    actors = []
+    for index, site in enumerate(US_SITES):
+        f = curl_at[index]
+        if f >= 1.0:
+            continue
+        x, y = sets.map_local(*sets.PLACES[site])
+        where = at("Intro_Bunker", x - 9.0, y + 3.0, sets.TABLE_TOP_Z + 0.4 + 0.5 + 0.5)
+        actors.append({"kind": "mesh", "asset": "SM_Intro_PaperTag_Curled", "label": "TagCurled_" + site,
+                       "mats": sets.M + "MI_Intro_TagCurled_" + site, "shadow": False,
+                       "spawn": (max(f, 0.0), 1.0), "keys": [(0.0, where, (0, 96 + index * 5, 0), 1.8)]})
+    return actors
+
+
 def shots():
     germany = (51.0, 10.5)
     europe = (51.5, 20.0)
@@ -276,9 +296,11 @@ def shots():
         {"id": "4.2", "levels": ["Intro_Bunker"], "vo": ["4_2"], "pre": 0.5, "post": 1.6, "fov": 55,
          "cam": [(0.0, on_map(*usa, back=62, up=66), (-46, 0, 0)), (1.0, on_map(*usa, back=54, up=58), (-46, 0, 0))],
          "mpc": {"Rings42": clock(1.0), "Rings36": [(0.0, 60.0)], "Darken": [(0.0, 0.0), (0.12, 0.3), (1.0, 0.3)]},
+         "actors": tags_curl((4.8 / 8.33, 6.5 / 8.33, 8.2 / 8.33)),
          "cues": [card("MAY 1945", "MANHATTAN PROJECT SITES, USA", 0.4, 5.6), stamp("CONFIRMED", (0.76, 0.70), -9.0, 0, -0.2, 2.6)]},
         {"id": "4.3", "levels": ["Intro_Bunker"], "vo": ["4_3"], "pre": 0.5, "post": 1.2, "fov": 85,
          "mpc_run_on": ["Rings42"],     # the US fires keep burning down through the wide shot
+         "actors": tags_curl((0.0, 0.0, 0.0)),
          "cam": [(0.0, at("Intro_Bunker", -205, -10, 228), (-44, 0, 0)), (0.3, at("Intro_Bunker", -200, 0, 226), (-44, 0, 0)),
                  (1.0, on_map(50.2, 20.5, back=30, up=32), (-46, 0, 0))]},
         # ---- Section 5: August 1945, the Purple Death --------------------------------------------------------------
@@ -361,7 +383,7 @@ def shots():
                  (0.66, at("Intro_Ural", -8300, -1000, 260), {"at": at("Intro_Ural", -900, 0, 1500)}),
                  (1.0, at("Intro_Ural", -8900, -1300, 1500), {"at": at("Intro_Ural", -900, 0, 1900)})],
          "actors": [
-             {"kind": "class", "asset": T34, "label": "T34_%d" % index, "drive": 2.0,
+             {"kind": "class", "asset": T34, "label": "T34_%d" % index, "drive": 2.0, "snap": 0.0, "trace_from": 600.0,
               "keys": [(0.0, at("Intro_Ural", -7600 - index * 1200, 0, 0), (0, 0, 0)),
                        (0.62, at("Intro_Ural", 700 - index * 1200, 0, 0), (0, 0, 0)),
                        (1.0, at("Intro_Ural", 4200 - index * 1200, 0, 0), (0, 0, 0))]} for index in range(4)] + [
@@ -471,6 +493,7 @@ def shots():
          "mpc": {"Archive": [(0.0, 1.0), (0.06, 1.0), (0.3, 0.0)], "Flash": [(0.0, 0.0), (0.05, 0.0), (0.08, 0.14), (0.16, 0.0)],
                  # 1976: every strike on the map is long burnt out (no flames, no smoke).
                  "Rings36": [(0.0, 60.0)], "Rings42": [(0.0, 60.0)], "Rings62": [(0.0, 60.0)]},
+         "actors": tags_curl((0.0, 0.0, 0.0)),
          "cues": [card("1976", "THIRTY YEARS LATER", 1.4, 5.0)]},
         {"id": "9.3a", "handheld": 0.14, "levels": [DESERT], "grade": "present", "vo": ["9_3"], "pre": 0.4, "cut_vo": 0.75, "fov": 45, "cam_snap": 150.0,
          "cam": [(0.0, (DUNE[0] + 6950, -2950, 0), {"at": (DUNE[0] + 6050, -3550, 0), "snap": 110.0}),

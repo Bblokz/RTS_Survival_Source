@@ -370,7 +370,8 @@ def build_text_material():
     mel.connect_material_expressions(reveal, "", fade, "B")
     mel.connect_material_property(fade, "", unreal.MaterialProperty.MP_OPACITY_MASK)
     _finish(material)
-    opaque = _new_material("M_Intro_PaperTex", two_sided=True)
+    # Masked: burnt paper falls away to ash behind the burn front (Char 0 keeps every pixel: date line, blueprint).
+    opaque = _new_material("M_Intro_PaperTex", blend=unreal.BlendMode.BLEND_MASKED, two_sided=True)
     texture = mel.create_material_expression(opaque, unreal.MaterialExpressionTextureSampleParameter2D, -700, 0)
     texture.set_editor_property("parameter_name", "Texture")
     # Char 0..1: the paper browns, then blackens, with a glowing rim while it burns.
@@ -379,20 +380,34 @@ def build_text_material():
     code = VNOISE + """
 float n = vnoise(UV * 9.0) * 0.6 + vnoise(UV * 31.0) * 0.4;
 Char = max(Char, saturate((C42 - Delay) / 2.2));
-float edge = saturate((Char * 1.35 - n) * 4.0);
-float3 col = lerp(Tex, Tex * float3(0.32, 0.2, 0.1), saturate(Char * 2.0));
-col = lerp(col, float3(0.012, 0.01, 0.008), edge);
-float rim = saturate(1.0 - abs(Char * 1.35 - n - 0.06) * 14.0) * step(0.02, Char) * step(Char, 0.98);
-return float4(col, rim);
+// The burn starts at the corner nearest the strike and its front sweeps across, ragged, not in spots.
+float front = UV.x * 0.75 + (1.0 - UV.y) * 0.25 + (n - 0.5) * 0.35;
+float reach = Char * 1.5 - 0.15;
+float behind = reach - front;
+float scorch = smoothstep(-0.25, 0.0, behind);
+float3 col = lerp(Tex, Tex * float3(0.42, 0.27, 0.13), scorch);
+col = lerp(col, float3(0.012, 0.01, 0.008), smoothstep(0.0, 0.06, behind));
+float rim = saturate(1.0 - abs(behind) * 16.0) * step(0.02, Char) * step(Char, 0.98);
+// ash: well behind the front the paper crumbles away in holes
+float ash = step(0.3 + 0.5 * vnoise(UV * 17.0 + 3.0), behind);
+// the flat tag gives way to the curled one (a separate mesh spawned by the shot) once the burn has taken it
+float gone = step(VanishAt, Char);
+return float4(col, rim - (ash + gone) * 2.0);
 """
     custom = _custom(opaque, code, [("Tex", texture, "RGB"), ("Char", char, ""), ("UV", uv, ""),
                                     ("Delay", _scalar(opaque, "Delay", 9999.0, 500), ""),
-                                    ("C42", _collection(opaque, "Rings42", 600), "")])
+                                    ("C42", _collection(opaque, "Rings42", 600), ""),
+                                    ("VanishAt", _scalar(opaque, "VanishAt", 9.0, 700), "")])
     mel.connect_material_property(_mask(opaque, custom, "rgb"), "", unreal.MaterialProperty.MP_BASE_COLOR)
     glow = mel.create_material_expression(opaque, unreal.MaterialExpressionMultiply, -150, 300)
     ember = mel.create_material_expression(opaque, unreal.MaterialExpressionConstant3Vector, -400, 400)
-    ember.set_editor_property("constant", unreal.LinearColor(9.0, 2.6, 0.4, 1.0))
-    mel.connect_material_expressions(_mask(opaque, custom, "a", y=300), "", glow, "A")
+    ember.set_editor_property("constant", unreal.LinearColor(3.2, 0.95, 0.05, 1.0))
+    rim = mel.create_material_expression(opaque, unreal.MaterialExpressionSaturate, -300, 300)
+    mel.connect_material_expressions(_mask(opaque, custom, "a", y=300), "", rim, "")
+    mel.connect_material_expressions(rim, "", glow, "A")
+    keep = _custom(opaque, "return A < -0.5 ? 0.0 : 1.0;", [("A", _mask(opaque, custom, "a", y=450), "")],
+                   output_type=unreal.CustomMaterialOutputType.CMOT_FLOAT1, y=450)
+    mel.connect_material_property(keep, "", unreal.MaterialProperty.MP_OPACITY_MASK)
     mel.connect_material_expressions(ember, "", glow, "B")
     mel.connect_material_property(glow, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
     _finish(opaque)
@@ -445,7 +460,7 @@ for (int k = 0; k < 9; k++) {
 float body = smoothstep(0.012, -0.03, field + (n - 0.5) * 0.085);
 float veins = smoothstep(0.10, 0.0, abs(field + (n - 0.5) * 0.16)) * 0.45 * step(0.005, Stain);
 float wet = vnoise(UV * float2(46.0, 19.0));
-float3 col = lerp(float3(0.07, 0.016, 0.26), float3(0.045, 0.01, 0.17), wet);
+float3 col = lerp(float3(0.04, 0.008, 0.13), float3(0.022, 0.005, 0.08), wet);   // bruise-dark, not pastel
 // Veins: a branching network (warped Voronoi edges) that reaches out ahead of the front like roots, and shows
 // through the body as livid lines. It moves with the front, so it creeps on as the stain grows.
 float2 q = UV * float2(64.0, 25.8);
@@ -455,7 +470,7 @@ float ahead = saturate(1.0 - max(field, 0.0) / (0.05 + 0.05 * Stain)) * step(0.0
 float tendril = saturate(net * 1.2 + fine * 0.5 * ahead) * ahead * ahead * (1.0 - body) * step(0.005, Stain);
 col = lerp(col, float3(0.03, 0.005, 0.06), net * 0.6 * body);   // veins through the body darker, not a pale veil
 col = lerp(col, float3(0.05, 0.008, 0.09), tendril);
-float alpha = saturate(body * 0.98 + veins + tendril * 0.95) * Opacity * step(0.002, Stain);
+float alpha = saturate(body * 0.86 + veins + tendril * 0.95) * Opacity * step(0.002, Stain);   // coastlines show through
 return float4(col, alpha);
 """
 
@@ -741,8 +756,11 @@ def extras():
     instance("MI_Intro_DateLine", paper, textures={"Texture": unreal.load_asset(T + "T_Intro_DateStrip")})
     instance("MI_Intro_Blueprint", paper, textures={"Texture": unreal.load_asset(T + "T_Intro_Blueprint")})
     for index, name in enumerate(("LosAlamos", "OakRidge", "Hanford")):
+        # flat tag: vanishes at Char 0.545 (1.2 s into its burn); the curled tag (same paper) takes over then
         instance("MI_Intro_Tag_" + name, paper, textures={"Texture": unreal.load_asset(T + "T_Intro_Tag_" + name)},
-                 scalars={"Delay": 3.6 + index * 1.7})
+                 scalars={"Delay": 3.6 + index * 1.7, "VanishAt": 0.545})
+        instance("MI_Intro_TagCurled_" + name, paper, textures={"Texture": unreal.load_asset(T + "T_Intro_Tag_" + name)},
+                 scalars={"Delay": 3.6 + index * 1.7, "VanishAt": 9.0})
     instance("MI_Intro_Dirt", flat, vectors={"Tint": (0.075, 0.055, 0.04, 1.0)}, scalars={"Roughness": 0.95})
     instance("MI_Intro_Mould", flat, vectors={"Tint": (0.16, 0.02, 0.22, 1.0)}, scalars={"Roughness": 0.22})
     instance("MI_Intro_DarkStone", flat, vectors={"Tint": (0.05, 0.05, 0.055, 1.0)}, scalars={"Roughness": 0.9})

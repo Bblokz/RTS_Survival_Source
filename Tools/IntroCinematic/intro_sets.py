@@ -388,7 +388,10 @@ def build_map(s):
     pin("Pin_SovietStar", (50.2, 20.5), 1.5, star=True)
     # Operation Svarog (6.2b): scattered strikes on Soviet-held Europe.
     for index, strike in enumerate(SVAROG_STRIKES):
-        ring("Ring_Svarog_%d" % index, strike, 2.3 + 0.9 * ((index * 7) % 3), 2, 0.5 + ((index * 5) % 16) * 0.4)
+        delay = 0.5 + ((index * 5) % 16) * 0.4
+        # every strike is a marker pin that burns with its scorch, like the German cities
+        pin("Pin_Svarog_%d" % index, strike, 0.4, burn=(2, delay, 1.6))
+        ring("Ring_Svarog_%d" % index, strike, 2.3 + 0.9 * ((index * 7) % 3), 2, delay)
     # The stain (5.4) and its pencil label.
     s.plane("Map_Stain", (centre[0], centre[1], top + 0.25), (depth_x, width_y), M + "M_Intro_Stain", mobile=True)
     label_x, label_y = map_local(63.5, 28.0)

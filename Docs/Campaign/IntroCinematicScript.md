@@ -755,3 +755,15 @@ Not taken (bigger builds): Berlin skyline and cloud remodel (3.3/3.4), Ural Shie
 - Archive grade scratches weave from frame to frame and break up along their length.
 Not taken: tag burn and curl (needs WPO, which python cannot reach), bunker re-dress and lamp swing, overlay
 re-framing, 4.1 graticule, 0.2 film-burn rework, 3.4b cloud swap, 9.4 sentry pose, 8.4b dressing, 5.1 canister fins.
+
+**Confirmation review** (a third fresh reviewer judged the render against the owner's four requests only). Fixed:
+- T-34s at the Ural gate (6.3) hovered: they now use the same four-corner ground fit as 6.1 (traces start 6 m up,
+  under the gateway lintel), and the set suns cast contact shadows (`contact_shadow_length` 0.06 in `sun()`): far
+  from the world origin the shadow bias alone left a lit strip under the tracks.
+- Operation Svarog (6.2b) strikes had no marker: each strike now has a pin that burns and chars like the German
+  cities; it only appears on the map half a second before its strike (masked pin material), so 1945 shots show none.
+- US tags: the burn front sweeps across each tag from one corner with a dull ember rim and ash holes behind it,
+  and the tag is replaced by the kit's curled tag (charred) the moment its burn takes it (`MI_Intro_Tag_*` VanishAt,
+  `tags_curl` spawnables in 4.2, 4.3, 9.2).
+- 5.2 growth without the bright "fresh front" tint; 5.4 stain bruise-dark (not pastel) with the coastlines showing
+  through.
