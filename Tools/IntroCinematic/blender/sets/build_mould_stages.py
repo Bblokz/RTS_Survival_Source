@@ -117,7 +117,7 @@ def build_mat_stages():
             bumps = [(bs, bt, ba * g, br) for (bs, bt, ba, br) in a.get('bumps', ())]
             ob = build_mat(stage_name(base, index), a['x0'], a['dirx'], a['y0'], a['s_c'], a['Rs'] * g, a['Rt'] * g,
                            a['T'] * (0.55 + 0.45 * g), a['seed'], a['lobes'], bumps, a.get('corner', 0.0),
-                           spokes=128, edge_noise=0.07, lumps=0.7)
+                           spokes=128, edge_noise=0.07, lumps=0.7, max_climb=0.25, bump_power=2)
             raise_relief(ob, MF.OFFSETS[base], 2 if g >= 0.3 else 1)
             out.append(ob)
     return out

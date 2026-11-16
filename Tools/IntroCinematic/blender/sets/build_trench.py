@@ -435,7 +435,7 @@ def sec_point(x0, dirx, s, y):
 
 
 def build_mat(name, x0, dirx, y0, s_c, Rs, Rt, T, seed, lobes, bumps=(), corner=0.0, spokes=64, edge_noise=0.0,
-              lumps=0.0):
+              lumps=0.0, max_climb=None, bump_power=4):
     """edge_noise: fine scalloping of the rim (a smooth rounded outline read as a balloon); lumps: knobbly bulges ~10 cm
     across in the thickness, as a fraction of T (a smooth crest read as CG); spokes: finer rim (64 left a sawtooth)."""
     rings = [0.12, 0.25, 0.38, 0.5, 0.61, 0.71, 0.8, 0.87, 0.93, 0.975, 1.0]
@@ -452,14 +452,21 @@ def build_mat(name, x0, dirx, y0, s_c, Rs, Rt, T, seed, lobes, bumps=(), corner=
         s = s_c + rho * Rs * rm * math.cos(th)
         t = rho * Rt * rm * math.sin(th)
         P = np.array(sec_point(x0, dirx, s, y0 + t))
+        if max_climb is not None:
+            # do not climb a wall higher than max_climb above where it took hold: a sheet lying flat on the vertical
+            # trench wall read as a standing slab face (5.3); pull the point back along its section instead
+            while P[2] - pivot[2] > max_climb and abs(s - s_c) > 0.02:
+                s -= math.copysign(0.01, s - s_c)
+                P = np.array(sec_point(x0, dirx, s, y0 + t))
         n = surf_n(P[0], P[1], 0.10)
         prof = math.sqrt(max(1 - rho ** 6, 0.0)) * (1 + 0.25 * math.exp(-((rho - 0.82) / 0.12) ** 2))
         thk = T * prof * (1 + 0.3 * float(sn(s, t, seed, 2.2, 2)) + 0.12 * float(sn(s, t, seed + 1, 6.0, 1)))
         for (bs, bt, ba, br) in bumps:
-            thk += ba * math.exp(-((math.hypot(s - bs, t - bt)) / br) ** 4) * min(prof, 1.0)
+            # bump_power 4 is a flat-topped mesa with steep sides (over a helmet it read as a standing block); 2 rounds it
+            thk += ba * math.exp(-((math.hypot(s - bs, t - bt)) / br) ** bump_power) * min(prof, 1.0)
         thk += corner * math.exp(-((s) / 0.22) ** 2) * prof
         if lumps:
-            thk += lumps * T * max(float(sn(s, t, seed + 3, 5.0, 2)), 0.0) * min(prof, 1.0)
+            thk += lumps * T * max(float(sn(s, t, seed + 3, 5.0, 2)), 0.0) ** 1.6 * min(prof, 1.0)   # soft onset, no square knobs
         off = 0.006 if rho >= 1.0 else 0.02 + max(thk, 0.01)
         verts.append(tuple(P + n * off))
         st.append((s, t))

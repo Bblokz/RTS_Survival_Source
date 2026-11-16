@@ -856,3 +856,9 @@ flat-ish top with a jagged rim; both need the mats re-sculpted (a modelling task
 scalloped rim (`edge_noise` 0.07) and knobbly bulges about 10 cm across in the thickness (`lumps` 0.7 x T). Re-check:
 the balloon lobe (f1) now has folds and an indent (cleared, still soft-shaded); "scary, detailed, real" borderline
 pass; left (b1): a smaller sharp fold where the sheet creases against the trench wall (3936-4008) remains.
+
+**Wall cap and round domes.** Stage mats climb a wall at most 25 cm above where they took hold (`max_climb`), the
+domes over the helmets are rounded (`bump_power` 2; the default 4 is a flat-topped mesa that read as a block) and the
+knobbly bulges start softly. Re-check: (a) (c) (d) (e) pass, (f) "scary, detailed, real" passes for the main body
+(veined, folded relief); (b) still flags a pale near-vertical strip where mat B follows the fire step's riser down to
+the floor (3936-4008) and stage-step knobs on the crest that change between two growth steps (3989/3990).
