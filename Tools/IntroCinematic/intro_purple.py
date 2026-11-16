@@ -29,10 +29,12 @@ PD_LIB = mats.PD_VEINS
 # stage's instance shows it while the MPC Mould clock is in [StageLo, StageHi]. The old reveal mask cut hard slabs,
 # spikes and specks wherever its edge crossed geometry standing off the ground, and cut the veins off blunt.
 # stage n shows from Mould = its size on (blender STAGES), the first from 0
-STAGE_LO = (0.0, 0.09, 0.13, 0.17, 0.21, 0.26, 0.31, 0.37, 0.43, 0.49, 0.55, 0.61, 0.67, 0.73, 0.79, 0.86, 0.93, 1.0)
+STAGE_LO = (0.0, 0.0625, 0.075, 0.0875, 0.1, 0.1125, 0.125, 0.1375, 0.15, 0.1625, 0.175, 0.1875, 0.2, 0.2125, 0.22, 0.2469, 0.2738, 0.3007, 0.3276, 0.3545, 0.3814, 0.4083, 0.4352, 0.4621, 0.489, 0.5159, 0.5428, 0.5697, 0.5966, 0.6234, 0.6503, 0.6772, 0.7041, 0.731, 0.7579, 0.7848, 0.8117, 0.8386, 0.8655, 0.8924, 0.9193, 0.9462, 0.9731, 1)
 
 CORE = PD_LIB + """
-float3 an = pow(abs(N), 4.0); an /= (an.x + an.y + an.z);
+// Mode 0 (mats) blends its three projections softly: a hard hand-over turned the projected vessel lines into sharp L
+// corners on the curved flesh; soft, they fade across it.
+float3 an = pow(abs(N), 4.0 - 2.5 * step(Mode, 0.5)); an /= (an.x + an.y + an.z);
 float3 p = WP / 14.0 + Seed * 3.0;
 // Mode 0: mats (vessels from the baked relief, T_Intro_MouldRelief_ORM, on the mats' UVs: the same field the mesh
 // raised its vessels from), 1: vein tubes, 2: pustules.

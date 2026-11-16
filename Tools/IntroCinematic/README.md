@@ -105,7 +105,7 @@ More rules learned:
   under the hull (`M_Intro_ContactShadow`): far from the world origin the sun's shadow starts behind the tracks and
   the tank reads as hovering even when the geometry sits on the ground.
 - The Purple Death grows by baked stages, not a reveal mask: `blender/sets/build_mould_stages.py` (then
-  `python bake_mould_relief.py`) writes `SM_Intro_Mould_<piece>_S<n>` for 18 stage sizes; `intro_purple.STAGE_LO`
+  `python bake_mould_relief.py`) writes `SM_Intro_Mould_<piece>_S<n>` for 44 stage sizes; `intro_purple.STAGE_LO`
   must match its `STAGES`, and `intro_manifest.MOULD_STAGES` their count. A mask edge may only fall where a mesh lies on
   the ground: anywhere else it cuts slabs, spikes and specks, and it cut every vein off blunt.
 - Judge a look change blind: A/B sheets of the same frames in random order, three independent judges, majority per

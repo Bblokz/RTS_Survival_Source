@@ -34,8 +34,9 @@ exec(compile(_src, _VEINS, 'exec'), globals())
 
 import mould_field as MF  # noqa: E402
 
-# 18 small steps (a hard switch per step, so each must be small); four fall in 5.2 (Mould 0.05 -> 0.22)
-STAGES = (0.05, 0.09, 0.13, 0.17, 0.21, 0.26, 0.31, 0.37, 0.43, 0.49, 0.55, 0.61, 0.67, 0.73, 0.79, 0.86, 0.93, 1.0)
+# 44 small steps (a hard switch per step, so each must be small enough to read as time-lapse growth, not a jump):
+# 14 through 5.2 (Mould 0.05 -> 0.22), 30 through 5.3 (0.22 -> 1.0)
+STAGES = (0.05, 0.0625, 0.075, 0.0875, 0.1, 0.1125, 0.125, 0.1375, 0.15, 0.1625, 0.175, 0.1875, 0.2, 0.2125, 0.22, 0.2469, 0.2738, 0.3007, 0.3276, 0.3545, 0.3814, 0.4083, 0.4352, 0.4621, 0.489, 0.5159, 0.5428, 0.5697, 0.5966, 0.6234, 0.6503, 0.6772, 0.7041, 0.731, 0.7579, 0.7848, 0.8117, 0.8386, 0.8655, 0.8924, 0.9193, 0.9462, 0.9731, 1)
 
 MAT_ARGS = {
     'SM_Intro_Mould_Mat_A': lambda: dict(x0=wall_foot(-0.4, -1.0, 4.4), dirx=-1.0, y0=4.4, s_c=0.30, Rs=0.95, Rt=1.10,
@@ -114,7 +115,7 @@ def build_mat_stages():
             bumps = [(bs, bt, ba * g, br) for (bs, bt, ba, br) in a.get('bumps', ())]
             ob = build_mat(stage_name(base, index), a['x0'], a['dirx'], a['y0'], a['s_c'], a['Rs'] * g, a['Rt'] * g,
                            a['T'] * (0.55 + 0.45 * g), a['seed'], a['lobes'], bumps, a.get('corner', 0.0))
-            raise_relief(ob, MF.OFFSETS[base], 2)
+            raise_relief(ob, MF.OFFSETS[base], 2 if g >= 0.3 else 1)
             out.append(ob)
     return out
 

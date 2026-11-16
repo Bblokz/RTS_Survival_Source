@@ -64,7 +64,7 @@ def PD_MAT(mesh):
     return sets.M + "MI_Intro_PD_" + mesh.replace("SM_Intro_Mould_", "")
 
 
-MOULD_STAGES = 18
+MOULD_STAGES = 44
 
 
 def mould_actors():

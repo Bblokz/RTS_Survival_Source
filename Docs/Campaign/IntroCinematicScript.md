@@ -812,3 +812,12 @@ Judged blind (three independent judges each, frames labelled A/B in random order
 per adjective decided before running): committed vs pre-task 3-0 on scary, detailed and real for committed; staged vs
 pre-task 3-0 on all three for staged; staged vs committed: scary 2-1 staged, detailed 2-1 committed, real 3-0 staged.
 The staged version shipped.
+
+**Purple Death, 44 stages (owner's pick).** The stage count went to 44 (14 through 5.2, 30 through 5.3) so the
+growth steps are 2.5x finer, the vessel field gained a third capillary tier, and the mats blend their three vein
+projections softly (a hard hand-over turned the projected lines into sharp L corners on the curved flesh). Python
+cannot reach world-position offset (not in `MaterialProperty`, not exposed on `MaterialEditorOnlyData`), so truly
+continuous growth with tapering tips is out of reach for this toolchain; the growth is a fine time-lapse of steps.
+Blind vs the 18-stage version: real 3-0 for the 44-stage one, scary and detailed 2-1 for the 18-stage one; the owner
+chose the 44-stage version ("more real"). Still noted by reviewers: the mound's lower half falls to near-black, its
+silhouette is a smooth blob, the ground tendrils read a little ribbon-flat.

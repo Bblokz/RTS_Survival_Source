@@ -33,10 +33,12 @@ def vessels(s, t):
     the fine ones only where a third noise lets them (so they cluster and branch off the big ones)."""
     a = 1.0 - np.abs(sn(s, t, 931, 0.9, 3))
     b = 1.0 - np.abs(sn(s + 3.1, t - 1.7, 932, 2.2, 2))
-    keep = np.clip((sn(s, t, 933, 0.6, 2) + 0.4) * 2.0, 0.0, 1.0)
-    main = np.clip((a - 0.86) / 0.14, 0.0, 1.0) ** 1.5
-    fine = np.clip((b - 0.9) / 0.1, 0.0, 1.0) ** 1.5 * 0.6 * keep
-    return np.maximum(main, fine)
+    c = 1.0 - np.abs(sn(s - 1.3, t + 2.9, 935, 4.6, 2))
+    keep = np.clip((sn(s, t, 933, 0.6, 2) + 0.7) * 2.0, 0.0, 1.0)
+    main = np.clip((a - 0.84) / 0.16, 0.0, 1.0) ** 1.5
+    fine = np.clip((b - 0.88) / 0.12, 0.0, 1.0) ** 1.5 * 0.7 * keep
+    capillary = np.clip((c - 0.92) / 0.08, 0.0, 1.0) ** 1.5 * 0.4 * keep   # a third, finer tier
+    return np.maximum(np.maximum(main, fine), capillary)
 
 
 def nodules(s, t):
