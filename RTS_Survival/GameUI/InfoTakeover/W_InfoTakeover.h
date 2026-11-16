@@ -259,8 +259,8 @@ private:
 	UPROPERTY()
 	TObjectPtr<UHorizontalBox> M_PageLampRow;
 
-	// Same layout as M_PageLampRow, drawn under it: each lamp's halo, so a halo lights its neighbours' bezels evenly
-	// instead of depending on which lamp draws first.
+	// Same layout as M_PageLampRow, drawn under it: each lamp's halo. Every halo lies under every lamp body, so the
+	// light on the plate never depends on which lamp draws first.
 	UPROPERTY()
 	TObjectPtr<UHorizontalBox> M_PageLampHaloRow;
 
@@ -340,6 +340,8 @@ private:
 
 	void ApplyNeverShowAgainChoice() const;
 
+	bool GetIsValidPlate() const;
+	bool GetIsValidPageLampRows() const;
 	bool GetIsValidTitleText() const;
 	bool GetIsValidDescriptionText() const;
 	bool GetIsValidNeverShowAgainCheckBox() const;

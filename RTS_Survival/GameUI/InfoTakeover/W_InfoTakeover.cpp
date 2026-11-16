@@ -166,7 +166,7 @@ UWidget* UW_InfoTakeover::BuildPageLampRow()
 
 void UW_InfoTakeover::RebuildPageLamps(const int32 LampCount)
 {
-	if (not IsValid(M_PageLampRow) || not IsValid(M_PageLampHaloRow))
+	if (not GetIsValidPageLampRows())
 	{
 		return;
 	}
@@ -770,7 +770,7 @@ float UW_InfoTakeover::GetPageLampPower(const int32 LampIndex) const
 bool UW_InfoTakeover::GetPageLampLayout(FBox2D& OutRowRect, FVector2D& OutLitLampCentre) const
 {
 	OutLitLampCentre = FVector2D(-1.f, -1.f);
-	if (not IsValid(M_Plate) || not IsValid(M_PageLampRow))
+	if (not GetIsValidPlate() || not GetIsValidPageLampRows())
 	{
 		return false;
 	}
@@ -887,6 +887,27 @@ void UW_InfoTakeover::ApplyNeverShowAgainChoice() const
 		return;
 	}
 	SettingsSubsystem->SetShowInfoTakeoversImmediately(false);
+}
+
+bool UW_InfoTakeover::GetIsValidPlate() const
+{
+	if (IsValid(M_Plate))
+	{
+		return true;
+	}
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(this, "M_Plate", "GetIsValidPlate", this);
+	return false;
+}
+
+bool UW_InfoTakeover::GetIsValidPageLampRows() const
+{
+	if (IsValid(M_PageLampRow) && IsValid(M_PageLampHaloRow))
+	{
+		return true;
+	}
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(this, "M_PageLampRow / M_PageLampHaloRow",
+	                                                             "GetIsValidPageLampRows", this);
+	return false;
 }
 
 bool UW_InfoTakeover::GetIsValidTitleText() const

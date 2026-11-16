@@ -36,6 +36,14 @@ public:
 	UPROPERTY(Config, EditAnywhere, Category="Idle Unit Buttons", meta=(ClampMin="0.0"))
 	float IdleLampOverhang = 4.f;
 
+	/** M_UI_IndicatorLampHalo: the light an idle lamp throws on the HUD around it, pulsing with the lamp. Empty: none. */
+	UPROPERTY(Config, EditAnywhere, Category="Idle Unit Buttons")
+	TSoftObjectPtr<UMaterialInterface> IdleLampHaloMaterial;
+
+	/** Edge of the idle lamp's halo over the edge of the lamp. */
+	UPROPERTY(Config, EditAnywhere, Category="Idle Unit Buttons", meta=(ClampMin="1.0"))
+	float IdleLampHaloScale = 3.5f;
+
 	/** Seconds a lamp takes to light up or go dark, like a warming filament. */
 	UPROPERTY(Config, EditAnywhere, Category="Lamps", meta=(ClampMin="0.0"))
 	float FadeSeconds = 0.1f;

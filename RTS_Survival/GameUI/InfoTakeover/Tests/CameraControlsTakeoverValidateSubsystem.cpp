@@ -262,7 +262,8 @@ void UCameraControlsTakeoverValidateSubsystem::CheckPageLampLayout(const UW_Came
 	constexpr float ExpectedRowRight = PlateWidth - 50.f;
 	constexpr float ExpectedRowTop = 47.f;
 	constexpr float ExpectedLampCentreY = 59.f;
-	constexpr float LampPitch = 30.f;
+	constexpr float LampSize = 24.f;
+	constexpr float LampPitch = LampSize + 6.f;
 	constexpr float LayoutTolerance = 0.75f;
 	FBox2D RowRect(ForceInit);
 	FVector2D LitCentre;
@@ -273,7 +274,7 @@ void UCameraControlsTakeoverValidateSubsystem::CheckPageLampLayout(const UW_Came
 	}
 	const int32 LitLamp = Takeover.GetLitPageLampIndex();
 	const int32 LampCount = Takeover.GetPageLampCount();
-	const float ExpectedLitCentreX = ExpectedRowRight - (LampCount - 1 - LitLamp) * LampPitch - 12.f;
+	const float ExpectedLitCentreX = ExpectedRowRight - (LampCount - 1 - LitLamp) * LampPitch - LampSize * 0.5f;
 	FViewport* const Viewport = GEngine && GEngine->GameViewport ? GEngine->GameViewport->Viewport : nullptr;
 	const FIntPoint ViewportSize = Viewport ? Viewport->GetSizeXY() : FIntPoint::ZeroValue;
 	FString Powers;
