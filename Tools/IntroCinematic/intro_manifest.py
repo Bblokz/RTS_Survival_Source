@@ -19,6 +19,9 @@ import intro_sets as sets
 importlib.reload(sets)
 
 import intro_sets2 as sets2
+import intro_berlin as berlin
+
+importlib.reload(berlin)
 
 O = sets.ORIGINS
 M = sets.M
@@ -264,28 +267,32 @@ def shots():
              # Hard sunlight on the hull: the planet is so bright that the sun alone leaves the rocket a black bar.
              {"kind": "point", "label": "HullKey", "intensity": 900.0, "color": (1.0, 0.95, 0.86, 1.0), "radius": 6000.0,
               "keys": [(0.0, at("Intro_Space", -1500, 1500, 1900), (0, 0, 0))]}]},
-        {"id": "3.3", "levels": ["Intro_Skyline"], "min": 6.0, "fov": 28,
-         "cam": [(0.0, at("Intro_Skyline", -5200, 620, 400), (2.4, 0, 0)), (1.0, at("Intro_Skyline", 600, 500, 430), (2.5, 0, 0))],
+        # Berlin, January 1945, from the Berlin mission kits on a set of its own (intro_berlin): down the boulevard
+        # to the Gate, the city standing; the game's nuke (NS_Nuke_1) beyond the Gate; the blast front runs out
+        # from ground zero and knocks the city down toward the camera, then hits the camera.
+        {"id": "3.3", "levels": ["Intro_Skyline"], "min": 6.0, "fov": 44,
+         "cam": [(0.0, at("Intro_Skyline", berlin.CAMERA_X, 0, 1600), (-1.5, -1.5, 0)),
+                 (1.0, at("Intro_Skyline", berlin.CAMERA_X + 600, 0, 1620), (-1.4, -1.5, 0))],
+         "actors": berlin.smoke_actors(lambda *a: at(*a)),
+         "mpc": {"PurpleKeep": [(0.0, 0.0)]},
          "cues": [card("JANUARY 1945", "BERLIN", 0.8, 4.6)]},
-        {"id": "3.4a", "levels": ["Intro_Skyline"], "min": 1.4, "fov": 28,
-         "cam": [(0.0, at("Intro_Skyline", 600, 500, 430), (2.5, 0, 0)), (1.0, at("Intro_Skyline", 1950, 472, 437), (2.6, 0, 0))],
-         "mpc": {"Flash": [(0.0, 0.0), (0.3, 0.0), (0.42, 1.0), (1.0, 1.0)]}},
-        {"id": "3.4b", "levels": ["Intro_SkylineRuin"], "min": 8.0, "fov": 28,
-         "cam": [(0.0, at("Intro_Skyline", 1950, 472, 437), (2.6, 0, 0)), (0.45, at("Intro_Skyline", 2300, 300, 470), (4.4, -3.0, 0)),
-                 (1.0, at("Intro_Skyline", 2500, 100, 520), (7.4, -5.5, 0))],
-         "actors": [
-             {"kind": "mesh", "asset": SPHERE, "label": "Cloud_%d" % index, "mats": M + "MI_Intro_Silhouette",
-              "keys": [(0.0, at("Intro_Skyline", 50000, -8200 + dy * 0.6, z0), (0, 0, 0), (sx * 0.6, sx * 0.6, sz * 0.6)),
-                       (1.0, at("Intro_Skyline", 50000, -8200 + dy, z1), (0, 0, 0), (sx, sx, sz))]}
-             for index, (dy, z0, z1, sx, sz) in enumerate((
-                 # cap: a broad core and lumps round its edge and top
-                 (0, 4200, 7000, 84.0, 30.0), (-3300, 3900, 6500, 44.0, 24.0), (3300, 3900, 6500, 44.0, 24.0),
-                 (-1700, 4700, 7900, 46.0, 26.0), (1600, 4800, 8100, 42.0, 24.0), (0, 5100, 8700, 36.0, 22.0),
-                 (-4600, 3600, 5900, 26.0, 16.0), (4500, 3600, 5900, 26.0, 16.0),
-                 # skirt under the cap, stem in three swelling parts, the dust foot
-                 (0, 3000, 5100, 40.0, 9.0), (0, 2300, 4000, 20.0, 22.0), (300, 1500, 2600, 23.0, 24.0), (-200, 700, 1200, 28.0, 22.0),
-                 (0, 0, 0, 110.0, 13.0), (-5200, 0, 0, 56.0, 9.0), (5200, 0, 0, 56.0, 9.0)))],
-         "mpc": {"Flash": [(0.0, 1.0), (0.12, 1.0), (0.42, 0.0)]}},
+        {"id": "3.4a", "levels": ["Intro_Skyline"], "min": 1.4, "fov": 44,
+         "cam": [(0.0, at("Intro_Skyline", berlin.CAMERA_X + 600, 0, 1620), (-1.4, -1.5, 0)),
+                 (1.0, at("Intro_Skyline", berlin.CAMERA_X + 740, 0, 1625), (-1.4, -1.5, 0))],
+         "actors": berlin.smoke_actors(lambda *a: at(*a)),
+         "mpc": {"Flash": [(0.0, 0.0), (0.3, 0.0), (0.42, 1.0), (1.0, 1.0)], "PurpleKeep": [(0.0, 0.0)]}},
+        {"id": "3.4b", "levels": ["Intro_SkylineRuin"], "min": 8.0, "fov": 44,
+         "cam": berlin.strike_camera(lambda *a: at(*a), 8.0, ((berlin.CAMERA_X + 740, 0, 1625), (-1.4, -1.5, 0)),
+                                     ((berlin.CAMERA_X + 1000, 0, 1660), (9.0, -2.5, 0))),
+         "actors": berlin.nuke_actors(lambda *a: at(*a), 8.0) + berlin.collapse_actors(lambda *a: at(*a), 8.0),
+         # white-out, then the fireball; the front reaches the camera at berlin.camera_hit_time(): the frame darkens
+         # and the blast's dust streams across it (the grade's Sand)
+         "mpc": {"Flash": [(0.0, 1.0), (0.03, 0.7), (0.09, 0.18), (0.22, 0.0)],
+                 "Sand": [(0.0, 0.0), (berlin.camera_hit_time() / 8.0 - 0.01, 0.0), (berlin.camera_hit_time() / 8.0 + 0.06, 0.85),
+                          (1.0, 0.7)],
+                 "Darken": [(0.0, 0.0), (berlin.camera_hit_time() / 8.0, 0.0), (berlin.camera_hit_time() / 8.0 + 0.05, 0.35),
+                            (1.0, 0.25)],
+                 "PurpleKeep": [(0.0, 0.0)]}},
         {"id": "3.5", "levels": ["Ger_Berlin", "Intro_BerlinSky"], "vo": ["3_5"], "pre": 1.6, "post": 2.2, "fov": 52,
          "cam": [(0.0, (72, -5200, 250), (5, -90, 0)), (1.0, (72, -5950, 235), (6, -90, 0))],
          "actors": [{"kind": "niagara", "asset": "P_Rain_Converted", "label": "Sleet",

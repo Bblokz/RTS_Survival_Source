@@ -129,7 +129,16 @@ def clear_level(name):
     return count
 
 
+def standalone(name):
+    """True when the set's own sublevel is open as the editor world (built without the cinematic map, so the
+    streamed mission maps are never loaded or locked)."""
+    return lib.editor_world().get_outermost().get_name() == lib.SUBMAP_ROOT + "/" + name
+
+
 def finish_level(name):
+    if standalone(name):
+        lib.safe_save([unreal.find_package(lib.SUBMAP_ROOT + "/" + name)])
+        return
     lib.make_persistent_current()
     lib.safe_save([unreal.find_package(lib.SUBMAP_ROOT + "/" + name)])
     lib.save_map()
@@ -141,7 +150,8 @@ class Set(object):
     def __init__(self, name):
         self.name = name
         self.origin = unreal.Vector(*ORIGINS[name])
-        set_level(name)
+        if not standalone(name):
+            set_level(name)
         print(name, "cleared", clear_level(name))
 
     def at(self, local):

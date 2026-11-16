@@ -219,8 +219,8 @@ Assets:
 |---|---|---|---|---|
 | 3.1 | Snow. A Soviet launch plateau. The green rocket rises off its stand and the crew shield their faces. | "1945... ze year it all came down. Ve were told ze atomic bomb was decades away." | 1945... the year it all came down. We were told the atomic bomb was decades away. | none |
 | 3.2 | Close on the rocket nose cone in flight, at high altitude, with the curve of the earth behind it. A Soviet marking is hand-painted on the warhead casing. | "But God, were we wrong. Ze Soviets managed to win ze race for ze atom und zhey used our rocket technology to carry it." | But God, were we wrong. The Soviets managed to win the race for the atom and they used our rocket technology to carry it. | none |
-| 3.3 | The Berlin skyline at dawn, seen from far outside the city in silhouette only, so the ruin-kit meshes read as an intact city. Church spires and the Brandenburg Gate shape. | none (the music drops) | none | Card: `JANUARY 1945` / `BERLIN` |
-| 3.4 | A white-out flash. Hold on white, then the mushroom cloud rises over the silhouette. The sound cuts to a low hum. | none | none | none |
+| 3.3 | Berlin at dawn in 3D, from the Berlin mission kits on a set of its own (`Intro_Skyline`, not Ger_Berlin): 16 m up, down a bomb-scarred boulevard of ruin-kit shells to the Brandenburg Gate, the Reichstag and a flak tower beyond, smoke from earlier raids. | none (the music drops) | none | Card: `JANUARY 1945` / `BERLIN` |
+| 3.4 | A white-out flash. The game's own nuke (`NS_Nuke_1`, as in Operation Svarog) rises beyond the Gate; the blast front runs out from ground zero and knocks the city down toward the camera (shells lean away and sink into the game's destruction smoke, stone debris flies), then hits the camera. The Gate is left standing in a flattened city under the cloud. | none | none | none |
 | 3.5 | Present-day Ger_Berlin ruins in the archive grade: a glassed street, the Brandenburg Gate ruin, falling ash, slow dolly. Berlin stays clean, with glass and ruin only: no purple and no Radixite (see `BerlinMission.md`). | "Berlin was ze first target" | Berlin was the first target | Stamp: `CONFIRMED` |
 | 3.6 | Map table. Pins on other German cities get a burnt ring one after another. The pins have no city labels. Each one makes the lamp flicker and dust fall. | "und many followed." | and many followed. | none |
 
@@ -867,3 +867,17 @@ the floor (3936-4008) and stage-step knobs on the crest that change between two 
 pitch -18 with yaw 90, which tilted it sideways, so half of the sheet sank into the board and the board cut a diagonal
 across the drawing. It now takes the board's slope as a roll (rotation (0, 90, -18)) and sits 3.5 mm above the board's
 top face; traced at its centre and four corners, every point is 0.35 cm above `Draft_Board`.
+
+**3.3 / 3.4 Berlin strike in 3D** (owner: "not 2D but proper in game nukes like the Svarog part ... use the Berlin 3D
+assets ... a small Berlin assets scene, not the Berlin map, because this nuke needs to destroy things"). `intro_berlin.py`
+holds one city plan (about 450 plots of ruin-kit shells, the brewery hall, the Reichstag ruin pieces, the flak tower and
+the Gate ruin) and builds both levels from it: `Intro_Skyline` standing (3.3, 3.4a) and `Intro_SkylineRuin` with every
+plot as heaps and stubs (3.4b). The 109 shells near enough to watch are 3.4b spawnables keyed to fall when the front
+reaches them (180 m/s from ground zero 860 m out; a jolt, then a lean away from ground zero and a sink into the ground),
+each with `NS_DestructionSmoke(_Large)` and some with `NS_RTSDebrisExplosion_Huge`. The nuke is `NS_Nuke_1` at scale 16
+(the 6.2 nukes are 5 to 12 at 400 to 900 m); the camera tilts up after the cap and shakes when the front reaches it
+(5.3 s, with a boom, the grade's dust and a darker frame). The Gate stands through it (3.5 stands inside its ruin). The
+kits have no intact houses: "standing" Berlin is the bomb-damaged city of January 1945. Sets build standalone (the
+sublevel opened on its own, `intro_sets.standalone`), so building them never loads the mission maps. Leftovers: the
+white holds about 2.4 s over the cut (3.4a white plus the nuke's own flash), so the fireball's first rise is not seen;
+the explosion pack's `NS_Ground_*` (fiery) and the smoke pillar (thin wisps) were tried as collapse dust and dropped.

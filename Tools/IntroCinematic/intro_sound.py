@@ -35,6 +35,8 @@ SOUNDS = [
     ("3.4a", "f0.35", "cinematic_deep_boom_impact_01", -5.0, {}),
     ("3.4b", 0.2, "cinematic_deep_bass_rumble_02", -5.0, {}),
     ("3.4b", "f0.5", "cinematic_deep_bass_rumble_01", -9.0, {"fade_out": 2.0, "dur": 4.0}),
+    # the blast front reaches the camera (intro_berlin.camera_hit_time(), 5.3 s into 3.4b)
+    ("3.4b", "f0.665", "cinematic_deep_boom_impact_01", -7.0, {}),
     ("3.5", 0.0, "DesertWind20Sec", -13.0, {"dur": 6.7, "fade_in": 1.0, "fade_out": 1.0}),
     # Map table, the Purple Death.
     ("3.6", 0.0, "The_Loss", -17.0, {"dur": 73.0, "fade_in": 2.5, "fade_out": 3.0, "track": "music"}),

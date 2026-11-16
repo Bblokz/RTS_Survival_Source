@@ -153,81 +153,18 @@ def build_space():
     base.finish_level("Intro_Space")
 
 
-def _skyline_common(s, black):
-    s.box("Sky_Ground", (30000, 0, -60), (160000, 400000, 100), black)
-    s.mesh("Sky_Backdrop", PLANE, (90000, 0, 26000), rotation=(0, -90, 90), scale=(4200, 620, 1), materials=M + "MI_Intro_Sky_Dawn",
-           shadow=False)
-    fog(s, "Sky_Fog", 0.004, (0.9, 0.6, 0.38, 1.0), 0.05)
-
-
 def build_skyline():
-    """Shot 3.3: Berlin from far outside at dawn, whole: roofs, spires, a dome and the Gate with its quadriga, in
-    silhouette only (plain shapes are enough at this distance and keep the city reading as intact)."""
-    s = Set("Intro_Skyline")
-    rng = random.Random(1945)
-    black = M + "MI_Intro_Silhouette"
-    _skyline_common(s, black)
-    distance = 42000.0
-    y = -56000.0
-    index = 0
-    while y < 56000.0:
-        width = rng.uniform(1400, 3600)
-        if abs(y + width / 2 - 1500) < 5200:      # keep the Gate's square free
-            y += width
-            continue
-        height = rng.uniform(2200, 5200)
-        depth = rng.uniform(1500, 3000)
-        x = distance + rng.uniform(-2500, 5000)
-        s.box("Sky_Block_%02d" % index, (x, y + width / 2, height / 2), (depth, width, height), black, shadow=False)
-        # A pitched roof: a box turned 45 degrees on the eaves.
-        s.box("Sky_Roof_%02d" % index, (x, y + width / 2, height), (depth * 0.98, width * 0.7, width * 0.7), black,
-              rotation=(0, 0, 45), shadow=False)
-        if index % 4 == 1:
-            s.box("Sky_Chimney_%02d" % index, (x, y + width * 0.3, height + width * 0.45), (200, 220, 900), black, shadow=False)
-        y += width + rng.uniform(0, 500)
-        index += 1
-    for k, (sy, height) in enumerate(((-21000, 7800), (9500, 9600), (27000, 6400), (-38000, 5600))):
-        s.box("Sky_Tower_%d" % k, (distance, sy, height * 0.3), (1100, 1100, height * 0.6), black, shadow=False)
-        s.mesh("Sky_Spire_%d" % k, CONE, (distance, sy, height * 0.8), scale=(12, 12, height * 0.004), materials=black, shadow=False)
-    s.box("Sky_DomeDrum", (distance + 2000, -12500, 2300), (3400, 3400, 4600), black, shadow=False)
-    s.mesh("Sky_Dome", SPHERE, (distance + 2000, -12500, 4700), scale=(34, 34, 30), materials=black, shadow=False)
-    # The Brandenburg Gate, whole: six piers, entablature, attic, the quadriga as a block with horses' heads.
-    gate_x, gate_y, unit = distance - 6000, 1500.0, 2.6
-    for k in range(6):
-        s.box("Sky_GatePier_%d" % k, (gate_x, gate_y + (k - 2.5) * 1050 * unit / 2.6, 700 * unit), (420, 330, 1400 * unit), black,
-              shadow=False)
-    s.box("Sky_GateEntablature", (gate_x, gate_y, 1400 * unit + 260), (520, 6300, 520), black, shadow=False)
-    s.box("Sky_GateAttic", (gate_x, gate_y, 1400 * unit + 760), (480, 3600, 520), black, shadow=False)
-    s.box("Sky_Quadriga", (gate_x, gate_y, 1400 * unit + 1300), (300, 900, 560), black, shadow=False)
-    for k in (-1, 1):
-        s.mesh("Sky_QuadrigaHorse_%d" % k, CONE, (gate_x, gate_y + k * 560, 1400 * unit + 1380), scale=(2.2, 2.2, 7.5), materials=black,
-               shadow=False)
-        s.box("Sky_GateWing_%d" % k, (gate_x, gate_y + k * 4300, 1150), (900, 2000, 2300), black, shadow=False)
-    base.finish_level("Intro_Skyline")
+    """Shots 3.3 / 3.4a: Berlin standing, January 1945, in 3D from the Berlin mission kits (intro_berlin)."""
+    import intro_berlin
+    importlib.reload(intro_berlin)
+    intro_berlin.build_level(base, importlib.import_module("intro_sets2"), ruined=False)
 
 
 def build_skyline_ruin():
-    """Shot 3.4 after the flash: the same view, the city broken (ruin-kit pieces and the ruined Gate)."""
-    s = Set("Intro_SkylineRuin")
-    rng = random.Random(1945)
-    black = M + "MI_Intro_Silhouette"
-    _skyline_common(s, black)
-    distance = 42000.0
-    ruins = find_assets("/Game/RTS_Survival/Blueprints/Environment/Berlin/RuinKit/Meshes", "SM_BerlinRuin_")
-    y = -56000.0
-    index = 0
-    while y < 56000.0 and ruins:
-        mesh = ruins[rng.randrange(len(ruins))]
-        scale = rng.uniform(1.6, 3.0)
-        s.mesh("Sky_Ruin_%02d" % index, mesh, (distance + rng.uniform(-3000, 6000), y, 0), rotation=(0, rng.choice((0, 90, 180, 270)), 0),
-               scale=(scale, scale, scale * rng.uniform(0.8, 1.3)), materials=black, shadow=False)
-        y += rng.uniform(1700, 3800)
-        index += 1
-    for k, (sy, height) in enumerate(((-21000, 3100), (9500, 4200), (27000, 2600))):
-        s.box("Sky_TowerStump_%d" % k, (distance, sy, height * 0.5), (1100, 1100, height), black, rotation=(0, 0, 4 * (k - 1)), shadow=False)
-    s.mesh("Sky_Gate", "/Game/RTS_Survival/Blueprints/Environment/Landmarks/BrandenburgGate/SM_BrandenburgGate_Ruin",
-           (distance - 6000, 1500, 0), rotation=(0, 90, 0), scale=(2.4, 2.4, 2.4), materials=black, shadow=False)
-    base.finish_level("Intro_SkylineRuin")
+    """Shot 3.4b: the same plots after the strike; the near shells fall in the shot itself (intro_berlin)."""
+    import intro_berlin
+    importlib.reload(intro_berlin)
+    intro_berlin.build_level(base, importlib.import_module("intro_sets2"), ruined=True)
 
 
 def build_clouds():

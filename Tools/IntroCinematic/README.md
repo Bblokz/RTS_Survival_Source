@@ -36,6 +36,7 @@ Brief: `Source/Docs/Campaign/IntroCinematicScript.md` (script + build ledger at 
 | `render.sh <preset>` | headless MRQ render -> `Saved/IntroCinematic/Render/<preset>/` |
 | `game_run.sh` | headless plain `-game` playthrough with auto-quit and UI screenshots |
 | `contact_sheet.py` | contact sheet from rendered frames |
+| `intro_berlin.py` | Berlin strike (3.3 / 3.4): city plan of the Berlin kits, both Skyline levels, the 3.4b nuke, collapses and camera |
 | `intro_fire.py` | fire on the map strikes: flame cards, light pool, burning pins (run off the ring clocks) |
 | `intro_purple.py` | `M_Intro_PurpleDeath` on the trench mould and veins (growth revealed by MPC `Mould`) |
 | `blender/sets/build_veins.py` | branching vein networks over the trench (`SM_Intro_Mould_Veins`, U = metres from root) |
@@ -115,3 +116,9 @@ More rules learned:
   mid-shot pops late and smears with motion blur on its first frame.
 - `extras()` (material instances) is separate from `build_text_material()`: run it after any parent rebuild that
   adds a parameter, or the new instance values do not stick.
+- A set builds standalone when its own sublevel is the editor world (`load_map(<Intro1976>/<set>)`, then the
+  `build_*` function): `Set` skips `set_level` and `finish_level` saves only that level, so the mission maps are never
+  loaded or locked. Build `Intro_Skyline` / `Intro_SkylineRuin` this way after any `intro_berlin` plan change, then
+  rebuild 3.3 / 3.4a / 3.4b (the falling shells are spawnables of 3.4b from the same plan).
+- Re-adding sounds without a full build: remove the master's "Music" and "Effects" audio tracks, then
+  `intro_sound.add_sounds(timeline shots, cues)` (it adds new tracks every call).

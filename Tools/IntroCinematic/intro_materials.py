@@ -684,6 +684,8 @@ return float4(lerp(Near.rgb, Near2.rgb, 0.5) * macro * Tint.rgb, 1.0);
     mel.connect_material_property(rough, "", unreal.MaterialProperty.MP_ROUGHNESS)
     _finish(material)
     instance("MI_Intro_Ground_Ural", material, vectors={"Tint": (1.7, 1.55, 1.4, 1.0)})
+    # Berlin (3.3 / 3.4): the same soil, greyer and darker: ash and brick dust over the streets.
+    instance("MI_Intro_Ground_Berlin", material, vectors={"Tint": (0.95, 0.9, 0.84, 1.0)})
 
 
 NOTICE_CODE = VNOISE + """
