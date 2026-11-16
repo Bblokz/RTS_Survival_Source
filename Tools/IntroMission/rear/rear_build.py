@@ -108,7 +108,7 @@ def _rail(label, pts):
     a.set_actor_label(label)
     a.set_folder_path(FOLDER + 'Station')
     sp = a.get_component_by_class(unreal.SplineComponent)
-    sp.set_spline_points([unreal.Vector(x, y, TOP_Z + 2.0) for x, y in pts], unreal.SplineCoordinateSpace.WORLD, True)
+    sp.set_spline_points([unreal.Vector(x, y, gz(x, y) + 2.0) for x, y in pts], unreal.SplineCoordinateSpace.WORLD, True)
     a.set_editor_property('RoadMesh', unreal.load_asset(RAIL_MESH))
     a.set_editor_property('bUseCollision', True)
     a.set_editor_property('bUseCollision', False)
@@ -419,7 +419,9 @@ def build_all():
     step_depot()
     step_detail()
     step_extras()
+    step_decals()
     step_edges()
+    step_skirt()
 
 
 # ---- extras: saddle defences, depot edges, station yard odds and ends, road-end wreck, ground decals --------------
@@ -467,24 +469,165 @@ def step_extras():
                  (x, y, gz(x, y)), dp['yaw'], 'Extras')
     # station yard north: sleeper piles + a lineman's hut by the line
     for k, (x, y) in enumerate([(20300, 18800), (20450, 19600), (22300, 21000)]):
-        spawn_bp(ENV + 'NaturalCover/Logs/BP_Cover_Log%d' % (k + 1), 'REAR_Extra_Sleepers_%d' % k, (x, y, TOP_Z),
+        spawn_bp(ENV + 'NaturalCover/Logs/BP_Cover_Log%d' % (k + 1), 'REAR_Extra_Sleepers_%d' % k, (x, y, gz(x, y)),
                  rng.uniform(80, 100), 'Extras')
-    spawn_mesh('/Game/MillitaryBase/Meshes/SM_Shed', 'REAR_Extra_LinemanHut', (20250.0, 21600.0, TOP_Z), 90.0, 'Extras')
+    spawn_mesh('/Game/MillitaryBase/Meshes/SM_Shed', 'REAR_Extra_LinemanHut', (20250.0, 21600.0, gz(20250, 21600)), 90.0,
+               'Extras')
     # road-end wreck: an abandoned KV-1 where the east track runs out
     spawn_bp(MIL + 'DestTanks/BP_Env_Destroyed_KV1E', 'REAR_Extra_RoadEndWreck', (23650.0, -400.0, gz(23650, -400)),
              -70.0, 'Extras')
-    # ground decals: old shell craters on the depot ridge and the plain, erosion on the ridge flanks
-    craters = ['/Game/RTS_Survival/Materials/Decals/CraterDirt/MI_Decal_Crater_Dirt_0%d_Sandy' % i for i in (1, 2, 3, 4)]
-    n = 0
-    for _ in range(400):
-        if n >= 22:
-            break
-        x, y = rng.uniform(7000, 23500), rng.uniform(-22000, 20000)
-        if not _free(x, y):
+    log('extras placed')
+
+
+# ---- decals: craters on their terrain hollows, erosion channels on the gullies, wear and debris ----------------------
+DECALS = '/Game/RTS_Survival/Materials/Decals/'
+SCATTER = ['/Game/Crater_Decals/Decals/Dirt/MI_Decal_Dirt_Scatter_0%d' % i for i in (1, 2, 3)]
+EROSION = [DECALS + 'DirtTracks/MI_Decal_Erosion_Channel_0%d' % i for i in (2, 3, 4, 5)]
+TRACKS = [DECALS + 'DirtTracks/MI_Decal_Dirt_TracksSandy_0%d' % i for i in (1, 2, 3, 4)]
+DEBRIS = [DECALS + 'Concrete/MI_RTS_Decal_Concrete_Debris_0%d_Sandy' % i for i in (1, 2, 3, 5)]
+ARID = '/Game/Megascans/Decals/Arid_Debris_vbzebfrh/MI_Arid_Debris_vbzebfrh_2K'
+
+
+def step_decals():
+    """Every crater decal sits on the bowl rear_terrain_gen.py dug for it (plan 'craters'); erosion channels lie in the
+    gullies it cut; tyre ruts at the junctions, debris on the depot slab, dirt scatter around wrecks and rocks.
+    Only decal materials the map already uses."""
+    clear_prefix('REAR_Decal_')
+    clear_prefix('REAR_CraterStone_')
+    rng = random.Random(77)
+    stones = ['/Game/RTS_Survival/Meshes/Desert/Rocks/SM_Rock_0%d' % i for i in (1, 2, 3, 6, 7)]
+    n = {'crater': 0, 'scatter': 0, 'erosion': 0, 'tracks': 0, 'debris': 0, 'arid': 0, 'stones': 0}
+    for k, c in enumerate(PLAN['craters']):
+        x, y, r = c['x'], c['y'], c['r']
+        _decal('REAR_Decal_Crater_%02d' % k, c['mat'], x, y, c['yaw'], r * 1.25, depth=260.0)
+        n['crater'] += 1
+        if c['scatter']:
+            sx, sy = x + math.cos(c['scatter_a']) * r * 0.9, y + math.sin(c['scatter_a']) * r * 0.9
+            _decal('REAR_Decal_CraterScatter_%02d' % k, rng.choice(SCATTER), sx, sy, rng.uniform(0, 360), r * 1.1)
+            n['scatter'] += 1
+        for j in range(rng.randint(1, 3)):          # thrown-out stones on the rim
+            a = rng.uniform(0, 6.28)
+            px, py = x + math.cos(a) * r * rng.uniform(1.05, 1.5), y + math.sin(a) * r * rng.uniform(1.05, 1.5)
+            spawn_mesh(rng.choice(stones), 'REAR_CraterStone_%02d_%d' % (k, j), (px, py, gz(px, py) - 8.0),
+                       rng.uniform(0, 360), 'Decals', scale=rng.uniform(0.25, 0.5), collision=False)
+            n['stones'] += 1
+    for k, g in enumerate(PLAN['gullies']):
+        a, b = g['pts'][0], g['pts'][-1]
+        mx, my = (a[0] + b[0]) / 2.0, (a[1] + b[1]) / 2.0
+        heading = math.degrees(math.atan2(a[1] - b[1], a[0] - b[0]))
+        length = math.hypot(b[0] - a[0], b[1] - a[1])
+        actor = _decal('REAR_Decal_Erosion_%02d' % k, rng.choice(EROSION), mx, my, heading, 190.0, depth=300.0)
+        actor.get_component_by_class(unreal.DecalComponent).set_editor_property(
+            'decal_size', unreal.Vector(300.0, 190.0, length * 0.55))
+        n['erosion'] += 1
+    # tyre ruts where the roads fork and where they reach the depot and the station forecourt
+    for k, (x, y, hd) in enumerate([(8600, -1600, 30), (10100, -350, 80), (16400, -13500, 20), (19450, 9300, 70),
+                                    (17200, -12800, 5), (6800, -800, 10)]):
+        _decal('REAR_Decal_Tracks_%02d' % k, rng.choice(TRACKS), x, y, hd + 90.0, rng.uniform(300, 420))
+        n['tracks'] += 1
+    # debris on the depot slab and the station forecourt (decals also project onto the concrete tiles)
+    dp = PLAN['depot']
+    aa = math.radians(dp['yaw'])
+    for k in range(10):
+        u, v = rng.uniform(-3300, 3300), rng.uniform(-2100, 2100)
+        x = dp['centre'][0] + u * math.cos(aa) - v * math.sin(aa)
+        y = dp['centre'][1] + u * math.sin(aa) + v * math.cos(aa)
+        _decal('REAR_Decal_Debris_%02d' % k, rng.choice(DEBRIS), x, y, rng.uniform(0, 360), rng.uniform(220, 380),
+               depth=200.0)
+        n['debris'] += 1
+    # dirt scatter + arid debris around wrecks, big rocks and the station goods shed
+    anchors = [a for a in all_actors() if a.get_actor_label().startswith(('REAR_Detail_Rock', 'REAR_Extra_RoadEndWreck',
+                                                                          'REAR_Depot_Prop_16', 'REAR_Station_GoodsShed'))]
+    rng.shuffle(anchors)
+    for k, a in enumerate(anchors[:24]):
+        o = a.get_actor_location()
+        ang = rng.uniform(0, 6.28)
+        x, y = o.x + math.cos(ang) * 250.0, o.y + math.sin(ang) * 250.0
+        if _in_pond(x, y, 300.0):
             continue
-        _decal('REAR_Extra_Crater_%02d' % n, rng.choice(craters), x, y, rng.uniform(0, 360), rng.uniform(250, 520))
+        if k % 3 == 0:
+            _decal('REAR_Decal_Arid_%02d' % k, ARID, x, y, rng.uniform(0, 360), rng.uniform(220, 320))
+            n['arid'] += 1
+        else:
+            _decal('REAR_Decal_Scatter_%02d' % k, rng.choice(SCATTER), x, y, rng.uniform(0, 360), rng.uniform(250, 400))
+            n['scatter'] += 1
+    log('decals: %s' % n)
+
+
+# ---- horizon skirt: the survival map's end-of-map planes around the whole landscape ------------------------------
+SKIRT_MATERIAL = '/Game/RTS_Survival/SurvivalMode/Maps/Materials/M_SM_HorizonSkirt'
+SKIRT_Z = 97.0           # just under the lowest landscape boundary height (99): the planes never poke through
+LAND_RECT = (-41100.0, -25201.0, 30900.0, 25799.0)
+HOLE_SOUTH_Z = 142.0     # south-west hole border is 144 all round
+HOLE_NORTH_Z = 121.0     # north-west hole border runs 123..144
+SKIRT_REACH = 150000.0
+
+
+def _skirt_plane(label, cx, cy, sx, sy):
+    a = spawn_mesh('/Engine/BasicShapes/Plane', label, (cx, cy, SKIRT_Z), 0.0, 'Edges', scale=(sx / 100.0, sy / 100.0, 1.0),
+                   collision=False, materials=[SKIRT_MATERIAL])
+    comp = a.static_mesh_component
+    comp.set_editor_property('cast_shadow', False)
+    comp.set_editor_property('hidden_in_scene_capture', True)    # keep it out of the minimap capture
+    return a
+
+
+def step_skirt():
+    """Same planes as SMD_HorizonSkirt_* on SM_Desert_01: flat landscape sand past the landscape edge out to 1.5 km, no
+    collision/nav/shadow, hidden from scene captures. Four strips around the landscape rectangle (20 cm under its edge)
+    plus fills for the missing landscape sections in the two west corners. Tucked 4 m under the landscape edge."""
+    clear_prefix('REAR_Skirt_')
+    x0, y0, x1, y1 = LAND_RECT
+    ov = 400.0          # tucked 4 m under the landscape so no sky shows through the edge step at RTS angles
+    R = SKIRT_REACH
+    _skirt_plane('REAR_Skirt_PX', (x1 - ov + R) / 2.0, 0.0, R - (x1 - ov), 2.0 * R)
+    _skirt_plane('REAR_Skirt_NX', (x0 + ov - R) / 2.0, 0.0, (x0 + ov) + R, 2.0 * R)
+    _skirt_plane('REAR_Skirt_PY', (x0 + x1) / 2.0, (y1 - ov + R) / 2.0, x1 - x0, R - (y1 - ov))
+    _skirt_plane('REAR_Skirt_NY', (x0 + x1) / 2.0, (y0 + ov - R) / 2.0, x1 - x0, (y0 + ov) + R)
+    # missing 15 m sections: merge each row's run of missing components into one plane
+    n = 0
+    for row in _missing_component_runs():
+        cx0, cx1, cy0, cy1 = row
+        a = _skirt_plane('REAR_Skirt_Hole_%02d' % n, (cx0 + cx1) / 2.0, (cy0 + cy1) / 2.0, cx1 - cx0 + 2 * ov,
+                         cy1 - cy0 + 2 * ov)
+        # the holes border the user's dressed ground (not eased): sit just under that border's lowest height
+        o = a.get_actor_location()
+        a.set_actor_location(unreal.Vector(o.x, o.y, HOLE_SOUTH_Z if o.y < 0 else HOLE_NORTH_Z), False, False)
         n += 1
-    log('extras placed, %d crater decals' % n)
+    log('skirt: 4 strips + %d hole fills at z %.0f' % (n, SKIRT_Z))
+
+
+def _missing_component_runs():
+    """World rectangles of missing landscape components (one per row run). A component is missing where every paint
+    layer weighs 0 in the full-grid export (terrain/check_ext_*), sampled at the component's centre vertex."""
+    import array
+    gx0, gy0, gx1, gy1 = PLAN['grid']
+    sx = gx1 - gx0 + 1
+    total = None
+    for name in LAYER_NAMES:
+        with open(TERRAIN + 'check_ext_%s.r8' % name, 'rb') as handle:
+            data = array.array('B', handle.read())
+        total = data if total is None else array.array('H', (p + q for p, q in zip(total, data)))
+    x0, y0 = LAND_RECT[0], LAND_RECT[1]
+    ncx, ncy = (gx1 - gx0) // 15, (gy1 - gy0) // 15
+    runs = []
+    for cj in range(ncy):
+        start = None
+        for ci in range(ncx + 1):
+            missing = ci < ncx and total[(cj * 15 + 7) * sx + ci * 15 + 7] == 0
+            if missing and start is None:
+                start = ci
+            if not missing and start is not None:
+                runs.append((x0 + start * 1500.0, x0 + ci * 1500.0, y0 + cj * 1500.0, y0 + (cj + 1) * 1500.0))
+                start = None
+    return runs
+
+
+def _landscape_under(x, y):
+    hits = unreal.SystemLibrary.line_trace_multi(world(), unreal.Vector(x, y, 20000.0), unreal.Vector(x, y, -20000.0),
+                                                 unreal.TraceTypeQuery.TRACE_TYPE_QUERY1, False, [],
+                                                 unreal.DrawDebugTrace.NONE, True) or []
+    return any(h.to_tuple()[9] is not None and h.to_tuple()[9].get_class().get_name() == 'Landscape' for h in hits)
 
 
 # ---- landscape extension -------------------------------------------------------------------------------------------

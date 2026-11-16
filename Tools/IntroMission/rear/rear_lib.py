@@ -293,3 +293,11 @@ def run_steps(steps):
             return False
         return True
     return tick
+
+
+def import_heights(tag, rect):
+    """Heights only (no paint) for a rectangle: TERRAIN/<tag>_height.r16, e.g. the full-grid edge_full file."""
+    ok = unreal.RTSShortsLandscapeLibrary.import_landscape_region(landscape(), rect[0], rect[1], rect[2], rect[3],
+                                                                  TERRAIN + tag + '_height.r16', [], [])
+    log('import heights %s %s -> %s' % (tag, rect, ok))
+    return ok

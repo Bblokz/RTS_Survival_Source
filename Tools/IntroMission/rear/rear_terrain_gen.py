@@ -32,6 +32,8 @@ GRID = (105, 75, 765 + EXTEND_X, 585)  # full extent after rear_build.extend_lan
 REGION = (556, 75, 765 + EXTEND_X, 585)  # rectangle that gets re-imported (x >= 3999)
 ORIGIN = (-51600.0, -32701.0)
 GROUND = 143.0
+SKIRT_Z = 98.0                        # horizon skirt planes sit at 97 (rear_build.SKIRT_Z)
+RIM_VERTS = 5                         # outer rim width (m) eased down to the skirt height
 rng = np.random.default_rng(1976)
 
 # ---------------------------------------------------------------------------------------------------------------------
@@ -187,6 +189,90 @@ def pond_sd(X, Y, pond, seed):
     return sd
 
 
+CRATER_ZONES = [  # (x0, x1, y0, y1, count, big): ground the war has crossed
+    (8200, 12000, -9000, -3200, 7, True),      # base-side approach to the saddle
+    (12800, 16500, -13500, -9500, 5, True),     # depot side of the saddle
+    (7000, 11000, -20000, -11000, 5, False),    # in front of the depot ridge
+    (9000, 14000, -500, 6000, 5, True),         # hub fan, between the forks
+    (16500, 23500, -4000, 1000, 6, False),      # road E between the ponds and the edge
+    (15000, 19000, 7000, 14000, 4, False),      # foot of the station ridge
+    (8000, 15000, 9000, 22000, 6, True),        # northern plain
+    (19500, 23500, -23000, -19000, 3, False),   # behind the depot
+]
+CRATER_MATS = ['/Game/RTS_Survival/Materials/Decals/CraterDirt/MI_Decal_Crater_Dirt_0%d_Sandy' % i for i in (1, 2, 3, 4, 5, 6)]
+
+
+def _slope_deg(Zn, i, j):
+    gx = (Zn[j, min(i + 1, Zn.shape[1] - 1)] - Zn[j, max(i - 1, 0)]) / 200.0
+    gy = (Zn[min(j + 1, Zn.shape[0] - 1), i] - Zn[max(j - 1, 0), i]) / 200.0
+    return math.degrees(math.atan(math.hypot(gx, gy)))
+
+
+def _idx(x, y):
+    return int(round((x - ORIGIN[0]) / 100.0)) - GRID[0], int(round((y - ORIGIN[1]) / 100.0)) - GRID[1]
+
+
+def place_craters(Zn, work, pond_mask, pad_d, bed, sy, sx):
+    """Shell craters in the CRATER_ZONES, clear of roads, ponds, the depot pad and the station top (sizes as on the
+    detail pass: radius 2.6-5.6 m, bowl depth 26 + 0.085 r cm, decal 1.25 r)."""
+    import random
+    rng = random.Random(1944)
+    road_polys = [catmull(p, 200.0) for p in ROADS.values()]
+    out = []
+    for x0, x1, y0, y1, n, big in CRATER_ZONES:
+        got = tries = 0
+        while got < n and tries < 600:
+            tries += 1
+            x, y = rng.uniform(x0, x1), rng.uniform(y0, y1)
+            r = rng.uniform(380, 560) if (big and rng.random() < 0.55) else rng.uniform(260, 380)
+            i, j = _idx(x, y)
+            if not (0 <= i < sx and 0 <= j < sy) or not work[j, i] or bed[j, i] > 0.05 or pad_d[j, i] < 900 + r:
+                continue
+            if any(pm[j, i] < 900 + r for pm in pond_mask.values()) or _slope_deg(Zn, i, j) > 11.0:
+                continue
+            if any(np.min(np.hypot(pl[:, 0] - x, pl[:, 1] - y)) < 650 + r for pl in road_polys):
+                continue
+            if any(math.hypot(x - c['x'], y - c['y']) < r + c['r'] + 300 for c in out):
+                continue
+            out.append({'x': round(x), 'y': round(y), 'r': round(r), 'depth': round(26 + r * 0.085),
+                        'yaw': round(rng.uniform(0, 360), 1), 'mat': rng.choice(CRATER_MATS),
+                        'scatter': rng.random() < 0.6, 'scatter_a': round(rng.uniform(0, 6.28), 2)})
+            got += 1
+    return out
+
+
+def place_gullies(Zn, work, sy, sx):
+    """Short erosion channels that start below a ridge crest and follow the steepest descent."""
+    import random
+    rng = random.Random(7)
+    out = []
+    tries = 0
+    while len(out) < 26 and tries < 6000:
+        tries += 1
+        x, y = rng.uniform(6000, 24000), rng.uniform(-24000, 23500)
+        i, j = _idx(x, y)
+        if not (2 <= i < sx - 2 and 2 <= j < sy - 2) or not work[j, i]:
+            continue
+        if _slope_deg(Zn, i, j) < 15.0 or Zn[j, i] < 420.0:
+            continue
+        if any(math.hypot(x - g['pts'][0][0], y - g['pts'][0][1]) < 1400 for g in out):
+            continue
+        pts = [(x, y)]
+        for _ in range(16):
+            i, j = _idx(*pts[-1])
+            if not (1 <= i < sx - 1 and 1 <= j < sy - 1):
+                break
+            gx = (Zn[j, i + 1] - Zn[j, i - 1]) / 200.0
+            gy = (Zn[j + 1, i] - Zn[j - 1, i]) / 200.0
+            g = math.hypot(gx, gy)
+            if g < 0.08:
+                break
+            pts.append((pts[-1][0] - gx / g * 90.0, pts[-1][1] - gy / g * 90.0))
+        if len(pts) >= 8:
+            out.append({'pts': [[round(a), round(b)] for a, b in pts]})
+    return out
+
+
 # ---------------------------------------------------------------------------------------------------------------------
 def build():
     h, w = load()
@@ -213,12 +299,18 @@ def build():
     warp1 = fbm(X, Y, 3000.0, 11)
     warp2 = fbm(X, Y, 900.0, 12)
     micro = fbm(X, Y, 1600.0, 13) - 0.5
+    n_fine = fbm(X, Y, 250.0, 14)
 
     # ---- base: gentle undulation of the rear plain (+-35 cm), lower towards the ponds
     add = 70.0 * (fbm(X, Y, 5000.0, 21) - 0.5)
     # beyond the map-edge blocker (x 24775) the ground rises into low rolling hills, so the camera at the playable
     # edge looks onto terrain instead of the end of the landscape
     add = add + 700.0 * smooth((X - 25300.0) / 3800.0) * (0.55 + 0.7 * fbm(X, Y, 2600.0, 22))
+    # everything settles back to the plain at the landscape's outer edges, where the horizon skirt planes take over:
+    # the far hills fall in the last 13 m, the station ridge comes down as an embankment over its last 36 m and the
+    # depot ridge ends before the south edge
+    edge_fade = smooth((30700.0 - X) / 1300.0) * smooth((25650.0 - Y) / 1500.0) * smooth((Y + 25050.0) / 1500.0)
+    add = add * edge_fade
 
     # ---- station ridge
     sp = catmull(RIDGE_S['spine'], 100.0)
@@ -230,6 +322,7 @@ def build():
     # rounded south nose: fade the height over the first 1500 cm of the spine
     nose = smooth(sS / 1500.0)
     h_s = RIDGE_S['height'] * prof_s * (0.25 + 0.75 * nose) + 60.0 * micro * prof_s
+    h_s = h_s * smooth((25500.0 - Y) / 3600.0)
     # ---- depot ridge
     dp = catmull(RIDGE_D['spine'], 100.0)
     dD, sD = dist_to_poly(X, Y, dp)
@@ -239,6 +332,7 @@ def build():
     prof_d = 1.0 - smooth((dD - topd) / (RIDGE_D['flank_w'] * (1.0 + 0.35 * (warp2 - 0.5))))
     hgtD = RIDGE_D['height'] * (0.85 + 0.3 * warp1)
     h_d = hgtD * prof_d * endfade + 70.0 * micro * prof_d
+    h_d = h_d * smooth((Y + 25000.0) / 2500.0)
     # saddle where road D crosses
     sad = np.hypot(X - SADDLE_D[0], Y - SADDLE_D[1])
     h_d = h_d * (1.0 - 0.62 * (1.0 - smooth((sad - 600.0) / 1800.0)))
@@ -258,7 +352,7 @@ def build():
 
     # ---- station top: flatten the forecourt + track bed (z = ridge top)
     st_top = GROUND + RIDGE_S['height']
-    bed = (1.0 - smooth((dS - (top - 200.0)) / 400.0)) * smooth((sS - 1200.0) / 900.0)
+    bed = (1.0 - smooth((dS - (top - 200.0)) / 400.0)) * smooth((sS - 1200.0) / 900.0) * smooth((21500.0 - Y) / 1200.0)
     Zn = Zn * (1 - bed) + (st_top + 0.0) * bed
 
     # ---- dry wash out of W1: 60 cm deep meandering channel
@@ -279,6 +373,33 @@ def build():
         basin = np.maximum(basin, wz - 280.0)
         Zn = np.where(r_px > 0, np.minimum(Zn, bank), basin)
         pond_mask[name] = r_px
+
+    # ---- shell craters: bowl hollow + low rim under every crater decal (the decals sit on real erosion)
+    craters = place_craters(Zn, work, pond_mask, pad_d, bed, sy, sx)
+    crater_core = np.zeros_like(Z)
+    crater_ring = np.zeros_like(Z)
+    crater_ejecta = np.zeros_like(Z)
+    for c in craters:
+        d = np.hypot(X - c['x'], Y - c['y'])
+        m = d < c['r'] * 1.8
+        r = c['r']
+        t = d[m] / r
+        bowl = np.where(t < 1.0, -c['depth'] * (1.0 - t * t), 0.0)
+        rim = 0.14 * c['depth'] * np.exp(-((t - 1.08) / 0.22) ** 2)
+        Zn[m] = Zn[m] + bowl + rim
+        crater_core[m] = np.maximum(crater_core[m], 1.0 - smooth((t - 0.32 - 0.2 * n_fine[m]) / 0.25))
+        crater_ring[m] = np.maximum(crater_ring[m], (1.0 - smooth((t - 1.15) / 0.3)) * smooth((t - 0.45) / 0.2))
+        crater_ejecta[m] = np.maximum(crater_ejecta[m], (1.0 - smooth((t - 1.2) / 0.5)) * smooth((t - 0.9) / 0.15))
+    # ---- erosion gullies down the ridge flanks: shallow troughs that carry the erosion-channel decals
+    gullies = place_gullies(Zn, work, sy, sx)
+    gully_w = np.zeros_like(Z)
+    for g in gullies:
+        poly = np.array(g['pts'], dtype=float)
+        dG, sG = dist_to_poly(X, Y, poly)
+        length = sG.max()
+        w_g = (1.0 - smooth((dG - 45.0) / 150.0)) * smooth(sG / 150.0) * smooth((length - sG) / 200.0)
+        Zn = Zn - 22.0 * w_g
+        gully_w = np.maximum(gully_w, w_g)
 
     # ---- roads: graded corridor (cut/fill to a smoothed centre profile)
     road_polys = {}
@@ -344,6 +465,11 @@ def build():
     # dry wash bed: cracked mud with gravel banks
     tgt['Weedy'] += 2.2 * (1.0 - smooth((dW - 150.0) / 300.0)) * smooth(sW / 400.0)
     tgt['DesertGravel'] += 0.8 * (1.0 - smooth((dW - 350.0) / 400.0)) * smooth((n1 - 0.3) / 0.3)
+    # craters: charred core, gravel ring, pale ejecta flecks; gullies: gravel beds
+    tgt['ScorchSandyStone'] += 2.4 * crater_core
+    tgt['DesertGravel'] += 1.4 * crater_ring
+    tgt['DesertRockDark'] += 1.2 * crater_ejecta * smooth((n1 - 0.35) / 0.2)
+    tgt['DesertGravel'] += 1.6 * gully_w
     # road wear: gravel band along the roads (the two-track ribbons draw the ruts)
     for name, poly in road_polys.items():
         d, s = dist_to_poly(X, Y, poly)
@@ -364,6 +490,7 @@ def build():
         infl = np.maximum(infl, 1.0 - smooth((d - 300.0) / 900.0))
     infl = np.maximum(infl, 1.0 - smooth(pad_d / 2600.0))
     infl = np.maximum(infl, 1.0 - smooth((dW - 400.0) / 600.0))
+    infl = np.maximum(infl, np.maximum(np.maximum(crater_core, crater_ring), np.maximum(crater_ejecta, gully_w)))
     for r_px in pond_mask.values():
         infl = np.maximum(infl, 1.0 - smooth((r_px - 1500.0) / 1200.0))
     infl = box_blur(infl, 4) * work
@@ -376,6 +503,22 @@ def build():
     for k in range(len(LAYERS)):
         stack[k] += np.where(dom == k, diff, 0)
     stack = np.where(valid[None], stack, 0)
+
+    # ===== outer rim: the last 5 m of the landscape rectangle eases down to the horizon skirt height, so landscape and
+    # skirt meet without a step. All of it lies outside the playable blockers; only heights change there (written as
+    # the full-grid file edge_full_height.r16).
+    # distance (vertices) to the outer landscape rectangle only: the missing-section holes in the west corners border
+    # the user's dressed ground, so their skirt fills sit at the border height instead (rear_build.step_skirt)
+    jj, ii = np.indices(Z.shape)
+    rim_d = np.minimum(np.minimum(ii, Z.shape[1] - 1 - ii), np.minimum(jj, Z.shape[0] - 1 - jj))
+    rim_d = np.where(valid, rim_d, 99)
+    rim_w = np.where(rim_d <= RIM_VERTS, smooth(rim_d / float(RIM_VERTS)), 1.0)
+    Z_rim = np.where(Z > SKIRT_Z, SKIRT_Z + (Z - SKIRT_Z) * rim_w, Z)
+    rim_changed = (np.abs(to_h(Z_rim).astype(int) - to_h(Z).astype(int)) > 0)
+    print('outer rim: %d vertices eased to the skirt height' % int(rim_changed.sum()))
+    Z = Z_rim
+    to_h(Z).tofile(T + 'edge_full_height.r16')
+    np.save(T + 'rim_changed.npy', rim_changed)
 
     # ===== write region =============================================================================================
     i0, j0 = REGION[0] - GRID[0], REGION[1] - GRID[1]
@@ -403,6 +546,7 @@ def build():
             pts.append([float(last[0]), float(last[1])])
         shores[name] = pts
     plan = {
+        'craters': craters, 'gullies': gullies,
         'shores': shores,
         'wash': [list(map(float, p)) for p in wash[::8]],
         'region': REGION, 'grid': GRID, 'hub': HUB,
@@ -418,8 +562,9 @@ def build():
 
     # ===== stats + picture ===========================================================================================
     changed = np.abs(to_h(Z).astype(int) - h.astype(int)) > 0
-    outside = changed & ~in_region
-    print('changed vertices', int(changed.sum()), 'outside region', int(outside.sum()),
+    rim = np.load(T + 'rim_changed.npy')
+    outside = changed & ~in_region & ~rim
+    print('changed vertices', int(changed.sum()), 'outside region (not counting the outer rim)', int(outside.sum()),
           'in keep-out', int((changed & keep).sum()))
     print('z range in region %.0f .. %.0f' % (Z[in_region].min(), Z[in_region].max()))
     mx = slope[work & (Z > 60)].max()
