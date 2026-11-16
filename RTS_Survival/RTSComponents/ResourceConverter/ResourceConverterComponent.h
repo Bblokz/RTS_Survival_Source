@@ -18,6 +18,7 @@ class UPlayerResourceManager;
 class UAnimatedTextWidgetPoolManager;
 class UAudioComponent;
 class ABuildingExpansion;
+class UW_HealthBar;
 
 /**
  * @brief Container for vertical text layout/styling to use with the pooled system.
@@ -102,6 +103,27 @@ struct FResourceConverterSettings
 
 
 /**
+ * @brief State of the conversion progress bar a UResourceConverterComponent drives on its owner's health widget.
+ */
+USTRUCT()
+struct FResourceConverterProgressBarState
+{
+	GENERATED_BODY()
+
+	// Only runs while conversion runs; refreshes the bar fill from the conversion timer's elapsed time.
+	FTimerHandle RefreshTimerHandle;
+
+	// The owner's health widget; resolved lazily as the health component may create it after InitResourceConverter.
+	UPROPERTY()
+	TWeakObjectPtr<UW_HealthBar> HealthWidget;
+
+	// Whether the bar is currently shown on HealthWidget (avoids re-setting visibility every refresh).
+	bool bIsShown = false;
+
+	bool bHasReportedMissingBar = false;
+};
+
+/**
  * @brief Converts player resources at a fixed interval, optionally showing vertical resource text and playing a sound.
  * The component does not tick; it manages its own timer for conversion.
  * @note InitResourceConverter: call in Blueprint once to configure & start.
@@ -178,6 +200,10 @@ private:
 	/** Our conversion timer handle; we do not use actor ticking. */
 	FTimerHandle M_TickTimerHandle;
 
+	// Conversion progress bar on the owner's health widget; shown only while conversion runs.
+	UPROPERTY()
+	FResourceConverterProgressBarState M_ProgressBarState;
+
 	// --- Cached pointers with validity wrappers (rule 0.5) ---
 
 	// Owner’s RTS component (used to read OwningPlayer).
@@ -210,6 +236,18 @@ private:
 
 	/** Core tick: attempts to apply deltas; plays VFX/SFX on success. */
 	void OnResourceTick();
+
+	/** Shows + refreshes the health widget's conversion bar while conversion runs; hides it otherwise. */
+	void UpdateConversionProgressBar();
+	void StopConversionProgressBar();
+	void StopConversionProgressBarRefreshTimer();
+	void OnConversionProgressBarRefresh();
+	/** @return Whether the health widget was resolved; unset is expected until the health component creates it. */
+	bool GetHasProgressBarHealthWidget() const;
+	/** @return 0..1 progress of the running conversion timer towards its next tick. */
+	float GetConversionProgress() const;
+	/** @return The owner's health widget if it exists and has a conversion progress bar, else null. */
+	UW_HealthBar* GetProgressBarHealthWidget();
 
 	void ApplyResourceConversionState();
 	bool GetCanRunResourceConversion() const;

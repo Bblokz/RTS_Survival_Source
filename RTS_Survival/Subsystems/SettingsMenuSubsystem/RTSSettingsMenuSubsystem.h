@@ -349,7 +349,7 @@ public:
 	/**
 	 * @brief Saves the info takeover switch at once, outside the menu's pending/apply flow: the takeover's "never
 	 * show again" box must stick without an Apply, and a later Apply in the menu must not revert it.
-	 * @param bNewShowInfoTakeovers False hides every later info takeover.
+	 * @param bNewShowInfoTakeovers False hides every later unit info takeover; game-mechanic field manuals still show.
 	 */
 	void SetShowInfoTakeoversImmediately(const bool bNewShowInfoTakeovers);
 

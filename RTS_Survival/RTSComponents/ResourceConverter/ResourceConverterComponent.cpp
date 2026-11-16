@@ -6,6 +6,8 @@
 #include "Engine/World.h"
 #include "TimerManager.h"
 #include "RTS_Survival/Buildings/BuildingExpansion/BuildingExpansion.h"
+#include "RTS_Survival/GameUI/Healthbar/W_HealthBar.h"
+#include "RTS_Survival/RTSComponents/HealthComponent.h"
 #include "RTS_Survival/GameUI/Pooled_AnimatedVerticalText/Pooling/AnimatedTextWidgetPoolManager/AnimatedTextWidgetPoolManager.h"
 #include "RTS_Survival/GameUI/Pooled_AnimatedVerticalText/Pooling/WorldSubSystem/AnimatedTextWorldSubsystem.h"
 
@@ -37,6 +39,7 @@ void UResourceConverterComponent::BeginPlay()
 void UResourceConverterComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	StopResourceTimer();
+	StopConversionProgressBar();
 	Super::EndPlay(EndPlayReason);
 }
 
@@ -163,6 +166,7 @@ void UResourceConverterComponent::ApplyResourceConversionState()
 		}
 	}
 
+	UpdateConversionProgressBar();
 	UpdateBuildingExpansionConversionAbility();
 
 	if (bWasConversionEnabled == bM_Enabled || not bM_IsOwnedByBuildingExpansion)
@@ -416,6 +420,157 @@ void UResourceConverterComponent::StopResourceTimer()
 	{
 		W->GetTimerManager().ClearTimer(M_TickTimerHandle);
 	}
+}
+
+// ===== conversion progress bar =====
+
+namespace ResourceConverterProgressBar
+{
+	// Seconds between bar refreshes while conversion runs (bar is small on screen; 20 Hz reads as smooth).
+	constexpr float RefreshInterval = 0.05f;
+}
+
+void UResourceConverterComponent::UpdateConversionProgressBar()
+{
+	if (not bM_Enabled)
+	{
+		StopConversionProgressBar();
+		return;
+	}
+
+	UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		return;
+	}
+	FTimerManager& TimerManager = World->GetTimerManager();
+	if (not TimerManager.IsTimerActive(M_ProgressBarState.RefreshTimerHandle))
+	{
+		TWeakObjectPtr<UResourceConverterComponent> WeakThis(this);
+		FTimerDelegate RefreshDelegate;
+		RefreshDelegate.BindLambda([WeakThis]()
+		{
+			if (not WeakThis.IsValid())
+			{
+				return;
+			}
+			WeakThis->OnConversionProgressBarRefresh();
+		});
+		TimerManager.SetTimer(M_ProgressBarState.RefreshTimerHandle, RefreshDelegate,
+		                      ResourceConverterProgressBar::RefreshInterval, /*bLoop=*/true);
+	}
+	OnConversionProgressBarRefresh();
+}
+
+void UResourceConverterComponent::StopConversionProgressBar()
+{
+	StopConversionProgressBarRefreshTimer();
+	if (not M_ProgressBarState.bIsShown)
+	{
+		return;
+	}
+	M_ProgressBarState.bIsShown = false;
+	if (GetHasProgressBarHealthWidget())
+	{
+		M_ProgressBarState.HealthWidget->SetConversionProgressVisible(false);
+	}
+}
+
+void UResourceConverterComponent::StopConversionProgressBarRefreshTimer()
+{
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(M_ProgressBarState.RefreshTimerHandle);
+	}
+}
+
+void UResourceConverterComponent::OnConversionProgressBarRefresh()
+{
+	if (not bM_Enabled)
+	{
+		StopConversionProgressBar();
+		return;
+	}
+
+	// May be null for a while: the health component can create its widget after this converter starts.
+	UW_HealthBar* HealthWidget = GetProgressBarHealthWidget();
+	if (not IsValid(HealthWidget))
+	{
+		if (M_ProgressBarState.bHasReportedMissingBar)
+		{
+			// This owner's widget class has no bar; stop polling until conversion restarts.
+			StopConversionProgressBarRefreshTimer();
+		}
+		return;
+	}
+
+	if (not M_ProgressBarState.bIsShown)
+	{
+		M_ProgressBarState.bIsShown = true;
+		HealthWidget->SetConversionProgressVisible(true);
+	}
+	HealthWidget->SetConversionProgress(GetConversionProgress());
+}
+
+float UResourceConverterComponent::GetConversionProgress() const
+{
+	const UWorld* World = GetWorld();
+	if (not IsValid(World) || M_Settings.Tick.TickRate <= 0.f)
+	{
+		return 0.f;
+	}
+
+	const float Elapsed = World->GetTimerManager().GetTimerElapsed(M_TickTimerHandle);
+	if (Elapsed < 0.f)
+	{
+		return 0.f;
+	}
+	return FMath::Clamp(Elapsed / M_Settings.Tick.TickRate, 0.f, 1.f);
+}
+
+UW_HealthBar* UResourceConverterComponent::GetProgressBarHealthWidget()
+{
+	if (GetHasProgressBarHealthWidget())
+	{
+		return M_ProgressBarState.HealthWidget.Get();
+	}
+
+	// The cached widget is gone (or never resolved); a new one starts with its bar collapsed.
+	M_ProgressBarState.bIsShown = false;
+	const AActor* Owner = GetOwner();
+	const UHealthComponent* HealthComponent = IsValid(Owner) ? Owner->FindComponentByClass<UHealthComponent>() : nullptr;
+	if (not IsValid(HealthComponent))
+	{
+		return nullptr;
+	}
+
+	UW_HealthBar* HealthWidget = HealthComponent->GetHealthBarWidget();
+	if (not IsValid(HealthWidget))
+	{
+		return nullptr;
+	}
+
+	if (not HealthWidget->GetHasConversionProgressBar())
+	{
+		if (not M_ProgressBarState.bHasReportedMissingBar)
+		{
+			M_ProgressBarState.bHasReportedMissingBar = true;
+			RTSFunctionLibrary::ReportWarning(TEXT("ResourceConverter: the owner's health widget ")
+				+ HealthWidget->GetClass()->GetName()
+				+ TEXT(" has no ConversionProgressBar; conversion progress is not shown for ")
+				+ Owner->GetName());
+		}
+		return nullptr;
+	}
+
+	M_ProgressBarState.HealthWidget = HealthWidget;
+	return HealthWidget;
+}
+
+bool UResourceConverterComponent::GetHasProgressBarHealthWidget() const
+{
+	// No error report: the widget is legitimately unresolved until the owner's health component creates it.
+	return M_ProgressBarState.HealthWidget.IsValid();
 }
 
 // ===== core tick =====
