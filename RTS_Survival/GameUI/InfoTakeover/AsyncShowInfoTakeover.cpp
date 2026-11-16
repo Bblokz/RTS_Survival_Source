@@ -25,7 +25,7 @@ void UAsyncShowInfoTakeoverBase::Activate()
 	M_RequestId = QueueTakeover(*InfoTakeoverSubsystem);
 	if (M_RequestId == INDEX_NONE && not bM_HasFinished)
 	{
-		// The player turned the info takeovers off.
+		// Nothing was queued; the mission continues at once.
 		Finish(true, false);
 	}
 }
@@ -180,6 +180,16 @@ UAsyncShowDigInTakeover* UAsyncShowDigInTakeover::ShowDigInTakeover(UObject* Wor
 int32 UAsyncShowDigInTakeover::QueueTakeover(UInfoTakeoverSubsystem& InfoTakeoverSubsystem) const
 {
 	return InfoTakeoverSubsystem.QueueDigInTakeover();
+}
+
+UAsyncShowWallBreachTakeover* UAsyncShowWallBreachTakeover::ShowWallBreachTakeover(UObject* WorldContextObject)
+{
+	return CreateNode<UAsyncShowWallBreachTakeover>(WorldContextObject);
+}
+
+int32 UAsyncShowWallBreachTakeover::QueueTakeover(UInfoTakeoverSubsystem& InfoTakeoverSubsystem) const
+{
+	return InfoTakeoverSubsystem.QueueWallBreachTakeover();
 }
 
 UAsyncShowAdrenalineShotTakeover* UAsyncShowAdrenalineShotTakeover::ShowAdrenalineShotTakeover(UObject* WorldContextObject)

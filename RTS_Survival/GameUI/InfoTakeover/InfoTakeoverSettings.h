@@ -17,6 +17,7 @@ class UW_VulturesAtTakeover;
 class UW_RattleFeedTakeover;
 class UW_WespeBarrageTakeover;
 class UW_DigInTakeover;
+class UW_WallBreachTakeover;
 class UW_AdrenalineShotTakeover;
 class UW_VehicleInfoTakeover;
 
@@ -86,6 +87,10 @@ public:
 	// WBP_DigInTakeover: the Blueprint child that carries the style for the Dig In field manual.
 	UPROPERTY(EditAnywhere, Config, Category = "Tutorials")
 	TSoftClassPtr<UW_DigInTakeover> DigInTakeoverWidgetClass;
+
+	// WBP_WallBreachTakeover: the Blueprint child that carries the style for the Wall Breach field manual.
+	UPROPERTY(EditAnywhere, Config, Category = "Tutorials")
+	TSoftClassPtr<UW_WallBreachTakeover> WallBreachTakeoverWidgetClass;
 
 	// WBP_AdrenalineShotTakeover: the Blueprint child that carries the style for the Adrenaline Shot field manual.
 	UPROPERTY(EditAnywhere, Config, Category = "Tutorials")

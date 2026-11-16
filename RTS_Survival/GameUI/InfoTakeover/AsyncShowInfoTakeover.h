@@ -48,7 +48,7 @@ protected:
 		return Node;
 	}
 
-	/** @return The request id of the queued takeover; INDEX_NONE when takeovers are turned off. */
+	/** @return The request id of the queued takeover; INDEX_NONE when it could not be queued. */
 	virtual int32 QueueTakeover(UInfoTakeoverSubsystem& InfoTakeoverSubsystem) const
 		PURE_VIRTUAL(UAsyncShowInfoTakeoverBase::QueueTakeover, return INDEX_NONE;);
 
@@ -85,7 +85,7 @@ public:
 	/**
 	 * @brief Shows the camera controls takeover (arrow keys, edge panning, zoom, marquee selection) and waits.
 	 * @param WorldContextObject The mission (or any object in the game world); filled in as self.
-	 * @return The node; On Closed fires later, or in the same frame when the takeovers are turned off.
+	 * @return The node; On Closed fires once the player closed it; field manuals ignore "never show again".
 	 */
 	UFUNCTION(BlueprintCallable, Category = "Mission|Info Takeover",
 		meta = (BlueprintInternalUseOnly = "true", DefaultToSelf = "WorldContextObject",
@@ -110,7 +110,7 @@ public:
 	/**
 	 * @brief Shows the cover takeover and waits for it to close.
 	 * @param WorldContextObject The mission (or any object in the game world); filled in as self.
-	 * @return The node; On Closed fires later, or in the same frame when the takeovers are turned off.
+	 * @return The node; On Closed fires once the player closed it; field manuals ignore "never show again".
 	 */
 	UFUNCTION(BlueprintCallable, Category = "Mission|Info Takeover",
 		meta = (BlueprintInternalUseOnly = "true", DefaultToSelf = "WorldContextObject",
@@ -135,7 +135,7 @@ public:
 	/**
 	 * @brief Shows the spaced armour takeover and waits for it to close.
 	 * @param WorldContextObject The mission (or any object in the game world); filled in as self.
-	 * @return The node; On Closed fires later, or in the same frame when the takeovers are turned off.
+	 * @return The node; On Closed fires once the player closed it; field manuals ignore "never show again".
 	 */
 	UFUNCTION(BlueprintCallable, Category = "Mission|Info Takeover",
 		meta = (BlueprintInternalUseOnly = "true", DefaultToSelf = "WorldContextObject",
@@ -160,7 +160,7 @@ public:
 	/**
 	 * @brief Shows the nomadic conversion takeover and waits for it to close.
 	 * @param WorldContextObject The mission (or any object in the game world); filled in as self.
-	 * @return The node; On Closed fires later, or in the same frame when the takeovers are turned off.
+	 * @return The node; On Closed fires once the player closed it; field manuals ignore "never show again".
 	 */
 	UFUNCTION(BlueprintCallable, Category = "Mission|Info Takeover",
 		meta = (BlueprintInternalUseOnly = "true", DefaultToSelf = "WorldContextObject",
@@ -186,7 +186,7 @@ public:
 	/**
 	 * @brief Shows the building expansion pack-up takeover and waits for it to close.
 	 * @param WorldContextObject The mission (or any object in the game world); filled in as self.
-	 * @return The node; On Closed fires later, or in the same frame when the takeovers are turned off.
+	 * @return The node; On Closed fires once the player closed it; field manuals ignore "never show again".
 	 */
 	UFUNCTION(BlueprintCallable, Category = "Mission|Info Takeover",
 		meta = (BlueprintInternalUseOnly = "true", DefaultToSelf = "WorldContextObject",
@@ -212,7 +212,7 @@ public:
 	/**
 	 * @brief Shows the Vultures AT stick grenade takeover and waits for it to close.
 	 * @param WorldContextObject The mission (or any object in the game world); filled in as self.
-	 * @return The node; On Closed fires later, or in the same frame when the takeovers are turned off.
+	 * @return The node; On Closed fires once the player closed it; field manuals ignore "never show again".
 	 */
 	UFUNCTION(BlueprintCallable, Category = "Mission|Info Takeover",
 		meta = (BlueprintInternalUseOnly = "true", DefaultToSelf = "WorldContextObject",
@@ -238,7 +238,7 @@ public:
 	/**
 	 * @brief Shows the Rattle-Feed takeover and waits for it to close.
 	 * @param WorldContextObject The mission (or any object in the game world); filled in as self.
-	 * @return The node; On Closed fires later, or in the same frame when the takeovers are turned off.
+	 * @return The node; On Closed fires once the player closed it; field manuals ignore "never show again".
 	 */
 	UFUNCTION(BlueprintCallable, Category = "Mission|Info Takeover",
 		meta = (BlueprintInternalUseOnly = "true", DefaultToSelf = "WorldContextObject",
@@ -264,7 +264,7 @@ public:
 	/**
 	 * @brief Shows the Wespe Barrage takeover and waits for it to close.
 	 * @param WorldContextObject The mission (or any object in the game world); filled in as self.
-	 * @return The node; On Closed fires later, or in the same frame when the takeovers are turned off.
+	 * @return The node; On Closed fires once the player closed it; field manuals ignore "never show again".
 	 */
 	UFUNCTION(BlueprintCallable, Category = "Mission|Info Takeover",
 		meta = (BlueprintInternalUseOnly = "true", DefaultToSelf = "WorldContextObject",
@@ -290,7 +290,7 @@ public:
 	/**
 	 * @brief Shows the Dig In takeover and waits for it to close.
 	 * @param WorldContextObject The mission (or any object in the game world); filled in as self.
-	 * @return The node; On Closed fires later, or in the same frame when the takeovers are turned off.
+	 * @return The node; On Closed fires once the player closed it; field manuals ignore "never show again".
 	 */
 	UFUNCTION(BlueprintCallable, Category = "Mission|Info Takeover",
 		meta = (BlueprintInternalUseOnly = "true", DefaultToSelf = "WorldContextObject",
@@ -300,6 +300,31 @@ public:
 protected:
 	virtual int32 QueueTakeover(UInfoTakeoverSubsystem& InfoTakeoverSubsystem) const override;
 	virtual FString GetNodeName() const override { return TEXT("Show Dig In Takeover"); }
+};
+
+/**
+ * @brief Mission node that pauses the game with the Wall Breach field manual (a Tiger driving through a Soviet concrete
+ * wall, and which tanks can do it) and continues from On Closed once the player pressed UNDERSTOOD.
+ */
+UCLASS()
+class RTS_SURVIVAL_API UAsyncShowWallBreachTakeover : public UAsyncShowInfoTakeoverBase
+{
+	GENERATED_BODY()
+
+public:
+	/**
+	 * @brief Shows the Wall Breach takeover and waits for it to close.
+	 * @param WorldContextObject The mission (or any object in the game world); filled in as self.
+	 * @return The node; On Closed fires once the player closed it; field manuals ignore "never show again".
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Mission|Info Takeover",
+		meta = (BlueprintInternalUseOnly = "true", DefaultToSelf = "WorldContextObject",
+			HidePin = "WorldContextObject", DisplayName = "Show Wall Breach Takeover"))
+	static UAsyncShowWallBreachTakeover* ShowWallBreachTakeover(UObject* WorldContextObject);
+
+protected:
+	virtual int32 QueueTakeover(UInfoTakeoverSubsystem& InfoTakeoverSubsystem) const override;
+	virtual FString GetNodeName() const override { return TEXT("Show Wall Breach Takeover"); }
 };
 
 /**
@@ -316,7 +341,7 @@ public:
 	/**
 	 * @brief Shows the Adrenaline Shot takeover and waits for it to close.
 	 * @param WorldContextObject The mission (or any object in the game world); filled in as self.
-	 * @return The node; On Closed fires later, or in the same frame when the takeovers are turned off.
+	 * @return The node; On Closed fires once the player closed it; field manuals ignore "never show again".
 	 */
 	UFUNCTION(BlueprintCallable, Category = "Mission|Info Takeover",
 		meta = (BlueprintInternalUseOnly = "true", DefaultToSelf = "WorldContextObject",

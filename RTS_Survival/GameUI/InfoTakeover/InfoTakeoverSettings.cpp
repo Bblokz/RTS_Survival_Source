@@ -12,6 +12,7 @@
 #include "W_RattleFeedTakeover.h"
 #include "W_WespeBarrageTakeover.h"
 #include "W_DigInTakeover.h"
+#include "W_WallBreachTakeover.h"
 #include "W_AdrenalineShotTakeover.h"
 #include "W_VulturesAtTakeover.h"
 
@@ -43,6 +44,9 @@ UInfoTakeoverSettings::UInfoTakeoverSettings()
 		"/Game/RTS_Survival/Blueprints/GameUI/InfoTakeover/WespeBarrage/WBP_WespeBarrageTakeover.WBP_WespeBarrageTakeover_C")));
 	DigInTakeoverWidgetClass = TSoftClassPtr<UW_DigInTakeover>(FSoftObjectPath(TEXT(
 		"/Game/RTS_Survival/Blueprints/GameUI/InfoTakeover/DigIn/WBP_DigInTakeover.WBP_DigInTakeover_C")));
+	WallBreachTakeoverWidgetClass = TSoftClassPtr<UW_WallBreachTakeover>(FSoftObjectPath(TEXT(
+		"/Game/RTS_Survival/Blueprints/GameUI/InfoTakeover/WallBreach/WBP_WallBreachTakeover."
+		"WBP_WallBreachTakeover_C")));
 	AdrenalineShotTakeoverWidgetClass = TSoftClassPtr<UW_AdrenalineShotTakeover>(FSoftObjectPath(TEXT(
 		"/Game/RTS_Survival/Blueprints/GameUI/InfoTakeover/AdrenalineShot/WBP_AdrenalineShotTakeover.WBP_AdrenalineShotTakeover_C")));
 }
