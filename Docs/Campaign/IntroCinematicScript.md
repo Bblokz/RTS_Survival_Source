@@ -862,3 +862,8 @@ domes over the helmets are rounded (`bump_power` 2; the default 4 is a flat-topp
 knobbly bulges start softly. Re-check: (a) (c) (d) (e) pass, (f) "scary, detailed, real" passes for the main body
 (veined, folded relief); (b) still flags a pale near-vertical strip where mat B follows the fire step's riser down to
 the floor (3936-4008) and stage-step knobs on the crest that change between two growth steps (3989/3990).
+
+**2.2 blueprint seated on the board.** The drafting board tilts front-to-back (pitch -18); the blueprint plane had
+pitch -18 with yaw 90, which tilted it sideways, so half of the sheet sank into the board and the board cut a diagonal
+across the drawing. It now takes the board's slope as a roll (rotation (0, 90, -18)) and sits 3.5 mm above the board's
+top face; traced at its centre and four corners, every point is 0.35 cm above `Draft_Board`.

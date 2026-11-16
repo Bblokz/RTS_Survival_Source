@@ -128,7 +128,10 @@ def build_draft():
     s.box("Draft_Desk", (200, 0, 40), (130, 230, 80), M + "MI_Intro_DarkWood")
     # Tilted drafting board with the cutaway drawing.
     s.box("Draft_Board", (215, 0, 96), (112, 170, 4), M + "MI_Intro_DarkWood", rotation=(-18, 0, 0))
-    s.mesh("Draft_Blueprint", PLANE, (214, 0, 99.5), rotation=(-18, 90, 0), scale=(1.56, 1.04, 1.0),
+    # Lies on the board: the board tilts front-to-back (pitch -18), so with its long side along Y the sheet takes that
+    # slope as a roll (pitch -18 with yaw 90 tilted it sideways and half of it sank into the board); centred 3.5 mm
+    # above the board's top face (board centre + up * (2 cm half thickness + 0.35 cm)).
+    s.mesh("Draft_Blueprint", PLANE, (215.73, 0, 98.23), rotation=(0, 90, -18), scale=(1.56, 1.04, 1.0),
            materials=M + "MI_Intro_Blueprint", shadow=False)
     s.mesh("Draft_Typewriter", "/Game/UVB80/Assets/UVB80/Items/SM_Typewriter", (180, 150, 80.5), rotation=(0, 200, 0))
     s.mesh("Draft_Lamp", "/Game/UVB80/Assets/UVB80/Items/SM_TableLamp", (240, -140, 80.5), rotation=(0, 30, 0))
