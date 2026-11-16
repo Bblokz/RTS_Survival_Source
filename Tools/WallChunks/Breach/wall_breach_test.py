@@ -33,7 +33,14 @@ LANES = {
     'D_corner_medium': (9000, 'Rus_Wall_Concrete_Corner', 570, 'PzIV_G', 'breach'),
     # A Soviet tank never breaks (or plans through) a Soviet wall.
     'G_soviet_own_wall': (-6000, 'Rus_Wall_Concrete_Long', 1130, 'PzIV_G', 'own_side'),
+    # Two long walls end to end, the tank 3.5 m from the joint: the neighbour holds that end up (no free-end fall).
+    'H_chain_medium': (15000, 'Rus_Wall_Concrete_Long', 350, 'PzIV_G', 'breach'),
 }
+CHAIN_NEIGHBOUR_X = 15000 + 350 + 2260
+# A second Pz IV 5.6 m beside the J lane tank on the same wall: the pier left between the two gaps is too narrow to
+# stand and must fall (a sight line through its middle passes afterwards).
+LANES['J_pier_medium'] = (21000, 'Rus_Wall_Concrete_Long', 1130, 'PzIV_G', 'breach')
+PIER_TANK_DX = 560
 WALL_OWNER = 2
 # Lanes off the main row (y of the wall); the Soviet lane is far from the player's tanks, which would shoot it.
 LANE_Y = {'G_soviet_own_wall': -14000.0}
@@ -138,6 +145,16 @@ def place_all():
                                              unreal.Rotator(0, 0, -90))
         owner = TANK_OWNER.get(key, 1)
         log(f'{key}: placed {bp} (owner {WALL_OWNER}) and {vehicle} (owner {owner}) set {set_owner(tank, owner)}')
+        if key == 'J_pier_medium':
+            second = actors.spawn_actor_from_class(unreal.load_class(None, VEHICLES[vehicle]),
+                                                   unreal.Vector(x + PIER_TANK_DX, y0 + START_Y,
+                                                                 ground_z(world, x + PIER_TANK_DX, y0 + START_Y) + 50),
+                                                   unreal.Rotator(0, 0, -90))
+            set_owner(second, 1)
+        if key == 'H_chain_medium':
+            neighbour = actors.spawn_actor_from_class(cls, unreal.Vector(CHAIN_NEIGHBOUR_X, y0, ground_z(world, x, y0 + 1500)),
+                                                      unreal.Rotator(0, 0, 0))
+            set_owner(neighbour, WALL_OWNER)
     for key, (x, bp, offset) in FIRE.items():
         cls = unreal.load_class(None, f'{WALLS}{bp}.{bp}_C')
         wall = actors.spawn_actor_from_class(cls, unreal.Vector(x + offset, FIRE_Y, ground_z(world, x, FIRE_Y + 1500)),
@@ -193,6 +210,14 @@ def find_runtime(world):
         for key, (x, _, _, _, _) in LANES.items():
             if abs(loc.x - x) < 300 and abs(loc.y - lane_y(key) - START_Y) < 500:
                 S['tanks'][key] = tank
+    for actor in unreal.GameplayStatics.get_all_actors_of_class(world, unreal.Actor):
+        loc = actor.get_actor_location()
+        if actor.get_class().get_name() == 'Rus_Wall_Concrete_Long_C' and abs(loc.x - CHAIN_NEIGHBOUR_X) < 50                 and abs(loc.y) < 50:
+            S['chain_neighbour'] = actor
+    for tank in unreal.GameplayStatics.get_all_actors_of_class(world, unreal.TankMaster):
+        loc = tank.get_actor_location()
+        if abs(loc.x - LANES['J_pier_medium'][0] - PIER_TANK_DX) < 150 and abs(loc.y - START_Y) < 500:
+            S['pier_tank'] = tank
     captures = unreal.GameplayStatics.get_all_actors_of_class(world, unreal.SceneCapture2D)
     S['capture'] = captures[0] if captures else None
     if S['capture'] is not None:
@@ -445,6 +470,17 @@ def fire_hits():
                                                            z + 120 + ((i + 2) % 4) * 80),
                                             unreal.Vector(-1, 0, 0), 50 + (i % 3) * 25)
     out['F_corner_fire'] = dict(state=wall_state('F_corner_fire'), removed_m2=round(removed, 2))
+    # A small shell on the BACK face of a sandbag wall (115 cm thick, no through-hole): it must cut and count.
+    for actor in unreal.GameplayStatics.get_all_actors_of_class(game_world(), unreal.Actor):
+        if actor.get_class().get_name() == 'Rus_Wall_Concrete_LongSandBagsNoFlag_C'                 and abs(actor.get_actor_location().y - ALL_WALLS_Y) < 50:
+            holes = holes_of(actor)
+            centre, box, _ = unreal.SystemLibrary.get_component_bounds(wall_mesh(actor))
+            before = holes.get_hole_count()
+            removed = holes.debug_fire_test_hit(unreal.Vector(centre.x + 300, centre.y - box.y - 20, centre.z),
+                                               unreal.Vector(0, 1, 0), 37)
+            out['back_face'] = dict(removed_m2=round(removed, 3), holes_before=before, holes=holes.get_hole_count(),
+                                    share=round(holes.get_removed_face_share(), 4),
+                                    ok=bool(removed > 0 and holes.get_hole_count() > before))
     return out
 
 
@@ -577,6 +613,11 @@ def step():
                 except Exception as error:  # noqa: BLE001
                     result = f'failed {error!r}'[:140]
                 log(f'{key}: MoveToLocation {target} -> {result}')
+            pier = S.get('pier_tank')
+            if alive(pier):
+                x = LANES['J_pier_medium'][0] + PIER_TANK_DX
+                log(f'pier tank MoveToLocation -> '
+                    f'{pier.move_to_location(unreal.Vector(x, -START_Y, S["ground"]["J_pier_medium"] + 20), True, unreal.Rotator(0, 0, -90), False)}')
             for key, units in S.get('real', {}).items():
                 target = units.get('target') or units.get('wall')
                 shooter = units.get('shooter')
@@ -628,7 +669,9 @@ def step():
                               and before['PlayerMedium'].get('through') and not before['SovietMedium'].get('through')
                               and not before['Character'].get('through')
                               and after.get('Character', {}).get('through')
-                              and after.get('PlayerLight', {}).get('through'))
+                              and after.get('PlayerLight', {}).get('through')
+                              # The gap a medium tank broke fits another medium (the Soviet one, which cannot breach).
+                              and (vehicle != 'PzIV_G' or after.get('SovietMedium', {}).get('through')))
                 elif expected == 'own_side':
                     ok = bool(state and state['breaches'] == 0 and state['health'] == track.get('health0')
                               and not before['SovietMedium'].get('through'))
@@ -656,6 +699,22 @@ def step():
                     hc = target.get_component_by_class(unreal.HealthComponent)
                     real[key]['target_health'] = hc.get_editor_property('CurrentHealth') if hc else None
             S['result']['real_fire'] = real
+            neighbour = S.get('chain_neighbour')
+            nh = holes_of(neighbour)
+            S['result']['chain'] = dict(neighbour_breaches=nh.get_breach_count() if nh else None,
+                                        neighbour_removed=round(nh.get_removed_face_share(), 3) if nh else None,
+                                        near_removed=(wall_state('H_chain_medium') or {}).get('removed'))
+            log(f'chain {json.dumps(S["result"]["chain"])}')
+            pier_x = LANES['J_pier_medium'][0] + PIER_TANK_DX * 0.5
+            pier_z = S['ground']['J_pier_medium'] + 200
+            hit = unreal.SystemLibrary.line_trace_single(game_world(), unreal.Vector(pier_x, 400, pier_z),
+                                                         unreal.Vector(pier_x, -400, pier_z),
+                                                         unreal.TraceTypeQuery.TRACE_TYPE_QUERY1, False, [],
+                                                         unreal.DrawDebugTrace.NONE, True)
+            pier_blocked = bool(hit is not None and hit.to_tuple()[0])
+            S['result']['pier'] = dict(blocked=pier_blocked, ok=not pier_blocked,
+                                       wall=wall_state('J_pier_medium'))
+            log(f'pier {json.dumps(S["result"]["pier"])}')
             log(f'real fire result {json.dumps(real, default=str)}')
             try:
                 S['result']['friendly_fire'] = friendly_fire_checks()
@@ -678,12 +737,12 @@ def step():
             lanes_ok = all(r['passed'] for r in S['result']['lanes'].values())
             fire = S['result']['fire']
             # Clustered hits partly land in earlier holes and widen them (by design); separate holes must survive.
-            fire_ok = fire['E_long_fire']['state']['holes'] >= 15 and fire['F_corner_fire']['state']['holes'] >= 20
+            fire_ok = fire['E_long_fire']['state']['holes'] >= 15 and fire['F_corner_fire']['state']['holes'] >= 20                 and bool(fire.get('back_face', {}).get('ok'))
             ff = S['result'].get('friendly_fire', {})
             ff_ok = bool(ff.get('own_side', {}).get('ok')) and bool(ff.get('through_breach', {}).get('ok'))                 and bool(ff.get('sight_gap', {}).get('ok'))
             walls_ok = all(v['ok'] for v in S['result']['all_walls'].values()) and len(S['result']['all_walls']) == 9
             log(f'friendly_fire_ok {ff_ok} all_walls_ok {walls_ok}')
-            S['result']['all_passed'] = lanes_ok and fire_ok and S['result']['kill']['gone'] and ff_ok and walls_ok
+            S['result']['all_passed'] = lanes_ok and fire_ok and S['result']['kill']['gone'] and ff_ok and walls_ok                 and bool(S['result'].get('pier', {}).get('ok'))
             log(f'kill {json.dumps(S["result"]["kill"])} lanes_ok {lanes_ok} fire_ok {fire_ok}')
             log(f'ALL PASSED {S["result"]["all_passed"]}')
             finish()

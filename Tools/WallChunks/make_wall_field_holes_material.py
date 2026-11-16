@@ -81,7 +81,8 @@ float FineB = frac(sin(dot(FineCell + float2(1.0, 0.0), float2(127.1, 311.7))) *
 float FineC = frac(sin(dot(FineCell + float2(0.0, 1.0), float2(127.1, 311.7))) * 43758.5453);
 float FineD = frac(sin(dot(FineCell + float2(1.0, 1.0), float2(127.1, 311.7))) * 43758.5453);
 float FineNoise = lerp(lerp(FineA, FineB, FineT.x), lerp(FineC, FineD, FineT.x), FineT.y);
-// Field values: f = 1 - distance / radius for holes, f > 0 is gone. Noise warps the edges.
+// Field values: holes f = (radius - distance) / 40 cm (the C++ HoleEdgeScale), breaches (distance inside) / edge band;
+// f > 0 is gone. The noise warps the edges by a fixed amount of cm on every hole.
 float HoleF = ((Side >= 0.0 ? F.r : F.g) * 2.0 - 1.0) - (Noise - 0.5) * 0.4 - (FineNoise - 0.5) * 0.35;
 float BreachF = (F.b * 2.0 - 1.0) - (NoiseCoarse - 0.5) * 0.7 - (Noise - 0.5) * 0.25 - (FineNoise - 0.5) * 0.15;
 float HoleCut = step(0.0, HoleF);
