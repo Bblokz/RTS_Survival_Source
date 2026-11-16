@@ -9,6 +9,12 @@
 
 #include "WallGateNavigation.generated.h"
 
+namespace RTSWallSides
+{
+	// The human player; every other owning player is the AI side (UGameUnitManager splits units the same way).
+	inline constexpr uint8 HumanPlayerIndex = 1;
+}
+
 /**
  * @brief Doorway area of a closed wall gate that only player 1's units may plan through (gate AllowedPlayer == 1).
  * Only URTSWallGateNavQueryFilter tells the sides apart; any other filter treats it as plain ground.
@@ -33,6 +39,46 @@ class RTS_SURVIVAL_API UNavArea_WallGateEnemySide : public UNavArea
 
 public:
 	UNavArea_WallGateEnemySide(const FObjectInitializer& ObjectInitializer);
+};
+
+/**
+ * @brief A breachable wall of player 1 (UWallTankBreachComponent). Only the human player's tanks break walls, so no
+ * unit plans through it; it exists so player-owned breachable walls block like the AI's do for the AI.
+ */
+UCLASS(Config=Engine)
+class RTS_SURVIVAL_API UNavArea_BreachableWallPlayerOwned : public UNavArea
+{
+	GENERATED_BODY()
+
+public:
+	UNavArea_BreachableWallPlayerOwned(const FObjectInitializer& ObjectInitializer);
+};
+
+/**
+ * @brief A wall of the AI side (the Soviet walls): only player 1's medium and heavy tanks may plan through it; the
+ * wall's own side never drives through (or breaks) its own wall. Its default cost is an obstacle's, so pathfinding
+ * without the RTS filters (convoy routes, planners) goes round; the filter lowers it for the tanks that may breach.
+ */
+UCLASS(Config=Engine)
+class RTS_SURVIVAL_API UNavArea_BreachableWallEnemyOwned : public UNavArea
+{
+	GENERATED_BODY()
+
+public:
+	UNavArea_BreachableWallEnemyOwned(const FObjectInitializer& ObjectInitializer);
+};
+
+/**
+ * @brief A wall only heavy tanks break (the Berlin ruin walls, unowned): only the human player's heavy tanks plan
+ * through it; mediums, light vehicles and infantry go round. An obstacle's cost for unfiltered queries.
+ */
+UCLASS(Config=Engine)
+class RTS_SURVIVAL_API UNavArea_BreachableWallHeavyOnly : public UNavArea
+{
+	GENERATED_BODY()
+
+public:
+	UNavArea_BreachableWallHeavyOnly(const FObjectInitializer& ObjectInitializer);
 };
 
 /**
@@ -62,6 +108,22 @@ private:
 	 * @return False when no unit with an RTS component stands behind the querier.
 	 */
 	static bool TryGetQuerierOwningPlayer(const UObject* Querier, uint8& OutOwningPlayer);
+
+	/**
+	 * @brief Breachable walls: only the other side's medium and heavy tanks plan through them.
+	 * @param NavData Navigation data the filter is built for.
+	 * @param Querier Object that asked for the path.
+	 * @param bHasKnownSide False when no unit stands behind the querier (every breachable wall is closed then).
+	 * @param bIsHumanPlayer The querier's unit belongs to player 1.
+	 * @param Filter Filter to exclude the closed areas in.
+	 */
+	static void ExcludeBreachableWalls(const ANavigationData& NavData, const UObject* Querier, bool bHasKnownSide,
+	                                   bool bIsHumanPlayer, FNavigationQueryFilter& Filter);
+	static bool GetIsQuerierMediumOrHeavyTank(const UObject* Querier);
+	static bool GetIsQuerierHeavyTank(const UObject* Querier);
+	// Lets the querier through a breachable area: plain ground plus the entering cost (the area's own cost blocks).
+	static void OpenBreachableArea(const ANavigationData& NavData, const UClass* AreaClass, FNavigationQueryFilter& Filter,
+	                               float EnteringCost);
 
 	static void ExcludeArea(const ANavigationData& NavData, const UClass* AreaClass, FNavigationQueryFilter& Filter);
 };

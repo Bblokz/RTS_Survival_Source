@@ -5,11 +5,14 @@
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
 #include "WallDamageShared.h"
+#include "WallHoleField.h"
 
 #include "WallHoleDamageComponent.generated.h"
 
 class UHealthComponent;
 class UMaterialInterface;
+class UMaterialInstanceDynamic;
+class UTexture2D;
 class UNiagaraSystem;
 class UStaticMesh;
 class UStaticMeshComponent;
@@ -37,6 +40,41 @@ enum class EWallHoleGridAxis : uint8
 	AlongY,
 	// Towers and other shapes that are not one flat wall: holes only; full slots merge the two nearest holes.
 	NoGrid
+};
+
+// Where the hole mask lives. Custom primitive data holds 6 holes (shared masters of towers, pits, trees, gates); the
+// field texture holds any number of holes and tank breaches (the `_WallHolesField` masters, Rus concrete walls).
+UENUM(BlueprintType)
+enum class EWallHoleMaskStorage : uint8
+{
+	CustomPrimitiveData,
+	FieldTexture
+};
+
+// Field-texture mode: the wall face unrolled along a centre line into a small CPU-written mask (WallHoleField.h).
+USTRUCT(BlueprintType)
+struct FWallHoleFieldSettings
+{
+	GENERATED_BODY()
+
+	// Mesh-space XY centre line of the wall, 2 or 3 points (L corners). Empty: the long axis of the mesh bounds.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category="WallHoles")
+	TArray<FVector2D> WallPathPoints;
+
+	// Wall thickness in cm; 0 takes the short side of the mesh bounds (straight walls only).
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category="WallHoles", meta=(ClampMin="0.0"))
+	float WallThickness = 0.f;
+
+	// Mask resolution in cm; the noise in the material adds the detail between texels.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category="WallHoles", meta=(ClampMin="2.0"))
+	float TexelSize = 6.f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category="WallHoles", meta=(ClampMin="16", ClampMax="1024"))
+	int32 MaxTexels = 512;
+
+	// Separate holes kept; past this a new hit widens the nearest hole instead.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category="WallHoles", meta=(ClampMin="6"))
+	int32 MaxHoles = 160;
 };
 
 USTRUCT(BlueprintType)
@@ -112,6 +150,16 @@ struct FWallHole
 
 	UPROPERTY()
 	float Radius = 0.f;
+
+	// Field mode: the hole on the unrolled wall (along the path, height) and the face it was struck on.
+	UPROPERTY()
+	float U = 0.f;
+
+	UPROPERTY()
+	float Z = 0.f;
+
+	UPROPERTY()
+	bool bIsFrontSide = true;
 };
 
 /**
@@ -167,6 +215,54 @@ public:
 	int32 GetHoleCount() const { return M_Holes.Num(); }
 
 	UFUNCTION(BlueprintPure, Category="WallHoles")
+	int32 GetBreachCount() const { return M_Breaches.Num(); }
+
+	// Removed share of the wall face (holes, cells, breaches), 0..1.
+	UFUNCTION(BlueprintPure, Category="WallHoles")
+	float GetRemovedFaceShare() const;
+
+	// Highest health seen on the owner (environment walls) or its known max (building expansions).
+	float GetKnownMaxOwnerHealth() const { return M_MaxOwnerHealth; }
+
+	bool GetIsFieldMode() const { return MaskStorage == EWallHoleMaskStorage::FieldTexture; }
+	bool GetHasCollapsed() const { return bM_HasCollapsed; }
+
+	// The unrolled wall of field mode; uninitialised in custom primitive data mode or before BeginPlay.
+	const FWallHoleField& GetField() const { return M_Field; }
+
+	/**
+	 * @brief Cuts or widens a tank breach (field mode only); throws the newly broken part along the tank's travel.
+	 * A new breach that removes nothing (a tank through an existing gap) is not kept.
+	 * @param InOutBreachIndex INDEX_NONE starts a new breach and receives its index; later calls widen that breach.
+	 * @param Breach The breach as it stands now (interval the hull covered, hull height, how far the top has fallen).
+	 * @param WorldTravelDirection The tank's travel; debris falls that way and a later collapse throws that way.
+	 * @param DebrisSpeedScale Toppling slabs fly slower than shell debris.
+	 * @param NoDebrisZone Unrolled (U, Z) box where no debris starts (inside the hull); an invalid box keeps all.
+	 * @return Face area this call removed, cm².
+	 */
+	float ApplyBreach(int32& InOutBreachIndex, const FWallHoleFieldBreach& Breach, const FVector& WorldTravelDirection,
+	                  float DebrisSpeedScale, const FBox2D& NoDebrisZone);
+
+	/** @return True when a tank breach has removed the wall at this world point (field mode). */
+	bool GetIsWorldPointInBreach(const FVector& WorldPoint) const;
+
+	// Pieces the wall breaks into (its debris meshes), for rubble that stays.
+	const TArray<TObjectPtr<UStaticMesh>>& GetDebrisMeshes() const { return DebrisMeshes; }
+
+#if WITH_EDITOR
+	// Authoring (RTS.WallBreach.ConfigureRusWall): switch a wall template to field mode.
+	void Editor_SetFieldMode(const TArray<UMaterialInterface*>& InDamagedMaterials, const TArray<FVector2D>& PathPoints,
+	                         float Thickness);
+	void Editor_SetDamagedMaterials(const TArray<UMaterialInterface*>& InDamagedMaterials);
+#endif
+
+	/** @return The breach at this index; null when out of range. */
+	const FWallHoleFieldBreach* GetBreach(const int32 BreachIndex) const
+	{
+		return M_Breaches.IsValidIndex(BreachIndex) ? &M_Breaches[BreachIndex] : nullptr;
+	}
+
+	UFUNCTION(BlueprintPure, Category="WallHoles")
 	int32 GetHiddenCellCount() const;
 
 	// The mesh this component cuts holes into; null before BeginPlay. Owners with several hole components route hits by it.
@@ -202,6 +298,14 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category="WallHoles")
 	FWallHoleGridSettings GridSettings;
+
+	// FieldTexture needs DamagedMaterials on a `_WallHolesField` master; the grid is not used then.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category="WallHoles")
+	EWallHoleMaskStorage MaskStorage = EWallHoleMaskStorage::CustomPrimitiveData;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category="WallHoles",
+		meta=(EditCondition="MaskStorage == EWallHoleMaskStorage::FieldTexture"))
+	FWallHoleFieldSettings FieldSettings;
 
 	// bCollapseIntoChunksOnDeath: destructible walls hide and die; building expansions throw the debris and keep
 	// their own death.
@@ -274,7 +378,11 @@ private:
 	                          const FWallHolePieceAnchor& Anchor) const;
 	void AddPiece(const FVector& MeshPoint, float PieceArea, TArray<FWallDebrisPiece>& OutPieces) const;
 
-	bool GetHasGrid() const { return GridSettings.GridAxis != EWallHoleGridAxis::NoGrid; }
+	// Field mode has no knock-out cells.
+	bool GetHasGrid() const
+	{
+		return not GetIsFieldMode() && GridSettings.GridAxis != EWallHoleGridAxis::NoGrid;
+	}
 	// Position along the wall (mesh X or Y) and height (mesh Z): the grid's plane.
 	FVector2D GetGridPoint(const FVector& MeshPoint) const;
 	FVector GetMeshPointFromGrid(const FVector2D& GridPoint) const;
@@ -282,12 +390,46 @@ private:
 	void GetCellRect(int32 CellIndex, FVector2D& OutMin, FVector2D& OutMax) const;
 	bool GetIsCellHidden(int32 CellIndex) const;
 	bool GetIsMeshPointRemoved(const FVector& MeshPoint) const;
-	float GetRemovedAreaEstimate() const;
+	// Field mode counts the breaches only when asked: the shell hole budget ignores what tanks broke.
+	float GetRemovedAreaEstimate(bool bIncludeBreaches = true) const;
 	float GetFaceArea() const;
 	float GetAllowedRemovedArea(float HealthFractionAfter) const;
 
 	float ApplyHit(const FVector& WorldHit, const FVector& ShotDirection, float HoleRadius, float AllowedArea);
-	void WriteMask() const;
+	void WriteMask();
+
+	// ---- Field mode (WallHoleField.h) ----
+	void InitField();
+	/**
+	 * @brief Field-mode hit: a new hole on the struck face (through to the other face when wider than the wall is
+	 * thick); a hit deep inside an opening flies through it, one near the rim bites a new circle out of the edge.
+	 * @param MeshSurfacePoint Struck point in mesh space.
+	 * @param ShotDirection World shot direction, zero for splash.
+	 * @param Radius Hole radius after the health cap.
+	 * @param OutPieces Receives the debris of the broken part.
+	 * @param OutExitNormal World face normal the debris leaves by; zero when unknown.
+	 * @return Face area removed, cm².
+	 */
+	float CutFieldHole(const FVector& MeshSurfacePoint, const FVector& ShotDirection, float Radius,
+	                   TArray<FWallDebrisPiece>& OutPieces, FVector& OutExitNormal);
+	/** @return Index of the hole a hit at (U, Z) on this face lands in; INDEX_NONE when it lands on intact wall. */
+	int32 FindFieldHoleAt(float U, float Z, bool bIsFrontSide) const;
+	/** @return Index of the hole whose rim lies nearest to (U, Z) on this face; INDEX_NONE when there are none. */
+	int32 FindNearestFieldHole(float U, float Z, bool bIsFrontSide) const;
+	// Grows a hole to NewRadius (clamped to the max hole radius) and throws the broken ring.
+	void GrowFieldHole(int32 HoleIndex, float NewRadius, TArray<FWallDebrisPiece>& OutPieces);
+	FWallHoleFieldHole MakeFieldHole(const FWallHole& Hole) const;
+	void AddFieldRingPieces(float U, float Z, bool bIsFrontSide, float InnerRadius, float OuterRadius,
+	                        TArray<FWallDebrisPiece>& OutPieces) const;
+	void RebuildField();
+	/** @return Jittered points of wall still standing around a breach (debris starts), none inside the hull zone. */
+	TArray<FVector2D> GetStandingBreachCandidates(const FWallHoleFieldBreach& Breach, float PieceSpacing,
+	                                              const FBox2D& NoDebrisZone) const;
+	void AddFieldCollapsePieces(int32 PieceBudget, float PieceArea, TArray<FWallDebrisPiece>& OutPieces) const;
+	/** @return World front-face normal at U, flipped to point along WorldDirection; zero when the direction is unknown. */
+	FVector GetFieldExitNormal(float U, const FVector& WorldDirection) const;
+	void SwapToFieldMaterials();
+	void SetFieldMaterialParameters(UMaterialInstanceDynamic* FieldMaterial) const;
 	void SwapToDamagedMaterials();
 	void RestoreIntactMaterials();
 	void OnDestructibleOwnerDied();
@@ -325,6 +467,18 @@ private:
 	FBox M_MeshBounds = FBox(ForceInit);
 	int32 M_Columns = 1;
 	int32 M_Rows = 1;
+
+	// Field mode: the unrolled-wall mask, its texture and one dynamic material per slot that reads it.
+	FWallHoleField M_Field;
+
+	// Tank breaches cut into the field, oldest first.
+	TArray<FWallHoleFieldBreach> M_Breaches;
+
+	UPROPERTY()
+	TObjectPtr<UTexture2D> M_FieldTexture;
+
+	UPROPERTY()
+	TArray<TObjectPtr<UMaterialInstanceDynamic>> M_FieldMaterials;
 
 	// Rough face area of each debris mesh (cm²), to scale a piece to the area it stands for.
 	TArray<float> M_DebrisMeshAreas;

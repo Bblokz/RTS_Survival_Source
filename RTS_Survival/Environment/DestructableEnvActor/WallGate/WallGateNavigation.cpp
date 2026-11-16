@@ -6,15 +6,62 @@
 #include "NavAreas/NavArea_Null.h"
 #include "GameFramework/Controller.h"
 #include "GameFramework/Pawn.h"
+#include "RTS_Survival/Navigation/RTSNavAgents/IRTSNavAgent/IRTSNavAgent.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "WallGate.h"
 
 namespace WallGateNavigationConstants
 {
-	// The human player; every other owning player is the AI side (UGameUnitManager splits units the same way).
-	constexpr uint8 HumanPlayerIndex = 1;
+	constexpr uint8 HumanPlayerIndex = RTSWallSides::HumanPlayerIndex;
 	const FColor PlayerSideAreaColour = FColor(40, 160, 255);
 	const FColor EnemySideAreaColour = FColor(255, 120, 40);
+	const FColor BreachableWallColour = FColor(150, 90, 60);
+	// A tank breaks a wall only when the way round is more than about this far (cm of path) longer: a gap or gate right
+	// beside it wins, a long way round does not.
+	constexpr float BreachableWallEnteringCost = 300.f;
+	// Berlin ruin walls (heavy tanks only): a heavy tank drives through brick and rubble as through open ground. A ruin is
+	// a wall box plus heap boxes, each entered separately, so any entering cost would add up into a detour.
+	constexpr float HeavyOnlyRuinEnteringCost = 0.f;
+	// Cost per cm through a breachable wall for queries without the RTS filter: an obstacle's (NavArea_Obstacle).
+	constexpr float BreachableWallUnfilteredCost = 1000000.f;
+	constexpr float BreachableWallTankCost = 1.f;
+}
+
+namespace
+{
+	const AActor* GetQuerierActor(const UObject* Querier)
+	{
+		if (const AController* const QuerierController = Cast<AController>(Querier))
+		{
+			return QuerierController->GetPawn();
+		}
+		return Cast<AActor>(Querier);
+	}
+
+}
+
+UNavArea_BreachableWallPlayerOwned::UNavArea_BreachableWallPlayerOwned(const FObjectInitializer& ObjectInitializer)
+	: Super(ObjectInitializer)
+{
+	DrawColor = WallGateNavigationConstants::BreachableWallColour;
+	DefaultCost = WallGateNavigationConstants::BreachableWallUnfilteredCost;
+	FixedAreaEnteringCost = WallGateNavigationConstants::BreachableWallEnteringCost;
+}
+
+UNavArea_BreachableWallHeavyOnly::UNavArea_BreachableWallHeavyOnly(const FObjectInitializer& ObjectInitializer)
+	: Super(ObjectInitializer)
+{
+	DrawColor = WallGateNavigationConstants::BreachableWallColour;
+	DefaultCost = WallGateNavigationConstants::BreachableWallUnfilteredCost;
+	FixedAreaEnteringCost = WallGateNavigationConstants::BreachableWallEnteringCost;
+}
+
+UNavArea_BreachableWallEnemyOwned::UNavArea_BreachableWallEnemyOwned(const FObjectInitializer& ObjectInitializer)
+	: Super(ObjectInitializer)
+{
+	DrawColor = WallGateNavigationConstants::BreachableWallColour;
+	DefaultCost = WallGateNavigationConstants::BreachableWallUnfilteredCost;
+	FixedAreaEnteringCost = WallGateNavigationConstants::BreachableWallEnteringCost;
 }
 
 UNavArea_WallGatePlayerSide::UNavArea_WallGatePlayerSide(const FObjectInitializer& ObjectInitializer)
@@ -41,26 +88,82 @@ void URTSWallGateNavQueryFilter::InitializeFilter(const ANavigationData& NavData
 {
 	Super::InitializeFilter(NavData, Querier, Filter);
 	uint8 OwningPlayer = 0;
-	if (not TryGetQuerierOwningPlayer(Querier, OwningPlayer))
+	const bool bHasKnownSide = TryGetQuerierOwningPlayer(Querier, OwningPlayer);
+	const bool bIsHumanPlayer = OwningPlayer == WallGateNavigationConstants::HumanPlayerIndex;
+	ExcludeBreachableWalls(NavData, Querier, bHasKnownSide, bIsHumanPlayer, Filter);
+	if (not bHasKnownSide)
 	{
 		// Unknown side: no closed gate lets it through.
 		ExcludeArea(NavData, UNavArea_WallGatePlayerSide::StaticClass(), Filter);
 		ExcludeArea(NavData, UNavArea_WallGateEnemySide::StaticClass(), Filter);
 		return;
 	}
-	const bool bIsHumanPlayer = OwningPlayer == WallGateNavigationConstants::HumanPlayerIndex;
 	ExcludeArea(NavData, bIsHumanPlayer
 		                     ? UNavArea_WallGateEnemySide::StaticClass()
 		                     : UNavArea_WallGatePlayerSide::StaticClass(), Filter);
 }
 
+void URTSWallGateNavQueryFilter::ExcludeBreachableWalls(const ANavigationData& NavData, const UObject* Querier,
+                                                        const bool bHasKnownSide, const bool bIsHumanPlayer,
+                                                        FNavigationQueryFilter& Filter)
+{
+	// Only the human player's tanks break walls: mediums and heavies the AI side's walls, heavies alone the ruin walls.
+	ExcludeArea(NavData, UNavArea_BreachableWallPlayerOwned::StaticClass(), Filter);
+	const bool bIsPlayerUnit = bHasKnownSide && bIsHumanPlayer;
+	if (bIsPlayerUnit && GetIsQuerierMediumOrHeavyTank(Querier))
+	{
+		OpenBreachableArea(NavData, UNavArea_BreachableWallEnemyOwned::StaticClass(), Filter,
+		                   WallGateNavigationConstants::BreachableWallEnteringCost);
+	}
+	else
+	{
+		ExcludeArea(NavData, UNavArea_BreachableWallEnemyOwned::StaticClass(), Filter);
+	}
+	if (bIsPlayerUnit && GetIsQuerierHeavyTank(Querier))
+	{
+		OpenBreachableArea(NavData, UNavArea_BreachableWallHeavyOnly::StaticClass(), Filter,
+		                   WallGateNavigationConstants::HeavyOnlyRuinEnteringCost);
+	}
+	else
+	{
+		ExcludeArea(NavData, UNavArea_BreachableWallHeavyOnly::StaticClass(), Filter);
+	}
+}
+
+void URTSWallGateNavQueryFilter::OpenBreachableArea(const ANavigationData& NavData, const UClass* AreaClass,
+                                                    FNavigationQueryFilter& Filter, const float EnteringCost)
+{
+	// The area's own cost is an obstacle's (for unfiltered queries); for the tanks that may break it, the wall is plain
+	// ground plus the entering cost.
+	const int32 AreaId = NavData.GetAreaID(AreaClass);
+	if (AreaId < 0 || AreaId > MAX_uint8)
+	{
+		return;
+	}
+	Filter.SetAreaCost(static_cast<uint8>(AreaId), WallGateNavigationConstants::BreachableWallTankCost);
+	Filter.SetFixedAreaEnteringCost(static_cast<uint8>(AreaId), EnteringCost);
+}
+
+bool URTSWallGateNavQueryFilter::GetIsQuerierHeavyTank(const UObject* Querier)
+{
+	const IRTSNavAgentInterface* const NavAgent = Cast<IRTSNavAgentInterface>(GetQuerierActor(Querier));
+	return NavAgent != nullptr && NavAgent->GetRTSNavAgentType() == ERTSNavAgents::HeavyTank;
+}
+
+bool URTSWallGateNavQueryFilter::GetIsQuerierMediumOrHeavyTank(const UObject* Querier)
+{
+	const IRTSNavAgentInterface* const NavAgent = Cast<IRTSNavAgentInterface>(GetQuerierActor(Querier));
+	if (NavAgent == nullptr)
+	{
+		return false;
+	}
+	const ERTSNavAgents AgentType = NavAgent->GetRTSNavAgentType();
+	return AgentType == ERTSNavAgents::MediumTank || AgentType == ERTSNavAgents::HeavyTank;
+}
+
 bool URTSWallGateNavQueryFilter::TryGetQuerierOwningPlayer(const UObject* Querier, uint8& OutOwningPlayer)
 {
-	const AActor* QuerierActor = Cast<AActor>(Querier);
-	if (const AController* const QuerierController = Cast<AController>(Querier))
-	{
-		QuerierActor = QuerierController->GetPawn();
-	}
+	const AActor* const QuerierActor = GetQuerierActor(Querier);
 	if (not IsValid(QuerierActor))
 	{
 		return false;
