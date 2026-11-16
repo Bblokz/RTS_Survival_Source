@@ -49,6 +49,32 @@ FIntroNoise IntroNoise;
 """
 
 
+# Branching vein network (warped Voronoi edges at three sizes); also used by intro_purple for the trench mould.
+PD_VEINS = """
+struct FPurpleDeath {
+  float h(float2 v) { return frac(sin(dot(v, float2(127.1, 311.7))) * 43758.5453); }
+  float2 h2(float2 v) { return frac(sin(float2(dot(v, float2(127.1, 311.7)), dot(v, float2(269.5, 183.3)))) * 43758.5453); }
+  float n(float2 q) { float2 i = floor(q); float2 f = frac(q); f = f * f * (3.0 - 2.0 * f);
+    return lerp(lerp(h(i), h(i + float2(1, 0)), f.x), lerp(h(i + float2(0, 1)), h(i + float2(1, 1)), f.x), f.y); }
+  float fbm(float2 q) { float s = 0.0; float a = 0.5;
+    for (int k = 0; k < 4; k++) { s += a * n(q); q = q * 2.03 + 1.7; a *= 0.5; } return s; }
+  float edge(float2 q) { float2 i = floor(q); float2 f = frac(q); float d1 = 8.0; float d2 = 8.0;
+    for (int y = -1; y <= 1; y++) { for (int x = -1; x <= 1; x++) {
+      float2 g = float2(x, y); float2 r = g + h2(i + g) - f; float d = dot(r, r);
+      if (d < d1) { d2 = d1; d1 = d; } else if (d < d2) { d2 = d; } } }
+    return sqrt(d2) - sqrt(d1); }
+  float big(float2 q) {
+    float2 w = q + (float2(fbm(q * 0.6), fbm(q * 0.6 + 5.2)) - 0.5) * 1.6;
+    return smoothstep(0.09, 0.0, edge(w)); }
+  float veins(float2 q) {
+    float2 w = q + (float2(fbm(q * 0.6), fbm(q * 0.6 + 5.2)) - 0.5) * 1.6;
+    return saturate(smoothstep(0.11, 0.0, edge(w)) + 0.65 * smoothstep(0.07, 0.0, edge(w * 2.6 + 3.1))
+                    + 0.35 * smoothstep(0.05, 0.0, edge(w * 6.1 + 7.7))); }
+};
+FPurpleDeath PD;
+"""
+
+
 def _new_material(name, domain=None, blend=None, shading=None, two_sided=False):
     path = MAT_DIR + "/" + name
     # Reuse the asset on a rebuild: deleting it would null every reference placed actors hold.
@@ -396,7 +422,7 @@ def build_ring_material():
 
 
 # Seeds in sheet UV (u = east, v = north), set by intro_sets from real places; the stain bleeds from all at once.
-STAIN_CODE = VNOISE + """
+STAIN_CODE = VNOISE + PD_VEINS + """
 float2 UV = float2(P.y / 100.0 + 0.5, P.x / 100.0 + 0.5);
 float2 seeds[9] = { SEEDS };
 float n = vnoise(UV * float2(34.0, 14.0)) * 0.55 + vnoise(UV * float2(120.0, 50.0)) * 0.45;
@@ -410,7 +436,16 @@ float body = smoothstep(0.012, -0.03, field + (n - 0.5) * 0.085);
 float veins = smoothstep(0.10, 0.0, abs(field + (n - 0.5) * 0.16)) * 0.45 * step(0.005, Stain);
 float wet = vnoise(UV * float2(46.0, 19.0));
 float3 col = lerp(float3(0.07, 0.016, 0.26), float3(0.045, 0.01, 0.17), wet);
-float alpha = saturate(body * 0.93 + veins) * Opacity * step(0.002, Stain);
+// Veins: a branching network (warped Voronoi edges) that reaches out ahead of the front like roots, and shows
+// through the body as livid lines. It moves with the front, so it creeps on as the stain grows.
+float2 q = UV * float2(64.0, 25.8);
+float net = PD.veins(q);
+float fine = PD.veins(q * 2.4 + 4.0);
+float ahead = saturate(1.0 - max(field, 0.0) / (0.05 + 0.05 * Stain)) * step(0.0, field + 0.02);
+float tendril = saturate(net * 1.2 + fine * 0.5 * ahead) * ahead * ahead * (1.0 - body) * step(0.005, Stain);
+col = lerp(col, float3(0.16, 0.02, 0.24), net * 0.55 * body);
+col = lerp(col, float3(0.05, 0.008, 0.09), tendril);
+float alpha = saturate(body * 0.93 + veins + tendril * 0.95) * Opacity * step(0.002, Stain);
 return float4(col, alpha);
 """
 

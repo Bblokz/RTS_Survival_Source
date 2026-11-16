@@ -58,6 +58,11 @@ CUBE, SPHERE, CYL = sets.CUBE, sets.SPHERE, sets.CYLINDER
 NUKE = "NS_Nuke_1"
 DUST = "NS_FallingDust_01"
 
+
+def PD_MAT(mesh):
+    """The Purple Death material instance of a trench mould mesh (intro_purple.build_instances)."""
+    return sets.M + "MI_Intro_PD_" + mesh.replace("SM_Intro_Mould_", "")
+
 NOTICE = ("ARCHIVAL NOTICE\\n\\nThirty years of static, ash and, well, the nukes,\\nleft huge blackouts in our history."
           "\\n\\nWhat follows is compiled from the limited data available.")
 
@@ -102,6 +107,45 @@ def column(start, end, count, spacing, yaw, lateral=0.0):
         specs.append({"kind": "class", "asset": T34, "label": "T34_%d" % index, "snap": 5.0,
                       "keys": [(k / float(steps), (a[0] + (e[0] - a[0]) * k / steps, a[1] + (e[1] - a[1]) * k / steps, 0.0), (0, yaw, 0))
                                for k in range(steps + 1)]})
+    return specs
+
+
+# Ger_2ndOreMountains valley road (spline ORE_Road_Valley), sampled every 4 m: (distance along spline, x, y).
+ORE_ROAD = [(44800, 290, -7036), (45200, 369, -7428), (45600, 442, -7822), (46000, 513, -8215), (46400, 585, -8609),
+            (46800, 662, -9001), (47200, 748, -9392), (47600, 842, -9781), (48000, 940, -10168), (48400, 1040, -10556),
+            (48800, 1140, -10943), (49200, 1237, -11331), (49600, 1328, -11721), (50000, 1411, -12112),
+            (50400, 1486, -12505), (50800, 1557, -12898), (51200, 1630, -13292), (51600, 1709, -13684),
+            (52000, 1800, -14073), (52400, 1908, -14458), (52800, 2039, -14836), (53200, 2184, -15209),
+            (53600, 2332, -15581), (54000, 2472, -15956), (54400, 2595, -16336), (54800, 2686, -16725),
+            (55200, 2736, -17122), (55600, 2749, -17522), (56000, 2738, -17922), (56400, 2719, -18321),
+            (56800, 2703, -18721)]
+
+
+def road_at(distance, lateral=0.0):
+    """Point on the valley road and the heading toward lower distances (the column drives toward the arches);
+    lateral cm to the right of that heading."""
+    import math
+    for a, c in zip(ORE_ROAD[:-1], ORE_ROAD[1:]):
+        if a[0] <= distance <= c[0]:
+            f = (distance - a[0]) / float(c[0] - a[0])
+            x, y = a[1] + (c[1] - a[1]) * f, a[2] + (c[2] - a[2]) * f
+            yaw = math.degrees(math.atan2(a[2] - c[2], a[1] - c[1]))
+            r = math.radians(yaw)
+            return (x - math.sin(r) * lateral, y + math.cos(r) * lateral, 0.0), yaw
+    raise ValueError("distance off the sampled road: %s" % distance)
+
+
+def road_column(tail_start, travel, count, spacing, lateral, drive):
+    """Tanks in line ahead on the valley road, driving away from the camera; keys every eighth of the shot follow
+    the road's curve. Seated on the ground under their tracks (snap) with turning tracks (drive)."""
+    specs = []
+    for index in range(count):
+        start = tail_start - (count - 1 - index) * spacing
+        keys = []
+        for k in range(9):
+            position, yaw = road_at(start - travel * k / 8.0, lateral)
+            keys.append((k / 8.0, position, (0, yaw, 0)))
+        specs.append({"kind": "class", "asset": T34, "label": "T34_%d" % index, "snap": 0.0, "drive": drive, "keys": keys})
     return specs
 
 
@@ -225,12 +269,15 @@ def shots():
         # ---- Section 4: May 1945, the Manhattan strike (map table) -------------------------------------------------
         {"id": "4.1", "levels": ["Intro_Bunker"], "vo": ["4_1"], "pre": 0.5, "post": 0.5, "fov": 50,
          "cam": [(0.0, on_map(52.0, 12.0, back=5, side=52, up=46), (-40, -90, 0)),
-                 (1.0, on_map(44.0, -62.0, back=5, side=52, up=46), (-40, -90, 0))]},
+                 (1.0, on_map(44.0, -62.0, back=5, side=52, up=46), (-40, -90, 0))],
+         # The German fires burn down behind the camera's first frames (their clock runs on from the end of 3.6).
+         "mpc_run_on": ["Rings36"]},
         {"id": "4.2", "levels": ["Intro_Bunker"], "vo": ["4_2"], "pre": 0.5, "post": 1.6, "fov": 55,
          "cam": [(0.0, on_map(*usa, back=62, up=66), (-46, 0, 0)), (1.0, on_map(*usa, back=54, up=58), (-46, 0, 0))],
-         "mpc": {"Rings42": clock(1.0), "Darken": [(0.0, 0.0), (0.12, 0.3), (1.0, 0.3)]},
+         "mpc": {"Rings42": clock(1.0), "Rings36": [(0.0, 60.0)], "Darken": [(0.0, 0.0), (0.12, 0.3), (1.0, 0.3)]},
          "cues": [card("MAY 1945", "MANHATTAN PROJECT SITES, USA", 0.4, 5.6), stamp("CONFIRMED", (0.76, 0.70), -9.0, 0, -0.2, 2.6)]},
         {"id": "4.3", "levels": ["Intro_Bunker"], "vo": ["4_3"], "pre": 0.5, "post": 1.2, "fov": 85,
+         "mpc_run_on": ["Rings42"],     # the US fires keep burning down through the wide shot
          "cam": [(0.0, at("Intro_Bunker", -205, -10, 228), (-44, 0, 0)), (0.3, at("Intro_Bunker", -200, 0, 226), (-44, 0, 0)),
                  (1.0, on_map(50.2, 20.5, back=30, up=32), (-46, 0, 0))]},
         # ---- Section 5: August 1945, the Purple Death --------------------------------------------------------------
@@ -249,34 +296,39 @@ def shots():
              {"kind": "niagara", "asset": DUST, "label": "Dust", "keys": [(0.0, at("Intro_Trench", 0, -100, 330), (0, 0, 0), 1.2)]},
              {"kind": "point", "label": "PurpleHaze", "intensity": 0.35, "color": (0.62, 0.2, 0.95, 1.0), "radius": 1300.0,
               "keys": [(0.0, at("Intro_Trench", 0, -300, 210), (0, 0, 0))]}] + [
-             # The first of it: small, already there when we arrive.
-             {"kind": "mesh", "asset": mesh, "label": "Growth_%d" % index,
-              "keys": [(0.0, at("Intro_Trench", *offset), (0, 0, 0), 0.03), (1.0, at("Intro_Trench", *offset), (0, 0, 0), 0.22 if index != 3 else 0.12)]}
-             for index, (mesh, offset) in enumerate(sets2.TRENCH_MOULD)]},
+             # The first of it: small, already there when we arrive (the material reveals it, MPC Mould).
+             {"kind": "mesh", "asset": mesh, "label": "Growth_%d" % index, "mats": PD_MAT(mesh),
+              "keys": [(0.0, at("Intro_Trench", *offset), (0, 0, 0))]}
+             for index, (mesh, offset) in enumerate(sets2.TRENCH_MOULD)],
+         "mpc": {"Mould": [(0.0, 0.05), (1.0, 0.22)]}},
         {"id": "5.3", "levels": ["Intro_Trench"], "vo": ["5_3"], "pre": 0.6, "post": 1.4, "fov": 55,
          "cam": [(0.0, at("Intro_Trench", -52, 96, 118), {"at": at("Intro_Trench", 100, -150, 62)}),
                  (1.0, at("Intro_Trench", -30, 30, 104), {"at": at("Intro_Trench", 100, -160, 66)})],
          "actors": [
-             {"kind": "mesh", "asset": mesh, "label": "Growth_%d" % index,
-              "keys": [(0.0, at("Intro_Trench", *offset), (0, 0, 0), 0.22 if index != 3 else 0.12),
-                       (0.1 + 0.05 * index, at("Intro_Trench", *offset), (0, 0, 0), 0.3 if index != 3 else 0.2),
-                       (0.92, at("Intro_Trench", *offset), (0, 0, 0), 1.0)]}
+             {"kind": "mesh", "asset": mesh, "label": "Growth_%d" % index, "mats": PD_MAT(mesh),
+              "keys": [(0.0, at("Intro_Trench", *offset), (0, 0, 0))]}
              for index, (mesh, offset) in enumerate(sets2.TRENCH_MOULD)] + [
              {"kind": "point", "label": "PurpleHaze", "intensity": 0.7, "color": (0.62, 0.2, 0.95, 1.0), "radius": 1300.0,
-              "keys": [(0.0, at("Intro_Trench", 0, -300, 210), (0, 0, 0))]}]},
+              "keys": [(0.0, at("Intro_Trench", 0, -300, 210), (0, 0, 0))]}],
+         # Time-lapse: it takes the trench (the growth front crawls outward, the veins pump).
+         "mpc": {"Mould": [(0.0, 0.22), (0.12, 0.3), (0.92, 1.0), (1.0, 1.0)]}},
         {"id": "5.4", "levels": ["Intro_Bunker"], "vo": ["5_4"], "pre": 0.6, "post": 0.2, "fov": 55,
          "cam": [(0.0, on_map(*europe, back=78, up=92), (-50, 0, 0)), (1.0, on_map(*europe, back=70, up=84), (-50, 0, 0))],
-         "mpc": {"Stain": [(0.0, 0.02), (1.0, 0.8)], "StainOpacity": [(0.0, 1.0)], "Pencil": [(0.0, 0.0), (0.45, 0.0), (0.6, 1.0)]}},
+         "mpc": {"Stain": [(0.0, 0.02), (1.0, 0.8)], "StainOpacity": [(0.0, 1.0)], "Pencil": [(0.0, 0.0), (0.45, 0.0), (0.6, 1.0)],
+                 "Rings36": [(0.0, 60.0)], "Rings42": [(0.0, 60.0)], "Rings62": [(0.0, 0.0)]}},
         {"id": "5.5", "levels": ["Ger_PripyatMe410"], "min": 6.5, "fov": 58, "cam_snap": 230.0,
          "cam": [(0.0, (28050, 24800, 0), (-6, 198, 0)), (1.0, (27650, 25400, 0), (-6, 205, 0))],
          "actors": [{"kind": "niagara", "asset": "P_Rain_Converted", "label": "Rain", "snap": 500.0,
                      "keys": [(0.0, (27500, 24650, 0), (0, 0, 0), 2.5), (1.0, (27100, 25250, 0), (0, 0, 0), 2.5)]}],
          "mpc": {"Stain": [(0.0, 0.82), (1.0, 1.6)], "Rain": [(0.0, 1.0)]}},
         # ---- Section 6: 1946-1947, Operation Svarog and the Ural Shield --------------------------------------------
-        {"id": "6.1", "handheld": 0.22, "levels": [ORE], "vo": ["6_1"], "pre": 1.4, "min": 7.6, "fov": 50, "cam_snap": 190.0,
-         "cam": [(0.0, (2500, -15600, 0), (2, 72, 0)), (1.0, (2500, -15350, 0), (2, 66, 0))],
-         "actors": column((3050, -13600), (3250, -10200), 4, 1150, 88) + [
-             {"kind": "niagara", "asset": DUST, "label": "Ash", "snap": 700.0, "keys": [(0.0, (2900, -14600, 0), (0, 0, 0), 4.0)]}],
+        # Behind the column on the valley road, looking down it to the ruined arches; a wreck lies at the roadside.
+        # The tanks follow the road's curve, sit on the ground under their tracks and their tracks turn.
+        {"id": "6.1", "handheld": 0.22, "levels": [ORE], "vo": ["6_1"], "pre": 1.4, "min": 7.6, "fov": 40, "cam_snap": 230.0,
+         # Pitch at most -4 at this lens: something high in the map's sky draws as a dark square above -4 degrees.
+         "cam": [(0.0, (2790, -17560, 0), (-4, 101, 0)), (1.0, (2782, -17300, 0), (-4, 103, 0))],
+         # (No falling-dust Niagara here: in this view it draws as a dark square over the sky.)
+         "actors": road_column(54250, 3600, 4, 1500, 150.0, 1.5),
          "cues": [card("1946 - 1947", "OPERATION SVAROG", 0.5, 5.6)]},
         {"id": "6.2", "levels": [ORE], "vo": ["6_2"], "pre": 0.5, "post": 0.8, "fov": 62, "cam_snap": 620.0,
          "cam": [(0.0, (-11900, 2500, 0), (-4, -138, 0)), (0.3, (-11900, 2500, 0), (-4, -128, 0)), (0.45, (-11900, 2500, 0), (-3, -92, 0)),
@@ -299,7 +351,7 @@ def shots():
                  (0.66, at("Intro_Ural", -8300, -1000, 260), {"at": at("Intro_Ural", -900, 0, 1500)}),
                  (1.0, at("Intro_Ural", -8900, -1300, 1500), {"at": at("Intro_Ural", -900, 0, 1900)})],
          "actors": [
-             {"kind": "class", "asset": T34, "label": "T34_%d" % index,
+             {"kind": "class", "asset": T34, "label": "T34_%d" % index, "drive": 2.0,
               "keys": [(0.0, at("Intro_Ural", -7600 - index * 1200, 0, 0), (0, 0, 0)),
                        (0.62, at("Intro_Ural", 700 - index * 1200, 0, 0), (0, 0, 0)),
                        (1.0, at("Intro_Ural", 4200 - index * 1200, 0, 0), (0, 0, 0))]} for index in range(4)] + [
@@ -406,7 +458,9 @@ def shots():
          "cues": [stamp("UNKNOWN", (0.72, 0.62), -8.0, 0, -1.0, 2.1)]},
         {"id": "9.2", "levels": ["Intro_Bunker"], "vo": ["9_2"], "pre": 2.6, "min": 7.2, "fov": 55,
          "cam": [(0.0, at("Intro_Bunker", -74, 148, 150), (-82, 0, 0)), (1.0, at("Intro_Bunker", -215, 60, 232), (-42, 0, 0))],
-         "mpc": {"Archive": [(0.0, 1.0), (0.06, 1.0), (0.3, 0.0)], "Flash": [(0.0, 0.0), (0.05, 0.0), (0.08, 0.14), (0.16, 0.0)]},
+         "mpc": {"Archive": [(0.0, 1.0), (0.06, 1.0), (0.3, 0.0)], "Flash": [(0.0, 0.0), (0.05, 0.0), (0.08, 0.14), (0.16, 0.0)],
+                 # 1976: every strike on the map is long burnt out (no flames, no smoke).
+                 "Rings36": [(0.0, 60.0)], "Rings42": [(0.0, 60.0)], "Rings62": [(0.0, 60.0)]},
          "cues": [card("1976", "THIRTY YEARS LATER", 1.4, 5.0)]},
         {"id": "9.3a", "handheld": 0.14, "levels": [DESERT], "grade": "present", "vo": ["9_3"], "pre": 0.4, "cut_vo": 0.75, "fov": 45, "cam_snap": 150.0,
          "cam": [(0.0, (DUNE[0] + 6950, -2950, 0), {"at": (DUNE[0] + 6050, -3550, 0), "snap": 110.0}),
@@ -502,6 +556,8 @@ def global_cues(timeline):
                                                          "Ger_Weapon_")]
     # Ger_Berlin: the pod with the "Demeter" label must never be in frame.
     rules += [("DemeterPod", "Ger_Berlin")]
+    # Ger_2ndOreMountains: resource pickups draw as glassy bubbles beside the road (6.1).
+    rules += [("Resource_", "Ger_2ndOreMountains")]
     for part, level in rules:
         cues.append({"type": "HideActors", "start": 0.0, "end": 0.0, "l1": part, "l2": level})
     return cues

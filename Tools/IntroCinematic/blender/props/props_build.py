@@ -539,6 +539,79 @@ def build_maptable():
                 slots=['Wood', 'Steel'], max_tris=3000, view=(1.0, -1.4, 0.55), pivot='floor centre')
 
 
+
+# ====================================================================================== 10 ammunition on the table
+# 9 x 19 mm Parabellum round (metres): case (rim, extractor groove, slightly tapered body) and a round-nosed bullet.
+CASE_PROF = [(0, 0.0), (0.00496, 0.0), (0.00496, 0.0011), (0.0040, 0.0014), (0.0040, 0.0021), (0.00493, 0.0025),
+             (0.00482, 0.0188), (0.00470, 0.0190)]
+BULLET_PROF = [(0.00452, 0.0186), (0.00452, 0.0222), (0.0043, 0.0245), (0.0037, 0.0266), (0.0026, 0.0284),
+               (0.0012, 0.0294), (0, 0.0297)]
+
+
+def _round(b, m):
+    b.add(b.lathe(CASE_PROF + [(0, 0.0190)], 14, m=m), 'ammo_brass', smooth=50)
+    b.add(b.lathe([(0, 0.0186)] + BULLET_PROF, 14, m=m), 'ammo_copper', smooth=60)
+
+
+def _lying_round(b, x, y, yaw, roll=0.0):
+    """A round lying on the table: axis horizontal along yaw, resting on its case (z = case radius)."""
+    m = TRS((x, y, 0.00496), (0, 0, yaw)) @ Matrix.Rotation(PI / 2, 4, 'Y') @ Matrix.Rotation(roll, 4, 'Z')         @ Matrix.Translation((0, 0, -0.0148))
+    _round(b, m)
+
+
+def _magazine(b, x, y, yaw, flip=False):
+    """MP40 32-round stick magazine lying on its side: body 250 x 33 x 22 mm, two pressed ribs per side,
+    floorplate at -X, feed lips and the top round at +X."""
+    m = TRS((x, y, 0.0), (0, 0, yaw))
+    L, D, T = 0.236, 0.033, 0.022
+    b.add(b.box((0, 0, T / 2), (L, D, T), m=m), 'ammo_mag', smooth=30)
+    for side in (-1, 1):                                   # ribs pressed into both flat faces (top and bottom)
+        z = T / 2 + side * (T / 2 + 0.0006)
+        for ry in (-0.0075, 0.0075):
+            b.add(b.box((-0.004, ry, z), (0.19, 0.0035, 0.0012), m=m), 'ammo_mag', smooth=30)
+    b.add(b.box((-L / 2 - 0.004, 0, T / 2), (0.008, D + 0.004, T + 0.004), m=m), 'ammo_mag', smooth=30)   # floorplate
+    b.add(b.box((L / 2 + 0.005, 0.0015, T / 2), (0.010, D - 0.006, T - 0.006), m=m), 'ammo_mag', smooth=30)  # lips
+    # the top round in the lips, nose toward +Y of the magazine's frame (the feed direction)
+    rm = m @ TRS((L / 2 + 0.006, -0.010, T / 2), (0, 0, 0)) @ Matrix.Rotation(-PI / 2, 4, 'X')
+    _round(b, rm)
+
+
+def build_ammospread():
+    b = Builder(101)
+    # Three magazines: two side by side, one slewed across.
+    _magazine(b, 0.0, 0.0, math.radians(8))
+    _magazine(b, 0.012, 0.042, math.radians(3))
+    _magazine(b, -0.205, -0.03, math.radians(74))
+    # An opened 16-round cardboard box: tray (5 walls) with the lid folded back, rounds standing in it.
+    bx, by, W, Dp, H, t = 0.13, 0.03, 0.062, 0.044, 0.033, 0.0012
+    bm = TRS((bx, by, 0.0), (0, 0, math.radians(-12)))
+    b.add(b.box((0, 0, t / 2), (W, Dp, t), m=bm), 'ammo_card', smooth=20)
+    b.add(b.box((W / 2 - t / 2, 0, H / 2), (t, Dp, H), m=bm), 'ammo_card', smooth=20)
+    b.add(b.box((-W / 2 + t / 2, 0, H / 2), (t, Dp, H), m=bm), 'ammo_card', smooth=20)
+    b.add(b.box((0, Dp / 2 - t / 2, H / 2), (W - 2 * t, t, H), m=bm), 'ammo_card', smooth=20)
+    b.add(b.box((0, -Dp / 2 + t / 2, H / 2), (W - 2 * t, t, H), m=bm), 'ammo_card', smooth=20)
+    lid = bm @ TRS((0, Dp / 2, H), (math.radians(-115), 0, 0)) @ Matrix.Translation((0, -Dp / 2, t / 2))
+    b.add(b.box((0, 0, 0), (W, Dp, t), m=lid), 'ammo_card', smooth=20)
+    taken = {(0, 3), (1, 3), (3, 0), (2, 3), (3, 3), (0, 0)}
+    for i in range(4):
+        for j in range(4):
+            if (i, j) in taken:
+                continue
+            rx = -W / 2 + t + 0.0075 + i * 0.0145
+            ry = -Dp / 2 + t + 0.0055 + j * 0.0105
+            _round(b, bm @ TRS((rx, ry, t), (0, 0, b.rng.uniform(0, 2 * PI))))
+    # Loose rounds spilled across the table, two standing on their bases.
+    for (x, y, yaw) in ((0.165, -0.035, 0.4), (0.19, -0.012, 2.1), (0.082, -0.06, 1.2), (0.205, 0.062, -0.7),
+                        (0.055, 0.085, 2.8), (-0.04, 0.078, 0.9), (0.24, 0.01, 1.7), (0.11, -0.095, -1.3),
+                        (-0.06, -0.035, 0.2)):
+        _lying_round(b, x, y, yaw, b.rng.uniform(0, 2 * PI))
+    for (x, y) in ((0.175, 0.025), (0.093, 0.072)):
+        _round(b, TRS((x, y, 0.0), (0, 0, b.rng.uniform(0, 2 * PI))))
+    return dict(sets=[dict(b=b, tex='AmmoSpread', size=2048, uv='smart',
+                           slots={'ammo_mag': 'Ammo', 'ammo_brass': 'Ammo', 'ammo_copper': 'Ammo', 'ammo_card': 'Ammo'})],
+                slots=['Ammo'], max_tris=12000, view=(0.55, -0.75, 0.45),
+                pivot='on the table under the first magazine; magazines along X, box at +X')
+
 # ====================================================================================== numpy-made texture sets
 def gen_twine(tex, size):
     rng = np.random.default_rng(5)
@@ -598,7 +671,8 @@ def gen_weave_detail():
 # ====================================================================================== pipeline
 PROPS = dict(OilLamp=build_oillamp, Canister=build_canister, MapPin=build_mappin, StarPin=build_starpin,
              PaperTag=build_papertag, PaperTag_Curled=build_papertag_curled, BurnRing=build_burnring,
-             Banner=build_banner, PictureFrame=build_frame, MapTable=build_maptable)
+             Banner=build_banner, PictureFrame=build_frame, MapTable=build_maptable,
+             AmmoSpread=build_ammospread)
 GENERATED = set()
 
 

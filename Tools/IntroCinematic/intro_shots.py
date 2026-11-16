@@ -71,11 +71,12 @@ def _key_transform(binding, keys, seconds, snap=None, base_scale=None, snap_at=N
         fraction, location, rotation = key[0], _ground(key[1], snap, snap_at), key[2]
         if isinstance(rotation, dict):      # {'at': point}: aim at a point (torches, spotlights)
             rotation = look_at(location, rotation["at"])
-        if local_offset:                    # a part of a larger thing: offset in the thing's own (yawed) frame
-            yaw = math.radians(rotation[1])
-            location = (location[0] + local_offset[0] * math.cos(yaw) - local_offset[1] * math.sin(yaw),
-                        location[1] + local_offset[0] * math.sin(yaw) + local_offset[1] * math.cos(yaw),
-                        location[2] + local_offset[2])
+        if local_offset:                    # a part of a larger thing: offset in the thing's own frame (pitch and
+            # roll included, or a tilted tank's hull and turret shear off its tracks)
+            frame = unreal.Rotator(roll=rotation[2], pitch=rotation[0], yaw=rotation[1])
+            axes = (frame.get_forward_vector(), frame.get_right_vector(), frame.get_up_vector())
+            location = tuple(location[i] + sum(axis.to_tuple()[i] * offset for axis, offset in zip(axes, local_offset))
+                             for i in range(3))
         scale = key[3] if len(key) > 3 else 1.0
         if not isinstance(scale, (tuple, list)):
             scale = (scale, scale, scale)
@@ -141,6 +142,8 @@ def _make_instance(spec):
         if spec.get("mats"):
             for index in range(actor.skeletal_mesh_component.get_num_materials()):
                 actor.skeletal_mesh_component.set_material(index, unreal.load_asset(resolve(spec["mats"])))
+        for index, path in (spec.get("slot_mats") or {}).items():
+            actor.skeletal_mesh_component.set_material(index, unreal.load_asset(path))
     elif kind == "class":
         actor = actors_api.spawn_actor_from_class(unreal.EditorAssetLibrary.load_blueprint_class(asset_path), where)
     elif kind == "niagara":
@@ -189,8 +192,60 @@ TANK_KITS = {
 }
 
 
+# Where a tank's tracks touch the ground (cm from the unit origin, forward / right) and how far the tracks sink in.
+TANK_FOOTPRINT = {"Rus_Vehicle_T3476_Soviet": (205.0, 120.0), "Ger_Vehicle_PantherG": (200.0, 135.0)}
+TANK_SINK = 4.0
+# Track drive: the forward animation (wheels and sprockets turn) and the track material's pan rate, as the game sets
+# them (PlayRate = speed / the unit's animation speed divider).
+TANK_DRIVE = {
+    "Rus_Vehicle_T3476_Soviet": ("/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Rus_Medium/T34/Anims/Anim_T34_Tracks_FWD",
+                                 "/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/MasterMaterials/"
+                                 "DerivedUsedMutlipleTimes/MI_T34_Tracks", (1, 2)),
+}
+
+
+def _ground_fit(location, rotation, footprint, extra_z):
+    """Seats a tank on uneven ground: height, pitch and roll from the ground under its four track corners. A corner
+    trace that lands on a prop (far off the others) is replaced by the median, so a rock does not tip the hull."""
+    yaw = math.radians(rotation[1])
+    fx, fy = math.cos(yaw), math.sin(yaw)
+    rx, ry = -fy, fx
+    length, width = footprint
+    corners = {}
+    for name, (a, c) in {"fl": (length, -width), "fr": (length, width), "bl": (-length, -width), "br": (-length, width)}.items():
+        z = scout.ground_z(location[0] + fx * a + rx * c, location[1] + fy * a + ry * c)
+        corners[name] = z
+    known = sorted(z for z in corners.values() if z is not None)
+    if not known:
+        return location, rotation
+    median = known[len(known) // 2]
+    for name, z in corners.items():
+        if z is None or abs(z - median) > 120.0:
+            corners[name] = median
+    front = (corners["fl"] + corners["fr"]) / 2.0
+    back = (corners["bl"] + corners["br"]) / 2.0
+    left = (corners["fl"] + corners["bl"]) / 2.0
+    right = (corners["fr"] + corners["br"]) / 2.0
+    pitch = math.degrees(math.atan2(front - back, 2.0 * length))
+    # UE roll: positive lowers the right side (right vector of roll +10 has z < 0).
+    roll = math.degrees(math.atan2(left - right, 2.0 * width))
+    z = sum(corners.values()) / 4.0 - TANK_SINK + extra_z
+    return (location[0], location[1], z), (rotation[0] + pitch, rotation[1], rotation[2] + roll)
+
+
 def add_tank(sequence, spec, seconds):
-    """Expands a unit class into its mesh parts; every part follows the unit's keys."""
+    """Expands a unit class into its mesh parts; every part follows the unit's keys. With 'snap' the keys are seated
+    on the ground under the tracks (pitch and roll included); with 'drive' the tracks and wheels turn."""
+    spec = dict(spec)
+    footprint = TANK_FOOTPRINT.get(spec["asset"])
+    if spec.get("snap") is not None and footprint:
+        fitted = []
+        for key in _densify(spec["keys"], 12):
+            location, rotation = _ground_fit(key[1], key[2], footprint, key[1][2])
+            fitted.append((key[0], location, rotation) + tuple(key[3:]))
+        spec["keys"] = fitted
+        spec["snap"] = None
+    drive = TANK_DRIVE.get(spec["asset"]) if spec.get("drive") else None
     bindings = []
     for index, (kind, asset, offset, materials) in enumerate(TANK_KITS[spec["asset"]]):
         part = dict(spec)
@@ -198,8 +253,34 @@ def add_tank(sequence, spec, seconds):
         kind = "skel" if isinstance(unreal.load_asset(asset), unreal.SkeletalMesh) else "mesh"
         part.update({"kind": kind, "asset": asset, "mats": materials, "local_offset": offset,
                      "label": "%s_part%d" % (spec.get("label", "Tank"), index)})
+        if drive and index == 0:
+            part["anim"] = drive[0]
+            part["play_rate"] = float(spec["drive"])
+            part["slot_mats"] = {slot: _drive_track_material(drive[1], float(spec["drive"])) for slot in drive[2]}
         bindings.append(add_actor(sequence, part, seconds))
     return bindings
+
+
+def _densify(keys, steps):
+    """Extra keys between moving keys (a move over a crest needs the ground under it, not only at its ends)."""
+    if len(keys) < 2:
+        return list(keys)
+    out = [keys[0]]
+    for a, c in zip(keys[:-1], keys[1:]):
+        moved = math.hypot(c[1][0] - a[1][0], c[1][1] - a[1][1])
+        count = max(1, int(round(steps * (c[0] - a[0]))) if moved > 50.0 else 1)
+        for k in range(1, count + 1):
+            f = k / float(count)
+            location = tuple(a[1][i] + (c[1][i] - a[1][i]) * f for i in range(3))
+            rotation = tuple(a[2][i] + (c[2][i] - a[2][i]) * f for i in range(3)) if not isinstance(a[2], dict) else c[2]
+            out.append((a[0] + (c[0] - a[0]) * f, location, rotation) + tuple(c[3:]))
+    return out
+
+
+def _drive_track_material(parent_path, play_rate):
+    """A track material that pans at a fixed rate (the game sets PlayRate at run time; a film needs it baked)."""
+    name = "MI_Intro_TrackDrive_%s_%d" % (parent_path.rsplit("/", 1)[1], int(round(play_rate * 100)))
+    return mats.instance(name, unreal.load_asset(parent_path), scalars={"PlayRate": play_rate}).get_path_name()
 
 
 def add_actor(sequence, spec, seconds):
@@ -224,6 +305,10 @@ def add_actor(sequence, spec, seconds):
         section.set_range(0, b.frames(seconds))
         params = section.get_editor_property("params")
         params.set_editor_property("animation", unreal.load_asset(resolve(animation)))
+        if spec.get("play_rate"):
+            rate = unreal.MovieSceneTimeWarpVariant()
+            rate.set_fixed_play_rate(float(spec["play_rate"]))
+            params.set_editor_property("play_rate", rate)
         section.set_editor_property("params", params)
     return binding
 
@@ -341,11 +426,15 @@ def add_master_mpc(master, shots, timeline):
         section.add_scalar_parameter_key(name, FRAME(int(round(seconds * TICKS_PER_SECOND))), float(value))
 
     hold = 1.0 / b.FPS
+    held = {name: 0.0 for name in STICKY}      # where each sticky clock stood at the end of the previous shot
     for shot, placed in zip(shots, timeline):
         start, seconds = placed["start"], placed["duration"]
         # Every shot (the reused logo sequence too) starts from the defaults: a flash or blackout never leaks on.
         keys = {name: [(0.0, default)] for name, default in mats.MPC_SCALARS.items() if name not in STICKY}
         keys["Archive"] = [(0.0, 1.0 if shot.get("grade", "archive") == "archive" else 0.0)]
+        # "mpc_run_on": sticky clocks that keep running through this shot from where the last shot left them.
+        for name in shot.get("mpc_run_on", []):
+            keys[name] = [(0.0, held[name]), (1.0, held[name] + seconds)]
         keys.update(shot.get("mpc") or {})
         for name, pairs in keys.items():
             last = None
@@ -355,6 +444,8 @@ def add_master_mpc(master, shots, timeline):
                 at = min(fraction * seconds, seconds - hold)
                 key(name, start + at, value)
                 last = (at, value)
+            if name in held:
+                held[name] = last[1]
             if last[0] < seconds - hold - 1e-4:
                 key(name, start + seconds - hold, last[1])
 
@@ -415,3 +506,22 @@ def build_film(shots, global_cues):
     b.build_cues(cues)
     print("film %.1f s, %d shots, %d cues" % (total, len(shots), len(cues)))
     return timeline, total
+
+
+def rebuild_in_place(shots, ids):
+    """Rebuilds only these shots' subsequences at their current length (from the timeline of the last full build).
+    The master is not touched, so a patch render of the whole film's frame range shows the change. A shot whose
+    voice rows changed length needs a full build_film instead."""
+    with open(b.TIMELINE_JSON, encoding="utf-8") as handle:
+        placed = {entry["id"]: entry for entry in json.load(handle)["shots"]}
+    packages = []
+    for shot in shots:
+        if shot["id"] not in ids or shot.get("sequence"):
+            continue
+        seconds = placed[shot["id"]]["duration"]
+        sub = b.new_sequence("%s/LS_Intro_%s" % (b.SEQ_DIR, shot["id"].replace(".", "_")), seconds)
+        build_shot(sub, shot, seconds)
+        packages.append(sub.get_outermost())
+        print("rebuilt shot", shot["id"], "%.2f s" % seconds)
+    lib.safe_save(packages)
+    scout.set_levels_visible([])

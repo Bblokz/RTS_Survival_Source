@@ -609,3 +609,37 @@ def m_twine(name):
 def m_burn(name):
     g = G(name)
     return g.finish((0.03, 0.02, 0.015), 0.85, 0.0)
+
+
+# ---- ammunition on the table (object space, metres)
+@_reg
+def m_ammo_mag(name):
+    g = G(name)
+    # blued steel: dark, worn bright only on edges and in fine scratches
+    c, r, m, h = worn(g, (0.028, 0.029, 0.033), s=120.0, paint_rough=0.38, paint_metal=0.85, under=(0.30, 0.30, 0.31),
+                      under_rough=0.3, chip=0.0, edge=0.0, rust=0.1, scratch=0.5, dirt=0.35, var=0.08)
+    return g.finish(c, r, m, h, bump=0.00003)
+
+
+@_reg
+def m_ammo_brass(name):
+    g = G(name)
+    c, r, m, h = worn(g, (0.66, 0.47, 0.19), s=900.0, paint_rough=0.28, paint_metal=1.0, under=(0.26, 0.18, 0.08),
+                      under_rough=0.55, under_metal=0.8, chip=0.15, edge=0.0, rust=0.0, scratch=0.5, dirt=0.65, var=0.14)
+    return g.finish(c, r, m, h, bump=0.00001)
+
+
+@_reg
+def m_ammo_copper(name):
+    g = G(name)
+    c, r, m, h = worn(g, (0.58, 0.29, 0.16), s=900.0, paint_rough=0.3, paint_metal=1.0, under=(0.2, 0.1, 0.06),
+                      under_rough=0.6, under_metal=0.7, chip=0.15, edge=0.0, rust=0.0, scratch=0.4, dirt=0.6, var=0.12)
+    return g.finish(c, r, m, h, bump=0.00001)
+
+
+@_reg
+def m_ammo_card(name):
+    g = G(name)
+    c, r, m, h = worn(g, (0.40, 0.34, 0.22), s=180.0, paint_rough=0.86, paint_metal=0.0, under=(0.27, 0.22, 0.15),
+                      under_rough=0.92, under_metal=0.0, chip=0.25, edge=1.2, rust=0.0, scratch=0.25, dirt=0.75, var=0.18)
+    return g.finish(c, r, m, h, bump=0.00004)

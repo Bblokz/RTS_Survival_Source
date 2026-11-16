@@ -125,11 +125,15 @@ def _fix_texture_settings(folder):
     return packages
 
 
-def import_kit(kit, destination, slot_rules):
-    """slot_rules(mesh name, slot name) -> texture-set prefix, an existing material path, or None."""
+def import_kit(kit, destination, slot_rules, only=None):
+    """slot_rules(mesh name, slot name) -> texture-set prefix, an existing material path, or None.
+    only: name parts; just the meshes and textures whose file names contain one of them are imported."""
     folder = SRC + "/" + kit
     textures = [p.replace("\\", "/") for p in glob.glob(folder + "/T_*.png")]
     meshes = [p.replace("\\", "/") for p in glob.glob(folder + "/SM_*.fbx")]
+    if only:
+        textures = [p for p in textures if any(part in os.path.basename(p) for part in only)]
+        meshes = [p for p in meshes if any(part in os.path.basename(p) for part in only)]
     _import(textures, destination + "/Textures")
     packages = _fix_texture_settings(destination + "/Textures")
     mesh_paths = _import(meshes, destination, _fbx_options())

@@ -694,3 +694,30 @@ after the last fixes and the cinematic pass: the owner reviews it next. Picture 
 - Never replace the scalar list of `MPC_Intro`: collection nodes find their scalar by id, so every material built
   before breaks in the render process ("CollectionParameter has invalid parameter"). `build_mpc` only appends.
   `render.sh` now prints the cinematic materials that failed to compile; the line must be empty.
+
+### State 2026-11-16: owner's fixes, then two adversarial rounds
+
+The owner asked for four fixes, then two rounds of a fresh adversarial reviewer with fixes after each.
+
+**Owner's fixes**
+- **Fire on the strike markers** (3.6 Germany, 4.2 USA, 6.2b Svarog). Each burn ring now catches fire when its clock
+  reaches it: two crossed upright cards with procedural flames (domain-warped noise, licks that tear off at the top),
+  sparks and a smoke plume, an additive light pool that flickers on the paper, and the struck city's pin glows
+  red-hot and chars black. Flames stay inside the archive grade's orange window (blue near zero, bright), so they
+  keep their colour in the 1945 look. All of it runs off the existing ring clocks (`intro_fire.py`). The clocks run
+  on through 4.1 (Germany) and 4.3 (USA) and are parked at 60 s in 5.4 and 9.2, so no map shot shows a stale fire.
+- **The Purple Death** (5.2, 5.3, 5.4). New Blender veins (`blender/sets/build_veins.py`): branching networks from
+  seven places where it took hold, over the floor and creeping along both walls, 1.8 cm trunks forking down to 3 mm
+  capillaries with nodules, half sunk into the earth. New material `M_Intro_PurpleDeath` on the mats, pustules and
+  veins: necrotic plum-black flesh, bruised violet, dry spore crust, a livid magenta vein network that beats, light
+  pumping outward along the veins. The growth is revealed by MPC `Mould` (a ragged front that spreads from each
+  pivot, veins that crawl out along their length) instead of scaling the meshes. The map stain (5.4) grows vein
+  tendrils ahead of its front.
+- **Ammunition on the table** (1.1): three blued MP40 magazines, an opened 9 mm box with rounds standing in it, and
+  loose rounds (Blender prop `SM_Intro_AmmoSpread`), next to the MP40.
+- **T-34s no longer float** (6.1, also 6.2, 6.3). Cause: the column drove across a steep side slope beside the valley
+  road, level, seated by one centre trace (one track up to 1.5 m higher than the other). Now every tank key is
+  seated on the ground under its four track corners (height, pitch and roll; hull and turret follow the full
+  rotation), the column follows the valley road itself, and the tracks drive (forward animation and panning track
+  material). 6.1 looks down the road toward the ruined arches, a wreck at the roadside. Resource pickups of the Ore
+  map (glassy bubbles beside the road) are hidden.

@@ -36,6 +36,9 @@ Brief: `Source/Docs/Campaign/IntroCinematicScript.md` (script + build ledger at 
 | `render.sh <preset>` | headless MRQ render -> `Saved/IntroCinematic/Render/<preset>/` |
 | `game_run.sh` | headless plain `-game` playthrough with auto-quit and UI screenshots |
 | `contact_sheet.py` | contact sheet from rendered frames |
+| `intro_fire.py` | fire on the map strikes: flame cards, light pool, burning pins (run off the ring clocks) |
+| `intro_purple.py` | `M_Intro_PurpleDeath` on the trench mould and veins (growth revealed by MPC `Mould`) |
+| `blender/sets/build_veins.py` | branching vein networks over the trench (`SM_Intro_Mould_Veins`, U = metres from root) |
 
 Launch the throwaway editor (never the shared one):
 
@@ -88,3 +91,13 @@ More rules learned:
 - Shot lists in the manifest: a list comprehension must be its own `[...]`; join with `] + [`.
 - `MPC_Intro` scalars are only ever appended (`build_mpc`): replacing the list changes their ids and breaks every
   material that reads the collection. `render.sh` prints "broken cinematic materials:"; it must be empty.
+- Python cannot reach World Position Offset or customized UVs (`MaterialProperty` lacks them): upright effects are
+  crossed cards that fade where they are seen edge-on (`M_Intro_RingFlame`).
+- `intro_shots.rebuild_in_place(shots, ids)` rebuilds only those shots' subsequences at their timeline length, so a
+  patch render (`build_render_preset(..., frame_range=...)`) shows a change without rebuilding the master. The
+  `__ONLY__` film step rewrites the master with only those shots: always follow it with a full build.
+- Ring clocks are sticky across shots. `"mpc_run_on": [names]` keeps a clock running through a shot from where the
+  previous shot left it; park clocks at 60 s where a map shot must show no fire (5.4, 9.2).
+- Tanks: `"snap"` seats every key on the ground under the four track corners (height, pitch, roll; a corner trace
+  far off the others is replaced by the median); `"drive": <play rate>` plays the forward track animation and
+  pans the track material (the game sets `PlayRate` at run time). Two-key moves are densified first.

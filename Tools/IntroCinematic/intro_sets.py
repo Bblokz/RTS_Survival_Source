@@ -9,10 +9,12 @@ import math
 
 import unreal
 
+import intro_fire as fire
 import intro_lib as lib
 import intro_materials as mats
 
 importlib.reload(lib)
+importlib.reload(fire)
 
 actors_api = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
 les = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
@@ -91,6 +93,12 @@ SVAROG_STRIKES = [(52.2, 21.0), (50.45, 30.5), (47.5, 19.05), (44.4, 26.1), (56.
 # Shot 5.4: the stain starts in many places at once, west to east, so no start point reads as its target.
 STAIN_SEEDS = [(50.8, 4.4), (48.9, 2.3), (52.5, 13.4), (45.5, 9.2), (50.1, 19.9), (59.3, 18.1), (44.8, 20.5),
                (53.9, 27.5), (41.0, 29.0)]
+
+
+# The ammunition prop on the map table (local cm, yaw): past the mug on the officer's edge, clear of the date line
+# and inside the 1.1 push-in.
+AMMO_AT = (-104.0, 22.0, TABLE_TOP_Z + 0.1)
+AMMO_YAW = 95.0
 
 
 # --- Level and actor helpers -----------------------------------------------------------------------------------------
@@ -251,6 +259,11 @@ def build_bunker():
     s.mesh("Prop_Radio", "/Game/UVB80/Assets/UVB80/Items/SM_Radio", (-88, -52, TABLE_TOP_Z + 0.3), rotation=(0, -168, 0))
     s.mesh("Prop_Mug", "/Game/UVB80/Assets/UVB80/Items/SM_Cup", (-98, -8, TABLE_TOP_Z + 0.3), rotation=(0, 40, 0))
     s.mesh("Prop_Phone", "/Game/UVB80/Assets/UVB80/Items/SM_OldPhone", (-108, -128, TABLE_TOP_Z + 0.3), rotation=(0, 20, 0))
+    # Ammunition by the MP40: three stick magazines, an opened 9 mm box and loose rounds (Blender prop AmmoSpread),
+    # on the officer's side of the date line.
+    ammo_mesh = _first_existing([lib.ROOT + "/Props/SM_Intro_AmmoSpread"])
+    if ammo_mesh:
+        s.mesh("Prop_Ammo", ammo_mesh, AMMO_AT, rotation=(0, AMMO_YAW, 0))
 
     # The oil lamp over the table: the only real light. A weak cool fill keeps the room from going fully black.
     lamp_height = 205.0
@@ -305,12 +318,16 @@ def build_map(s):
     star_mesh = _first_existing([lib.ROOT + "/Props/SM_Intro_StarPin"])
     ring_mesh = _first_existing([lib.ROOT + "/Props/SM_Intro_BurnRing"])
 
-    def pin(label, where, scale=1.0, star=False):
+    def pin(label, where, scale=1.0, star=False, burn=None):
+        """burn = (group, delay, duration): the pin of a struck place glows, chars and leans over in the fire."""
         position = place(where)
         if star and star_mesh:
             return s.mesh(label, star_mesh, position, scale=(scale, scale, scale))
         if pin_mesh:
-            return s.mesh(label, pin_mesh, position, scale=(scale, scale, scale))
+            material = None
+            if burn:
+                material = fire.pin_instance(label, burn[0], burn[1], burn[2], (len(label) * 0.137 + burn[1] * 0.31) % 1.0)
+            return s.mesh(label, pin_mesh, position, scale=(scale, scale, scale), materials=material, mobile=bool(burn))
         s.mesh(label + "_Needle", CYLINDER, (position[0], position[1], position[2] + 1.4 * scale),
                scale=(0.0018 * scale, 0.0018 * scale, 0.028 * scale), materials=M + "MI_Intro_PinBrass")
         return s.mesh(label, SPHERE, (position[0], position[1], position[2] + 3.0 * scale),
@@ -324,20 +341,32 @@ def build_map(s):
         position = place(where, 0.12)
         mats.instance("MI_Intro_" + label, ring_parent, scalars={"Group": group, "Delay": delay, "Duration": duration})
         material = M + "MI_Intro_" + label
+        # The strike burns: flames, sparks and smoke on an upright card, and their light on the paper.
+        seed = (delay * 0.731 + size * 0.389 + group * 0.17) % 1.0
+        flame_mi, glow_mi = fire.ring_instances(label, group, delay, duration, size, seed)
+        width, height = 2.4 * size, 5.0 * size          # as in fire.ring_instances
+        for suffix, rotation in (("_FireA", (0.0, 90.0, 90.0)), ("_FireB", (0.0, 0.0, 90.0))):
+            card = s.mesh(label + suffix, PLANE, (position[0], position[1], position[2] + height / 2.0 - 0.1),
+                          rotation=rotation, scale=(width / 100.0, height / 100.0, 1.0), materials=flame_mi,
+                          shadow=False, mobile=True)
+            card.static_mesh_component.set_translucent_sort_priority(3)
+        pool = s.plane(label + "_FireLight", (position[0], position[1], position[2] + 0.08), (4.0 * size, 4.0 * size),
+                       glow_mi, mobile=True)
+        pool.static_mesh_component.set_translucent_sort_priority(2)
         if ring_mesh:
             return s.mesh(label, ring_mesh, position, scale=(size / 6.0, size / 6.0, 1.0),
                           materials=material, shadow=False, mobile=True)
         return s.plane(label, position, (size, size), material, mobile=True)
 
     # Berlin and the cities that followed (3.5 / 3.6).
-    pin("Pin_Berlin", "Berlin", 0.55)
+    pin("Pin_Berlin", "Berlin", 0.55, burn=(0, -10.0, 1.6))
     ring("Ring_Berlin", "Berlin", 2.6, 0, -10.0)
     for index, city in enumerate(GERMAN_CITIES):
-        pin("Pin_City_%d" % index, city, 0.45)
+        pin("Pin_City_%d" % index, city, 0.45, burn=(0, 0.9 + index * 0.6, 1.6))
         ring("Ring_City_%d" % index, city, 2.0, 0, 0.9 + index * 0.6)
     # Manhattan Project sites (4.x): three pins with paper tags, a red string from the east.
     for index, site in enumerate(("LosAlamos", "OakRidge", "Hanford")):
-        pin("Pin_" + site, site, 1.0)
+        pin("Pin_" + site, site, 1.0, burn=(1, 3.6 + index * 1.7, 2.6))
         ring("Ring_" + site, site, 7.0, 1, 3.6 + index * 1.7, 2.6)
         x, y, z = place(site)
         tag_mesh = _first_existing([lib.ROOT + "/Props/SM_Intro_PaperTag"])
