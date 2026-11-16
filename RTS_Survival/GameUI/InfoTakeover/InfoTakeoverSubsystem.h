@@ -20,7 +20,7 @@ enum class EInfoTakeoverRequestResult : uint8
 {
 	// The player closed it; the game is unpaused again.
 	Closed,
-	// It never opened: the takeovers are turned off or its widget could not be created.
+	// It never opened: unit intel is turned off or its widget could not be created.
 	Skipped,
 	// The world ended before it closed; nothing should continue.
 	Cancelled
@@ -51,9 +51,10 @@ struct FQueuedInfoTakeover
 
 /**
  * @brief Opens info takeovers for the mission nodes, one at a time: a call while another takeover, a cinematic, the
- * tech tree or the archive holds the screen waits in a queue. Content is taken when the node is called. Calls do
- * nothing once the player ticked "never show these info widgets again" (the gameplay setting is off). Every takeover is
- * also archived (with the archive pop-up) when it closes, or at once while the takeovers are off. A caller that must
+ * tech tree or the archive holds the screen waits in a queue. Content is taken when the node is called. Unit intel
+ * (vehicles, squads) does nothing once the player ticked "never show these info widgets again" (the gameplay setting is
+ * off); game-mechanic field manuals always show and ignore the setting. Every takeover is also archived (with the
+ * archive pop-up) when it closes, or at once while unit intel is off. A caller that must
  * wait for the close (the camera controls node) gets a request id that OnTakeoverRequestFinished reports once.
  */
 UCLASS()
@@ -69,7 +70,7 @@ public:
 	 * @brief Queues the vehicle takeover of a library prefab.
 	 * @param Vehicle The live vehicle whose weapons and armour are shown.
 	 * @param LibraryEntry Row name in the vehicle library (DT_VehicleInfoTakeovers).
-	 * @return False when takeovers are turned off or the vehicle or row is missing.
+	 * @return False when unit intel is turned off or the vehicle or row is missing.
 	 */
 	bool QueueVehicleTakeoverFromLibrary(ATankMaster* Vehicle, const FName LibraryEntry);
 
@@ -77,7 +78,7 @@ public:
 	 * @brief Queues a vehicle takeover with the caller's own text and picture.
 	 * @param Vehicle The live vehicle whose weapons and armour are shown.
 	 * @param Entry Name, description, year and picture; empty fields fall back to the unit's training data.
-	 * @return False when takeovers are turned off or the vehicle is missing.
+	 * @return False when unit intel is turned off or the vehicle is missing.
 	 */
 	bool QueueVehicleTakeover(ATankMaster* Vehicle, const FVehicleInfoTakeoverEntry& Entry);
 
@@ -85,7 +86,7 @@ public:
 	 * @brief Queues the squad takeover of a library prefab.
 	 * @param Infantry A squad controller or a solo infantry unit; its soldiers and weapons are shown.
 	 * @param LibraryEntry Row name in the squad library (DT_SquadInfoTakeovers).
-	 * @return False when takeovers are turned off or the infantry or row is missing.
+	 * @return False when unit intel is turned off or the infantry or row is missing.
 	 */
 	bool QueueSquadTakeoverFromLibrary(AActor* Infantry, const FName LibraryEntry);
 
@@ -93,85 +94,95 @@ public:
 	 * @brief Queues a squad takeover with the caller's own text and picture.
 	 * @param Infantry A squad controller or a solo infantry unit; its soldiers and weapons are shown.
 	 * @param Entry Name, description, year and picture; empty fields fall back to the unit's training data.
-	 * @return False when takeovers are turned off or the infantry is missing.
+	 * @return False when unit intel is turned off or the infantry is missing.
 	 */
 	bool QueueSquadTakeover(AActor* Infantry, const FSquadInfoTakeoverEntry& Entry);
 
 	/**
 	 * @brief Queues the camera controls field manual; a mission waits on OnTakeoverRequestFinished with the returned id
 	 * so its voice lines start only after the player closed it.
-	 * @return The request id that OnTakeoverRequestFinished reports exactly once; INDEX_NONE when takeovers are off
-	 * (nothing opens and nothing is broadcast, so the caller continues at once).
+	 * @return The request id that OnTakeoverRequestFinished reports exactly once; field manuals show even while
+	 * unit intel is off.
 	 */
 	int32 QueueCameraControlsTakeover();
 
 	/**
 	 * @brief Queues the cover field manual (what the green, yellow and red move preview means), waited on like the
 	 * camera controls takeover.
-	 * @return The request id that OnTakeoverRequestFinished reports exactly once; INDEX_NONE when takeovers are off.
+	 * @return The request id that OnTakeoverRequestFinished reports exactly once; field manuals show even while unit intel is off.
 	 */
 	int32 QueueCoverTakeover();
 
 	/**
 	 * @brief Queues the spaced armour field manual (side plates and how hits knock them off), waited on like the
 	 * camera controls takeover.
-	 * @return The request id that OnTakeoverRequestFinished reports exactly once; INDEX_NONE when takeovers are off.
+	 * @return The request id that OnTakeoverRequestFinished reports exactly once; field manuals show even while unit intel is off.
 	 */
 	int32 QueueSpacedArmourTakeover();
 
 	/**
 	 * @brief Queues the nomadic conversion field manual (a truck deploys into a building and packs up again), waited on
 	 * like the camera controls takeover.
-	 * @return The request id that OnTakeoverRequestFinished reports exactly once; INDEX_NONE when takeovers are off.
+	 * @return The request id that OnTakeoverRequestFinished reports exactly once; field manuals show even while unit intel is off.
 	 */
 	int32 QueueNomadicConversionTakeover();
 
 	/**
 	 * @brief Queues the Vultures AT stick grenade field manual (a short clip and how the volley works), waited on like
 	 * the camera controls takeover.
-	 * @return The request id that OnTakeoverRequestFinished reports exactly once; INDEX_NONE when takeovers are off.
+	 * @return The request id that OnTakeoverRequestFinished reports exactly once; field manuals show even while unit intel is off.
 	 */
 	int32 QueueVulturesAtTakeover();
 
 	/**
 	 * @brief Queues the Rattle-Feed field manual (a short clip and how the Panzer II's autocannon burst works), waited on
 	 * like the camera controls takeover.
-	 * @return The request id that OnTakeoverRequestFinished reports exactly once; INDEX_NONE when takeovers are off.
+	 * @return The request id that OnTakeoverRequestFinished reports exactly once; field manuals show even while unit intel is off.
 	 */
 	int32 QueueRattleFeedTakeover();
 
 	/**
 	 * @brief Queues the Wespe Barrage field manual (a short clip and how the Wespe's area barrage works), waited on like the camera
 	 * controls takeover.
-	 * @return The request id that OnTakeoverRequestFinished reports exactly once; INDEX_NONE when takeovers are off.
+	 * @return The request id that OnTakeoverRequestFinished reports exactly once; field manuals show even while unit intel is off.
 	 */
 	int32 QueueWespeBarrageTakeover();
 
 	/**
 	 * @brief Queues the Dig In field manual (a short clip and how a tank digs in behind sandbags), waited on like the camera
 	 * controls takeover.
-	 * @return The request id that OnTakeoverRequestFinished reports exactly once; INDEX_NONE when takeovers are off.
+	 * @return The request id that OnTakeoverRequestFinished reports exactly once; field manuals show even while unit intel is off.
 	 */
 	int32 QueueDigInTakeover();
 
 	/**
+	 * @brief Queues the Wall Breach field manual (a short clip and how medium and heavy tanks drive through Soviet
+	 * concrete walls), waited on like the camera controls takeover.
+	 * @return The request id that OnTakeoverRequestFinished reports exactly once; field manuals show even while unit intel is off.
+	 */
+	int32 QueueWallBreachTakeover();
+
+	/**
 	 * @brief Queues the Adrenaline Shot field manual (a short clip and how the Panzer 38(t)'s crew rush works), waited on like the camera
 	 * controls takeover.
-	 * @return The request id that OnTakeoverRequestFinished reports exactly once; INDEX_NONE when takeovers are off.
+	 * @return The request id that OnTakeoverRequestFinished reports exactly once; field manuals show even while unit intel is off.
 	 */
 	int32 QueueAdrenalineShotTakeover();
 
 	/**
 	 * @brief Queues the building expansion pack-up field manual (expansions pack up with their nomadic building and come
 	 * back after it deploys), waited on like the camera controls takeover.
-	 * @return The request id that OnTakeoverRequestFinished reports exactly once; INDEX_NONE when takeovers are off.
+	 * @return The request id that OnTakeoverRequestFinished reports exactly once; field manuals show even while unit intel is off.
 	 */
 	int32 QueueBxpPackUpTakeover();
 
-	// Fires once per queued request id: closed, skipped (turned off while waiting, broken widget) or cancelled.
+	// Fires once per queued request id: closed, skipped (broken widget) or cancelled.
 	FOnInfoTakeoverRequestFinished OnTakeoverRequestFinished;
 
-	/** @return False after "never show these info widgets again"; the settings menu turns it back on. */
+	/**
+	 * @return False after "never show these info widgets again" on a unit takeover; the settings menu turns it back on.
+	 * Only unit intel follows it; game-mechanic field manuals always show.
+	 */
 	static bool GetAreInfoTakeoversEnabled();
 
 	/** @return The row names of the vehicle library, for the mission node's dropdown. */
@@ -212,7 +223,7 @@ private:
 
 	void Enqueue(const FQueuedInfoTakeover& QueuedTakeover);
 	void TryOpenNextTakeover();
-	void DropQueuedTakeoversWhileTurnedOff();
+	void DropQueuedUnitIntelWhileTurnedOff();
 	bool GetCanOpenTakeoverNow() const;
 	void StartRetryTicker();
 	void StopRetryTicker();
@@ -233,12 +244,13 @@ private:
 	UW_InfoTakeover* CreateRattleFeedTakeoverWidget() const;
 	UW_InfoTakeover* CreateWespeBarrageTakeoverWidget() const;
 	UW_InfoTakeover* CreateDigInTakeoverWidget() const;
+	UW_InfoTakeover* CreateWallBreachTakeoverWidget() const;
 	UW_InfoTakeover* CreateAdrenalineShotTakeoverWidget() const;
 
 	/**
 	 * @brief Queues a field manual takeover that a mission node waits on; shared by every tutorial kind.
 	 * @param Kind The tutorial to show.
-	 * @return The request id; INDEX_NONE when takeovers are off (it is archived instead when the HUD exists).
+	 * @return The request id; field manuals show even while unit intel is turned off.
 	 */
 	int32 QueueWaitedTutorialTakeover(const EInfoTakeoverKind Kind);
 	void HandleTakeoverClosed(UW_InfoTakeover* ClosedTakeover);
@@ -261,6 +273,7 @@ private:
 	static FArchiveCustomContent MakeRattleFeedArchiveContent();
 	static FArchiveCustomContent MakeWespeBarrageArchiveContent();
 	static FArchiveCustomContent MakeDigInArchiveContent();
+	static FArchiveCustomContent MakeWallBreachArchiveContent();
 	static FArchiveCustomContent MakeAdrenalineShotArchiveContent();
 	const UDataTable* GetTrainingOptionsTable();
 };

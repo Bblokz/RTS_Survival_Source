@@ -299,22 +299,33 @@ void UAdrenalineShotTakeoverValidateSubsystem::TickCheckingClosed()
 	{
 		return;
 	}
-	CheckTurnedOffNode();
+	CheckShowsWhileTurnedOff();
 	Finish();
 }
 
-void UAdrenalineShotTakeoverValidateSubsystem::CheckTurnedOffNode()
+void UAdrenalineShotTakeoverValidateSubsystem::CheckShowsWhileTurnedOff()
 {
+	// "Never show again" only hides unit intel: this field manual must still open, without the box, and close as shown.
 	SetTakeoversEnabled(false);
 	M_TurnedOffNode = UAsyncShowAdrenalineShotTakeover::ShowAdrenalineShotTakeover(M_PlayerController.Get());
 	M_TurnedOffNode->OnClosed.AddDynamic(this, &UAdrenalineShotTakeoverValidateSubsystem::HandleTurnedOffClosed);
 	M_TurnedOffNode->Activate();
-	const bool bOpened = GetActiveAdrenalineShotTakeover() != nullptr;
-	UE_LOG(LogTemp, Display, TEXT("ADRENALINE_SHOT_TAKEOVER turned off: closed %d times at once, shown=%d, opened=%d"),
-	       M_TurnedOffClosedCount, bM_TurnedOffWasShown ? 1 : 0, bOpened ? 1 : 0);
-	if (M_TurnedOffClosedCount != 1 || bM_TurnedOffWasShown || bOpened)
+	UW_AdrenalineShotTakeover* const Takeover = GetActiveAdrenalineShotTakeover();
+	const bool bOpened = Takeover != nullptr;
+	const bool bOffersNeverShowAgain = bOpened && Takeover->GetOffersNeverShowAgain();
+	UE_LOG(LogTemp, Display, TEXT("ADRENALINE_SHOT_TAKEOVER turned off: opened=%d, closed %d times at once, never-show box=%d"),
+	       bOpened ? 1 : 0, M_TurnedOffClosedCount, bOffersNeverShowAgain ? 1 : 0);
+	if (not bOpened || M_TurnedOffClosedCount != 0 || bOffersNeverShowAgain)
 	{
-		Fail(TEXT("with the takeovers off, On Closed must fire at once with Was Shown false"));
+		Fail(TEXT("with unit intel off, the field manual must still open, without the never-show box"));
+		return;
+	}
+	Takeover->OnClickedContinue();
+	UE_LOG(LogTemp, Display, TEXT("ADRENALINE_SHOT_TAKEOVER turned off, after close: closed %d times, shown=%d"),
+	       M_TurnedOffClosedCount, bM_TurnedOffWasShown ? 1 : 0);
+	if (M_TurnedOffClosedCount != 1 || not bM_TurnedOffWasShown)
+	{
+		Fail(TEXT("with unit intel off, the field manual did not close once as shown"));
 	}
 }
 

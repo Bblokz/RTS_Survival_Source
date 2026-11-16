@@ -24,6 +24,7 @@
 #include "W_RattleFeedTakeover.h"
 #include "W_WespeBarrageTakeover.h"
 #include "W_DigInTakeover.h"
+#include "W_WallBreachTakeover.h"
 #include "W_AdrenalineShotTakeover.h"
 #include "W_VulturesAtTakeover.h"
 
@@ -45,6 +46,7 @@ namespace InfoTakeoverSubsystemPrivate
 	const FName RattleFeedArchiveKey(TEXT("InfoTakeover.RattleFeed"));
 	const FName WespeBarrageArchiveKey(TEXT("InfoTakeover.WespeBarrage"));
 	const FName DigInArchiveKey(TEXT("InfoTakeover.DigIn"));
+	const FName WallBreachArchiveKey(TEXT("InfoTakeover.WallBreach"));
 	const FName AdrenalineShotArchiveKey(TEXT("InfoTakeover.AdrenalineShot"));
 }
 
@@ -229,6 +231,11 @@ int32 UInfoTakeoverSubsystem::QueueDigInTakeover()
 	return QueueWaitedTutorialTakeover(EInfoTakeoverKind::DigIn);
 }
 
+int32 UInfoTakeoverSubsystem::QueueWallBreachTakeover()
+{
+	return QueueWaitedTutorialTakeover(EInfoTakeoverKind::WallBreach);
+}
+
 int32 UInfoTakeoverSubsystem::QueueAdrenalineShotTakeover()
 {
 	return QueueWaitedTutorialTakeover(EInfoTakeoverKind::AdrenalineShot);
@@ -236,18 +243,7 @@ int32 UInfoTakeoverSubsystem::QueueAdrenalineShotTakeover()
 
 int32 UInfoTakeoverSubsystem::QueueWaitedTutorialTakeover(const EInfoTakeoverKind Kind)
 {
-	if (not GetAreInfoTakeoversEnabled())
-	{
-		// Still archived, so the tutorial can be reread after the player turned the takeovers off. At the very start
-		// of a mission the HUD may not exist yet; it is then simply not archived.
-		if (FRTS_Statics::GetMainGameUI(this) != nullptr)
-		{
-			FQueuedInfoTakeover SkippedTakeover;
-			SkippedTakeover.Kind = Kind;
-			AddToArchive(SkippedTakeover);
-		}
-		return INDEX_NONE;
-	}
+	// Game-mechanic field manuals always show: "never show again" only hides unit intel.
 	FQueuedInfoTakeover QueuedTakeover;
 	QueuedTakeover.Kind = Kind;
 	QueuedTakeover.RequestId = M_NextRequestId++;
@@ -270,7 +266,11 @@ void UInfoTakeoverSubsystem::TryOpenNextTakeover()
 	}
 	if (not GetAreInfoTakeoversEnabled())
 	{
-		DropQueuedTakeoversWhileTurnedOff();
+		// May release missions that queue again; the queue is re-checked below.
+		DropQueuedUnitIntelWhileTurnedOff();
+	}
+	if (IsValid(M_ActiveTakeover) || M_QueuedTakeovers.IsEmpty())
+	{
 		return;
 	}
 	if (not GetCanOpenTakeoverNow())
@@ -294,12 +294,25 @@ void UInfoTakeoverSubsystem::TryOpenNextTakeover()
 	M_ActiveTakeover->OpenTakeover();
 }
 
-void UInfoTakeoverSubsystem::DropQueuedTakeoversWhileTurnedOff()
+void UInfoTakeoverSubsystem::DropQueuedUnitIntelWhileTurnedOff()
 {
-	// "Never show again" was just ticked: the waiting takeovers go straight to the archive. Moved out first, as a
-	// released mission may queue again from its callback.
-	const TArray<FQueuedInfoTakeover> DroppedTakeovers = MoveTemp(M_QueuedTakeovers);
-	M_QueuedTakeovers.Reset();
+	// "Never show again" was just ticked: the waiting unit intel goes straight to the archive, while the game-mechanic
+	// field manuals keep their place in the queue. The queue is settled first, as a released mission may queue again
+	// from its callback.
+	TArray<FQueuedInfoTakeover> DroppedTakeovers;
+	TArray<FQueuedInfoTakeover> KeptTakeovers;
+	for (const FQueuedInfoTakeover& QueuedTakeover : M_QueuedTakeovers)
+	{
+		if (InfoTakeoverKinds::GetIsUnitIntel(QueuedTakeover.Kind))
+		{
+			DroppedTakeovers.Add(QueuedTakeover);
+		}
+		else
+		{
+			KeptTakeovers.Add(QueuedTakeover);
+		}
+	}
+	M_QueuedTakeovers = MoveTemp(KeptTakeovers);
 	for (const FQueuedInfoTakeover& DroppedTakeover : DroppedTakeovers)
 	{
 		AddToArchive(DroppedTakeover);
@@ -350,6 +363,8 @@ UW_InfoTakeover* UInfoTakeoverSubsystem::CreateTakeoverWidget(const FQueuedInfoT
 		return CreateWespeBarrageTakeoverWidget();
 	case EInfoTakeoverKind::DigIn:
 		return CreateDigInTakeoverWidget();
+	case EInfoTakeoverKind::WallBreach:
+		return CreateWallBreachTakeoverWidget();
 	case EInfoTakeoverKind::AdrenalineShot:
 		return CreateAdrenalineShotTakeoverWidget();
 	default:
@@ -620,6 +635,31 @@ UW_InfoTakeover* UInfoTakeoverSubsystem::CreateDigInTakeoverWidget() const
 	return DigInTakeover;
 }
 
+UW_InfoTakeover* UInfoTakeoverSubsystem::CreateWallBreachTakeoverWidget() const
+{
+	ACPPController* const PlayerController = FRTS_Statics::GetRTSController(this);
+	if (not IsValid(PlayerController))
+	{
+		return nullptr;
+	}
+	TSubclassOf<UW_WallBreachTakeover> WidgetClass =
+		UInfoTakeoverSettings::Get()->WallBreachTakeoverWidgetClass.LoadSynchronous();
+	if (WidgetClass == nullptr)
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Info takeover: WBP_WallBreachTakeover could not be loaded; showing the "
+			"unstyled C++ widget."));
+		WidgetClass = UW_WallBreachTakeover::StaticClass();
+	}
+	UW_WallBreachTakeover* const WallBreachTakeover = CreateWidget<UW_WallBreachTakeover>(PlayerController,
+		WidgetClass);
+	if (not IsValid(WallBreachTakeover))
+	{
+		return nullptr;
+	}
+	WallBreachTakeover->SetupWallBreach();
+	return WallBreachTakeover;
+}
+
 UW_InfoTakeover* UInfoTakeoverSubsystem::CreateAdrenalineShotTakeoverWidget() const
 {
 	ACPPController* const PlayerController = FRTS_Statics::GetRTSController(this);
@@ -715,6 +755,9 @@ void UInfoTakeoverSubsystem::AddToArchive(const FQueuedInfoTakeover& Takeover) c
 		break;
 	case EInfoTakeoverKind::DigIn:
 		ArchiveContent = MakeDigInArchiveContent();
+		break;
+	case EInfoTakeoverKind::WallBreach:
+		ArchiveContent = MakeWallBreachArchiveContent();
 		break;
 	case EInfoTakeoverKind::AdrenalineShot:
 		ArchiveContent = MakeAdrenalineShotArchiveContent();
@@ -865,6 +908,19 @@ FArchiveCustomContent UInfoTakeoverSubsystem::MakeDigInArchiveContent()
 	ArchiveContent.Key = DigInArchiveKey;
 	ArchiveContent.Title = UW_DigInTakeover::GetDigInTitle();
 	ArchiveContent.Description = UW_DigInTakeover::GetDigInSummary();
+	// The picture is a flipbook atlas; the archive item only takes a still image of a fixed size.
+	ArchiveContent.bHasImage = false;
+	ArchiveContent.SortType = ERTSArchiveType::GameMechanics;
+	return ArchiveContent;
+}
+
+FArchiveCustomContent UInfoTakeoverSubsystem::MakeWallBreachArchiveContent()
+{
+	using namespace InfoTakeoverSubsystemPrivate;
+	FArchiveCustomContent ArchiveContent;
+	ArchiveContent.Key = WallBreachArchiveKey;
+	ArchiveContent.Title = UW_WallBreachTakeover::GetWallBreachTitle();
+	ArchiveContent.Description = UW_WallBreachTakeover::GetWallBreachSummary();
 	// The picture is a flipbook atlas; the archive item only takes a still image of a fixed size.
 	ArchiveContent.bHasImage = false;
 	ArchiveContent.SortType = ERTSArchiveType::GameMechanics;

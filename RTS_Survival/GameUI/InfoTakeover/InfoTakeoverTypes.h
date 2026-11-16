@@ -15,6 +15,7 @@ class UTexture2D;
 /**
  * What an info takeover introduces. Vehicles and squads exist now (both in the vehicle widget, each with its own
  * library); buildings come later and share the pause, the typewriter, the sounds and the one "never show again" switch.
+ * The other kinds are game-mechanic field manuals that the switch never hides (InfoTakeoverKinds::GetIsUnitIntel).
  */
 UENUM(BlueprintType)
 enum class EInfoTakeoverKind : uint8
@@ -48,8 +49,24 @@ enum class EInfoTakeoverKind : uint8
 	// node.
 	WespeBarrage,
 	// How a tank digs in behind a sandbag wall, with a short in-game clip; opened by the Show Dig In Takeover node.
-	DigIn
+	DigIn,
+	// How medium and heavy tanks drive through Soviet concrete walls, with a short in-game clip; opened by the Show
+	// Wall Breach Takeover node.
+	WallBreach
 };
+
+namespace InfoTakeoverKinds
+{
+	/**
+	 * @return True for unit intel (vehicles, squads, buildings), which the player can switch off with "never show again".
+	 * Every other kind is a game-mechanic field manual: it always shows and has no "never show again" box.
+	 */
+	inline bool GetIsUnitIntel(const EInfoTakeoverKind Kind)
+	{
+		return Kind == EInfoTakeoverKind::Vehicle || Kind == EInfoTakeoverKind::Squad
+			|| Kind == EInfoTakeoverKind::Building;
+	}
+}
 
 /**
  * @brief One prefab of the vehicle info takeover library (DT_VehicleInfoTakeovers): the hand-written part of the
