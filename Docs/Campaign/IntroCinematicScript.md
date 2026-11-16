@@ -840,3 +840,7 @@ material read as grey clay under the fixed exposure). Vein roots emerge dark fro
 out; the trench sun has a 2.5 deg disc (softer shadow edges); 5.2 opens with the growth further along (Mould 0.14).
 Reviewer leftovers, accepted by the owner: one lobe with a flat top, a smooth right lobe, slightly glossy tubes, one
 vein that runs under the sheet, near-static first 1.5 s of 5.2.
+
+**Final blind check of the committed build** (Source 47a42f02 / main 2435b1b6e, MRQ_Final): three fresh judges, A/B
+in random order, no hint which is which, majority per adjective fixed beforehand, the owner's own terms ("more scary
+and more detailed and real") against the pre-task 5.2 / 5.3: scary 3-0, detailed 3-0, real 3-0 for the final build.
