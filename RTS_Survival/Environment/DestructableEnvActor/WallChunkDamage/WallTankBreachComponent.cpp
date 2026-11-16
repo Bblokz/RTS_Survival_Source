@@ -3,12 +3,14 @@
 #include "WallTankBreachComponent.h"
 
 #include "Components/BoxComponent.h"
+#include "Components/InstancedStaticMeshComponent.h"
 #include "Components/ShapeComponent.h"
 #include "Components/ChildActorComponent.h"
 #include "Components/PrimitiveComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/World.h"
+#include "Engine/OverlapResult.h"
 #include "GameFramework/Actor.h"
 #include "GameFramework/Pawn.h"
 #include "Kismet/GameplayStatics.h"
@@ -78,6 +80,19 @@ namespace WallTankBreachConstants
 	// Attachments further than this from the wall's face (cm) stand on their own and stay.
 	constexpr float AttachmentWallReach = 150.f;
 	// A falling attachment tips this far (degrees) over this many seconds, accelerating.
+	// The top's fall takes TopCollapseDuration for every this much wall (cm) over the hull, at least once.
+	constexpr float TopCollapseReferenceHeight = 200.f;
+	// Probe for a touching wall piece just beyond a path end.
+	constexpr float PathEndSupportProbeRadius = 40.f;
+	constexpr float PathEndSupportProbeOutset = 30.f;
+	// Nav blocks reach this far past the wall's face (the engine grows them by each agent's radius anyway): infantry
+	// can stand at a wall, a 1.8 m strip kept them 2 m off it.
+	constexpr float NavBlockMarginOverWall = 40.f;
+	// Weapon blocks follow the fallen V in columns this wide; neighbours whose tops differ less than the step merge.
+	constexpr float WeaponColumnWidth = 50.f;
+	constexpr float WeaponTopStep = 20.f;
+	// Rubble left on the ground grows with the fallen area: RubblePieces per lane's worth, at most this many times.
+	constexpr float MaxRubbleScale = 3.f;
 	// Footprint radius of the kit's collapse heaps at scale 1 (SM_BerlinFoot_CollapseHeap_S / _L).
 	constexpr float SmallDeathHeapRadius = 300.f;
 	constexpr float LargeDeathHeapRadius = 500.f;
@@ -160,8 +175,13 @@ void UWallTankBreachComponent::OnWallCollisionSetUp(UPrimitiveComponent* const W
 	M_WallMesh = WallMesh;
 	// Tanks drive through: they overlap the wall (the overlap cuts the breach) and the mesh carves no nav; the wall's
 	// nav boxes decide who may plan through.
+	// Only the human player's tanks breach: AI-side units never raise overlap events on the wall (their response is
+	// left as the wall had it, unless that was an overlap).
 	WallMesh->SetCollisionResponseToChannel(COLLISION_OBJ_PLAYER, ECR_Overlap);
-	WallMesh->SetCollisionResponseToChannel(COLLISION_OBJ_ENEMY, ECR_Overlap);
+	if (WallMesh->GetCollisionResponseToChannel(COLLISION_OBJ_ENEMY) == ECR_Overlap)
+	{
+		WallMesh->SetCollisionResponseToChannel(COLLISION_OBJ_ENEMY, ECR_Ignore);
+	}
 	WallMesh->SetGenerateOverlapEvents(true);
 	WallMesh->SetCanEverAffectNavigation(false);
 	WallMesh->OnComponentBeginOverlap.RemoveDynamic(this, &UWallTankBreachComponent::OnWallBeginOverlap);
@@ -291,20 +311,32 @@ void UWallTankBreachComponent::StartCrossing(AActor* const Tank)
 		Existing->bIsOverlapping = true;
 		return;
 	}
+	if (bM_IsUpdatingCrossings)
+	{
+		M_DeferredCrossingTanks.AddUnique(Tank);
+		return;
+	}
 	FWallTankCrossing& Crossing = M_Crossings.AddDefaulted_GetRef();
 	Crossing.Tank = Tank;
 	// Colliding parts only: the hull and turret, not effects or selection decals.
 	constexpr bool bIncludeNonColliding = false;
 	constexpr bool bIncludeChildActors = false;
 	Crossing.LocalHullBox = Tank->CalculateComponentsBoundingBoxInLocalSpace(bIncludeNonColliding, bIncludeChildActors);
+	// Height from the tank's nav agent: the colliding bounds include the gun, antennas and hatches (Pz IV 375 cm).
+	const APawn* const TankPawn = Cast<APawn>(Tank);
+	const float AgentHeight = IsValid(TankPawn) ? TankPawn->GetNavAgentPropertiesRef().AgentHeight : 0.f;
+	if (AgentHeight > 0.f && Crossing.LocalHullBox.IsValid && Crossing.LocalHullBox.GetSize().Z > AgentHeight)
+	{
+		Crossing.LocalHullBox.Max.Z = Crossing.LocalHullBox.Min.Z + AgentHeight;
+	}
 	Crossing.FirstContactTime = GetWorld()->GetTimeSeconds();
 	Crossing.Breach.VSlope = Settings.VSlope;
 	Crossing.Breach.EdgeBand = Settings.EdgeBand;
 	Crossing.Breach.StubHeight = Settings.StubHeight;
 	UE_LOG(LogWallTankBreach, Display, TEXT("RTS_WALL_BREACH contact %s by %s hull=%s"), *GetNameSafe(GetOwner()),
 	       *GetNameSafe(Tank), *Crossing.LocalHullBox.GetSize().ToCompactString());
+	// The first step runs on the timer, never inside the overlap callback that started the crossing.
 	EnsureUpdateTimer();
-	UpdateCrossings();
 }
 
 void UWallTankBreachComponent::EnsureUpdateTimer()
@@ -330,7 +362,8 @@ void UWallTankBreachComponent::UpdateCrossings()
 	{
 		ReleaseAllTanks();
 	}
-	// Index loop, backwards: a step can kill the wall (collapse) but never adds crossings.
+	// Index loop, backwards: a step can kill the wall (collapse); new crossings wait in M_DeferredCrossingTanks.
+	bM_IsUpdatingCrossings = true;
 	for (int32 CrossingIndex = M_Crossings.Num() - 1; CrossingIndex >= 0; --CrossingIndex)
 	{
 		if (not M_Crossings.IsValidIndex(CrossingIndex))
@@ -340,7 +373,24 @@ void UWallTankBreachComponent::UpdateCrossings()
 		if (not UpdateCrossing(M_Crossings[CrossingIndex]) && M_Crossings.IsValidIndex(CrossingIndex))
 		{
 			ReleaseTank(M_Crossings[CrossingIndex]);
-			M_Crossings.RemoveAt(CrossingIndex);
+			if (M_Crossings[CrossingIndex].bHasWidenedAfterFall)
+			{
+				RefreshAfterLateWidening(M_Crossings[CrossingIndex]);
+			}
+			if (M_Crossings.IsValidIndex(CrossingIndex))
+			{
+				M_Crossings.RemoveAt(CrossingIndex);
+			}
+		}
+	}
+	bM_IsUpdatingCrossings = false;
+	const TArray<TWeakObjectPtr<AActor>> DeferredTanks = MoveTemp(M_DeferredCrossingTanks);
+	M_DeferredCrossingTanks.Reset();
+	for (const TWeakObjectPtr<AActor>& DeferredTank : DeferredTanks)
+	{
+		if (DeferredTank.IsValid())
+		{
+			StartCrossing(DeferredTank.Get());
 		}
 	}
 	UpdateAttachmentFalls();
@@ -416,11 +466,17 @@ void UWallTankBreachComponent::UpdateCrossing_Push(FWallTankCrossing& Crossing)
 	Breach.GroundZ = bIsFirstReach ? GroundZ : FMath::Min(Breach.GroundZ, GroundZ);
 	Breach.HullHeight = bIsFirstReach ? HullHeight : FMath::Max(Breach.HullHeight, HullHeight);
 	Crossing.HullZone = FBox2D(FVector2D(UMin, GroundZ), FVector2D(UMax, GroundZ + HullHeight));
+	Crossing.CutUMin = bIsFirstReach ? UMin - Settings.SideMargin : FMath::Min(Crossing.CutUMin, UMin - Settings.SideMargin);
+	Crossing.CutUMax = bIsFirstReach ? UMax + Settings.SideMargin : FMath::Max(Crossing.CutUMax, UMax + Settings.SideMargin);
 	constexpr bool bKeepDebrisOutOfHull = true;
 	if (ApplyBreachStep(Crossing, Settings.PushDebrisSpeedScale, bKeepDebrisOutOfHull) <= 0.f)
 	{
 		// Through an existing gap: nothing breaks, nothing slows the tank, no dust.
 		return;
+	}
+	if (Crossing.bHasTopFallen)
+	{
+		Crossing.bHasWidenedAfterFall = true;
 	}
 	SlowTank(Crossing);
 	if (Crossing.FirstBreakTime >= 0.0)
@@ -449,6 +505,7 @@ void UWallTankBreachComponent::UpdateCrossing_TopFall(FWallTankCrossing& Crossin
 		// whole run), then its own death plays (dust, debris, heap); the remnant it leaves is the removed field.
 		Crossing.bHasTopStartedFalling = true;
 		Crossing.bHasTopFallen = true;
+		Crossing.LaneIndex = M_TankLanes.Add(FVector2f(Crossing.CutUMin, Crossing.CutUMax));
 		Crossing.Breach.UMin = -Crossing.Breach.EdgeBand;
 		Crossing.Breach.UMax = M_HoleDamage->GetField().GetPathLength() + Crossing.Breach.EdgeBand;
 		Crossing.Breach.TopCollapse = 1.f;
@@ -462,12 +519,14 @@ void UWallTankBreachComponent::UpdateCrossing_TopFall(FWallTankCrossing& Crossin
 	if (not Crossing.bHasTopStartedFalling)
 	{
 		Crossing.bHasTopStartedFalling = true;
-		ExtendBreachOverFreeEnds(Crossing.Breach);
+		Crossing.LaneIndex = M_TankLanes.Add(FVector2f(Crossing.CutUMin, Crossing.CutUMax));
+		ExtendBreachOverFreeEnds(Crossing.Breach, Crossing.BreachIndex);
 		OnTopStartsFalling(Crossing);
 	}
 	// The slab over the hull drops first, then the edges crumble out to the full V.
-	const float Progress = Settings.TopCollapseDuration > 0.f
-		                       ? FMath::Clamp(static_cast<float>(FallingFor) / Settings.TopCollapseDuration, 0.f, 1.f)
+	const float CollapseDuration = GetTopCollapseDuration(Crossing.Breach);
+	const float Progress = CollapseDuration > 0.f
+		                       ? FMath::Clamp(static_cast<float>(FallingFor) / CollapseDuration, 0.f, 1.f)
 		                       : 1.f;
 	Crossing.Breach.TopCollapse = FMath::Max(Progress, MinTopCollapse);
 	constexpr bool bKeepDebrisOutOfHull = false;
@@ -475,6 +534,14 @@ void UWallTankBreachComponent::UpdateCrossing_TopFall(FWallTankCrossing& Crossin
 	if (Progress < 1.f)
 	{
 		return;
+	}
+	// Gaps that finished falling meanwhile (two tanks side by side): a pier left between them falls now.
+	const float UMinBeforeRecheck = Crossing.Breach.UMin;
+	const float UMaxBeforeRecheck = Crossing.Breach.UMax;
+	ExtendBreachOverFreeEnds(Crossing.Breach, Crossing.BreachIndex);
+	if (Crossing.Breach.UMin != UMinBeforeRecheck || Crossing.Breach.UMax != UMaxBeforeRecheck)
+	{
+		ApplyBreachStep(Crossing, Settings.FallDebrisSpeedScale, bKeepDebrisOutOfHull);
 	}
 	Crossing.bHasTopFallen = true;
 	OnTopFallen(Crossing);
@@ -608,23 +675,127 @@ float UWallTankBreachComponent::ApplyBreachStep(FWallTankCrossing& Crossing, con
 	return Removed;
 }
 
-void UWallTankBreachComponent::ExtendBreachOverFreeEnds(FWallHoleFieldBreach& Breach) const
+void UWallTankBreachComponent::ExtendBreachOverFreeEnds(FWallHoleFieldBreach& Breach, const int32 OwnBreachIndex) const
 {
 	const FWallHoleField& Field = M_HoleDamage->GetField();
 	const float WallHeight = Field.GetZMax() - Breach.GroundZ;
-	const float MinStandingWidth = WallHeight * Settings.MinFreeStandingWidthShare;
+	const float MinStandingWidth = FMath::Min(WallHeight * Settings.MinFreeStandingWidthShare,
+	                                          Settings.MaxFreeStandingWidth);
 	FWallHoleFieldBreach FullyFallen = Breach;
 	FullyFallen.TopCollapse = 1.f;
 	const float TopReach = Field.GetBreachTopHalfWidth(FullyFallen) - (Breach.UMax - Breach.UMin) * 0.5f;
 	// The stretch between the top of the V and a wall end is all that holds that end up.
-	if (Breach.UMin - TopReach < MinStandingWidth)
+	// A pier between this gap and one that fell earlier holds up nothing but itself: too narrow, it falls too.
+	for (int32 BreachIndex = 0; BreachIndex < M_HoleDamage->GetBreachCount(); ++BreachIndex)
+	{
+		const FWallHoleFieldBreach* const Other = M_HoleDamage->GetBreach(BreachIndex);
+		if (BreachIndex == OwnBreachIndex || Other == nullptr || Other->TopCollapse < 1.f)
+		{
+			continue;
+		}
+		const float OtherTopReach = Field.GetBreachTopHalfWidth(*Other) - (Other->UMax - Other->UMin) * 0.5f;
+		if (Other->UMax <= Breach.UMin && Breach.UMin - TopReach - (Other->UMax + OtherTopReach) < MinStandingWidth)
+		{
+			Breach.UMin = FMath::Min(Breach.UMin, Other->UMax);
+		}
+		if (Other->UMin >= Breach.UMax && Other->UMin - OtherTopReach - (Breach.UMax + TopReach) < MinStandingWidth)
+		{
+			Breach.UMax = FMath::Max(Breach.UMax, Other->UMin);
+		}
+	}
+	if (Breach.UMin - TopReach < MinStandingWidth && not GetIsPathEndSupported(0.f))
 	{
 		Breach.UMin = -Breach.EdgeBand;
 	}
-	if (Field.GetPathLength() - (Breach.UMax + TopReach) < MinStandingWidth)
+	if (Field.GetPathLength() - (Breach.UMax + TopReach) < MinStandingWidth
+		&& not GetIsPathEndSupported(Field.GetPathLength()))
 	{
 		Breach.UMax = Field.GetPathLength() + Breach.EdgeBand;
 	}
+}
+
+void UWallTankBreachComponent::RefreshAfterLateWidening(FWallTankCrossing& Crossing)
+{
+	Crossing.bHasWidenedAfterFall = false;
+	if (not GetIsValidHoleDamage() || M_HoleDamage->GetHasCollapsed())
+	{
+		return;
+	}
+	if (M_TankLanes.IsValidIndex(Crossing.LaneIndex))
+	{
+		M_TankLanes[Crossing.LaneIndex] = FVector2f(Crossing.CutUMin, Crossing.CutUMax);
+	}
+	const float UMinBefore = Crossing.Breach.UMin;
+	const float UMaxBefore = Crossing.Breach.UMax;
+	ExtendBreachOverFreeEnds(Crossing.Breach, Crossing.BreachIndex);
+	if (Crossing.Breach.UMin != UMinBefore || Crossing.Breach.UMax != UMaxBefore)
+	{
+		constexpr bool bKeepDebrisOutOfHull = false;
+		ApplyBreachStep(Crossing, Settings.FallDebrisSpeedScale, bKeepDebrisOutOfHull);
+	}
+	if (Settings.bHideAttachmentsOverBreach)
+	{
+		DropAttachmentsOverBreach(Crossing);
+	}
+	if (Settings.bManageWallNav)
+	{
+		BuildWallNav();
+	}
+	RebuildWeaponCollision();
+	UE_LOG(LogWallTankBreach, Display, TEXT("RTS_WALL_BREACH late widening %s u=[%.0f, %.0f]"), *GetNameSafe(GetOwner()),
+	       Crossing.Breach.UMin, Crossing.Breach.UMax);
+}
+
+float UWallTankBreachComponent::GetNavBlockHalfDepth() const
+{
+	using namespace WallTankBreachConstants;
+	const float WallHalfThickness = GetIsValidHoleDamage() ? M_HoleDamage->GetField().GetThickness() * 0.5f : 0.f;
+	return FMath::Min(Settings.NavBlockHalfDepth, WallHalfThickness + NavBlockMarginOverWall);
+}
+
+bool UWallTankBreachComponent::GetIsPathEndSupported(const float U) const
+{
+	using namespace WallTankBreachConstants;
+	const UWorld* const World = GetWorld();
+	if (not IsValid(World) || not GetIsValidWallMesh() || not GetIsValidHoleDamage())
+	{
+		return false;
+	}
+	const FWallHoleField& Field = M_HoleDamage->GetField();
+	const bool bIsStart = U <= 0.f;
+	const float ProbeU = bIsStart ? U - PathEndSupportProbeOutset : U + PathEndSupportProbeOutset;
+	FVector FaceNormal = FVector::ZeroVector;
+	const float MidZ = (Field.GetZMin() + Field.GetZMax()) * 0.5f;
+	const FVector Probe = M_WallMesh->GetComponentTransform().TransformPosition(
+		Field.GetMeshPoint(ProbeU, MidZ, 0.f, FaceNormal));
+	TArray<FOverlapResult> Overlaps;
+	const FCollisionQueryParams Params(SCENE_QUERY_STAT(WallBreachEndSupport), false, GetOwner());
+	World->OverlapMultiByObjectType(Overlaps, Probe, FQuat::Identity,
+	                                FCollisionObjectQueryParams(FCollisionObjectQueryParams::AllObjects),
+	                                FCollisionShape::MakeSphere(PathEndSupportProbeRadius), Params);
+	for (const FOverlapResult& Overlap : Overlaps)
+	{
+		// Only a standing wall piece holds the end up: not a dead one, a crate or a fence.
+		AActor* const Other = Overlap.GetActor();
+		if (not IsValid(Other) || Other == GetOwner() || not Other->IsA<ADestructableEnvActor>() || not Other->IsUnitAlive())
+		{
+			continue;
+		}
+		const UWallHoleDamageComponent* const OtherHoles = Other->FindComponentByClass<UWallHoleDamageComponent>();
+		// Its collision has no gaps: a neighbour whose own breach reaches the joint holds nothing up there.
+		if (IsValid(OtherHoles) && not OtherHoles->GetIsWorldPointInBreach(Probe))
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
+float UWallTankBreachComponent::GetTopCollapseDuration(const FWallHoleFieldBreach& Breach) const
+{
+	using namespace WallTankBreachConstants;
+	const float HeightOverHull = M_HoleDamage->GetField().GetZMax() - Breach.GroundZ - Breach.HullHeight;
+	return Settings.TopCollapseDuration * FMath::Max(1.f, HeightOverHull / TopCollapseReferenceHeight);
 }
 
 void UWallTankBreachComponent::OnTopStartsFalling(const FWallTankCrossing& Crossing)
@@ -665,12 +836,12 @@ void UWallTankBreachComponent::OnTopFallen(const FWallTankCrossing& Crossing)
 
 void UWallTankBreachComponent::RebuildWeaponCollision()
 {
+	using namespace WallTankBreachConstants;
 	if (not GetIsValidWallMesh() || not GetIsValidHoleDamage())
 	{
 		return;
 	}
-	const TArray<FVector2f> OpenIntervals = GetOpenNavIntervals();
-	if (OpenIntervals.IsEmpty())
+	if (GetOpenNavIntervals().IsEmpty())
 	{
 		return;
 	}
@@ -700,23 +871,44 @@ void UWallTankBreachComponent::RebuildWeaponCollision()
 		float UStart = 0.f;
 		float UEnd = 0.f;
 		Field.GetSegment(SegmentIndex, Start, End, UStart, UEnd);
+		// Columns along the run: each block is as high as the wall still standing there, so shells and sight lines
+		// pass over the shoulders of the fallen V; columns with the same top merge into one block.
 		float BlockFrom = UStart;
-		for (const FVector2f& Open : OpenIntervals)
+		float BlockTop = GetStandingTopZ(FMath::Min(UStart + WeaponColumnWidth * 0.5f, UEnd));
+		for (float ColumnFrom = UStart + WeaponColumnWidth; ColumnFrom < UEnd; ColumnFrom += WeaponColumnWidth)
 		{
-			if (Open.Y <= BlockFrom || Open.X >= UEnd)
+			const float ColumnTop = GetStandingTopZ(FMath::Min(ColumnFrom + WeaponColumnWidth * 0.5f, UEnd));
+			if (FMath::Abs(ColumnTop - BlockTop) < WeaponTopStep)
 			{
 				continue;
 			}
-			AddWeaponBlock(SegmentIndex, BlockFrom, FMath::Max(BlockFrom, Open.X));
-			BlockFrom = FMath::Max(BlockFrom, Open.Y);
+			AddWeaponBlock(SegmentIndex, BlockFrom, ColumnFrom, BlockTop);
+			BlockFrom = ColumnFrom;
+			BlockTop = ColumnTop;
 		}
-		AddWeaponBlock(SegmentIndex, BlockFrom, UEnd);
+		AddWeaponBlock(SegmentIndex, BlockFrom, UEnd, BlockTop);
 	}
 }
 
-void UWallTankBreachComponent::AddWeaponBlock(const int32 SegmentIndex, const float UFrom, const float UTo)
+float UWallTankBreachComponent::GetStandingTopZ(const float U) const
 {
-	if (UTo - UFrom < WallTankBreachConstants::MinNavBlockLength)
+	using namespace WallTankBreachConstants;
+	const FWallHoleField& Field = M_HoleDamage->GetField();
+	for (float Z = Field.GetZMax() - WeaponTopStep * 0.5f; Z > Field.GetZMin(); Z -= WeaponTopStep)
+	{
+		if (not Field.GetIsInBreach(U, Z))
+		{
+			return Z + WeaponTopStep * 0.5f;
+		}
+	}
+	return Field.GetZMin();
+}
+
+void UWallTankBreachComponent::AddWeaponBlock(const int32 SegmentIndex, const float UFrom, const float UTo,
+                                              const float TopZ)
+{
+	const float BottomZ = M_HoleDamage->GetField().GetZMin();
+	if (UTo - UFrom < WallTankBreachConstants::MinNavBlockLength || TopZ - BottomZ < WallTankBreachConstants::MinNavBlockLength)
 	{
 		return;
 	}
@@ -728,7 +920,7 @@ void UWallTankBreachComponent::AddWeaponBlock(const int32 SegmentIndex, const fl
 	Field.GetSegment(SegmentIndex, Start, End, UStart, UEnd);
 	const FVector2D Direction = (End - Start).GetSafeNormal();
 	const FVector2D MeshCentre2D = Start + Direction * ((UFrom + UTo) * 0.5f - UStart);
-	const float MidZ = (Field.GetZMin() + Field.GetZMax()) * 0.5f;
+	const float MidZ = (BottomZ + TopZ) * 0.5f;
 	const FTransform MeshTransform = M_WallMesh->GetComponentTransform();
 	const FVector WorldAlong = MeshTransform.TransformVector(FVector(Direction.X, Direction.Y, 0.0));
 	const FVector WorldAcross = MeshTransform.TransformVector(FVector(-Direction.Y, Direction.X, 0.0));
@@ -737,13 +929,15 @@ void UWallTankBreachComponent::AddWeaponBlock(const int32 SegmentIndex, const fl
 	Block->SetMobility(EComponentMobility::Movable);
 	Block->SetCanEverAffectNavigation(false);
 	Block->SetGenerateOverlapEvents(false);
-	Block->SetCollisionObjectType(M_WallMesh->GetCollisionObjectType());
+	// Not the mesh's object type (destructible): area damage queries that type and hits every component it finds, so a
+	// breached wall would take splash once per block. Shells and sight find the blocks by trace channel (responses).
+	Block->SetCollisionObjectType(ECC_WorldDynamic);
 	Block->SetCollisionResponseToChannels(M_WeaponResponses);
 	Block->SetCollisionResponseToChannel(COLLISION_OBJ_PLAYER, ECR_Ignore);
 	Block->SetCollisionResponseToChannel(COLLISION_OBJ_ENEMY, ECR_Ignore);
 	Block->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
 	Block->SetBoxExtent(FVector((UTo - UFrom) * 0.5f * WorldAlong.Size(), Field.GetThickness() * 0.5f * WorldAcross.Size(),
-	                            (Field.GetZMax() - Field.GetZMin()) * 0.5f * WorldUp.Size()), false);
+	                            (TopZ - BottomZ) * 0.5f * WorldUp.Size()), false);
 	Block->SetWorldLocationAndRotation(MeshTransform.TransformPosition(FVector(MeshCentre2D.X, MeshCentre2D.Y, MidZ)),
 	                                   FRotationMatrix::MakeFromXZ(WorldAlong, WorldUp).ToQuat());
 	Block->RegisterComponent();
@@ -775,7 +969,20 @@ void UWallTankBreachComponent::OnWallDied()
 		M_WallMesh->SetCollisionResponseToChannels(M_WeaponResponses);
 		bM_HasTakenOverWeaponCollision = false;
 	}
-	HandNavBackToKit();
+	if (not M_KitObstacleBoxes.IsEmpty())
+	{
+		HandNavBackToKit();
+		return;
+	}
+	// A Rus wall collapses and is hidden at once (the actor lives on a few seconds): nothing blocks there any more.
+	for (URTSNavCollisionEnvObstacle* const NavBlock : M_NavBlocks)
+	{
+		if (IsValid(NavBlock))
+		{
+			NavBlock->DestroyComponent();
+		}
+	}
+	M_NavBlocks.Reset();
 }
 
 void UWallTankBreachComponent::OnWallDied_KeepBreachInRemnant()
@@ -791,6 +998,7 @@ void UWallTankBreachComponent::OnWallDied_KeepBreachInRemnant()
 			NavBlock->SetAreaClass(UNavArea_Null::StaticClass());
 		}
 	}
+	RestoreKitAreasOfRelevantBoxes();
 	RemoveDeathHeapsOverOpenBreaches();
 	UE_LOG(LogWallTankBreach, Display, TEXT("RTS_WALL_BREACH remnant %s keeps its gap: nav blocks=%d weapon blocks=%d"),
 	       *GetNameSafe(GetOwner()), M_NavBlocks.Num(), M_WeaponBlocks.Num());
@@ -865,6 +1073,77 @@ void UWallTankBreachComponent::HandNavBackToKit()
 	}
 }
 
+void UWallTankBreachComponent::SetKitObstacleAreaOutsideTankLanes(const TSubclassOf<UNavArea> AreaClass)
+{
+	for (UShapeComponent* const Shape : M_KitObstacleBoxes)
+	{
+		if (not IsValid(Shape))
+		{
+			continue;
+		}
+		const bool bIsRelevant = not GetIsKitBoxInTankLane(*Shape);
+		if (bIsRelevant && Shape->GetDesiredAreaClass() != AreaClass)
+		{
+			Shape->SetAreaClassOverride(AreaClass);
+			FNavigationSystem::UpdateComponentData(*Shape);
+		}
+		if (Shape->CanEverAffectNavigation() != bIsRelevant)
+		{
+			Shape->SetCanEverAffectNavigation(bIsRelevant);
+		}
+	}
+}
+
+bool UWallTankBreachComponent::GetIsKitBoxInTankLane(const UShapeComponent& Shape) const
+{
+	if (M_TankLanes.IsEmpty() || not GetIsValidWallMesh() || not GetIsValidHoleDamage())
+	{
+		return false;
+	}
+	// The box's run along the wall: its footprint corners projected onto the wall path.
+	const FBoxSphereBounds LocalBounds = Shape.CalcBounds(FTransform::Identity);
+	const FTransform& BoxTransform = Shape.GetComponentTransform();
+	const FTransform& MeshTransform = M_WallMesh->GetComponentTransform();
+	float BoxUMin = TNumericLimits<float>::Max();
+	float BoxUMax = TNumericLimits<float>::Lowest();
+	for (const float SignX : {-1.f, 1.f})
+	{
+		for (const float SignY : {-1.f, 1.f})
+		{
+			const FVector Corner = LocalBounds.Origin + FVector(SignX * LocalBounds.BoxExtent.X,
+			                                                    SignY * LocalBounds.BoxExtent.Y, 0.0);
+			float U = 0.f;
+			float Offset = 0.f;
+			M_HoleDamage->GetField().ProjectToPath(
+				MeshTransform.InverseTransformPosition(BoxTransform.TransformPosition(Corner)), U, Offset);
+			BoxUMin = FMath::Min(BoxUMin, U);
+			BoxUMax = FMath::Max(BoxUMax, U);
+		}
+	}
+	for (const FVector2f& Lane : M_TankLanes)
+	{
+		if (BoxUMax > Lane.X && BoxUMin < Lane.Y)
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
+void UWallTankBreachComponent::RestoreKitAreasOfRelevantBoxes()
+{
+	for (int32 BoxIndex = 0; BoxIndex < M_KitObstacleBoxes.Num(); ++BoxIndex)
+	{
+		UShapeComponent* const Shape = M_KitObstacleBoxes[BoxIndex];
+		if (not IsValid(Shape) || not Shape->CanEverAffectNavigation() || not M_KitObstacleAreas.IsValidIndex(BoxIndex))
+		{
+			continue;
+		}
+		Shape->SetAreaClassOverride(M_KitObstacleAreas[BoxIndex]);
+		FNavigationSystem::UpdateComponentData(*Shape);
+	}
+}
+
 void UWallTankBreachComponent::RemoveDeathHeapsOverOpenBreaches() const
 {
 	using namespace WallTankBreachConstants;
@@ -872,7 +1151,8 @@ void UWallTankBreachComponent::RemoveDeathHeapsOverOpenBreaches() const
 	{
 		return;
 	}
-	const TArray<FVector2f> OpenIntervals = GetOpenNavIntervals();
+	// The tank lanes, not the fallen run: heaps beside the lane still come down where the kit put them.
+	const TArray<FVector2f>& OpenIntervals = M_TankLanes;
 	const TPair<FName, float> HeapArrays[] = {
 		{FName(TEXT("DeathHeapsSmall")), SmallDeathHeapRadius}, {FName(TEXT("DeathHeapsLarge")), LargeDeathHeapRadius}
 	};
@@ -884,6 +1164,9 @@ void UWallTankBreachComponent::RemoveDeathHeapsOverOpenBreaches() const
 			                                             : nullptr;
 		if (InnerProperty == nullptr || InnerProperty->Struct != TBaseStructure<FTransform>::Get())
 		{
+			RTSFunctionLibrary::ReportError(TEXT("UWallTankBreachComponent on ") + GetNameSafe(GetOwner())
+				+ TEXT(": the ruin kit death heap array ") + HeapArray.Key.ToString()
+				+ TEXT(" (TArray<FTransform>) is missing; a death heap may land in the breach."));
 			continue;
 		}
 		TArray<FTransform>* const Heaps = ArrayProperty->ContainerPtrToValuePtr<TArray<FTransform>>(GetOwner());
@@ -953,7 +1236,15 @@ void UWallTankBreachComponent::SpawnRubble(const FWallTankCrossing& Crossing)
 	const FWallHoleFieldBreach& Breach = Crossing.Breach;
 	const FTransform MeshTransform = M_WallMesh->GetComponentTransform();
 	const float Spill = (Breach.UMax - Breach.UMin) * RubbleSpillShare;
-	for (int32 PieceIndex = 0; PieceIndex < Settings.RubblePieces; ++PieceIndex)
+	// More fell than the lane (free ends, the V of a tall wall): more rubble, up to MaxRubbleScale times.
+	// This crossing's own lane (two tanks can cross the same wall at once).
+	const FVector2f Lane = M_TankLanes.IsValidIndex(Crossing.LaneIndex)
+		                       ? M_TankLanes[Crossing.LaneIndex]
+		                       : FVector2f(Breach.UMin, Breach.UMax);
+	const float RubbleScale = FMath::Clamp((Breach.UMax - Breach.UMin) / FMath::Max(Lane.Y - Lane.X, 1.f), 1.f,
+	                                       MaxRubbleScale);
+	const int32 RubbleCount = FMath::RoundToInt32(Settings.RubblePieces * RubbleScale);
+	for (int32 PieceIndex = 0; PieceIndex < RubbleCount; ++PieceIndex)
 	{
 		UStaticMesh* const Mesh = Meshes[FMath::RandRange(0, Meshes.Num() - 1)];
 		if (not IsValid(Mesh))
@@ -976,19 +1267,36 @@ void UWallTankBreachComponent::SpawnRubble(const FWallTankCrossing& Crossing)
 		const float Scale = FMath::FRandRange(RubbleMinSize, RubbleMaxSize) / FMath::Max(MeshSize.GetMax(), 1.0);
 		Location.Z = WallDamageShared::GetGroundHeightBelow(*GetOwner(), Location + FVector::UpVector * RubbleMaxSize)
 			- MeshSize.Z * Scale * RubbleSinkShare;
-		UStaticMeshComponent* const Piece = NewObject<UStaticMeshComponent>(GetOwner());
-		Piece->SetStaticMesh(Mesh);
-		Piece->SetMobility(EComponentMobility::Movable);
-		Piece->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-		Piece->SetCanEverAffectNavigation(false);
-		Piece->SetCastShadow(true);
-		Piece->SetWorldLocationAndRotation(Location, FRotator(FMath::FRandRange(-RubbleMaxTilt, RubbleMaxTilt),
-		                                                      FMath::FRandRange(0.f, FullTurnDegrees),
-		                                                      FMath::FRandRange(-RubbleMaxTilt, RubbleMaxTilt)));
-		Piece->SetWorldScale3D(FVector(Scale));
-		Piece->RegisterComponent();
-		M_RubblePieces.Add(Piece);
+		UInstancedStaticMeshComponent* const Instances = GetOrCreateRubbleInstances(Mesh);
+		if (not IsValid(Instances))
+		{
+			continue;
+		}
+		const FRotator Rotation(FMath::FRandRange(-RubbleMaxTilt, RubbleMaxTilt), FMath::FRandRange(0.f, FullTurnDegrees),
+		                        FMath::FRandRange(-RubbleMaxTilt, RubbleMaxTilt));
+		constexpr bool bIsWorldSpace = true;
+		Instances->AddInstance(FTransform(Rotation, Location, FVector(Scale)), bIsWorldSpace);
 	}
+}
+
+UInstancedStaticMeshComponent* UWallTankBreachComponent::GetOrCreateRubbleInstances(UStaticMesh* const Mesh)
+{
+	for (UInstancedStaticMeshComponent* const Instances : M_RubbleInstances)
+	{
+		if (IsValid(Instances) && Instances->GetStaticMesh() == Mesh)
+		{
+			return Instances;
+		}
+	}
+	UInstancedStaticMeshComponent* const Instances = NewObject<UInstancedStaticMeshComponent>(GetOwner());
+	Instances->SetStaticMesh(Mesh);
+	Instances->SetMobility(EComponentMobility::Movable);
+	Instances->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	Instances->SetCanEverAffectNavigation(false);
+	Instances->SetCastShadow(true);
+	Instances->RegisterComponent();
+	M_RubbleInstances.Add(Instances);
+	return Instances;
 }
 
 void UWallTankBreachComponent::DropAttachmentsOverBreach(const FWallTankCrossing& Crossing)
@@ -1005,7 +1313,8 @@ void UWallTankBreachComponent::DropAttachmentsOverBreach(const FWallTankCrossing
 	TInlineComponentArray<UStaticMeshComponent*> MeshComponents(GetOwner());
 	for (UStaticMeshComponent* const MeshComponent : MeshComponents)
 	{
-		const bool bIsWallOrRubble = MeshComponent == M_WallMesh.Get() || M_RubblePieces.Contains(MeshComponent);
+		const bool bIsWallOrRubble = MeshComponent == M_WallMesh.Get()
+			|| M_RubbleInstances.Contains(Cast<UInstancedStaticMeshComponent>(MeshComponent));
 		if (not IsValid(MeshComponent) || bIsWallOrRubble || not MeshComponent->IsVisible())
 		{
 			continue;
@@ -1019,7 +1328,12 @@ void UWallTankBreachComponent::DropAttachmentsOverBreach(const FWallTankCrossing
 		{
 			continue;
 		}
-		StartAttachmentFall(MeshComponent, Crossing.LastTravel);
+		const bool bIsFallingAlready = M_AttachmentFalls.ContainsByPredicate(
+			[MeshComponent](const FWallAttachmentFall& Fall) { return Fall.Component.Get() == MeshComponent; });
+		if (not bIsFallingAlready)
+		{
+			StartAttachmentFall(MeshComponent, Crossing.LastTravel);
+		}
 	}
 }
 
@@ -1114,7 +1428,7 @@ void UWallTankBreachComponent::BuildWallNav()
 		       M_KitObstacleBoxes.Num(), *GetNameSafe(WallArea.Get()));
 		return;
 	}
-	SetKitObstacleArea(nullptr, false);
+	SetKitObstacleAreaOutsideTankLanes(WallArea);
 	TakeOverWallNav();
 	for (URTSNavCollisionEnvObstacle* const NavBlock : M_NavBlocks)
 	{
@@ -1225,7 +1539,16 @@ TSubclassOf<UNavArea> UWallTankBreachComponent::GetWallNavArea()
 
 TArray<FVector2f> UWallTankBreachComponent::GetOpenNavIntervals() const
 {
+	return GetOpenIntervals(Settings.NavGapInset);
+}
+
+TArray<FVector2f> UWallTankBreachComponent::GetOpenIntervals(const float Inset) const
+{
 	TArray<FVector2f> Intervals;
+	if (not GetIsValidHoleDamage())
+	{
+		return Intervals;
+	}
 	for (int32 BreachIndex = 0; BreachIndex < M_HoleDamage->GetBreachCount(); ++BreachIndex)
 	{
 		const FWallHoleFieldBreach* const Breach = M_HoleDamage->GetBreach(BreachIndex);
@@ -1234,8 +1557,8 @@ TArray<FVector2f> UWallTankBreachComponent::GetOpenNavIntervals() const
 		{
 			continue;
 		}
-		const float From = Breach->UMin + Settings.NavGapInset;
-		const float To = Breach->UMax - Settings.NavGapInset;
+		const float From = Breach->UMin + Inset;
+		const float To = Breach->UMax - Inset;
 		if (To > From)
 		{
 			Intervals.Add(FVector2f(From, To));
@@ -1275,7 +1598,7 @@ void UWallTankBreachComponent::AddNavBlock(const int32 SegmentIndex, const float
 	const FVector WorldCentre = MeshTransform.TransformPosition(FVector(MeshCentre2D.X, MeshCentre2D.Y, Field.GetZMin()));
 	// Scaled along the run: one mesh-space cm along the segment is this long in the world.
 	const FVector WorldAlong = MeshTransform.TransformVector(FVector(Direction.X, Direction.Y, 0.0));
-	const FVector LocalExtent((UTo - UFrom) * 0.5f * WorldAlong.Size(), Settings.NavBlockHalfDepth,
+	const FVector LocalExtent((UTo - UFrom) * 0.5f * WorldAlong.Size(), GetNavBlockHalfDepth(),
 	                          Settings.NavBlockHalfHeight);
 	URTSNavCollisionEnvObstacle* const NavBlock = NewObject<URTSNavCollisionEnvObstacle>(GetOwner());
 	NavBlock->SetAreaClass(BlockedArea);

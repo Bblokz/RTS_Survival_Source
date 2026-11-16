@@ -9,6 +9,8 @@
 #include "WallTankBreachComponent.generated.h"
 
 class UBoxComponent;
+class UInstancedStaticMeshComponent;
+class UStaticMesh;
 class UNavAreaBase;
 class UShapeComponent;
 class UNavArea;
@@ -69,6 +71,10 @@ struct FWallTankBreachSettings
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category="Breach", meta=(ClampMin="0.0"))
 	float MinFreeStandingWidthShare = 0.6f;
 
+	// Cap of that width (cm): the end of a tall brick facade a few metres wide stands on its own.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category="Breach", meta=(ClampMin="0.0"))
+	float MaxFreeStandingWidth = 250.f;
+
 	// Debris speed while the hull pushes through, and for the slabs that fall from above.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category="Breach", meta=(ClampMin="0.0"))
 	float PushDebrisSpeedScale = 0.45f;
@@ -128,9 +134,12 @@ struct FWallTankBreachSettings
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category="Breach|Navigation", meta=(ClampMin="50.0"))
 	float NavBlockHalfHeight = 400.f;
 
-	// The open gap for navigation is this much narrower than the broken stretch on each side (jagged edges, rubble).
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category="Breach|Navigation", meta=(ClampMin="0.0"))
-	float NavGapInset = 30.f;
+	// The nav blocks stop this far inside the broken stretch on each side (negative: short of it). The engine grows
+	// every block by the agent's radius, so a gap the size of the breaching tank's hull plus margins only lets a tank
+	// of the same class through when the blocks stop short of the jagged edge (-25: Pz IV 420 cm open for a 320 cm
+	// medium agent, Tiger 500 for 400).
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category="Breach|Navigation", meta=(ClampMin="-100.0"))
+	float NavGapInset = -25.f;
 };
 
 /** One medium or heavy tank pushing through the wall. */
@@ -158,6 +167,13 @@ struct FWallTankCrossing
 	bool bHasTopFallen = false;
 	// The tank is slowed (ATankMaster mobility restriction, this component as source) while its hull pushes through.
 	bool bIsSlowed = false;
+	// What the hull itself cut (margins included, free ends not): the lane in M_TankLanes once the top has fallen.
+	float CutUMin = 0.f;
+	float CutUMax = 0.f;
+	int32 LaneIndex = INDEX_NONE;
+	// The hull cut more after the top had fallen (an oblique crossing): nav, weapon blocks and flags follow once the
+	// tank has left the wall.
+	bool bHasWidenedAfterFall = false;
 };
 
 /** A flag or pole on a fallen stretch of wall, tipping over and dropping to the ground. */
@@ -267,7 +283,15 @@ private:
 	float ApplyBreachStep(FWallTankCrossing& Crossing, float DebrisSpeedScale, bool bKeepDebrisOutOfHull);
 
 	// A free end of the wall too narrow to stand on its own once the V is cut falls with it.
-	void ExtendBreachOverFreeEnds(FWallHoleFieldBreach& Breach) const;
+	void ExtendBreachOverFreeEnds(FWallHoleFieldBreach& Breach, int32 OwnBreachIndex) const;
+	// A crossing that widened its gap after the fall: its lane, the free ends and the wall's nav and blocks catch up.
+	void RefreshAfterLateWidening(FWallTankCrossing& Crossing);
+	/** @return Half depth of the nav blocks: the setting, but no deeper than the wall needs (infantry stand at it). */
+	float GetNavBlockHalfDepth() const;
+	// An end that touches another wall piece (chained walls) is held up by it and never counts as free.
+	bool GetIsPathEndSupported(float U) const;
+	// The fall over the hull takes longer on a tall wall (TopCollapseDuration per 2 m of wall over the hull).
+	float GetTopCollapseDuration(const FWallHoleFieldBreach& Breach) const;
 	void OnTopStartsFalling(const FWallTankCrossing& Crossing);
 	void OnTopFallen(const FWallTankCrossing& Crossing);
 	void PlayBreachEffects(const FVector& WorldLocation, float DustScale) const;
@@ -278,6 +302,8 @@ private:
 	 * @param Crossing The crossing whose top has fallen.
 	 */
 	void DropAttachmentsOverBreach(const FWallTankCrossing& Crossing);
+	/** @return The wall's rubble instances for this debris mesh; created (no collision, no nav) on first use. */
+	UInstancedStaticMeshComponent* GetOrCreateRubbleInstances(UStaticMesh* Mesh);
 	void StartAttachmentFall(UStaticMeshComponent* Attachment, const FVector& TravelDirection);
 	void UpdateAttachmentFalls();
 	FVector GetBreachWorldPoint(const FWallHoleFieldBreach& Breach, float HeightAboveGround) const;
@@ -288,7 +314,11 @@ private:
 	 * visibility traces and boxes along the standing stretches block them instead (same responses as the mesh had).
 	 */
 	void RebuildWeaponCollision();
-	void AddWeaponBlock(int32 SegmentIndex, float UFrom, float UTo);
+	void AddWeaponBlock(int32 SegmentIndex, float UFrom, float UTo, float TopZ);
+	/** @return Mesh-space top of the wall still standing at U (the fallen V lowers it); ZMin when nothing stands. */
+	float GetStandingTopZ(float U) const;
+	/** @return The fallen breaches along the wall (merged), each side moved by Inset. */
+	TArray<FVector2f> GetOpenIntervals(float Inset) const;
 	void OnWallDied();
 	// A breached Berlin ruin's remnant: keeps its gap (nav and weapon blocks) instead of the kit's full-length boxes.
 	void OnWallDied_KeepBreachInRemnant();
@@ -321,6 +351,11 @@ private:
 	// they carry the wall's area meanwhile, and get their own area back when the piece dies.
 	void CollectKitObstacleBoxes();
 	void SetKitObstacleArea(TSubclassOf<UNavArea> AreaClass, bool bIsRelevant);
+	// After a breach: the kit boxes in a tank's lane switch off, the others (heaps beside it) keep blocking in AreaClass.
+	void SetKitObstacleAreaOutsideTankLanes(TSubclassOf<UNavArea> AreaClass);
+	bool GetIsKitBoxInTankLane(const UShapeComponent& Shape) const;
+	// A remnant: the kit boxes still on get their own (kit) areas back.
+	void RestoreKitAreasOfRelevantBoxes();
 	void HandNavBackToKit();
 
 	bool GetIsValidHoleDamage() const;
@@ -350,11 +385,21 @@ private:
 	bool bM_HasTakenOverWeaponCollision = false;
 	FDelegateHandle M_WallDiedHandle;
 
-	// Rubble left by the breaches.
+	// Rubble left by the breaches: one instanced component per debris mesh (a breach adds instances, not components;
+	// one draw per mesh instead of one per piece). World-space instances, not attached: a sinking remnant leaves them.
 	UPROPERTY()
-	TArray<TObjectPtr<UStaticMeshComponent>> M_RubblePieces;
+	TArray<TObjectPtr<UInstancedStaticMeshComponent>> M_RubbleInstances;
 
 	bool bM_HasTakenOverNav = false;
+
+	// The stretch each tank's hull cut before the free ends were added (U along the path): kit boxes and death heaps
+	// are judged against these lanes, not against the whole fallen run.
+	TArray<FVector2f> M_TankLanes;
+
+	// Set while the crossings loop runs: an overlap raised by a step (collision response changes) only queues its tank,
+	// so M_Crossings never grows while a crossing is being updated by reference.
+	bool bM_IsUpdatingCrossings = false;
+	TArray<TWeakObjectPtr<AActor>> M_DeferredCrossingTanks;
 	bool bM_HasWarnedAboutNavFilters = false;
 
 	// The kit's box obstacles and the areas they had (Berlin ruins); empty on the Rus walls.

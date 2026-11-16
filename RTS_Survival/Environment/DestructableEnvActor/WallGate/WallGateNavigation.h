@@ -11,6 +11,15 @@
 
 namespace RTSWallSides
 {
+	// Queries without the RTS filter see a breachable wall at an obstacle's cost (1e6 per cm): a path that costs this
+	// much went through an intact wall that nobody using that query may break (an enclosed Soviet base). Plain ground
+	// costs 1 per cm, so no real path comes near it. Callers treat such a path as no path.
+	inline constexpr double WallCrossingPathCost = 1.0e6;
+	inline bool GetDoesPathCrossIntactWall(const double PathCost)
+	{
+		return PathCost >= WallCrossingPathCost;
+	}
+
 	// The human player; every other owning player is the AI side (UGameUnitManager splits units the same way).
 	inline constexpr uint8 HumanPlayerIndex = 1;
 }
@@ -123,9 +132,24 @@ private:
 	static bool GetIsQuerierHeavyTank(const UObject* Querier);
 	// Lets the querier through a breachable area: plain ground plus the entering cost (the area's own cost blocks).
 	static void OpenBreachableArea(const ANavigationData& NavData, const UClass* AreaClass, FNavigationQueryFilter& Filter,
-	                               float EnteringCost);
+	                               float TankCost, float EnteringCost);
 
 	static void ExcludeArea(const ANavigationData& NavData, const UClass* AreaClass, FNavigationQueryFilter& Filter);
+};
+
+/**
+ * @brief For planners that ask for paths without a unit (strategic AI waypoints, convoy routes, survival reach checks,
+ * wanderers): every breachable wall is closed, everything else keeps the navmesh's defaults. Without it such a query
+ * sees an intact wall at an obstacle's cost and routes through an enclosed base. Pass the class as the query filter.
+ */
+UCLASS()
+class RTS_SURVIVAL_API URTSClosedBreachableWallsQueryFilter : public UNavigationQueryFilter
+{
+	GENERATED_BODY()
+
+protected:
+	virtual void InitializeFilter(const ANavigationData& NavData, const UObject* Querier,
+	                              FNavigationQueryFilter& Filter) const override;
 };
 
 /**

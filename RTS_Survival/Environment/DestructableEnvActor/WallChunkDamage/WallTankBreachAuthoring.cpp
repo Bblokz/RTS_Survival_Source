@@ -244,6 +244,11 @@ namespace WallTankBreachAuthoring
 		Settings.bHeavyTanksOnly = GetArg(Line, TEXT("HeavyOnly")) == TEXT("1");
 		Settings.bBreachUnownedWall = GetArg(Line, TEXT("Unowned")) == TEXT("1");
 		Settings.bKillWhenTopFalls = GetArg(Line, TEXT("KillOnFall")) == TEXT("1");
+		const FString VSlope = GetArg(Line, TEXT("VSlope"));
+		if (not VSlope.IsEmpty())
+		{
+			Settings.VSlope = FCString::Atof(*VSlope);
+		}
 		const FString SideMargin = GetArg(Line, TEXT("SideMargin"));
 		if (not SideMargin.IsEmpty())
 		{
@@ -321,7 +326,7 @@ namespace WallTankBreachAuthoring
 		TEXT("RTS.WallBreach.ConfigureRusWall"),
 		TEXT("Field holes + tank breaches on a wall BP. Args: Blueprint= Materials=a|b [Path=x,y;x,y] [Thickness=] "
 			"[NavArea=] [NavBlocker=] [Dust=] [Sound=] [Attenuation=] [Concurrency=] [HeavyOnly=1] [Unowned=1] "
-			"[KillOnFall=1] [NavHalfDepth=] [SideMargin=] [MeshNoNav=<mesh component name>]"),
+			"[KillOnFall=1] [NavHalfDepth=] [SideMargin=] [VSlope=] [MeshNoNav=<mesh component name>]"),
 		FConsoleCommandWithArgsDelegate::CreateStatic(&ConfigureRusWall));
 }
 

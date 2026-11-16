@@ -22,6 +22,10 @@ namespace WallGateNavigationConstants
 	// Berlin ruin walls (heavy tanks only): a heavy tank drives through brick and rubble as through open ground. A ruin is
 	// a wall box plus heap boxes, each entered separately, so any entering cost would add up into a detour.
 	constexpr float HeavyOnlyRuinEnteringCost = 0.f;
+	// ... but each cm through a ruin costs a little more than open ground (counted over the area grown by the 2 m heavy
+	// agent radius on both sides): a way round a metre or so longer still wins; at 1.15 a corner ruin (B5) was already
+	// avoided, which the owner asked against.
+	constexpr float HeavyOnlyRuinTankCost = 1.05f;
 	// Cost per cm through a breachable wall for queries without the RTS filter: an obstacle's (NavArea_Obstacle).
 	constexpr float BreachableWallUnfilteredCost = 1000000.f;
 	constexpr float BreachableWallTankCost = 1.f;
@@ -113,6 +117,7 @@ void URTSWallGateNavQueryFilter::ExcludeBreachableWalls(const ANavigationData& N
 	if (bIsPlayerUnit && GetIsQuerierMediumOrHeavyTank(Querier))
 	{
 		OpenBreachableArea(NavData, UNavArea_BreachableWallEnemyOwned::StaticClass(), Filter,
+		                   WallGateNavigationConstants::BreachableWallTankCost,
 		                   WallGateNavigationConstants::BreachableWallEnteringCost);
 	}
 	else
@@ -122,6 +127,7 @@ void URTSWallGateNavQueryFilter::ExcludeBreachableWalls(const ANavigationData& N
 	if (bIsPlayerUnit && GetIsQuerierHeavyTank(Querier))
 	{
 		OpenBreachableArea(NavData, UNavArea_BreachableWallHeavyOnly::StaticClass(), Filter,
+		                   WallGateNavigationConstants::HeavyOnlyRuinTankCost,
 		                   WallGateNavigationConstants::HeavyOnlyRuinEnteringCost);
 	}
 	else
@@ -131,7 +137,8 @@ void URTSWallGateNavQueryFilter::ExcludeBreachableWalls(const ANavigationData& N
 }
 
 void URTSWallGateNavQueryFilter::OpenBreachableArea(const ANavigationData& NavData, const UClass* AreaClass,
-                                                    FNavigationQueryFilter& Filter, const float EnteringCost)
+                                                    FNavigationQueryFilter& Filter, const float TankCost,
+                                                    const float EnteringCost)
 {
 	// The area's own cost is an obstacle's (for unfiltered queries); for the tanks that may break it, the wall is plain
 	// ground plus the entering cost.
@@ -140,7 +147,7 @@ void URTSWallGateNavQueryFilter::OpenBreachableArea(const ANavigationData& NavDa
 	{
 		return;
 	}
-	Filter.SetAreaCost(static_cast<uint8>(AreaId), WallGateNavigationConstants::BreachableWallTankCost);
+	Filter.SetAreaCost(static_cast<uint8>(AreaId), TankCost);
 	Filter.SetFixedAreaEnteringCost(static_cast<uint8>(AreaId), EnteringCost);
 }
 
@@ -187,6 +194,22 @@ void URTSWallGateNavQueryFilter::ExcludeArea(const ANavigationData& NavData, con
 		return;
 	}
 	Filter.SetExcludedArea(static_cast<uint8>(AreaId));
+}
+
+void URTSClosedBreachableWallsQueryFilter::InitializeFilter(const ANavigationData& NavData, const UObject* Querier,
+                                                            FNavigationQueryFilter& Filter) const
+{
+	Super::InitializeFilter(NavData, Querier, Filter);
+	for (const UClass* const AreaClass : {UNavArea_BreachableWallEnemyOwned::StaticClass(),
+	                                      UNavArea_BreachableWallPlayerOwned::StaticClass(),
+	                                      UNavArea_BreachableWallHeavyOnly::StaticClass()})
+	{
+		const int32 AreaId = NavData.GetAreaID(AreaClass);
+		if (AreaId >= 0 && AreaId <= MAX_uint8)
+		{
+			Filter.SetExcludedArea(static_cast<uint8>(AreaId));
+		}
+	}
 }
 
 UWallGateNavModifierBase::UWallGateNavModifierBase(const FObjectInitializer& ObjectInitializer)
