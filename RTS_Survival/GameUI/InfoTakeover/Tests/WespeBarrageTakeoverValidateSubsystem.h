@@ -30,7 +30,8 @@ enum class EWespeBarrageTakeoverValidatePhase : uint8
  * waits, screenshots the typing, two clip frames, the finished panel and the HUD after closing to
  * Saved/InfoTakeover/WespeBarrage/<height>p/, checks that the clip atlas loaded, that the game paused and that the clip
  * keeps changing frames while it is paused, that On Closed fires once after UNDERSTOOD with the game
- * unpaused and at once while the takeovers are off. Grep WESPE_BARRAGE_TAKEOVER. Restores the setting and quits.
+ * unpaused and that it still opens
+ * (without the never-show box) and closes as shown while unit intel is turned off. Grep WESPE_BARRAGE_TAKEOVER. Restores the setting and quits.
  */
 UCLASS()
 class RTS_SURVIVAL_API UWespeBarrageTakeoverValidateSubsystem : public UTickableWorldSubsystem
@@ -89,7 +90,7 @@ private:
 
 	void CallMainNode();
 	void StartWatching(UW_WespeBarrageTakeover& Takeover);
-	void CheckTurnedOffNode();
+	void CheckShowsWhileTurnedOff();
 	void TrackClip(const UW_WespeBarrageTakeover& Takeover, const double SecondsOpen);
 
 	UFUNCTION()

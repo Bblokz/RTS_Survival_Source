@@ -942,6 +942,37 @@ shapes. All other users of `UWallHoleDamageComponent` keep the slot mode unchang
 - Not done: sandbag walls are cut like concrete (their rubble is sandbag pieces, but no slumped bag pile); rubble has no
   collision (it lies at the gap edges and would otherwise snag units the nav does not know about).
 
+### Berlin ruin walls: heavy tanks only (2026-11-16)
+
+Owner's request: "on the berlin map we have many ruins walls; not full ruin buildings. only for those walls make sure
+they are damageable by heavy tanks like we just implemented that for the soviet walls", then "make sure the heavy
+vehicles can drive through those walls; right now they avoid them".
+
+- **Which pieces:** the wall pieces `BP_BerlinRuin_B1_Facade1St_A/B`, `B2_Facade2St_A/B`, `B3_Facade4St`,
+  `B4_Firewall`, `B5_CornerL`, `B6_Stub_A/B`. Not the E-series building shells, the B7 wall cores or the B8 debris beds.
+  Setup: `Tools/WallChunks/Breach/berlin_ruin_breach_setup.py` (`run_berlin_breach_setup.sh`); the kit builder
+  `ruin_blueprints_build.run()` calls it at its end, so a kit rebuild keeps it.
+- **Settings:** `bHeavyTanksOnly`, `bBreachUnownedWall` (the ruins have no RTS component), 75 cm side margin (Rus 25),
+  250 cm nav half depth, 60 cm thick wall line at mesh x = 0 (B5: the two legs of the L). Material
+  `MI_BerlinRuin_Wall_HolesField` on `M_BerlinRuin_WallHolesField` (no rebar, brick-brown inner tint, two-sided).
+- **Why heavies avoided them:** every piece has hidden `NavBlock_NN` boxes (dynamic obstacles, `NavArea_Null`). At play
+  the breach component sets them to `UNavArea_BreachableWallHeavyOnly`; the filter opens that area for player heavies
+  with **no entering cost** (a ruin is a wall box plus heap boxes, each entered separately: the 3 m Rus cost added up
+  to a detour). Two engine traps on the way: `UShapeComponent::SetAreaClassOverride` only stores the area, so the box
+  is pushed with `FNavigationSystem::UpdateComponentData`; and the nav setup must not run on a ruin that already died.
+- **Tall or short pieces come down whole:** B3 and B4 (`bKillWhenTopFalls`) clear their whole run when the top falls,
+  then die. Any wall whose fallen breach leaves 95 % of the face removed (the free-end rule takes B1, B2 and B5 whole)
+  dies too, so the kit's own death (debris, dust, sink) plays instead of an invisible live wall.
+- **Remnants keep the gap:** when a breached ruin dies, the kit's boxes stay off, the centre-line nav blocks stay at
+  ground level (exact world box, no longer rebuilt from the owner when the remnant sinks:
+  `URTSNavCollisionEnvObstacle::SetKeepExactBoxWhenOwnerMoves`) in `NavArea_Null`, the weapon blocks ride on the
+  sinking mesh, and death heaps that would land on the open breach are dropped from `DeathHeapsSmall/Large`. A dead
+  remnant is never breached again; a ruin killed before any tank came keeps the kit's full nav.
+- **Test:** `BREACH_SCRIPT=berlin_ruin_breach_test.py sh run_breach_test.sh <run>`: Tigers through B1, B2, B3, B5,
+  B6 (paths through before: heavy only), a Pz IV round B2, a Tiger round a dead B4, then B6 killed after its breach
+  (paths through for all four agent types). Passed in run `berlin4` (before the whole-wall death and the heap drop).
+- **Maps:** the B pieces on Ger_Berlin need no map change (the mesh never carved the navmesh; the boxes switch at play).
+
 ## Open points
 
 - The collapse reads as a blast, not a falling wall. Tune `CollapseSettings.DeathSpeedScale`, or add a slumping

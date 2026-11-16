@@ -22,6 +22,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "PauseSafeProtoRichTextBlock.h"
+#include "RTS_Survival/GameUI/IndicatorLamps/IndicatorLampSettings.h"
 #include "RTS_Survival/FactionSystem/FactionSelection/UnitVariantSelection/UnitVariantSelectionWidgetHelpers.h"
 #include "RTS_Survival/Subsystems/SettingsMenuSubsystem/RTSSettingsMenuSubsystem.h"
 #include "RTS_Survival/Units/Variants/UnitVariantPresentationLibrary.h"
@@ -50,6 +51,8 @@ namespace InfoTakeoverLayout
 	constexpr float PageLampSize = 24.f;
 	constexpr float PageLampGap = 6.f;
 	const FMargin PageLampRowPadding(0.f, 17.f, 10.f, 0.f);
+	// Neighbouring lamps flicker out of step.
+	constexpr float PageLampFlickerPhaseStep = 1.7f;
 	constexpr float PreviousButtonGap = 16.f;
 	const FName HoverSweepIntensityParameter(TEXT("HoverSweepIntensity"));
 	const FName HoverScratchBoostParameter(TEXT("HoverScratchBoost"));
@@ -101,6 +104,7 @@ void UW_InfoTakeover::BuildWidgetTree()
 	Plate->SetBrush(M_Style.Skin.Card.Normal);
 	Plate->SetPadding(PanelPadding);
 	PanelBox->SetContent(Plate);
+	M_Plate = Plate;
 
 	UVerticalBox* const PanelColumn = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass());
 	Plate->SetContent(PanelColumn);
@@ -148,32 +152,63 @@ UWidget* UW_InfoTakeover::BuildHeader()
 
 UWidget* UW_InfoTakeover::BuildPageLampRow()
 {
+	M_PageLampMaterial = GetDefault<UIndicatorLampSettings>()->PageLampMaterial.LoadSynchronous();
+	// The halos sit in their own row under the lamps, laid out exactly like the lamp row.
+	UOverlay* const LampLayers = WidgetTree->ConstructWidget<UOverlay>(UOverlay::StaticClass());
+	LampLayers->SetVisibility(ESlateVisibility::HitTestInvisible);
+	M_PageLampHaloRow = WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass());
 	M_PageLampRow = WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass());
-	M_PageLampRow->SetVisibility(ESlateVisibility::HitTestInvisible);
+	LampLayers->AddChildToOverlay(M_PageLampHaloRow);
+	LampLayers->AddChildToOverlay(M_PageLampRow);
 	RebuildPageLamps(1);
-	return M_PageLampRow;
+	return LampLayers;
 }
 
 void UW_InfoTakeover::RebuildPageLamps(const int32 LampCount)
 {
-	using namespace InfoTakeoverLayout;
-	if (not IsValid(M_PageLampRow))
+	if (not IsValid(M_PageLampRow) || not IsValid(M_PageLampHaloRow))
 	{
 		return;
 	}
 	M_PageLampRow->ClearChildren();
+	M_PageLampHaloRow->ClearChildren();
 	M_PageLamps.Reset();
 	for (int32 LampIndex = 0; LampIndex < LampCount; ++LampIndex)
+	{
+		AddPageLamp(LampIndex);
+	}
+}
+
+void UW_InfoTakeover::AddPageLamp(const int32 LampIndex)
+{
+	using namespace InfoTakeoverLayout;
+	const UIndicatorLampSettings* const LampSettings = GetDefault<UIndicatorLampSettings>();
+	FPanelSignalLamp& Lamp = M_PageLamps.AddDefaulted_GetRef();
+	Lamp.Build(*WidgetTree, M_PageLampMaterial, M_Style.PageLampLit, M_Style.PageLampUnlit,
+	           LampSettings->PageLampHaloScale, LampIndex * PageLampFlickerPhaseStep);
+	const FMargin LampSlotPadding(LampIndex == 0 ? 0.f : PageLampGap, 0.f, 0.f, 0.f);
+	// Both rows get the same box and padding, so every halo stays centred on its lamp.
+	auto AddToRow = [this, &LampSlotPadding](UHorizontalBox& Row, UImage* Image)
 	{
 		USizeBox* const LampBox = WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass());
 		LampBox->SetWidthOverride(PageLampSize);
 		LampBox->SetHeightOverride(PageLampSize);
-		UImage* const Lamp = WidgetTree->ConstructWidget<UImage>(UImage::StaticClass());
-		Lamp->SetBrush(M_Style.PageLampUnlit);
-		LampBox->SetContent(Lamp);
-		UHorizontalBoxSlot* const LampSlot = M_PageLampRow->AddChildToHorizontalBox(LampBox);
-		LampSlot->SetPadding(FMargin(LampIndex == 0 ? 0.f : PageLampGap, 0.f, 0.f, 0.f));
-		M_PageLamps.Add(Lamp);
+		LampBox->SetContent(Image);
+		Row.AddChildToHorizontalBox(LampBox)->SetPadding(LampSlotPadding);
+	};
+	AddToRow(*M_PageLampRow, Lamp.GetLampImage());
+	if (UImage* const HaloImage = Lamp.GetHaloImage())
+	{
+		AddToRow(*M_PageLampHaloRow, HaloImage);
+	}
+}
+
+void UW_InfoTakeover::TickPageLamps(const float DeltaSeconds)
+{
+	const float FadeSeconds = GetDefault<UIndicatorLampSettings>()->PageLampFadeSeconds;
+	for (FPanelSignalLamp& Lamp : M_PageLamps)
+	{
+		Lamp.Tick(DeltaSeconds, FadeSeconds);
 	}
 }
 
@@ -196,6 +231,11 @@ UWidget* UW_InfoTakeover::BuildFooter()
 	LabelSlot->SetVerticalAlignment(VAlign_Center);
 	LabelSlot->SetPadding(CheckBoxLabelPadding);
 	Footer->AddChildToHorizontalBox(CheckBoxRow)->SetVerticalAlignment(VAlign_Center);
+	// Game-mechanic field manuals must always show, so they never offer to hide the takeovers.
+	if (not GetOffersNeverShowAgain())
+	{
+		CheckBoxRow->SetVisibility(ESlateVisibility::Collapsed);
+	}
 
 	USpacer* const FooterSpacer = WidgetTree->ConstructWidget<USpacer>(USpacer::StaticClass());
 	Footer->AddChildToHorizontalBox(FooterSpacer)->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
@@ -556,6 +596,7 @@ void UW_InfoTakeover::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
 	}
 	TickTypingSound(InDeltaTime);
 	TickGlassHover(InDeltaTime);
+	TickPageLamps(InDeltaTime);
 }
 
 void UW_InfoTakeover::TickTypingSound(const float RealDeltaSeconds)
@@ -684,11 +725,7 @@ void UW_InfoTakeover::RefreshPageControls()
 	const int32 CurrentPageIndex = GetCurrentPageIndex();
 	for (int32 LampIndex = 0; LampIndex < M_PageLamps.Num(); ++LampIndex)
 	{
-		if (IsValid(M_PageLamps[LampIndex]))
-		{
-			M_PageLamps[LampIndex]->SetBrush(LampIndex == CurrentPageIndex ? M_Style.PageLampLit
-			                                                                : M_Style.PageLampUnlit);
-		}
+		M_PageLamps[LampIndex].SetIsLit(LampIndex == CurrentPageIndex);
 	}
 	if (IsValid(M_PreviousButtonBox))
 	{
@@ -707,8 +744,7 @@ int32 UW_InfoTakeover::GetLitPageLampIndex() const
 	int32 LitIndex = INDEX_NONE;
 	for (int32 LampIndex = 0; LampIndex < M_PageLamps.Num(); ++LampIndex)
 	{
-		const bool bIsLit = IsValid(M_PageLamps[LampIndex]) && M_PageLamps[LampIndex]->GetBrush() == M_Style.PageLampLit;
-		if (not bIsLit)
+		if (not M_PageLamps[LampIndex].GetIsLit())
 		{
 			continue;
 		}
@@ -719,6 +755,46 @@ int32 UW_InfoTakeover::GetLitPageLampIndex() const
 		LitIndex = LampIndex;
 	}
 	return LitIndex;
+}
+
+bool UW_InfoTakeover::GetHasPageLampHalos() const
+{
+	return M_PageLamps.Num() > 0 && M_PageLamps[0].GetHaloImage() != nullptr;
+}
+
+float UW_InfoTakeover::GetPageLampPower(const int32 LampIndex) const
+{
+	return M_PageLamps.IsValidIndex(LampIndex) ? M_PageLamps[LampIndex].GetPower() : -1.f;
+}
+
+bool UW_InfoTakeover::GetPageLampLayout(FBox2D& OutRowRect, FVector2D& OutLitLampCentre) const
+{
+	OutLitLampCentre = FVector2D(-1.f, -1.f);
+	if (not IsValid(M_Plate) || not IsValid(M_PageLampRow))
+	{
+		return false;
+	}
+	const FGeometry& PlateGeometry = M_Plate->GetCachedGeometry();
+	const FVector2D PlateSize = PlateGeometry.GetLocalSize();
+	if (PlateSize.X <= 0.f)
+	{
+		return false;
+	}
+	// Local units of the plate are the 1080p reference units the layout constants use, whatever the DPI scale.
+	auto ToPlateUnits = [&PlateGeometry](const FGeometry& Geometry, const FVector2D& LocalPoint)
+	{
+		return PlateGeometry.AbsoluteToLocal(Geometry.LocalToAbsolute(LocalPoint));
+	};
+	const FGeometry& RowGeometry = M_PageLampRow->GetCachedGeometry();
+	OutRowRect = FBox2D(ToPlateUnits(RowGeometry, FVector2D::ZeroVector),
+	                    ToPlateUnits(RowGeometry, RowGeometry.GetLocalSize()));
+	const int32 LitIndex = GetLitPageLampIndex();
+	if (M_PageLamps.IsValidIndex(LitIndex) && IsValid(M_PageLamps[LitIndex].GetLampImage()))
+	{
+		const FGeometry& LampGeometry = M_PageLamps[LitIndex].GetLampImage()->GetCachedGeometry();
+		OutLitLampCentre = ToPlateUnits(LampGeometry, LampGeometry.GetLocalSize() * 0.5f);
+	}
+	return true;
 }
 
 void UW_InfoTakeover::PressConfirmButton()
@@ -773,7 +849,7 @@ void UW_InfoTakeover::OnClickedContinue()
 
 void UW_InfoTakeover::SetNeverShowAgainChecked(const bool bIsChecked) const
 {
-	if (not GetIsValidNeverShowAgainCheckBox())
+	if (not GetOffersNeverShowAgain() || not GetIsValidNeverShowAgainCheckBox())
 	{
 		return;
 	}
@@ -792,6 +868,11 @@ FString UW_InfoTakeover::GetActiveTypingSoundName() const
 
 void UW_InfoTakeover::ApplyNeverShowAgainChoice() const
 {
+	// A field manual never writes the setting, whatever state its hidden box is in.
+	if (not GetOffersNeverShowAgain())
+	{
+		return;
+	}
 	if (not GetIsValidNeverShowAgainCheckBox() || not M_NeverShowAgainCheckBox->IsChecked())
 	{
 		return;
