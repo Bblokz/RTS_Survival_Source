@@ -9,7 +9,7 @@ ENGINE="D:/UnrealEngine/UE5.5_ReleaseBranch/UnrealEngine/Engine/Binaries/Win64/U
 for RES in "$@"; do
   W=${RES%x*}; H=${RES#*x}
   LOG=$ROOT/Saved/Logs/PageLampCheck_$RES.log
-  rm -rf "$ROOT/Saved/InfoTakeover/CameraControls/${H}p"
+  rm -rf "$ROOT"/Saved/InfoTakeover/CameraControls/*p
   "$ENGINE" $ROOT/RTS_Survival.uproject /Game/RTS_Survival/Maps/UnitTests/RTS_ToCopySmall -game -unattended -nosound \
     -RenderOffscreen -windowed -ResX=$W -ResY=$H -DisablePlugins=Fab,BpGeneratorUltimate \
     -ExecCmds="r.TextureStreaming 0, r.SetRes ${W}x${H}w" -ForceRes -CameraControlsTakeoverValidate -abslog=$LOG > /dev/null 2>&1

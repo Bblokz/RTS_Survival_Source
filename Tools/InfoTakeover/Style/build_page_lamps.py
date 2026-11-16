@@ -69,7 +69,7 @@ if (Pass > 0.5)
     float glow = GlowIntensity * on * spill * edge;
     float3 rgb = GlowColor.rgb * glow;
     float a = shadow * (1.0 - saturate(glow * 6.0));
-    return float4(rgb, a) * VertexAlpha;
+    return float4(rgb * VertexAlpha, a);
 }
 
 // ======================================================================================== lamp pass
@@ -141,7 +141,7 @@ lens += SpecColor.rgb * (streak * 0.55 + sparkle * 0.45 + sheen) * SpecIntensity
 
 float inLens = saturate((lensR - r) / aa + 0.5);
 float3 col = lerp(metal, lens, inLens) * Brightness;
-return float4(col * cover, cover) * VertexAlpha;
+return float4(col * cover * VertexAlpha, cover);
 '''
 
 SCALARS = {
@@ -168,7 +168,14 @@ def log(msg):
 
 
 def build_master():
-    path = MASTER_FOLDER + '/' + MASTER_NAME
+    return build_premultiplied_master(MASTER_NAME, HLSL, SCALARS, VECTORS,
+                                      'SignalLamp (premultiplied: lamp pass 0, halo pass 1)')
+
+
+def build_premultiplied_master(name, hlsl, scalars, vectors, description):
+    """Fresh UI material in AlphaComposite: one Custom node fed by UV, a pause-ignoring Time, vertex alpha and the
+    parameters."""
+    path = MASTER_FOLDER + '/' + name
     if EAL.does_asset_exist(path):
         material = unreal.load_asset(path)
         for _ in range(8):
@@ -176,18 +183,18 @@ def build_master():
             if MEL.get_num_material_expressions(material) == 0:
                 break
     else:
-        material = TOOLS.create_asset(MASTER_NAME, MASTER_FOLDER, unreal.Material, unreal.MaterialFactoryNew())
+        material = TOOLS.create_asset(name, MASTER_FOLDER, unreal.Material, unreal.MaterialFactoryNew())
     material.set_editor_property('material_domain', unreal.MaterialDomain.MD_UI)
     material.set_editor_property('blend_mode', unreal.BlendMode.BLEND_ALPHA_COMPOSITE)
     material.set_editor_property('shading_model', unreal.MaterialShadingModel.MSM_UNLIT)
     custom = MEL.create_material_expression(material, unreal.MaterialExpressionCustom, -400, 0)
-    custom.set_editor_property('code', HLSL)
+    custom.set_editor_property('code', hlsl)
     custom.set_editor_property('output_type', unreal.CustomMaterialOutputType.CMOT_FLOAT4)
-    custom.set_editor_property('description', 'SignalLamp (premultiplied: lamp pass 0, halo pass 1)')
+    custom.set_editor_property('description', description)
     inputs = []
-    for name in ['UV', 'Seconds', 'VertexAlpha'] + list(SCALARS) + list(VECTORS):
+    for input_name in ['UV', 'Seconds', 'VertexAlpha'] + list(scalars) + list(vectors):
         ci = unreal.CustomInput()
-        ci.set_editor_property('input_name', name)
+        ci.set_editor_property('input_name', input_name)
         inputs.append(ci)
     custom.set_editor_property('inputs', inputs)
     uv = MEL.create_material_expression(material, unreal.MaterialExpressionTextureCoordinate, -900, -400)
@@ -195,29 +202,29 @@ def build_master():
     seconds = MEL.create_material_expression(material, unreal.MaterialExpressionTime, -900, -320)
     seconds.set_editor_property('ignore_pause', True)
     MEL.connect_material_expressions(seconds, '', custom, 'Seconds')
-    # Slate multiplies the premultiplied output by the vertex colour, which scales only alpha by the widget's
-    # opacity; premultiplying by it here keeps a fading widget's rgb in step.
+    # Slate multiplies the output by the vertex colour, so alpha already gets the widget's opacity but premultiplied
+    # rgb would not; the HLSL scales rgb (only) by it, so a fading widget stays premultiplied correctly.
     vertex = MEL.create_material_expression(material, unreal.MaterialExpressionVertexColor, -900, -240)
     MEL.connect_material_expressions(vertex, 'A', custom, 'VertexAlpha')
     y = -150
-    for name, value in SCALARS.items():
+    for param, value in scalars.items():
         node = MEL.create_material_expression(material, unreal.MaterialExpressionScalarParameter, -900, y)
-        node.set_editor_property('parameter_name', name)
+        node.set_editor_property('parameter_name', param)
         node.set_editor_property('default_value', float(value))
-        MEL.connect_material_expressions(node, '', custom, name)
+        MEL.connect_material_expressions(node, '', custom, param)
         y += 70
-    for name, value in VECTORS.items():
+    for param, value in vectors.items():
         node = MEL.create_material_expression(material, unreal.MaterialExpressionVectorParameter, -900, y)
-        node.set_editor_property('parameter_name', name)
+        node.set_editor_property('parameter_name', param)
         node.set_editor_property('default_value', unreal.LinearColor(*value))
         rgba = MEL.create_material_expression(material, unreal.MaterialExpressionAppendVector, -700, y)
         MEL.connect_material_expressions(node, '', rgba, 'A')
         MEL.connect_material_expressions(node, 'A', rgba, 'B')
-        MEL.connect_material_expressions(rgba, '', custom, name)
+        MEL.connect_material_expressions(rgba, '', custom, param)
         y += 110
     ui_skin_material.connect_rgb_and_alpha(material, custom)
     MEL.recompile_material(material)
-    log('master saved=%s' % EAL.save_asset(path, only_if_is_dirty=False))
+    log('%s saved=%s' % (name, EAL.save_asset(path, only_if_is_dirty=False)))
     return material
 
 
@@ -239,9 +246,63 @@ def build_instance(master):
     return inst
 
 
+# ------------------------------------------------------------------------------------------------ HUD indicator halo
+# The idle unit buttons' blinking jewel lamps (M_UI_IndicatorLamp instances) get the same kind of halo. It is its own
+# master so the shared lamp master stays untouched; FIndicatorLamp copies the lamp instance's blink parameters and
+# colour onto its halo, and both read the same pause-ignoring clock, so the halo pulses in step with the jewel.
+HALO_NAME = 'M_UI_IndicatorLampHalo'
+HALO_HLSL = r'''
+float T = Seconds + TimeOffset + BlinkPhase;
+float S = max(HaloScale, 1.0);
+float2 d = (UV - 0.5) * S;                         // lamp space, lamp radius 0.5
+float r = length(d);
+// ---- the same blink as M_UI_IndicatorLamp
+float mode = round(BlinkMode);
+float on = 1.0;
+float s = frac(T * BlinkHz);
+if (mode > 0.5 && mode < 1.5)
+    on = smoothstep(0.0, 0.05, s) * (1.0 - smoothstep(Duty, Duty + 0.07, s));
+else if (mode > 1.5 && mode < 2.5)
+{
+    on = 0.5 - 0.5 * cos(T * BlinkHz * 6.2832);
+    on = on * on * (3.0 - 2.0 * on);
+}
+else if (mode > 2.5 && mode < 3.5)
+    on = smoothstep(0.0, 0.03, s) * (1.0 - smoothstep(0.07, 0.11, s)) + smoothstep(0.17, 0.2, s) * (1.0 - smoothstep(0.24, 0.28, s));
+else if (mode > 3.5)
+{
+    float drop = frac(sin(floor(T * 9.0) * 12.9898) * 43758.5453);
+    on = (0.86 + 0.14 * sin(T * 31.0) * sin(T * 17.0)) * (drop < 0.08 ? 0.3 : 1.0);
+}
+else
+    on = 0.94 + 0.06 * sin(T * 29.0) * sin(T * 13.0);
+on = lerp(MinOn, 1.0, saturate(on)) * saturate(Power);
+// ---- contact shadow of the bezel plus additive light spill, zero at the quad edge
+float edge = saturate(1.0 - r / (0.5 * S));
+edge *= edge;
+float rs = length(d - float2(ShadowX, ShadowY));
+float shadow = ShadowStrength * (1.0 - smoothstep(0.40, 0.70, rs)) * edge;
+float spill = exp(-max(r - 0.47, 0.0) / GlowFalloff) * 0.6 + exp(-(r * r) / (GlowWide * GlowWide)) * 0.4;
+float glow = GlowIntensity * on * spill * edge;
+float3 rgb = lerp(LampColor.rgb, float3(1.0, 1.0, 1.0), 0.12) * glow;
+float a = shadow * (1.0 - saturate(glow * 6.0));
+return float4(rgb * VertexAlpha, a);
+'''
+HALO_SCALARS = {'TimeOffset': 0.0, 'BlinkMode': 0.0, 'BlinkHz': 1.0, 'BlinkPhase': 0.0, 'Duty': 0.5, 'MinOn': 0.0,
+                'Power': 1.0, 'HaloScale': 3.5, 'GlowIntensity': 0.12, 'GlowFalloff': 0.16, 'GlowWide': 0.85,
+                'ShadowStrength': 0.45, 'ShadowX': 0.03, 'ShadowY': 0.05}
+HALO_VECTORS = {'LampColor': (1.0, 0.12, 0.05, 1.0)}
+
+
+def build_indicator_halo():
+    return build_premultiplied_master(HALO_NAME, HALO_HLSL, HALO_SCALARS, HALO_VECTORS,
+                                      'IndicatorLamp halo (premultiplied: shadow alpha + additive light)')
+
+
 def build():
     master = build_master()
     build_instance(master)
+    build_indicator_halo()
     log('DONE')
 
 

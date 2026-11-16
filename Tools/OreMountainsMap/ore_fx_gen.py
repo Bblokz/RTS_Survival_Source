@@ -33,6 +33,9 @@ DARK = (0.45, 0.38, 0.27, 1.0)
 PRESETS = {
     # 2026-11-13 second round: the owner asked for stronger effects. Denser and larger; the colour stays warm because
     # AddWhiteColor stays at 0.38 (0.2-0.3 with more Emessive came out whiter and cooler in the test sheet).
+    # 2026-11-16 masked rework (ore_sandstreak_build.py): NS_SandPush now draws masked materials and its four SpawnRate
+    # inputs are fixed literals in the system (mesh 40, smoke A 10, smoke B 6, grains 400 a second), so the four
+    # *SpawnRate overrides below no longer do anything; the per-MI Boost makes up for the lower counts.
     "SandStreak": {"system": PACK + "NS_SandPush", "scale": 1.0,
                    "floats": {"SandScale": 1.8, "Length": 2400.0, "AddWhiteColor": 0.38, "Emessive": 0.42,
                               "ParticleSmokeSizeScale": 2.6, "ParticleSpawnRate": 2000.0, "Sand_SpawnRate": 110.0,

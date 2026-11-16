@@ -29,6 +29,11 @@ enum class EAircraftTestPhase : uint8
 	AircraftStrafeRunning,
 	// -AircraftDropValidate: the German vehicle drop abilities must land every vehicle they promise, in its exact variant.
 	AircraftDropRunning,
+	// -AircraftBaseTakeOffValidate: an aircraft parked in an airbase bay takes off, flies out, lands back and takes off again.
+	AircraftBaseTakeOffRunning,
+	// -AircraftTerrainFollowValidate: an airborne aircraft flies over the bumpiest route from the anchor and keeps its
+	// clearance above the ground; then an attack dive, which terrain following must leave alone.
+	AircraftTerrainFollowRunning,
 	Finished
 };
 
@@ -61,6 +66,81 @@ struct FAircraftVtoUnderTest
 	bool bSawVerticalTakeOff = false;
 	bool bSawTakeOffMontage = false;
 	int32 MagazineBeforeAttack = 0;
+};
+
+UENUM()
+enum class EAircraftBaseTakeOffStep : uint8
+{
+	WaitingForAirbase,
+	// Parked in its bay; BeginPlay, the anim instance and the bay settle before the move order.
+	Settling,
+	TakingOff,
+	// Airborne after the first take-off: the hand-over to normal flight must not jolt the height.
+	FlyingOut,
+	ReturningToBase,
+	SecondTakeOff,
+	Done
+};
+
+/** The aircraft of -AircraftBaseTakeOffValidate and what was seen of its take-offs and landing. */
+USTRUCT()
+struct FAircraftBaseTakeOffUnderTest
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	TWeakObjectPtr<ANomadicVehicle> Airbase;
+
+	UPROPERTY()
+	TWeakObjectPtr<AAircraftMaster> Aircraft;
+
+	EAircraftBaseTakeOffStep Step = EAircraftBaseTakeOffStep::WaitingForAirbase;
+	float StepStartSeconds = 0.f;
+	FVector BayLocation = FVector::ZeroVector;
+	float ParkedZ = 0.f;
+	float LastZ = 0.f;
+	float LargestZStepPerSecond = 0.f;
+	float HeightAboveGroundAtAirborne = 0.f;
+	bool bSawVerticalTakeOff = false;
+};
+
+UENUM()
+enum class EAircraftTerrainFollowTestStep : uint8
+{
+	// Airborne at the route start; the clearance is captured.
+	Settling,
+	FlyingRoute,
+	AttackDiving,
+	Done
+};
+
+/** The aircraft of -AircraftTerrainFollowValidate and what was measured over the route. */
+USTRUCT()
+struct FAircraftTerrainFollowFlightUnderTest
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	TWeakObjectPtr<AAircraftMaster> Aircraft;
+
+	EAircraftTerrainFollowTestStep Step = EAircraftTerrainFollowTestStep::Settling;
+	float StepStartSeconds = 0.f;
+	FVector RouteStart = FVector::ZeroVector;
+	FVector RouteEnd = FVector::ZeroVector;
+	float RouteLowestGroundZ = 0.f;
+	float RouteHighestGroundZ = 0.f;
+	float Clearance = 0.f;
+	float LastZ = 0.f;
+	float LowestAircraftZ = BIG_NUMBER;
+	float HighestAircraftZ = -BIG_NUMBER;
+	float LowestAboveGround = BIG_NUMBER;
+	float HighestAboveGround = -BIG_NUMBER;
+	float FastestVerticalRate = 0.f;
+	float NextSampleLogSeconds = 0.f;
+	int32 DiveFrames = 0;
+	int32 DiveFramesWithTerrainMotion = 0;
+	float LastDiveSeconds = -1.f;
+	FVector AttackPoint = FVector::ZeroVector;
 };
 
 /** One anti-air unit under test and what its turrets did against the aircraft. */
@@ -274,6 +354,52 @@ private:
 	/** Rig, anim instance and weapon of the parked aircraft, before it takes off. */
 	void CheckVtoLoadout(const FAircraftVtoUnderTest& Entry);
 	void EnterVtoStep(FAircraftVtoUnderTest& Entry, EAircraftVtoTestStep NewStep);
+
+	// ---------------- Take-off from an airbase (AircraftBaseTakeOffTest.cpp) ----------------
+	UPROPERTY()
+	FAircraftBaseTakeOffUnderTest M_BaseTakeOff;
+
+	void StartAircraftBaseTakeOff();
+	void TickAircraftBaseTakeOff();
+	void TickBaseTakeOffWaitingForAirbase(FAircraftBaseTakeOffUnderTest& Entry);
+	void TickBaseTakeOffSettling(FAircraftBaseTakeOffUnderTest& Entry);
+	/**
+	 * @brief Waits for the vertical take-off out of the bay and checks it ends exactly at the take-off height.
+	 * @param Entry The aircraft under test.
+	 * @param Label Prefix of the check names, one per take-off.
+	 * @param NextStep Step once airborne.
+	 */
+	void TickBaseTakeOffTakingOff(FAircraftBaseTakeOffUnderTest& Entry, const FString& Label,
+	                              EAircraftBaseTakeOffStep NextStep);
+	void TickBaseTakeOffFlyingOut(FAircraftBaseTakeOffUnderTest& Entry);
+	void TickBaseTakeOffReturning(FAircraftBaseTakeOffUnderTest& Entry);
+	/** @return Whether a move order away from the airbase was accepted; a parked aircraft takes off for it. */
+	bool OrderBaseTakeOffMoveOut(FAircraftBaseTakeOffUnderTest& Entry, const FString& Label);
+	/** @return Height of the aircraft above the landscape below it; -1 when no landscape is below. */
+	float GetHeightAboveLandscape(const AAircraftMaster& Aircraft) const;
+	void EnterBaseTakeOffStep(FAircraftBaseTakeOffUnderTest& Entry, EAircraftBaseTakeOffStep NewStep);
+
+	// ---------------- Terrain following over relief (AircraftTerrainFollowFlightTest.cpp) ----------------
+	UPROPERTY()
+	FAircraftTerrainFollowFlightUnderTest M_TerrainFlight;
+
+	void StartAircraftTerrainFollow();
+	void TickAircraftTerrainFollow();
+	/**
+	 * @brief Picks the straight route from the anchor with the largest ground height range, so the flight crosses
+	 * the strongest relief the map has nearby.
+	 * @param Entry Receives route start, end and its lowest / highest ground.
+	 * @return Whether a route over landscape was found.
+	 */
+	bool FindBumpiestRoute(FAircraftTerrainFollowFlightUnderTest& Entry) const;
+	/** @return Landscape height at the XY; false where no landscape is. */
+	bool GetLandscapeZ(const FVector2D& Location2D, float& OutGroundZ) const;
+	void TickTerrainFollowSettling(FAircraftTerrainFollowFlightUnderTest& Entry);
+	void TickTerrainFollowFlyingRoute(FAircraftTerrainFollowFlightUnderTest& Entry);
+	void TickTerrainFollowAttackDiving(FAircraftTerrainFollowFlightUnderTest& Entry);
+	/** @brief Updates the extremes and vertical rate, and logs a sample row now and then. */
+	void RecordTerrainFollowSample(FAircraftTerrainFollowFlightUnderTest& Entry, const TCHAR* StepName);
+	void EnterTerrainFollowStep(FAircraftTerrainFollowFlightUnderTest& Entry, EAircraftTerrainFollowTestStep NewStep);
 
 	// ---------------- Strafing global ability (AircraftStrafeTest.cpp) ----------------
 	void StartAircraftStrafe();

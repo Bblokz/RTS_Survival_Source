@@ -32,6 +32,9 @@ NAV_HALF_DEPTH = 250
 # Brick tears out wider than the hull: 75 cm a side (Rus walls 25) leaves a gap the heavy navmesh (agent radius 200)
 # still fits through once a dead remnant blocks everyone outside its gap.
 SIDE_MARGIN = 75
+# Brick over a ragged hole holds nearer vertical than the Rus concrete's V (0.45): with 0.45 a 9 m facade's V took the
+# whole 13 m piece down; 0.15 leaves B2's ends standing, B1 (7 m) and B5's legs still come down whole.
+V_SLOPE = 0.15
 # piece: (path or None for x = 0 along the mesh's Y extent, dies whole when the top falls)
 WALL_PIECES = {
     'B1_Facade1St_A': (None, False), 'B1_Facade1St_B': (None, False),
@@ -82,7 +85,7 @@ def configure_ruin_walls(only=None):
             continue
         command = (f'RTS.WallBreach.ConfigureRusWall Blueprint={BP_DIR}BP_BerlinRuin_{piece} Materials={FIELD_MI} '
                    f'Path={path or _straight_path(piece)} Thickness={WALL_THICKNESS} HeavyOnly=1 Unowned=1 '
-                   f'KillOnFall={1 if kill_on_fall else 0} NavHalfDepth={NAV_HALF_DEPTH} SideMargin={SIDE_MARGIN} MeshNoNav=StaticMesh Dust={DUST} Sound={SOUND} '
+                   f'KillOnFall={1 if kill_on_fall else 0} NavHalfDepth={NAV_HALF_DEPTH} SideMargin={SIDE_MARGIN} VSlope={V_SLOPE} MeshNoNav=StaticMesh Dust={DUST} Sound={SOUND} '
                    f'Attenuation={ATTENUATION} Concurrency={CONCURRENCY}')
         unreal.log('BERLIN_BREACH ' + command)
         unreal.SystemLibrary.execute_console_command(None, command)
