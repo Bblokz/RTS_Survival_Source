@@ -66,7 +66,7 @@ for (int o2 = 0; o2 < 4; o2++) { w2 += amp * vnoise(r); r = r * 2.07 + float2(-2
 float sway = (vnoise(float2(Y * 0.8 - tt * 1.1, S + 4.0)) - 0.5) * 0.45 * yy;
 float env = saturate(1.0 - abs(X - sway) / max(bw * (1.15 - 0.55 * saturate(yy)), 0.001));
 float dens = env * 1.25 - yy * 1.05 + (w2 - 0.5) * (0.9 + 0.9 * yy);
-float flame = smoothstep(0.0, 0.22, dens) * smoothstep(0.0, 0.16 + 0.16 * w1, Y) * fire;
+float flame = smoothstep(0.0, 0.22, dens) * smoothstep(0.0, 0.3 + 0.2 * w1, Y) * fire;      // rises out of the char, no hard base
 float heat = smoothstep(0.05, 0.85, dens) * (1.1 - 0.5 * saturate(yy));
 float3 fcol = lerp(float3(0.75, 0.08, 0.0), float3(2.3, 0.72, 0.02), smoothstep(0.08, 0.4, heat));
 fcol = lerp(fcol, float3(3.3, 1.95, 0.1), smoothstep(0.5, 0.95, heat));
@@ -102,7 +102,7 @@ float2 p = (UV - 0.5) * 2.0;
 float r2 = dot(p, p);
 float S = Seed * 17.31;
 float flick = 0.72 + 0.22 * vnoise(float2(Time * 7.0, S)) + 0.12 * vnoise(float2(Time * 19.0, S + 3.0));
-float pool = exp(-r2 * 4.5) * (1.0 - smoothstep(0.75, 1.0, sqrt(r2)));
+float pool = exp(-r2 * 7.0) * (1.0 - smoothstep(0.6, 1.0, sqrt(r2)));
 return float4(float3(1.0, 0.36, 0.04) * pool * flick * fire * flare * Bright, 0.0);
 """
 
@@ -166,7 +166,7 @@ def build_glow_material():
     time = mel.create_material_expression(material, unreal.MaterialExpressionTime, -900, 100)
     custom = mats._custom(material, GLOW_CODE, [
         ("UV", coords, ""), ("Time", time, ""), ("Seed", mats._scalar(material, "Seed", 0.0, 200), ""),
-        ("Bright", mats._scalar(material, "Bright", 0.7, 250), "")] + _clock_inputs(material))
+        ("Bright", mats._scalar(material, "Bright", 0.4, 250), "")] + _clock_inputs(material))
     mel.connect_material_property(mats._mask(material, custom, "rgb"), "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
     return mats._finish(material)
 
@@ -193,7 +193,7 @@ float3 char_ = float3(0.018, 0.016, 0.014);
 float3 col = lerp(BC, char_, State.y * 0.92);
 return float4(col, lerp(ORM.g, 0.92, State.y));
 """, [("BC", base, "RGB"), ("ORM", orm, ""), ("State", state, "")], y=0)
-    glow = mats._custom(material, "return float3(1.6, 0.22, 0.02) * State.x * (0.8 + 0.2 * sin(Time * 23.0));",
+    glow = mats._custom(material, "return float3(0.55, 0.07, 0.006) * State.x * (0.8 + 0.2 * sin(Time * 23.0));",
                         [("State", state, ""), ("Time", mel.create_material_expression(material, unreal.MaterialExpressionTime, -900, 650), "")],
                         output_type=unreal.CustomMaterialOutputType.CMOT_FLOAT3, y=400)
     metal = mats._custom(material, "return lerp(ORM.b, 0.0, State.y);", [("ORM", orm, ""), ("State", state, "")],

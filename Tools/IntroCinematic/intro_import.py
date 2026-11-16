@@ -250,7 +250,7 @@ def tune_trench_steel():
     """The trench props' steel (helmets, mess tins) as painted field-grey, not the shared polished MI_Intro_Steel
     (helmets read as mirror chrome in 5.2 / 5.3)."""
     flat = unreal.load_asset(mats.MAT_DIR + "/M_Intro_Flat")
-    mi = mats.instance("MI_Intro_FieldGrey", flat, vectors={"Tint": (0.07, 0.075, 0.065, 1.0)},
+    mi = mats.instance("MI_Intro_FieldGrey", flat, vectors={"Tint": (0.018, 0.02, 0.017, 1.0)},
                        scalars={"Roughness": 0.8, "Metallic": 0.1})
     mesh = unreal.load_asset(lib.ROOT + "/Sets/SM_Intro_TrenchProps")
     for index, slot in enumerate(mesh.static_materials):

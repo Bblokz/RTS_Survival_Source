@@ -738,3 +738,19 @@ The owner asked for four fixes, then two rounds of a fresh adversarial reviewer 
 - Archive grade: scratches rarer, of varied width and strength.
 Not taken (bigger builds): Berlin skyline and cloud remodel (3.3/3.4), Ural Shield remodel and gate motion
 (6.3/6.4), 6.2 nuke shockwave dome, hangar re-dress (2.3/9.1), hand and camera flash (2.2), 9.3b HQ materials.
+
+**Adversarial round 2** (second fresh reviewer, 2026-11-16). Fixed:
+- Hard rule (sections 5 and 8 apart): the mould, its veins and the map stain used the same Voronoi cell pattern as
+  the Radixite crater floor. The shared vein function (`PD_VEINS` in `intro_materials.py`) is now a domain-warped
+  ridged multifractal: long branching vessels, no cells.
+- Hard rule risks: the 5.4 stain's north-eastern front was in frame (framed further west now, and the stain runs on
+  to 0.9 at the cut); four eastern Svarog rings stood in a north-south row (three moved east or west).
+- Map fires: flames rise out of the char with a tall soft base; the light pool is smaller and weaker; each scorch is
+  turned and sized differently; the red-hot pins glow dull, not orange lollipops.
+- Soviet star pin pressed in (head a few mm over the paper), no hard shadow (it read as a second star).
+- Trench helmets: field-grey paint at 0.02 albedo (this set is exposed for very dark surfaces; 0.07 still read as
+  porcelain in the sun).
+- 6.1: the Ore map's parked civilian cars are hidden (one read as a van driving in the column); tanks 20 m apart.
+- Archive grade scratches weave from frame to frame and break up along their length.
+Not taken: tag burn and curl (needs WPO, which python cannot reach), bunker re-dress and lamp swing, overlay
+re-framing, 4.1 graticule, 0.2 film-burn rework, 3.4b cloud swap, 9.4 sentry pose, 8.4b dressing, 5.1 canister fins.

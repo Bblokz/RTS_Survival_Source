@@ -84,9 +84,9 @@ PLACES = {
 GERMAN_CITIES = [(53.55, 10.0), (48.14, 11.58), (50.94, 6.96), (51.05, 13.74), (50.11, 8.68), (48.78, 9.18),
                  (52.37, 9.73), (49.45, 11.08)]
 # Shot 6.2b: strikes scattered over Soviet-held Europe. Deliberately irregular: no line, no arc.
-SVAROG_STRIKES = [(52.2, 21.0), (50.45, 30.5), (47.5, 19.05), (44.4, 26.1), (56.95, 24.1), (49.2, 16.6),
-                  (53.9, 27.55), (46.5, 30.7), (54.7, 20.5), (48.2, 16.4), (51.75, 19.45), (45.8, 15.97),
-                  (58.4, 26.7), (49.8, 24.0), (55.2, 30.2), (43.2, 23.3),
+SVAROG_STRIKES = [(52.2, 21.0), (50.45, 32.3), (47.5, 19.05), (44.4, 26.1), (56.95, 24.1), (49.2, 16.6),
+                  (53.9, 27.55), (46.9, 28.8), (54.7, 20.5), (48.2, 16.4), (51.75, 19.45), (45.8, 15.97),
+                  (58.4, 26.7), (49.8, 24.0), (55.5, 33.0), (43.2, 23.3),
                   # No belt, no front line: strikes west, north, south and east of the rest, all on land the Soviets
                   # held (Germany and eastward; nothing on Britain, France, Scandinavia or Turkey).
                   (48.9, 8.4), (50.1, 8.7), (59.9, 30.3), (46.0, 14.5), (55.3, 39.0), (48.1, 11.6), (54.3, 10.1)]
@@ -323,7 +323,8 @@ def build_map(s):
         """burn = (group, delay, duration): the pin of a struck place glows, chars and leans over in the fire."""
         position = place(where)
         if star and star_mesh:
-            return s.mesh(label, star_mesh, position, scale=(scale, scale, scale))
+            # pressed in, head a few mm over the paper; no hard shadow (it read as a second star)
+            return s.mesh(label, star_mesh, position, scale=(scale, scale, scale * 0.3), shadow=False)
         if pin_mesh:
             material = None
             if burn:
@@ -355,8 +356,10 @@ def build_map(s):
                        glow_mi, mobile=True)
         pool.static_mesh_component.set_translucent_sort_priority(2)
         if ring_mesh:
-            return s.mesh(label, ring_mesh, position, scale=(size / 6.0, size / 6.0, 1.0),
-                          materials=material, shadow=False, mobile=True)
+            # each scorch turned and sized a little differently (not one stamped coaster)
+            jitter = 0.85 + 0.3 * ((seed * 7.31) % 1.0)
+            return s.mesh(label, ring_mesh, position, rotation=(0.0, seed * 360.0, 0.0),
+                          scale=(size / 6.0 * jitter, size / 6.0 * jitter, 1.0), materials=material, shadow=False, mobile=True)
         return s.plane(label, position, (size, size), material, mobile=True)
 
     # Berlin and the cities that followed (3.5 / 3.6).

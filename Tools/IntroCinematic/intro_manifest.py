@@ -315,8 +315,8 @@ def shots():
          "mpc": {"Mould": [(0.0, 0.22), (0.12, 0.3), (0.92, 1.0), (1.0, 1.0)]}},
         {"id": "5.4", "levels": ["Intro_Bunker"], "vo": ["5_4"], "pre": 0.6, "post": 0.2, "fov": 55,
          # framed west of centre: the stain's eastern edge stays out of frame (it must never read as where it stops)
-         "cam": [(0.0, on_map(51.5, 15.5, back=78, up=92), (-50, 0, 0)), (1.0, on_map(51.5, 15.5, back=70, up=84), (-50, 0, 0))],
-         "mpc": {"Stain": [(0.0, 0.02), (1.0, 0.8)], "StainOpacity": [(0.0, 1.0)], "Pencil": [(0.0, 0.0), (0.45, 0.0), (0.6, 1.0)],
+         "cam": [(0.0, on_map(50.5, 7.5, back=70, up=80), (-50, 0, 0)), (1.0, on_map(50.5, 7.5, back=62, up=72), (-50, 0, 0))],
+         "mpc": {"Stain": [(0.0, 0.02), (1.0, 0.9)], "StainOpacity": [(0.0, 1.0)], "Pencil": [(0.0, 0.0), (0.45, 0.0), (0.6, 1.0)],
                  "Rings36": [(0.0, 60.0)], "Rings42": [(0.0, 60.0)], "Rings62": [(0.0, 0.0)]}},
         {"id": "5.5", "levels": ["Ger_PripyatMe410"], "min": 6.5, "fov": 58, "cam_snap": 230.0,
          "cam": [(0.0, (28050, 24800, 0), (-6, 198, 0)), (1.0, (27650, 25400, 0), (-6, 205, 0))],
@@ -330,7 +330,7 @@ def shots():
          # Pitch at most -4 at this lens: something high in the map's sky draws as a dark square above -4 degrees.
          "cam": [(0.0, (2790, -17560, 0), (-4, 101, 0)), (1.0, (2782, -17300, 0), (-4, 103, 0))],
          # (No falling-dust Niagara here: in this view it draws as a dark square over the sky.)
-         "actors": road_column(54250, 3600, 4, 1500, 150.0, 1.5) + [
+         "actors": road_column(54250, 3350, 4, 2000, 150.0, 1.5) + [
              # Artillery beyond the ridge: three distant flashes light the haze behind the arches.
              {"kind": "point", "label": "Artillery_%d" % k, "intensity": 60000.0, "color": (1.0, 0.72, 0.42, 1.0),
               "radius": 30000.0, "snap": 900.0, "spawn": (at_, at_ + 0.035), "keys": [(0.0, position, (0, 0, 0))]}
@@ -568,6 +568,8 @@ def global_cues(timeline):
     rules += [("DemeterPod", "Ger_Berlin")]
     # Ger_2ndOreMountains: resource pickups draw as glassy bubbles beside the road (6.1).
     rules += [("Resource_", "Ger_2ndOreMountains")]
+    # ... and its parked civilian cars read as a van driving in the 6.1 tank column.
+    rules += [("BP_Cover_OldCar", "Ger_2ndOreMountains")]
     for part, level in rules:
         cues.append({"type": "HideActors", "start": 0.0, "end": 0.0, "l1": part, "l2": level})
     return cues

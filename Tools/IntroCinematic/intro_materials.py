@@ -64,13 +64,19 @@ struct FPurpleDeath {
       float2 g = float2(x, y); float2 r = g + h2(i + g) - f; float d = dot(r, r);
       if (d < d1) { d2 = d1; d1 = d; } else if (d < d2) { d2 = d; } } }
     return sqrt(d2) - sqrt(d1); }
+  // Ridged multifractal: long branching vessels (river-like), deliberately not Voronoi cells, so the Purple Death
+  // never rhymes with the cracked plates of the Radixite crater (sections 5 and 8 stay apart, doc).
+  float ridged(float2 q) { float s = 0.0; float a = 0.55; float w = 1.0;
+    for (int k = 0; k < 5; k++) { float r = 1.0 - abs(n(q) * 2.0 - 1.0); r = r * r; s += r * a * w;
+      w = saturate(r * 1.6); q = q * 2.07 + float2(3.1, 1.7); a *= 0.5; }
+    return s; }
   float big(float2 q) {
-    float2 w = q + (float2(fbm(q * 0.6), fbm(q * 0.6 + 5.2)) - 0.5) * 1.6;
-    return smoothstep(0.09, 0.0, edge(w)); }
+    float2 w = q + (float2(fbm(q * 0.5), fbm(q * 0.5 + 5.2)) - 0.5) * 1.3;
+    float r = 1.0 - abs(n(w * 0.7) * 2.0 - 1.0);
+    return smoothstep(0.9, 0.985, r); }
   float veins(float2 q) {
-    float2 w = q + (float2(fbm(q * 0.6), fbm(q * 0.6 + 5.2)) - 0.5) * 1.6;
-    return saturate(smoothstep(0.11, 0.0, edge(w)) + 0.65 * smoothstep(0.07, 0.0, edge(w * 2.6 + 3.1))
-                    + 0.35 * smoothstep(0.05, 0.0, edge(w * 6.1 + 7.7))); }
+    float2 w = q + (float2(fbm(q * 0.5), fbm(q * 0.5 + 5.2)) - 0.5) * 1.3;
+    return saturate(smoothstep(0.66, 0.88, ridged(w * 0.8)) + big(q)); }
 };
 FPurpleDeath PD;
 """
@@ -241,9 +247,10 @@ arch += grain * (0.6 + 0.4 * (1.0 - luma));
 // Scratches: a few thin vertical lines, new places every few film frames.
 float st = floor(t / 3.0);
 for (int k = 0; k < 3; k++) {
-  float sx = H2(float2(st, k * 5.1 + 0.37));
+  float sx = H2(float2(st, k * 5.1 + 0.37)) + (H2(float2(t, k + 11.0)) - 0.5) * 0.0016;   // weaves frame to frame
   float on = step(0.8 + 0.06 * k, H2(float2(st * 1.7, k + 9.0)));
-  float seg = step(H2(float2(st, k + 3.0)), uv.y + 0.4) * step(uv.y - 0.5, H2(float2(st, k + 4.0)));
+  float seg = step(H2(float2(st, k + 3.0)), uv.y + 0.4) * step(uv.y - 0.5, H2(float2(st, k + 4.0)))
+              * step(0.35, vnoise(float2(uv.y * 38.0, st * 3.0 + k)));                      // broken, not one hairline
   float w = 0.0005 + 0.0012 * H2(float2(st, k + 6.0));
   arch += on * seg * smoothstep(w, 0.0, abs(uv.x - sx)) * (0.05 + 0.11 * H2(float2(st, k + 7.0)));
 }
