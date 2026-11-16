@@ -795,3 +795,20 @@ the committed version in A/B, so both were reverted. Lessons: an opacity-mask ed
 on the ground; on a denser mat grid the blanket relax needs ~70 passes, not 3, or the sheet stands up the wall as a
 fin. The right next step is a modelled mould (sculpted folds, fibrous edges, tapered branching roots grown into the
 soil, growth by baked stages handed over on the Mould clock), not more shader tuning.
+
+**Purple Death, staged growth (supersedes the "next step" above).** The growth mask is gone: every trench mould
+mesh is built in Blender at 18 stages of growth (`blender/sets/build_mould_stages.py`, sizes 0.05 to 1.0, four of
+them inside 5.2), each a complete mesh whose edges lie on the ground; `M_Intro_PurpleDeath` shows one stage at a time
+from the MPC `Mould` clock (hard switch per small step, `StageLo` / `StageHi`). Mats: the committed draped shapes at
+stage scale (helmet domes scaled with the stage), subdivided, with real vessels and nodules raised out of the surface
+from `mould_field.py`; the same field is baked into `T_Intro_MouldRelief_ORM` on the mats' UVs, so the vessel
+colour sits on the ridges, and the procedural vein network is kept on top. Veins: the build_veins network cut at each
+stage's length, every vessel ending in an 18 cm taper to a point. Pustules: pods placed once, each stage holding the
+pods within its radius. The flesh has almost no specular (a broad sheen on the smooth stages read as pale lilac
+upholstery), and the trench steel (helmets, mess tins) is `M_Intro_MouldSteel`: worn field-grey, rust and mould
+spots, no specular (its sheen read as grey clay).
+
+Judged blind (three independent judges each, frames labelled A/B in random order, no hint which is which, majority
+per adjective decided before running): committed vs pre-task 3-0 on scary, detailed and real for committed; staged vs
+pre-task 3-0 on all three for staged; staged vs committed: scary 2-1 staged, detailed 2-1 committed, real 3-0 staged.
+The staged version shipped.

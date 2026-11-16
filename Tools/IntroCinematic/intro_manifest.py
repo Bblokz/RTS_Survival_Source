@@ -60,8 +60,19 @@ DUST = "NS_FallingDust_01"
 
 
 def PD_MAT(mesh):
-    """The Purple Death material instance of a trench mould mesh (intro_purple.build_instances)."""
+    """The Purple Death material instance prefix of a trench mould mesh (intro_purple.build_instances)."""
     return sets.M + "MI_Intro_PD_" + mesh.replace("SM_Intro_Mould_", "")
+
+
+MOULD_STAGES = 18
+
+
+def mould_actors():
+    """Every growth stage of every trench mould mesh (SM_..._S<n>); each stage's instance shows it only in its window
+    of the MPC Mould clock (intro_purple.STAGE_LO), so the growth needs no reveal mask."""
+    return [{"kind": "mesh", "asset": "%s_S%d" % (mesh, stage), "label": "Growth_%d_S%d" % (index, stage),
+             "mats": "%s_S%d" % (PD_MAT(mesh), stage), "keys": [(0.0, at("Intro_Trench", *offset), (0, 0, 0))]}
+            for index, (mesh, offset) in enumerate(sets2.TRENCH_MOULD) for stage in range(MOULD_STAGES)]
 
 NOTICE = ("ARCHIVAL NOTICE\\n\\nThirty years of static, ash and, well, the nukes,\\nleft huge blackouts in our history."
           "\\n\\nWhat follows is compiled from the limited data available.")
@@ -318,19 +329,14 @@ def shots():
          "actors": [
              {"kind": "niagara", "asset": DUST, "label": "Dust", "keys": [(0.0, at("Intro_Trench", 0, -100, 330), (0, 0, 0), 1.2)]},
              {"kind": "point", "label": "PurpleHaze", "intensity": 0.35, "color": (0.62, 0.2, 0.95, 1.0), "radius": 1300.0,
-              "keys": [(0.0, at("Intro_Trench", 0, -300, 210), (0, 0, 0))]}] + [
-             # The first of it: small, already there when we arrive (the material reveals it, MPC Mould).
-             {"kind": "mesh", "asset": mesh, "label": "Growth_%d" % index, "mats": PD_MAT(mesh),
-              "keys": [(0.0, at("Intro_Trench", *offset), (0, 0, 0))]}
-             for index, (mesh, offset) in enumerate(sets2.TRENCH_MOULD)],
+              "keys": [(0.0, at("Intro_Trench", 0, -300, 210), (0, 0, 0))]}] +
+             # The first of it: small, already there when we arrive (its first growth stage, MPC Mould).
+             mould_actors(),
          "mpc": {"Mould": [(0.0, 0.05), (1.0, 0.22)]}},
         {"id": "5.3", "levels": ["Intro_Trench"], "vo": ["5_3"], "pre": 0.6, "post": 1.4, "fov": 55,
          "cam": [(0.0, at("Intro_Trench", -52, 96, 118), {"at": at("Intro_Trench", 100, -150, 62)}),
                  (1.0, at("Intro_Trench", -30, 30, 104), {"at": at("Intro_Trench", 100, -160, 66)})],
-         "actors": [
-             {"kind": "mesh", "asset": mesh, "label": "Growth_%d" % index, "mats": PD_MAT(mesh),
-              "keys": [(0.0, at("Intro_Trench", *offset), (0, 0, 0))]}
-             for index, (mesh, offset) in enumerate(sets2.TRENCH_MOULD)] + [
+         "actors": mould_actors() + [
              {"kind": "point", "label": "PurpleHaze", "intensity": 0.7, "color": (0.62, 0.2, 0.95, 1.0), "radius": 1300.0,
               "keys": [(0.0, at("Intro_Trench", 0, -300, 210), (0, 0, 0))]}],
          # Time-lapse: it takes the trench (the growth front crawls outward, the veins pump).
