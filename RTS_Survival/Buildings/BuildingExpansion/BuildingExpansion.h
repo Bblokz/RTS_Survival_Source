@@ -101,6 +101,14 @@ public:
 
 	inline EBuildingExpansionType GetBuildingExpansionType() const { return M_BuildingExpansionType; };
 	inline EBuildingExpansionStatus GetBuildingExpansionStatus() const { return M_StatusBuildingExpansion; };
+
+	/**
+	 * @brief Whether the expansion stands finished at its spot, so it may count towards tech unlocks.
+	 * Placed-in-level and spawned-finished expansions keep their initial status and count as standing.
+	 * @return False while looking for placement, being built, unpacking, packed up or looking to unpack.
+	 */
+	bool GetIsStanding() const;
+
 	inline TScriptInterface<IBuildingExpansionOwner> GetBuildingExpansionOwner() const { return M_Owner; }
 
 	/**

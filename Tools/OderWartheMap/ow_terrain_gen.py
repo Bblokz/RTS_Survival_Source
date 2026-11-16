@@ -78,6 +78,39 @@ DRUMLIN_FOOT = 1.22                     # the stamp blends into the ground betwe
 WERK_PATHS = [[(-5000.0, 0.0), (-3200.0, 250.0), (-1200.0, 0.0)], [(-300.0, 0.0), (900.0, -900.0)],
               [(-300.0, 0.0), (1150.0, 650.0)], [(-300.0, 0.0), (250.0, 1250.0)], [(-1200.0, 0.0), (-1300.0, -1100.0)]]
 WERK_CRATERS = [(2100.0, -1500.0, 260.0), (-2600.0, 1900.0, 320.0), (1500.0, 1900.0, 220.0), (-900.0, -2100.0, 280.0)]
+WERK_BLOCK = (-300.0, 0.0)                                       # = ow_dress_gen WERK_TEMPLATE block / cupolas
+WERK_CUPOLAS = [(900.0, -900.0), (1150.0, 650.0), (250.0, 1250.0)]
+BREACHES = ((-21000.0, -2000.0), (-2960.0, 2790.0))                # Kalau / island causeway breach centres (= ow_dress_gen)
+WERK_BLOCK_BOX = (-1372.0, 772.0, 1080.0)                         # buried block footprint: front x, back x, half width
+WERK_MOUND = 560.0                                                 # earth over the block roof (5 m over the plateau)
+WERK_MOUND_FALL = 1500.0                                           # its sides and back fall over 15 m (27 degrees)
+WERK_BENCH = (380.0, 720.0)                                        # flat cupola bench radius, blend out to
+
+
+def werk_local_height(lx, ly):
+    """The drumlin's height over its base at a Werk-frame point (no mound): same formula as the stamp."""
+    rho = math.hypot(lx / DRUMLIN_A, ly / DRUMLIN_B)
+    prof = 1.0 - float(smoothstep(DRUMLIN_TOP, 1.12, np.array(rho)))
+    relief = 35.0 * math.sin(lx / 610.0) * math.cos(ly / 470.0) + 25.0 * math.sin((lx + ly) / 390.0)
+    return WERK_HILL * prof * (1.0 + 0.10 * max(-1.0, min(1.0, lx / DRUMLIN_A))) + relief * prof
+
+
+def werk_mound_abs(lx, ly):
+    """The mound surface over the Werk base: 60 cm under the plateau where it fades out, so the plateau relief wins there."""
+    return WERK_HILL - 60.0 + werk_block_mound(lx, ly)
+
+
+def werk_block_mound(lx, ly):
+    """Earth heaped over the block: flat over the roof, a steep front at the concrete face, 25 degree sides and back."""
+    fx, bx, hw = WERK_BLOCK_BOX
+    side = np.maximum(np.abs(ly) - hw, 0.0)
+    back = np.maximum(lx - bx, 0.0)
+    outer = np.hypot(side, back)
+    m = WERK_MOUND * (1.0 - smoothstep(0.0, WERK_MOUND_FALL, outer))
+    front = np.clip((lx - (fx - 60.0)) / 300.0, 0.0, 1.0)            # 0 just before the face, full 2.4 m behind it
+    return m * front
+
+
 WERK_TRENCH = [(-1700.0, -1600.0), (-2000.0, -800.0), (-1750.0, 0.0), (-2050.0, 800.0), (-1800.0, 1600.0)]
 # critic R1-10: the rail yard (rich metal) sits on one ballast bed that runs off the east edge of the map
 RAIL_LINE = [(3500.0, 15300.0), (4800.0, 21000.0), (3800.0, 30000.0), (3500.0, 45000.0)]
@@ -348,6 +381,13 @@ class Gen:
             for cx_, cy_, cr in WERK_CRATERS:
                 dc = np.hypot(lx - cx_, ly - cy_)
                 hz = hz - 45.0 * smoothstep(cr, cr * 0.3, dc) + 18.0 * smoothstep(cr * 1.5, cr, dc) * smoothstep(cr * 0.8, cr, dc)
+            # r8 (critic R7-5): the cupolas stand on level 7.6 m benches, so every skirt sits flat. (Burying the block
+            # under a mound was tried and dropped: the block fills the plateau, so the mound's flank lands on the
+            # drumlin's 33 degree flank and the sum walls off the hill top for every agent.)
+            for cx_, cy_ in WERK_CUPOLAS:
+                hc = werk_local_height(cx_, cy_)
+                wb = smoothstep(WERK_BENCH[1], WERK_BENCH[0], np.hypot(lx - cx_, ly - cy_))
+                hz = hz * (1.0 - wb) + (base + hc) * wb
             blend = 1.0 - smoothstep(1.12, DRUMLIN_FOOT, rho)
             Z = Z * (1.0 - blend) + hz * blend
             t_pt = c + WERK_TUNNEL * np.array([math.cos(math.radians(bearing)), math.sin(math.radians(bearing))])
@@ -363,9 +403,17 @@ class Gen:
             inside_cut = (lx < px0 + 900.0) & (lx > px1) & (np.abs(ly) < phw)
             wall = floor + BANK * np.maximum(np.abs(ly) - phw, 0.0) + BANK * np.maximum(lx - px0 - 900.0, 0.0)
             pcut = np.where(inside_cut, floor, np.where((lx > px1 - 50.0) & (lx < px0 + 2500.0), wall, 1e9))
+            # the berm: a mound over the portal's roof and flanks (critic R3-1); the cut ramp in front stays open
+            bx = (lx - (px0 + 700.0)) / 1500.0
+            by = ly / 1050.0                                             # only the portal's own flanks: lanes stay open
+            berm = base + 400.0 * (1.0 - smoothstep(0.55, 1.0, np.hypot(bx, by)))
+            front_open = (lx < px0 + 300.0) & (np.abs(ly) < phw + 100.0)
+            hz = np.where(front_open, hz, np.maximum(hz, berm))
+            bw = 1.0 - smoothstep(0.55, 1.05, np.hypot(bx, by))
+            Z = np.where(front_open, Z, np.maximum(Z, berm * (bw > 0.0) + Z * (bw <= 0.0)))
             Z = np.minimum(Z, pcut)
             self.werks[fid] = {"centre": c, "base": base, "yaw": math.degrees(yaw) % 360.0, "tunnel": t_pt,
-                               "apron_pt": a_pt, "portal_cut": pcut, "portal_floor": base - depth,
+                               "apron_pt": a_pt, "portal_cut": pcut, "berm": np.where(front_open, -1e9, berm), "portal_floor": base - depth,
                                "mask": rho <= DRUMLIN_TOP, "hill": rho < DRUMLIN_FOOT + 0.05, "apron": ra < WERK_APRON_R,
                                "hill_z": hz, "blend": blend, "apron_w": apron, "lx": lx, "ly": ly, "rho": rho}
 
@@ -461,23 +509,33 @@ class Gen:
             self.ponds.append({"dam": did, "xmin": float(X[rr, cc].min() - 300.0), "xmax": float(X[rr, cc].max() + 300.0),
                                "ymin": float(Y[rr, cc].min() - 300.0), "ymax": float(Y[rr, cc].max() + 300.0), "z": UP_WATER,
                                "mask": sel})
-        lvl_land = soft(level, 18)                                       # the land round a pond rises with it
+        # the land round a pond rises with it: a max filter (not an average), so no shore dips under the pond surface
+        lvl_land = level.copy()
+        for _ in range(22):
+            q = np.pad(lvl_land, 1, mode="edge")
+            lvl_land = np.maximum.reduce([lvl_land, q[:-2, 1:-1], q[2:, 1:-1], q[1:-1, :-2], q[1:-1, 2:]])
+        lvl_land = soft(lvl_land, 6)
         deep = BED + 30.0 * noise(431, 14) - 40.0 * smoothstep(0.6, 1.0, soft(water, 9))
         # in a narrow channel the shelf shrinks (its half width is the largest rim distance nearby), so the cut still
         # reaches deep water: an 8-12 m inlet must block as well as a lake
         half_w = d_in.copy()
-        for _ in range(8):
+        for _ in range(16):
             q = np.pad(half_w, 1, mode="edge")
             half_w = np.maximum.reduce([half_w, q[:-2, 1:-1], q[2:, 1:-1], q[1:-1, :-2], q[1:-1, 2:]])
-        half_w = np.where(water, half_w, 0.0)
-        shelf = np.clip(0.18 * half_w, 40.0, 250.0)
-        lake = np.maximum(level + CUT_TOP - 1.45 * BANK * np.maximum(d_in - shelf, 0.0) - 6.0 * np.minimum(d_in, shelf) / 100.0,
-                          level + deep)                                   # 2.5 m of gentle shelf, then the 60 degree cut
-        # land: a gentle shore down to just above the waterline (the blocking cut is under the water)
+        shelf = np.where(half_w > 600.0, np.clip(0.3 * half_w, 90.0, 230.0), 40.0)   # wide water: never a cliff at the waterline
+        # critic R2-1: the waterline is the zero contour of a SMOOTHED signed distance (not the 1 m mask edge, which
+        # draws stairs): the shore rises at 8.5 degrees from it, the water shelves down to about -75 cm, then the cut
+        sdf = soft(d_out - np.where(water, d_in, 0.0), 3)
+        lake = np.maximum(level + 0.25 * np.maximum(sdf, -shelf) - 2.6 * BANK * np.maximum(-sdf - shelf, 0.0), level + deep)
         shore_h = lvl_land + SHORE + 20.0 * noise(433, 5)
         fade = smoothstep(0.0, 1800.0, d_out + 250.0 * noise(434, 9))
         land = shore_h + (np.maximum(Z, shore_h) - shore_h) * fade
-        Z = np.where(water, lake, land)
+        near = lvl_land + 0.15 * np.clip(sdf, 0.0, 600.0)               # the first 6 m of shore only (capped)
+        w_near = smoothstep(150.0, 600.0, sdf)
+        land = near * (1.0 - w_near) + land * w_near
+        Z = np.where(sdf < 0.0, lake, land)
+        water = (sdf < 0.0) & ((level > 0.0) | water | (soft(water, 2) > 0.2))
+        self.water_sketch = water
         # the pond water is a set of 4 m tiles over the pond cells (one tile of margin); land under a tile stands above
         # the pond level, so the sheet shows only on the pond (no rectangle raised round it)
         TILE = 400.0
@@ -507,7 +565,8 @@ class Gen:
             pond["tile_cm"] = TILE
         self.level = level
         # critic R2-7: the Mittelsee is the design's algae lake: 4 m tiles of purple algae water over it (z +2 cm)
-        mittel = water & (soft(self.extend(self.masks["lake_mittel"]), 10) > 0.15) & (level == 0.0)
+        mfield = soft(self.extend(self.masks["lake_mittel"]), 14) + 0.35 * noise(441, 6) + 0.2 * noise(442, 2.5)
+        mittel = water & (mfield > 0.45) & (level == 0.0) & (sub_cell_dist(~water, 6) > 150.0)
         rr, cc = np.nonzero(mittel)
         tiles = set(zip(np.floor(X[rr, cc] / 400.0).astype(int).tolist(), np.floor(Y[rr, cc] / 400.0).astype(int).tolist()))
         self.algae_tiles = [[(a_ + 0.5) * 400.0, (b_ + 0.5) * 400.0] for a_, b_ in sorted(tiles)]
@@ -525,20 +584,32 @@ class Gen:
         self.road_kind = np.full(SHAPE, "", dtype=object)
         self.road_centre = np.full(SHAPE, 1e9)
         self.road_end = np.full(SHAPE, 1e9)
+        self.road_kind_near = np.full(SHAPE, "", dtype=object)
         for rid in ROAD_ORDER:
             Z = self.lay_road(rid, Z)
 
+        # R7-3: the two breaches are notches: the crown drops 1.1 m over 7 m into a 10-11 m wide rubble gap
+        for bx_, by_ in BREACHES:
+            db_ = np.hypot(X - bx_, Y - by_)
+            notch = smoothstep(1300.0, 600.0, db_) * (self.road_d < 250.0)
+            Z = Z - 110.0 * notch
+        toe = (self.road_d > 0.0) & (self.road_d < 900.0) & (Z < self.level) & np.isin(self.road_kind_near, ["dam"])
+        Z = np.where(toe, np.minimum(Z, self.level - 170.0), Z)
         # R2-1: smooth every cell in the waterline band among itself (corridor decks and their banks excluded)
         lo_b, hi_b = SHORE_BAND
         band = (Z - self.level >= lo_b) & (Z - self.level <= hi_b) & (self.road_d > 400.0)
-        for _ in range(2):
-            num = soft(np.where(band, Z, 0.0), 2)
-            den = soft(band, 2)
-            Z = np.where(band & (den > 1e-3), num / np.maximum(den, 1e-3), Z)
+        for lvl in np.unique(self.level):                                # each water level on its own (pond vs lake)
+            bl = band & (self.level == lvl)
+            for _ in range(2):
+                num = soft(np.where(bl, Z, 0.0), 2)
+                den = soft(bl, 2)
+                Z = np.where(bl & (den > 1e-3), num / np.maximum(den, 1e-3), Z)
         # the werk stamps are authoritative: stamp them again (identity) after every terrain operation
         for wk in self.werks.values():
             Z = Z * (1.0 - wk["blend"]) + wk["hill_z"] * wk["blend"]
             Z = Z * (1.0 - wk["apron_w"]) + wk["base"] * wk["apron_w"]
+            Z = np.maximum(Z, np.where(np.hypot((wk["lx"] - (PORTAL_CUT[0] + 700.0)) / 1500.0, wk["ly"] / 1050.0) < 1.05,
+                                       wk["berm"], -1e9))
             Z = np.minimum(Z, wk["portal_cut"])
         self.Z = Z
         self.slope = slope_deg(Z)
@@ -630,6 +701,7 @@ class Gen:
         self.road_end = np.where(near & (d - w < self.road_d), end_s, self.road_end)
         self.road_d = np.where(near, np.minimum(self.road_d, d - w), self.road_d)
         self.road_kind = np.where(on, kind, self.road_kind)
+        self.road_kind_near = np.where(near & (d - w < 900.0), kind, self.road_kind_near)
         self.road_centre = np.where(on, np.minimum(self.road_centre, d), self.road_centre)
         self.out_masks["road_" + rid] = on
         return Zn
@@ -687,6 +759,14 @@ class Gen:
         band = np.clip(1.0 - np.abs(shore - 0.5) / 0.45, 0.0, 1.0) * smoothstep(60.0, 0.0, Z)
         algae = np.clip(band * (0.35 + lee) * filaments * 1.5, 0.0, 1.0)
         W["PripAlgae"] += 7.0 * algae
+        # r6: the Mittelsee is the algae lake: its shallow shelf carries algae, seen through the murky water
+        mit_w = soft(self.extend(self.masks["lake_mittel"]), 8) * smoothstep(-260.0, -60.0, Z) * (Z < 20.0)
+        W["PripAlgae"] += 26.0 * mit_w * (0.5 + 0.5 * filaments)
+        # r8 (R7-8): no algae speckle at the Hochwald ford
+        fp = self.feature("ford_hochwald").points[0]
+        W["PripAlgae"] *= smoothstep(3000.0, 5500.0, np.hypot(X - fp[0], Y - fp[1]))
+        fd = self.line_dist(np.asarray(self.corridor_points("ford_hochwald"), float), 4000.0)    # R8-2: the whole bar + 3-7 m
+        W["PripAlgae"] *= smoothstep(1050.0, 1450.0, fd)
         # a 2-3 m band of wet dark mud on land at every shoreline (critic R1-2)
         d_shore = sub_cell_dist(Z < 0.0, 6)
         band_w = 250.0 + 250.0 * fbm(119, 18)                          # 0-5 m, varying along the shore
@@ -704,6 +784,11 @@ class Gen:
         for name in LAYERS:
             W[name] *= (1.0 - 0.85 * crag)
         streak = smoothstep(0.2, 0.6, np.abs(noise(417, 3)) + 0.5 * noise(418, 11))     # rills down the face
+        gully = smoothstep(0.35, 0.7, noise(419, 9)) * self.ridge_any * ~self.ridge_top
+        fan = smoothstep(0.3, 0.75, noise(419, 9)) * soft(dist_outside(self.crag, 14) <= 12.0, 3) * ~self.ridge_top * ~self.crag
+        W["PripSand"] += 9.0 * fan * (0.6 + 0.4 * n2)
+        W["PripGravel"] += 5.0 * fan
+        W["PripGrass"] *= (1.0 - 0.7 * np.clip(fan + gully, 0.0, 1.0))
         W["PripEarth"] += 18.0 * crag * (0.7 + 0.3 * patch)
         W["PripMud"] += 7.0 * crag * (1.0 - streak)
         W["PripSand"] += 7.0 * crag * streak
@@ -716,7 +801,7 @@ class Gen:
         W["PripSand"] += 4.0 * topsoft * (0.5 + 0.5 * n3)
         start = self.feature("start").points[0]
         dstart = np.hypot(X - start[0], Y - start[1]) + 300.0 * n2
-        W["PripEarth"] += 6.0 * topsoft * smoothstep(6000.0, 2500.0, dstart)
+        W["PripSand"] += 5.0 * topsoft * smoothstep(6000.0, 2500.0, dstart)
         # werk hills: one paint set in the Werk frame (local patterns only, so the five are identical): an earth cap,
         # grass flanks, worn paths between entrance, cupolas, mast and tunnel, a trench scar, old craters, gravel apron
         def lseg_dist(lx, ly, pts):
@@ -740,6 +825,18 @@ class Gen:
             for pts in WERK_PATHS:
                 pd = lseg_dist(lx, ly, pts)
                 W["PripEarth"] += 14.0 * hill_w * smoothstep(170.0, 70.0, pd)
+            # r5: dug earth round the block and each cupola, so their earth skirts sit in worked ground, not on grass
+            ragged = 120.0 * np.sin(lx / 140.0 + 0.7) * np.cos(ly / 115.0 + 1.9)
+            for cx_, cy_ in WERK_CUPOLAS:
+                dc = np.hypot(lx - cx_, ly - cy_) + ragged
+                W["PripSand"] += 9.0 * hill_w * smoothstep(820.0, 520.0, dc)
+                W["PripMud"] += 4.0 * hill_w * smoothstep(760.0, 450.0, dc) * (0.5 + 0.5 * lpat)
+            fx_, bx_, hw_ = WERK_BLOCK_BOX
+            fore = (lx < fx_ + 50.0) & (lx > fx_ - 900.0 - ragged) & (np.abs(ly) < hw_ + 200.0 + ragged)
+            W["PripSand"] += 8.0 * hill_w * fore
+            W["PripGravel"] += 4.0 * hill_w * fore * (0.5 + 0.5 * lpat)
+            db = np.maximum(np.maximum(lx - bx_, fx_ - lx), np.abs(ly) - hw_) + ragged     # a sod band round the block
+            W["PripGrass"] += 6.0 * hill_w * smoothstep(500.0, 0.0, db) * (lx > fx_ + 50.0)
             td = lseg_dist(lx, ly, WERK_TRENCH)
             W["PripMud"] += 10.0 * hill_w * smoothstep(110.0, 40.0, td)
             W["PripEarth"] += 6.0 * hill_w * smoothstep(240.0, 110.0, td)
@@ -775,6 +872,14 @@ class Gen:
         W["PripEarth"] += 6.0 * bankz
         W["PripGrass"] *= (1.0 - 0.8 * bankz)
         end_fade = smoothstep(300.0, 1500.0, self.road_end)            # no grey blobs where a corridor ends on land
+        breach = np.zeros(SHAPE)
+        for at_ in BREACHES:
+            breach = np.maximum(breach, smoothstep(1100.0, 600.0, np.hypot(X - at_[0], Y - at_[1]) + 120.0 * n2))
+        breach = breach * (d <= 0.0)
+        end_fade = end_fade * (1.0 - breach)
+        W["PripMud"] += 14.0 * breach * np.clip(0.4 + n2, 0.0, 1.0)
+        W["PripAsh"] += 6.0 * breach * np.clip(0.6 - n2, 0.0, 1.0)
+        W["PripGravel"] += 4.0 * breach * np.clip(noise(443, 2) + 0.3, 0.0, 1.0)
         for k, layer, width, mix in (("dam", "PripGravel", 500.0, "PripEarth"), ("boardwalk", "PripEarth", 125.0, "PripPeat"),
                                      ("ford", "PripGravel", 700.0, "PripSand"), ("ramp", "PripGravel", 520.0, "PripEarth")):
             m = on & (kind == k)
@@ -782,9 +887,11 @@ class Gen:
             core = core * end_fade
             W[layer] += 30.0 * core
             W[mix] += 12.0 * m * (1.0 - smoothstep(width, width - 180.0, centre))
-        ramp_bank = (kind == "ramp") | ((d > 0.0) & (d < 500.0) & self.ridge_any)
-        W["PripGrass"] *= (1.0 - 0.7 * ramp_bank)
-        W["PripEarth"] += 5.0 * ramp_bank
+        ramp_bank = (kind == "ramp") | ((d > 0.0) & (d < 900.0) & self.ridge_any)
+        W["PripGrass"] *= (1.0 - 0.9 * ramp_bank)
+        W["PripMoss"] *= (1.0 - 0.9 * ramp_bank)
+        W["PripSand"] += 6.0 * ramp_bank           # r8 (R7-4): the earth layer renders olive; banks are sand and mud
+        W["PripMud"] += 3.0 * ramp_bank
         # tracks: two-track dirt between the crossings and the bunker groups (paint only)
         track_d = np.full(SHAPE, 1e9)
         for tid in TRACKS:
@@ -809,8 +916,8 @@ class Gen:
         bed = smoothstep(yard_w + 120.0, yard_w, rail_d + 30.0 * n2) * (Z > 60.0)
         for name in LAYERS:
             W[name] = W[name] * (1.0 - 0.8 * bed)
-        W["PripGravel"] += 6.0 * bed
-        W["PripEarth"] += 6.0 * bed * np.clip(n2 + 0.6, 0.0, 1.0)
+        W["PripGravel"] += 1.0 * bed                # r8 (R7-8): old cinder ballast, darker
+        W["PripMud"] += 11.0 * bed * np.clip(n2 + 0.7, 0.3, 1.0)
         W["PripAsh"] += 2.0 * bed
         self.rail_d = rail_d
 
@@ -1013,7 +1120,7 @@ class Gen:
                             "tunnel": [float(v) for v in wk["tunnel"]], "top_r": WERK_TOP_R} for fid, wk in self.werks.items()},
             "ponds": [{k: v for k, v in pond.items() if k != "mask"} for pond in self.ponds],
             "rail_line": [list(p) for p in RAIL_LINE],
-            "algae_tiles": {"tiles": self.algae_tiles, "tile_cm": 400.0, "z": 2.0},
+            "algae_tiles": {"tiles": [], "tile_cm": 400.0, "z": 2.0},     # off: 4 m tiles read as squares (r4)
             "drumlin": {"a": DRUMLIN_A, "b": DRUMLIN_B, "top": DRUMLIN_TOP, "foot": DRUMLIN_FOOT},
             "layers": LAYERS, "files": files, "regions": regions, "features": features, "paths": paths, "roads": roads,
         }

@@ -27,7 +27,7 @@ VIEWS = [('valley', streaks[1][2], streaks[1][3]), ('road', streaks[2][2], strea
 # dither pass 2026-11-16 (DriftDither node: coverage ramps over EdgeSoft up to Opacity, screen-door vs IGN noise)
 BRACKETS = [('base', {}), ('op45', {'Opacity': 0.45}), ('op80', {'Opacity': 0.8, 'EdgeSoft': 0.5}),
             ('static', {'TemporalDither': 0.0})]
-BASE = {'ColourGain': 0.5, 'ShadeContrast': 0.95, 'NormalStrength': 1.7, 'Opacity': 0.6, 'EdgeSoft': 0.35,
+BASE = {'ColourGain': 0.5, 'ShadeContrast': 0.95, 'NormalStrength': 1.7, 'Opacity': 0.8, 'EdgeSoft': 0.5,
         'TemporalDither': 1.0, 'SandTint': (0.66, 0.48, 0.29)}   # the saved MI / master values
 MOTION_FRAMES, MOTION_STEP = 4, 0.75
 les = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)

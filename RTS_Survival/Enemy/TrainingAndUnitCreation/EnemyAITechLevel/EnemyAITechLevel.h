@@ -41,10 +41,16 @@ struct FEnemyTrainingOptionsForTechLevel
 	EEnemyAITechLevel TechLevel = EEnemyAITechLevel::NotInitialized;
 
 	// What building expansions does the enemy AI need to have built to unlock this tech level?
-	// If multiple are listed, then building either one of them will unlock the level.
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	// If multiple are listed, then building either one of them will unlock the level,
+	// unless bRequireAllTypesUnlockingThisLevel is set. An empty list never unlocks the level.
+	// Only finished expansions count (ABuildingExpansion::GetIsStanding).
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	TArray<EBuildingExpansionType> TypesUnlockingThisLevel;
-	
+
+	// Set: every listed type must stand (e.g. research centre AND assembly yard). Unset: any one of them is enough.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	bool bRequireAllTypesUnlockingThisLevel = false;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TArray<ETankSubtype> TrainableTankSubtypes = {};
 	

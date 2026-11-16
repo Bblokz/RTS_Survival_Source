@@ -80,9 +80,10 @@ def run(verbose=True):
     for fid in sorted(L["werks"]):
         w = L["werks"][fid]
         # from the apron in front of the portal (the portal itself and the Werk block are solid) to the hill top
-        legs.append(("%s tunnel apron -> hill top" % fid, werk(fid, -6300.0, 0.0), werk(fid, 300.0, -1900.0), "go"))
+        legs.append(("%s tunnel apron -> hill top" % fid, werk(fid, -7900.0, 0.0), werk(fid, 300.0, -1900.0), "go"))
+        legs.append(("%s portal floor -> apron" % fid, werk(fid, -5600.0, 0.0), werk(fid, -7900.0, 0.0), "go"))
         # cross the belt where both ends are dry ground (some fronts look out over a lake)
-        for bdeg in (-10.0, -30.0, 10.0, -45.0, 25.0, 0.0):
+        for bdeg in (-10.0, -20.0, -30.0, 10.0, -5.0, 5.0, -45.0, 0.0):          # away from the 36-48 degree vehicle gap
             br = math.radians(bdeg)
             outer = werk(fid, 4300.0 * math.cos(br), 4300.0 * math.sin(br))
             inner = werk(fid, 2400.0 * math.cos(br), 2400.0 * math.sin(br))

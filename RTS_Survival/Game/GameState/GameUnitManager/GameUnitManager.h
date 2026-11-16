@@ -198,6 +198,7 @@ public:
 
 	/**
 	 * @brief Counts only the requested building expansion types in one pass over that player's live BXPs.
+	 * Only standing BXPs count (ABuildingExpansion::GetIsStanding), so one still under construction unlocks nothing.
 	 * @param Player The player that owns the building expansions.
 	 * @param BxpTypes The building expansion types that need explicit count entries.
 	 * @return Mapping with every requested type present, including zero-count types.

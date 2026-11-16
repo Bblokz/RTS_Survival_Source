@@ -253,11 +253,11 @@ def werks():
         keep(w["tunnel"][0], w["tunnel"][1], 1700.0)
         # the concrete block and the steel cupolas on the hill top
         bx, by = werk_xy(fid, *WERK_TEMPLATE["block"][:2])
-        if not piece("Werk_Block", "SM_OW_WerkBlock", bx, by, yaw, collision=True):
+        if not piece("Werk_Block", "SM_OW_WerkBlock", bx, by, yaw, dz=-45.0, collision=True):
             bp(tag + "_Block", D + "Military/BP_Military_Dest_Bunker05", bx, by, yaw, 0.0, folder)
         for k, (lx, ly) in enumerate(WERK_TEMPLATE["cupolas"]):
             x, y = werk_xy(fid, lx, ly)
-            piece("Werk_Cupola", "SM_OW_SteelCupola", x, y, yaw + 30.0 * k, collision=True,
+            piece("Werk_Cupola", "SM_OW_SteelCupola", x, y, yaw + 30.0 * k, dz=-70.0, collision=True,
                   fallback=STANDIN_DOME, fb_scale=3.0, fb_dz=-110.0)
         x, y = werk_xy(fid, *WERK_TEMPLATE["mast"])
         if not piece("Werk_Mast", "SM_OW_WerkMast", x, y, yaw, collision=True):
@@ -358,8 +358,51 @@ def stations():
     if best:
         r, k = best
         px, py = x + (r - 900.0) * math.cos(math.radians(k)), y + (r - 900.0) * math.sin(math.radians(k))
-        bp("PumpHouse", D + "PostApo/BP_Dest_PostApo_House", px, py, k, 0.0, "Stations")
+        pump_house(px, py, k, x, y)
         keep(px, py, 1500.0)
+
+
+IA = "/Game/IndustrialArea/Meshes/"
+
+
+def pump_house(px, py, k, sx, sy):
+    """R7-6: a walled 5 x 10 m concrete pump house on the Packlitz shore, its long side to the water, intake pipes
+    running from it into the lake, the old pump in front of the door."""
+    yaw = float(k)                                     # mesh +X faces the water, mesh Y (the wall span) runs along the shore
+    ca, sa = math.cos(math.radians(k)), math.sin(math.radians(k))
+    tx, ty = -sa, ca                                   # along the shore
+    gz = min(ground_z_cell(px + ca * ox + tx * oy, py + sa * ox + ty * oy) for ox in (-260, 260) for oy in (-510, 510)) - 15.0
+
+    def put(group, mesh, lx, ly, lyaw, dz=0.0, scale=1.0, pitch=0.0, collision=True):
+        group = mesh.rsplit("/", 1)[-1]                 # one instance group per mesh
+        g = INST.setdefault("PH_" + group, {"mesh": mesh, "collision": collision, "items": [], "shadow": True, "abs_z": gz})
+        if "Roof" in mesh:                              # R8-4: weathered concrete, not near white
+            g["material"] = "/Game/RTS_Survival/Blueprints/Environment/OderWarthe/Kit/Materials/MI_OW_ConcreteDark"
+        if "Pipe" in mesh:
+            g["material"] = "/Game/RTS_Survival/Blueprints/Environment/OderWarthe/Kit/Materials/MI_OW_RustSteel"
+        g["items"].append([round(px + ca * lx + tx * ly, 1), round(py + sa * lx + ty * ly, 1), round(dz, 1),
+                           round((yaw + lyaw) % 360.0, 1), scale, pitch, 0.0])
+
+    # long walls (span local Y), wall pieces span their own Y: yaw 0 in the house frame
+    put("Wall", IA + "SM_Wall_Exterior_5x3_5m_Window", 250.0, -250.0, 0.0)
+    put("Wall", IA + "SM_Wall_Exterior_5x3_5m", 250.0, 250.0, 0.0)
+    put("WallDoor", IA + "SM_Wall_Exterior_5x3_5m_Door", -250.0, -250.0, 0.0)
+    put("WallWin", IA + "SM_Wall_Exterior_5x3_5m_Window", -250.0, 250.0, 0.0)
+    put("Wall", IA + "SM_Wall_Exterior_5x3_5m", 0.0, -500.0, 90.0)
+    put("Wall", IA + "SM_Wall_Exterior_5x3_5m", 0.0, 500.0, 90.0)
+    for i in range(8):                                 # flat roof: 8 strips of 70 cm by two 5 m rows
+        for ly in (-250.0, 250.0):
+            put("Roof", IA + "SM_Roof_Block_5m", -245.0 + 70.0 * i, ly, 0.0, dz=350.0)
+    put("Pump", IA + "SM_Pump_Station", -480.0, -150.0, 0.0)
+    # instanced walls do not cut the navmesh: one blocker (every agent) over the house
+    NAVBLOCKS.append(["PumpHouse", round(px, 1), round(py, 1), 0.0, round(yaw % 360.0, 1), 270.0, 520.0, 300.0, ""])
+    # two intake pipes from the water wall down into the lake (pipe mesh: 1 m long on its X, 12 cm thick)
+    for ly in (-160.0, 160.0):
+        put("Pipe", IA + "SM_Pipe_1m", 250.0 + 330.0, ly, 0.0, dz=40.0, scale=6.0, pitch=-8.0, collision=False)
+
+
+def ground_z_cell(x, y):
+    return float(at("height", x, y))
 
 
 def sandbag_ring(tag, cx, cy, face, folder):
@@ -499,8 +542,29 @@ def crossings():
             g = INST.setdefault("Kit_SluiceGate", {"mesh": path, "collision": True, "items": [], "shadow": True,
                                                    "abs_z": LAYOUT["levels"]["crown"] - 10.0})
             g["items"].append([round(gx, 1), round(gy, 1), 0.0, round(yaw, 1), 1.0, 0.0, 0.0])
+            # R8-1: the kit gate does not cut the navmesh; an all-agent blocker under it, so nav matches the 10 m lane
+            z_off = LAYOUT["levels"]["crown"] - float(at("height", gx, gy))     # centred on the deck, not the lake bed under the gate
+            NAVBLOCKS.append(["%s_SluiceGate" % did, round(gx, 1), round(gy, 1), round(z_off, 1), round(yaw, 1), 150.0, 420.0, 300.0, ""])
         else:
             STANDINS.add("SM_OW_SluiceGate")
+        # R7-2: the outlet: a concrete headwall with two culvert pipes at the water on the downstream face (the gate is
+        # the intake on the pond side; the culvert runs under the road)
+        ox, oy = pts[k][0] - nx * (w + 230.0), pts[k][1] - ny * (w + 230.0)
+        # R8-1: the downstream shoulder at the outlet is closed too, so the nav lane is the 10 m deck
+        bx_, by_ = pts[k][0] - nx * (w + 190.0), pts[k][1] - ny * (w + 190.0)
+        NAVBLOCKS.append(["%s_SluiceOutlet" % did, round(bx_, 1), round(by_, 1),
+                          round(LAYOUT["levels"]["crown"] - float(at("height", bx_, by_)), 1), round(bearing_yaw(nx, ny), 1),
+                          150.0, 420.0, 300.0, ""])
+        for grp, mesh, off, dz, sc, pitch in (("Outlet_Wall", "/Game/IndustrialArea/Meshes/SM_Wall_Exterior_Top_5x1_5m", 0.0, -40.0, 1.0, 0.0),
+                                              ("Outlet_Pipe", "/Game/IndustrialArea/Meshes/SM_Pipe_1m", -130.0, 30.0, 4.5, 0.0),
+                                              ("Outlet_Pipe", "/Game/IndustrialArea/Meshes/SM_Pipe_1m", 130.0, 30.0, 4.5, 0.0)):
+            g = INST.setdefault("Sluice" + grp, {"mesh": mesh, "collision": False, "items": [], "shadow": True, "abs_z": 0.0})
+            px_, py_ = ox - uy * 0.0 + ux * off, oy + uy * off
+            if grp == "Outlet_Wall":
+                g["items"].append([round(px_, 1), round(py_, 1), dz, round(bearing_yaw(ux, uy) - 90.0, 1), sc, 0.0, 0.0])
+            else:
+                g["material"] = "/Game/RTS_Survival/Blueprints/Environment/OderWarthe/Kit/Materials/MI_OW_RustSteel"
+                g["items"].append([round(px_ - nx * 120.0, 1), round(py_ - ny * 120.0, 1), dz, round(bearing_yaw(-nx, -ny), 1), sc, 0.0, 0.0])
         note(did + "_sluice", "Sluice gate (10 m choke)", pts[k][0], pts[k][1])
         keep(pts[k][0], pts[k][1], 2200.0)
     for cid, choke in (("causeway_kalau", (-21000.0, -2000.0)), ("causeway_island", (-2960.0, 2790.0))):
@@ -522,6 +586,13 @@ def crossings():
                 else:
                     inst("BreachSlab_%d" % (1 + j % 2), slab % (1 + j % 2), x, y, bearing_yaw(ux, uy) + RNG.uniform(-35, 35),
                          RNG.uniform(0.35, 0.55), -60.0, False, pitch=RNG.uniform(-25, 25), roll=RNG.uniform(-20, 20))
+        # R7-3: broken deck slabs standing up at both ends of the notch, on the shoulders (the lane stays clear)
+        for s in (-640.0, 640.0):
+            for side in (-1.0, 1.0):
+                x = pts[k][0] + ux * s - uy * side * (w + 90.0)
+                y = pts[k][1] + uy * s + ux * side * (w + 90.0)
+                inst("BreachEndSlab", slab % 1, x, y, bearing_yaw(-uy, ux) + RNG.uniform(-12, 12), RNG.uniform(0.45, 0.6), -70.0, False,
+                     pitch=RNG.uniform(55, 70) * (1 if s > 0 else -1), roll=RNG.uniform(-10, 10))
         note(cid + "_breach", "Breach (10-11 m choke)", pts[k][0], pts[k][1])
         keep(pts[k][0], pts[k][1], 2000.0)
     # riprap: stones along both faces of every dam and causeway at the waterline (critic R1-5)
@@ -643,7 +714,10 @@ def nature():
     reeds = [p for p in (pry("bog_reed_a"), pry("bog_reed_b"), pry("bog_cattail_a")) if p]
     if reeds:
         # clumps of 5-14 stems standing in 10-60 cm of water, irregular groups, dark (critic R1-2)
-        for x, y in scatter(950, lambda x, y: -60.0 < at("height", x, y) < 10.0 and not kept(x, y), margin=-6000.0):
+        def patchy(x, y):
+            return math.sin(x / 2300.0 + 1.7) * math.cos(y / 1900.0 - 0.6) + 0.5 * math.sin((x + y) / 1300.0) > 0.25
+
+        for x, y in scatter(700, lambda x, y: -70.0 < at("height", x, y) < 0.0 and patchy(x, y) and not kept(x, y), margin=-6000.0):
             n = int(RNG.integers(5, 15))
             spread = RNG.uniform(150.0, 420.0)
             for _ in range(n):
@@ -651,7 +725,18 @@ def nature():
                 if -80.0 < at("height", rx, ry) < 15.0 and not kept(rx, ry):
                     g = "Reed_%d" % RNG.integers(len(reeds))
                     inst(g, reeds[int(g[-1])], rx, ry, None, RNG.uniform(0.9, 1.4), -10.0, shadow=False)
-                    INST[g]["material"] = "/Game/RTS_Survival/Blueprints/Environment/Prypyat/Map/MI_Pripyat_BogFoliage_Dark"
+                    INST[g]["material"] = "/Game/RTS_Survival/Blueprints/Environment/OderWarthe/Map/MI_OW_ReedDark"
+    # the Mittelsee is the algae lake: kit algae mats at their own scale in its sheltered shallows (critic R1-2 / R2-7)
+    mats = [p for p in (pry("bog_algaemat_a"), pry("bog_algaemat_b")) if p]
+    mit = region("lake_mittel")
+    if mats and False:     # r6: the fibre-web mats read as pale scribbles on the water; the shelf algae paint carries it
+        for x, y in scatter(260, lambda x, y: at("water", x, y) and (at("height", x, y) > -140.0 or RNG.random() < 0.35) and
+                            math.hypot(x - mit["centre"][0], y - mit["centre"][1]) < 6500.0 and not kept(x, y), margin=-2000.0, tries=200):
+            k = int(RNG.integers(len(mats)))
+            g = INST.setdefault("AlgaeMat_%d" % k, {"mesh": mats[k], "collision": False, "items": [],
+                                                    "material": "/Game/RTS_Survival/Blueprints/Environment/OderWarthe/Map/MI_OW_AlgaeMat",
+                                                                   "abs_z": 1.0, "shadow": False})
+            g["items"].append([round(x, 1), round(y, 1), 0.0, round(RNG.uniform(0, 360), 1), round(RNG.uniform(0.8, 1.15), 3), 0.0, 0.0])
     snags = [p for p in (pry("bog_snag_a"), pry("bog_snag_b")) if p]
     if snags:
         for x, y in scatter(160, lambda x, y: at("water", x, y) and -140.0 < at("height", x, y) < -20.0, margin=-6000.0):
@@ -730,9 +815,24 @@ def decals():
             x, y = werk_xy(fid, lx, ly)
             decal("Werk_%s_Crater_%d" % (fid, k), DECAL_SETS["crater"][k % 3], x, y, r * 2.6, yaw + 37.0 * k)
     n = 0
-    for x, y in scatter(70, lambda x, y: dry_ok(x, y) and not at("forest", x, y) and inside(x, y, 500.0)
-                        and min(math.hypot(x - w["centre"][0], y - w["centre"][1]) for w in WERKS.values()) > 6500.0
-                        and not build_circle(x, y)):
+    targets = []
+    for rid in ("dam_packlitz", "causeway_kalau", "causeway_island", "dam_lubow"):
+        pts = road(rid)
+        targets.append(pts[2][:2])
+    targets.append(LAYOUT["rail_line"][0])
+    barrage = []
+    for tx, ty in targets:
+        got = 0
+        for _ in range(80):
+            a, d = RNG.uniform(0, 2 * math.pi), 2600.0 * math.sqrt(RNG.random())
+            x, y = tx + d * math.cos(a), ty + d * math.sin(a)
+            if dry_ok(x, y) and inside(x, y, 500.0) and not build_circle(x, y) and \
+                    min(math.hypot(x - w["centre"][0], y - w["centre"][1]) for w in WERKS.values()) > 6500.0:
+                barrage.append((x, y))
+                got += 1
+            if got >= 12:
+                break
+    for x, y in barrage:
         r = RNG.uniform(250.0, 520.0)
         decal("Crater_%03d" % n, DECAL_SETS["crater"][n % 3], x, y, r * 2.2)
         a = RNG.uniform(0, 2 * math.pi)

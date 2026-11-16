@@ -471,7 +471,7 @@ WATER_LOOK = {
     # murky plum-brown lake water (the Pripyat algae purple reads near black here; 2026-11-16 first look)
     "scalars": {"WaveStrength_1": 0.0, "Panning Speed_1": 0.02, "Normal Intensity_1": 0.06, "MacroNormalIntensity_1": 0.12,
                 "ShoreWidth": 70.0, "BandSpacing": 40.0, "Specular": 0.25, "Tiling_1": 3.0, "BandSpeed": 0.04, "BandWobble": 1.2, "ContactWidth": 18.0,
-                "ContactStrength": 0.35, "FoamBreakup": 0.85, "FoamIntensity": 0.2, "FoamOpacity": 0.3,
+                "ContactStrength": 0.25, "FoamBreakup": 0.9, "FoamIntensity": 0.1, "FoamOpacity": 0.15,
                 "WaterOpacity": 0.9, "OpacityDepth": 140.0, "Roughness": 0.55, "FoamRoughness": 0.6,
                 "EmissiveStrength": 0.0, "ColorOpacity": 0.55},
     "vectors": {"Color_1": (0.17, 0.13, 0.16, 0.03), "FoamColor": (0.40, 0.30, 0.44, 1.0)},
@@ -610,7 +610,7 @@ def step_dress(only=None):
                 continue
             transforms = []
             for x, y, dz, yaw, scale, pitch, roll in spec["items"]:
-                z = spec["abs_z"] if "abs_z" in spec else ground_z(x, y) + dz
+                z = (spec["abs_z"] + dz) if "abs_z" in spec else ground_z(x, y) + dz
                 transforms.append(unreal.Transform(unreal.Vector(x, y, z), unreal.Rotator(roll, pitch, yaw), unreal.Vector(scale, scale, scale)))
             actor = _instance_actor(PREFIX + "I_" + group, FOLDER + "Instances", mesh, transforms, collision=spec.get("collision", False))
             comp = actor.get_component_by_class(unreal.HierarchicalInstancedStaticMeshComponent)
@@ -652,12 +652,12 @@ def step_dress(only=None):
         areas = {}
         placed = 0
         for label, x, y, z_off, yaw, hx, hy, hz, area in data.get("navblocks", []):
-            if area not in areas:
+            if area and area not in areas:                      # "" keeps the blocker's own area (blocks every agent)
                 areas[area] = unreal.EditorAssetLibrary.load_blueprint_class(area)
             actor = actors_sub().spawn_actor_from_class(cls, unreal.Vector(x, y, ground_z(x, y) + z_off), unreal.Rotator(0.0, 0.0, yaw))
             actor.set_actor_scale3d(unreal.Vector(hx / 128.0, hy / 128.0, hz / 128.0))
             for comp in actor.get_components_by_class(unreal.ActorComponent):
-                if comp.get_class().get_name() == "RTSNavCollisionEnvObstacle":
+                if area and comp.get_class().get_name() == "RTSNavCollisionEnvObstacle":
                     comp.set_editor_property("area_class", areas[area])
             actor.set_actor_label(PREFIX + "NB_" + label)
             actor.set_folder_path(FOLDER + "NavBlockers")
@@ -683,10 +683,11 @@ def step_dress(only=None):
 LANDSCAPE_TUNE = {
     "scalars": {"PripSand_Desaturation": 0.7, "PripGravel_Desaturation": 0.55, "PripGrass_Desaturation": 0.45,
                 "PripAlgae_Desaturation": 0.95, "PripAlgae_Roughness": 0.62, "PripMud_Roughness": 0.66, "PripPeat_Roughness": 0.85,
-                "PripMud_TileSize": 4.5, "PripMud_Desaturation": 0.5},
+                "PripMud_TileSize": 4.5, "PripMud_Desaturation": 0.5, "PripEarth_Desaturation": 0.55},
     "vectors": {"PripGravel_Tint": (1.25, 1.18, 1.05), "PripSand_Tint": (0.40, 0.375, 0.32), "PripGrass_Tint": (0.86, 0.80, 0.58),
                 "PripMoss_Tint": (0.52, 0.58, 0.36), "PripPeat_Tint": (0.40, 0.33, 0.27), "PripAlgae_Tint": (0.34, 0.20, 0.40),
-                "PripMud_Tint": (0.13, 0.105, 0.09), "PripAsh_Tint": (0.62, 0.61, 0.62)},
+                "PripMud_Tint": (0.13, 0.105, 0.09), "PripAsh_Tint": (0.62, 0.61, 0.62),
+                "PripEarth_Tint": (0.62, 0.50, 0.38)},          # r8 (R7-4): the earth layer read olive-green
 }
 
 
@@ -696,7 +697,7 @@ KIT_TUNE = {
     # cover paler than the landscape round it
     "MI_OW_Concrete": (0.42, 0.42, 0.40), "MI_OW_ConcreteDark": (0.34, 0.34, 0.32),
     # round 3: the earth covers matched to the lowland grass (they read as pasted-on ochre) and warmer granite (bluish)
-    "MI_OW_Earth": (0.50, 0.46, 0.33), "MI_OW_Granite": (0.62, 0.58, 0.52),
+    "MI_OW_Earth": (0.80, 0.72, 0.52), "MI_OW_Granite": (0.62, 0.58, 0.52),
 }
 
 
@@ -708,9 +709,37 @@ def tune_kit_materials():
         if mi is None:
             continue
         mel.set_material_instance_vector_parameter_value(mi, "Tint", unreal.LinearColor(tint[0], tint[1], tint[2], 1.0))
+        if name == "MI_OW_Earth":          # r5: the earth covers read as smooth clay; r7: sod of the lowland's dry grass
+            mel.set_material_instance_texture_parameter_value(mi, "BaseTex", unreal.load_asset(
+                "/Game/Brushify/Materials/Landscape/Textures/Grass/T_GrassDry_D"))
+            mel.set_material_instance_scalar_parameter_value(mi, "Tiling", 1.6)
+            mel.set_material_instance_scalar_parameter_value(mi, "MacroDark", 0.7)
+            mel.set_material_instance_scalar_parameter_value(mi, "MacroBright", 1.15)
         mel.update_material_instance(mi)
         unreal.EditorAssetLibrary.save_loaded_asset(mi, False)
         done.append(name)
+    # the dark reed clumps (critic R3-5): a child of the Pripyat bog foliage instance
+    reed = OW_ROOT + "Map/MI_OW_ReedDark"
+    if not unreal.EditorAssetLibrary.does_asset_exist(reed):
+        mi = unreal.AssetToolsHelpers.get_asset_tools().create_asset("MI_OW_ReedDark", reed.rsplit("/", 1)[0], unreal.MaterialInstanceConstant,
+                                                                     unreal.MaterialInstanceConstantFactoryNew())
+        mel.set_material_instance_parent(mi, unreal.load_asset(PRIPYAT_ENV + "BogFoliage/Materials/MI_Prypyat_BogFoliage"))
+    mi = unreal.load_asset(reed)
+    mel.set_material_instance_vector_parameter_value(mi, "Tint", unreal.LinearColor(0.17, 0.15, 0.09, 1.0))
+    mel.update_material_instance(mi)
+    unreal.EditorAssetLibrary.save_loaded_asset(mi, False)
+    # the Mittelsee algae mats: the Pripyat fibre web darkened to a drowned olive-plum (r5: the violet shroud read as pale lilac)
+    alg = OW_ROOT + "Map/MI_OW_AlgaeMat"
+    if not unreal.EditorAssetLibrary.does_asset_exist(alg):
+        mi = unreal.AssetToolsHelpers.get_asset_tools().create_asset("MI_OW_AlgaeMat", alg.rsplit("/", 1)[0], unreal.MaterialInstanceConstant,
+                                                                     unreal.MaterialInstanceConstantFactoryNew())
+        mel.set_material_instance_parent(mi, unreal.load_asset(PRIPYAT_ENV + "Phytophage/MI_Phytophage_VioletShroud"))
+    mi = unreal.load_asset(alg)
+    mel.set_material_instance_vector_parameter_value(mi, "FibreTint", unreal.LinearColor(0.19, 0.15, 0.13, 1.0))
+    mel.set_material_instance_vector_parameter_value(mi, "DarkTint", unreal.LinearColor(0.07, 0.035, 0.07, 1.0))
+    mel.set_material_instance_scalar_parameter_value(mi, "DryRoughness", 0.35)
+    mel.update_material_instance(mi)
+    unreal.EditorAssetLibrary.save_loaded_asset(mi, False)
     log("kit tints %s" % done)
     return done
 

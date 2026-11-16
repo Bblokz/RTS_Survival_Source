@@ -1596,7 +1596,8 @@ TMap<EBuildingExpansionType, int32> UGameUnitManager::GetPlayerBxpCountsByType(
 	const TArray<ABuildingExpansion*>& BuildingExpansions = Player == 1 ? M_BxpAlivePlayer : M_BxpAliveEnemy;
 	for (const ABuildingExpansion* BuildingExpansion : BuildingExpansions)
 	{
-		if (not IsValid(BuildingExpansion))
+		// One still under construction (or packed up) must not unlock its tech yet.
+		if (not IsValid(BuildingExpansion) || not BuildingExpansion->GetIsStanding())
 		{
 			continue;
 		}

@@ -155,16 +155,26 @@ bool EnemyTrainingHelpers::GetIsTechLevelUnlockedByBxpCounts(
 	const FEnemyTrainingOptionsForTechLevel& TrainingOptions,
 	const TMap<EBuildingExpansionType, int32>& BxpCountsByType)
 {
+	if (TrainingOptions.TypesUnlockingThisLevel.IsEmpty())
+	{
+		return false;
+	}
+	const bool bRequireAll = TrainingOptions.bRequireAllTypesUnlockingThisLevel;
 	for (const EBuildingExpansionType RequiredBxpType : TrainingOptions.TypesUnlockingThisLevel)
 	{
 		const int32* const BxpCount = BxpCountsByType.Find(RequiredBxpType);
-		if (BxpCount != nullptr && *BxpCount > 0)
+		const bool bHasType = BxpCount != nullptr && *BxpCount > 0;
+		if (bHasType && not bRequireAll)
 		{
 			return true;
 		}
+		if (not bHasType && bRequireAll)
+		{
+			return false;
+		}
 	}
-
-	return false;
+	// Any-of: none was found. All-of: every one was found.
+	return bRequireAll;
 }
 
 void EnemyTrainingHelpers::UpdateTechLevelUnlockedMapForOptions(

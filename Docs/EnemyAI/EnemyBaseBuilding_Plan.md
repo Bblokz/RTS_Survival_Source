@@ -27,6 +27,13 @@ No code yet. This doc maps what exists, where building plugs in, a phased plan, 
 
 ## 2. Fixes needed before anything else (small, needed by any design)
 
+**Status 2026-11-16:** 1, 2 (the mechanism; the D4 mapping is still open) and 3 are done in code. 4 is checked; see below.
+
+- **1, done.** `ABuildingExpansion::GetIsStanding()` is false while a BXP is placing, being built, unpacking, packed up or looking to unpack. `GetPlayerBxpCountsByType` counts only standing BXPs. Expansions placed in a level or spawned finished (survival) never pass through an owner, so they keep their initial status (`BXS_NotUnlocked`). They count as standing, so existing maps unlock as before.
+- **2, done.** `TypesUnlockingThisLevel` is `EditAnywhere`, and there is a new `bRequireAllTypesUnlockingThisLevel` (all of / any of). An empty list still never unlocks. The C++ defaults are unchanged; the upper tiers stay empty until D4 is decided.
+- **3, done.** `URTSComponent::ChangeOwningPlayer` now moves a BXP that has begun play between the player and enemy lists (`AddBxpForPlayer` already de-duplicates). Aircraft are still not moved there; that is a separate gap.
+- **4, checked.** No `.umap` and not `RTS_BP_EnemyController` contain `bAllowBuilding`, and the survival coordinator does not set it. So **base trenches never dig outside their test**, including survival, where the trench doc says they should start in the grace period.
+
 1. **A building still under construction unlocks its tier.** `UGameUnitManager::GetPlayerBxpCountsByType` (`GameUnitManager.cpp:1581`) counts every alive BXP with no `BXS_Built` filter, and BXPs register in `URTSComponent::BeginPlay`. Add an "only built" filter (default on for the AI's tech step). Otherwise an AI barracks unlocks infantry the second it starts rising.
 2. **The upper tiers can never unlock.** MediumTanks, AdvancedInfantry, Tier3 and Experimental have empty `TypesUnlockingThisLevel`, and the field is `VisibleAnywhere`. Make the ladder data-driven (a data asset or `EditAnywhere` on the controller), and fill it. See decision D4.
 3. **Ownership at spawn.** `ChangeOwningPlayer` does not move a BXP between the player/enemy lists. The builder spawns **deferred** with owning player 2 set before `FinishSpawning` (or relies on BP-default owner 2, which the Rus BPs have).

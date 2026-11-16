@@ -1305,6 +1305,23 @@ void ABuildingExpansion::DestroyBuildingAttachments()
 }
 
 
+bool ABuildingExpansion::GetIsStanding() const
+{
+	switch (M_StatusBuildingExpansion)
+	{
+	case EBuildingExpansionStatus::BXS_LookingForPlacement:
+	case EBuildingExpansionStatus::BXS_BeingBuild:
+	case EBuildingExpansionStatus::BXS_PackedUp:
+	case EBuildingExpansionStatus::BXS_LookingForUnpackingLocation:
+	case EBuildingExpansionStatus::BXS_BeingUnpacked:
+		return false;
+	default:
+		// Built, being packed up (still works until packed), or never constructed through an owner:
+		// expansions placed in a level or spawned finished keep their initial status.
+		return true;
+	}
+}
+
 void ABuildingExpansion::SetStatusAndPropagateToOwner(const EBuildingExpansionStatus NewStatus)
 {
 	M_StatusBuildingExpansion = NewStatus;

@@ -326,6 +326,12 @@ void URTSComponent::ChangeOwningPlayer(const uint8 NewOwningPlayer)
 					GameUnitManager->RemoveActorForPlayer(ParentActor, OwningPlayer);
 					GameUnitManager->AddActorForPlayer(ParentActor, NewOwningPlayer);
 				}
+				else if (ParentActor->IsA(ABuildingExpansion::StaticClass()) && ParentActor->HasActorBegunPlay())
+				{
+					// Moves the expansion between the player and enemy lists (tech counts, base clusters).
+					// Before BeginPlay it is not registered yet; BeginPlay registers it with the new owner.
+					GameUnitManager->AddBxpForPlayer(Cast<ABuildingExpansion>(ParentActor), NewOwningPlayer);
+				}
 			}
 		}
 		OwningPlayer = NewOwningPlayer;

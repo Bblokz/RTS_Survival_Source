@@ -20,6 +20,10 @@ Edits made afterwards in the main editor (2026-11-16, python + UECP; a rebuild w
     particle colour alpha (the pack's per-particle alpha is tiny: its haze was many faint layers).
   * Colour: DriftColour uses a 'SandTint' vector (0.60, 0.49, 0.33) x ColourGain instead of the particle colour
     (Smoke A's particle colour renders near white). Under this map's sun an albedo near 0.3 matches the ground.
+  * Dither (owner: "use some dither ... too opaque"): a 'DriftDither' Custom sits between DriftMask and OpacityMask.
+    coverage = smoothstep(saturate((DriftMask - 0.5) / EdgeSoft)) * Opacity, drawn where coverage beats screen-space
+    interleaved gradient noise (Parameters.SvPosition; offset by View.StateFrameIndexMod8 when TemporalDither is 1 so
+    TSR resolves it into see-through sand). Params Opacity 0.6 / EdgeSoft 0.35 / TemporalDither 1 (MI: 0.8 / 0.5).
 """
 import unreal
 

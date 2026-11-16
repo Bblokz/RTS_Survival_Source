@@ -321,7 +321,15 @@ the now silent emitters).
   (ShadeContrast 0.95, NormalStrength 1.7) turns the flat fill into wind-brushed sand lineation, so those were saved
   on MI_SandDrift_A. Sheet heads are rounded (atlas cells are empty at their borders: no quad-edge cuts). Motion
   frames 0.75 s apart show sheets growing in and thinning out over their life, no popping.
-- **Open:** GPU cost not measured (one masked layer, ~7 quads per streak). Nothing committed.
+- **Dither (owner: "use some dither ... right now it is too opaque"):** new `DriftDither` Custom between `DriftMask` and
+  OpacityMask: coverage ramps from the density threshold over `EdgeSoft` up to `Opacity` and is screen-doored against
+  interleaved gradient noise, re-offset every frame (`TemporalDither` 1) so TSR resolves it into see-through sand.
+  Brackets (shots `Saved/OreMountains/sandstreak/dither`, taken with `HighResShot 1` so the TSR history stays valid):
+  Opacity 0.45 / 0.6 nearly vanish; 0.8 with EdgeSoft 0.5 reads as streaky sand with the ground showing through and
+  feathered edges - saved on MI_SandDrift_A. A static dither looked about the same in stills; temporal kept for motion.
+  Still masked (no translucency, no DitherTemporalAA node); a fully covered pixel costs the same as before.
+- **Open:** a sheet crossing a terrain rise is cut with a hard line (masked cannot depth-fade; raise `LiftCm` if it
+  shows). Dither crawl not judged in motion; GPU cost not measured. Nothing committed.
 
 ## Mid-map relief and the dead forest (2026-11-13, evening)
 
