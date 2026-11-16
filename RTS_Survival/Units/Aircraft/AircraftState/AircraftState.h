@@ -180,6 +180,50 @@ struct FAircraftAttackMoveSettings
 };
 
 
+/**
+ * Keeps an airborne aircraft at the ground clearance it had when its flight height was set, over hills and valleys.
+ * Not applied while it dives, drops bombs or flies a rope-slung payload in; those keep their planned heights.
+ */
+USTRUCT(Blueprintable, BlueprintType)
+struct FAircraftTerrainFollowSettings
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	bool bEnabled = true;
+
+	// Seconds between two ground samples; between samples the height eases every frame toward the last one.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (ClampMin = "0.05", UIMin = "0.05"))
+	float SampleInterval = 0.3f;
+
+	// The ground is also sampled this many seconds of flight ahead (at cruise speed at least), so the aircraft climbs
+	// before a hill instead of on it, and only descends once the valley lies under the whole look-ahead. Tuned on the
+	// Ore Mountains ridges: a fast aircraft needs about this long to climb a 18 m rise at the speed caps below.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (ClampMin = "0.0", UIMin = "0.0"))
+	float LookAheadSeconds = 3.5f;
+
+	// Fastest climb or descent caused by the terrain (cm/s).
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (ClampMin = "1.0", UIMin = "1.0"))
+	float MaxVerticalSpeed = 700.f;
+
+	// How quickly a climb or descent starts and stops (cm/s²); lower is softer.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (ClampMin = "1.0", UIMin = "1.0"))
+	float MaxVerticalAcceleration = 500.f;
+
+	// The aircraft never follows the ground lower than this above it, whatever height it started at (cm).
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (ClampMin = "0.0", UIMin = "0.0"))
+	float MinGroundClearance = 300.f;
+
+	// A level aircraft ignores height changes smaller than this, so uneven ground does not make it bob (cm).
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (ClampMin = "0.0", UIMin = "0.0"))
+	float HeightDeadZone = 40.f;
+
+	// Largest nose up / down angle shown while the terrain makes the aircraft climb or descend (degrees).
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (ClampMin = "0.0", ClampMax = "45.0", UIMin = "0.0",
+		UIMax = "45.0"))
+	float MaxClimbPitch = 15.f;
+};
+
 USTRUCT(Blueprintable, BlueprintType)
 struct FAircraftMovementData
 {
@@ -232,6 +276,9 @@ struct FAircraftMovementData
 	
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Attack")
 	FAircraftAttackMoveSettings AttackMoveSettings;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Movement")
+	FAircraftTerrainFollowSettings TerrainFollowSettings;
 
 	// If both conditions hold we consider the point in deadzone and have the aircraft fly away before
 	// turning.

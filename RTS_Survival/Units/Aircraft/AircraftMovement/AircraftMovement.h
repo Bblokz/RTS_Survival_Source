@@ -29,9 +29,16 @@ public:
 
 	void OnVerticalTakeOffCompleted();
 
+	/**
+	 * @brief Flies toward the next path point.
+	 * @param TargetPoint Point to home in on; its roll is applied.
+	 * @param DeltaTime Frame time.
+	 * @param ClimbPitch Extra nose pitch (degrees, up positive) while terrain following moves the whole path up or down.
+	 */
 	void TickMovement_Homing(
 		const FAircraftPathPoint& TargetPoint,
-		const float DeltaTime);
+		const float DeltaTime,
+		const float ClimbPitch = 0.f);
 
 	/** 
 	 * Smoothly rotates PawnOwner toward InTargetRot.

@@ -129,6 +129,12 @@ struct FAircraftPath
 
 	void DebugPath(const float DebugTime);
 
+	/** @brief Moves every point up or down with the aircraft's cruise height, so the path keeps its shape. */
+	void ShiftHeight(const float DeltaZ);
+
+	/** @return Whether the aircraft is flying into a dive or out of it: the part of an attack run that aims. */
+	bool GetIsFlyingDiveSegment() const;
+
 	UPROPERTY()
 	TArray<FAircraftPathPoint> PathPoints;
 

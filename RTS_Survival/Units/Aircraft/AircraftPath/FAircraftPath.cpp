@@ -28,6 +28,25 @@ void FAircraftPath::Reset()
 	CurrentPathIndex = 0;
 }
 
+void FAircraftPath::ShiftHeight(const float DeltaZ)
+{
+	for (FAircraftPathPoint& PathPoint : PathPoints)
+	{
+		PathPoint.Location.Z += DeltaZ;
+	}
+}
+
+bool FAircraftPath::GetIsFlyingDiveSegment() const
+{
+	const int32 TargetPointIndex = CurrentPathIndex + 1;
+	if (not PathPoints.IsValidIndex(TargetPointIndex))
+	{
+		return false;
+	}
+	const FAircraftPathPoint& TargetPoint = PathPoints[TargetPointIndex];
+	return TargetPoint.IsDivePoint() || TargetPoint.IsDiveRecoveryPoint();
+}
+
 void FAircraftPath::CreateMoveToPath(
 	const FVector& StartAirPoint,
 	const FVector& EndAirPoint,
