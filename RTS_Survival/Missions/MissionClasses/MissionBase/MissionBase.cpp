@@ -145,6 +145,7 @@ void UMissionBase::OnMissionFailed()
 	MissionState.bIsMissionComplete = true;
 	// End the intro now, so it does not hand the HUD back later over the defeat screen.
 	CancelActiveLocationIntro();
+	CancelActiveCameraTour();
 	if (UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().ClearTimer(M_AbilityCooldownPollingTimerHandle);
@@ -615,6 +616,7 @@ void UMissionBase::OnCleanUpMission()
 		M_ActiveCinematicTakeOverSession->RequestCancel();
 	}
 	CancelActiveLocationIntro();
+	CancelActiveCameraTour();
 
 	Tracking_ClearState();
 	EnemyInBuilding_ClearTracking();
@@ -652,6 +654,7 @@ void UMissionBase::BeginDestroy()
 		M_ActiveCinematicTakeOverSession->RequestCancel();
 	}
 	CancelActiveLocationIntro();
+	CancelActiveCameraTour();
 
 	Tracking_ClearState();
 	EnemyInBuilding_ClearTracking();
@@ -3667,6 +3670,7 @@ void UMissionBase::CompleteMissionStartSetUIAndNotifyMgr()
 		M_MissionWidget->InitMissionWidget(MissionWidgetState, this,
 		                                   bIsTextOnlyMission, bStartAsCollapsedWidget);
 	}
+	OnMissionStartedNative();
 	BP_OnMissionStart();
 }
 

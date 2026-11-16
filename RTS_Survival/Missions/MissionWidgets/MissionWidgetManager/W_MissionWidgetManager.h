@@ -14,6 +14,12 @@ public:
 	/** return A valid mission widget that has no mission assigned. Null if non available. */
 	UW_Mission* GetFreeMissionWidget();
 
+	/**
+	 * @brief The mission widgets that show an active mission, in the order the mission panel lists them.
+	 * @param OutMissionWidgets Filled with the in-use widgets; silent, the tactical map polls it.
+	 */
+	void GetMissionWidgetsInUse(TArray<UW_Mission*>& OutMissionWidgets) const;
+
 protected:
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void InitMissionWidgetReferences(TArray<UW_Mission*> MissionWidgets);

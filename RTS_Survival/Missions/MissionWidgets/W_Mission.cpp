@@ -27,6 +27,7 @@ void UW_Mission::InitMissionWidget(const FMissionWidgetState& WidgetState,
 	M_AssociatedMission = AssociatedMission;
 	bM_IsInUse = true;
 	M_WidgetState = WidgetType;
+	M_ShownWidgetState = WidgetState;
 	M_RichTitle->SetText(WidgetState.MissionTitle);
 	M_RichDescription->SetText(WidgetState.MissionDescription);
 	M_NextButtonType = WidgetState.NextButtonType;
@@ -44,9 +45,15 @@ void UW_Mission::RefreshMissionWidget(const FMissionWidgetState& WidgetState)
 		return;
 	}
 
+	M_ShownWidgetState = WidgetState;
 	M_RichTitle->SetText(WidgetState.MissionTitle);
 	M_RichDescription->SetText(WidgetState.MissionDescription);
 	M_NextButtonType = WidgetState.NextButtonType;
+}
+
+URichTextBlock* UW_Mission::GetRichDescriptionBlock() const
+{
+	return M_RichDescription;
 }
 
 void UW_Mission::EnsureMissionShowsTitleOnly()
@@ -68,6 +75,7 @@ void UW_Mission::MarkWidgetAsFree()
 	SetVisibility(ESlateVisibility::Collapsed);
 	bM_IsInUse = false;
 	M_AssociatedMission.Reset();
+	M_ShownWidgetState = FMissionWidgetState();
 }
 
 void UW_Mission::OnHideAllGameUI(const bool bHide)

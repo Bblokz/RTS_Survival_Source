@@ -23,6 +23,7 @@
 #include "RTS_Survival/Missions/NomadicAirDelivery/NomadicAirDeliveryTypes.h"
 #include "RTS_Survival/GameUI/InfoTakeover/InfoTakeoverTypes.h"
 #include "RTS_Survival/GameUI/LocationIntro/LocationIntroTypes.h"
+#include "RTS_Survival/GameUI/CameraTour/MissionCameraTourTypes.h"
 #include "MissionBase.generated.h"
 
 enum class ERTSFaction : uint8;
@@ -47,6 +48,8 @@ class UMissionTrigger;
 class UMissionCinematicTakeOverSession;
 class UMissionLocationIntroSession;
 enum class ELocationIntroSessionEnd : uint8;
+class UMissionCameraTourSession;
+enum class EMissionCameraTourEnd : uint8;
 class UInfoTakeoverSubsystem;
 class UMovieSceneSequencePlayer;
 class UW_Mission;
@@ -263,6 +266,7 @@ class RTS_SURVIVAL_API UMissionBase : public UObject
 	friend struct FMissionSpawnCommandQueueState;
 	friend class UMissionCinematicTakeOverSession;
 	friend class UMissionLocationIntroSession;
+	friend class UMissionCameraTourSession;
 	// Headless tests start a location intro on a throwaway mission.
 	friend class UMissionMapTestLibrary;
 
@@ -1016,6 +1020,13 @@ protected:
 	UFUNCTION(BlueprintImplementableEvent)
 	void BP_OnMissionStart();
 
+	// Native twin of BP_OnMissionStart for C++ mission classes: runs right before it, once the mission really starts
+	// (after its trigger, with the mission widget set up).
+	virtual void OnMissionStartedNative() {}
+
+	// Native twin of BP_OnCameraTourFinished for C++ mission classes; runs right before it.
+	virtual void OnCameraTourFinishedNative(const int32 ID, const bool bWasShown) {}
+
 	// Called by cpp function in base do NOT CALL DIRECTLY.
 	UFUNCTION(BlueprintImplementableEvent)
 	void BP_OnMissionComplete();
@@ -1254,6 +1265,45 @@ protected:
 	void BP_OnLocationIntroFinished(const int32 ID, const bool bWasShown);
 
 	/**
+	 * @brief Plays a short in-map camera tour: the HUD hides, cinema bars slide in and the RTS camera moves through
+	 * the shots (each one eases from its start to its end pose, with an optional caption bottom centre), then eases
+	 * back to the player's own view and zoom and the HUD returns. Waits like ShowLocationIntro while the screen is
+	 * busy (skipped after 45 s). Like any cinematic takeover it stops a playing portrait and mutes voice lines.
+	 * @param Shots The shots in order; empty is refused.
+	 * @param Settings Bars, the ease back to the player's view and an optional start sound.
+	 * @param ID Handed back in BP_OnCameraTourFinished.
+	 * @return False when the tour cannot run (no shots, no camera, a tour of this mission already runs);
+	 * BP_OnCameraTourFinished then still fires next frame with bWasShown false.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|Camera",
+		meta = (AdvancedDisplay = "ID", AutoCreateRefTerm = "Settings"))
+	bool PlayCameraTour(const TArray<FMissionCameraTourShot>& Shots, const FMissionCameraTourSettings& Settings,
+	                    const int32 ID = 0);
+
+	/** @return True from PlayCameraTour until BP_OnCameraTourFinished (waiting for the screen included). */
+	UFUNCTION(BlueprintPure, NotBlueprintable, Category = "Mission|Camera")
+	bool GetIsCameraTourPlaying() const;
+
+	/** @return Index of the tour shot on screen, or -1 when no tour shot shows. */
+	UFUNCTION(BlueprintPure, NotBlueprintable, Category = "Mission|Camera")
+	int32 GetCameraTourShotIndex() const;
+
+	// The camera tour of PlayCameraTour ended and the HUD is back. bWasShown is false when it never showed.
+	// Not fired when the tour is cut short by the mission failing or being cleaned up.
+	UFUNCTION(BlueprintImplementableEvent, Category = "Mission|Camera")
+	void BP_OnCameraTourFinished(const int32 ID, const bool bWasShown);
+
+	/**
+	 * @brief Lifts the fog of war for the player over a circle for a while, like a recon flight's vision bubble.
+	 * @param Location Centre of the revealed circle (ground height is fine).
+	 * @param Radius Radius in cm.
+	 * @param Seconds How long the area stays revealed.
+	 * @return The bubble actor (gone after Seconds), or nullptr when it could not spawn.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|FogOfWar")
+	AActor* RevealAreaForSeconds(const FVector Location, const float Radius, const float Seconds);
+
+	/**
 	 * @brief Registers an additional camera blocking boundary through mission blueprint logic.
 	 * @param BoundaryRegistrationParams Boundary registration payload forwarded to the player camera controller.
 	 * @return True if the boundary registration succeeded.
@@ -1482,6 +1532,17 @@ private:
 	void OnLocationIntroSessionEnded(const UMissionLocationIntroSession* Session, const int32 ID,
 	                                 const ELocationIntroSessionEnd EndReason);
 	void LocationIntro_ReportSkippedNextFrame(const int32 ID);
+
+	// The running PlayCameraTour; it hides the HUD, so every way out of the mission must cancel it.
+	UPROPERTY()
+	TObjectPtr<UMissionCameraTourSession> M_ActiveCameraTourSession = nullptr;
+
+	// Ends a running camera tour early (view, HUD and camera input back) without firing BP_OnCameraTourFinished.
+	void CancelActiveCameraTour();
+	// Called by the session once it handed the screen back.
+	void OnCameraTourSessionEnded(const UMissionCameraTourSession* Session, const int32 ID,
+	                              const EMissionCameraTourEnd EndReason);
+	void CameraTour_ReportFinishedNextFrame(const int32 ID, const bool bWasShown);
 
 	// Tracks actor validity transitions so each tracked element increments at most once.
 	UPROPERTY()
