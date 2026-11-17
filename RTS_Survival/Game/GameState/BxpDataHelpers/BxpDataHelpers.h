@@ -267,6 +267,66 @@ namespace BxpHelpers
 			InPlayerDataMap.Add(EBuildingExpansionType::BTX_GerMetalVaultSmelter, SmelterData);
 		}
 
+		/**
+		 * @brief The Strike Division mechanized depot's origin expansions: the radio van (vision) and the Wurfrahmen
+		 * shop (Panzerwerfer reload). Each its own struct, so no field leaks from one entry to the next.
+		 * @param InPlayerDataMap Player bxp data; the enemy map is copied from it afterwards.
+		 */
+		static void InitGerMechDepotBxpData(TMap<EBuildingExpansionType, FBxpData>& InPlayerDataMap)
+		{
+			using namespace BxpHelpers;
+			using namespace DeveloperSettings::GameBalance::TrainingTime;
+			using namespace DeveloperSettings::GameBalance::UnitCosts::Bxps;
+			using namespace DeveloperSettings::GameBalance::VisionRadii::BxpVision;
+			using namespace DeveloperSettings::GameBalance::UnitHealth;
+
+			// ----------------------- SD Mechanized Depot radio van origin expansion -----------------------
+			// The depot's eyes: a Kfz. 17 radio van and a 12 m aerial tower; no gun, but the widest sight of any expansion.
+			FBxpData RadioVanData;
+			RadioVanData.ConstructionTime = GerMechDepotRadioVanBuildTime;
+			RadioVanData.Health = RoundToNearestMultipleOfFive(T1BxpHealth * 1.5);
+			RadioVanData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIBasicBuildingArmorResistances(
+				RadioVanData.Health);
+			RadioVanData.VisionRadius = GerMechDepotRadioVanVisionRadius;
+			RadioVanData.Cost = FUnitCost({
+				{
+					ERTSResourceType::Resource_Radixite,
+					GerMechDepotRadioVan_Radixite
+				},
+				{
+					ERTSResourceType::Resource_Metal,
+					GerMechDepotRadioVan_Metal
+				},
+			});
+			// The radio sets draw power like the cipher room's.
+			RadioVanData.EnergySupply = -10;
+			RadioVanData.Abilities = NotArmedBxpAbilities;
+			InPlayerDataMap.Add(EBuildingExpansionType::BTX_GerMechDepotRadioVan, RadioVanData);
+
+			// ----------------------- SD Mechanized Depot Wurfrahmen shop origin expansion -----------------------
+			// A lean-to where a 251 gets its rocket racks; while it stands the player's Panzerwerfers reload faster.
+			FBxpData WurfrahmenShopData;
+			WurfrahmenShopData.ConstructionTime = GerMechDepotWurfrahmenShopBuildTime;
+			WurfrahmenShopData.Health = RoundToNearestMultipleOfFive(T1BxpHealth * 2);
+			WurfrahmenShopData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIBasicBuildingArmorResistances(
+				WurfrahmenShopData.Health);
+			WurfrahmenShopData.VisionRadius = T1BxpVisionRadius;
+			WurfrahmenShopData.Cost = FUnitCost({
+				{
+					ERTSResourceType::Resource_Radixite,
+					GerMechDepotWurfrahmenShop_Radixite
+				},
+				{
+					ERTSResourceType::Resource_Metal,
+					GerMechDepotWurfrahmenShop_Metal
+				},
+			});
+			WurfrahmenShopData.EnergySupply = -5;
+			WurfrahmenShopData.Abilities = NotArmedBxpAbilities;
+			WurfrahmenShopData.PanzerwerferReloadMlt = GerMechDepotWurfrahmenShopPanzerwerferReloadMlt;
+			InPlayerDataMap.Add(EBuildingExpansionType::BTX_GerMechDepotWurfrahmenShop, WurfrahmenShopData);
+		}
+
 		static void InitGerBarracksBxpData(TMap<EBuildingExpansionType, FBxpData>& InPlayerDataMap)
 		{
 			using namespace BxpHelpers;
@@ -312,6 +372,29 @@ namespace BxpHelpers
 			BxpData.EnergySupply = 5;
 			BxpData.Abilities = NotArmedBxpAbilities;
 			InPlayerDataMap.Add(EBuildingExpansionType::BTX_GerBarrackFuelCell, BxpData);
+
+			// ----------------------- GER Barracks Sniper Loft Origin Expansion -----------------------
+			// A timber loft with one Kar98k sniper on its deck; a light post, so tougher than the Panzerschreck foxhole
+			// but softer than the Schreck frame's steel deck. Own struct: the shared BxpData above carries no new fields.
+			FBxpData SniperLoftData;
+			SniperLoftData.ConstructionTime = GerBarracksSniperLoftBuildTime;
+			SniperLoftData.Health = RoundToNearestMultipleOfFive(T1BxpHealth * 1.5);
+			SniperLoftData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIBasicBuildingArmorResistances(
+				SniperLoftData.Health);
+			SniperLoftData.VisionRadius = GerBarracksSniperLoftVisionRadius;
+			SniperLoftData.Cost = FUnitCost({
+				{
+					ERTSResourceType::Resource_Radixite,
+					GerBarracksSniperLoft_Radixite
+				},
+				{
+					ERTSResourceType::Resource_Metal,
+					GerBarracksSniperLoft_Metal
+				},
+			});
+			SniperLoftData.EnergySupply = 0;
+			SniperLoftData.Abilities = ArmedBxpAbilities;
+			InPlayerDataMap.Add(EBuildingExpansionType::BTX_GerBarracksSniperLoft, SniperLoftData);
 		}
 
 		static void InitGerHQBxpData(TMap<EBuildingExpansionType, FBxpData>& InPlayerDataMap)

@@ -465,6 +465,16 @@ private:
 	void RemoveGlobalAbilityCooldownBonus();
 	UGlobalAbilitiesManager* GetPlayerGlobalAbilitiesManager() const;
 
+	// The fraction of their reload time the owner's Panzerwerfers take while this expansion is built
+	// (FBxpData::PanzerwerferReloadMlt; 1 = no effect).
+	float M_PanzerwerferReloadMlt = 1.f;
+
+	// Set while this expansion is a source in UPanzerwerferReloadBonusSubsystem, so it is taken back exactly once.
+	bool bM_IsPanzerwerferReloadBonusRegistered = false;
+
+	void ApplyPanzerwerferReloadBonus();
+	void RemovePanzerwerferReloadBonus();
+
 	void OnFinishedExpansionConstruction();
 
 	// Goes through the attachments array and spanws the actors at the sockets.

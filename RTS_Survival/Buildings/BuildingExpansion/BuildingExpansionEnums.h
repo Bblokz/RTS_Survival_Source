@@ -162,6 +162,17 @@ enum class EBuildingExpansionType : uint8
 	// net; built at the building origin. While it stands, its owner's commander abilities recharge faster
 	// (FBxpData::GlobalAbilityCooldownMlt).
 	BTX_GerCommCipherRoom UMETA(DisplayName = "Ger Comm Cipher Room"),
+	// Strike Division mechanized depot: a Kfz. 17 radio van parked under a camo net beside the fold-out container,
+	// with a 12 m lattice aerial tower on the container's top crate; built at the building origin. Gives the depot a
+	// far larger vision radius than any other expansion (FBxpData::VisionRadius).
+	BTX_GerMechDepotRadioVan UMETA(DisplayName = "Ger Mech Depot Radio Van"),
+	// Strike Division mechanized depot: a lean-to rocket shop along the container where a 251 is fitted with
+	// Wurfrahmen 40 racks; built at the building origin. While it stands, its owner's Panzerwerfers reload faster
+	// (FBxpData::PanzerwerferReloadMlt).
+	BTX_GerMechDepotWurfrahmenShop UMETA(DisplayName = "Ger Mech Depot Wurfrahmen Shop"),
+	// Strike Division barracks: a timber sniper loft with a ghillie canvas and sandbag parapet; a Kar98k sniper on its
+	// deck covers the front half circle (the loft's net poles block the back); built at the building origin.
+	BTX_GerBarracksSniperLoft UMETA(DisplayName = "Ger Barracks Sniper Loft"),
 };
 
 static FString Global_GetBxpTypeEnumAsString(EBuildingExpansionType BxpType)
@@ -290,6 +301,12 @@ static FString Global_GetBxpTypeEnumAsString(EBuildingExpansionType BxpType)
 		return FString("BTX_GerCommRequisitionOffice");
 	case EBuildingExpansionType::BTX_GerCommCipherRoom:
 		return FString("BTX_GerCommCipherRoom");
+	case EBuildingExpansionType::BTX_GerMechDepotRadioVan:
+		return FString("BTX_GerMechDepotRadioVan");
+	case EBuildingExpansionType::BTX_GerMechDepotWurfrahmenShop:
+		return FString("BTX_GerMechDepotWurfrahmenShop");
+	case EBuildingExpansionType::BTX_GerBarracksSniperLoft:
+		return FString("BTX_GerBarracksSniperLoft");
 	case EBuildingExpansionType::BTX_GerHQRadar:
 		return FString("BTX_GerHQRadar");
 	case EBuildingExpansionType::BTX_GerHQPlatform:
@@ -397,6 +414,9 @@ static FString Global_GetBxpDisplayString(const EBuildingExpansionType BxpType)
 	case EBuildingExpansionType::BTX_RefFlakStand: return TEXT("Flak Stand");
 	case EBuildingExpansionType::BTX_GerForgeSchreckFrame: return TEXT("Panzerschreck Frame");
 	case EBuildingExpansionType::BTX_GerMetalVaultSmelter: return TEXT("Smelter");
+	case EBuildingExpansionType::BTX_GerMechDepotRadioVan: return TEXT("Radio Van");
+	case EBuildingExpansionType::BTX_GerMechDepotWurfrahmenShop: return TEXT("Wurfrahmen Shop");
+	case EBuildingExpansionType::BTX_GerBarracksSniperLoft: return TEXT("Sniper Loft");
 
 	default:
 		break;

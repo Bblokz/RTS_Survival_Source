@@ -78,6 +78,17 @@ namespace BxpConstructionRules
 		// stool to the cable post (the span into the tent wall is left out).
 		{EBuildingExpansionType::BTX_GerBarracksRadixReactor, WithFootprint(OriginConstructionRules, 745.f, 435.f)},
 		{EBuildingExpansionType::BTX_GerBarrackFuelCell, WithFootprint(OriginConstructionRules, 500.f, 300.f)},
+		// The sniper loft behind the reactor's spot: 3.9 m from the back bent's foot bags to the landing's front posts,
+		// 4.55 m from the gangway's landing to the left foot bags (mesh bounds X -778..-387, Y 223..677 cm).
+		{EBuildingExpansionType::BTX_GerBarracksSniperLoft, WithFootprint(OriginConstructionRules, 395.f, 455.f)},
+
+		// Ger Mechanized Depot Expansions.
+		// The radio van in the slot beside the container, its aerial tower on the top crate: 8.8 m from the tower
+		// sleepers to the van's nose, 2.25 m across the van and its camo net (mesh bounds X -598..280, Y -360..-138 cm).
+		{EBuildingExpansionType::BTX_GerMechDepotRadioVan, WithFootprint(OriginConstructionRules, 880.f, 225.f)},
+		// The Wurfrahmen lean-to along the container's right side: 6.8 m along the 251, 4.7 m from the wall posts to the
+		// fitted side unit (mesh bounds X -883..-207, Y -817..-349 cm).
+		{EBuildingExpansionType::BTX_GerMechDepotWurfrahmenShop, WithFootprint(OriginConstructionRules, 680.f, 470.f)},
 
 		// --- Free-placed defenses ---
 		// Note that the default construction grid square is 200 in size.

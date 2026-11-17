@@ -19,6 +19,10 @@ namespace EmbeddedInfantryTurretConstants
 
 	// Infantry master meshes face +Y.
 	constexpr float SoldierMeshRelativeYaw = -90.f;
+
+	// Idle yaw targets stay this far inside a limited traverse arc.
+	constexpr float IdleTraverseArcPaddingDegrees = 5.f;
+	constexpr float FullCircleDegrees = 360.f;
 }
 
 AEmbeddedInfantryTurret::AEmbeddedInfantryTurret()
@@ -51,6 +55,59 @@ void AEmbeddedInfantryTurret::PlayWeaponAnimation(const int32 WeaponIndex, const
 		return;
 	}
 	M_InfantryAnimInstance->PlayFireMontage(FireMode);
+}
+
+bool AEmbeddedInfantryTurret::GetCanTraverseToLocation(const FVector& TargetLocation) const
+{
+	if (not GetHasFixedTraverseArc())
+	{
+		return true;
+	}
+	float MountWorldYaw = 0.f;
+	if (not GetMountWorldYaw(MountWorldYaw))
+	{
+		return true;
+	}
+	const FVector ToTarget = TargetLocation - GetTurretTransform().GetLocation();
+	const float YawFromMount = FMath::FindDeltaAngleDegrees(MountWorldYaw, ToTarget.Rotation().Yaw);
+	return YawFromMount >= InfantryTurretSettings.MinTraverseYaw
+		&& YawFromMount <= InfantryTurretSettings.MaxTraverseYaw;
+}
+
+bool AEmbeddedInfantryTurret::GetHasFixedTraverseArc() const
+{
+	return InfantryTurretSettings.bLimitTraverseArc;
+}
+
+float AEmbeddedInfantryTurret::GetIdleAnimationYawTarget() const
+{
+	float MountWorldYaw = 0.f;
+	if (not GetHasFixedTraverseArc() || not GetMountWorldYaw(MountWorldYaw))
+	{
+		// As the turret master: any world yaw (its version is private).
+		return FMath::RandRange(0.f, EmbeddedInfantryTurretConstants::FullCircleDegrees);
+	}
+	using EmbeddedInfantryTurretConstants::IdleTraverseArcPaddingDegrees;
+	const float MinIdleYaw = InfantryTurretSettings.MinTraverseYaw + IdleTraverseArcPaddingDegrees;
+	const float MaxIdleYaw = InfantryTurretSettings.MaxTraverseYaw - IdleTraverseArcPaddingDegrees;
+	if (MinIdleYaw > MaxIdleYaw)
+	{
+		constexpr float Half = 0.5f;
+		return MountWorldYaw + (InfantryTurretSettings.MinTraverseYaw + InfantryTurretSettings.MaxTraverseYaw) * Half;
+	}
+	return MountWorldYaw + FMath::RandRange(MinIdleYaw, MaxIdleYaw);
+}
+
+bool AEmbeddedInfantryTurret::GetMountWorldYaw(float& OutMountWorldYaw) const
+{
+	const USceneComponent* Root = GetRootComponent();
+	const USceneComponent* MountComponent = IsValid(Root) ? Root->GetAttachParent() : nullptr;
+	if (not IsValid(MountComponent))
+	{
+		return false;
+	}
+	OutMountWorldYaw = MountComponent->GetComponentRotation().Yaw;
+	return true;
 }
 
 void AEmbeddedInfantryTurret::PostInitializeComponents()

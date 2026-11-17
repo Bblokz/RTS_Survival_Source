@@ -1042,8 +1042,8 @@ void ACPPGameState::AddStrikeDivisionBxpOptions()
 			return Existing.ExpansionType == EBuildingExpansionType::BTX_37mmFlak;
 		});
 	}
-	// The Kaskade, the flak stand, the Schreck frame and the smelter are drawn in the Strike Division's field-kit look,
-	// so only this faction's buildings offer them.
+	// The Kaskade, the flak stand, the Schreck frame, the smelter, the radio van, the Wurfrahmen shop and the sniper
+	// loft are drawn on the Strike Division's building meshes, so only this faction's buildings offer them.
 	AddOptions(ENomadicSubtype::Nomadic_GerRefinery, InitBxpOptions({
 		           AsEconomic(EBuildingExpansionType::BTX_RefKaskade),
 		           AsDefense(EBuildingExpansionType::BTX_RefFlakStand)
@@ -1053,6 +1053,13 @@ void ACPPGameState::AddStrikeDivisionBxpOptions()
 	           }));
 	AddOptions(ENomadicSubtype::Nomadic_GerMetalVault, InitBxpOptions({
 		           AsEconomic(EBuildingExpansionType::BTX_GerMetalVaultSmelter)
+	           }));
+	AddOptions(ENomadicSubtype::Nomadic_GerMechanizedDepot, InitBxpOptions({
+		           AsTech(EBuildingExpansionType::BTX_GerMechDepotRadioVan),
+		           AsTech(EBuildingExpansionType::BTX_GerMechDepotWurfrahmenShop)
+	           }));
+	AddOptions(ENomadicSubtype::Nomadic_GerBarracks, InitBxpOptions({
+		           AsDefense(EBuildingExpansionType::BTX_GerBarracksSniperLoft)
 	           }));
 }
 
@@ -8863,6 +8870,7 @@ void ACPPGameState::InitAllGameBxpData()
 	BxpHelpers::GerBxpData::InitGerLFactoryBxpData(M_TPlayerBxpDataHashMap);
 	BxpHelpers::GerBxpData::InitRefineryBxpData(M_TPlayerBxpDataHashMap);
 	BxpHelpers::GerBxpData::InitGerMetalVaultBxpData(M_TPlayerBxpDataHashMap);
+	BxpHelpers::GerBxpData::InitGerMechDepotBxpData(M_TPlayerBxpDataHashMap);
 	BxpHelpers::GerBxpData::InitGerCaptureBunkersBxpData(M_TPlayerBxpDataHashMap);
 	BxpHelpers::GerBxpData::InitGerBarracksBxpData(M_TPlayerBxpDataHashMap);
 	BxpHelpers::GerBxpData::InitGerCommCenterBxpData(M_TPlayerBxpDataHashMap);
@@ -9746,7 +9754,8 @@ void ACPPGameState::InitAllGameNomadicData()
 		AsTech(EBuildingExpansionType::BTX_GerBarrackFuelCell),
 		AsTech(EBuildingExpansionType::BTX_GerBarracksRadixReactor)
 	});
-	NomadicData.MaxAmountBuildingExpansions = 2;
+	// Flak, fuel cell, reactor and (Strike Division only, see AddStrikeDivisionBxpOptions) the sniper loft.
+	NomadicData.MaxAmountBuildingExpansions = 3;
 	NomadicData.ExperienceLevels = GetNomadicTruckExpLevels();
 	NomadicData.ExperienceMultiplier = 1.0;
 	NomadicData.ExperienceWorth = T1NomadicExp;
@@ -9796,7 +9805,8 @@ void ACPPGameState::InitAllGameNomadicData()
 	NomadicData.BuildingExpansionOptions = InitBxpOptions({
 		AsDefense(EBuildingExpansionType::BTX_37mmFlak),
 	});
-	NomadicData.MaxAmountBuildingExpansions = 2;
+	// Flak and (Strike Division only, see AddStrikeDivisionBxpOptions) the radio van and the Wurfrahmen shop.
+	NomadicData.MaxAmountBuildingExpansions = 3;
 	NomadicData.ExperienceLevels = GetNomadicTruckExpLevels();
 	NomadicData.ExperienceMultiplier = 1.0;
 	NomadicData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(T1NomadicExp * 1.2, 5);

@@ -300,6 +300,11 @@ namespace DeveloperSettings
 			inline constexpr int32 GerCommRequisitionOfficeBuildTime = RoundToNearestMultipleOf(20.f * GameTimeMlt, 2);
 			// Two portal frames and a hung cabin: more to raise than the office.
 			inline constexpr int32 GerCommCipherRoomBuildTime = RoundToNearestMultipleOf(30.f * GameTimeMlt, 2);
+			// Strike Division round 2026-11-17: the radio van with its aerial tower, the Wurfrahmen lean-to and the
+			// timber sniper loft.
+			inline constexpr int32 GerMechDepotRadioVanBuildTime = RoundToNearestMultipleOf(25.f * GameTimeMlt, 2);
+			inline constexpr int32 GerMechDepotWurfrahmenShopBuildTime = RoundToNearestMultipleOf(25.f * GameTimeMlt, 2);
+			inline constexpr int32 GerBarracksSniperLoftBuildTime = RoundToNearestMultipleOf(20.f * GameTimeMlt, 2);
 			// A poured concrete pillbox takes longer than a sandbag pit.
 			inline constexpr int32 GerRailPakBunkerBuildTime = RoundToNearestMultipleOf(40.f * GameTimeMlt, 2);
 		}
@@ -1013,6 +1018,16 @@ namespace DeveloperSettings
 				inline constexpr int32 GerCommCipherRoom_Metal = 220;
 				// While the player has a Cipher room, commander abilities recharge in this fraction of their cooldown.
 				inline constexpr float GerCommCipherRoomGlobalAbilityCooldownMlt = 0.8f;
+				// Strike Division round 2026-11-17 (mechanized depot and barracks origin expansions).
+				inline constexpr int32 GerMechDepotRadioVan_Radixite = 320;
+				inline constexpr int32 GerMechDepotRadioVan_Metal = 180;
+				inline constexpr int32 GerMechDepotWurfrahmenShop_Radixite = 360;
+				inline constexpr int32 GerMechDepotWurfrahmenShop_Metal = 220;
+				// While the player has a Wurfrahmen shop, Panzerwerfers reload in this fraction of their reload time.
+				inline constexpr float GerMechDepotWurfrahmenShopPanzerwerferReloadMlt = 0.75f;
+				// Priced like the Schreck frame: a crewed origin defence on a raised deck.
+				inline constexpr int32 GerBarracksSniperLoft_Radixite = 340;
+				inline constexpr int32 GerBarracksSniperLoft_Metal = 160;
 				inline constexpr int32 GerRailPakBunker_Radixite = 850;
 				inline constexpr int32 GerRailPakBunker_Metal = 420;
 				inline constexpr int32 GerFlak88Pit_Radixite = 560;
@@ -1111,6 +1126,12 @@ namespace DeveloperSettings
 				// like medium tanks.
 				inline constexpr float T2BxpVisionRadius = 4500.f;
 				inline constexpr float MegaBunkerVisionRadius = 10000.f;
+				// The radio van's 12 m aerial tower: twice a medium tank's sight, so clearly above the Communication
+				// Center's observation post (T2BxpVisionRadius); below the mega bunker.
+				inline constexpr float GerMechDepotRadioVanVisionRadius = 9000.f;
+				// The sniper loft's deck: a scope on a raised post, so it sees most of the Kar98k sniper's reach
+				// (SmallArmsSniperRange) by itself; above every team weapon.
+				inline constexpr float GerBarracksSniperLoftVisionRadius = 8000.f;
 			}
 
 			namespace UnitVision

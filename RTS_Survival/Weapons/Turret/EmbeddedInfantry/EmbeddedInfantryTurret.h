@@ -29,6 +29,19 @@ struct FEmbeddedInfantryTurretSettings
 
 	UPROPERTY(EditDefaultsOnly, Category = "Infantry Turret")
 	TEnumAsByte<EIdleRotation> IdleRotationType = EIdleRotation::Idle_Animate;
+
+	// For a gunner whose post blocks part of the circle (the sniper loft's net poles): he only picks targets, and idles,
+	// inside [MinTraverseYaw, MaxTraverseYaw] around the forward (+X) of the component he is mounted on.
+	UPROPERTY(EditDefaultsOnly, Category = "Infantry Turret|Traverse Arc")
+	bool bLimitTraverseArc = false;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Infantry Turret|Traverse Arc",
+		meta = (EditCondition = "bLimitTraverseArc", ClampMin = "-180", ClampMax = "180"))
+	float MinTraverseYaw = -90.f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Infantry Turret|Traverse Arc",
+		meta = (EditCondition = "bLimitTraverseArc", ClampMin = "-180", ClampMax = "180"))
+	float MaxTraverseYaw = 90.f;
 };
 
 /**
@@ -53,6 +66,9 @@ public:
 	virtual void PlayWeaponAnimation(const int32 WeaponIndex, const EWeaponFireMode FireMode,
 	                                 const int32 WeaponCalibre) override;
 
+	/** @return False for targets outside the traverse arc, when InfantryTurretSettings limits it. */
+	virtual bool GetCanTraverseToLocation(const FVector& TargetLocation) const override;
+
 protected:
 	virtual void PostInitializeComponents() override;
 	virtual void BeginPlay() override;
@@ -61,6 +77,11 @@ protected:
 	virtual FTransform GetTurretTransform() const override;
 
 	virtual void UpdateTargetPitchCPP(float NewPitch) override;
+
+	virtual bool GetHasFixedTraverseArc() const override;
+
+	/** @brief Idles inside the traverse arc when it is limited, so the gunner never looks into his post's blind side. */
+	virtual float GetIdleAnimationYawTarget() const override;
 
 	// A passenger: the host's own weapons decide whether it closes in on an attack target.
 	virtual bool GetShouldReportRangeToOwner() const override { return false; }
@@ -85,6 +106,13 @@ private:
 	void BeginPlay_CacheInfantryAnimInstance();
 
 	static void DisableCollisionNavigationAndDecals(UPrimitiveComponent* PrimitiveComponent);
+
+	/**
+	 * @brief World yaw the traverse arc is measured from: the forward of the component the turret is mounted on.
+	 * @param OutMountWorldYaw The mount's world yaw in degrees.
+	 * @return False when the turret is not attached to anything (no arc can be measured).
+	 */
+	bool GetMountWorldYaw(float& OutMountWorldYaw) const;
 
 	bool GetIsValidSoldierMesh() const;
 	bool GetIsValidInfantryAnimInstance() const;

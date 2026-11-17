@@ -15,6 +15,7 @@
 #include "RTS_Survival/Weapons/Turret/StandaloneTurret/StandaloneTurret.h"
 #include "TacticalAIComponents/TacticalAISquad/EnemySquadTacticalAI.h"
 #include "TacticalAIComponents/TacticalAITank/EnemyTankTacticalAI.h"
+#include "RTS_Survival/Buildings/BuildingExpansion/BxpBonuses/PanzerwerferReloadBonus/PanzerwerferReloadBonusSubsystem.h"
 
 
 URTSComponent::URTSComponent()
@@ -490,6 +491,15 @@ void URTSComponent::AddAppliedTechnology(const ETechnology Technology)
 
 void URTSComponent::OnTankInitializedLookingForUpgrades(ATankMaster* Tank)
 {
+	// Expansion bonuses come from the owner's standing expansions, for every owner (not only researched player techs).
+	if (UWorld* World = GetWorld())
+	{
+		if (UPanzerwerferReloadBonusSubsystem* ReloadBonusSubsystem =
+			World->GetSubsystem<UPanzerwerferReloadBonusSubsystem>())
+		{
+			ReloadBonusSubsystem->OnTankReady(Tank);
+		}
+	}
 	if (OwningPlayer != UPlayerTechManager::PlayerTechOwnerIndex || not IsValid(Tank))
 	{
 		return;

@@ -37,6 +37,7 @@
 #include "RTS_Survival/RTSComponents/AbilityComponents/AttachedWeaponAbilityComponent/AttachedWeaponAbilityComponent.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/TurretSwapComponent/TurretSwapComp.h"
 #include "RTS_Survival/Weapons/Turret/CPPTurretsMaster.h"
+#include "RTS_Survival/Buildings/BuildingExpansion/BxpBonuses/PanzerwerferReloadBonus/PanzerwerferReloadBonusSubsystem.h"
 
 ABuildingExpansion::ABuildingExpansion(FObjectInitializer const& ObjectInitializer) :
 	Super(ObjectInitializer),
@@ -338,6 +339,7 @@ void ABuildingExpansion::FinishPackUpExpansion()
 	RemoveExtraResourceStorage();
 	RemoveFieldDefenseDiscount();
 	RemoveGlobalAbilityCooldownBonus();
+	RemovePanzerwerferReloadBonus();
 	SetStatusAndPropagateToOwner(EBuildingExpansionStatus::BXS_PackedUp);
 	BP_OnFinishedPackupBxp();
 	Destroy();
@@ -539,6 +541,7 @@ void ABuildingExpansion::EndPlay(const EEndPlayReason::Type EndPlayReason)
 		RemoveExtraResourceStorage();
 		RemoveFieldDefenseDiscount();
 		RemoveGlobalAbilityCooldownBonus();
+		RemovePanzerwerferReloadBonus();
 	}
 
 	if (M_StatusBuildingExpansion == EBuildingExpansionStatus::BXS_PackedUp)
@@ -566,6 +569,7 @@ void ABuildingExpansion::UnitDies(const ERTSDeathType DeathType)
 	RemoveExtraResourceStorage();
 	RemoveFieldDefenseDiscount();
 	RemoveGlobalAbilityCooldownBonus();
+	RemovePanzerwerferReloadBonus();
 
 	SetUnitDying();
 	StopDeployAnimationForDeath();
@@ -992,6 +996,7 @@ void ABuildingExpansion::InitBuildingExpansion(
 	M_ExtraResourceStorage = MyData.ExtraResourceStorage;
 	M_FieldDefenseCostMlt = MyData.FieldDefenseCostMlt;
 	M_GlobalAbilityCooldownMlt = MyData.GlobalAbilityCooldownMlt;
+	M_PanzerwerferReloadMlt = MyData.PanzerwerferReloadMlt;
 	OnInitBuildingExpansion_SetupCollision(bLetBuildingMeshAffectNavMesh);
 	if (GetIsValidHealthComponent())
 	{
@@ -1094,6 +1099,7 @@ void ABuildingExpansion::OnFinishedExpansionConstruction()
 	ApplyExtraResourceStorage();
 	ApplyFieldDefenseDiscount();
 	ApplyGlobalAbilityCooldownBonus();
+	ApplyPanzerwerferReloadBonus();
 	OnBxpConstructed.Broadcast();
 	BP_OnFinishedExpansionConstruction();
 }
@@ -1215,6 +1221,52 @@ void ABuildingExpansion::RemoveGlobalAbilityCooldownBonus()
 		return;
 	}
 	GlobalAbilitiesManager->UnregisterCooldownMlt(this);
+}
+
+void ABuildingExpansion::ApplyPanzerwerferReloadBonus()
+{
+	// Already registered (an unpacked or rebuilt expansion), or this expansion grants no bonus.
+	if (bM_IsPanzerwerferReloadBonusRegistered || M_PanzerwerferReloadMlt >= 1.f)
+	{
+		return;
+	}
+	if (not GetIsValidRTSComponent())
+	{
+		return;
+	}
+	UWorld* World = GetWorld();
+	UPanzerwerferReloadBonusSubsystem* BonusSubsystem = IsValid(World)
+		                                                    ? World->GetSubsystem<UPanzerwerferReloadBonusSubsystem>()
+		                                                    : nullptr;
+	if (not IsValid(BonusSubsystem))
+	{
+		RTSFunctionLibrary::ReportError("Expansion grants a Panzerwerfer reload bonus but there is no bonus subsystem."
+			"\n Expansion: " + GetName() +
+			"\n At function ABuildingExpansion::ApplyPanzerwerferReloadBonus");
+		return;
+	}
+	// Any owner: an enemy's shop speeds up the enemy's own Panzerwerfers.
+	BonusSubsystem->RegisterBonusSource(this, RTSComponent->GetOwningPlayer());
+	bM_IsPanzerwerferReloadBonusRegistered = true;
+}
+
+void ABuildingExpansion::RemovePanzerwerferReloadBonus()
+{
+	if (not bM_IsPanzerwerferReloadBonusRegistered)
+	{
+		return;
+	}
+	bM_IsPanzerwerferReloadBonusRegistered = false;
+	UWorld* World = GetWorld();
+	UPanzerwerferReloadBonusSubsystem* BonusSubsystem = IsValid(World)
+		                                                    ? World->GetSubsystem<UPanzerwerferReloadBonusSubsystem>()
+		                                                    : nullptr;
+	if (not IsValid(BonusSubsystem))
+	{
+		// The world is tearing down: its Panzerwerfers go with it.
+		return;
+	}
+	BonusSubsystem->UnregisterBonusSource(this);
 }
 
 UGlobalAbilitiesManager* ABuildingExpansion::GetPlayerGlobalAbilitiesManager() const

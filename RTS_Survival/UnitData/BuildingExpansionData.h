@@ -51,4 +51,10 @@ struct FBxpData
 	// 1 = no effect. With several such expansions the lowest multiplier counts: they do not stack.
 	UPROPERTY(BlueprintReadOnly)
 	float GlobalAbilityCooldownMlt = 1.f;
+
+	// While the expansion is built, its owner's Panzerwerfers (Tank_Panzerwerfer and the Pz 38(t) R rocket tank, see
+	// UPanzerwerferReloadBonusSubsystem::GetIsPanzerwerfer) reload their rockets in this fraction of the reload time. 1 = no effect. Gates UPanzerwerferReloadBonusSubsystem; the bonus itself is
+	// UBehaviourWeaponWurfrahmenShop, which uses the same DeveloperSettings value. Several shops do not stack.
+	UPROPERTY(BlueprintReadOnly)
+	float PanzerwerferReloadMlt = 1.f;
 };
