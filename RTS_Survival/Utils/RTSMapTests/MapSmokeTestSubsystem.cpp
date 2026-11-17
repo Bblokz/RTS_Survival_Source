@@ -22,7 +22,7 @@
 #include "RTS_Survival/GameUI/GameDifficultyPicker/W_GameDifficultyPicker.h"
 #include "RTS_Survival/GameUI/TutorialOvertakeWidget/W_TutorialOvertake.h"
 #include "RTS_Survival/Missions/MissionManager/MissionManager.h"
-#include "RTS_Survival/Missions/Victory/W_Victory.h"
+#include "RTS_Survival/Missions/MissionDebrief/W_MissionEnd.h"
 #include "RTS_Survival/Player/CPPController.h"
 #include "RTS_Survival/Player/PauseGame/PauseGameOptions.h"
 #include "RTS_Survival/FactionSystem/FactionSelection/FactionPlayerController.h"
@@ -67,7 +67,6 @@ namespace MapSmokeTestPrivate
 	// The game instance outlives the worlds; the settings are applied for the first world only.
 	bool bGHasAppliedPIESettings = false;
 	// The victory widget's Continue button.
-	const FName VictoryContinueButtonName(TEXT("M_Continue"));
 	constexpr float VictoryWidgetDelaySeconds = 3.f;
 	constexpr float VictoryTravelTimeoutSeconds = 60.f;
 	constexpr float VictoryArrivalSettleSeconds = 10.f;
@@ -585,14 +584,15 @@ void UMapSmokeTestSubsystem::TickVictoryRoundTrip(const float WorldSeconds)
 		{
 			return;
 		}
-		TArray<UUserWidget*> VictoryWidgets;
-		UWidgetBlueprintLibrary::GetAllWidgetsOfClass(GetWorld(), VictoryWidgets, UW_Victory::StaticClass(), false);
+		TArray<UUserWidget*> EndWidgets;
+		UWidgetBlueprintLibrary::GetAllWidgetsOfClass(GetWorld(), EndWidgets, UW_MissionEnd::StaticClass(), false);
 		UButton* ContinueButton = nullptr;
-		for (UUserWidget* const VictoryWidget : VictoryWidgets)
+		for (UUserWidget* const EndWidget : EndWidgets)
 		{
-			if (IsValid(VictoryWidget) && IsValid(VictoryWidget->WidgetTree))
+			const UW_MissionEnd* const MissionEnd = Cast<UW_MissionEnd>(EndWidget);
+			if (IsValid(MissionEnd))
 			{
-				ContinueButton = Cast<UButton>(VictoryWidget->WidgetTree->FindWidget(VictoryContinueButtonName));
+				ContinueButton = MissionEnd->GetPrimaryButton();
 			}
 		}
 		if (not IsValid(ContinueButton))

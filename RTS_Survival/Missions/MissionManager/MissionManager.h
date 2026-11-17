@@ -38,8 +38,9 @@ class UW_MissionWidgetManager;
 class UMissionBase;
 class UDontLoseCommanderMission;
 class UW_GameDifficultyPicker;
-class UW_Defeat;
-class UW_Victory;
+class UW_MissionEnd;
+class AMissionDebriefStage;
+enum class EMissionDebriefOutcome : uint8;
 class AActor;
 class UObject;
 class USceneComponent;
@@ -390,6 +391,10 @@ public:
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|Victory")
 	void TriggerVictory(bool bShowBackToMenu);
+
+	// The end screen once the mission ended (tests and tools); null before.
+	UW_MissionEnd* GetMissionEndWidget() const { return M_MissionEndWidget; }
+	AMissionDebriefStage* GetDebriefStage() const { return M_DebriefStage; }
 	void CallBackOnMissionWhenEnemyUnitsDestroyed(
 		const EEnemyUnitQueryType EnemyUnitQueryType,
 		TWeakObjectPtr<UMissionBase> Mission,
@@ -466,11 +471,13 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Difficulty|Faction Backup")
 	FPlayerFactionBackupData PlayerFactionBackupData;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mission|Defeat")
-	TSubclassOf<UW_Defeat> M_DefeatWidgetClass;
+	// Buttons and outcome line of the end screen; defaults to the C++ overlay, a Blueprint child can restyle it.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mission|End Screen")
+	TSoftClassPtr<UW_MissionEnd> M_MissionEndWidgetClass;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mission|Victory")
-	TSubclassOf<UW_Victory> M_VictoryWidgetClass;
+	// The 3D debrief (stamp, order, burn) spawned when the mission ends; none shows the buttons over the paused game.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mission|End Screen")
+	TSubclassOf<AMissionDebriefStage> M_DebriefStageClass;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mission|Victory")
 	TSoftObjectPtr<UWorld> M_MapToLoadOnContinueVictory;
@@ -566,17 +573,24 @@ private:
 	void RemoveActiveMission(UMissionBase* Mission);
 
 	UPROPERTY()
-	TObjectPtr<UW_Defeat> M_DefeatWidget;
+	TObjectPtr<UW_MissionEnd> M_MissionEndWidget;
 
 	UPROPERTY()
-	TObjectPtr<UW_Victory> M_VictoryWidget;
+	TObjectPtr<AMissionDebriefStage> M_DebriefStage;
 
-	void TriggerDefeat_LockPauseAndShowWidget();
-	void TriggerDefeat_ShowDefeatWidget();
-	bool GetIsValidDefeatWidgetClass() const;
-	void TriggerVictory_LockPausePlayMusicAndShowWidget(bool bShowBackToMenu);
-	void TriggerVictory_ShowVictoryWidget(bool bShowBackToMenu);
-	bool GetIsValidVictoryWidgetClass() const;
+	/**
+	 * @brief Hides the HUD, shows the end screen widget and starts the 3D debrief behind it; the game is already paused.
+	 * @param Outcome Victory or defeat.
+	 * @param ReasonText Line under the outcome.
+	 * @param bShowBackToMenu Victory: whether the Main Menu button shows.
+	 */
+	void ShowMissionEnd(const EMissionDebriefOutcome Outcome, const FText& ReasonText, const bool bShowBackToMenu);
+	UW_MissionEnd* ShowMissionEnd_CreateWidget(const EMissionDebriefOutcome Outcome, const FText& ReasonText,
+	                                           const bool bShowBackToMenu);
+	// @return Whether the stage runs; without it the buttons show at once.
+	bool ShowMissionEnd_StartStage(const EMissionDebriefOutcome Outcome);
+	void HandleDebriefButtonsDue();
+	static FText GetDefeatReasonText(const ERTSDefeatType DefeatType);
 	bool GetIsValidMapToLoadOnContinueVictory() const;
 	bool GetIsValidMenuLevelToLoadOnVictory() const;
 	// The configured continue level; when a mission names none it is reported and the menu level is used instead.

@@ -165,7 +165,7 @@ A 578x242 dialog plate centred at the bottom of the screen: title, `[<] LOCATION
   faced, best on this map, a NEW RECORD line (only when `bIsNewBest`), and [RETRY] / [MAIN MENU]. When `bIsNewBest`
   is set, the best time shown is `max(BestSeconds, SecondsSurvived)`, so it is right whether or not the director
   saved first. It also sets Game+UI input with the cursor shown and focus on the HUD.
-  - **Retry** is `UGameplayStatics::OpenLevel(GetCurrentLevelName)`, the `UW_Defeat` pattern. The game instance keeps
+  - **Retry** is `UGameplayStatics::OpenLevel(GetCurrentLevelName)`, the pattern of `UW_MissionEnd` (Restart on defeat). The game instance keeps
     faction, variants and difficulty, so the survival flow starts again at army selection.
   - **Main menu** is `OpenLevel(UGameMapsSettings::GetGameDefaultMap())`, the escape menu's
     `UMainGameUI::OnEscapeMenuExitToMainMenu` pattern.

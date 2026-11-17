@@ -21,8 +21,8 @@
 #include "RTS_Survival/Missions/MissionWidgets/W_Mission.h"
 #include "RTS_Survival/Missions/MissionWidgets/W_MissionTimer.h"
 #include "RTS_Survival/Missions/MissionWidgets/MissionWidgetManager/W_MissionWidgetManager.h"
-#include "RTS_Survival/Missions/Defeat/W_Defeat.h"
-#include "RTS_Survival/Missions/Victory/W_Victory.h"
+#include "RTS_Survival/Missions/MissionDebrief/MissionDebriefStage.h"
+#include "RTS_Survival/Missions/MissionDebrief/W_MissionEnd.h"
 #include "RTS_Survival/Music/RTSMusicManager/RTSMusicManager.h"
 #include "RTS_Survival/GameUI/GameDifficultyPicker/W_GameDifficultyPicker.h"
 #include "RTS_Survival/Player/AsyncRTSAssetsSpawner/RTSAsyncSpawner.h"
@@ -232,6 +232,8 @@ AMissionManager::AMissionManager()
 	PrimaryActorTick.bCanEverTick = true;
 	M_MissionTriggerVolumesManager = CreateDefaultSubobject<UMissionTriggerVolumesManager>(
 		TEXT("MissionTriggerVolumesManager"));
+	M_MissionEndWidgetClass = UW_MissionEnd::StaticClass();
+	M_DebriefStageClass = AMissionDebriefStage::StaticClass();
 }
 
 void AMissionManager::OnAnyMissionCompleted(UMissionBase* CompletedMission, const bool bPlaySound)
@@ -2692,152 +2694,138 @@ void AMissionManager::TriggerDefeat(const ERTSDefeatType DefeatType)
 		RTSFunctionLibrary::ReportError("Mission manager received TriggerDefeat with Uninitialized defeat type.");
 		return;
 	}
-
-	PlayEndStateMusic(ERTSMusicType::Defeat);
-	TriggerDefeat_LockPauseAndShowWidget();
-}
-
-void AMissionManager::TriggerDefeat_LockPauseAndShowWidget()
-{
 	if (not EnsureValidPlayerController())
 	{
 		return;
 	}
-
 	PlayEndStateMusic(ERTSMusicType::Defeat);
 	M_PlayerController->PauseAndLockGame(true);
-	TriggerDefeat_ShowDefeatWidget();
-}
-
-void AMissionManager::TriggerDefeat_ShowDefeatWidget()
-{
-	if (not EnsureValidPlayerController())
-	{
-		return;
-	}
-
-	if (not M_DefeatWidget)
-	{
-		if (not GetIsValidDefeatWidgetClass())
-		{
-			return;
-		}
-
-		UW_Defeat* CreatedDefeatWidget = CreateWidget<UW_Defeat>(M_PlayerController.Get(), M_DefeatWidgetClass);
-		if (not IsValid(CreatedDefeatWidget))
-		{
-			RTSFunctionLibrary::ReportError("Mission manager failed to create defeat widget from M_DefeatWidgetClass.");
-			return;
-		}
-
-		M_DefeatWidget = CreatedDefeatWidget;
-	}
-
-	if (M_DefeatWidget->IsInViewport())
-	{
-		return;
-	}
-
-	constexpr int32 DefeatWidgetZOrder = 300;
-	M_DefeatWidget->AddToViewport(DefeatWidgetZOrder);
-}
-
-bool AMissionManager::GetIsValidDefeatWidgetClass() const
-{
-	if (M_DefeatWidgetClass)
-	{
-		return true;
-	}
-
-	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
-		this,
-		"M_DefeatWidgetClass",
-		"GetIsValidDefeatWidgetClass",
-		this
-	);
-	return false;
+	ShowMissionEnd(EMissionDebriefOutcome::Defeat, GetDefeatReasonText(DefeatType), false);
 }
 
 void AMissionManager::TriggerVictory(const bool bShowBackToMenu)
 {
-	TriggerVictory_LockPausePlayMusicAndShowWidget(bShowBackToMenu);
-}
-
-void AMissionManager::TriggerVictory_LockPausePlayMusicAndShowWidget(const bool bShowBackToMenu)
-{
 	if (not EnsureValidPlayerController())
 	{
 		return;
 	}
-
 	PlayEndStateMusic(ERTSMusicType::Victory);
-	if (not M_VictoryWidget && not GetIsValidVictoryWidgetClass())
+	if (not M_MissionEndWidget && M_MissionEndWidgetClass.LoadSynchronous() == nullptr)
 	{
-		// Without a victory widget a paused and locked game would leave the player stuck: continue at once instead.
+		// Without the end screen a paused and locked game would leave the player stuck: continue at once instead.
+		RTSFunctionLibrary::ReportError("Mission manager has no mission end widget class; continuing without an end screen.");
 		UGameplayStatics::OpenLevelBySoftObjectPtr(this, GetVictoryContinueLevel(), true, FString());
 		return;
 	}
 	M_PlayerController->PauseAndLockGame(true);
-	TriggerVictory_ShowVictoryWidget(bShowBackToMenu);
-}
-
-void AMissionManager::TriggerVictory_ShowVictoryWidget(const bool bShowBackToMenu)
-{
-	if (not EnsureValidPlayerController())
-	{
-		return;
-	}
-
-	// The game is already paused and locked here, so a missing level must not stop the victory widget: the player
-	// would be stuck. A missing level is still reported, and the widget falls back to the main menu map.
-	const TSoftObjectPtr<UWorld> ContinueLevel = GetVictoryContinueLevel();
 	if (bShowBackToMenu)
 	{
 		(void)GetIsValidMenuLevelToLoadOnVictory();
 	}
-	const TSoftObjectPtr<UWorld> MenuLevel = GetVictoryMenuLevelOrDefaultMap();
+	ShowMissionEnd(EMissionDebriefOutcome::Victory,
+	               NSLOCTEXT("MissionEnd", "VictoryReason", "All objectives secured"), bShowBackToMenu);
+}
 
-	if (not M_VictoryWidget)
+void AMissionManager::ShowMissionEnd(const EMissionDebriefOutcome Outcome, const FText& ReasonText,
+                                     const bool bShowBackToMenu)
+{
+	if (IsValid(M_MissionEndWidget) && M_MissionEndWidget->IsInViewport())
 	{
-		if (not GetIsValidVictoryWidgetClass())
-		{
-			return;
-		}
-
-		UW_Victory* CreatedVictoryWidget = CreateWidget<UW_Victory>(M_PlayerController.Get(), M_VictoryWidgetClass);
-		if (not IsValid(CreatedVictoryWidget))
-		{
-			RTSFunctionLibrary::ReportError("Mission manager failed to create victory widget from M_VictoryWidgetClass.");
-			return;
-		}
-
-		M_VictoryWidget = CreatedVictoryWidget;
+		// The mission already ended; a second victory or defeat call changes nothing.
+		return;
 	}
-
-	M_VictoryWidget->TriggerVictory(ContinueLevel, MenuLevel, bShowBackToMenu);
-	if (M_VictoryWidget->IsInViewport())
+	// The end screen owns the whole screen: the HUD and the mission list go away as in a cinematic.
+	M_PlayerController->OnCinematicTakeOver(true);
+	SetMissionWidgetManagerVisibility(false);
+	UW_MissionEnd* const EndWidget = ShowMissionEnd_CreateWidget(Outcome, ReasonText, bShowBackToMenu);
+	if (not IsValid(EndWidget))
 	{
 		return;
 	}
-
-	constexpr int32 VictoryWidgetZOrder = 300;
-	M_VictoryWidget->AddToViewport(VictoryWidgetZOrder);
+	if (not ShowMissionEnd_StartStage(Outcome))
+	{
+		EndWidget->SkipFadeIn();
+		EndWidget->RevealButtons();
+	}
 }
 
-bool AMissionManager::GetIsValidVictoryWidgetClass() const
+UW_MissionEnd* AMissionManager::ShowMissionEnd_CreateWidget(const EMissionDebriefOutcome Outcome,
+                                                            const FText& ReasonText, const bool bShowBackToMenu)
 {
-	if (M_VictoryWidgetClass)
+	if (not M_MissionEndWidget)
+	{
+		const TSubclassOf<UW_MissionEnd> WidgetClass = M_MissionEndWidgetClass.LoadSynchronous();
+		if (WidgetClass == nullptr)
+		{
+			RTSFunctionLibrary::ReportError("Mission manager could not load the mission end widget class.");
+			return nullptr;
+		}
+		M_MissionEndWidget = CreateWidget<UW_MissionEnd>(M_PlayerController.Get(), WidgetClass);
+		if (not IsValid(M_MissionEndWidget))
+		{
+			RTSFunctionLibrary::ReportError("Mission manager failed to create the mission end widget.");
+			return nullptr;
+		}
+	}
+	// The game is already paused and locked here, so a missing level must not stop the end screen: the player
+	// would be stuck. A missing level is still reported, and the widget falls back to the main menu map.
+	M_MissionEndWidget->SetupEndScreen(Outcome, ReasonText, GetVictoryContinueLevel(),
+	                                   GetVictoryMenuLevelOrDefaultMap(), bShowBackToMenu);
+	constexpr int32 MissionEndWidgetZOrder = 300;
+	M_MissionEndWidget->AddToViewport(MissionEndWidgetZOrder);
+	return M_MissionEndWidget;
+}
+
+bool AMissionManager::ShowMissionEnd_StartStage(const EMissionDebriefOutcome Outcome)
+{
+	UWorld* const World = GetWorld();
+	if (M_DebriefStageClass == nullptr || World == nullptr)
+	{
+		return false;
+	}
+	// High above any map: the stage is a closed room, so neither the level nor its fog reach into it.
+	const FVector StageLocation(0.0, 0.0, 250000.0);
+	FActorSpawnParameters SpawnParameters;
+	SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	M_DebriefStage = World->SpawnActor<AMissionDebriefStage>(M_DebriefStageClass, StageLocation, FRotator::ZeroRotator,
+	                                                        SpawnParameters);
+	if (not IsValid(M_DebriefStage))
+	{
+		RTSFunctionLibrary::ReportError("Mission manager could not spawn the mission debrief stage.");
+		return false;
+	}
+	M_DebriefStage->OnButtonsDue.BindUObject(this, &AMissionManager::HandleDebriefButtonsDue);
+	if (M_DebriefStage->StartDebrief(Outcome, M_PlayerController.Get()))
 	{
 		return true;
 	}
-
-	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
-		this,
-		"M_VictoryWidgetClass",
-		"GetIsValidVictoryWidgetClass",
-		this
-	);
+	M_DebriefStage->Destroy();
+	M_DebriefStage = nullptr;
 	return false;
+}
+
+void AMissionManager::HandleDebriefButtonsDue()
+{
+	if (not IsValid(M_MissionEndWidget))
+	{
+		return;
+	}
+	M_MissionEndWidget->RevealButtons();
+}
+
+FText AMissionManager::GetDefeatReasonText(const ERTSDefeatType DefeatType)
+{
+	switch (DefeatType)
+	{
+	case ERTSDefeatType::LostHQ:
+		return NSLOCTEXT("MissionEnd", "LostHQ", "Headquarters destroyed");
+	case ERTSDefeatType::LostCommandVehicle:
+		return NSLOCTEXT("MissionEnd", "LostCommandVehicle", "Command vehicle lost");
+	case ERTSDefeatType::LostMainObjective:
+		return NSLOCTEXT("MissionEnd", "LostMainObjective", "Main objective failed");
+	default:
+		return NSLOCTEXT("MissionEnd", "Defeated", "The mission was lost");
+	}
 }
 
 TSoftObjectPtr<UWorld> AMissionManager::GetVictoryContinueLevel() const
