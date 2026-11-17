@@ -71,3 +71,44 @@ Scripts in `Source/Tools/BerlinMap/rubbledecals/`:
    `REBUILD_MATERIAL = True`) and the 16 MIs.
 
 The atlas that is in the project is `Saved/Berlin/rubble_decals/final/` (round 3).
+
+## Placement on Ger_Berlin
+
+Additive only: plain DecalActors labelled `RUBDECAL_<NN>_<Name>_<nnnn>` in folder `Berlin/Decals/Rubble/<NN_Name>`.
+Nothing else on the map is touched. `step_decals()` (which clears `DECAL_*`) and the dress generator do not know
+these actors.
+
+1. `rubble_dump_level.py` (throwaway editor, read only) writes `Saved/Berlin/rubble_decals/level_dump.json`: every actor,
+   with the mesh box of each ruin (local axes: +X = street front).
+2. `rubble_place_gen.py` (plain python) writes `rubble_placements.json` and `placements_preview.png` from the dump, the
+   terrain masks (`Saved/Berlin/terrain/Ger_Berlin_masks.npz`) and the existing crater and puddle decals. Rules:
+   - facades (B1-B3, E1, E2, E3, E5, E7, B5, B6): brick fans against the street front (one per about 6 m of front),
+     some masonry strips or plaster dust instead, tile/slate/glass litter 4-7 m out, some spill behind the front;
+   - firewalls and wall cores: masonry strips along the base; corner piles inside the L of corner pieces;
+   - cover heaps and debris beds: brick heap, grit, plaster or (concrete heaps) concrete-and-rebar spreads;
+   - smoulder and fire sites: charred timber and ash; yard, power station and wrecks: steel scrap and concrete;
+   - streets near ruins: torn-up setts beside craters on the carriageway, paving, grit and glass on the berms;
+   - Reichstag and Gate: sandstone blocks in clumps along the front; flak towers and the Zoo bunker: concrete.
+   - kept out: river, bridge, sinkholes, gaps, the blast crater, landmark pads, puddles, crater floors, and heavy
+     overlap with each other.
+3. `rubble_place_apply.py` in a throwaway editor on Ger_Berlin (`rubble_headless_run.sh <script> <map> <log>`):
+   removes old `RUBDECAL_` actors, finds the landscape under each centre (traces skip props), drops fans, strips and
+   corner piles that do not touch a ruin wall (horizontal traces), spawns the decals, waits for the navmesh, runs
+   `berlin_nav_check` and saves the map package. `RUBBLE_APPLY_DRY=1` places without saving;
+   `RUBBLE_APPLY_SHOTS=<dir>` takes before/after pictures.
+
+On the map since 2026-11-17 12:18 (owner approved the save): 1443 candidates, 1366 placed (77 dropped by the wall
+checks: 30 corner piles, 30 fans, 17 strips), none without ground, ground within 3 cm of the height file, nav check
+0 problems. Ger_Berlin.umap 119.0 -> 121.7 MB; a re-dump showed only the 1366 `RUBDECAL_` actors added (plus the
+horizon skirt planes saved earlier that morning by another session). Backup of the map before:
+`_MapBackups/Ger_Berlin_2026-11-17_before_rubble_decals.umap`. Other sessions' `-game` runs open the umap while they
+load Berlin, so the save step retries for up to 10 minutes ("Error moving file" on the first attempt once).
+
+## Pictures from a throwaway editor
+
+A fresh editor on Ger_Berlin draws newly referenced decals as dark opaque squares for minutes (the textures sample
+the black placeholder and the shaders compile on demand), and the first frame after a camera cut shows unsettled
+decals (old puddle decals drew black). For pictures: set `never_stream` on the two atlases in memory (never saved),
+call `unreal.AutomationLibrary.finish_loading_before_screenshot()`, prove visibility with an on/off probe of one decal
+(it must change the picture without darkening it), then take a warm-up shot per view. None of this happens in the
+shared editor or in the game: it is a cold-start effect of the throwaway editor.
