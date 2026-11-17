@@ -578,3 +578,14 @@ patch, lichen crust, soot fall-out, rust wash, ore fines, rock-flour fan). Sourc
 - Checked: `NAV PROBLEMS 0`; editor views in `Saved/OreMountains/rocks/map/`. The nav check does not use the per-agent
   area filters, so the gaps in the plan are what keeps infantry and light vehicles from being walled in.
 - Open: no crush driven on this map; puff and sound of the crush are still the building-sized ones.
+
+## Large rockworks (2026-11-17)
+
+- Kit: `Environment/OreMountains/Rockworks/` (8 formations 5-10 m, not crushable, shell holes, `NavArea_Null`; see
+  `Docs/Environment/OreRockworks.md`). Holes show flat back faces inside the solid rock; the user kept that as is.
+- Plan: `ore_rockworks_gen.py` (reuses the keep-out part of `ore_crush_rocks_gen.py`; file `Ore_rockworks.json`,
+  preview `Saved/OreMountains/rockworks/placement_plan.png`). 15 rockworks: 6 at cliff feet, 4 on crests, 5 on open
+  ground. 6.5 m free all round, 60 m apart, none inside the HQ build radius, scale 1 only.
+- Build: `ore_map_build.step_rockworks()` (labels `ORE_Rockwork_*`; skips a spot when an actor this tool did not
+  place stands within 12 m). In the full rebuild order after `step_crush_rocks()`.
+- Checked: `NAV PROBLEMS 0`; editor views in `Saved/OreMountains/rockworks/map/`. Not fired at on this map.

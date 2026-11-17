@@ -1164,6 +1164,48 @@ def step_crush_rocks():
     return placed
 
 
+# ---- large rockworks (Rockworks kit; plan from ore_rockworks_gen.py) ------------------------------------------------------
+ROCKWORK_FILE = "D:/UE5Projects/RTS_Survival/Saved/OreMountains/terrain/Ore_rockworks.json"
+ROCKWORK_CLEAR_OF_OTHERS = 1200.0
+
+
+def step_rockworks():
+    """Large rockworks: not crushable, block every unit, take shell holes. Single Blueprint actors at scale 1 (a scaled
+    rock stretches its holes). A spot is skipped when an actor this tool did not place (mission scripting, clue spots)
+    stands within 12 m: the plan does not know those. Rebuild navigation afterwards. Labels ORE_Rockwork_*."""
+    require_map()
+    removed = clear_prefix(PREFIX + "Rockwork_")
+    with open(ROCKWORK_FILE, "r") as handle:
+        data = json.load(handle)
+    others = []
+    for actor in all_actors():
+        label = actor.get_actor_label()
+        if label.startswith(PREFIX) or label.startswith("Ore_") or actor.root_component is None:
+            continue
+        if isinstance(actor, (unreal.Landscape, unreal.LandscapeStreamingProxy, unreal.Volume, unreal.Light, unreal.SkyLight,
+                              unreal.SkyAtmosphere, unreal.ExponentialHeightFog, unreal.RecastNavMesh, unreal.Brush)):
+            continue
+        loc = actor.get_actor_location()
+        others.append((loc.x, loc.y, label))
+    classes, placed, skipped = {}, [], []
+    for index, (name, x, y, yaw, sink, zone) in enumerate(data["rocks"]):
+        near = [label for ox, oy, label in others if math.hypot(ox - x, oy - y) < ROCKWORK_CLEAR_OF_OTHERS]
+        if near:
+            skipped.append((name, x, y, near[:3]))
+            continue
+        if name not in classes:
+            classes[name] = unreal.EditorAssetLibrary.load_blueprint_class(data["blueprint"].replace("<name>", name))
+            if classes[name] is None:
+                raise RuntimeError("missing rockwork Blueprint " + name)
+        actor = actors_sub().spawn_actor_from_class(classes[name], unreal.Vector(x, y, ground_z(x, y) - sink),
+                                                    unreal.Rotator(0.0, 0.0, yaw))
+        actor.set_actor_label("%sRockwork_%s_%02d" % (PREFIX, name, index))
+        actor.set_folder_path(FOLDER + "Rockworks")
+        placed.append(name)
+    log("rockworks: removed %d, placed %d, skipped %s" % (removed, len(placed), skipped))
+    return {"placed": len(placed), "skipped": skipped}
+
+
 # ---- cliff decals (OreCliffKit/Decals/v02, built by a subagent; spec decals.json) ----------------------------------------
 CLIFF_DECAL_SPEC = "D:/Blender/BlenderProjects/BlenderTanks/CustomMapItems/Environment/OreCliffKit/Decals/v02/decals.json"
 CLIFF_DECAL_MI = "/Game/RTS_Survival/Blueprints/Environment/OreMountains/CliffKit/Decals/MI_OreCliffDecal_"
