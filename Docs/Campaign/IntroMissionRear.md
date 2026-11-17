@@ -70,3 +70,29 @@ The tools are in `Source/Tools/IntroMission/rear/`.
 - The map's edge `BlockingVolume`s span z 0..200 only, so any ridge that reaches an edge needs a taller blocker.
 - With the fog of war on, unexplored ground renders black in play-in-editor shots: judge edges with `ShowFlag.PostProcessMaterial 0`.
 - Editor-viewport and scene-capture pictures draw water and many decals black, and the existing pond does the same. Judge water and decals in game.
+
+## Rock faces on the ridges (2026-11-17)
+
+User request: remove the small stones and decals on the station ridge and depot ridge flanks, and add proper cliffs
+like the Ore mission's. Applied to both ridges on every flank, except the station ridge's east flank, which lies beyond
+the playable edge. The cacti on the ridge tops stay.
+
+- **Terrain.** `rear_cliffs_gen.py` (numpy) reads the current landscape export (`terrain/cliffpre_full_height.r16`). For each metre along a ridge spine it measures the crest and foot heights of the flank and smooths them along the ridge. It then remaps every flank vertex by its height fraction q: `0.9 * clip((q - 0.5) * k + 0.5) + 0.1 * q`.
+  - The station ridge uses k 3.6, the depot ridge k 2.2.
+  - The face stays on the old mid-height contour, with a gentle lip and toe, and the face is about 64 degrees.
+  - It leaves alone: road corridors (the road plus 2.5 m), the depot saddle, the ponds, the depot pad plus 15 m, the keep-outs, the station's north embankment (y > 22600) and any flank lower than 3 m.
+  - It changes 10060 vertices by at most 2.6 m.
+- **Kit.** The Ore cliff kit, kit C (`OreMountains/CliffKit`), is laid along the new lip and foot lines by an `ock_place.Layout` subclass.
+  - Each face piece is chosen by the local face height: Mass from 5.5 m, MassLow from 2.5 m.
+  - The last 7 m of a face carry only scree and chunks, with no flat end slabs.
+  - Lip blocks are sunk 0.8-1.5 m at irregular spacing, after an even row read as teeth.
+  - Pieces that would reach within 1.5 m of a road are dropped.
+  - Result: 150 instances in 34 `REAR_Cliff_*` HISM actors (folder `IntroRear/Cliffs`), with no collision and no nav effect: the landscape does the blocking.
+  - Material `MI_IntroCliff`, a child of `MI_OreCliff`: RockTint (0.54, 0.32, 0.21), DustColor (0.5, 0.25, 0.13), GroundColor (0.46, 0.23, 0.12), DustAmount 0.9, GroundFromRVT 0.6. The map has `RVT_Environment`.
+- **Props.** `rear_cliffs_props.py` writes `cliffs/prop_actions.json` from an actor dump.
+  - It removed 139 actors on the flanks, all `REAR_` stones, crater stones and decals, plus the shrubs, rocks and dead trees under a face.
+  - It re-seated 17 others by the height change, including a ridge-top cactus raised 1 m.
+- **Editor steps.** `rear_cliffs_editor.py`: `dump_actors`, `apply_terrain`, `apply_props`, `make_material` and `step_cliffs`. Run `apply_props` once only: a second run moves the re-seated actors again.
+- **Checks.** `rear_nav_check.py` reports `NAV FAILS 0`. Crossing checks show paths over a face now detour: station foot to top 33 m straight becomes a 158 m path, depot foot to crest 16 m becomes 151 m. The station's north end stays open by design, and so do the south nose next to road S and the ridge ends. In-game shots are in `Saved/IntroRear/shots/cl_*` (sheet `cliffs_sheet_v3.jpg`).
+- **Gameplay change.** The ridge tops are now reached only by the road S ramp, the station's north embankment and south nose, the depot saddle and the depot ridge's ends.
+- **Open.** The rocks have no collision, so infantry on a ridge top can stand inside a lip block. The lip blocks reach about 2 m inward.
