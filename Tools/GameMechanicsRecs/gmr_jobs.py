@@ -796,13 +796,13 @@ def nomadic_sequence():
 
 def berlin_flight(name, anchor, anchor_yaw, sky, keys_spec, duration=22.0, clear=8000.0, **extra):
     """One continuous camera flight (no cuts) through anchor-frame keys:
-    keys_spec = ((t, (x, y), yaw, pitch, dist, focal, look_z), ...). An S-curve over the whole flight eases it in
-    and out; Catmull-Rom between the keys keeps it smooth."""
+    keys_spec = ((t, (x, y), yaw, pitch, dist, focal, look), ...), look = z or (x, y, z) in the anchor frame. An
+    S-curve over the whole flight eases it in and out; Catmull-Rom between the keys keeps it smooth."""
     job = base_job(name, "POI", "Berlin", anchor, anchor_yaw, duration, SkyMaterial=SKY[sky], ClearUnitsRadius=clear,
                    **extra)
-    keys = [key(t, "", yaw, pitch, dist, focal, (x, y, 0), (0, 0, look_z), vpitch=pitch + 6, vdist=dist * 1.08,
-                vfocal=focal * 0.8)
-            for t, (x, y), yaw, pitch, dist, focal, look_z in keys_spec]
+    keys = [key(t, "", yaw, pitch, dist, focal, (x, y, 0), look if isinstance(look, tuple) else (0, 0, look),
+                vpitch=pitch + 6, vdist=dist * 1.08, vfocal=focal * 0.8)
+            for t, (x, y), yaw, pitch, dist, focal, look in keys_spec]
     job["Shots"] = [shot("Flight", 0, duration, "Orbit", keys)]
     return job
 
@@ -811,11 +811,14 @@ def batch_berlin_poi():
     return [
         # The nuclear crater by the map origin (on the editor's red X axis): low over the glass rim, up above the
         # bowl, then a wide circle with the blast zone around it.
+        # Take 1 sat too close and steep (the glass floor filled the frame): low on the south rim looking across the
+        # bowl toward the Gate ruin and the Forge camp, then up into a wide circle that shows the whole crater.
         berlin_flight("POI_Berlin_Crater", (-2167, -3000, 0), 0, "fire", (
-            (0.0, (-6500, 0), 180, 10, 2200, 24, 200),
-            (7.0, (-2500, 0), 190, 26, 3200, 24, -100),
-            (14.0, (0, 0), 250, 58, 5200, 22, -300),
-            (22.0, (0, 0), 320, 34, 7600, 22, -200),
+            (0.0, (-6000, 1500), 200, 10, 2000, 24, (3000, 0, 300)),
+            # Further back and higher than take 2 (its 8 s key sat over the bowl: green glass filled the frame).
+            (8.0, (-3000, 0), 190, 30, 7500, 24, (2500, 0, 300)),
+            (15.0, (0, 0), 235, 40, 9000, 24, -200),
+            (22.0, (0, 0), 295, 34, 11000, 22, -200),
         )),
         # Down the central avenue from Alexanderplatz toward the crater at rooftop height, rising at the end.
         berlin_flight("POI_Berlin_CentralAvenue", (7583, 13333, 0), -119, "storm", (
@@ -825,18 +828,27 @@ def batch_berlin_poi():
             (22.0, (10400, 0), 205, 42, 6500, 24, 300),
         )),
         # Along the contaminated Spree channel, over the half-collapsed Moltke bridge, between the quay walls.
+        # Take 1 looked down at flat water: low along the channel looking ~30 m ahead, so the quays, the ruins and the
+        # bridge come toward the camera; the channel bends toward +Y after the bridge (river points (16800,-16000),
+        # (16500,-24000)).
         berlin_flight("POI_Berlin_SpreeMoltke", (19500, -10500, 0), -135, "storm", (
-            (0.0, (0, 0), 180, 16, 2600, 26, 0),
-            (9.0, (2830, 0), 180, 18, 2600, 26, 0),
-            # The channel bends toward +Y after the bridge (river points (16800,-16000), (16500,-24000)).
-            (16.0, (5800, 1980), 212, 26, 3400, 24, 0),
-            (22.0, (7265, 3341), 228, 40, 6000, 24, 0),
+            (0.0, (-2500, 0), 180, 9, 2000, 26, (3000, 0, 250)),
+            (9.0, (1800, 0), 180, 11, 2200, 26, (3000, 0, 250)),
+            (16.0, (5800, 1980), 212, 15, 2600, 24, (2500, 1700, 250)),
+            (22.0, (7265, 3341), 228, 32, 5500, 24, (0, 0, 0)),
         )),
-        poi("POI_Berlin_PotsdamerPlatz", "Berlin", (-11375, -11111, 0), 0, "storm", 2600, look_height=500),
+        # The 9:16 Scale camera stood behind a ruin wall on the -Y side: film the patrol from the sinkhole side.
+        poi("POI_Berlin_PotsdamerPlatz", "Berlin", (-11375, -11111, 0), 0, "storm", 2600, look_height=500,
+            scale=pan("Scale", 9, 15, "tag:Patrol", "", 90, pitch=16, dist=3000, focal=24, off1=(0, 0, 500),
+                      look=(0, 0, 150), vpitch=20, vfocal=18)),
         poi("POI_Berlin_Hauptbahnhof", "Berlin", (22400, -15500, 0), 0, "storm", 3800, look_height=700, yaw0=260,
             reveal_yaw=140),
-        poi("POI_Berlin_ZooTower", "Berlin", (-14625, -43889, 0), 0, "fire", 3400, look_height=1400, low=True),
-        poi("POI_Berlin_RailYard", "Berlin", (-3792, 13389, 0), 0, "storm", 2400, look_height=500),
+        # Take 1 used the low hero angle: mostly sky with the tower small; a normal height, closer.
+        poi("POI_Berlin_ZooTower", "Berlin", (-14625, -43889, 0), 0, "fire", 2800, look_height=1000),
+        # Take 1's Scale camera stood behind a ruin wall on the -Y side (black frames): film from the yard side.
+        poi("POI_Berlin_RailYard", "Berlin", (-3792, 13389, 0), 0, "storm", 2400, look_height=500,
+            scale=pan("Scale", 9, 15, "tag:Patrol", "", 90, pitch=16, dist=3000, focal=24, off1=(0, 0, 500),
+                      look=(0, 0, 150), vpitch=20, vfocal=18)),
         # (Anhalter Bf has no set piece on the map, only empty lots: scouted 2026-11-17.)
         poi("POI_Berlin_Alexanderplatz", "Berlin", (11194, 26528, 0), -90, "storm", 2500, look_height=600),
     ]

@@ -26,23 +26,23 @@
      "Time": 0.0,
      "Pivot": "",
      "Offset": {
-      "X": -6500.0,
-      "Y": 0.0,
+      "X": -6000.0,
+      "Y": 1500.0,
       "Z": 0.0
      },
-     "Yaw": 180.0,
+     "Yaw": 200.0,
      "Pitch": 10.0,
-     "Distance": 2200.0,
+     "Distance": 2000.0,
      "Focal": 24.0,
      "Roll": 0.0,
      "LookOffset": {
-      "X": 0.0,
+      "X": 3000.0,
       "Y": 0.0,
-      "Z": 200.0
+      "Z": 300.0
      },
      "VYaw": 0.0,
      "VPitch": 16.0,
-     "VDistance": 2376.0,
+     "VDistance": 2160.0,
      "VFocal": 19.200000000000003,
      "VLookOffset": {
       "X": 0.0,
@@ -51,26 +51,26 @@
      }
     },
     {
-     "Time": 7.0,
+     "Time": 8.0,
      "Pivot": "",
      "Offset": {
-      "X": -2500.0,
+      "X": -3000.0,
       "Y": 0.0,
       "Z": 0.0
      },
      "Yaw": 190.0,
-     "Pitch": 26.0,
-     "Distance": 3200.0,
+     "Pitch": 30.0,
+     "Distance": 7500.0,
      "Focal": 24.0,
      "Roll": 0.0,
      "LookOffset": {
-      "X": 0.0,
+      "X": 2500.0,
       "Y": 0.0,
-      "Z": -100.0
+      "Z": 300.0
      },
      "VYaw": 0.0,
-     "VPitch": 32.0,
-     "VDistance": 3456.0,
+     "VPitch": 36.0,
+     "VDistance": 8100.000000000001,
      "VFocal": 19.200000000000003,
      "VLookOffset": {
       "X": 0.0,
@@ -79,27 +79,27 @@
      }
     },
     {
-     "Time": 14.0,
+     "Time": 15.0,
      "Pivot": "",
      "Offset": {
       "X": 0.0,
       "Y": 0.0,
       "Z": 0.0
      },
-     "Yaw": 250.0,
-     "Pitch": 58.0,
-     "Distance": 5200.0,
-     "Focal": 22.0,
+     "Yaw": 235.0,
+     "Pitch": 40.0,
+     "Distance": 9000.0,
+     "Focal": 24.0,
      "Roll": 0.0,
      "LookOffset": {
       "X": 0.0,
       "Y": 0.0,
-      "Z": -300.0
+      "Z": -200.0
      },
      "VYaw": 0.0,
-     "VPitch": 64.0,
-     "VDistance": 5616.0,
-     "VFocal": 17.6,
+     "VPitch": 46.0,
+     "VDistance": 9720.0,
+     "VFocal": 19.200000000000003,
      "VLookOffset": {
       "X": 0.0,
       "Y": 0.0,
@@ -114,9 +114,9 @@
       "Y": 0.0,
       "Z": 0.0
      },
-     "Yaw": 320.0,
+     "Yaw": 295.0,
      "Pitch": 34.0,
-     "Distance": 7600.0,
+     "Distance": 11000.0,
      "Focal": 22.0,
      "Roll": 0.0,
      "LookOffset": {
@@ -126,7 +126,7 @@
      },
      "VYaw": 0.0,
      "VPitch": 40.0,
-     "VDistance": 8208.0,
+     "VDistance": 11880.0,
      "VFocal": 17.6,
      "VLookOffset": {
       "X": 0.0,

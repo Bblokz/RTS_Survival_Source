@@ -44,12 +44,14 @@ BASE_COLOR = """return Bco.rgb * Tint * lerp(0.88, 1.12, Var);"""
 NORMAL = """float2 XY = (Nrs.rg * 2.0 - 1.0) * float2(1.0, -1.0) * NormalStrength;
 return float3(XY, sqrt(saturate(1.0 - dot(XY, XY))));"""
 ROUGH = """return saturate(Nrs.b * RoughnessMul);"""
-# Receiver normal from screen derivatives (DBuffer decals can't read the GBuffer normal); the face normal comes in
-# through DecalColor.B as a yaw, so the decal fades on window reveals, ledges and the ground.
+# Receiver normal from screen derivatives (DBuffer decals can't read the GBuffer normal); the face normal is the
+# decal's own X axis in world space (Local -> World transform, which is DecalToWorld in a decal), so the decal fades on
+# window reveals, ledges and the ground at any actor rotation. (It used to be a BP-local yaw in DecalColor.B, which
+# hid every decal once the ruin was rotated in Ger_Berlin.)
 OPACITY = """float3 N = cross(ddx(Wp), ddy(Wp));
 N *= rsqrt(max(dot(N, N), 1e-12));
-float A = Yaw01 * 6.2831853;
-float Facing = abs(dot(N.xy, float2(cos(A), sin(A))));
+float3 F = normalize(Face);
+float Facing = abs(dot(N, F));
 return saturate(BcoA * DecalA * Opacity) * smoothstep(FacingStart, FacingEnd, Facing);"""
 
 
@@ -106,6 +108,64 @@ def link(a, a_out, b, b_in):
         raise RuntimeError(f'connect failed {a.get_name()}.{a_out} -> {b.get_name()}.{b_in}')
 
 
+OPACITY_INPUTS = ['BcoA', 'DecalA', 'Opacity', 'Wp', 'Face', 'FacingStart', 'FacingEnd']
+
+
+def face_axis(mat):
+    """The decal's X axis (its projection direction = the wall's outward normal) in world space."""
+    x = MEL.create_material_expression(mat, unreal.MaterialExpressionConstant3Vector, -1250, 900)
+    x.set_editor_property('constant', unreal.LinearColor(1, 0, 0, 0))
+    t = MEL.create_material_expression(mat, unreal.MaterialExpressionTransform, -950, 900)
+    t.set_editor_property('transform_source_type', unreal.MaterialVectorCoordTransformSource.TRANSFORMSOURCE_LOCAL)
+    t.set_editor_property('transform_type', unreal.MaterialVectorCoordTransform.TRANSFORM_WORLD)
+    link(x, '', t, '')
+    return t
+
+
+def upgrade_face_input():
+    """Moves existing masters' RuinOpacity from the DecalColor.B yaw to the world-space decal axis."""
+    for name in ('M_RT_RuinDecal', 'M_RT_RuinDecal_Paint'):
+        mat = unreal.load_asset(f'{FOLDER}/{name}')
+        if mat is None:
+            continue
+        op = [e for e in unreal.ObjectIterator(unreal.MaterialExpressionCustom)
+              if e.get_outer() == mat and str(e.get_editor_property('description')) == 'RuinOpacity']
+        if not op:
+            continue
+        op = op[0]
+        names = [str(i.get_editor_property('input_name')) for i in op.get_editor_property('inputs')]
+        nodes = [e for e in unreal.ObjectIterator(unreal.MaterialExpression) if e.get_outer() == mat]
+        if 'Face' in names and any(isinstance(e, unreal.MaterialExpressionTransform) for e in nodes):
+            print('face', name, 'already upgraded')
+            continue
+        for e in nodes:     # leftovers of an interrupted run
+            if isinstance(e, (unreal.MaterialExpressionConstant3Vector, unreal.MaterialExpressionTransform)):
+                MEL.delete_material_expression(mat, e)
+        nodes = [e for e in unreal.ObjectIterator(unreal.MaterialExpression) if e.get_outer() == mat]
+        def find(cls, pname=None):
+            for e in nodes:
+                if isinstance(e, cls) and (pname is None or str(e.get_editor_property('parameter_name')) == pname):
+                    return e
+            raise RuntimeError(f'{name}: no {cls.__name__} {pname or ""}')
+        ins = []
+        for nm in OPACITY_INPUTS:
+            ci = unreal.CustomInput()
+            ci.set_editor_property('input_name', nm)
+            ins.append(ci)
+        op.set_editor_property('inputs', ins)       # drops the old links; re-made below
+        link(find(unreal.MaterialExpressionTextureSampleParameter2D, 'RuinBCO'), 'A', op, 'BcoA')
+        link(find(unreal.MaterialExpressionDecalColor), 'A', op, 'DecalA')
+        link(find(unreal.MaterialExpressionScalarParameter, 'Opacity'), '', op, 'Opacity')
+        link(find(unreal.MaterialExpressionWorldPosition), '', op, 'Wp')
+        link(find(unreal.MaterialExpressionScalarParameter, 'FacingStart'), '', op, 'FacingStart')
+        link(find(unreal.MaterialExpressionScalarParameter, 'FacingEnd'), '', op, 'FacingEnd')
+        op.set_editor_property('code', OPACITY)
+        link(face_axis(mat), '', op, 'Face')
+        MEL.recompile_material(mat)
+        save(f'{FOLDER}/{name}')
+        print('face', name, 'upgraded')
+
+
 def build_master(name, with_normal, bco, nrs):
     path = f'{FOLDER}/{name}'
     if EAL.does_asset_exist(path):
@@ -146,10 +206,10 @@ def build_master(name, with_normal, bco, nrs):
     rg = custom(mat, -350, 350, 'RuinRoughness', ROUGH, F1, ['Nrs', 'RoughnessMul'])
     link(s_nrs, 'RGBA', rg, 'Nrs')
     link(rmul, '', rg, 'RoughnessMul')
-    op = custom(mat, -350, 600, 'RuinOpacity', OPACITY, F1, ['BcoA', 'DecalA', 'Opacity', 'Wp', 'Yaw01', 'FacingStart', 'FacingEnd'])
+    op = custom(mat, -350, 600, 'RuinOpacity', OPACITY, F1, OPACITY_INPUTS)
     link(s_bco, 'A', op, 'BcoA')
     link(dc, 'A', op, 'DecalA')
-    link(dc, 'B', op, 'Yaw01')
+    link(face_axis(mat), '', op, 'Face')
     link(opac, '', op, 'Opacity')
     link(wp, '', op, 'Wp')
     link(f0, '', op, 'FacingStart')
@@ -211,6 +271,7 @@ def materials():
     inrs = import_texture('T_RT_Inscription_NRS', False, TC.TC_MASKS)
     full = build_master('M_RT_RuinDecal', True, bco, nrs)
     paint = build_master('M_RT_RuinDecal_Paint', False, bco, nrs)
+    upgrade_face_input()
     update_code()
     return {'relief': instance('MI_RT_RuinDecal', full),
             'paint': instance('MI_RT_RuinDecal_Paint', paint),
@@ -256,7 +317,9 @@ def decals(mats):
     print('DECALS', len(plan), 'on', BP_PATH)
 
 
-if globals().get('RT_DECALS_CODE_ONLY'):
+if globals().get('RT_DECALS_UPGRADE_ONLY'):    # existing masters -> world-space face axis, no decal rebuild
+    upgrade_face_input()
+elif globals().get('RT_DECALS_CODE_ONLY'):
     update_code()
 else:
     mats = load_materials() if globals().get('RT_DECALS_ONLY') else materials()
