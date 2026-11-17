@@ -198,3 +198,25 @@ End-of-map planes `SKIRT_Plane_*` (folder MapSkirt, `MI_Berlin_HorizonSkirt`) ru
   ash = rock, scrub = grass, cobble and glass = concrete).
 - Rail yard, Alexanderplatz and the Hauptbahnhof shell are generic dressing, not designed set pieces.
 - No landscape grass output; the Tiergarten is dead trees and logs on the scrub layer.
+
+## Floating gaps under ruins and objects (2026-11-17)
+
+Tools in `Tools/BerlinMap/gaps/` (throwaway DebugGame editor through `gaps_editor_server.py` / `gaps_cmd.py`):
+`gaps_dump.py` (landscape heights, every static mesh instance's transform, LOD0 geometry), `gaps_scan.py` (offline
+detector and sculpt plan), `gaps_apply.py` (height sub-rectangle import + piece moves), `gaps_shots.py` (pictures).
+
+- Detector: lowest geometry of anything per 50 cm cell against the landscape; a cell floats when that underside is
+  3-260 cm above ground, belongs to the base of its piece and lies on the outline of what covers the ground.
+- Fixed pieces (ruins, footprint plates, cover heaps, landmarks, power station, rail yard): the landscape is raised to
+  the floating edge and blended out over 3 m. It never rises above a footprint floor or another flat fixed piece.
+- Loose pieces (rubble instances, furniture, cover, wrecks, trees, yard clutter): lowered onto the ground, or sunk in up
+  to 30 cm when one side floats; they ride on any ground that rose under them. Pieces resting on another piece and
+  pieces more than 60 cm in the air (the slabs hanging in the sinkholes) are left alone.
+- Result on the saved map: visible floating area under fixed pieces 1,330 m2 -> 56 m2; 24,000 vertices raised (1.7 % of
+  the map, mean 13 cm), 552 loose pieces moved. Nav check 0 problems. Left: plate `FOOT_StubHeap_3` overhanging the
+  sinkhole at (-17450, 1820), about 5 m2 around the Brandenburg Gate (up to 12 cm), the fallen power mast.
+- Rerun after placing new pieces: dump, `gaps_scan.py plan <height file> nosink`, apply, rescan.
+
+`BP_Berlin_BreweryVaults` placed at (-11959, 34847), yaw 20, on the hall's -X side (`vaults_clear_plan.py`,
+`vaults_apply.py`): 5 footprint instances and 9 rubble instances removed from their instanced actors, 3 loose actors
+and 12 decals inside the footprint deleted.
