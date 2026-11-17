@@ -14,6 +14,7 @@ class UNiagaraSystem;
 class UNiagaraComponent;
 class UTraceImpactVfxBatcher;
 class USmallArmsMuzzleVfxBatcher;
+class UAircraftStrafeImpactBatcher;
 class UBulletFlyByAudioSubsystem;
 struct FSoA_SmallArmsProjectilesPool;
 
@@ -48,6 +49,9 @@ public:
 
 	// Draws the muzzle flashes and powder smoke of all infantry small arms with one Niagara system.
 	USmallArmsMuzzleVfxBatcher* GetSmallArmsMuzzleVfxBatcher() const { return M_SmallArmsMuzzleVfxBatcher; }
+
+	// Draws the dirt spurts, debris, dust and sparks of every aircraft strafe gun with one Niagara system.
+	UAircraftStrafeImpactBatcher* GetAircraftStrafeImpactBatcher() const { return M_AircraftStrafeImpactBatcher; }
 
 protected:
 	// Called when the game starts or when spawned
@@ -101,6 +105,9 @@ private:
 
 	UPROPERTY()
 	TObjectPtr<USmallArmsMuzzleVfxBatcher> M_SmallArmsMuzzleVfxBatcher;
+
+	UPROPERTY()
+	TObjectPtr<UAircraftStrafeImpactBatcher> M_AircraftStrafeImpactBatcher;
 
 	bool EnsureSystemIsValid(TObjectPtr<UNiagaraSystem> System) const;
 	bool EnsureWorldIsValid();

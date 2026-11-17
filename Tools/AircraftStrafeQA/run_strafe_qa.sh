@@ -16,7 +16,7 @@ run_one() {
 	local log="$OUT_DIR/$label.log"
 	# Git Bash would rewrite /Game/... into a Windows path: no conversion, Windows paths for the rest.
 	MSYS_NO_PATHCONV=1 timeout 600 "$EDITOR" "D:/UE5Projects/RTS_Survival/RTS_Survival.uproject" "$MAP" -game -unattended -nosound -RenderOffscreen \
-		-windowed -ResX=1280 -ResY=720 -AircraftStrafeValidate -AircraftStrafeAbility=GA_2xBf110Strafing -AircraftStrafeClassMarker=BF110Airborne "$@" -log -abslog="$(cygpath -m "$log")" >/dev/null 2>&1
+		-windowed -ResX=1280 -ResY=720 -AircraftStrafeValidate -AircraftStrafeAbility=GA_2xBf110Strafing -AircraftStrafeClassMarker=BF110Airborne -AircraftTestAnchor=-14909,-9709 "$@" -log -abslog="$(cygpath -m "$log")" >/dev/null 2>&1
 	echo "== $label (exit $?)"
 	grep -E "RTS_AIRCRAFT_TEST (CHECK|STRAFE_QA|SUMMARY|RESULT)|Pool saturated|LogExit" "$log" | head -40
 }

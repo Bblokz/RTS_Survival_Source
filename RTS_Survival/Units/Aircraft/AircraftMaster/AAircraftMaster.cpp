@@ -1783,6 +1783,13 @@ void AAircraftMaster::OnAttackMoveCompleted()
 	}
 	if (M_StrafeState.bM_IsStrafing)
 	{
+		if (not M_StrafeState.bM_HasDivedThisRun)
+		{
+			// The path only brought the aircraft into dive range (spawned far out, or a U-turn): plan the same run
+			// again from here instead of ending the strafe without a shot. TotalStrafeTime still ends it.
+			Strafe_StartAttackRun();
+			return;
+		}
 		if (M_StrafeState.bM_RepeatRunsOverTarget)
 		{
 			Strafe_PrepareNextAttackRun();
@@ -2744,6 +2751,29 @@ void AAircraftMaster::Strafe_TickTargetLocation(const float DeltaTime)
 	}
 }
 
+FString AAircraftMaster::DescribeFlightForTests() const
+{
+	const FAircraftPath& Path = M_AircraftAttackData.Path;
+	const bool bHasNextPoint = Path.PathPoints.IsValidIndex(Path.CurrentPathIndex + 1);
+	const int32 NextPointType = bHasNextPoint
+		                            ? static_cast<int32>(Path.PathPoints[Path.CurrentPathIndex + 1].PointType)
+		                            : -1;
+	const int32 Magazine = IsValid(M_AircraftWeapon) && M_AircraftWeapon->GetWeapons().Num() > 0
+		                       && IsValid(M_AircraftWeapon->GetWeapons()[0])
+		                       ? M_AircraftWeapon->GetWeapons()[0]->GetCurrentMagCapacity()
+		                       : -1;
+	return FString::Printf(
+		TEXT("loc=%s pitch=%.1f yaw=%.1f landed=%d move_state=%d attack_ground=%d target=%s path=%d/%d next_type=%d "
+			"strafing=%d lerping=%d progress=%.2f weapons_active=%d weapons=%d mag0=%d"),
+		*GetActorLocation().ToCompactString(), GetActorRotation().Pitch, GetActorRotation().Yaw,
+		static_cast<int32>(M_LandedState), static_cast<int32>(M_MovementState),
+		M_AircraftAttackData.bM_IsAttackGround ? 1 : 0, *M_AircraftAttackData.TargetLocation.ToCompactString(),
+		Path.CurrentPathIndex, Path.PathPoints.Num(), NextPointType,
+		M_StrafeState.bM_IsStrafing ? 1 : 0, M_StrafeState.bM_IsLerpingStrafePoint ? 1 : 0,
+		M_StrafeState.FlightProgressAlpha, IssuedActionsState.bM_AreWeaponsActive ? 1 : 0,
+		IsValid(M_AircraftWeapon) ? M_AircraftWeapon->GetWeapons().Num() : -1, Magazine);
+}
+
 void AAircraftMaster::Strafe_TickTargetFromFlightProgress()
 {
 	// The guns look this steeply down at the ground ahead; with the strafe gun's nose cone the fire then lands
@@ -2762,10 +2792,14 @@ void AAircraftMaster::Strafe_TickTargetFromFlightProgress()
 		M_StrafeState.bM_IsLerpingStrafePoint = false;
 		return;
 	}
+	// In a steep dive the guns look as far down as the nose does.
+	constexpr float MaxGunDepressionDeg = 60.f;
 	const FVector AircraftLocation = GetActorLocation();
 	const float GroundZ = FMath::Lerp(RunStart.Z, RunEnd.Z, M_StrafeState.FlightProgressAlpha);
+	const float GunDepressionDeg = FMath::Clamp(-GetActorRotation().Pitch, PreferredGunDepressionDeg,
+	                                            MaxGunDepressionDeg);
 	const float GunLead = FMath::Clamp(
-		(AircraftLocation.Z - GroundZ) / FMath::Tan(FMath::DegreesToRadians(PreferredGunDepressionDeg)),
+		(AircraftLocation.Z - GroundZ) / FMath::Tan(FMath::DegreesToRadians(GunDepressionDeg)),
 		MinGunLeadCm, MaxGunLeadCm);
 	FVector Forward2D = GetActorForwardVector();
 	Forward2D.Z = 0.f;
@@ -2833,9 +2867,37 @@ void AAircraftMaster::Strafe_StartAttackRun()
 	const FVector WeaponStartLocation = M_StrafeState.NextRunStartLocation;
 	const FVector AttackRunEndLocation = Strafe_GetNextRunEndLocation();
 
+	M_StrafeState.bM_HasDivedThisRun = false;
+	Strafe_ApplyDiveProfile();
 	M_AircraftAttackData.TargetLocation = AttackRunEndLocation;
 	StartAttackGround();
 	M_AircraftAttackData.TargetLocation = WeaponStartLocation;
+}
+
+void AAircraftMaster::Strafe_ApplyDiveProfile()
+{
+	if (UWeaponStateAircraftStrafeGun::GetIsLegacyAircraftGunsRequested())
+	{
+		return;
+	}
+	// The dive bottoms out this high above the run's ground, most of the way along the run.
+	constexpr float PullOutHeightAboveRunGroundCm = 650.f;
+	// The dive starts at most this far out: from a 20+ m cruise that is a dive of about 30 degrees.
+	constexpr float MaxDiveStartDistanceCm = 3600.f;
+	// Dive / (dive + recovery) = 6 / 7: the lowest point lies close to the run's end, so the guns cover the run.
+	constexpr float MinDiveStrength = 6.f;
+	// A long pull-out climbs back gently instead of snapping up over the target.
+	constexpr float MinRecoveryLengthAdditionCm = 2500.f;
+	FAircraftAttackMoveSettings& Settings = M_AircraftMovementSettings.AttackMoveSettings;
+	const float RunGroundZ = FMath::Min(M_StrafeState.NextRunStartLocation.Z, Strafe_GetNextRunEndLocation().Z);
+	const float CruiseHeightAboveRunGround = M_AircraftLandedData.TargetAirborneHeight - RunGroundZ;
+	Settings.DeltaAttackHeight = FMath::Max(Settings.DeltaAttackHeight,
+	                                        CruiseHeightAboveRunGround - PullOutHeightAboveRunGroundCm);
+	Settings.AttackDiveRange.Y = FMath::Max(FMath::Min(Settings.AttackDiveRange.Y, MaxDiveStartDistanceCm),
+	                                        Settings.AttackDiveRange.X * 2.f);
+	Settings.AttackDive_DiveStrength = FMath::Max(Settings.AttackDive_DiveStrength, MinDiveStrength);
+	Settings.AttackDive_RecoveryLengthAddition = FMath::Max(Settings.AttackDive_RecoveryLengthAddition,
+	                                                        MinRecoveryLengthAdditionCm);
 }
 
 void AAircraftMaster::Strafe_OnAttackDiveStarted()
@@ -2849,6 +2911,7 @@ void AAircraftMaster::Strafe_OnAttackDiveStarted()
 	M_StrafeState.ActiveLerpEndLocation = Strafe_GetNextRunEndLocation();
 	M_StrafeState.CurrentLerpTime = 0.f;
 	M_StrafeState.FlightProgressAlpha = 0.f;
+	M_StrafeState.bM_HasDivedThisRun = true;
 	M_StrafeState.bM_IsLerpingStrafePoint = true;
 	M_AircraftAttackData.TargetLocation = M_StrafeState.ActiveLerpStartLocation;
 }

@@ -51,6 +51,17 @@ public:
 	UPROPERTY(EditAnywhere, Config, Category="Small Arms Muzzle VFX")
 	TSoftObjectPtr<UNiagaraSystem> SmallArmsMuzzleNiagaraSystem;
 
+	/**
+	 * The one Niagara system that draws every aircraft strafe impact (dirt spurts, debris, dust, sparks on units).
+	 * Emitters are named Ground_<Layer> / Unit_<Layer>; built by the console command RTS.StrafeImpactVfx.BuildNiagaraSystem.
+	 */
+	UPROPERTY(EditAnywhere, Config, Category="Aircraft Strafe VFX")
+	TSoftObjectPtr<UNiagaraSystem> AircraftStrafeImpactNiagaraSystem;
+
+	// Strafe impacts above this amount in one frame are not drawn.
+	UPROPERTY(EditAnywhere, Config, Category="Aircraft Strafe VFX", meta=(ClampMin="1", UIMin="1"))
+	int32 MaxAircraftStrafeImpactsPerFrame = 512;
+
 	// Off: infantry weapons keep the launch effect configured on each weapon.
 	UPROPERTY(EditAnywhere, Config, Category="Small Arms Muzzle VFX")
 	bool bUseBatchedSmallArmsMuzzleVfx = true;

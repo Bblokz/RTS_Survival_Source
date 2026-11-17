@@ -1236,6 +1236,9 @@ protected:
 	void FireTracerProjectile(const FVector& LaunchLocation, const FVector& EndLocation,
 	                          const float ProjectileLaunchTime) const;
 
+	// Null until the projectile manager has loaded.
+	ASmallArmsProjectileManager* GetTraceProjectileManager() const { return M_ProjectileManager.Get(); }
+
 private:
 	/**
 	 * @brief Spawns a trace from the provided location using the collision channel of this weapon state.

@@ -42,6 +42,9 @@ public:
 	                         const FVector& ImpactLocation, const FVector& AimTarget, const FVector& FlightForward,
 	                         const float LaunchTime, const float ImpactTime);
 
+	// A strafe gun volley probed the ground under its aim point; a miss puts the volley on the aim plane instead.
+	static void RecordGroundProbe(const bool bFoundGround);
+
 	// One line with every metric, for the RTS_AIRCRAFT_TEST log.
 	static FString DescribeMetrics();
 

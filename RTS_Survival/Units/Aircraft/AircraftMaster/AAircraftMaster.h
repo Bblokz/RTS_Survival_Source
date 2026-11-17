@@ -133,6 +133,9 @@ public:
 	/** @return Terrain following state, for map tests and debugging. */
 	const FAircraftTerrainFollow& GetTerrainFollow() const { return M_TerrainFollow; }
 
+	// Map tests and debugging: one line with the movement state, attack path point, strafe and weapon state.
+	FString DescribeFlightForTests() const;
+
 	/** @return Whether the aircraft flies into or out of an attack dive, where terrain following must not act. */
 	bool GetIsFlyingAttackDive() const
 	{
@@ -698,6 +701,8 @@ private:
 		bool bM_IsStrafing = false;
 		bool bM_IsLerpingStrafePoint = false;
 		bool bM_IsFirstAttackRun = true;
+		// An attack path from far away is only an approach without a dive; such a path does not count as a run.
+		bool bM_HasDivedThisRun = false;
 		bool bM_IsRetreatingToDestroy = false;
 		// Keeps attacking the authored target instead of switching to aggro after the first run.
 		bool bM_RepeatRunsOverTarget = false;
@@ -707,6 +712,7 @@ private:
 		{
 			CurrentLerpTime = 0.f;
 			FlightProgressAlpha = 0.f;
+			bM_HasDivedThisRun = false;
 			bM_IsStrafing = false;
 			bM_IsLerpingStrafePoint = false;
 			bM_IsFirstAttackRun = true;
@@ -857,6 +863,8 @@ private:
 	FVector Strafe_GetOrientedEndLocation(const FVector& CurrentTargetLocation) const;
 	FVector Strafe_GetNextRunEndLocation() const;
 	void Strafe_StartAttackRun();
+	// Makes the run's dive steep and long enough that the nose (and so the fixed guns) points at the ground.
+	void Strafe_ApplyDiveProfile();
 	void IssuePostLiftOffAttackGroundAction();
 	void Strafe_OnAttackDiveStarted();
 	void Strafe_OnDiveRecoveryStarted();

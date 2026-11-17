@@ -32,6 +32,8 @@ namespace AircraftStrafeShotRecorderPrivate
 		double SumSlantDistanceCm = 0.0;
 		float FirstImpactTime = -1.f;
 		float LastImpactTime = -1.f;
+		int32 GroundProbes = 0;
+		int32 GroundProbeHits = 0;
 		TArray<FString> CsvLines;
 	};
 
@@ -160,6 +162,18 @@ void FAircraftStrafeShotRecorder::RecordImpact(
 	                                   ImpactLeadSeconds));
 }
 
+void FAircraftStrafeShotRecorder::RecordGroundProbe(const bool bFoundGround)
+{
+	using namespace AircraftStrafeShotRecorderPrivate;
+	FRecorderState& State = GetState();
+	if (not State.bIsEnabled)
+	{
+		return;
+	}
+	++State.GroundProbes;
+	State.GroundProbeHits += bFoundGround ? 1 : 0;
+}
+
 int32 FAircraftStrafeShotRecorder::GetShotCount()
 {
 	return AircraftStrafeShotRecorderPrivate::GetState().ShotCount;
@@ -204,13 +218,14 @@ FString FAircraftStrafeShotRecorder::DescribeMetrics()
 	return FString::Printf(
 		TEXT("label=%s shots=%d impacts=%d ground_hit_share=%.2f air_impacts=%d nose_angle_mean=%.1f nose_angle_max=%.1f "
 			"off_nose_share=%.2f impact_lead_abs_mean_s=%.3f slant_mean_cm=%.0f cross_track_miss_mean_cm=%.0f "
-			"along_track_miss_mean_cm=%.0f along_track_sigma_cm=%.0f impacts_per_s=%.1f"),
+			"along_track_miss_mean_cm=%.0f along_track_sigma_cm=%.0f impacts_per_s=%.1f ground_probes=%d probe_hits=%d"),
 		*State.Label, State.ShotCount, State.ImpactCount, GetGroundHitShare(),
 		State.ImpactCount - State.GroundOrUnitHits,
 		State.ShotCount > 0 ? State.SumNoseAngleDeg / State.ShotCount : 0.0, State.MaxNoseAngleDeg,
 		GetShareOfShotsOutsideNoseCone(), GetMeanAbsImpactLeadSeconds(),
 		State.ImpactCount > 0 ? State.SumSlantDistanceCm / State.ImpactCount : 0.0,
-		GetMeanCrossTrackMissCm(), MeanAlong, AlongSigma, State.ImpactCount / FiringSeconds);
+		GetMeanCrossTrackMissCm(), MeanAlong, AlongSigma, State.ImpactCount / FiringSeconds, State.GroundProbes,
+		State.GroundProbeHits);
 }
 
 void FAircraftStrafeShotRecorder::WriteCsv()

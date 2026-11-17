@@ -11,6 +11,7 @@
 #include "RTS_Survival/Subsystems/CameraShakeSubsystem/RTSCameraShakeSubsystem.h"
 #include "MuzzleVfx/SmallArmsMuzzleVfxBatcher.h"
 #include "TraceImpactVfx/TraceImpactVfxBatcher.h"
+#include "RTS_Survival/Weapons/AircraftWeapon/AircraftStrafeGun/AircraftStrafeImpactBatcher.h"
 
 namespace SmallArmsProjectileManagerPrivate
 {
@@ -34,6 +35,7 @@ ASmallArmsProjectileManager::ASmallArmsProjectileManager()
 	M_NiagaraComponent = CreateDefaultSubobject<UNiagaraComponent>(TEXT("NiagaraComponent"));
 	M_TraceImpactVfxBatcher = CreateDefaultSubobject<UTraceImpactVfxBatcher>(TEXT("TraceImpactVfxBatcher"));
 	M_SmallArmsMuzzleVfxBatcher = CreateDefaultSubobject<USmallArmsMuzzleVfxBatcher>(TEXT("SmallArmsMuzzleVfxBatcher"));
+	M_AircraftStrafeImpactBatcher = CreateDefaultSubobject<UAircraftStrafeImpactBatcher>(TEXT("AircraftStrafeImpactBatcher"));
 }
 
 void ASmallArmsProjectileManager::FireProjectile(

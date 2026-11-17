@@ -274,6 +274,23 @@ private:
 	bool bM_StrafeAnyFired = false;
 	// World time the first measured MG round left a gun; the QA window runs from here.
 	float M_StrafeFirstShotSeconds = -1.f;
+	// Last time the strafing aircraft's flight state was logged.
+	float M_StrafeLastFlightLogSeconds = -1.f;
+	// Screenshots of the strafe taken so far, from a camera placed over the target when the first round is fired.
+	int32 M_StrafeScreenshotCount = 0;
+	TWeakObjectPtr<AActor> M_StrafeCamera;
+	// Enemy armoured cars put on the strafe line once the first aircraft's approach is known, and their start health.
+	TArray<TWeakObjectPtr<AActor>> M_StrafeTargets;
+	TArray<float> M_StrafeTargetStartHealth;
+	bool bM_StrafeTargetsPlaced = false;
+	// Load during the QA window: the most strafe impact particles alive at once, and the frame times.
+	int32 M_StrafePeakLiveParticles = 0;
+	// VFX showcase while the aircraft fly in: synthetic strafe bands drawn straight into the impact batcher.
+	float M_StrafeShowcaseImpactBudget = 0.f;
+	int32 M_StrafeShowcaseScreenshotCount = 0;
+	float M_StrafeWorstFrameSeconds = 0.f;
+	double M_StrafeFrameSecondsSum = 0.0;
+	int32 M_StrafeFrameCount = 0;
 
 	// -AircraftDropValidate: nothing else holds the running abilities, and their load callbacks outlive StartAircraftDrop.
 	UPROPERTY()
@@ -410,6 +427,16 @@ private:
 	bool TrackStrafeAircraft();
 	// Logs the measured MG rounds (FAircraftStrafeShotRecorder), checks them for the strafe gun and writes the CSV.
 	void FinishAircraftStrafeQA();
+	// Views the target from an oblique camera and takes screenshots at fixed times after the first round.
+	void TickStrafeScreenshots(const float SecondsSinceFirstShot);
+	// Places the QA camera (made once) to look at LookAt from behind and above, and makes it the view.
+	void PointStrafeCamera(const FVector& LookAt);
+	// Draws two walking strafe bands (7.92 mm and 20 mm) in front of the camera and screenshots them.
+	void TickStrafeImpactShowcase(const float SecondsSincePhaseStart, const float DeltaSeconds);
+	// Puts enemy armoured cars on the strafe line, broadside, between the target and 30 m past it.
+	void PlaceStrafeTargets(const FVector& ApproachingAircraftLocation);
+	// Total health the strafe targets lost (destroyed ones count their whole start health).
+	float GetStrafeTargetDamage(int32& OutDestroyed) const;
 
 	// ---------------- Vehicle drop global abilities (AircraftDropTest.cpp) ----------------
 	void StartAircraftDrop();
