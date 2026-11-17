@@ -41,6 +41,7 @@ Work dir: `Saved/NomadicDeploy/<Building>/` with `config.json` (see `HQ/config.j
 | `truck_centre`, `truck_bed` | outward ordering origin; where unpacked pieces start (bed top) |
 | `mast_xy`, `mast_radius` | optional tall lattice that becomes one hinged piece |
 | `smoke_screen` | optional `{ring, waves}` overrides (see `ue_data_asset.py`) |
+| `two_sided_slots` | optional deploy-mesh slot indices whose deploy material instance becomes two-sided (step `twosided`). For one-sided kit walls: seen from inside while the box is still open, the wall body is culled and only its trim shows, floating. Leave the truck slots out |
 | `extra_bursts` | optional hand-placed bursts `[{progress, location, scale, system: smoke/dust}]`: contact-frame dust, covers for runtime attachments |
 
 Per-building hooks live in the work dir, never in the shared scripts: `pieces_hook.py` (`relabel(records)`,

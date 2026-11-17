@@ -3,6 +3,7 @@
   textures  vat_offset.exr / vat_rot.exr -> T_<B>_DeployVat*
   masters   NomadicDeploy static switch into the building mesh's master materials (shared, idempotent)
   mis       per-slot deploy material instances on the deploy mesh
+  twosided  config "two_sided_slots": those deploy material instances become two-sided (no key = nothing happens)
   data      DA_<B>_Deploy (smoke screen + heavy dust bursts) set on the truck blueprint (expansions: config
             "mode": "bxp" sets it on "bxp_bp" instead)
 Usage: python ue_pipeline.py <building work dir> [step ...]     (no steps = all; also: export, probe)
@@ -34,8 +35,8 @@ def content_folder(cfg):
 def owner_blueprint(cfg):
     """The blueprint that gets DeployAnimationData: the nomadic truck, or the expansion itself."""
     return cfg['bxp_bp'] if cfg.get('mode') == 'bxp' else cfg['truck_bp']
-ALL = ['import', 'textures', 'masters', 'mis', 'data', 'verify']
-SAVING = ('import', 'textures', 'masters', 'mis', 'data')
+ALL = ['import', 'textures', 'masters', 'mis', 'twosided', 'data', 'verify']
+SAVING = ('import', 'textures', 'masters', 'mis', 'twosided', 'data')
 
 
 def run(script, mode='py', **variables):
@@ -93,6 +94,12 @@ def main(argv):
             elif step == 'mis':
                 run('ue_deploy_mis.py', BUILDING=b, SOURCE_MESH=cfg['source_mesh'], DEPLOY_MESH=mesh,
                     OFFSET_TEX=f'{folder}/T_{b}_DeployVatOffset', ROT_TEX=f'{folder}/T_{b}_DeployVatRot')
+            elif step == 'twosided':
+                # opt-in (config "two_sided_slots"): one-sided kit walls seen from inside while the deploy plays
+                if cfg.get('two_sided_slots'):
+                    run('ue_deploy_two_sided.py', DEPLOY_MESH=mesh, SLOTS=cfg['two_sided_slots'])
+                else:
+                    print('no two_sided_slots in config: nothing to do')
             elif step == 'data':
                 run('ue_data_asset.py', BUILDING=b, WORK=work, FOLDER=folder, DEPLOY_MESH=mesh, TRUCK_BP=owner_blueprint(cfg))
             elif step in ('verify', 'probe'):
