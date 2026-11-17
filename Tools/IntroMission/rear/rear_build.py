@@ -229,6 +229,9 @@ def step_depot():
         ('PostApo/BP_Dest_PostApo_ContainerBox2', -3150, -200, 0), ('Airport/BP_Airport_Dest_Building01', 600, 3300, 0),
         ('Military/DestTanks/BP_Env_DestroyedT34', -4300, 2600, 140),
     ]
+    # 2026-11-17: the slab became the Soviet landing field (Source/Tools/IntroMission/landing/landing_build.py, LAND_*);
+    # the old clutter props are no longer spawned.
+    props = []
     for k, (bp, u, v, yw) in enumerate(props):
         x, y = W(u, v)
         try:
@@ -456,11 +459,12 @@ def step_extras():
 
     def W(u, v):
         return cx + u * math.cos(a) - v * math.sin(a), cy + u * math.sin(a) + v * math.cos(a)
-    for k, (u, v) in enumerate([(-3800, -2600), (3800, -2600), (3800, 2600), (-3800, 2600)]):
+    # (2026-11-17: depot corner lights and barriers replaced by the landing field's fence and lights, see landing_build.py)
+    for k, (u, v) in enumerate([]):
         x, y = W(u, v)
         spawn_bp(ENV + 'Industrial/Poles/BP_Industrial_Dest_CrushablePoleLight_1', 'REAR_Extra_DepotLight_%d' % k,
                  (x, y, gz(x, y)), dp['yaw'] + 45 + 90 * k, 'Extras')
-    for k in range(7):
+    for k in range(0):
         u = -3300 + k * 650
         if -900 < u < 300:      # gap where road D comes in
             continue
@@ -528,7 +532,7 @@ def step_decals():
     # debris on the depot slab and the station forecourt (decals also project onto the concrete tiles)
     dp = PLAN['depot']
     aa = math.radians(dp['yaw'])
-    for k in range(10):
+    for k in range(0):     # 2026-11-17: no debris on the landing field slab
         u, v = rng.uniform(-3300, 3300), rng.uniform(-2100, 2100)
         x = dp['centre'][0] + u * math.cos(aa) - v * math.sin(aa)
         y = dp['centre'][1] + u * math.sin(aa) + v * math.cos(aa)

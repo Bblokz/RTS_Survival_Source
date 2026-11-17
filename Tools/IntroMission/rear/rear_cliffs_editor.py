@@ -15,6 +15,7 @@ CLIFF_DIR = 'D:/UE5Projects/RTS_Survival/Saved/IntroRear/cliffs/'
 CLIFF_MI = '/Game/RTS_Survival/Blueprints/Environment/OreMountains/CliffKit/Materials/MI_IntroCliff'
 ORE_MI = '/Game/RTS_Survival/Blueprints/Environment/OreMountains/CliffKit/Materials/MI_OreCliff'
 FULL_GRID = (105, 75, 825, 585)
+PROTECT_PREFIXES = ('REAR_Station_', 'REAR_Extra_Lineman', 'REAR_Extra_Sleeper', 'LAND_')
 # desert retune of the Ore gneiss (Ore values: RockTint (0.74, 0.67, 0.58), DustAmount 0.75, GroundFromRVT 0.45)
 INTRO_TUNE = {'vector': {'RockTint': (0.54, 0.32, 0.21, 1.0), 'DustColor': (0.5, 0.25, 0.13, 1.0), 'GroundColor': (0.46, 0.23, 0.12, 1.0)},
               'scalar': {'DustAmount': 0.9, 'GroundFromRVT': 0.6}}
@@ -102,9 +103,28 @@ def step_cliffs():
     mi = unreal.load_asset(CLIFF_MI) or make_material()
     with open(CLIFF_DIR + 'Intro_cliffs.json') as handle:
         data = json.load(handle)
-    groups = {}
+    # never let a rock reach into the station, the rails or the landing field (actor bounds + 1.5 m)
+    boxes = []
+    for a in all_actors():
+        label = a.get_actor_label()
+        if label.startswith(PROTECT_PREFIXES):
+            origin, ext = a.get_actor_bounds(False)
+            if ext.x < 6000 and ext.y < 6000:
+                boxes.append((origin.x - ext.x - 150, origin.x + ext.x + 150, origin.y - ext.y - 150, origin.y + ext.y + 150))
+        if label.startswith('REAR_Rail'):
+            spline = a.get_component_by_class(unreal.SplineComponent)
+            if spline:
+                for k in range(0, int(spline.get_spline_length()), 200):
+                    p = spline.get_location_at_distance_along_spline(k, unreal.SplineCoordinateSpace.WORLD)
+                    boxes.append((p.x - 450, p.x + 450, p.y - 450, p.y + 450))
+    groups, dropped = {}, []
     for item in data['instances']:
+        if item['piece'] not in ('Scree5', 'Scree9', 'Block2') and any(
+                b[0] <= x <= b[1] and b[2] <= y <= b[3] for (x, y) in item.get('fp', []) for b in boxes):
+            dropped.append(item['piece'])
+            continue
         groups.setdefault((item['face'], item['piece']), []).append(item)
+    log('cliffs: %d pieces dropped near station props / rails: %s' % (len(dropped), dropped))
     total = 0
     for (face, piece), items in sorted(groups.items()):
         mesh = unreal.load_asset(data['mesh_path'].replace('<piece>', piece))

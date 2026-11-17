@@ -9,7 +9,6 @@
 #include "Components/ScaleBox.h"
 #include "Components/ScrollBox.h"
 #include "Components/ScrollBoxSlot.h"
-#include "Components/Spacer.h"
 #include "Components/UniformGridPanel.h"
 #include "Components/UniformGridSlot.h"
 #include "Components/VerticalBox.h"
@@ -57,6 +56,8 @@ namespace DeckBuilderMenuLayout
 	constexpr float CollectionCardScale = 0.68f;
 	const FVector2D CollectionCardSpacing(8.f, 8.f);
 	const FVector2D DockRowSpacing(8.f, 8.f);
+	// Gap between the dock's description and its variant rows.
+	const FMargin DockRowsPadding(0.f, 18.f, 0.f, 0.f);
 	const FVector2D DockPreviewSize(262.f, 315.f);
 	const FVector2D SectionIconSize(36.f, 36.f);
 	const FVector2D SaveButtonSize(226.f, 48.f);
@@ -73,7 +74,6 @@ namespace DeckBuilderMenuLayout
 	constexpr int32 SectionNameFontSize = 16;
 	constexpr int32 SectionNameLetterSpacing = 120;
 	constexpr int32 SectionSubtitleFontSize = 10;
-	constexpr int32 SectionCountFontSize = 10;
 	constexpr int32 UnavailableFontSize = 12;
 	constexpr int32 DockTitleFontSize = 15;
 	constexpr int32 DockTitleLetterSpacing = 100;
@@ -234,12 +234,6 @@ void UW_DeckBuilderMenu::BuildSectionPanel()
 	UHorizontalBoxSlot* const SubtitleSlot = Header->AddChildToHorizontalBox(M_SectionSubtitleText);
 	SubtitleSlot->SetVerticalAlignment(VAlign_Center);
 	SubtitleSlot->SetPadding(FMargin(12.f, 4.f, 0.f, 0.f));
-	USpacer* const HeaderSpacer = WidgetTree->ConstructWidget<USpacer>(USpacer::StaticClass());
-	Header->AddChildToHorizontalBox(HeaderSpacer)->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
-	M_SectionCountText = DeckBuilderWidgets::MakeText(
-		*WidgetTree, FText::GetEmpty(), DeckBuilderWidgets::MakeFont(M_Look.BodyFont, SectionCountFontSize),
-		Style.GoodColor);
-	Header->AddChildToHorizontalBox(M_SectionCountText)->SetVerticalAlignment(VAlign_Center);
 
 	UOverlay* const Body = WidgetTree->ConstructWidget<UOverlay>(UOverlay::StaticClass());
 	Column->AddChildToVerticalBox(Body)->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
@@ -296,14 +290,9 @@ void UW_DeckBuilderMenu::BuildDock()
 		Style.DescriptionColor);
 	M_DockDescriptionText->SetAutoWrapText(true);
 	TextColumn->AddChildToVerticalBox(M_DockDescriptionText)->SetPadding(FMargin(0.f, 8.f, 0.f, 0.f));
-	M_DockVariantsLabel = DeckBuilderWidgets::MakeText(
-		*WidgetTree, FText::GetEmpty(),
-		DeckBuilderWidgets::MakeFont(M_Look.HeadingFont, GroupHeaderFontSize, GroupHeaderLetterSpacing),
-		Style.MutedTextColor);
-	TextColumn->AddChildToVerticalBox(M_DockVariantsLabel)->SetPadding(FMargin(0.f, 14.f, 0.f, 8.f));
 	M_DockVariantRows = WidgetTree->ConstructWidget<UWrapBox>(UWrapBox::StaticClass());
 	M_DockVariantRows->SetInnerSlotPadding(DockRowSpacing);
-	TextColumn->AddChildToVerticalBox(M_DockVariantRows);
+	TextColumn->AddChildToVerticalBox(M_DockVariantRows)->SetPadding(DockRowsPadding);
 }
 
 void UW_DeckBuilderMenu::BuildCollection()
@@ -588,7 +577,7 @@ void UW_DeckBuilderMenu::RefreshRail()
 
 void UW_DeckBuilderMenu::RefreshSectionPanel()
 {
-	if (not IsValid(M_SlotGrid) || not IsValid(M_SectionCountText))
+	if (not IsValid(M_SlotGrid) || not IsValid(M_SectionNameText))
 	{
 		return;
 	}
@@ -597,16 +586,6 @@ void UW_DeckBuilderMenu::RefreshSectionPanel()
 	                                                            DeckBuilderMenuLayout::SectionIconSize));
 	M_SectionNameText->SetText(DeckBuilder::GetSectionDisplayName(M_SelectedSection).ToUpper());
 	M_SectionSubtitleText->SetText(DeckBuilder::GetSectionSubtitle(M_SelectedSection));
-	const bool bIsFull = Section.Cards.Num() >= Section.SlotCount;
-	M_SectionCountText->SetColorAndOpacity(bIsFull ? M_Look.Style.GoodColor : M_Look.Style.OpenSlotsColor);
-	FText CountText = FText::Format(NSLOCTEXT("DeckBuilder", "SectionCount", "{0} / {1} slots"),
-	                                FText::AsNumber(Section.Cards.Num()), FText::AsNumber(Section.SlotCount));
-	if (M_SelectedSection != EDeckSection::Technologies)
-	{
-		CountText = FText::Format(NSLOCTEXT("DeckBuilder", "SectionCountVariants", "{0}, {1} {1}|plural(one=variant,other=variants) attached"),
-		                          CountText, M_State.GetAttachedVariantCount(M_SelectedSection));
-	}
-	M_SectionCountText->SetText(Section.bIsAvailable ? CountText : FText::GetEmpty());
 	M_SectionUnavailableText->SetVisibility(Section.bIsAvailable ? ESlateVisibility::Collapsed
 		                                        : ESlateVisibility::HitTestInvisible);
 	RefreshSectionPanel_Grid(Section);
@@ -783,7 +762,6 @@ void UW_DeckBuilderMenu::RefreshDock()
 	}
 	M_DockPreviewHost->ClearChildren();
 	M_DockVariantRows->ClearChildren();
-	M_DockVariantsLabel->SetText(FText::GetEmpty());
 	const FDeckCardDefinition* Definition = M_DockSubject.Kind == FDeckDockSubject::EKind::Card
 		                                        ? M_State.FindDefinition(M_DockSubject.Card)
 		                                        : nullptr;
@@ -848,9 +826,6 @@ void UW_DeckBuilderMenu::RefreshDock_VariantRows(const FTrainingOption& Unit)
 	{
 		return;
 	}
-	M_DockVariantsLabel->SetText(FText::Format(NSLOCTEXT("DeckBuilder", "DockVariantsOwned",
-	                                                     "{0} {0}|plural(one=VARIANT,other=VARIANTS) OWNED: CLICK ONE TO EQUIP IT"),
-	                                           OwnedVariants.Num()));
 	const EUnitVariant Attached = M_State.GetAttachedVariant(Unit);
 	TArray<FDeckVariantCardView> Rows;
 	Rows.Add(MakeBaseView(Unit));

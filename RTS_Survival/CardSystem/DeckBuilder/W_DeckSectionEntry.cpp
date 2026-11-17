@@ -12,8 +12,9 @@ namespace DeckSectionEntryLayout
 	const FVector2D EntrySize(226.f, 80.f);
 	const FVector2D IconWellPosition(16.f, 14.f);
 	const FVector2D IconWellSize(52.f, 52.f);
-	const FVector2D IconPosition(21.f, 19.f);
-	const FVector2D IconSize(42.f, 42.f);
+	// The building portrait fills the well up to its rim.
+	const FVector2D IconPosition(19.f, 17.f);
+	const FVector2D IconSize(46.f, 46.f);
 	const FVector2D NamePosition(80.f, 13.f);
 	const FVector2D NameSize(126.f, 22.f);
 	const FVector2D CountPosition(80.f, 37.f);

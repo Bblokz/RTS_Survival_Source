@@ -116,6 +116,38 @@ light vehicles out, and F keeps infantry out.
     building, so their "no path" says nothing about the pumps.
 - **Not tested:** tanks crushing the trees, shells hitting them, or the rendering cost of about 800 tree actors.
 
+## Night (2026-11-17, owner: a moonlit night map, dark but units still readable)
+
+`fl_map_build.step_night()` sets the night (values in `NIGHT`), and `step_lighting()` restores the day.
+`step_night_lights()` adds the story lights. The map is saved at night.
+
+- **Moon:** the directional light, cold blue-white (0.62, 0.74, 1.0), intensity 1.6, 42 degrees up.
+- **Sky light:** deep blue, intensity 0.6.
+- **Haze:** dark blue height fog.
+- **Fill:** `FL_NightFill`, a shadowless directional light from the RTS camera's direction (intensity 0.5). It puts a
+  faint edge on every unit and does not affect the sky.
+- **Fixed exposure:** histogram auto exposure pinned at EV100 1.0 (minimum = maximum) plus 0.3, so the game cannot
+  brighten the night back into day.
+  - Manual exposure (AEM_MANUAL) was tried first; scene captures ignored it.
+  - Editor scene captures ignore exposure entirely: every exposure value gave the same image. Judge the night only
+    from the running game.
+- **Grade:** saturation 0.62, a blue gain in the shadows, white temperature 7400 K, bloom 0.9.
+- **Story lights** (`FL_Light_*`, folder `FrozenLake/Lighting`):
+  - four floods on the drill rig deck, two of them with shadows;
+  - a green pool at each pump;
+  - amber edge lights along the Soviet runway;
+  - three embers at the burnt convoy.
+- **Checked in game** (Development build, `run_bench.sh fl_night2 -TankTrailBenchAt=-18600,-18600`, 16 Pz IV H,
+  `Saved/TankTrailBench/fl_night2/TankTrails_View.png`):
+  - on snow, the tanks are clear dark silhouettes with moon shadows, and the snow ruts read;
+  - on the darker gravel and moss they are darker but visible.
+- **Not checked yet:**
+  - infantry at night;
+  - fog of war over the dark ground;
+  - selection rings and health bars;
+  - muzzle flashes and explosions under the fixed exposure;
+  - the rig, pump and runway lights in game (only seen in exposure-less editor captures).
+
 ## Snow ruts
 
 Tank trails cut deeper-looking ruts in snow and frost than in the bog. The shared `MF_RTS_LS_TankTrails` is not

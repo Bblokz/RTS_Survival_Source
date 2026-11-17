@@ -119,10 +119,6 @@ struct RTS_SURVIVAL_API FDeckBuilderStyle
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Text")
 	FSlateColor GoodColor = FSlateColor(FColor::FromHex(TEXT("8FE3C8")));
 
-	// A section that still has empty slots.
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Text")
-	FSlateColor OpenSlotsColor = FSlateColor(FColor::FromHex(TEXT("FFB347")));
-
 	// Spine lettering on the four light rarity paints and on the two dark ones (Legendary, Mythic).
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Text")
 	FSlateColor SpineInkOnLightPaint = FSlateColor(FColor::FromHex(TEXT("040506")));

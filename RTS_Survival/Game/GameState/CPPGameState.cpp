@@ -1,4 +1,4 @@
-﻿// Copyright (C) 2020-2025 Bas Blokzijl - All rights reserved.
+// Copyright (C) 2020-2025 Bas Blokzijl - All rights reserved.
 
 #include "CPPGameState.h"
 
@@ -9407,6 +9407,18 @@ void ACPPGameState::InitAllGameBxpData()
 		{ERTSResourceType::Resource_Metal, Rus53KSectorPit_Metal},
 	});
 	M_TPlayerBxpDataHashMap.Add(EBuildingExpansionType::BTX_Rus53KSectorPit, Pit53KSectorData);
+
+	FBxpData TripleCrownData = B4PitData;
+	TripleCrownData.Health = B4PitData.Health * 2.f;
+	TripleCrownData.ConstructionTime = 90.f;
+	TripleCrownData.VisionRadius = 14000.f;
+	TripleCrownData.Cost = FUnitCost({
+		{ERTSResourceType::Resource_Radixite, 1500},
+		{ERTSResourceType::Resource_Metal, 1500},
+	});
+	TripleCrownData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIReinforcedArmorResistances(
+		TripleCrownData.Health);
+	M_TPlayerBxpDataHashMap.Add(EBuildingExpansionType::BTX_RusTripleCrownBunker, TripleCrownData);
 
 	// -----------------------------------------------------------------------
 	// ------------------------- RUS BS-3 PIT --------------------------------

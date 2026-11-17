@@ -1,0 +1,263 @@
+{
+ "JobName": "POI_OderWarthe_Werk4Peilturm",
+ "Category": "POI",
+ "Fps": 60,
+ "WarmupSeconds": 6.0,
+ "DurationSeconds": 22.0,
+ "Anchor": {
+  "X": 19072.0,
+  "Y": 15299.0,
+  "Z": 0.0
+ },
+ "AnchorYaw": 180.0,
+ "ClearUnitsRadius": 10500,
+ "bKeepVoiceLines": true,
+ "bKeepAnnouncer": false,
+ "bKeepMusic": false,
+ "Events": [
+  {
+   "Time": -1.5,
+   "Type": "Spawn",
+   "Tag": "Patrol",
+   "ClassPath": "/Game/RTS_Survival/Blueprints/Squads/Ger/Barracks_Infantry/Scavengers/Squad_Ger_Scavengers",
+   "Player": 1,
+   "Offset": {
+    "X": -4550.0,
+    "Y": -5950.0,
+    "Z": 0.0
+   },
+   "Yaw": 0.0,
+   "Count": 1,
+   "Columns": 0,
+   "Spacing": 1200.0
+  },
+  {
+   "Time": 0.4,
+   "Type": "Move",
+   "Tag": "Patrol",
+   "TargetOffset": {
+    "X": 3500.0,
+    "Y": -5775.0,
+    "Z": 0.0
+   },
+   "TargetYaw": 0
+  }
+ ],
+ "Shots": [
+  {
+   "Name": "Establish",
+   "Start": 0.0,
+   "End": 9.0,
+   "Rig": "Orbit",
+   "Keys": [
+    {
+     "Time": 0.0,
+     "Pivot": "",
+     "Offset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": -2100.0
+     },
+     "Yaw": 280.0,
+     "Pitch": 3.0,
+     "Distance": 7000.0,
+     "Focal": 26.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 1050.0
+     },
+     "VYaw": 0.0,
+     "VPitch": 7.0,
+     "VDistance": 7350.0,
+     "VFocal": 20.0,
+     "VLookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     }
+    },
+    {
+     "Time": 9.0,
+     "Pivot": "",
+     "Offset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": -2100.0
+     },
+     "Yaw": 235.0,
+     "Pitch": 7.0,
+     "Distance": 6300.0,
+     "Focal": 26.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 1050.0
+     },
+     "VYaw": 0.0,
+     "VPitch": 11.0,
+     "VDistance": 6615.0,
+     "VFocal": 20.0,
+     "VLookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     }
+    }
+   ],
+   "Ease": "InOut",
+   "PivotLag": 0.7,
+   "Aperture": 0.0,
+   "Shake": 0.0,
+   "bAvoidOcclusion": true,
+   "MinGroundClearance": 350.0
+  },
+  {
+   "Name": "Scale",
+   "Start": 9.0,
+   "End": 15.0,
+   "Rig": "Fixed",
+   "Keys": [
+    {
+     "Time": 0.0,
+     "Pivot": "tag:Patrol",
+     "Offset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     },
+     "Yaw": 270.0,
+     "Pitch": 14.0,
+     "Distance": 3000.0,
+     "Focal": 24.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 150.0
+     },
+     "VYaw": 0.0,
+     "VPitch": 18.0,
+     "VDistance": 0.0,
+     "VFocal": 18.0,
+     "VLookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     }
+    },
+    {
+     "Time": 6.0,
+     "Pivot": "",
+     "Offset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": -1050.0
+     },
+     "Yaw": 270.0,
+     "Pitch": 14.0,
+     "Distance": 3000.0,
+     "Focal": 24.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 150.0
+     },
+     "VYaw": 0.0,
+     "VPitch": 18.0,
+     "VDistance": 0.0,
+     "VFocal": 18.0,
+     "VLookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     }
+    }
+   ],
+   "Ease": "InOut",
+   "PivotLag": 0.7,
+   "Aperture": 0.0,
+   "Shake": 0.0,
+   "bAvoidOcclusion": true,
+   "MinGroundClearance": 350.0
+  },
+  {
+   "Name": "Reveal",
+   "Start": 15.0,
+   "End": 22.0,
+   "Rig": "Orbit",
+   "Keys": [
+    {
+     "Time": 0.0,
+     "Pivot": "",
+     "Offset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": -2100.0
+     },
+     "Yaw": 210.0,
+     "Pitch": 10.0,
+     "Distance": 7700.000000000001,
+     "Focal": 30.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 1050.0
+     },
+     "VYaw": 0.0,
+     "VPitch": 14.0,
+     "VDistance": 8400.0,
+     "VFocal": 0.0,
+     "VLookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     }
+    },
+    {
+     "Time": 7.0,
+     "Pivot": "",
+     "Offset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": -2100.0
+     },
+     "Yaw": 170.0,
+     "Pitch": 28.0,
+     "Distance": 11200.0,
+     "Focal": 24.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 1050.0
+     },
+     "VYaw": 0.0,
+     "VPitch": 34.0,
+     "VDistance": 11900.0,
+     "VFocal": 0.0,
+     "VLookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     }
+    }
+   ],
+   "Ease": "InOut",
+   "PivotLag": 0.7,
+   "Aperture": 0.0,
+   "Shake": 0.0,
+   "bAvoidOcclusion": true,
+   "MinGroundClearance": 350.0
+  }
+ ],
+ "MapPath": "/Game/RTS_Survival/Maps/GerMissions/Ger_OderWarthe",
+ "GameModeClassPath": "/Game/RTS_Survival/Blueprints/GameSettings/RTS_BP_GamemodeBase.RTS_BP_GamemodeBase_C",
+ "HideActorPrefixes": [],
+ "SkyMaterial": "/Game/SkyboxPack_X/Materials/Instances/M_Flowmap_Inst_01.M_Flowmap_Inst_01",
+ "Batch": "maps_poi"
+}

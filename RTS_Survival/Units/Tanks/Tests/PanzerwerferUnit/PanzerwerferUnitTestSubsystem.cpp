@@ -22,6 +22,7 @@
 #include "RTS_Survival/DeveloperSettings.h"
 #include "RTS_Survival/GameUI/TrainingUI/TrainerComponent/TrainerComponent.h"
 #include "RTS_Survival/GameUI/TrainingUI/TrainingLayout/TrainingLayoutDataAsset.h"
+#include "RTS_Survival/GameUI/TrainingUI/TrainingLayout/TrainingLayoutSettings.h"
 #include "RTS_Survival/GameUI/TrainingUI/TrainingLayout/TrainingLayoutSubsystem.h"
 #include "RTS_Survival/GameUI/TrainingUI/TrainingLayout/TrainingLayoutTypes.h"
 #include "RTS_Survival/GameUI/TrainingUI/TrainingOptions/TrainingOptions.h"
@@ -485,8 +486,8 @@ void UPanzerwerferUnitTestSubsystem::ClickPanzerwerferTrainingOption()
 	Check(SlotIndex != INDEX_NONE, TEXT("depot_menu_shows_panzerwerfer"),
 	      FString::Printf(TEXT("sub_section=%d slot=%d"), SubSectionIndex, SlotIndex));
 	// The layout asset was re-saved for the new slot; both doctrines must still have their own layouts.
-	UTrainingLayoutSubsystem* LayoutSubsystem = UTrainingLayoutSubsystem::Get(this);
-	const UTrainingLayoutDataAsset* Layout = IsValid(LayoutSubsystem) ? LayoutSubsystem->GetTrainingLayout() : nullptr;
+	// Loaded the way UTrainingLayoutSubsystem loads it; the subsystem's own getter is private.
+	const UTrainingLayoutDataAsset* Layout = UTrainingLayoutSettings::Get()->LoadTrainingLayout();
 	Check(IsValid(Layout) && Layout->FactionLayouts.Contains(ERTSFaction::GerStrikeDivision)
 	      && Layout->FactionLayouts.Contains(ERTSFaction::GerBreakthroughDoctrine),
 	      TEXT("layout_keeps_both_doctrines"), GetNameSafe(Layout));

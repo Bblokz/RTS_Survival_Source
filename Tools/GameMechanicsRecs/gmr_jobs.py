@@ -8,6 +8,7 @@ rules: no German resistance infantry (Mauser/MG34/STG/JagerTrupp/LMG) and no Ste
 """
 import argparse
 import json
+import math
 import pathlib
 import sys
 
@@ -589,12 +590,14 @@ def batch_trench_supply():
 
 def poi(name, map_key, anchor, anchor_yaw, sky, size, yaw0=200, patrol=("Scavengers", (-1.5, -1.3), (1.5, -1.0)),
         tank=None, look_height=600, tank_path=((-1.6, 0.9), (1.4, 0.7)), low=False, reveal_yaw=None, ground_z=0.0,
-        pitch_add=0.0, scale=None, **extra):
+        pitch_add=0.0, scale=None, hide=(), **extra):
     """A landmark: establishing arc, a tilt from a passing patrol up to the landmark, then a rising reveal.
     size = landmark radius cm; reveal_yaw = where the reveal starts (ends 40 deg further); ground_z = how far the anchor
     sits above the ground (an anchor that dropped onto a roof); pitch_add lifts the establishing pitch (horizon band);
-    scale = a replacement Scale shot."""
-    job = base_job(name, "POI", map_key, anchor, anchor_yaw, 22, SkyMaterial=SKY[sky], ClearUnitsRadius=size * 3, **extra)
+    scale = a replacement Scale shot; hide = ((class/label prefix, world (x, y), radius), ...) hidden for this take."""
+    clear = extra.pop("ClearUnitsRadius", size * 3)
+    job = base_job(name, "POI", map_key, anchor, anchor_yaw, 22, SkyMaterial=SKY[sky], ClearUnitsRadius=clear, **extra)
+    job["Events"] += hide_events(anchor, anchor_yaw, hide)
     unit, start, end = patrol
     job["Events"] += [
         spawn(-1.5, "Patrol", unit, (start[0] * size, start[1] * size), 0),
@@ -633,8 +636,13 @@ def batch_poi():
             patrol=("Scavengers", (-1.5, -1.8), (1.5, -1.7))),
         poi("POI_Berlin_BrandenburgGate", "Berlin", (0, -8300, 0), 0, "storm", 2600, look_height=900, yaw0=295,
             reveal_yaw=130, pitch_add=4),
-        poi("POI_Berlin_FlakTower", "Berlin", (22750, 46000, 0), 180, "storm", 3600, look_height=1500, low=True,
-            ground_z=2305.0, pitch_add=4),
+        # 2026-11-17 retake: the low hero orbit (low=True, R 3600) drove through the ruins south of the tower and the
+        # Scale camera (bearing 270) stood in the ruin 60 m west; scouted top-down: normal height like the Zoo tower,
+        # closer, and the Scale camera behind the patrol on the open -Y strip, turning to the tower.
+        poi("POI_Berlin_FlakTower", "Berlin", (22750, 46000, 0), 180, "storm", 2800, look_height=1200,
+            ground_z=2305.0, pitch_add=4,
+            scale=pan("Scale", 9, 15, "tag:Patrol", "", 180, pitch=14, dist=3000, focal=24, off1=(0, 0, 1200 - 2305.0),
+                      look=(0, 0, 150), vpitch=18, vfocal=18)),
         poi("POI_Berlin_ForgeStation", "Berlin", (363, 1382, 0), 0, "storm", 2500, look_height=500, pitch_add=4,
             ClearPlayers=[2]),
         poi("POI_Berlin_PowerStation", "Berlin", (13800, 35000, 0), 90, "fire", 3500, look_height=900),
@@ -794,17 +802,71 @@ def nomadic_sequence():
 
 # --- Berlin showcase: 8 more POIs (positions from MapDesigner/Berlin/berlin_01.layout.json, +X north, +Y east) ----
 
-def berlin_flight(name, anchor, anchor_yaw, sky, keys_spec, duration=22.0, clear=8000.0, **extra):
+def hide_events(anchor, anchor_yaw, hide):
+    """Runtime-only Hide events for actors given by world (x, y): (prefix, (x, y), radius) -> anchor-frame offsets."""
+    a = math.radians(-anchor_yaw)
+    events = []
+    for prefix, (wx, wy), radius in hide:
+        dx, dy = wx - anchor[0], wy - anchor[1]
+        events.append(ev(-3.5, "Hide", Text=prefix, Offset=(dx * math.cos(a) - dy * math.sin(a),
+                                                            dx * math.sin(a) + dy * math.cos(a)), Radius=float(radius)))
+    return events
+
+
+def map_flight(name, map_key, anchor, anchor_yaw, sky, keys_spec, duration=22.0, clear=8000.0, occlusion=True,
+               hide=(), **extra):
     """One continuous camera flight (no cuts) through anchor-frame keys:
     keys_spec = ((t, (x, y), yaw, pitch, dist, focal, look), ...), look = z or (x, y, z) in the anchor frame. An
-    S-curve over the whole flight eases it in and out; Catmull-Rom between the keys keeps it smooth."""
-    job = base_job(name, "POI", "Berlin", anchor, anchor_yaw, duration, SkyMaterial=SKY[sky], ClearUnitsRadius=clear,
+    S-curve over the whole flight eases it in and out; Catmull-Rom between the keys keeps it smooth.
+    occlusion=False for long flights: a sideways occlusion swing at 100 m+ throws the camera tens of metres."""
+    job = base_job(name, "POI", map_key, anchor, anchor_yaw, duration, SkyMaterial=SKY[sky], ClearUnitsRadius=clear,
                    **extra)
-    keys = [key(t, "", yaw, pitch, dist, focal, (x, y, 0), look if isinstance(look, tuple) else (0, 0, look),
-                vpitch=pitch + 6, vdist=dist * 1.08, vfocal=focal * 0.8)
-            for t, (x, y), yaw, pitch, dist, focal, look in keys_spec]
-    job["Shots"] = [shot("Flight", 0, duration, "Orbit", keys)]
+    job["Events"] += hide_events(anchor, anchor_yaw, hide)
+    keys = [key(t, "", yaw, pitch, dist, focal, tuple(xy) + (0,) * (3 - len(xy)),
+                look if isinstance(look, tuple) else (0, 0, look), vpitch=pitch + 6, vdist=dist * 1.08,
+                vfocal=focal * 0.8)
+            for t, xy, yaw, pitch, dist, focal, look in keys_spec]
+    job["Shots"] = [shot("Flight", 0, duration, "Orbit", keys, occlusion=occlusion)]
     return job
+
+
+def berlin_flight(name, anchor, anchor_yaw, sky, keys_spec, duration=22.0, clear=8000.0, **extra):
+    return map_flight(name, "Berlin", anchor, anchor_yaw, sky, keys_spec, duration, clear, **extra)
+
+
+def _lerp(a, b, f):
+    if isinstance(a, tuple):
+        return tuple(x + (y - x) * f for x, y in zip(a, b))
+    return a + (b - a) * f
+
+
+def camera_keys(anchor, keys, subdivide=3.0):
+    """Flight keys from camera positions (anchor yaw 0, anchor = (x, y, its ground z)): (t, (cam x, cam y), cam z,
+    facing yaw, pitch down, focal, ground z where the view lands) -> map_flight keys pivoting on that ground point."""
+    # Unwrap the facing so each turn takes the short way, then subdivide every leg: the rig interpolates pivot,
+    # bearing and distance, so a big turn between far-apart keys would swing the camera off the checked line.
+    unwrapped, prev = [], None
+    for k in keys:
+        f = k[3]
+        if prev is not None:
+            f = prev + ((f - prev + 180.0) % 360.0 - 180.0)
+        prev = f
+        unwrapped.append(k[:3] + (f,) + k[4:])
+    dense = []
+    for a, b in zip(unwrapped, unwrapped[1:]):
+        steps = max(1, round((b[0] - a[0]) / subdivide)) if subdivide else 1
+        for i in range(steps):
+            f = i / steps
+            dense.append(tuple(_lerp(va, vb, f) for va, vb in zip(a, b)))
+    dense.append(unwrapped[-1])
+    out = []
+    for t, (cx, cy), cz, facing, pitch, focal, ground in dense:
+        h = cz - ground
+        d = h / math.tan(math.radians(pitch))
+        px, py = cx + d * math.cos(math.radians(facing)), cy + d * math.sin(math.radians(facing))
+        out.append((t, (px - anchor[0], py - anchor[1], ground - anchor[2]), facing + 180.0, pitch, math.hypot(d, h),
+                    focal, 0))
+    return out
 
 
 def batch_berlin_poi():
@@ -857,6 +919,80 @@ def batch_berlin_poi():
     ]
 
 
+# --- Other maps: showcase POIs + one fly-through per map (2026-11-17). Landmarks picked from headless actor dumps of
+# the saved maps + the map docs; yaw0 = bearing landmark -> camera in the anchor frame, the orbit turns -45 deg.
+
+def batch_maps_poi():
+    return [
+        # Ore Mountains (2026-11-17: the Ore landscape renders as the default checker material in game since the new
+        # M_RTS_Landscape_OreMountains: Nanite base pass "too many SRVs: 66 (only 64)"; re-render Ore after a fix).
+        # Base A Wismut yard (1200, 24000) yaw 90 R 2500, look 500, yaw0 -60, reveal_yaw -60, patrol (-1.5,-1.55) ->
+        # (1.5,-1.45), ClearUnitsRadius 12000: taken out because its checker ground was the landscape failure above;
+        # not evaluable until Ore renders, re-test it with the other Ore POIs.
+        # Adit 1 "STROSSE 2" at the foot of the quarried crest face, mine railway + carts on the 18 m bench.
+        poi("POI_Ore_Strosse2Adit", "Ore", (-21700, 2850, 0), 143, "dusk", 1500, look_height=800, low=True, yaw0=-98,
+            reveal_yaw=-103, ClearUnitsRadius=9000.0),
+        # North foothills over Base A, the radixite field and the checkpoint to the broken A4 viaduct, heading west.
+        map_flight("POI_Ore_ValleyFlight", "Ore", (0, 0, 0), 0, "dusk", camera_keys((0, 0, 0), (
+            (0.0, (7000, 26000), 2700, 195, 20, 24, 0),
+            (9.8, (-1500, 15500), 2000, 245, 15, 24, 0),
+            (16.5, (1500, 7000), 2200, 235, 18, 24, 0),
+            (22.0, (2500, -500), 2000, 235, 20, 24, 0))), occlusion=False),
+        # Oder-Warthe W4: the Marine-Peilstand tower on its granite knoll inside the dragon's-teeth ring. The anchor
+        # drops onto the tower roof (~z 3570, knoll 1474): ground_z brings the pivot down to the knoll.
+        poi("POI_OderWarthe_Werk4Peilturm", "OderWarthe", (19072, 15299, 0), 180, "storm", 3500, look_height=1050,
+            low=True, yaw0=280, ground_z=2100.0, patrol=("Scavengers", (-1.3, -1.7), (1.0, -1.65))),
+        # Rail yard metal_c on the Lubowsee: ramp, wagons, scrap tower, double track; W4 tower behind.
+        poi("POI_OderWarthe_RailYard", "OderWarthe", (5300, 15300, 0), 135, "storm", 2500, look_height=900, yaw0=60,
+            reveal_yaw=-20, patrol=("Scavengers", (-1.4, -1.3), (1.4, -1.0)),
+            hide=(("BP_OW_DeadPine", (8681, 17662), 200), ("BP_OW_DeadPine", (7598, 18648), 200))),
+        # Along the double track from the east wood over the crossovers and the Lubow dam head to the W4 tower.
+        map_flight("POI_OderWarthe_RailFlight", "OderWarthe", (5300, 15300, 0), 0, "storm", (
+            (0.0, (3288 - 5300, 24023 - 15300), 103, 14, 10024, 24, 0),
+            (7.0, (6261 - 5300, 19501 - 15300), 112, 15, 8597, 24, 0),
+            (14.0, (8998 - 5300, 14541 - 15300), 122, 15, 8983, 24, 0),
+            (22.0, (19072 - 5300, 15299 - 15300), 178.6, 8.9, 20829, 22, (0, 0, 330))), occlusion=False),
+        # Pripyat: the leaning 27 m radio mast on the bench edge with the signals house; patrol up the east-road ramp.
+        poi("POI_Pripyat_SignalsMast", "Pripyat", (-6050, 16550, 0), 220, "storm", 3000, look_height=1300, low=True,
+            yaw0=300, reveal_yaw=250, patrol=("Scavengers", (-0.75, -0.65), (0.75, -0.5))),
+        # Khutor kill zone: six tank wrecks, log houses, stork nest, downed Ju 87 on the east-lane sand ridge.
+        poi("POI_Pripyat_KhutorKillZone", "Pripyat", (1600, 24300, 0), 270, "dusk", 2400, look_height=250, yaw0=240,
+            reveal_yaw=290, patrol=("Scavengers", (0.25, -0.8), (1.5, -0.8))),
+        # Drowned forest past the sunken and Demeter pods, along the plank boardwalk to the start village and memorial.
+        map_flight("POI_Pripyat_BogFlight", "Pripyat", (-17000, -29000, 0), 0, "storm", camera_keys(
+            (-17000, -29000, 200), (
+                (0.0, (-23200, -36500), 1800, 100, 15, 24, 0),
+                (7.0, (-22600, -29000), 2000, 115, 22, 24, 50),
+                (15.0, (-17500, -27400), 2600, 345, 15, 24, 400),
+                (22.0, (-12500, -28500), 4500, 45, 15, 22, 400))), occlusion=False, clear=15000.0),
+        # Kessel gate 304: water tower, two silos, pipes. Anchor moved 5 m off the tower (a top-down drop at the pad
+        # centre lands on the tank). Sun travels to -Y: cameras on the +Y side looking -Y are front-lit.
+        poi("POI_Kessel_Waterworks", "Kessel", (14400, -14128, 0), 180, "dusk", 2200, look_height=550, yaw0=270,
+            reveal_yaw=290),
+        # Gate 238: the overrun Soviet trench line (MG nest, dugout, wire, hedgehogs, knocked-out Pz III).
+        poi("POI_Kessel_TrenchLine", "Kessel", (-11900, -12300, 0), 153, "dusk", 2500, look_height=250, yaw0=210,
+            patrol=("Scavengers", (-1.5, -1.75), (1.5, -1.65))),
+        # Down the gate 304 ramp, past the waterworks, turning back onto the yard (take 1 opened on 6 s of the empty
+        # base plateau: start on the ramp instead and glide slower).
+        map_flight("POI_Kessel_GateFlight", "Kessel", (13000, -11500, 0), 0, "dusk", camera_keys((13000, -11500, 520), (
+            (0.0, (7600, -11000), 1650, 325, 8, 24, 520),
+            (9.0, (11200, -12700), 1800, 330, 12, 24, 520),
+            (22.0, (17800, -12200), 2300, 207, 16, 24, 520))), occlusion=False),
+        # Desert lone butte (2500, -26700) dropped 2026-11-17: its top is a flat plate, and with the pivot on the floor
+        # the look target sits inside the butte, so occlusion avoidance lifts every orbit to a top-down view. The butte
+        # flight shows it from low instead.
+        # Red Mesa north face with the cliff road climbing to the rim.
+        poi("POI_Desert_RedMesaCliffRoad", "Desert", (25300, -23500, 0), 90, "haze", 2500, look_height=700, yaw0=270,
+            reveal_yaw=300, pitch_add=-6, **DESERT_ARGS),
+        # A sweep round the butte: silhouette first, then the sunlit east face, ending on a pull-back over the canyon.
+        map_flight("POI_Desert_ButteFlight", "Desert", (-1140, -22500, 0), 0, "haze", camera_keys((-1140, -22500, 600), (
+            (0.0, (-8500, -35000), 2200, 37, 4, 24, 600),
+            (7.0, (-2500, -24000), 2000, 332, 7, 24, 600),
+            (14.5, (1000, -20500), 2400, 279, 10, 24, 600),
+            (22.0, (-1500, -17000), 3200, 292, 10, 22, 600))), occlusion=False, **DESERT_ARGS),
+    ]
+
+
 def batch_custom():
     return [reichstag_battle(), nomadic_sequence()]
 
@@ -870,6 +1006,7 @@ BATCHES = {
     "poi": batch_poi,
     "custom": batch_custom,
     "berlin_poi": batch_berlin_poi,
+    "maps_poi": batch_maps_poi,
 }
 
 

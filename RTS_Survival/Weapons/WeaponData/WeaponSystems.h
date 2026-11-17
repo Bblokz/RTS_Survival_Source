@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "CoreMinimal.h"
 
@@ -387,13 +387,16 @@ enum class
 	// 2 sockets, so all stats are per projectile and one shot fires both barrels.
 	KPV_14_5MM_Twin UMETA(DisplayName = "2x KPV 14.5MM"),
 	// GAZ-MM 72-K: the 25mm 72-K automatic anti-aircraft gun on a full-traverse truck pedestal; fast 7-round clips.
-	Gun72K_25MM UMETA(DisplayName = "25 mm 72-K (GAZ-MM AA)")
+	Gun72K_25MM UMETA(DisplayName = "25 mm 72-K (GAZ-MM AA)"),
+	// Frozen Lake fixed emplacement; values are per active barrel.
+	TripleCrown_Radixite_300MM UMETA(DisplayName = "Triple Crown 300 mm Ice Cannon")
 };
 
 static FString Global_GetWeaponDisplayName(const EWeaponName WeaponName)
 {
 	switch (WeaponName)
 	{
+	case EWeaponName::TripleCrown_Radixite_300MM: return "Triple Crown Ice Cannon";
 	case EWeaponName::T26_Mg: return "7.62 DT";
 	case EWeaponName::MP46: return "MP46";
 	case EWeaponName::F_35_76MM: return "F-35";

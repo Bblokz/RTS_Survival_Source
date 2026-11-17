@@ -17,7 +17,7 @@ Coordinates are world cm. X runs from the base to the map edge, and the playable
 | Station ridge | spine x ~21000, y 3600 to the north map edge | An 8 m spine with a flat top about 35 m wide. North of y 21900 it comes down as an embankment to the plain at the map edge, and the rails follow it down. The rail line (`REAR_Rail_Main`) comes from the north map edge and ends at a buffer stop at y 4950. A siding (`REAR_Rail_Siding`) runs beside the platform. |
 | Station | top of the ridge, y 5500..17500 | Two `SM_Berlin_RailRamp` loading platforms, an `SM_Berlin_SwitchTower` as the station office, an `SM_Warehouse_03` goods shed, a lattice water tower and a water tank, two houses, and freight stacks. The parked trains are static `SM_SovietTrain_*` meshes (locomotive, fuel and goods cars), not train Blueprints. Telegraph poles run along the line. North of the station are sleeper piles and a lineman's hut. |
 | Depot ridge | arc from near the south map edge (7000, -25500) to (15100, -7600) | About 9.5 m high and steep; it sinks into the plain over the last 25 m before the south edge, with a cut saddle for road D. Hedgehogs and two sandbag arcs guard the cutting. It sits between the depot and the base. |
-| Depot | centre (18300, -15700), yaw 18 | A 72 x 48 m slab of 6 `BP_Airport_Ground1` tiles on a painted concrete apron. On it: a Soviet crane, oil tanks, containers, a camo net with crates, a Quonset hut, a pipe stack, barrels, flood lights on the corners, a barrier line with a gap for the road, and a T-34 wreck by the entrance. |
+| Depot (landing field) | centre (18300, -15700), yaw 18 | Since 2026-11-17 a Soviet landing field: the 72 x 48 m slab of 6 `BP_Airport_Ground1` tiles carries 4 landing pads for the Pe-8 transport drops. See "Landing field" below. |
 | Ponds | W1 (15200, 2600), W2 (17600, -5700) | Organic shorelines with cracked-mud margins. The water planes use `MI_Water_Shore` with no collision. |
 | Dry wash | from W1 north-west to (7300, 19500) | A shallow meandering cracked-mud channel. Road S crosses it. |
 | Map edges | east x 24775, north y 25130, south y -24387 (rear part) | The map's own edge blockers only reach z 200, and both ridges rise over them. Three `REAR_Edge_*` copies of `TopBlocker` (z -200..900 east, -200..1500 north/south) close the rear edges. They stay low so aircraft coming in over the edges never touch them. |
@@ -96,3 +96,65 @@ the playable edge. The cacti on the ridge tops stay.
 - **Checks.** `rear_nav_check.py` reports `NAV FAILS 0`. Crossing checks show paths over a face now detour: station foot to top 33 m straight becomes a 158 m path, depot foot to crest 16 m becomes 151 m. The station's north end stays open by design, and so do the south nose next to road S and the ridge ends. In-game shots are in `Saved/IntroRear/shots/cl_*` (sheet `cliffs_sheet_v3.jpg`).
 - **Gameplay change.** The ridge tops are now reached only by the road S ramp, the station's north embankment and south nose, the depot saddle and the depot ridge's ends.
 - **Open.** The rocks have no collision, so infantry on a ridge top can stand inside a lip block. The lip blocks reach about 2 m inward.
+
+## Landing field (2026-11-17)
+
+The old depot clutter on the slab was removed: the crane, tanks, containers, camo net, crates, hut, pipes, barrels, corner pole lights, barrier line, T-34 wreck and debris decals. The slab tiles were kept. All new actors are `LAND_*` in the outliner folder `IntroRear/LandingField/...`.
+
+**Pads.**
+- Four `SM_LandingPad_Soviet` pads: 21 x 21 m olive steel planking, 19 cm tall with ramped edges, 12 emissive edge lamps, and a red star in a white landing circle.
+- The local centres are (+-1850, +-1250) in the slab frame; u runs along the 72 m axis and +v is the road side.
+- The numbers read 1 2 / 3 4 from the default RTS camera, which looks along +u:
+  - pad 1 (1850, -1250), world (20446, -16317);
+  - pad 2 (1850, 1250), world (19673, -13939);
+  - pad 3 (-1850, -1250), world (16927, -17461);
+  - pad 4 (-1850, 1250), world (16154, -15083).
+- An `AEnemyAirDrop` placed on a pad centre lands its first Pe-8 dead centre. Code spreads further aircraft of the same drop about 10 m, so use one cargo type per drop for a clean landing.
+
+**Fence and gate.**
+- 82 `BP_Airport_Dest_FenceWire` pieces on a rectangle 10 m outside the slab (u +-4600, v +-3400). Each side is a whole number of pieces, stretched 0.98-1.02, seated 3 cm into the ground.
+- Like every fence in the project, they are crushable and stay out of the navmesh.
+- The open gate is `SM_RusWallGateA_Frame` (no leaves) on road D at u -1880, with a raised boom.
+- Road D's tail was rerouted: square through the gate, then a bend onto the slab at the centre lane's mouth (0, 2470).
+
+**Towers.** Two live `Rus_BXP_GuardTowerMG_Soviet`:
+- (-3100, 2900), facing the road approach;
+- (4050, 0), facing the open east end.
+
+They lie outside the "Secure the Line" target box, so they are not mission targets.
+
+**Lighting.**
+- Four `SM_FloodLight_2` masts in the fence corners. Each has one shadowless spot on its nearest pad: 4000 cd, 18/8 degrees, specular 0.25.
+- Red obstruction beacons on the mast tops blink out of step.
+- One green centreline: it starts outside the gate, follows road D with a sequenced "rabbit" flash toward the slab, then burns steady down the centre lane.
+- One 80 cd point light at the gate.
+- Everything except the 5 light actors is emissive: `M_LandingField_Lamp` with Colour/Intensity parameters, and flash phase/amount/rate in custom primitive data 0/1/2.
+
+**Service strip** (north apron, east of the gate): a container hut (live building expansion), a flag, a fuel bowser on pallets and two barrel stacks.
+
+**Build.**
+- Script: `Source/Tools/IntroMission/landing/landing_build.py`, run in a throwaway editor through `landing_editor_server.py` / `landing_cmd.py`. Every `step_*` respawns its own `LAND_<Step>_*` actors.
+- Checks:
+  - `landing_nav_check.py`: every pad is reachable by every agent from the Soviet base and from outside the gate. NAV FAILS 0.
+  - `landing_ingame.py`: PIE pictures plus a temporary test air drop that is never saved.
+  - `landing_save.py`: saves only after the navmesh has finished building.
+- `rear_build.py` step_depot / step_extras / step_decals no longer respawn the old clutter. Don't re-run step_roads: it would revert road D's tail.
+- Assets:
+  - `/Game/RTS_Survival/Blueprints/Environment/IntroMission/LandingField/`.
+  - The pad mesh source is in `D:/Blender/BlenderProjects/BlenderTanks/CustomMapItems/IntroMission/LandingPads/` (see its README). The importer is `landing/landing_pad_import.py`.
+- Pre-edit map copy: `Saved/IntroLanding/Ger_IntroMission_before_landing.umap`.
+- Two adversarial review rounds: pictures in `Saved/IntroLanding/shots/r1_*`, `r2_*` and `r3_*`.
+
+### Second pass: station east flank and south nose (2026-11-17, later)
+
+The user asked for cliffs "at the end" of the station ridge (the south nose by the buffer stop) and on "the opposite
+side" (the east flank down towards the map edge).
+
+- **East flank.** It is now processed too (`k` 5.5, reach 50 m: it was a 25 degree slope over 26 m). The face is 173 m long and about 6.3 m high, with its lip around x 23800, just inside the playable edge at x 24775. The east-edge exclusion now starts at x 26500.
+- **South nose.** The nose gets its own straight line across the ridge top at y 4900, whose +1 side points south. The station west/east processing starts at spine station 6. Where two flanks overlap, the stronger weight wins.
+- **Ridge top.** The upper flank (q > 0.85) is never cut, so the rail bed and buffer stop keep their height.
+- **Corners.** Faces whose ends meet (within 12 m) run their face pieces to the corner. A corner Mass and a Chunk6 fill the bend.
+- **Station props.** `step_cliffs` drops any rock whose plan footprint reaches within 1.5 m of a `REAR_Station_*`, lineman, sleeper or `LAND_*` actor's bounds, or within 4.5 m of the rail splines. This dropped 2 lip blocks.
+- **Pond exclusion.** The pond exclusion is now rx + 7 m. The old rx + 18 m left a walkable corner at the nose's south-west.
+- **Props.** `rear_cliffs_props.py` re-seats against the terrain on the map: the `cliffs_vN_full_height.r16` copy named in `prev`. Removed 69 more `REAR_` stones, rocks, shrubs and decals.
+- **Checks.** `NAV FAILS 0`. Neither the east face nor the nose can be climbed: the nose path detours 100 m through the road S ramp area, and heavy tanks find no path. The depot-landing session's 127 `LAND_*` actors were left as they were. Total: 240 cliff instances in 51 actors.

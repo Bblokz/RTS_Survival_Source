@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "CoreMinimal.h"
 #include "RTS_Survival/Buildings/BuildingExpansion/BuildingExpansion.h"
@@ -112,6 +112,8 @@ namespace BxpConstructionRules
 		{EBuildingExpansionType::BTX_Rus53KPit, WithFootprint(FreeConstructionRules, 1150.f, 1150.f)},
 		// The same gun held to a 90 degree arc: only that wedge is swept, so a small square wall holds it.
 		{EBuildingExpansionType::BTX_Rus53KSectorPit, WithFootprint(FreeConstructionRules, 920.f, 920.f)},
+		// The off-centre 36.6 m bunker requires a 40 x 30 m footprint around its origin.
+		{EBuildingExpansionType::BTX_RusTripleCrownBunker, WithFootprint(FreeConstructionRules, 4000.f, 3000.f)},
 		// Same emplacement as the B-4 pit.
 		{EBuildingExpansionType::BTX_RusML20Pit, WithFootprint(FreeConstructionRules, 2000.f, 2000.f)},
 		// The BS-3 turns a full circle with its wide trails inside a square bag wall.

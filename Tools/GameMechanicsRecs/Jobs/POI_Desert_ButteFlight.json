@@ -1,0 +1,257 @@
+{
+ "JobName": "POI_Desert_ButteFlight",
+ "Category": "POI",
+ "Fps": 60,
+ "WarmupSeconds": 6.0,
+ "DurationSeconds": 22.0,
+ "Anchor": {
+  "X": -1140.0,
+  "Y": -22500.0,
+  "Z": 0.0
+ },
+ "AnchorYaw": 0.0,
+ "ClearUnitsRadius": 8000.0,
+ "bKeepVoiceLines": true,
+ "bKeepAnnouncer": false,
+ "bKeepMusic": false,
+ "Events": [
+  {
+   "Time": -3.5,
+   "Type": "Hide",
+   "Tag": "",
+   "Text": "BP_Electricity_SinglePole",
+   "Radius": 0.0
+  }
+ ],
+ "Shots": [
+  {
+   "Name": "Flight",
+   "Start": 0.0,
+   "End": 22.0,
+   "Rig": "Orbit",
+   "Keys": [
+    {
+     "Time": 0.0,
+     "Pivot": "",
+     "Offset": {
+      "X": 10913.631823912383,
+      "Y": 1270.1692709964846,
+      "Z": 0.0
+     },
+     "Yaw": 217.0,
+     "Pitch": 4.0,
+     "Distance": 22936.93924192588,
+     "Focal": 24.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     },
+     "VYaw": 0.0,
+     "VPitch": 10.0,
+     "VDistance": 24771.89438127995,
+     "VFocal": 19.200000000000003,
+     "VLookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     }
+    },
+    {
+     "Time": 3.5,
+     "Pivot": "",
+     "Offset": {
+      "X": 11170.07355033672,
+      "Y": -5777.7567044766365,
+      "Z": 0.0
+     },
+     "Yaw": 184.5,
+     "Pitch": 5.5,
+     "Distance": 15650.14578693502,
+     "Focal": 24.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     },
+     "VYaw": 0.0,
+     "VPitch": 11.5,
+     "VDistance": 16902.157449889823,
+     "VFocal": 19.200000000000003,
+     "VLookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     }
+    },
+    {
+     "Time": 7.0,
+     "Pivot": "",
+     "Offset": {
+      "X": 8707.443503585115,
+      "Y": -6852.954663575289,
+      "Z": 0.0
+     },
+     "Yaw": 152.0,
+     "Pitch": 7.0,
+     "Distance": 11487.712667375108,
+     "Focal": 24.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     },
+     "VYaw": 0.0,
+     "VPitch": 13.0,
+     "VDistance": 12406.729680765118,
+     "VFocal": 19.200000000000003,
+     "VLookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     }
+    },
+    {
+     "Time": 10.75,
+     "Pivot": "",
+     "Offset": {
+      "X": 6606.918727543381,
+      "Y": -8465.798606977434,
+      "Z": 0.0
+     },
+     "Yaw": 125.5,
+     "Pitch": 8.5,
+     "Distance": 10824.750520093725,
+     "Focal": 24.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     },
+     "VYaw": 0.0,
+     "VPitch": 14.5,
+     "VDistance": 11690.730561701224,
+     "VFocal": 19.200000000000003,
+     "VLookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     }
+    },
+    {
+     "Time": 14.5,
+     "Pivot": "",
+     "Offset": {
+      "X": 3736.931087579711,
+      "Y": -8082.62607303806,
+      "Z": 0.0
+     },
+     "Yaw": 99.0,
+     "Pitch": 10.0,
+     "Distance": 10365.786869658541,
+     "Focal": 24.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     },
+     "VYaw": 0.0,
+     "VPitch": 16.0,
+     "VDistance": 11195.049819231224,
+     "VFocal": 19.200000000000003,
+     "VLookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     }
+    },
+    {
+     "Time": 18.25,
+     "Pivot": "",
+     "Offset": {
+      "X": 4224.285116264913,
+      "Y": -8273.04371424648,
+      "Z": 0.0
+     },
+     "Yaw": 105.5,
+     "Pitch": 10.0,
+     "Distance": 12669.295062915993,
+     "Focal": 23.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     },
+     "VYaw": 0.0,
+     "VPitch": 16.0,
+     "VDistance": 13682.838667949274,
+     "VFocal": 18.400000000000002,
+     "VLookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     }
+    },
+    {
+     "Time": 22.0,
+     "Pivot": "",
+     "Offset": {
+      "X": 5163.69886314632,
+      "Y": -8171.6344384039985,
+      "Z": 0.0
+     },
+     "Yaw": 112.0,
+     "Pitch": 10.0,
+     "Distance": 14972.803256173447,
+     "Focal": 22.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     },
+     "VYaw": 0.0,
+     "VPitch": 16.0,
+     "VDistance": 16170.627516667324,
+     "VFocal": 17.6,
+     "VLookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     }
+    }
+   ],
+   "Ease": "InOut",
+   "PivotLag": 0.7,
+   "Aperture": 0.0,
+   "Shake": 0.0,
+   "bAvoidOcclusion": false,
+   "MinGroundClearance": 350.0
+  }
+ ],
+ "MapPath": "/Game/RTS_Survival/SurvivalMode/Maps/SM_Desert_01",
+ "GameModeClassPath": "/Game/RTS_Survival/SurvivalMode/Blueprints/BP_SurvivalGameMode.BP_SurvivalGameMode_C",
+ "LaunchArgs": [
+  "-SurvivalAutoStart",
+  "-SurvivalStartIndex=0",
+  "-SurvivalGrace=3600"
+ ],
+ "HideNear": [
+  [
+   "BP_Electricity_SinglePole",
+   0
+  ]
+ ],
+ "SuppressClassPrefixes": [
+  "Ger_Aircraft_JU390B_AirborneUnarmed"
+ ],
+ "HideActorPrefixes": [],
+ "SkyMaterial": "/Game/SkyboxPack_X/Materials/Instances/M_Flowmap_Inst_03.M_Flowmap_Inst_03",
+ "Batch": "maps_poi"
+}

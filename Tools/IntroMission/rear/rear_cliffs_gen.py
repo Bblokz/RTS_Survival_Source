@@ -1,8 +1,8 @@
 """Rock faces on the two rear ridges of Ger_IntroMission (plain python + numpy, no Unreal).
 
 User request 2026-11-17: remove the small stones and decals on the station ridge and depot ridge flanks and "add proper
-cliffs instead like we also have on the Ore mission", on both ridges, all flanks (the station ridge's east flank beyond
-the playable edge stays as it is). The cacti on the ridge tops stay.
+cliffs instead like we also have on the Ore mission", on both ridges, all flanks. The cacti on the ridge tops stay.
+Later the same day: the station ridge's east flank and its south nose by the buffer stop as well.
 
 What it does:
 1. Reads the current landscape (Saved/IntroRear/terrain/cliffpre_full_height.r16, exported by rear_lib.export_region).
@@ -47,9 +47,20 @@ SY, SX = GRID[3] - GRID[1] + 1, GRID[2] - GRID[0] + 1
 
 RIDGES = {
     # k = how much steeper the middle of the flank gets; reach = how far out from the spine the flank can go (cm)
-    'station': dict(spine=rtg.RIDGE_S['spine'], k=3.6, reach=4200.0, sides=(-1,)),
-    'depot': dict(spine=rtg.RIDGE_D['spine'], k=2.2, reach=3200.0, sides=(-1, 1)),
+    # station: west flank (base side) and, since 2026-11-17 later, the east flank down towards the map edge (a gentle
+    # 25 degree slope over 26 m, so it needs a much larger k); start=13 leaves the cells south of y ~4800 to the nose
+    'station': dict(spine=rtg.RIDGE_S['spine'], k={-1: 3.6, 1: 5.5}, reach={-1: 4200.0, 1: 5000.0}, sides=(-1, 1), start=6,
+                    label={-1: 'w', 1: 'e'}),
+    # the station ridge's south nose by the buffer stop (user 2026-11-17: "add the cliffs at the end here"): a straight
+    # line across the ridge top whose +1 side points south
+    'nose': dict(spine=[(18400.0, 4900.0), (20000.0, 4900.0), (21500.0, 4900.0), (23600.0, 4900.0)], k=3.6, reach=3400.0,
+                 sides=(1,), label={1: 's'}),
+    'depot': dict(spine=rtg.RIDGE_D['spine'], k=2.2, reach=3200.0, sides=(-1, 1), label={-1: 'w', 1: 'e'}),
 }
+
+
+def per_side(value, side):
+    return value[side] if isinstance(value, dict) else value
 MIN_H = 300.0          # flanks lower than this (cm) stay as they are
 FULL_H = 500.0         # full effect from this height
 STATION_NORTH_Y = 22600.0   # the rails come down the embankment north of here: keep it open
@@ -114,7 +125,7 @@ def exclusion_weight(X, Y):
     w = np.minimum(w, smooth((sad - 2600.0) / 1200.0))
     for pd in rtg.PONDS.values():
         c = pd['centre']
-        w = np.minimum(w, smooth((np.hypot(X - c[0], Y - c[1]) - (pd['rx'] + 1800.0)) / 800.0))
+        w = np.minimum(w, smooth((np.hypot(X - c[0], Y - c[1]) - (pd['rx'] + 700.0)) / 800.0))
     dc = rtg.DEPOT['centre']
     a = math.radians(rtg.DEPOT['yaw'])
     u = (X - dc[0]) * math.cos(a) + (Y - dc[1]) * math.sin(a)
@@ -128,7 +139,7 @@ def exclusion_weight(X, Y):
         dy = np.maximum(np.maximum(y0 - Y, Y - y1), 0)
         w = np.minimum(w, smooth((np.hypot(dx, dy) - 300.0) / 800.0))
     w = np.minimum(w, smooth((X - 5000.0) / 800.0))
-    w = np.minimum(w, smooth((24600.0 - X) / 600.0))    # nothing near the playable east edge
+    w = np.minimum(w, smooth((26500.0 - X) / 600.0))    # the station's east face reaches the playable edge (x 24775)
     return w
 
 
@@ -147,8 +158,9 @@ def steepen(Z0):
         nrm = np.column_stack([tan[:, 1], -tan[:, 0]])          # points to +X for a spine running +Y
         # cells near this ridge: nearest station by brute force in chunks
         band = np.zeros_like(Z, bool)
-        x0, x1 = sp[:, 0].min() - R['reach'] - 200, sp[:, 0].max() + R['reach'] + 200
-        y0, y1 = sp[:, 1].min() - R['reach'] - 200, sp[:, 1].max() + R['reach'] + 200
+        rmax = max(per_side(R['reach'], sd) for sd in R['sides'])
+        x0, x1 = sp[:, 0].min() - rmax - 200, sp[:, 0].max() + rmax + 200
+        y0, y1 = sp[:, 1].min() - rmax - 200, sp[:, 1].max() + rmax + 200
         band = (X >= x0) & (X <= x1) & (Y >= y0) & (Y <= y1)
         cj, ci = np.nonzero(band)
         cx, cy = X[cj, ci], Y[cj, ci]
@@ -162,24 +174,29 @@ def steepen(Z0):
             near[a0:a0 + 4000] = k
             dist[a0:a0 + 4000] = np.sqrt(d2[np.arange(len(k)), k])
         side_of = np.sign((cx - sp[near, 0]) * nrm[near, 0] + (cy - sp[near, 1]) * nrm[near, 1])
-        prof = {sd: station_profiles(Z0, sp, nrm, sd, R['reach']) for sd in R['sides']}
+        prof = {sd: station_profiles(Z0, sp, nrm, sd, per_side(R['reach'], sd)) for sd in R['sides']}
         info[name] = dict(sp=sp, s=s, nrm=nrm, prof=prof)
         for sd in R['sides']:
             crest, foot = prof[sd]
-            m = (side_of == sd) & (dist <= R['reach'])
-            # not at the ends of the spine (the ridge noses run out past them)
-            m &= (near > 3) & (near < len(sp) - 4) if name == 'depot' else (near > 0)
+            m = (side_of == sd) & (dist <= per_side(R['reach'], sd))
+            # not at the ends of the spine (the ridge noses run out past them; the station nose has its own line)
+            m &= (near > 3) & (near < len(sp) - 4) if name == 'depot' else (near >= R.get('start', 0))
             j, i = cj[m], ci[m]
             c, f = crest[near[m]], foot[near[m]]
             H = c - f
             q = np.clip((Z0[j, i] - f) / np.maximum(H, 1.0), 0.0, 1.0)
-            qn = 0.9 * np.clip((q - 0.5) * R['k'] + 0.5, 0.0, 1.0) + 0.1 * q
+            qn = 0.9 * np.clip((q - 0.5) * per_side(R['k'], sd) + 0.5, 0.0, 1.0) + 0.1 * q
             znew = f + qn * H
+            # the top stays where it is: never cut the upper flank or the ridge top (rail bed, buffer stop)
+            znew = np.where(q > 0.85, np.maximum(znew, Z0[j, i]), znew)
             wgt = smooth((H - MIN_H) / (FULL_H - MIN_H)) * excl[j, i]
             if name == 'station':
                 wgt = wgt * smooth((STATION_NORTH_Y - Y[j, i]) / 1200.0)
+            # where two flanks overlap (the nose corners) the stronger one wins
+            win = wgt >= weight[j, i]
+            j, i, wgt, znew = j[win], i[win], wgt[win], znew[win]
             Z[j, i] = Z0[j, i] + wgt * (znew - Z0[j, i])
-            weight[j, i] = np.maximum(weight[j, i], wgt)
+            weight[j, i] = wgt
     return X, Y, Z, weight, info
 
 
@@ -201,7 +218,7 @@ def faces(Znew, info, weight):
     for name, R in RIDGES.items():
         sp, nrm = info[name]['sp'], info[name]['nrm']
         for sd in R['sides']:
-            ds = np.arange(0.0, R['reach'] + 1, 100.0)
+            ds = np.arange(0.0, per_side(R['reach'], sd) + 1, 100.0)
             st = []
             for k in range(len(sp)):
                 px = sp[k, 0] + sd * nrm[k, 0] * ds
@@ -218,7 +235,7 @@ def faces(Znew, info, weight):
             segs = ock_map.Map._segments(None, st, closed=False)
             for seg in segs:
                 seg['open0'] = seg['open1'] = True
-            out['%s_%s' % (name, 'w' if sd < 0 else 'e')] = segs
+            out['%s_%s' % (name, R['label'][sd])] = segs
     return out
 
 
@@ -228,8 +245,9 @@ class IntroLayout(ock_place.Layout):
         """Face pieces side by side, each sized to the local face height: Mass (10 m) from 5.5 m, MassLow (6.8 m) from
         2.5 m, nothing lower (the ends of a face run out as scree and chunks, no flat end slabs)."""
         rng, L, P = self.rng, seg['length'], ock_place.PROUD
-        s, last = rng.uniform(3.0, 5.0), None
-        while s < L - 7.0:                     # the last metres of a face bend and run out: chunks and scree only
+        # the last metres of a face bend and run out: chunks and scree only, unless the face joins another one there
+        s, last = (0.5 if seg.get('join0') else rng.uniform(3.0, 5.0)), None
+        while s < L - (1.0 if seg.get('join1') else 7.0):
             # the lowest point under the whole piece decides, so a tall piece never lies on a face that runs out
             h = min(ock_map.at(seg, min(L, s + t))['h'] for t in (0.0, 3.0, 6.0, 9.0))
             if h >= 5.5:
@@ -284,6 +302,19 @@ class IntroLayout(ock_place.Layout):
                          yaw=rng.uniform(-180, 180), pitch=rng.uniform(-20, 20), roll=rng.uniform(-20, 20), scale=rng.uniform(0.8, 1.3),
                          ground=True)
             s += rng.uniform(13, 22) if tall else rng.uniform(16, 26)
+
+
+def plan_points(it, nx=4, ny=5):
+    """Plan-view sample points (cm) over a piece's bounds, for overlap tests here and in the editor."""
+    b = ock_place.PIECES[it['piece']]['bounds_cm']
+    a = math.radians(it['yaw'])
+    ca, sa = math.cos(a), math.sin(a)
+    sc = it['scale']
+    pts = []
+    for lx in np.linspace(b['min'][0], b['max'][0], nx):
+        for ly in np.linspace(b['min'][1], b['max'][1], ny):
+            pts.append((round(it['x'] + (lx * ca - ly * sa) * sc), round(it['y'] + (lx * sa + ly * ca) * sc)))
+    return pts
 
 
 def drop_on_roads(inst):
@@ -348,11 +379,34 @@ def main():
     m = IntroMap(Zr)
     fs = faces(Zr, info, weight)
     lay = IntroLayout(m, seed=1976)
+    ends = [(seg, e, seg['lip'][0 if e == 0 else -1, :2]) for segs in fs.values() for seg in segs for e in (0, 1)]
+    for seg, e, p in ends:
+        seg['join%d' % e] = any(o is not seg and np.linalg.norm(p - q) < 12.0 for o, _, q in ends)
     for face, segs in fs.items():
         for seg in segs:
             lay.crag_face(face, seg)
+    # where two faces meet (the nose corners) the bend between their last pieces is bare: fill it with a corner mass
+    done = set()
+    for seg, e, p in ends:
+        for o, e2, q in ends:
+            if o is seg or np.linalg.norm(p - q) >= 12.0 or (id(o), e2) in done:
+                continue
+            done.add((id(seg), e))
+            s1 = ock_map.at(seg, 0.0 if e == 0 else seg['length'])
+            s2 = ock_map.at(o, 0.0 if e2 == 0 else o['length'])
+            outv = s1['out'] + s2['out']
+            outv = outv / (np.linalg.norm(outv) + 1e-9)
+            lip = (s1['lip'] + s2['lip']) / 2.0
+            corner = dict(lip=lip, foot=(s1['foot'] + s2['foot']) / 2.0, out=outv, tan=np.array([-outv[1], outv[0]]),
+                          h=float(lip[2] - (s1['foot'][2] + s2['foot'][2]) / 2.0), run=0.0)
+            face = [k for k, v in fs.items() if any(x is seg for x in v)][0]
+            piece = 'Mass8' if corner['h'] >= 5.5 else 'MassLow7'
+            lay.add(piece, face, corner, dout=ock_place.PROUD, dz=0.0 if piece == 'Mass8' else 0.3, scale=1.05)
+            lay.add('Chunk6', face, corner, dout=ock_place.PROUD + 1.5, dz=-2.0, yaw=lay.rng.uniform(-180, 180), scale=1.1)
     n_before = len(lay.inst)
     lay.inst = drop_on_roads(lay.inst)
+    for it in lay.inst:
+        it['fp'] = plan_points(it)          # rear_cliffs_editor.step_cliffs drops pieces that reach into station props
     print('pieces dropped near roads', n_before - len(lay.inst))
     for face, segs in fs.items():
         print('face %-10s %d segments, %.0f m, height median %s, face angle median %s' % (

@@ -5,7 +5,13 @@ Source PNGs: UISkins/13_Frontstahl_Gunmetal/DeckBuilder/T_Deck_*.png
   T_Deck_CardFrame_<rarity>  the unit / technology card frame (Frontstahl T_Panel02), plus Vacant
   T_Deck_Spine_<rarity>      the narrow variant card with its painted spine (made with UISkins/_generator/cards.py,
                              see Saved/CardDesigns/make_spine_frames.py for the shape and the right-hand stripe)
-  T_Deck_Section_<section>   the building pictures of the rail
+  T_Deck_Section_<section>   the picture of each section on the rail and on the cards. The six buildings use their
+                             portrait without the tactical icon (D:/UE_Assets/Icons/TrainingUI/GerTrucks/
+                             WithoutIcon, cropped square): Barracks = T_Ger_BarracksBuilding, MechanicalDepot =
+                             T_Ger_MechanizedDepotBuilding, Forge = T_Ger_ForgeBuilding, T2Factory =
+                             T_Ger_MediumFactory, Airbase = T_Ger_AircraftBuilding, Experimental =
+                             T_Ger_ExperimentalBuilding. Technologies is not a building and keeps the flat stencil
+                             research icon (BuildingIcons/Set08_FlatStencil_Wasteland/T_ResearchBuilding).
   T_Deck_Part_*              half-size copies of the hangar variant screen's slice textures (rows, rail entries,
                              icon well, buttons, tabs). Slate draws box brush corners at texture size, so these are
                              one texel per UI unit; T_Deck_Panel is scaled for the same reason (corner 26 units).

@@ -133,8 +133,8 @@ namespace DeckCardCatalogPrivate
 	}
 
 	/**
-	 * @brief Training cards only say "set in training UI" in the card table: their name, text and (when the card has
-	 * none) picture are the unit's row in the training options table, as the Blueprint card showed them.
+	 * @brief Training cards only say "set in training UI" in the card table: their name, text and picture are the
+	 * unit's row in the training options table. The card table's picture is only used for a unit without one there.
 	 */
 	void ApplyTrainingTablePresentation(const UDataTable* TrainingOptionsTable, FDeckCardDefinition& InOutDefinition)
 	{
@@ -158,7 +158,8 @@ namespace DeckCardCatalogPrivate
 		}
 		const USlateBrushAsset* TrainingBrush = UUnitVariantPresentationLibrary::FindTrainingTableImageBrush(
 			TrainingOptionsTable, InOutDefinition.TrainingOption);
-		if (not InOutDefinition.ImageBrush.GetResourceObject() && IsValid(TrainingBrush))
+		// The card table's own pictures of training cards are placeholders; the unit's portrait wins when it exists.
+		if (IsValid(TrainingBrush) && TrainingBrush->Brush.GetResourceObject())
 		{
 			InOutDefinition.ImageBrush = TrainingBrush->Brush;
 		}
@@ -232,7 +233,7 @@ int32 UDeckCardCatalog::LoadFromTable(const UDataTable* CardTable)
 		       static_cast<int32>(Definition.Rarity), *Definition.TrainingOption.GetTrainingName(),
 		       *Definition.Title.ToString(),
 		       *Global_GetTechAsString(Definition.Technology),
-		       Definition.ImageBrush.GetResourceObject() ? TEXT("yes") : TEXT("no"));
+		       *GetNameSafe(Definition.ImageBrush.GetResourceObject()));
 		M_Definitions.Add(Card, Definition);
 	}
 	return M_Definitions.Num();

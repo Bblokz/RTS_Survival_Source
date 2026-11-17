@@ -220,9 +220,6 @@ private:
 	TObjectPtr<UTextBlock> M_SectionSubtitleText;
 
 	UPROPERTY()
-	TObjectPtr<UTextBlock> M_SectionCountText;
-
-	UPROPERTY()
 	TObjectPtr<UUniformGridPanel> M_SlotGrid;
 
 	// Shown instead of the grid for a section the player's profile has no slots for.
@@ -240,9 +237,6 @@ private:
 
 	UPROPERTY()
 	TObjectPtr<UTextBlock> M_DockDescriptionText;
-
-	UPROPERTY()
-	TObjectPtr<UTextBlock> M_DockVariantsLabel;
 
 	UPROPERTY()
 	TObjectPtr<UWrapBox> M_DockVariantRows;

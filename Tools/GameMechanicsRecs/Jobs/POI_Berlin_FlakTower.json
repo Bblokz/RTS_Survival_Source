@@ -10,7 +10,7 @@
   "Z": 0.0
  },
  "AnchorYaw": 180.0,
- "ClearUnitsRadius": 10800,
+ "ClearUnitsRadius": 8400,
  "bKeepVoiceLines": true,
  "bKeepAnnouncer": false,
  "bKeepMusic": false,
@@ -22,8 +22,8 @@
    "ClassPath": "/Game/RTS_Survival/Blueprints/Squads/Ger/Barracks_Infantry/Scavengers/Squad_Ger_Scavengers",
    "Player": 1,
    "Offset": {
-    "X": -5400.0,
-    "Y": -4680.0,
+    "X": -4200.0,
+    "Y": -3640.0,
     "Z": 0.0
    },
    "Yaw": 0.0,
@@ -36,8 +36,8 @@
    "Type": "Move",
    "Tag": "Patrol",
    "TargetOffset": {
-    "X": 5400.0,
-    "Y": -3600.0,
+    "X": 4200.0,
+    "Y": -2800.0,
     "Z": 0.0
    },
    "TargetYaw": 0
@@ -59,18 +59,18 @@
       "Z": -2305.0
      },
      "Yaw": 200.0,
-     "Pitch": 7.0,
-     "Distance": 7200.0,
+     "Pitch": 20.0,
+     "Distance": 8960.0,
      "Focal": 26.0,
      "Roll": 0.0,
      "LookOffset": {
       "X": 0.0,
       "Y": 0.0,
-      "Z": 1500.0
+      "Z": 1200.0
      },
      "VYaw": 0.0,
-     "VPitch": 11.0,
-     "VDistance": 7560.0,
+     "VPitch": 24.0,
+     "VDistance": 9408.0,
      "VFocal": 20.0,
      "VLookOffset": {
       "X": 0.0,
@@ -87,18 +87,18 @@
       "Z": -2305.0
      },
      "Yaw": 155.0,
-     "Pitch": 11.0,
-     "Distance": 6480.0,
+     "Pitch": 24.0,
+     "Distance": 8400.0,
      "Focal": 26.0,
      "Roll": 0.0,
      "LookOffset": {
       "X": 0.0,
       "Y": 0.0,
-      "Z": 1500.0
+      "Z": 1200.0
      },
      "VYaw": 0.0,
-     "VPitch": 15.0,
-     "VDistance": 6804.0,
+     "VPitch": 28.0,
+     "VDistance": 8820.0,
      "VFocal": 20.0,
      "VLookOffset": {
       "X": 0.0,
@@ -128,7 +128,7 @@
       "Y": 0.0,
       "Z": 0.0
      },
-     "Yaw": 270.0,
+     "Yaw": 180.0,
      "Pitch": 14.0,
      "Distance": 3000.0,
      "Focal": 24.0,
@@ -154,9 +154,9 @@
      "Offset": {
       "X": 0.0,
       "Y": 0.0,
-      "Z": -805.0
+      "Z": -1105.0
      },
-     "Yaw": 270.0,
+     "Yaw": 180.0,
      "Pitch": 14.0,
      "Distance": 3000.0,
      "Focal": 24.0,
@@ -199,18 +199,18 @@
       "Z": -2305.0
      },
      "Yaw": 130.0,
-     "Pitch": 10.0,
-     "Distance": 7920.000000000001,
+     "Pitch": 16.0,
+     "Distance": 7839.999999999999,
      "Focal": 30.0,
      "Roll": 0.0,
      "LookOffset": {
       "X": 0.0,
       "Y": 0.0,
-      "Z": 1500.0
+      "Z": 1200.0
      },
      "VYaw": 0.0,
-     "VPitch": 14.0,
-     "VDistance": 8640.0,
+     "VPitch": 20.0,
+     "VDistance": 6720.0,
      "VFocal": 0.0,
      "VLookOffset": {
       "X": 0.0,
@@ -227,18 +227,18 @@
       "Z": -2305.0
      },
      "Yaw": 90.0,
-     "Pitch": 28.0,
-     "Distance": 11520.0,
+     "Pitch": 40.0,
+     "Distance": 11200.0,
      "Focal": 24.0,
      "Roll": 0.0,
      "LookOffset": {
       "X": 0.0,
       "Y": 0.0,
-      "Z": 1500.0
+      "Z": 1200.0
      },
      "VYaw": 0.0,
-     "VPitch": 34.0,
-     "VDistance": 12240.0,
+     "VPitch": 46.0,
+     "VDistance": 12320.000000000002,
      "VFocal": 0.0,
      "VLookOffset": {
       "X": 0.0,

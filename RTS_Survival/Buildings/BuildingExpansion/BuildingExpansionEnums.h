@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "CoreMinimal.h"
 #include "BXPConstructionRules/BXPConstructionRules.h"
@@ -173,6 +173,7 @@ enum class EBuildingExpansionType : uint8
 	// Strike Division barracks: a timber sniper loft with a ghillie canvas and sandbag parapet; a Kar98k sniper on its
 	// deck covers the front half circle (the loft's net poles block the back); built at the building origin.
 	BTX_GerBarracksSniperLoft UMETA(DisplayName = "Ger Barracks Sniper Loft"),
+	BTX_RusTripleCrownBunker UMETA(DisplayName = "Rus Triple Crown Ice Cannon Bunker"),
 };
 
 static FString Global_GetBxpTypeEnumAsString(EBuildingExpansionType BxpType)
@@ -332,6 +333,7 @@ static FString Global_GetBxpDisplayString(const EBuildingExpansionType BxpType)
 {
 	switch (BxpType)
 	{
+	case EBuildingExpansionType::BTX_RusTripleCrownBunker: return TEXT("Triple Crown Ice Cannon");
 	case EBuildingExpansionType::BTX_GerHQRadar: return TEXT("HQ Radar");
 	case EBuildingExpansionType::BTX_GerHQPlatform: return TEXT("HQ Platform");
 	case EBuildingExpansionType::BTX_GerHQHarvester: return TEXT("HQ Harvester Hub");

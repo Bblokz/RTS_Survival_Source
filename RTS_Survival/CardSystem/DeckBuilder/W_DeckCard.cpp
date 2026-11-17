@@ -22,8 +22,9 @@ namespace DeckCardLayout
 	const FVector2D PictureSize(68.f, 68.f);
 	const FVector2D BuildingWellPosition(142.f, 35.f);
 	const FVector2D BuildingWellSize(52.f, 52.f);
-	const FVector2D BuildingIconPosition(148.f, 41.f);
-	const FVector2D BuildingIconSize(40.f, 40.f);
+	// The building portrait fills the well up to its rim.
+	const FVector2D BuildingIconPosition(145.f, 38.f);
+	const FVector2D BuildingIconSize(46.f, 46.f);
 	const FVector2D TypeBarPosition(17.f, 104.f);
 	const FVector2D TypeBarSize(206.f, 19.f);
 	const FVector2D NamePosition(12.f, 128.f);

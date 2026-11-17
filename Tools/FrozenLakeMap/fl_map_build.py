@@ -44,6 +44,7 @@ HEIGHTS = None
 SHOT_BRIGHTNESS = 0.12
 SHOT_EXPOSURE = 0.0
 SHOT_SOURCE = None                        # None = final colour; e.g. unreal.SceneCaptureSource.SCS_BASE_COLOR to measure
+SHOT_LEVEL_EXPOSURE = False               # True: the capture uses the level's own exposure (the night look as played)
 
 
 def log(text):
@@ -336,6 +337,158 @@ def step_lighting():
         report.append("sky atmosphere added")
     log("lighting %s" % report)
     return report
+
+
+# ---- night (owner 2026-11-17: a moonlit night map, dark but every unit still readable) -----------------------------
+# Snow and ice reflect moonlight: the ground stays a light grey-blue and dark hulls stand out against it. The exposure
+# is fixed in the map's post-process volume (auto exposure would lift the night back to day); a weak shadowless fill
+# from the RTS camera's direction keeps a faint edge on every unit. Tuned from editor captures that use the level's
+# own exposure (SHOT_LEVEL_EXPOSURE); see FrozenLakeMap.md "Night".
+NIGHT = {
+    "moon_intensity": 1.6, "moon_color": (0.62, 0.74, 1.0), "moon_rotation": (0.0, -42.0, 130.0),
+    "sky_intensity": 0.6, "sky_color": (0.40, 0.50, 0.80),
+    "fill_intensity": 0.5, "fill_color": (0.70, 0.78, 1.0), "fill_rotation": (0.0, -55.0, -21.0),
+    "fog_density": 0.010, "fog_color": (0.05, 0.07, 0.12), "fog_falloff": 0.12, "fog_max_opacity": 0.6,
+    "exposure_brightness": 1.0, "exposure_bias": 0.3,    # pinned histogram exposure (EV100, min = max) + compensation
+    "saturation": 0.62, "gain": (0.92, 0.96, 1.06), "shadow_gain": (0.86, 0.92, 1.12), "white_temp": 7400.0,
+    "bloom": 0.9,
+}
+FILL_LABEL = PREFIX + "NightFill"
+LIGHT_PREFIX = PREFIX + "Light_"
+
+
+def _night_post(settings):
+    n = NIGHT
+    # fixed exposure: histogram auto exposure pinned (min = max), which the game camera and scene captures both honour
+    # (scene captures ignored AEM_MANUAL in the 2026-11-17 sweep)
+    for key, value in (("auto_exposure_method", unreal.AutoExposureMethod.AEM_HISTOGRAM),
+                       ("auto_exposure_min_brightness", n["exposure_brightness"]),
+                       ("auto_exposure_max_brightness", n["exposure_brightness"]),
+                       ("auto_exposure_bias", n["exposure_bias"]),
+                       ("color_saturation", unreal.Vector4(n["saturation"], n["saturation"], n["saturation"], 1.0)),
+                       ("color_gain", unreal.Vector4(n["gain"][0], n["gain"][1], n["gain"][2], 1.0)),
+                       ("color_gain_shadows", unreal.Vector4(n["shadow_gain"][0], n["shadow_gain"][1],
+                                                             n["shadow_gain"][2], 1.0)),
+                       ("white_temp", n["white_temp"]), ("bloom_intensity", n["bloom"])):
+        settings.set_editor_property("override_" + key, True)
+        settings.set_editor_property(key, value)
+    return settings
+
+
+def step_night():
+    """Moonlit night: moon instead of the sun, deep-blue sky light, dark blue haze, fixed exposure, night grade and
+    a weak camera-side fill. step_lighting() restores the day."""
+    require_map()
+    n = NIGHT
+    report = []
+    clear_prefix(FILL_LABEL)
+    for actor in all_actors():
+        name = actor.get_class().get_name()
+        if name == "DirectionalLight":
+            comp = actor.light_component
+            comp.set_intensity(n["moon_intensity"])
+            comp.set_light_color(unreal.LinearColor(*n["moon_color"], 1.0))
+            comp.set_editor_property("atmosphere_sun_light", True)
+            actor.set_actor_rotation(unreal.Rotator(*n["moon_rotation"]), False)
+            report.append("moon")
+        elif name == "SkyLight":
+            comp = actor.light_component
+            comp.set_intensity(n["sky_intensity"])
+            comp.set_light_color(unreal.LinearColor(*n["sky_color"], 1.0))
+            comp.recapture_sky()
+            report.append("sky")
+        elif name == "ExponentialHeightFog":
+            comp = actor.component
+            comp.set_fog_density(n["fog_density"])
+            comp.set_fog_height_falloff(n["fog_falloff"])
+            comp.set_fog_inscattering_color(unreal.LinearColor(*n["fog_color"], 1.0))
+            comp.set_fog_max_opacity(n["fog_max_opacity"])
+            report.append("fog")
+        elif name == "PostProcessVolume":
+            actor.set_editor_property("settings", _night_post(actor.settings))
+            report.append("post unbound=%s" % actor.get_editor_property("unbound"))
+    fill = actors_sub().spawn_actor_from_class(unreal.DirectionalLight, unreal.Vector(0.0, 0.0, 3000.0),
+                                               unreal.Rotator(*n["fill_rotation"]))
+    comp = fill.light_component
+    comp.set_intensity(n["fill_intensity"])
+    comp.set_light_color(unreal.LinearColor(*n["fill_color"], 1.0))
+    comp.set_editor_property("cast_shadows", False)
+    comp.set_editor_property("atmosphere_sun_light", False)
+    comp.set_editor_property("forward_shading_priority", 1)
+    fill.set_actor_label(FILL_LABEL)
+    fill.set_folder_path(FOLDER + "Lighting")
+    report.append("fill")
+    log("night %s" % report)
+    return report
+
+
+def _point_light(label, x, y, z, intensity, colour, radius, folder):
+    actor = actors_sub().spawn_actor_from_class(unreal.PointLight, unreal.Vector(x, y, z))
+    comp = actor.point_light_component
+    comp.set_intensity(intensity)
+    comp.set_light_color(unreal.LinearColor(*colour, 1.0))
+    comp.set_attenuation_radius(radius)
+    comp.set_editor_property("cast_shadows", False)
+    actor.set_actor_label(LIGHT_PREFIX + label)
+    actor.set_folder_path(FOLDER + "Lighting/" + folder)
+    return actor
+
+
+def _spot_light(label, x, y, z, rotation, intensity, colour, radius, cone, folder, shadows=False):
+    actor = actors_sub().spawn_actor_from_class(unreal.SpotLight, unreal.Vector(x, y, z), unreal.Rotator(*rotation))
+    comp = actor.spot_light_component
+    comp.set_intensity(intensity)
+    comp.set_light_color(unreal.LinearColor(*colour, 1.0))
+    comp.set_attenuation_radius(radius)
+    comp.set_outer_cone_angle(cone)
+    comp.set_inner_cone_angle(cone * 0.6)
+    comp.set_editor_property("cast_shadows", shadows)
+    actor.set_actor_label(LIGHT_PREFIX + label)
+    actor.set_folder_path(FOLDER + "Lighting/" + folder)
+    return actor
+
+
+def step_night_lights():
+    """Story lights for the night: rig floodlights, green pools at the pumps, amber runway edge lights, embers at the
+    burnt convoy. All without shadows except the rig floods (cheap at this count)."""
+    require_map()
+    removed = clear_prefix(LIGHT_PREFIX)
+    count = 0
+    # rig: four floods on the deck corners, aimed out and down over the ice round the platform
+    for k, bearing in enumerate((10.0, 100.0, 190.0, 280.0)):
+        a = math.radians(bearing)
+        x, y = 2000.0 * math.cos(a), 2000.0 * math.sin(a)
+        _spot_light("RigFlood_%d" % k, x, y, 1800.0, (0.0, -38.0, bearing), 2600.0, (0.86, 0.93, 1.0), 6500.0,
+                    40.0, "Rig", shadows=k % 2 == 0)
+        count += 1
+    # pumps: a green pool from each Radixite core
+    for pid in ("pump_s", "pump_w", "pump_n", "pump_e"):
+        x, y = feature(pid)["points"][0]
+        _point_light("PumpGlow_" + pid, x, y, ground_z(x, y) + 600.0, 900.0, (0.35, 1.0, 0.45), 3200.0, "Pumps")
+        count += 1
+    # landing field: amber edge lights along both runway sides
+    air = feature("soviet_airfield")
+    (ax, ay), (bx, by) = air["raw"]["ends"]
+    half = air["raw"]["width"] / 2.0
+    length = math.hypot(bx - ax, by - ay)
+    nx, ny = -(by - ay) / length, (bx - ax) / length
+    steps = int(length // 1200.0)
+    for i in range(steps + 1):
+        t = i / float(steps)
+        for side in (-1.0, 1.0):
+            x = ax + (bx - ax) * t + nx * half * side
+            y = ay + (by - ay) * t + ny * half * side
+            _point_light("Runway_%02d_%s" % (i, "l" if side < 0 else "r"), x, y, ground_z(x, y) + 80.0, 60.0,
+                         (1.0, 0.62, 0.25), 700.0, "Runway")
+            count += 1
+    # burnt convoy: low embers
+    cx, cy = feature("convoy_wreck_se")["points"][0]
+    for k, (dx, dy) in enumerate(((0.0, 0.0), (700.0, -500.0), (-600.0, 400.0))):
+        _point_light("ConvoyEmber_%d" % k, cx + dx, cy + dy, ground_z(cx + dx, cy + dy) + 120.0, 180.0,
+                     (1.0, 0.35, 0.08), 1100.0, "Convoy")
+        count += 1
+    log("night lights %d (removed %d)" % (count, removed))
+    return count
 
 
 # The UVB80 mud and MilitaryAirport albedos are far darker than the sand and snow (median linear luminance ~0.1):
@@ -995,6 +1148,18 @@ def _capture(name, comp, rt, cap):
     comp.set_editor_property("texture_target", rt)
     comp.set_editor_property("capture_source", SHOT_SOURCE or unreal.SceneCaptureSource.SCS_FINAL_COLOR_LDR)
     comp.set_editor_property("capture_every_frame", False)
+    if SHOT_LEVEL_EXPOSURE:
+        # scene captures did not pick up the volume's exposure (2026-11-17 sweep): give the capture the same night
+        # exposure and grade the map's post-process volume has
+        comp.set_editor_property("post_process_settings", _night_post(comp.get_editor_property("post_process_settings")))
+        comp.set_editor_property("post_process_blend_weight", 1.0)
+        comp.capture_scene()
+        comp.capture_scene()
+        unreal.RenderingLibrary.export_render_target(world(), rt, SHOTS, name + ".png")
+        actors_sub().destroy_actor(cap)
+        unreal.RenderingLibrary.release_render_target2d(rt)
+        log("shot %s%s.png (level exposure)" % (SHOTS, name))
+        return
     pp = comp.get_editor_property("post_process_settings")
     pp.set_editor_property("override_auto_exposure_bias", True)
     pp.set_editor_property("auto_exposure_bias", SHOT_EXPOSURE)
