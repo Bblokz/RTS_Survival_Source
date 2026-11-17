@@ -12,5 +12,8 @@ public class RTS_SurvivalEditorTarget : TargetRules
 		IncludeOrderVersion = EngineIncludeOrderVersion.Unreal5_3;
 
 		ExtraModuleNames.AddRange( new string[] { "RTS_Survival" } );
+		// Game mechanics recorder (Source/RTS_GameMechanicsRecs): editor builds only and never loaded by itself;
+		// the headless render process loads it with -ExecCmds="Module Load RTS_GameMechanicsRecs".
+		ExtraModuleNames.Add("RTS_GameMechanicsRecs");
 	}
 }

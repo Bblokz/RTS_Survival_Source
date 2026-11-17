@@ -272,6 +272,8 @@ private:
 	TMap<TWeakObjectPtr<AAircraftMaster>, int32> M_StrafeAircraftFirstMagazines;
 	int32 M_StrafeMostAircraftSeen = 0;
 	bool bM_StrafeAnyFired = false;
+	// World time the first measured MG round left a gun; the QA window runs from here.
+	float M_StrafeFirstShotSeconds = -1.f;
 
 	// -AircraftDropValidate: nothing else holds the running abilities, and their load callbacks outlive StartAircraftDrop.
 	UPROPERTY()
@@ -406,6 +408,8 @@ private:
 	void TickAircraftStrafe();
 	/** @return Whether any strafing aircraft has fired since it was first seen. */
 	bool TrackStrafeAircraft();
+	// Logs the measured MG rounds (FAircraftStrafeShotRecorder), checks them for the strafe gun and writes the CSV.
+	void FinishAircraftStrafeQA();
 
 	// ---------------- Vehicle drop global abilities (AircraftDropTest.cpp) ----------------
 	void StartAircraftDrop();

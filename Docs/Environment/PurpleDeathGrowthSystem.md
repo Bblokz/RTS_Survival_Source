@@ -97,14 +97,20 @@ Proposed names (adjust to the project's conventions when building):
 | Are nodes killable? | **Yes.** Section 4. |
 | Look | **Match the cinematic**: not much neon, more cinematic. Section 3E. |
 
-### Still open
+### Decisions (owner, 2026-11-17)
 
-1. Which maps and modes use it (missions, Survival mode), and how large an area at most?
-2. Withering: when a node dies, does growth that no living node feeds wither away? This document assumes **yes,
-   slowly** (section 4), otherwise killing a node would only stop the spread. Confirm.
-3. Vehicles: how much damage do they take? This document assumes **a little** (section 4). Confirm.
-4. Fog of war: does growth update live in explored-but-not-visible areas, or show the last seen state?
-5. Save/load: missions need nodes plus `Arrival`/`Cut` arrays saved.
+| Question | Decision |
+|---|---|
+| Withering | **Yes.** Growth that no living node feeds withers away slowly (section 4). |
+| Vehicles | **A little damage** (section 4). |
+| Which maps | **Every map where nodes are placed.** A map without nodes pays nothing: the subsystem creates no grid, textures, tiles or decals until the first node exists. The grid covers the landscape bounds of the map it is on. |
+| Fog of war | **Ignored.** Growth updates and renders whenever it changes, visible or not; the fog of war post process darkens it like any other ground. No vision checks. |
+
+### Requirements without a question
+
+- Save/load: missions need the nodes (with health) plus the `Arrival`/`Cut` arrays saved and restored.
+- Very large maps: if a map's grid would exceed the memory budget, allocate the grid in chunks only where growth can
+  reach (around nodes), instead of one array for the whole landscape.
 
 ## 2. GPU data
 
@@ -258,7 +264,7 @@ records what worked.
 - When a node dies:
   - it is removed as a source, and the field is recalculated around it;
   - cells another living node still reaches stay (that node's growth takes over);
-  - cells no living node reaches **wither** (assumed, see "Still open"): they get a `Cut` time spread outward from the
+  - cells no living node reaches **wither** (decided 2026-11-17): they get a `Cut` time spread outward from the
     dead node over tens of seconds, so the goo dries and recedes in a wave instead of popping out;
   - a death effect: the heart bursts, the thick vessels around it collapse and darken.
 - Without withering, killing a node would only stop the spread, which would make it a weak objective.
@@ -286,7 +292,7 @@ scales with coverage under the unit), so a squad that blunders onto the edge has
 **Contamination.** Leaving the growth does not stop the damage at once: the effect runs on for about 2-3 s, so
 running through it is not free.
 
-**Vehicles (assumed, see "Still open").** A little damage over time (corrosion), small enough that tanks can push into
+**Vehicles (decided 2026-11-17).** A little damage over time (corrosion), small enough that tanks can push into
 the growth and fight it, large enough that they cannot park in it forever. Aircraft are unaffected.
 
 **How it is built (cheap):**
@@ -326,7 +332,7 @@ Each step ends with something that can be checked. Steps 2 and 3 are the spike t
 
 | # | Step | Done when |
 |---|---|---|
-| 1 | Answer the open questions (section 1). Units, nodes and look were decided 2026-11-16. | Remaining answers recorded in this document |
+| 1 | ~~Answer the open questions~~ **Done** 2026-11-16/17 (section 1) | All answers recorded in section 1 |
 | 2 | Simulation: subsystem, node actor, settings, grid, Dijkstra with slicing, damage, regrowth, debug view (`rts.PurpleDeath.Debug` draws coverage and fronts), console commands to place nodes and apply damage | Headless test: two nodes grow and merge with no overlap; damage cuts a hole that refills; CPU timers logged |
 | 3 | GPU textures and ground tiles (A) on Ger_Trains, plus the benchmark (section 9) | Bench shows the landscape's BasePass cost drops under the tiles and the ground pass criterion (section 9) is met; no landscape pokes through; look checked at the gameplay camera |
 | 4 | Wall and prop decals with climbing (B); units stop receiving decals | Buildings in the Ger_Trains test area are fully covered over time; no unit is painted; bench numbers within budget |
@@ -383,7 +389,7 @@ Each at the gameplay camera (pitch about -70 like the perf audit views), at defa
 | # | Scenario | Purpose |
 |---|---|---|
 | S0 | `rts.PurpleDeath 0` | Baseline |
-| S1 | System on, no nodes | Idle cost (must be ~0) |
+| S1 | System on, no nodes | Idle cost (must be ~0: no grid, textures, tiles or decals are created) |
 | S2 | Flat open ground fully covered, tiles on | Ground layer cost |
 | S3 | Same view, `rts.PurpleDeath.GroundTiles 0` | The landscape cost the tiles should save (compare with S2) |
 | S4 | Building cluster fully covered (walls, decals, skirts) | Wall decal and climb cost |

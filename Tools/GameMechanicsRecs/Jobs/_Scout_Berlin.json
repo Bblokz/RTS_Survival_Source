@@ -1,0 +1,630 @@
+{
+ "JobName": "Scout_Berlin",
+ "Category": "_Scout",
+ "Fps": 60,
+ "WarmupSeconds": 5.0,
+ "DurationSeconds": 4.8,
+ "Anchor": {
+  "X": 0.0,
+  "Y": 0.0,
+  "Z": 0.0
+ },
+ "AnchorYaw": 0.0,
+ "ClearUnitsRadius": 0.0,
+ "bKeepVoiceLines": true,
+ "bKeepAnnouncer": false,
+ "bKeepMusic": false,
+ "Events": [
+  {
+   "Time": -1.0,
+   "Type": "Marker",
+   "Tag": "",
+   "Offset": {
+    "X": -27250.0,
+    "Y": -5567.0,
+    "Z": 0.0
+   },
+   "Text": "red",
+   "Value": 250.0,
+   "Settings": {
+    "Height": 900.0
+   }
+  },
+  {
+   "Time": -1.0,
+   "Type": "Marker",
+   "Tag": "",
+   "Offset": {
+    "X": -18250.0,
+    "Y": -4667.0,
+    "Z": 0.0
+   },
+   "Text": "yellow",
+   "Value": 180.0,
+   "Settings": {
+    "Height": 900.0
+   }
+  },
+  {
+   "Time": -1.0,
+   "Type": "Marker",
+   "Tag": "",
+   "Offset": {
+    "X": -22750.0,
+    "Y": -1667.0,
+    "Z": 0.0
+   },
+   "Text": "white",
+   "Value": 150.0,
+   "Settings": {
+    "Height": 2500.0
+   }
+  },
+  {
+   "Time": -1.0,
+   "Type": "Marker",
+   "Tag": "",
+   "Offset": {
+    "X": 7583.0,
+    "Y": 13333.0,
+    "Z": 0.0
+   },
+   "Text": "white",
+   "Value": 150.0,
+   "Settings": {
+    "Height": 2500.0
+   }
+  },
+  {
+   "Time": -1.0,
+   "Type": "Marker",
+   "Tag": "",
+   "Offset": {
+    "X": -2167.0,
+    "Y": -3000.0,
+    "Z": 0.0
+   },
+   "Text": "white",
+   "Value": 150.0,
+   "Settings": {
+    "Height": 2500.0
+   }
+  },
+  {
+   "Time": -1.0,
+   "Type": "Marker",
+   "Tag": "",
+   "Offset": {
+    "X": 16700.0,
+    "Y": -20440.0,
+    "Z": 0.0
+   },
+   "Text": "red",
+   "Value": 250.0,
+   "Settings": {
+    "Height": 900.0
+   }
+  },
+  {
+   "Time": -1.0,
+   "Type": "Marker",
+   "Tag": "",
+   "Offset": {
+    "X": 28100.0,
+    "Y": -19300.0,
+    "Z": 0.0
+   },
+   "Text": "yellow",
+   "Value": 180.0,
+   "Settings": {
+    "Height": 900.0
+   }
+  },
+  {
+   "Time": -1.0,
+   "Type": "Marker",
+   "Tag": "",
+   "Offset": {
+    "X": 22400.0,
+    "Y": -15500.0,
+    "Z": 0.0
+   },
+   "Text": "white",
+   "Value": 150.0,
+   "Settings": {
+    "Height": 2500.0
+   }
+  },
+  {
+   "Time": -1.0,
+   "Type": "Marker",
+   "Tag": "",
+   "Offset": {
+    "X": -15275.0,
+    "Y": -14491.0,
+    "Z": 0.0
+   },
+   "Text": "red",
+   "Value": 250.0,
+   "Settings": {
+    "Height": 900.0
+   }
+  },
+  {
+   "Time": -1.0,
+   "Type": "Marker",
+   "Tag": "",
+   "Offset": {
+    "X": -7475.0,
+    "Y": -13711.0,
+    "Z": 0.0
+   },
+   "Text": "yellow",
+   "Value": 180.0,
+   "Settings": {
+    "Height": 900.0
+   }
+  },
+  {
+   "Time": -1.0,
+   "Type": "Marker",
+   "Tag": "",
+   "Offset": {
+    "X": -11375.0,
+    "Y": -11111.0,
+    "Z": 0.0
+   },
+   "Text": "white",
+   "Value": 150.0,
+   "Settings": {
+    "Height": 2500.0
+   }
+  },
+  {
+   "Time": -1.0,
+   "Type": "Marker",
+   "Tag": "",
+   "Offset": {
+    "X": -7392.0,
+    "Y": 10269.0,
+    "Z": 0.0
+   },
+   "Text": "red",
+   "Value": 250.0,
+   "Settings": {
+    "Height": 900.0
+   }
+  },
+  {
+   "Time": -1.0,
+   "Type": "Marker",
+   "Tag": "",
+   "Offset": {
+    "X": -192.0,
+    "Y": 10989.0,
+    "Z": 0.0
+   },
+   "Text": "yellow",
+   "Value": 180.0,
+   "Settings": {
+    "Height": 900.0
+   }
+  },
+  {
+   "Time": -1.0,
+   "Type": "Marker",
+   "Tag": "",
+   "Offset": {
+    "X": -3792.0,
+    "Y": 13389.0,
+    "Z": 0.0
+   },
+   "Text": "white",
+   "Value": 150.0,
+   "Settings": {
+    "Height": 2500.0
+   }
+  },
+  {
+   "Time": -1.0,
+   "Type": "Marker",
+   "Tag": "",
+   "Offset": {
+    "X": 19500.0,
+    "Y": -10500.0,
+    "Z": 0.0
+   },
+   "Text": "white",
+   "Value": 150.0,
+   "Settings": {
+    "Height": 2500.0
+   }
+  },
+  {
+   "Time": -1.0,
+   "Type": "Marker",
+   "Tag": "",
+   "Offset": {
+    "X": -19725.0,
+    "Y": -48309.0,
+    "Z": 0.0
+   },
+   "Text": "red",
+   "Value": 250.0,
+   "Settings": {
+    "Height": 900.0
+   }
+  },
+  {
+   "Time": -1.0,
+   "Type": "Marker",
+   "Tag": "",
+   "Offset": {
+    "X": -9525.0,
+    "Y": -47289.0,
+    "Z": 0.0
+   },
+   "Text": "yellow",
+   "Value": 180.0,
+   "Settings": {
+    "Height": 900.0
+   }
+  },
+  {
+   "Time": -1.0,
+   "Type": "Marker",
+   "Tag": "",
+   "Offset": {
+    "X": -14625.0,
+    "Y": -43889.0,
+    "Z": 0.0
+   },
+   "Text": "white",
+   "Value": 150.0,
+   "Settings": {
+    "Height": 2500.0
+   }
+  }
+ ],
+ "Shots": [
+  {
+   "Name": "POI_Berlin_AnhalterBf",
+   "Start": 0.0,
+   "End": 0.6,
+   "Rig": "Orbit",
+   "Keys": [
+    {
+     "Time": 0.0,
+     "Pivot": "",
+     "Offset": {
+      "X": -22750.0,
+      "Y": -1667.0,
+      "Z": 0.0
+     },
+     "Yaw": 180.0,
+     "Pitch": 84.0,
+     "Distance": 17000.0,
+     "Focal": 24.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     },
+     "VYaw": 0.0,
+     "VPitch": 0.0,
+     "VDistance": 0.0,
+     "VFocal": 0.0,
+     "VLookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     }
+    }
+   ],
+   "Ease": "InOut",
+   "PivotLag": 0.7,
+   "Aperture": 0.0,
+   "Shake": 0.0,
+   "bAvoidOcclusion": false,
+   "MinGroundClearance": 350.0
+  },
+  {
+   "Name": "POI_Berlin_CentralAvenue",
+   "Start": 0.6,
+   "End": 1.2,
+   "Rig": "Orbit",
+   "Keys": [
+    {
+     "Time": 0.0,
+     "Pivot": "",
+     "Offset": {
+      "X": 7583.0,
+      "Y": 13333.0,
+      "Z": 0.0
+     },
+     "Yaw": 61.0,
+     "Pitch": 84.0,
+     "Distance": 17000.0,
+     "Focal": 24.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     },
+     "VYaw": 0.0,
+     "VPitch": 0.0,
+     "VDistance": 0.0,
+     "VFocal": 0.0,
+     "VLookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     }
+    }
+   ],
+   "Ease": "InOut",
+   "PivotLag": 0.7,
+   "Aperture": 0.0,
+   "Shake": 0.0,
+   "bAvoidOcclusion": false,
+   "MinGroundClearance": 350.0
+  },
+  {
+   "Name": "POI_Berlin_Crater",
+   "Start": 1.2,
+   "End": 1.7999999999999998,
+   "Rig": "Orbit",
+   "Keys": [
+    {
+     "Time": 0.0,
+     "Pivot": "",
+     "Offset": {
+      "X": -2167.0,
+      "Y": -3000.0,
+      "Z": 0.0
+     },
+     "Yaw": 180.0,
+     "Pitch": 84.0,
+     "Distance": 17000.0,
+     "Focal": 24.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     },
+     "VYaw": 0.0,
+     "VPitch": 0.0,
+     "VDistance": 0.0,
+     "VFocal": 0.0,
+     "VLookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     }
+    }
+   ],
+   "Ease": "InOut",
+   "PivotLag": 0.7,
+   "Aperture": 0.0,
+   "Shake": 0.0,
+   "bAvoidOcclusion": false,
+   "MinGroundClearance": 350.0
+  },
+  {
+   "Name": "POI_Berlin_Hauptbahnhof",
+   "Start": 1.7999999999999998,
+   "End": 2.4,
+   "Rig": "Orbit",
+   "Keys": [
+    {
+     "Time": 0.0,
+     "Pivot": "",
+     "Offset": {
+      "X": 22400.0,
+      "Y": -15500.0,
+      "Z": 0.0
+     },
+     "Yaw": 180.0,
+     "Pitch": 84.0,
+     "Distance": 17000.0,
+     "Focal": 24.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     },
+     "VYaw": 0.0,
+     "VPitch": 0.0,
+     "VDistance": 0.0,
+     "VFocal": 0.0,
+     "VLookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     }
+    }
+   ],
+   "Ease": "InOut",
+   "PivotLag": 0.7,
+   "Aperture": 0.0,
+   "Shake": 0.0,
+   "bAvoidOcclusion": false,
+   "MinGroundClearance": 350.0
+  },
+  {
+   "Name": "POI_Berlin_PotsdamerPlatz",
+   "Start": 2.4,
+   "End": 3.0,
+   "Rig": "Orbit",
+   "Keys": [
+    {
+     "Time": 0.0,
+     "Pivot": "",
+     "Offset": {
+      "X": -11375.0,
+      "Y": -11111.0,
+      "Z": 0.0
+     },
+     "Yaw": 180.0,
+     "Pitch": 84.0,
+     "Distance": 17000.0,
+     "Focal": 24.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     },
+     "VYaw": 0.0,
+     "VPitch": 0.0,
+     "VDistance": 0.0,
+     "VFocal": 0.0,
+     "VLookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     }
+    }
+   ],
+   "Ease": "InOut",
+   "PivotLag": 0.7,
+   "Aperture": 0.0,
+   "Shake": 0.0,
+   "bAvoidOcclusion": false,
+   "MinGroundClearance": 350.0
+  },
+  {
+   "Name": "POI_Berlin_RailYard",
+   "Start": 3.0,
+   "End": 3.6,
+   "Rig": "Orbit",
+   "Keys": [
+    {
+     "Time": 0.0,
+     "Pivot": "",
+     "Offset": {
+      "X": -3792.0,
+      "Y": 13389.0,
+      "Z": 0.0
+     },
+     "Yaw": 180.0,
+     "Pitch": 84.0,
+     "Distance": 17000.0,
+     "Focal": 24.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     },
+     "VYaw": 0.0,
+     "VPitch": 0.0,
+     "VDistance": 0.0,
+     "VFocal": 0.0,
+     "VLookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     }
+    }
+   ],
+   "Ease": "InOut",
+   "PivotLag": 0.7,
+   "Aperture": 0.0,
+   "Shake": 0.0,
+   "bAvoidOcclusion": false,
+   "MinGroundClearance": 350.0
+  },
+  {
+   "Name": "POI_Berlin_SpreeMoltke",
+   "Start": 3.5999999999999996,
+   "End": 4.199999999999999,
+   "Rig": "Orbit",
+   "Keys": [
+    {
+     "Time": 0.0,
+     "Pivot": "",
+     "Offset": {
+      "X": 19500.0,
+      "Y": -10500.0,
+      "Z": 0.0
+     },
+     "Yaw": 45.0,
+     "Pitch": 84.0,
+     "Distance": 17000.0,
+     "Focal": 24.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     },
+     "VYaw": 0.0,
+     "VPitch": 0.0,
+     "VDistance": 0.0,
+     "VFocal": 0.0,
+     "VLookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     }
+    }
+   ],
+   "Ease": "InOut",
+   "PivotLag": 0.7,
+   "Aperture": 0.0,
+   "Shake": 0.0,
+   "bAvoidOcclusion": false,
+   "MinGroundClearance": 350.0
+  },
+  {
+   "Name": "POI_Berlin_ZooTower",
+   "Start": 4.2,
+   "End": 4.8,
+   "Rig": "Orbit",
+   "Keys": [
+    {
+     "Time": 0.0,
+     "Pivot": "",
+     "Offset": {
+      "X": -14625.0,
+      "Y": -43889.0,
+      "Z": 0.0
+     },
+     "Yaw": 180.0,
+     "Pitch": 84.0,
+     "Distance": 17000.0,
+     "Focal": 24.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     },
+     "VYaw": 0.0,
+     "VPitch": 0.0,
+     "VDistance": 0.0,
+     "VFocal": 0.0,
+     "VLookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     }
+    }
+   ],
+   "Ease": "InOut",
+   "PivotLag": 0.7,
+   "Aperture": 0.0,
+   "Shake": 0.0,
+   "bAvoidOcclusion": false,
+   "MinGroundClearance": 350.0
+  }
+ ],
+ "MapPath": "/Game/RTS_Survival/Maps/GerMissions/Ger_Berlin",
+ "GameModeClassPath": "/Game/RTS_Survival/Blueprints/GameSettings/RTS_BP_GamemodeBase.RTS_BP_GamemodeBase_C",
+ "HideActorPrefixes": []
+}

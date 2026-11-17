@@ -8,6 +8,7 @@
 #include "Components/DecalComponent.h"
 #include "Components/PrimitiveComponent.h"
 #include "RTS_Survival/Weapons/AircraftWeapon/AircraftWeapon.h"
+#include "RTS_Survival/Weapons/AircraftWeapon/AircraftStrafeGun/WeaponStateAircraftStrafeGun.h"
 #include "RTS_Survival/RTSComponents/RTSTargetAcquisition/AircraftTargetAcquisition/AircraftTargetAcquisition.h"
 #include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetMathLibrary.h"
@@ -2713,6 +2714,11 @@ void AAircraftMaster::Strafe_TickTargetLocation(const float DeltaTime)
 	{
 		return;
 	}
+	if (not UWeaponStateAircraftStrafeGun::GetIsLegacyAircraftGunsRequested())
+	{
+		Strafe_TickTargetFromFlightProgress();
+		return;
+	}
 
 	if (M_StrafeState.StrafePointTotalLerpTime <= KINDA_SMALL_NUMBER)
 	{
@@ -2733,6 +2739,43 @@ void AAircraftMaster::Strafe_TickTargetLocation(const float DeltaTime)
 	Strafe_UpdateWeaponTargetLocation();
 
 	if (LerpAlpha >= 1.f)
+	{
+		M_StrafeState.bM_IsLerpingStrafePoint = false;
+	}
+}
+
+void AAircraftMaster::Strafe_TickTargetFromFlightProgress()
+{
+	// The guns look this steeply down at the ground ahead; with the strafe gun's nose cone the fire then lands
+	// where the aircraft is heading instead of following a timer.
+	constexpr float PreferredGunDepressionDeg = 20.f;
+	constexpr float MinGunLeadCm = 1000.f;
+	constexpr float MaxGunLeadCm = 4500.f;
+	const FVector RunStart = M_StrafeState.ActiveLerpStartLocation;
+	const FVector RunEnd = M_StrafeState.ActiveLerpEndLocation;
+	const FVector RunLine2D = FVector(RunEnd.X - RunStart.X, RunEnd.Y - RunStart.Y, 0.f);
+	const float RunLengthSquared = RunLine2D.SizeSquared();
+	if (RunLengthSquared <= KINDA_SMALL_NUMBER)
+	{
+		M_AircraftAttackData.TargetLocation = RunEnd;
+		Strafe_UpdateWeaponTargetLocation();
+		M_StrafeState.bM_IsLerpingStrafePoint = false;
+		return;
+	}
+	const FVector AircraftLocation = GetActorLocation();
+	const float GroundZ = FMath::Lerp(RunStart.Z, RunEnd.Z, M_StrafeState.FlightProgressAlpha);
+	const float GunLead = FMath::Clamp(
+		(AircraftLocation.Z - GroundZ) / FMath::Tan(FMath::DegreesToRadians(PreferredGunDepressionDeg)),
+		MinGunLeadCm, MaxGunLeadCm);
+	FVector Forward2D = GetActorForwardVector();
+	Forward2D.Z = 0.f;
+	const FVector LeadPoint = AircraftLocation + Forward2D.GetSafeNormal() * GunLead;
+	const float Alpha = FMath::Clamp(
+		FVector::DotProduct(LeadPoint - RunStart, RunLine2D) / RunLengthSquared, 0.f, 1.f);
+	M_StrafeState.FlightProgressAlpha = FMath::Max(M_StrafeState.FlightProgressAlpha, Alpha);
+	M_AircraftAttackData.TargetLocation = FMath::Lerp(RunStart, RunEnd, M_StrafeState.FlightProgressAlpha);
+	Strafe_UpdateWeaponTargetLocation();
+	if (M_StrafeState.FlightProgressAlpha >= 1.f)
 	{
 		M_StrafeState.bM_IsLerpingStrafePoint = false;
 	}
@@ -2805,6 +2848,7 @@ void AAircraftMaster::Strafe_OnAttackDiveStarted()
 	M_StrafeState.ActiveLerpStartLocation = M_StrafeState.NextRunStartLocation;
 	M_StrafeState.ActiveLerpEndLocation = Strafe_GetNextRunEndLocation();
 	M_StrafeState.CurrentLerpTime = 0.f;
+	M_StrafeState.FlightProgressAlpha = 0.f;
 	M_StrafeState.bM_IsLerpingStrafePoint = true;
 	M_AircraftAttackData.TargetLocation = M_StrafeState.ActiveLerpStartLocation;
 }

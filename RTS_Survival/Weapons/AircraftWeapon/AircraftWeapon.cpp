@@ -4,6 +4,7 @@
 #include "AircraftWeapon.h"
 
 #include "Kismet/KismetMathLibrary.h"
+#include "AircraftStrafeGun/WeaponStateAircraftStrafeGun.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 #include "RTS_Survival/Weapons/FlameThrowerWeapon/UWeaponStateFlameThrower.h"
 #include "RTS_Survival/Weapons/SmallArmsProjectileManager/SmallArmsProjectileManager.h"
@@ -502,7 +503,11 @@ void UAircraftWeapon::SetupMultiTraceWeapon(FInitWeaponStateMultiTrace MultiTrac
 
 	const int32 WeaponIndex = M_TWeapons.Num();
 
-	UWeaponStateMultiTrace* MultiTrace = NewObject<UWeaponStateMultiTrace>(this);
+	// Every multi-socket aircraft MG is a strafe gun: fire along the nose into a walking beaten zone, impacts timed
+	// to the tracers. -AircraftStrafeLegacyGuns brings back the plain multi-trace weapon for comparisons.
+	UWeaponStateMultiTrace* MultiTrace = UWeaponStateAircraftStrafeGun::GetIsLegacyAircraftGunsRequested()
+		                                     ? NewObject<UWeaponStateMultiTrace>(this)
+		                                     : NewObject<UWeaponStateAircraftStrafeGun>(this);
 	MultiTrace->InitMultiTraceWeapon(
 		MultiTraceWeaponParameters.OwningPlayer,
 		WeaponIndex,

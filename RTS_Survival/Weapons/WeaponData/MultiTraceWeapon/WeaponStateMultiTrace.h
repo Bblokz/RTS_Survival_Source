@@ -75,7 +75,7 @@ public:
 		const int32 TraceProjectileType = 1);
 
 	/** @inheritdoc */
-	virtual void FireWeaponSystem() override final;
+	virtual void FireWeaponSystem() override;
 
 	inline int32 GetTraceCount() const { return M_FireSocketNames.Num(); }
 

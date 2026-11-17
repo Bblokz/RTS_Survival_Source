@@ -1,0 +1,554 @@
+{
+ "JobName": "MB_Berlin_TramLine",
+ "Category": "MixedBattles",
+ "Fps": 60,
+ "WarmupSeconds": 6.0,
+ "DurationSeconds": 32.0,
+ "Anchor": {
+  "X": 15000.0,
+  "Y": 8000.0,
+  "Z": 0.0
+ },
+ "AnchorYaw": 0.0,
+ "ClearUnitsRadius": 9000.0,
+ "bKeepVoiceLines": true,
+ "bKeepAnnouncer": false,
+ "bKeepMusic": false,
+ "Events": [
+  {
+   "Time": -1.5,
+   "Type": "Spawn",
+   "Tag": "GerInf",
+   "ClassPath": "/Game/RTS_Survival/Blueprints/Squads/Ger/T2/PanzerGrenadiers/Squad_Ger_PanzerGrenadiers",
+   "Player": 1,
+   "Offset": {
+    "X": -2400.0,
+    "Y": 600.0,
+    "Z": 0.0
+   },
+   "Yaw": 0.0,
+   "Count": 1,
+   "Columns": 0,
+   "Spacing": 1200.0
+  },
+  {
+   "Time": -1.5,
+   "Type": "Spawn",
+   "Tag": "GerInf",
+   "ClassPath": "/Game/RTS_Survival/Blueprints/Squads/Ger/Barracks_Infantry/FemaleSniper/Squad_Ger_FemaleSniper",
+   "Player": 1,
+   "Offset": {
+    "X": -2400.0,
+    "Y": -600.0,
+    "Z": 0.0
+   },
+   "Yaw": 0.0,
+   "Count": 1,
+   "Columns": 0,
+   "Spacing": 1200.0
+  },
+  {
+   "Time": -1.5,
+   "Type": "Spawn",
+   "Tag": "Ger",
+   "ClassPath": "/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Heavy/Tiger/Ger_Vehicle_TigerH1",
+   "Player": 1,
+   "Offset": {
+    "X": -3900.0,
+    "Y": -1200.0,
+    "Z": 0.0
+   },
+   "Yaw": 0.0,
+   "Count": 1,
+   "Columns": 0,
+   "Spacing": 1200.0
+  },
+  {
+   "Time": -1.5,
+   "Type": "Spawn",
+   "Tag": "SovInf",
+   "ClassPath": "/Game/RTS_Survival/Blueprints/Squads/Rus/Rus_Squad_Mosin",
+   "Player": 2,
+   "Offset": {
+    "X": 2400.0,
+    "Y": 600.0,
+    "Z": 0.0
+   },
+   "Yaw": 180.0,
+   "Count": 1,
+   "Columns": 0,
+   "Spacing": 1200.0
+  },
+  {
+   "Time": -1.5,
+   "Type": "Spawn",
+   "Tag": "SovInf",
+   "ClassPath": "/Game/RTS_Survival/Blueprints/Squads/Rus/Rus_Squad_PTRS",
+   "Player": 2,
+   "Offset": {
+    "X": 2400.0,
+    "Y": -600.0,
+    "Z": 0.0
+   },
+   "Yaw": 180.0,
+   "Count": 1,
+   "Columns": 0,
+   "Spacing": 1200.0
+  },
+  {
+   "Time": -1.5,
+   "Type": "Spawn",
+   "Tag": "Sov",
+   "ClassPath": "/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Rus_Heavy/IS-1And-2/Rus_Vehicle_IS-2",
+   "Player": 2,
+   "Offset": {
+    "X": 3900.0,
+    "Y": 0.0,
+    "Z": 0.0
+   },
+   "Yaw": 180.0,
+   "Count": 1,
+   "Columns": 0,
+   "Spacing": 1200.0
+  },
+  {
+   "Time": 0.3,
+   "Type": "AttackMove",
+   "Tag": "GerInf",
+   "TargetOffset": {
+    "X": 448.0,
+    "Y": 0.0,
+    "Z": 0.0
+   },
+   "TargetYaw": 0,
+   "Text": "Move"
+  },
+  {
+   "Time": 0.6,
+   "Type": "AttackMove",
+   "Tag": "Ger",
+   "TargetOffset": {
+    "X": -1680.0,
+    "Y": -1200.0,
+    "Z": 0.0
+   },
+   "TargetYaw": 0,
+   "Text": "Attack"
+  },
+  {
+   "Time": 0.5,
+   "Type": "AttackMove",
+   "Tag": "SovInf",
+   "TargetOffset": {
+    "X": -448.0,
+    "Y": 0.0,
+    "Z": 0.0
+   },
+   "TargetYaw": 180
+  },
+  {
+   "Time": 0.7,
+   "Type": "AttackMove",
+   "Tag": "Sov",
+   "TargetOffset": {
+    "X": 280.0,
+    "Y": 0.0,
+    "Z": 0.0
+   },
+   "TargetYaw": 180
+  },
+  {
+   "Time": 7.0,
+   "Type": "Voice",
+   "Tag": "GerInf",
+   "Text": "Attack",
+   "Settings": {
+    "ForceVoice": 1
+   }
+  },
+  {
+   "Time": 13.5,
+   "Type": "Voice",
+   "Tag": "Ger",
+   "Text": "AttackExcited",
+   "Settings": {
+    "ForceVoice": 1
+   }
+  },
+  {
+   "Time": 19.0,
+   "Type": "Voice",
+   "Tag": "GerInf",
+   "Text": "Confirm",
+   "Settings": {
+    "ForceVoice": 1
+   }
+  },
+  {
+   "Time": 24.0,
+   "Type": "Voice",
+   "Tag": "GerInf",
+   "Text": "Attack",
+   "Settings": {
+    "ForceVoice": 1
+   }
+  }
+ ],
+ "Shots": [
+  {
+   "Name": "SquadsAdvance",
+   "Start": 0.0,
+   "End": 7.0,
+   "Rig": "Orbit",
+   "Keys": [
+    {
+     "Time": 0.0,
+     "Pivot": "tag:GerInf[0]",
+     "Offset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     },
+     "Yaw": 35.0,
+     "Pitch": 11.0,
+     "Distance": 2300.0,
+     "Focal": 32.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 120.0
+     },
+     "VYaw": 0.0,
+     "VPitch": 16.0,
+     "VDistance": 2100.0,
+     "VFocal": 28.0,
+     "VLookOffset": {
+      "X": -983.0,
+      "Y": -688.0,
+      "Z": 150.0
+     }
+    },
+    {
+     "Time": 7.0,
+     "Pivot": "tag:GerInf[0]",
+     "Offset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     },
+     "Yaw": 15.0,
+     "Pitch": 14.0,
+     "Distance": 2000.0,
+     "Focal": 32.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 120.0
+     },
+     "VYaw": 0.0,
+     "VPitch": 18.0,
+     "VDistance": 1900.0,
+     "VFocal": 28.0,
+     "VLookOffset": {
+      "X": -1159.0,
+      "Y": -311.0,
+      "Z": 150.0
+     }
+    }
+   ],
+   "Ease": "InOut",
+   "PivotLag": 0.7,
+   "Aperture": 0.0,
+   "Shake": 0.0,
+   "bAvoidOcclusion": true,
+   "MinGroundClearance": 350.0
+  },
+  {
+   "Name": "Armour",
+   "Start": 7.0,
+   "End": 12.0,
+   "Rig": "Orbit",
+   "Keys": [
+    {
+     "Time": 0.0,
+     "Pivot": "live:Ger",
+     "Offset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     },
+     "Yaw": 105.0,
+     "Pitch": 14.0,
+     "Distance": 2000.0,
+     "Focal": 36.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 150.0
+     },
+     "VYaw": 0.0,
+     "VPitch": 17.0,
+     "VDistance": 2200.0,
+     "VFocal": 26.0,
+     "VLookOffset": {
+      "X": 311.0,
+      "Y": -1159.0,
+      "Z": 150.0
+     }
+    },
+    {
+     "Time": 5.0,
+     "Pivot": "live:Ger",
+     "Offset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     },
+     "Yaw": 80.0,
+     "Pitch": 16.0,
+     "Distance": 1900.0,
+     "Focal": 36.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 150.0
+     },
+     "VYaw": 0.0,
+     "VPitch": 19.0,
+     "VDistance": 2100.0,
+     "VFocal": 26.0,
+     "VLookOffset": {
+      "X": -208.0,
+      "Y": -1182.0,
+      "Z": 150.0
+     }
+    }
+   ],
+   "Ease": "InOut",
+   "PivotLag": 0.7,
+   "Aperture": 4.5,
+   "Shake": 0.0,
+   "bAvoidOcclusion": true,
+   "MinGroundClearance": 350.0
+  },
+  {
+   "Name": "EnemyCharge",
+   "Start": 12.0,
+   "End": 18.0,
+   "Rig": "Orbit",
+   "Keys": [
+    {
+     "Time": 0.0,
+     "Pivot": "tag:SovInf",
+     "Offset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     },
+     "Yaw": 100.0,
+     "Pitch": 18.0,
+     "Distance": 2300.0,
+     "Focal": 30.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 120.0
+     },
+     "VYaw": 140.0,
+     "VPitch": 20.0,
+     "VDistance": 2100.0,
+     "VFocal": 26.0,
+     "VLookOffset": {
+      "X": 919.0,
+      "Y": -771.0,
+      "Z": 150.0
+     }
+    },
+    {
+     "Time": 6.0,
+     "Pivot": "tag:SovInf",
+     "Offset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     },
+     "Yaw": 125.0,
+     "Pitch": 21.0,
+     "Distance": 2100.0,
+     "Focal": 30.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 120.0
+     },
+     "VYaw": 155.0,
+     "VPitch": 22.0,
+     "VDistance": 1900.0,
+     "VFocal": 26.0,
+     "VLookOffset": {
+      "X": 1088.0,
+      "Y": -507.0,
+      "Z": 150.0
+     }
+    }
+   ],
+   "Ease": "InOut",
+   "PivotLag": 0.7,
+   "Aperture": 0.0,
+   "Shake": 0.0,
+   "bAvoidOcclusion": true,
+   "MinGroundClearance": 350.0
+  },
+  {
+   "Name": "Firefight",
+   "Start": 18.0,
+   "End": 26.0,
+   "Rig": "Orbit",
+   "Keys": [
+    {
+     "Time": 0.0,
+     "Pivot": "",
+     "Offset": {
+      "X": -400.0,
+      "Y": 0.0,
+      "Z": 0.0
+     },
+     "Yaw": 100.0,
+     "Pitch": 22.0,
+     "Distance": 5320.0,
+     "Focal": 28.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 150.0
+     },
+     "VYaw": 168.0,
+     "VPitch": 33.0,
+     "VDistance": 4480.0,
+     "VFocal": 28.0,
+     "VLookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     }
+    },
+    {
+     "Time": 8.0,
+     "Pivot": "",
+     "Offset": {
+      "X": -400.0,
+      "Y": 0.0,
+      "Z": 0.0
+     },
+     "Yaw": 82.0,
+     "Pitch": 25.0,
+     "Distance": 5040.0,
+     "Focal": 28.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 150.0
+     },
+     "VYaw": 174.0,
+     "VPitch": 35.0,
+     "VDistance": 4200.0,
+     "VFocal": 28.0,
+     "VLookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     }
+    }
+   ],
+   "Ease": "InOut",
+   "PivotLag": 0.7,
+   "Aperture": 0.0,
+   "Shake": 0.0,
+   "bAvoidOcclusion": true,
+   "MinGroundClearance": 350.0
+  },
+  {
+   "Name": "SquadHero",
+   "Start": 26.0,
+   "End": 32.0,
+   "Rig": "Orbit",
+   "Keys": [
+    {
+     "Time": 0.0,
+     "Pivot": "tag:GerInf[0]",
+     "Offset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     },
+     "Yaw": 85.0,
+     "Pitch": 12.0,
+     "Distance": 1700.0,
+     "Focal": 40.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 110.0
+     },
+     "VYaw": 40.0,
+     "VPitch": 16.0,
+     "VDistance": 1900.0,
+     "VFocal": 30.0,
+     "VLookOffset": {
+      "X": -613.0,
+      "Y": -514.0,
+      "Z": 130.0
+     }
+    },
+    {
+     "Time": 6.0,
+     "Pivot": "tag:GerInf[0]",
+     "Offset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     },
+     "Yaw": 50.0,
+     "Pitch": 15.0,
+     "Distance": 1500.0,
+     "Focal": 40.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 110.0
+     },
+     "VYaw": 25.0,
+     "VPitch": 17.0,
+     "VDistance": 1700.0,
+     "VFocal": 30.0,
+     "VLookOffset": {
+      "X": -725.0,
+      "Y": -338.0,
+      "Z": 130.0
+     }
+    }
+   ],
+   "Ease": "InOut",
+   "PivotLag": 0.7,
+   "Aperture": 4.0,
+   "Shake": 0.0,
+   "bAvoidOcclusion": true,
+   "MinGroundClearance": 350.0
+  }
+ ],
+ "MapPath": "/Game/RTS_Survival/Maps/GerMissions/Ger_Berlin",
+ "GameModeClassPath": "/Game/RTS_Survival/Blueprints/GameSettings/RTS_BP_GamemodeBase.RTS_BP_GamemodeBase_C",
+ "HideActorPrefixes": [],
+ "SkyMaterial": "/Game/SkyboxPack_X/Materials/Instances/M_Flowmap_Inst_01.M_Flowmap_Inst_01",
+ "Batch": "mixed"
+}

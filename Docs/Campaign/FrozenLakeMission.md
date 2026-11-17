@@ -30,7 +30,8 @@ changes where the ice holds. Heavy tanks stop being the default.
 - **Why Act 3:** the Act 3 truth is that Radixite is a living root network, and that the CSD sedates it with cryo-tech
   before harvesting. Berlin showed "the first look at cryo-sedation tech" at a small survey station. This mission is the
   industrial version, and the place where the player *sees* the network alive.
-- Location: **north Russia / Karelia**, on the Phytophage (west) side of the Svarog Line. **(open)** which lake. Ideas:
+- Location: **north Russia / Karelia**, on the Phytophage (west) side of the Svarog Line. **Decided 2026-11-17: Lake Vygozero** (see
+  "Decisions and recommendations"). Ideas considered:
   - **Lake Onega** region: large, recognisable, Karelian.
   - **Vygozero** on the White Sea-Baltic canal (Belomorkanal): a Soviet forced-labour canal with locks and dams, which
     could be reused as the Forge's pump and dam stations. Strong Soviet-industry flavour.
@@ -111,8 +112,8 @@ stopped medium tank.
 - The cost: the player loses that short route too, and the vein wakes faster there (more heat for the whole lake, but also
   more Radixite exposed to harvest).
 - This is the mission's main strategic decision: which zones to keep frozen for yourself, and which to break.
-- **(open)** whether pumps can be **captured** and run by the player instead of only destroyed.
-- **(open)** whether the thaw of a broken zone is instant, fast (tens of seconds, with warning) or slow.
+- **Pumps can only be destroyed, never captured** (decided 2026-11-17); a flood is permanent.
+- Flood speed (decided): a 10 s warning plus a 40 s melt front (see "Decisions and recommendations").
 
 ### 5. Forge cryo-troopers and player lane preparation
 
@@ -137,9 +138,72 @@ stopped medium tank.
 - **Cutting a wreck out of the ice weakens the ice around it.** Greed thins your own routes.
 - **(open)** whether metal on this map comes mostly from the wrecks (forces the player onto the ice) or from the shore.
 
+## Mission setup (agreed with the owner, 2026-11-17)
+
+These parts are kept. The full flow below is still a draft around them.
+
+### Early game
+
+1. **Arrival.** A camera tour crosses the lake. It ends on the reveal: the glowing Radixite root network under clear
+   black ice, close to the player's shore. The player lands on the south-west shore, on a flat area with a build radius
+   of about 66 m.
+   - Objective that runs the whole mission: **keep the HQ alive**.
+2. **Establish the shore.** First objective: reach the ice edge, which plays the reveal.
+   - Starting resources: a Radixite seep on the player's shore and a small scrap yard for metal, which runs out.
+3. **Learn the ice.** A scripted Forge heavy tank breaks through the ice near the shore in front of the player. This
+   teaches the rule without a tutorial box. Early Forge patrols and light vehicles move on the ice.
+
+### Available from the start
+
+- **The heavy ice road.** One narrow road (10 m, one heavy wide) of Forge-thickened ice runs from the player's landing
+  shore to the Shield HQ. It is the only place where heavies can cross the lake without lane preparation (still
+  spaced, under the load rule).
+  - It is not straight. It leaves the shore at the King Tiger, threads a gap between two pressure ridges in zone 2,
+    passes 65-90 m west and north of the rig (inside the rig's guns), crosses the NW vein finger on thickened ice in
+    zone 3, and joins the Forge ice road in zone 4 up to the HQ gate. About 623 m long; the land road round is
+    about 844 m.
+  - Lore: the Forge's own heavy-transport road from its garrison to the old landing shore, the shore the player now
+    holds.
+  - **Both sides use it.** Shield heavies come down it at the player too.
+  - It passes through zones 2, 3 and 4, so **flooding any of those cuts it**. Big shells can hole it.
+  - Core haul: the rig's W face is about 40 m of thin ice from the road. A short prepared stub there plus the road's
+    zone 2 leg is now the alternative to the zone 1 prepared lane (it replaced v2's separate zone 2 haul lane).
+- **Optional: the frozen King Tiger.** A 1946-47 King Tiger is frozen into the shore ice at the head of the heavy
+  road, about 95 m from the HQ (112 m by path), in sight from the start. **Scavengers free it with their scavenge
+  ability; it takes 180 s.** Then it is the player's. This replaces the earlier Tiger II in the wreck bay.
+  - **(open)** whether it is an `AScavengeableObject` with a vehicle reward or a new actor, and whether 180 s is per
+    scavenger squad or fixed.
+- **Point of interest: the burnt Forge convoy** in the south-east, with intel on the pump zones.
+
+### Constant enemy pressure
+
+The AI builds out from the Shield HQ on the north-east shore, which has its own Radixite and metal. Its columns enter
+from three directions:
+
+- **N:** heavies with cryo-troopers, down the frozen spillway through the Forge dam.
+- **E:** heavies, across the wreck bay.
+- **S:** along the south road to the blown bridge, held by a Shield picket. From there the column must cross about
+  200 m of zone 1 ice to reach you (about 94 s).
+
+### The Forge answers
+
+Shield heavies arrive with cryo-troopers who build ice bridges, and there are artillery duels over the ice. The ice
+keeps thinning from a slow base thaw plus the heat of the fighting.
+
+- **Many of these reinforcements come by Soviet cargo planes** that land on a **landing field behind the Shield HQ**
+  (east edge, 90 x 18 m strip, about 45 m from the HQ yard). The planes land, unload Shield heavies and
+  cryo-troopers, and fly off; the units then move out by the heavy road, the Forge ice road or the columns' routes.
+- Existing system: `AEnemyAirDrop` with delivery **CargoPlane (lands)**. It already has landing points, per-difficulty
+  units and a landing order.
+- Proposed counterplay **(open)**: an airfield radio mast beside the strip, linked with the air drop's
+  **OnlyWhileAlive** rule, so destroying it stops new landings (planes already in the air still deliver). Reaching it
+  means a raid deep past the HQ.
+- **(open)** how much of the AI's reinforcement comes by air versus the three ground columns, and whether air
+  deliveries ramp up after the rig falls.
+
 ## Mission flow (draft, all open)
 
-Nothing here is decided. A proposal to react to:
+The agreed parts are in "Mission setup" above. The rest is a proposal to react to:
 
 1. **Arrival on the shore.** Intro camera tour across the lake, ending on the clear black ice and the glowing network
    below (the reveal shot). The player sets up on the near shore.
@@ -155,7 +219,64 @@ Nothing here is decided. A proposal to react to:
      running to bring it home. Ties every mechanic together in the finale, and the sedated core is the Act 3 evidence.
    - B. Destroy the sedation plant.
    - C. Hold a shore base while Forge ice-road convoys cross; sink them instead of shooting them.
-6. **(open)** what the mission unlocks (lane preparation as a campaign tool, a cryo unit, intel only).
+6. **Final objective (decided 2026-11-17): destroy the AI's base.** After the core is home, the last objective is to
+   destroy the Shield HQ. The sketch chains it after the core haul (`destroy_ai_base`, 537 m from the HQ to the AI
+   base by the tool's route). Likely attack routes: the heavy ice road (needs zones 2, 3 and 4 frozen), the Forge ice
+   road from the rig (zone 4), or the long west and north shore road over the canal bridge.
+   - **(open)** what counts as "destroyed" for a base the AI builds over the mission: only the Shield HQ building, or
+     every AI production building. `USecureBaseMission` ("destroy a set of base buildings", with a camera tour) is
+     the closest existing class, but it works on buildings placed in the map, not ones the AI builds later.
+7. **(open)** what the mission unlocks (lane preparation as a campaign tool, a cryo unit, intel only).
+
+## Decisions and recommendations (2026-11-17)
+
+- **Final objective: destroy the AI's base** (decided). See flow step 6.
+- **Pumps can only be destroyed, never captured** (decided). A dead pump cannot be repaired, so every flood is
+  permanent. That makes each pump a one-way decision.
+- **Player engineers can repair the blown south bridge** (decided). The consequence has to be clear to the player:
+  repairing it reopens the south road **both ways**. You get a land route south (to the burnt convoy and pump 1), but
+  the S column gets its land route back into your base (about 65 s instead of about 94 s over the ice). Only player
+  engineers can repair it; the AI does not, and its cryo-troopers only build ice bridges. **(open)** whether the
+  repaired bridge can be blown again (by player demolition or by artillery).
+- **Flood speed (decided 2026-11-17): a 10 s warning, then a melt front that takes about 40 s.**
+  - **Warning:** the pump explodes, a voice line plays, the ice cracks, and an orange glow spreads under the zone.
+  - **Melt front:** the ice turns thin, then black, then open water, moving out from the pump at about 5 m/s.
+  - **Why:** that is about vehicle speed. A unit driving away from the pump gets out; a unit driving toward it, or a
+    heavy standing still, sinks. You can time a pump kill to catch an enemy column in the middle of the zone, and your
+    own units still get a fair chance to leave.
+  - Instant flooding would sink units with no warning. A flood over several minutes would never catch anyone.
+  - Holes in a flooded zone never refreeze (no pump).
+- **The lake (decided 2026-11-17): Lake Vygozero, Karelia**, on the White Sea-Baltic canal (Belomorkanal). A real
+  name players may know.
+  - Vygozero is about 1,250 km², far too big for four pumps. Suggested framing (needs the owner's OK): the map is **a
+    bay of Vygozero that the Forge cut off with its dam**. The pumps keep only the bay frozen. Beyond the dam the rest of
+    the lake has steamed away to a cracked, dry lakebed, like every other lake in 1976. That fits the lore ("without
+    the pumps the lake would not stay a lake") and the dam and spillway already on the sketch.
+  - The Forge dam, the spillway canal and the pump stations can read as the canal's old dams and locks, reused by the
+    Forge.
+  - The Belomorkanal was a Soviet forced-labour canal. Handle this with care in text and voice lines; it is real
+    history.
+
+## Static mesh work
+
+Prompts for delegated modelling, with what can start now and what waits: [FrozenLakeMeshPrompts.md](FrozenLakeMeshPrompts.md).
+Work folder: `D:\Blender\BlenderProjects\BlenderTanks\AA_LevelSpecific\FrozenLake` (one subfolder per kit).
+
+## Code TODOs
+
+The sketch uses objective types that have no mission class yet:
+
+- [ ] **Reach area** (`reach_area`): complete when a player unit enters a trigger area. Used by "Establish the shore"
+  (the ice-edge trigger that plays the reveal). Probably a small `UMissionBase` child that listens to a `TriggerArea`.
+- [ ] **Capture** (`capture`): take an object and hold it. Used by "Capture the Forge drill rig".
+  - The frozen King Tiger is also marked `capture` in the sketch, but it is really a **scavenge** objective:
+    complete when scavengers finish the 180 s scavenge and the tank changes owner. It may fit the existing scavenging
+    (`AScavengeableObject`, `UScavengerComponent`) with a vehicle reward, plus a mission class that tracks it.
+- [ ] **Escort** (`escort`): a unit (the heavy core carrier) must reach a destination alive. Used by "Haul the sedated
+  core home". Needs: spawning the carrier at the rig (maybe `AsyncSpawnMissionVehicle`), a fail state if it dies or
+  sinks, and a completion area at the HQ.
+- [ ] **Destroy the AI's base** (`destroy_base`): MapDesigner maps it to `UKillActorsMission`. Check that this works
+  for buildings the AI builds during the mission, not only for buildings placed in the map (see flow step 6).
 
 ## Enemy
 
@@ -224,9 +345,11 @@ Sketch facts (v1):
 | Zone | Character | Enemy approach | Player stake |
 |---|---|---|---|
 | 1 (S) | wide open ice | S column -> rig; E column -> player | direct core haul, ice salvage |
-| 2 (W) | pressure-ridge field | N column -> player | covered core haul |
-| 3 (N) | frozen spillway through the Forge dam | N column -> rig (its only way in) | the rich Radixite upwelling |
-| 4 (E) | wreck bay (1946-47 wrecks) | E column + the AI's Forge ice road -> rig | main metal, frozen Tiger II, fast road to the AI HQ |
+| 2 (W) | pressure-ridge field | N column -> player | heavy ice road's first leg (ridge gap), alt core haul via the road |
+| 3 (N) | frozen spillway through the Forge dam | N column -> rig (its only way in) | the rich Radixite upwelling, heavy road's vein crossing |
+| 4 (E) | wreck bay (1946-47 wrecks) | E column + the AI's Forge ice road -> rig | main metal, heavy road's last leg into the AI HQ |
+
+Updated 2026-11-17 for the heavy ice road (see "Mission setup"); the Tiger moved out of zone 4.
 
 ### Zones 3 and 4 rework (v2, 2026-11-16)
 
@@ -242,12 +365,12 @@ the player wants to keep:
     the west shore road and drives into the player's base.
 - **Zone 4: the wreck bay is the player's metal.**
   - The **wreck graveyard is the main metal** on the map. The scrap yard by the player's base is small and runs out.
-  - A **frozen Tiger II** in the bay can be recovered (optional objective): engineers cut it free, which thins the ice
-    around it, then it has to drive out over zone 4 as a heavy. A free heavy tank.
+  - ~~A frozen Tiger II in the bay~~ (replaced 2026-11-17 by the frozen King Tiger by the landing shore, freed by
+    scavengers; see "Mission setup").
   - After the rig falls, the **Forge ice road** (rig -> AI HQ) through zone 4 is the player's fastest attack route on
     the AI base.
-  - **Flooding zone 4** cuts the AI's counter-attack on the rig along the ice road, but sinks the metal, the Tiger and the
-    attack road.
+  - **Flooding zone 4** cuts the AI's counter-attack on the rig along the ice road, but sinks the metal and the attack road,
+    and cuts the heavy ice road at the AI's end.
 - v1's long fallback haul lanes through zones 3 and 4 were removed. The core goes home through zone 1 or zone 2.
 
 ### South column fix (v3, 2026-11-16)
@@ -261,7 +384,8 @@ In v2 the S column drove along the south shore into the player's base in about 6
   469 m, about 94 s at the tool's speed (was 325 m, 65 s).
 - **Flooding zone 1** now also closes the S column's only way to the player's base; it then has to go the long way
   round by land. This adds weight to the zone 1 decision, which already costs the direct core haul and the ice salvage.
-- **(open)** whether player engineers can repair the blown bridge (a land route for the player, but also for the enemy).
+- **Player engineers can repair the blown bridge** (decided 2026-11-17). Repaired, it is a land route for the player
+  but also for the S column (see "Decisions and recommendations").
 
 - Roads: west and north (player -> canal bridge -> Shield HQ) and south (player -> S edge). The east shore has only a
   dead-end track, so the road is not a ring.

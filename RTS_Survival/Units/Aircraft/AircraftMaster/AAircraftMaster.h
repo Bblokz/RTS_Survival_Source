@@ -691,6 +691,8 @@ private:
 		FVector PostStrafeMoveToLocation = FVector::ZeroVector;
 		float StrafePointTotalLerpTime = 0.f;
 		float CurrentLerpTime = 0.f;
+		// How far along the active run the guns aim, from where the aircraft is; only ever moves forward.
+		float FlightProgressAlpha = 0.f;
 		// Cached from the ordered lane and reused for orientation-based follow-up runs.
 		float StrafePointDistance = 0.f;
 		bool bM_IsStrafing = false;
@@ -704,6 +706,7 @@ private:
 		void ResetRuntime()
 		{
 			CurrentLerpTime = 0.f;
+			FlightProgressAlpha = 0.f;
 			bM_IsStrafing = false;
 			bM_IsLerpingStrafePoint = false;
 			bM_IsFirstAttackRun = true;
@@ -848,6 +851,8 @@ private:
 	void Strafe_StartTimer(const float TotalStrafeTime);
 	void Strafe_OnTimerFinished();
 	void Strafe_TickTargetLocation(const float DeltaTime);
+	// Aims the guns where the aircraft's own flight will put them on the run line, so fire walks with the aircraft.
+	void Strafe_TickTargetFromFlightProgress();
 	void Strafe_UpdateWeaponTargetLocation() const;
 	FVector Strafe_GetOrientedEndLocation(const FVector& CurrentTargetLocation) const;
 	FVector Strafe_GetNextRunEndLocation() const;

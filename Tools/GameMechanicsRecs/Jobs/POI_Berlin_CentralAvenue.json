@@ -1,0 +1,151 @@
+{
+ "JobName": "POI_Berlin_CentralAvenue",
+ "Category": "POI",
+ "Fps": 60,
+ "WarmupSeconds": 6.0,
+ "DurationSeconds": 22.0,
+ "Anchor": {
+  "X": 7583.0,
+  "Y": 13333.0,
+  "Z": 0.0
+ },
+ "AnchorYaw": -119.0,
+ "ClearUnitsRadius": 8000.0,
+ "bKeepVoiceLines": true,
+ "bKeepAnnouncer": false,
+ "bKeepMusic": false,
+ "Events": [],
+ "Shots": [
+  {
+   "Name": "Flight",
+   "Start": 0.0,
+   "End": 22.0,
+   "Rig": "Orbit",
+   "Keys": [
+    {
+     "Time": 0.0,
+     "Pivot": "",
+     "Offset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     },
+     "Yaw": 180.0,
+     "Pitch": 18.0,
+     "Distance": 2600.0,
+     "Focal": 26.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 300.0
+     },
+     "VYaw": 0.0,
+     "VPitch": 24.0,
+     "VDistance": 2808.0,
+     "VFocal": 20.8,
+     "VLookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     }
+    },
+    {
+     "Time": 8.0,
+     "Pivot": "",
+     "Offset": {
+      "X": 4400.0,
+      "Y": 0.0,
+      "Z": 0.0
+     },
+     "Yaw": 180.0,
+     "Pitch": 18.0,
+     "Distance": 2600.0,
+     "Focal": 26.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 300.0
+     },
+     "VYaw": 0.0,
+     "VPitch": 24.0,
+     "VDistance": 2808.0,
+     "VFocal": 20.8,
+     "VLookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     }
+    },
+    {
+     "Time": 16.0,
+     "Pivot": "",
+     "Offset": {
+      "X": 8900.0,
+      "Y": 0.0,
+      "Z": 0.0
+     },
+     "Yaw": 185.0,
+     "Pitch": 22.0,
+     "Distance": 2800.0,
+     "Focal": 26.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 300.0
+     },
+     "VYaw": 0.0,
+     "VPitch": 28.0,
+     "VDistance": 3024.0,
+     "VFocal": 20.8,
+     "VLookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     }
+    },
+    {
+     "Time": 22.0,
+     "Pivot": "",
+     "Offset": {
+      "X": 10400.0,
+      "Y": 0.0,
+      "Z": 0.0
+     },
+     "Yaw": 205.0,
+     "Pitch": 42.0,
+     "Distance": 6500.0,
+     "Focal": 24.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 300.0
+     },
+     "VYaw": 0.0,
+     "VPitch": 48.0,
+     "VDistance": 7020.000000000001,
+     "VFocal": 19.200000000000003,
+     "VLookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     }
+    }
+   ],
+   "Ease": "InOut",
+   "PivotLag": 0.7,
+   "Aperture": 0.0,
+   "Shake": 0.0,
+   "bAvoidOcclusion": true,
+   "MinGroundClearance": 350.0
+  }
+ ],
+ "MapPath": "/Game/RTS_Survival/Maps/GerMissions/Ger_Berlin",
+ "GameModeClassPath": "/Game/RTS_Survival/Blueprints/GameSettings/RTS_BP_GamemodeBase.RTS_BP_GamemodeBase_C",
+ "HideActorPrefixes": [],
+ "SkyMaterial": "/Game/SkyboxPack_X/Materials/Instances/M_Flowmap_Inst_01.M_Flowmap_Inst_01",
+ "Batch": "berlin_poi"
+}

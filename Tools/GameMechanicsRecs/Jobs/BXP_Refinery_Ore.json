@@ -1,0 +1,357 @@
+{
+ "JobName": "BXP_Refinery_Ore",
+ "Category": "BuildingExpansion",
+ "Fps": 60,
+ "WarmupSeconds": 13.0,
+ "DurationSeconds": 34.0,
+ "Anchor": {
+  "X": -17085.0,
+  "Y": 8040.0,
+  "Z": 0.0
+ },
+ "AnchorYaw": 0.0,
+ "ClearUnitsRadius": 9000.0,
+ "bKeepVoiceLines": true,
+ "bKeepAnnouncer": false,
+ "bKeepMusic": false,
+ "Events": [
+  {
+   "Time": -3.0,
+   "Type": "Resources",
+   "Tag": "",
+   "Value": 300000
+  },
+  {
+   "Time": -2.5,
+   "Type": "Spawn",
+   "Tag": "Ref",
+   "ClassPath": "/Game/RTS_Survival/Blueprints/GroundVehicles/BaseAndNomadic/ChildBlueprints/GerEco/OpelBlitz_Ref/Ger_Refinery_Truck",
+   "Player": 1,
+   "Offset": {
+    "X": 0.0,
+    "Y": 0.0,
+    "Z": 0.0
+   },
+   "Yaw": 180.0,
+   "Count": 1,
+   "Columns": 0,
+   "Spacing": 1200.0
+  },
+  {
+   "Time": -2.3,
+   "Type": "Deploy",
+   "Tag": "Ref",
+   "Settings": {
+    "Yaw": 180,
+    "Instant": 1
+   }
+  },
+  {
+   "Time": -2.0,
+   "Type": "Expand",
+   "Tag": "Ref",
+   "Text": "RefConverter"
+  },
+  {
+   "Time": 0.6,
+   "Type": "Expand",
+   "Tag": "Ref",
+   "Text": "RefFlakStand"
+  },
+  {
+   "Time": 0.7,
+   "Type": "Expand",
+   "Tag": "Ref",
+   "Text": "RefKaskade"
+  }
+ ],
+ "Shots": [
+  {
+   "Name": "Converter",
+   "Start": 0.0,
+   "End": 9.0,
+   "Rig": "Orbit",
+   "Keys": [
+    {
+     "Time": 0.0,
+     "Pivot": "tag:Ref",
+     "Offset": {
+      "X": 512.0,
+      "Y": 535.0,
+      "Z": 0.0
+     },
+     "Yaw": 70.0,
+     "Pitch": 12.0,
+     "Distance": 3400.0,
+     "Focal": 30.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 400.0
+     },
+     "VYaw": 0.0,
+     "VPitch": 16.0,
+     "VDistance": 2800.0,
+     "VFocal": 0.0,
+     "VLookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 550.0
+     }
+    },
+    {
+     "Time": 9.0,
+     "Pivot": "tag:Ref",
+     "Offset": {
+      "X": 512.0,
+      "Y": 535.0,
+      "Z": 0.0
+     },
+     "Yaw": 25.0,
+     "Pitch": 16.0,
+     "Distance": 3100.0,
+     "Focal": 30.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 400.0
+     },
+     "VYaw": 0.0,
+     "VPitch": 20.0,
+     "VDistance": 2600.0,
+     "VFocal": 0.0,
+     "VLookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 550.0
+     }
+    }
+   ],
+   "Ease": "InOut",
+   "PivotLag": 0.7,
+   "Aperture": 5.0,
+   "Shake": 0.0,
+   "bAvoidOcclusion": false,
+   "MinGroundClearance": 350.0
+  },
+  {
+   "Name": "Kaskade",
+   "Start": 9.0,
+   "End": 18.0,
+   "Rig": "Orbit",
+   "Keys": [
+    {
+     "Time": 0.0,
+     "Pivot": "tag:Ref",
+     "Offset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     },
+     "Yaw": 40.0,
+     "Pitch": 14.0,
+     "Distance": 3600.0,
+     "Focal": 26.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 250.0,
+      "Y": -300.0,
+      "Z": 450.0
+     },
+     "VYaw": 0.0,
+     "VPitch": 0.0,
+     "VDistance": 3400.0,
+     "VFocal": 24.0,
+     "VLookOffset": {
+      "X": 480.0,
+      "Y": -580.0,
+      "Z": 600.0
+     }
+    },
+    {
+     "Time": 9.0,
+     "Pivot": "tag:Ref",
+     "Offset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     },
+     "Yaw": 40.0,
+     "Pitch": 18.0,
+     "Distance": 3500.0,
+     "Focal": 28.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 250.0,
+      "Y": -300.0,
+      "Z": 450.0
+     },
+     "VYaw": 0.0,
+     "VPitch": 0.0,
+     "VDistance": 3300.0,
+     "VFocal": 26.0,
+     "VLookOffset": {
+      "X": 480.0,
+      "Y": -580.0,
+      "Z": 600.0
+     }
+    }
+   ],
+   "Ease": "InOut",
+   "PivotLag": 0.7,
+   "Aperture": 0.0,
+   "Shake": 0.0,
+   "bAvoidOcclusion": false,
+   "MinGroundClearance": 350.0
+  },
+  {
+   "Name": "Reveal",
+   "Start": 18.0,
+   "End": 25.0,
+   "Rig": "Orbit",
+   "Keys": [
+    {
+     "Time": 0.0,
+     "Pivot": "tag:Ref",
+     "Offset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     },
+     "Yaw": 200.0,
+     "Pitch": 20.0,
+     "Distance": 3600.0,
+     "Focal": 28.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 600.0
+     },
+     "VYaw": 0.0,
+     "VPitch": 20.0,
+     "VDistance": 3200.0,
+     "VFocal": 0.0,
+     "VLookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 900.0
+     }
+    },
+    {
+     "Time": 7.0,
+     "Pivot": "tag:Ref",
+     "Offset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     },
+     "Yaw": 212.0,
+     "Pitch": 24.0,
+     "Distance": 5000.0,
+     "Focal": 26.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 600.0
+     },
+     "VYaw": 0.0,
+     "VPitch": 26.0,
+     "VDistance": 4000.0,
+     "VFocal": 0.0,
+     "VLookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 900.0
+     }
+    }
+   ],
+   "Ease": "InOut",
+   "PivotLag": 0.7,
+   "Aperture": 0.0,
+   "Shake": 0.0,
+   "bAvoidOcclusion": true,
+   "MinGroundClearance": 350.0
+  },
+  {
+   "Name": "FlakStand",
+   "Start": 25.0,
+   "End": 34.0,
+   "Rig": "Orbit",
+   "Keys": [
+    {
+     "Time": 0.0,
+     "Pivot": "tag:Ref",
+     "Offset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     },
+     "Yaw": 300.0,
+     "Pitch": 18.0,
+     "Distance": 3400.0,
+     "Focal": 30.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 350.0,
+      "Y": -100.0,
+      "Z": 700.0
+     },
+     "VYaw": 0.0,
+     "VPitch": 0.0,
+     "VDistance": 3600.0,
+     "VFocal": 0.0,
+     "VLookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 450.0
+     }
+    },
+    {
+     "Time": 9.0,
+     "Pivot": "tag:Ref",
+     "Offset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     },
+     "Yaw": 260.0,
+     "Pitch": 22.0,
+     "Distance": 3400.0,
+     "Focal": 30.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 350.0,
+      "Y": -100.0,
+      "Z": 700.0
+     },
+     "VYaw": 0.0,
+     "VPitch": 0.0,
+     "VDistance": 3300.0,
+     "VFocal": 0.0,
+     "VLookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 450.0
+     }
+    }
+   ],
+   "Ease": "InOut",
+   "PivotLag": 0.7,
+   "Aperture": 4.0,
+   "Shake": 0.0,
+   "bAvoidOcclusion": false,
+   "MinGroundClearance": 350.0
+  }
+ ],
+ "MapPath": "/Game/RTS_Survival/Maps/GerMissions/Ger_2ndOreMountains",
+ "GameModeClassPath": "/Game/RTS_Survival/Blueprints/GameSettings/RTS_BP_GamemodeBase.RTS_BP_GamemodeBase_C",
+ "HideActorPrefixes": [
+  "ORE_PH_"
+ ],
+ "SkyMaterial": "/Game/SkyboxPack_X/Materials/Instances/M_Flowmap_Inst_04.M_Flowmap_Inst_04",
+ "Batch": "base"
+}

@@ -18,10 +18,13 @@ HOME = globals().get('SUPPLY_HOME', '/Game/RTS_Survival/Blueprints/Environment/S
 ONLY = globals().get('ONLY')
 SHARED = '/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/Bunkers/BreakthroughShared/'
 EMBLEMS = '/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/RusBuildings/SovietFlags/Mat/Emblems/'
+WEAR = '/Game/RTS_Survival/Blueprints/Environment/SupplyPoint/Materials/'
+# Keys are the FBX slot names (the Blender material names); the crane slots get the supply-point-only worn materials of
+# the wear pass (Source/Tools/SupplyPoint/Wear, 2026-11-17) instead of the shared Breakthrough M_BF_* ones.
 MATERIALS = {
-    'M_BF_Trim': SHARED + 'M_BF_Trim',
-    'M_BF_Crane_PaintedSteel': SHARED + 'M_BF_Crane_PaintedSteel',
-    'M_BF_Crane_WornSteel': SHARED + 'M_BF_Crane_WornSteel',
+    'M_BF_Trim': WEAR + 'MI_SupplyPoint_Timber',
+    'M_BF_Crane_PaintedSteel': WEAR + 'MI_SupplyPoint_CraneSteel',
+    'M_BF_Crane_WornSteel': WEAR + 'MI_SupplyPoint_Rope',
     'M_BF_ResourceFill': '/Game/RTS_Survival/Blueprints/GroundVehicles/BaseAndNomadic/ChildBlueprints/BreakthroughHQ/Fills/M_BF_ResourceFill',
     'MI_Crystal1': '/Game/RTS_Survival/Blueprints/Resources/Crystals/Textures/MI_Crystal1',
     'MI_Emblem_DirectorOfShield': EMBLEMS + 'MI_Emblem_DirectorOfShield',

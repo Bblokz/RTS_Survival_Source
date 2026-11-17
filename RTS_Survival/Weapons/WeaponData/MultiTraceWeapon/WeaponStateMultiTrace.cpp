@@ -7,6 +7,7 @@
 #include "NiagaraFunctionLibrary.h"
 #include "RTS_Survival/Weapons/WeaponData/FRTSWeaponHelpers/FRTSWeaponHelpers.h"
 #include "RTS_Survival/Weapons/WeaponData/WeaponOwner/WeaponOwner.h"
+#include "RTS_Survival/Weapons/AircraftWeapon/AircraftStrafeGun/AircraftStrafeShotRecorder.h"
 #include "Trace/Trace.h"
 
 
@@ -160,6 +161,15 @@ void UWeaponStateMultiTrace::FireWeaponSystem_FireTraceFromSocket(const FName& S
 	const float TraceRange = WeaponData.Range * GetFlightRangeMltForCurrentTarget();
 	const FVector TraceEnd = FRTSWeaponHelpers::GetTraceEndWithAccuracy(
 		LaunchLocation, Direction, TraceRange, WeaponData.Accuracy, bIsAircraftWeapon);
+
+#if RTS_WITH_MAP_TESTS
+	if (bIsAircraftWeapon && WeaponOwner.GetObject() && IsValid(MeshComponent->GetOwner()))
+	{
+		FAircraftStrafeShotRecorder::RecordShot(this, LaunchLocation, TraceEnd - LaunchLocation,
+		                                        MeshComponent->GetOwner()->GetActorForwardVector(),
+		                                        WeaponOwner->GetTargetLocation(WeaponIndex));
+	}
+#endif
 
 #if 0
 	DrawDebugLine(World, LaunchLocation, TraceEnd, FColor::Green, false, 5.f, 0, 2.f);

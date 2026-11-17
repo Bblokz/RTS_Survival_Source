@@ -45,6 +45,7 @@ public:
 	friend class RTS_SURVIVAL_API UWeaponStateDirectHit;
 	friend class RTS_SURVIVAL_API UWeaponStateTrace;
 	friend class RTS_SURVIVAL_API UWeaponStateMultiTrace;
+	friend class RTS_SURVIVAL_API UWeaponStateAircraftStrafeGun;
 	friend class RTS_SURVIVAL_API UWeaponStateProjectile;
 	friend class RTS_SURVIVAL_API UWeaponStateMultiProjectile;
 	friend class RTS_SURVIVAL_API UWeaponStateArchProjectile;

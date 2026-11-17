@@ -36,6 +36,7 @@
 #include "RTS_Survival/RTSComponents/RTSOptimizer/RTSOptimizer.h"
 #include "RTS_Survival/Subsystems/CameraShakeSubsystem/RTSCameraShakeSubsystem.h"
 #include "RTS_Survival/Weapons/SmallArmsProjectileManager/MuzzleVfx/SmallArmsMuzzleRoundAudit.h"
+#include "RTS_Survival/Weapons/AircraftWeapon/AircraftStrafeGun/AircraftStrafeShotRecorder.h"
 
 namespace WeaponDataSmallArmsMuzzleAudit
 {
@@ -2654,15 +2655,39 @@ void UWeaponStateTrace::OnAsyncTraceComplete(
 		// If no hits, still create impact at the TraceEnd location
 		OnAsyncTraceNoHit(TraceEnd);
 	}
-	if (M_ProjectileManager.IsValid())
+#if RTS_WITH_MAP_TESTS
+	if (bIsAircraftWeapon && GetFiresTracerOnTraceComplete())
 	{
-		QUICK_SCOPE_CYCLE_COUNTER(STAT_TraceWeapon_FireTracerProjectile);
-		M_ProjectileManager->FireProjectile(
-			LaunchLocation,
-			EndLocation,
-			M_TraceProjectileType,
-			ProjectileLaunchTime);
+		// Regular aircraft MG: the impact shows the moment the trace resolves, the tracer still has to fly there.
+		const AActor* AircraftActor = IsValid(MeshComponent) ? MeshComponent->GetOwner() : nullptr;
+		FAircraftStrafeShotRecorder::RecordImpact(
+			this, TraceDatum.OutHits.Num() > 0, LaunchLocation, EndLocation,
+			WeaponOwner.GetObject() ? WeaponOwner->GetTargetLocation(WeaponIndex) : EndLocation,
+			IsValid(AircraftActor) ? AircraftActor->GetActorForwardVector() : FVector::ForwardVector,
+			ProjectileLaunchTime, World->GetTimeSeconds());
 	}
+#endif
+	if (GetFiresTracerOnTraceComplete())
+	{
+		FireTracerProjectile(LaunchLocation, EndLocation, ProjectileLaunchTime);
+	}
+}
+
+void UWeaponStateTrace::FireTracerProjectile(
+	const FVector& LaunchLocation,
+	const FVector& EndLocation,
+	const float ProjectileLaunchTime) const
+{
+	if (not M_ProjectileManager.IsValid())
+	{
+		return;
+	}
+	QUICK_SCOPE_CYCLE_COUNTER(STAT_TraceWeapon_FireTracerProjectile);
+	M_ProjectileManager->FireProjectile(
+		LaunchLocation,
+		EndLocation,
+		M_TraceProjectileType,
+		ProjectileLaunchTime);
 }
 
 

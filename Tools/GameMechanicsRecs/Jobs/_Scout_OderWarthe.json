@@ -1,0 +1,231 @@
+{
+ "JobName": "Scout_OderWarthe",
+ "Category": "_Scout",
+ "Fps": 60,
+ "WarmupSeconds": 5.0,
+ "DurationSeconds": 0.6,
+ "Anchor": {
+  "X": 0.0,
+  "Y": 0.0,
+  "Z": 0.0
+ },
+ "AnchorYaw": 0.0,
+ "ClearUnitsRadius": 0.0,
+ "bKeepVoiceLines": true,
+ "bKeepAnnouncer": false,
+ "bKeepMusic": false,
+ "Events": [
+  {
+   "Time": -1.0,
+   "Type": "Marker",
+   "Tag": "",
+   "Offset": {
+    "X": -10400.0,
+    "Y": -25600.0,
+    "Z": 0.0
+   },
+   "Text": "red",
+   "Value": 250.0,
+   "Settings": {
+    "Height": 900.0
+   }
+  },
+  {
+   "Time": -1.0,
+   "Type": "Marker",
+   "Tag": "",
+   "Offset": {
+    "X": -10400.0,
+    "Y": -24400.0,
+    "Z": 0.0
+   },
+   "Text": "red",
+   "Value": 250.0,
+   "Settings": {
+    "Height": 900.0
+   }
+  },
+  {
+   "Time": -1.0,
+   "Type": "Marker",
+   "Tag": "",
+   "Offset": {
+    "X": -11900.0,
+    "Y": -25000.0,
+    "Z": 0.0
+   },
+   "Text": "red",
+   "Value": 250.0,
+   "Settings": {
+    "Height": 900.0
+   }
+  },
+  {
+   "Time": -1.0,
+   "Type": "Marker",
+   "Tag": "",
+   "Offset": {
+    "X": -5600.0,
+    "Y": -25600.0,
+    "Z": 0.0
+   },
+   "Text": "blue",
+   "Value": 250.0,
+   "Settings": {
+    "Height": 900.0
+   }
+  },
+  {
+   "Time": -1.0,
+   "Type": "Marker",
+   "Tag": "",
+   "Offset": {
+    "X": -5600.0,
+    "Y": -24400.0,
+    "Z": 0.0
+   },
+   "Text": "blue",
+   "Value": 250.0,
+   "Settings": {
+    "Height": 900.0
+   }
+  },
+  {
+   "Time": -1.0,
+   "Type": "Marker",
+   "Tag": "",
+   "Offset": {
+    "X": -4100.0,
+    "Y": -25000.0,
+    "Z": 0.0
+   },
+   "Text": "blue",
+   "Value": 250.0,
+   "Settings": {
+    "Height": 900.0
+   }
+  },
+  {
+   "Time": -1.0,
+   "Type": "Marker",
+   "Tag": "",
+   "Offset": {
+    "X": -7552.0,
+    "Y": -25000.0,
+    "Z": 0.0
+   },
+   "Text": "yellow",
+   "Value": 180.0,
+   "Settings": {
+    "Height": 900.0
+   }
+  },
+  {
+   "Time": -1.0,
+   "Type": "Marker",
+   "Tag": "",
+   "Offset": {
+    "X": -8280.0,
+    "Y": -25000.0,
+    "Z": 0.0
+   },
+   "Text": "yellow",
+   "Value": 180.0,
+   "Settings": {
+    "Height": 900.0
+   }
+  },
+  {
+   "Time": -1.0,
+   "Type": "Marker",
+   "Tag": "",
+   "Offset": {
+    "X": -8448.0,
+    "Y": -25000.0,
+    "Z": 0.0
+   },
+   "Text": "yellow",
+   "Value": 180.0,
+   "Settings": {
+    "Height": 900.0
+   }
+  },
+  {
+   "Time": -1.0,
+   "Type": "Marker",
+   "Tag": "",
+   "Offset": {
+    "X": -7720.0,
+    "Y": -25000.0,
+    "Z": 0.0
+   },
+   "Text": "yellow",
+   "Value": 180.0,
+   "Settings": {
+    "Height": 900.0
+   }
+  },
+  {
+   "Time": -1.0,
+   "Type": "Marker",
+   "Tag": "",
+   "Offset": {
+    "X": -8000.0,
+    "Y": -25000.0,
+    "Z": 0.0
+   },
+   "Text": "white",
+   "Value": 150.0,
+   "Settings": {
+    "Height": 2500.0
+   }
+  }
+ ],
+ "Shots": [
+  {
+   "Name": "MB_OderWarthe_Heathland",
+   "Start": 0.0,
+   "End": 0.6,
+   "Rig": "Orbit",
+   "Keys": [
+    {
+     "Time": 0.0,
+     "Pivot": "",
+     "Offset": {
+      "X": -8000.0,
+      "Y": -25000.0,
+      "Z": 0.0
+     },
+     "Yaw": 180.0,
+     "Pitch": 84.0,
+     "Distance": 17000.0,
+     "Focal": 24.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     },
+     "VYaw": 0.0,
+     "VPitch": 0.0,
+     "VDistance": 0.0,
+     "VFocal": 0.0,
+     "VLookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     }
+    }
+   ],
+   "Ease": "InOut",
+   "PivotLag": 0.7,
+   "Aperture": 0.0,
+   "Shake": 0.0,
+   "bAvoidOcclusion": false,
+   "MinGroundClearance": 350.0
+  }
+ ],
+ "MapPath": "/Game/RTS_Survival/Maps/GerMissions/Ger_OderWarthe",
+ "GameModeClassPath": "/Game/RTS_Survival/Blueprints/GameSettings/RTS_BP_GamemodeBase.RTS_BP_GamemodeBase_C",
+ "HideActorPrefixes": []
+}

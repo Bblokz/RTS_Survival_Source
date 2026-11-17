@@ -187,6 +187,10 @@ Applied in the shared editor and saved; nav check 0 problems after the landscape
 - **Bridge without the MCP tools:** `Source/Tools/BerlinMap/uecp_call.py <script.py> "description"` sends a script to
   the editor's `execute_python` over a raw socket (the tool connection of a long session can drop).
 
+## Update 2026-11-17: horizon skirt
+
+End-of-map planes `SKIRT_Plane_*` (folder MapSkirt, `MI_Berlin_HorizonSkirt`) run from the landscape rim out to 1.5 km, and the landscape's outer 30 m (70 m at the two Spree mouths, where the trench now silts up before the rim) is eased to their height and painted pure rubble: `Docs/Environment/MapHorizonSkirt.md`, section Ger_Berlin; tools `Source/Tools/BerlinMap/skirt`. This was applied to the map as it stood on disk, not through the generators: `step_landscape()` or a re-import of the generator heights wipes the eased rim, so run `berlin_skirt_plan.py` and `berlin_skirt_apply.py` again after one.
+
 ## Known gaps
 
 - The track-smoke surface map is not baked, and the Berlin layer names are not in `URTSGroundSurfaceSettings`, so a bake

@@ -1229,6 +1229,13 @@ protected:
 		const FVector& TraceEnd,
 		TArray<TWeakObjectPtr<UPrimitiveComponent>> IgnoredShieldComponents = {});
 
+	// False when a subclass fires the pooled tracer itself (aircraft strafe gun: tracer at once, impact on arrival).
+	virtual bool GetFiresTracerOnTraceComplete() const { return true; }
+
+	// Draws the visual tracer of a resolved trace with the small arms projectile pool.
+	void FireTracerProjectile(const FVector& LaunchLocation, const FVector& EndLocation,
+	                          const float ProjectileLaunchTime) const;
+
 private:
 	/**
 	 * @brief Spawns a trace from the provided location using the collision channel of this weapon state.
