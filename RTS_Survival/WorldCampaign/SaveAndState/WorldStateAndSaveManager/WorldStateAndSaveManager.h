@@ -26,6 +26,13 @@ public:
 	void CachePlayerProfileSaveData(const FPlayerProfileSaveData& PlayerProfileSaveData);
 
 	/**
+	 * @brief Replaces only the card slice of the cached player profile; the deck builder hands its deck over here
+	 * when it closes, so the cards never live in the menu.
+	 * @param PlayerCardData The deck as the card menu left it.
+	 */
+	void CachePlayerCardData(const FPlayerCardSaveData& PlayerCardData);
+
+	/**
 	 * @brief Updates only the division slice of cached world state before saving.
 	 * @param WorldDivisionSaveData Current live division state built by UWorldDivisionManager.
 	 */

@@ -1,4 +1,4 @@
-﻿// Copyright (C) Bas Blokzijl - All rights reserved.
+// Copyright (C) Bas Blokzijl - All rights reserved.
 
 #pragma once
 
@@ -16,7 +16,9 @@ class UW_StrengthEstimation;
 class UW_EnemyOrMissionMapItem;
 class UW_RewardCardsViewer;
 class UW_CardMenu;
+class UW_DeckBuilderMenu;
 class AWorldPlayerController;
+struct FPlayerCardSaveData;
 struct FEnemyOrMissionMapItemUIData;
 struct FPrimaryReward;
 struct FSecondaryReward;
@@ -69,7 +71,21 @@ public:
 	                            const FSecondaryReward& SecondaryReward);
 	void CollapseMissionMapItemDesc() const;
 
+	/** The deck builder closed: stores its deck in the campaign save and returns to the map. */
+	void HandleDeckBuilderSaved(const FPlayerCardSaveData& CardData);
+
+	/** @return Null while the old Blueprint card menu is in use. */
+	UW_DeckBuilderMenu* GetDeckBuilderMenu() const;
+
 protected:
+	// The card menu the Army Layout button opens: the deck builder, or (off) the old Blueprint card menu.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Card Menu")
+	bool bUseDeckBuilderMenu = true;
+
+	// Left empty the C++ deck builder is used as it is; pick a Blueprint child of it to override its art.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Card Menu")
+	TSubclassOf<UW_DeckBuilderMenu> DeckBuilderMenuClass;
+
 	UFUNCTION(BlueprintImplementableEvent)
 	void BP_OnMissionClicked(const FEnemyOrMissionMapItemUIData& InData);
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
@@ -117,6 +133,16 @@ private:
 	void InitMenu_InitHeader();
 	void InitMenu_InitPerkUI();
 	void InitMenu_InitCardMenu();
+	void InitMenu_InitDeckBuilder();
+
+	/** Shows the deck builder with the campaign's current cards, or the old card menu when it is not in use. */
+	void ShowCardMenu();
+
+	UPROPERTY()
+	TObjectPtr<UW_DeckBuilderMenu> M_DeckBuilderMenu;
+
+	// Page of the deck builder in FullUISwitcher; it is added at runtime, after the Blueprint's own pages.
+	int32 M_DeckBuilderSwitcherIndex = INDEX_NONE;
 	void HandleMissionMapItemLaunchRequested(AWorldMapObject* OperationWorldObject);
 	bool GetIsValidWorldUIHeader() const;
 

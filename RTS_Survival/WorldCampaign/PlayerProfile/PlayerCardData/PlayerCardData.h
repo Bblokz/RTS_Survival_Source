@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "CoreMinimal.h"
 #include "RTS_Survival/CardSystem/CardUI/NomadLayoutWidget/NomadicLayoutBuilding/NomadicBuildingLayoutData/NomadicBuildingLayoutData.h"
@@ -83,4 +83,12 @@ struct FPlayerCardSaveData
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, SaveGame, meta=(TitleProperty="Unit"))
 	TArray<FUnitVariantSelection> UnitVariantSelections;
+
+	/**
+	 * @brief The variants the player has found, as variant cards the deck builder can clip onto their unit.
+	 *
+	 * Never holds Base. UnitVariantSelections says which of them is clipped on. Empty until missions grant variants.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, SaveGame, meta=(TitleProperty="Unit"))
+	TArray<FUnitVariantSelection> OwnedUnitVariants;
 };

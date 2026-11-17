@@ -36,6 +36,11 @@ void UWorldStateAndSaveManager::CachePlayerProfileSaveData(const FPlayerProfileS
 	M_PlayerProfileSaveData = PlayerProfileSaveData;
 }
 
+void UWorldStateAndSaveManager::CachePlayerCardData(const FPlayerCardSaveData& PlayerCardData)
+{
+	M_PlayerProfileSaveData.PlayerData.CardData = PlayerCardData;
+}
+
 void UWorldStateAndSaveManager::CacheWorldDivisionSaveData(
 	const TArray<FWorldDivisionSaveData>& WorldDivisionSaveData)
 {
