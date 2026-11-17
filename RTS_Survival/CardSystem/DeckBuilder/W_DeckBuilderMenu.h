@@ -89,17 +89,19 @@ public:
 
 	const FDeckBuilderLook& GetLook() const { return M_Look; }
 
-#if !UE_BUILD_SHIPPING
-	// Test hooks for the offscreen captures: the same edits the mouse makes, without a mouse.
+	// Test hooks for the offscreen capture (UDeckBuilderCaptureSubsystem): they go through the same handlers a
+	// right-click or a drop calls. In every configuration, because the capture subsystem is a UCLASS and so is too.
 	const FDeckBuilderState& Debug_GetState() const { return M_State; }
 	EDeckSection Debug_GetSelectedSection() const { return M_SelectedSection; }
+	bool Debug_ReturnFirstSlottedCard();
 	bool Debug_SlotFirstFittingCard();
 	bool Debug_AttachFirstLooseVariant();
 	void Debug_ShowWholeCollection(const bool bShowsWholeCollection);
 	// What Save & Go Back would hand to the campaign save, without saving anything.
 	FPlayerCardSaveData Debug_BuildCardData() const { return BuildCardDataToSave(); }
 	FString Debug_DescribeState() const;
-#endif
+	// Presses Save & Go Back: writes the campaign save and returns to the map.
+	void Debug_SaveAndGoBack() { OnSaveClicked(); }
 
 protected:
 	virtual void NativeOnInitialized() override;

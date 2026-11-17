@@ -5,7 +5,7 @@
 # Grep: MISSION_DEBRIEF (stage running / buttons revealed / PASS|FAIL).
 export MSYS_NO_PATHCONV=1
 ROOT=D:/UE5Projects/RTS_Survival
-ENGINE="D:/UnrealEngine/UE5.5_ReleaseBranch/UnrealEngine/Engine/Binaries/Win64/UnrealEditor-Cmd.exe"
+ENGINE="${DEBRIEF_ENGINE:-D:/UnrealEngine/UE5.5_ReleaseBranch/UnrealEngine/Engine/Binaries/Win64/UnrealEditor-Cmd.exe}"
 OUTCOME=${1:-victory}
 RES=${2:-1280x720}
 EXTRA=${3:-}

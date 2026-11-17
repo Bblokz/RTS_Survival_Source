@@ -29,16 +29,16 @@ namespace DeckBuilderStylePrivate
 	const FVector2D SpineFrameSize(118.f, 268.f);
 	const FVector2D SectionIconSize(42.f, 42.f);
 	const FVector2D SelectedMarkerSize(22.f, 22.f);
-	// Slice margins in texels (left, top, right, bottom), from UISkins/_generator/variant_selection_spec.md.
-	const FMargin PanelSlice(88.f, 88.f, 88.f, 88.f);
-	const FMargin VariantRowSlice(56.f, 56.f, 56.f, 56.f);
-	const FMargin RailEntrySlice(40.f, 80.f, 56.f, 80.f);
-	const FMargin IconWellSlice(20.f, 20.f, 20.f, 20.f);
-	const FMargin ButtonSlice(64.f, 48.f, 64.f, 48.f);
-	const FMargin TabSlice(24.f, 24.f, 24.f, 24.f);
-	// The slice art is two texels per UI unit; the panel plate is drawn finer so its rim stays 26 units wide.
-	constexpr float SliceTexelsPerUnit = 2.f;
-	constexpr float PanelTexelsPerUnit = 88.f / 26.f;
+	// Slate draws the corners of a box brush at texture size, whatever the brush's image size says. The box parts
+	// are therefore imported at one texel per UI unit: T_Deck_Part_* are half-size copies of the hangar screen's
+	// slice textures and T_Deck_Panel is the card holder plate scaled so its corner is 26 units.
+	// Slice margins in texels (left, top, right, bottom): half of UISkins/_generator/variant_selection_spec.md.
+	const FMargin PanelSlice(26.f, 26.f, 26.f, 26.f);
+	const FMargin VariantRowSlice(28.f, 28.f, 28.f, 28.f);
+	const FMargin RailEntrySlice(20.f, 40.f, 28.f, 40.f);
+	const FMargin IconWellSlice(10.f, 10.f, 10.f, 10.f);
+	const FMargin ButtonSlice(32.f, 24.f, 32.f, 24.f);
+	const FMargin TabSlice(12.f, 12.f, 12.f, 12.f);
 	// What a part draws as when its texture is missing: a flat dark plate instead of a white box.
 	const FLinearColor MissingArtTint(0.05f, 0.055f, 0.06f, 0.95f);
 
@@ -71,7 +71,7 @@ namespace DeckBuilderStylePrivate
 		return Brush;
 	}
 
-	FSlateBrush MakeBoxBrush(UTexture2D* Texture, const FMargin& SliceTexels, const float TexelsPerUnit)
+	FSlateBrush MakeBoxBrush(UTexture2D* Texture, const FMargin& SliceTexels)
 	{
 		FSlateBrush Brush;
 		if (not IsValid(Texture))
@@ -80,11 +80,14 @@ namespace DeckBuilderStylePrivate
 			Brush.TintColor = FSlateColor(MissingArtTint);
 			return Brush;
 		}
+#if WITH_EDITOR
+		// A texture that is still compiling reports a placeholder size, which would turn the slice into nonsense.
+		Texture->BlockOnAnyAsyncBuild();
+#endif
 		const FVector2D TextureSize(Texture->GetSizeX(), Texture->GetSizeY());
 		Brush.SetResourceObject(Texture);
 		Brush.DrawAs = ESlateBrushDrawType::Box;
-		// Slate draws a box corner at Margin * ImageSize units, so the image size sets the texel density.
-		Brush.ImageSize = TextureSize / TexelsPerUnit;
+		Brush.ImageSize = TextureSize;
 		Brush.Margin = FMargin(SliceTexels.Left / TextureSize.X, SliceTexels.Top / TextureSize.Y,
 		                       SliceTexels.Right / TextureSize.X, SliceTexels.Bottom / TextureSize.Y);
 		return Brush;
@@ -124,19 +127,19 @@ FDeckBuilderStyle::FDeckBuilderStyle()
 	{
 		SectionIcons.Add(MakeTextureReference(DeckArtFolder, FString(TEXT("T_Deck_Section_")) + SectionName));
 	}
-	VariantRow = MakeTextureReference(HangarSliceFolder, TEXT("T9_Custom_VariantCard_n"));
-	VariantRowHovered = MakeTextureReference(HangarSliceFolder, TEXT("T9_Custom_VariantCard_h"));
-	VariantRowSelected = MakeTextureReference(HangarSliceFolder, TEXT("T9_Custom_VariantCard_s"));
-	IconWell = MakeTextureReference(HangarSliceFolder, TEXT("T9_Custom_VariantIconWell_n"));
+	VariantRow = MakeTextureReference(DeckArtFolder, TEXT("T_Deck_Part_Row_n"));
+	VariantRowHovered = MakeTextureReference(DeckArtFolder, TEXT("T_Deck_Part_Row_h"));
+	VariantRowSelected = MakeTextureReference(DeckArtFolder, TEXT("T_Deck_Part_Row_s"));
+	IconWell = MakeTextureReference(DeckArtFolder, TEXT("T_Deck_Part_Well"));
 	SelectedMarker = MakeTextureReference(HangarSliceFolder, TEXT("T9_Custom_VariantSelectedMarker"));
-	RailEntry = MakeTextureReference(HangarSliceFolder, TEXT("T9_Custom_VariantUnitEntry_n"));
-	RailEntryHovered = MakeTextureReference(HangarSliceFolder, TEXT("T9_Custom_VariantUnitEntry_h"));
-	RailEntrySelected = MakeTextureReference(HangarSliceFolder, TEXT("T9_Custom_VariantUnitEntry_s"));
-	Button = MakeTextureReference(HangarSliceFolder, TEXT("T9_Custom_VariantBack_n"));
-	ButtonHovered = MakeTextureReference(HangarSliceFolder, TEXT("T9_Custom_VariantBack_h"));
-	ButtonPressed = MakeTextureReference(HangarSliceFolder, TEXT("T9_Custom_VariantBack_p"));
-	Tab = MakeTextureReference(HangarSliceFolder, TEXT("T9_Custom_FactionTab_n"));
-	TabSelected = MakeTextureReference(HangarSliceFolder, TEXT("T9_Custom_FactionTab_s"));
+	RailEntry = MakeTextureReference(DeckArtFolder, TEXT("T_Deck_Part_Entry_n"));
+	RailEntryHovered = MakeTextureReference(DeckArtFolder, TEXT("T_Deck_Part_Entry_h"));
+	RailEntrySelected = MakeTextureReference(DeckArtFolder, TEXT("T_Deck_Part_Entry_s"));
+	Button = MakeTextureReference(DeckArtFolder, TEXT("T_Deck_Part_Button_n"));
+	ButtonHovered = MakeTextureReference(DeckArtFolder, TEXT("T_Deck_Part_Button_h"));
+	ButtonPressed = MakeTextureReference(DeckArtFolder, TEXT("T_Deck_Part_Button_p"));
+	Tab = MakeTextureReference(DeckArtFolder, TEXT("T_Deck_Part_Tab_n"));
+	TabSelected = MakeTextureReference(DeckArtFolder, TEXT("T_Deck_Part_Tab_s"));
 }
 
 const FSlateBrush& FDeckBuilderLook::GetCardFrame(const ERTSCardRarity Rarity) const
@@ -168,7 +171,7 @@ void FDeckBuilderLook::BuildFromStyle(const FDeckBuilderStyle& InStyle, TArray<F
 	Style = InStyle;
 	HeadingFont = ResolveFont(InStyle.HeadingFont, TEXT("Bold"));
 	BodyFont = ResolveFont(InStyle.BodyFont, TEXT("Regular"));
-	Panel = MakeBoxBrush(LoadTexture(InStyle.PanelTexture, OutMissingTextures), PanelSlice, PanelTexelsPerUnit);
+	Panel = MakeBoxBrush(LoadTexture(InStyle.PanelTexture, OutMissingTextures), PanelSlice);
 	VacantCardFrame = MakeImageBrush(LoadTexture(InStyle.VacantCardFrame, OutMissingTextures), CardFrameSize);
 	CardFrames.Reset();
 	for (const TSoftObjectPtr<UTexture2D>& Frame : InStyle.CardFrames)
@@ -185,35 +188,31 @@ void FDeckBuilderLook::BuildFromStyle(const FDeckBuilderStyle& InStyle, TArray<F
 	{
 		SectionIcons.Add(MakeImageBrush(LoadTexture(Icon, OutMissingTextures), SectionIconSize));
 	}
-	IconWell = MakeBoxBrush(LoadTexture(InStyle.IconWell, OutMissingTextures), IconWellSlice, SliceTexelsPerUnit);
+	IconWell = MakeBoxBrush(LoadTexture(InStyle.IconWell, OutMissingTextures), IconWellSlice);
 	SelectedMarker = MakeImageBrush(LoadTexture(InStyle.SelectedMarker, OutMissingTextures), SelectedMarkerSize);
 
-	const FSlateBrush RowNormal = MakeBoxBrush(LoadTexture(InStyle.VariantRow, OutMissingTextures), VariantRowSlice,
-	                                           SliceTexelsPerUnit);
+	const FSlateBrush RowNormal = MakeBoxBrush(LoadTexture(InStyle.VariantRow, OutMissingTextures), VariantRowSlice);
 	const FSlateBrush RowHovered = MakeBoxBrush(LoadTexture(InStyle.VariantRowHovered, OutMissingTextures),
-	                                            VariantRowSlice, SliceTexelsPerUnit);
+	                                            VariantRowSlice);
 	const FSlateBrush RowSelected = MakeBoxBrush(LoadTexture(InStyle.VariantRowSelected, OutMissingTextures),
-	                                             VariantRowSlice, SliceTexelsPerUnit);
+	                                             VariantRowSlice);
 	VariantRow = MakeButtonStyle(RowNormal, RowHovered, RowHovered);
 	VariantRowSelected = MakeButtonStyle(RowSelected, RowSelected, RowSelected);
 
-	const FSlateBrush EntryNormal = MakeBoxBrush(LoadTexture(InStyle.RailEntry, OutMissingTextures), RailEntrySlice,
-	                                             SliceTexelsPerUnit);
+	const FSlateBrush EntryNormal = MakeBoxBrush(LoadTexture(InStyle.RailEntry, OutMissingTextures), RailEntrySlice);
 	const FSlateBrush EntryHovered = MakeBoxBrush(LoadTexture(InStyle.RailEntryHovered, OutMissingTextures),
-	                                              RailEntrySlice, SliceTexelsPerUnit);
+	                                              RailEntrySlice);
 	const FSlateBrush EntrySelected = MakeBoxBrush(LoadTexture(InStyle.RailEntrySelected, OutMissingTextures),
-	                                               RailEntrySlice, SliceTexelsPerUnit);
+	                                               RailEntrySlice);
 	RailEntry = MakeButtonStyle(EntryNormal, EntryHovered, EntryHovered);
 	RailEntrySelected = MakeButtonStyle(EntrySelected, EntrySelected, EntrySelected);
 
 	Button = MakeButtonStyle(
-		MakeBoxBrush(LoadTexture(InStyle.Button, OutMissingTextures), ButtonSlice, SliceTexelsPerUnit),
-		MakeBoxBrush(LoadTexture(InStyle.ButtonHovered, OutMissingTextures), ButtonSlice, SliceTexelsPerUnit),
-		MakeBoxBrush(LoadTexture(InStyle.ButtonPressed, OutMissingTextures), ButtonSlice, SliceTexelsPerUnit));
-	const FSlateBrush TabNormal = MakeBoxBrush(LoadTexture(InStyle.Tab, OutMissingTextures), TabSlice,
-	                                           SliceTexelsPerUnit);
-	const FSlateBrush TabOn = MakeBoxBrush(LoadTexture(InStyle.TabSelected, OutMissingTextures), TabSlice,
-	                                       SliceTexelsPerUnit);
+		MakeBoxBrush(LoadTexture(InStyle.Button, OutMissingTextures), ButtonSlice),
+		MakeBoxBrush(LoadTexture(InStyle.ButtonHovered, OutMissingTextures), ButtonSlice),
+		MakeBoxBrush(LoadTexture(InStyle.ButtonPressed, OutMissingTextures), ButtonSlice));
+	const FSlateBrush TabNormal = MakeBoxBrush(LoadTexture(InStyle.Tab, OutMissingTextures), TabSlice);
+	const FSlateBrush TabOn = MakeBoxBrush(LoadTexture(InStyle.TabSelected, OutMissingTextures), TabSlice);
 	Tab = MakeButtonStyle(TabNormal, TabOn, TabOn);
 	TabSelected = MakeButtonStyle(TabOn, TabOn, TabOn);
 }

@@ -185,8 +185,11 @@ bool FDeckBuilderVariantsTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("Base is not a variant card"), State.AttachVariant(MakeVariant(Pz38t, EUnitVariant::Base)));
 	TestTrue(TEXT("An owned variant attaches"), State.AttachVariant(MakeVariant(Pz38t, EUnitVariant::VariantB)));
 	TestEqual(TEXT("The unit runs the attached variant"), State.GetAttachedVariant(Pz38t), EUnitVariant::VariantB);
-	TestEqual(TEXT("A unit with a variant clipped on has no loose variants"),
-	          State.GetLooseVariantsForSection(EDeckSection::Forge).Num(), 0);
+	TestEqual(TEXT("The unit's other variant stays loose while one is clipped on"),
+	          State.GetLooseVariantsForSection(EDeckSection::Forge).Num(), 1);
+	TestTrue(TEXT("Attaching the other variant swaps"), State.AttachVariant(MakeVariant(Pz38t, EUnitVariant::VariantA)));
+	TestEqual(TEXT("After the swap the first variant is loose again"),
+	          State.GetLooseVariantsForSection(EDeckSection::Forge)[0].Variant, EUnitVariant::VariantB);
 	TestEqual(TEXT("The Forge counts its unit with a variant"), State.GetAttachedVariantCount(EDeckSection::Forge), 1);
 	TestTrue(TEXT("A variant detaches"), State.DetachVariant(Pz38t));
 	TestFalse(TEXT("Detaching twice changes nothing"), State.DetachVariant(Pz38t));

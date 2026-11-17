@@ -49,6 +49,7 @@ private:
 	/** @return The step's name for its picture; empty when there is no step left. */
 	FString ApplyStep(const int32 StepIndex);
 	FString ApplyStep_SaveAndReopen(UW_DeckBuilderMenu& Menu) const;
+	FString ApplyStep_SaveToDisk(UW_DeckBuilderMenu& Menu) const;
 
 	void CaptureStep() const;
 	void EnterPhase(const EPhase NewPhase);

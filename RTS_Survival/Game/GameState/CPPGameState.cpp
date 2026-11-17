@@ -5942,7 +5942,9 @@ void ACPPGameState::InitAllGameArmoredCarData()
 		});
 		TankData.ExperienceLevels = GetLightArtillerySpecialVehicleExpLevels();
 		TankData.ExperienceMultiplier = 1.0f;
-		TankData.Abilities = TankAbilitiesWithRockets;
+		// The launcher turret is the rocket weapon (no UAttachedRockets), so no Fire Rockets card; the Blueprint's
+		// rocket barrage aim ability adds its own card.
+		TankData.Abilities = BasicTankAbilities;
 		M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_Panzerwerfer, TankData);
 	}
 

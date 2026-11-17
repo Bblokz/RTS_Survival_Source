@@ -143,6 +143,10 @@ def instance(name, cfg, parent, textures, rebuild):
     path = KIT + '/Materials/' + name
     if _EAL.does_asset_exist(path) and name not in rebuild:
         return unreal.load_asset(path)
+    if cfg['tex'] == 'T_OW_PineBark_D' and _EAL.does_asset_exist(KIT + '/Materials/M_OW_PineBark'):
+        # the pine bark has its own PBR master (ow_bark_material.py); never put it back on the flat M_OW_Kit
+        log('skip', name, '(on M_OW_PineBark; rebuild with ow_bark_material.py OW_BARK_MODE=apply)')
+        return unreal.load_asset(path)
     mi = unreal.load_asset(path) if _EAL.does_asset_exist(path) else _TOOLS.create_asset(
         name, KIT + '/Materials', unreal.MaterialInstanceConstant, unreal.MaterialInstanceConstantFactoryNew())
     _MEL.set_material_instance_parent(mi, parent)

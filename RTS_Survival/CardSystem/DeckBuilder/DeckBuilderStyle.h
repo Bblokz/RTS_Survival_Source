@@ -49,7 +49,8 @@ struct RTS_SURVIVAL_API FDeckBuilderStyle
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Sections")
 	TArray<TSoftObjectPtr<UTexture2D>> SectionIcons;
 
-	// The Frontstahl Custom_Variant* slice textures of the hangar variant screen, drawn here as box brushes.
+	// Half-size copies of the hangar variant screen's Frontstahl slice textures (T_Deck_Part_*), drawn as box
+	// brushes.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Hangar Parts")
 	TSoftObjectPtr<UTexture2D> VariantRow;
 

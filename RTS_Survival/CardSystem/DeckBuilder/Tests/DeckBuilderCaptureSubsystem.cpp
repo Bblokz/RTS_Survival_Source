@@ -6,6 +6,7 @@
 #include "Misc/CommandLine.h"
 #include "Misc/Paths.h"
 #include "UnrealClient.h"
+#include "UnrealEngine.h"
 #include "RTS_Survival/CardSystem/DeckBuilder/W_DeckBuilderMenu.h"
 #include "RTS_Survival/Game/RTSGameInstance/GameInstCampaignGenerationSettings/GameInstCampaignGenerationSettings.h"
 #include "RTS_Survival/Game/RTSGameInstance/RTSGameInstance.h"
@@ -31,6 +32,38 @@ namespace DeckBuilderCaptureConstants
 	constexpr double SettleSeconds = 1.0;
 	// Time for the screenshot request to be written before the next step changes the screen.
 	constexpr double CaptureSeconds = 0.7;
+	// The offscreen window does not open at the size asked for on the command line; the menu is laid out for this.
+	const FIntPoint CaptureResolution(1920, 1080);
+
+	/** The parts of the card save the deck builder writes, as one line to compare and to log. */
+	FString DescribeCardData(const FPlayerCardSaveData& CardData)
+	{
+		const auto JoinCards = [](const TArray<ERTSCard>& Cards)
+		{
+			TArray<FString> CardNumbers;
+			for (const ERTSCard Card : Cards)
+			{
+				CardNumbers.Add(FString::FromInt(static_cast<int32>(Card)));
+			}
+			return FString::Join(CardNumbers, TEXT(","));
+		};
+		FString Description = FString::Printf(TEXT("available=[%s] selected=%d tech=[%s]"),
+		                                      *JoinCards(CardData.PlayerAvailableCards),
+		                                      CardData.SelectedCards.Num(),
+		                                      *JoinCards(CardData.CardsInTechResources));
+		for (const FNomadicBuildingLayoutData& Layout : CardData.NomadicBuildingLayouts)
+		{
+			Description += FString::Printf(TEXT(" building%d=[%s]"), static_cast<int32>(Layout.BuildingType),
+			                               *JoinCards(Layout.Cards));
+		}
+		for (const FUnitVariantSelection& Selection : CardData.UnitVariantSelections)
+		{
+			Description += FString::Printf(TEXT(" %s=variant%d"), *Selection.Unit.GetTrainingName(),
+			                               static_cast<int32>(Selection.Variant));
+		}
+		Description += FString::Printf(TEXT(" owned_variants=%d"), CardData.OwnedUnitVariants.Num());
+		return Description;
+	}
 }
 
 bool UDeckBuilderCaptureSubsystem::ShouldCreateSubsystem(UObject* Outer) const
@@ -52,6 +85,8 @@ void UDeckBuilderCaptureSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 	Super::OnWorldBeginPlay(InWorld);
 	RTSFunctionLibrary::PushModalDialogSuppression();
 	SeedGameInstanceForWorldCampaign();
+	FSystemResolution::RequestResolutionChange(DeckBuilderCaptureConstants::CaptureResolution.X,
+	                                           DeckBuilderCaptureConstants::CaptureResolution.Y, EWindowMode::Windowed);
 	EnterPhase(EPhase::WaitingForCampaign);
 	UE_LOG(LogRTSDeckBuilderCapture, Display, TEXT("DECKCAPTURE started"));
 }
@@ -175,26 +210,35 @@ FString UDeckBuilderCaptureSubsystem::ApplyStep(const int32 StepIndex)
 		StepName = TEXT("02_forge");
 		break;
 	case 2:
-		UE_LOG(LogRTSDeckBuilderCapture, Display, TEXT("DECKCAPTURE slot first fitting card: %s"),
-		       Menu->Debug_SlotFirstFittingCard() ? TEXT("done") : TEXT("nothing to slot"));
-		StepName = TEXT("03_card_slotted");
+		// A new campaign starts with every card slotted, so one comes out first to have something to slot.
+		UE_LOG(LogRTSDeckBuilderCapture, Display, TEXT("DECKCAPTURE return first slotted card: %s"),
+		       Menu->Debug_ReturnFirstSlottedCard() ? TEXT("done") : TEXT("nothing to return"));
+		StepName = TEXT("03_card_returned");
 		break;
 	case 3:
-		UE_LOG(LogRTSDeckBuilderCapture, Display, TEXT("DECKCAPTURE attach first loose variant: %s"),
-		       Menu->Debug_AttachFirstLooseVariant() ? TEXT("done") : TEXT("nothing to attach"));
-		StepName = TEXT("04_variant_attached");
+		UE_LOG(LogRTSDeckBuilderCapture, Display, TEXT("DECKCAPTURE slot first fitting card: %s"),
+		       Menu->Debug_SlotFirstFittingCard() ? TEXT("done") : TEXT("nothing to slot"));
+		StepName = TEXT("04_card_slotted");
 		break;
 	case 4:
-		Menu->Debug_ShowWholeCollection(true);
-		StepName = TEXT("05_everything");
+		UE_LOG(LogRTSDeckBuilderCapture, Display, TEXT("DECKCAPTURE attach first loose variant: %s"),
+		       Menu->Debug_AttachFirstLooseVariant() ? TEXT("done") : TEXT("nothing to attach"));
+		StepName = TEXT("05_variant_attached");
 		break;
 	case 5:
-		Menu->Debug_ShowWholeCollection(false);
-		Menu->HandleSectionClicked(EDeckSection::Technologies);
-		StepName = TEXT("06_technologies");
+		Menu->Debug_ShowWholeCollection(true);
+		StepName = TEXT("06_everything");
 		break;
 	case 6:
+		Menu->Debug_ShowWholeCollection(false);
+		Menu->HandleSectionClicked(EDeckSection::Technologies);
+		StepName = TEXT("07_technologies");
+		break;
+	case 7:
 		StepName = ApplyStep_SaveAndReopen(*Menu);
+		break;
+	case 8:
+		StepName = ApplyStep_SaveToDisk(*Menu);
 		break;
 	default:
 		return FString();
@@ -214,11 +258,11 @@ FString UDeckBuilderCaptureSubsystem::ApplyStep_SaveAndReopen(UW_DeckBuilderMenu
 	if (not IsValid(SaveManager) || not IsValid(WorldMenu))
 	{
 		UE_LOG(LogRTSDeckBuilderCapture, Error, TEXT("DECKCAPTURE no save manager to round-trip through"));
-		return TEXT("07_reopened");
+		return TEXT("08_reopened");
 	}
 	Menu.HandleSectionClicked(EDeckSection::Forge);
 	const FString DeckBeforeSave = Menu.Debug_DescribeState();
-	// The cache only, never the save file: a capture must not replace the player's campaign save.
+	// The cache only here; the save file is the next step's.
 	SaveManager->CachePlayerCardData(Menu.Debug_BuildCardData());
 	WorldMenu->UpdateMenuForNewFocus(EWorldUIFocusState::World);
 	WorldMenu->UpdateMenuForNewFocus(EWorldUIFocusState::CardMenu);
@@ -230,7 +274,40 @@ FString UDeckBuilderCaptureSubsystem::ApplyStep_SaveAndReopen(UW_DeckBuilderMenu
 		UE_LOG(LogRTSDeckBuilderCapture, Error, TEXT("DECKCAPTURE before save: %s"), *DeckBeforeSave);
 		UE_LOG(LogRTSDeckBuilderCapture, Error, TEXT("DECKCAPTURE after reopen: %s"), *DeckAfterReopen);
 	}
-	return TEXT("07_reopened");
+	return TEXT("08_reopened");
+}
+
+FString UDeckBuilderCaptureSubsystem::ApplyStep_SaveToDisk(UW_DeckBuilderMenu& Menu) const
+{
+	const TCHAR* const StepName = TEXT("09_saved_on_map");
+	const AWorldPlayerController* const WorldController = Cast<AWorldPlayerController>(
+		GetWorld()->GetFirstPlayerController());
+	UWorldStateAndSaveManager* const SaveManager = IsValid(WorldController)
+		                                               ? WorldController->GetWorldStateAndSaveManager()
+		                                               : nullptr;
+	if (not IsValid(SaveManager))
+	{
+		UE_LOG(LogRTSDeckBuilderCapture, Error, TEXT("DECKCAPTURE no save manager to save through"));
+		return StepName;
+	}
+	const FString DeckInMenu = DeckBuilderCaptureConstants::DescribeCardData(Menu.Debug_BuildCardData());
+	// The button's own path, save file included. run_deck_builder_capture.ps1 puts the player's save back afterwards.
+	Menu.Debug_SaveAndGoBack();
+	FWorldCampaignState SavedCampaign;
+	FPlayerProfileSaveData SavedProfile;
+	const bool bLoaded = SaveManager->LoadCampaignState(SavedCampaign, SavedProfile);
+	const FString DeckOnDisk = bLoaded
+		                           ? DeckBuilderCaptureConstants::DescribeCardData(SavedProfile.PlayerData.CardData)
+		                           : FString(TEXT("no save file"));
+	UE_LOG(LogRTSDeckBuilderCapture, Display, TEXT("DECKCAPTURE disk_save=%s"),
+	       DeckInMenu == DeckOnDisk ? TEXT("OK") : TEXT("MISMATCH"));
+	if (DeckInMenu != DeckOnDisk)
+	{
+		UE_LOG(LogRTSDeckBuilderCapture, Error, TEXT("DECKCAPTURE deck in menu: %s"), *DeckInMenu);
+		UE_LOG(LogRTSDeckBuilderCapture, Error, TEXT("DECKCAPTURE deck on disk: %s"), *DeckOnDisk);
+	}
+	UE_LOG(LogRTSDeckBuilderCapture, Display, TEXT("DECKCAPTURE saved deck: %s"), *DeckOnDisk);
+	return StepName;
 }
 
 void UDeckBuilderCaptureSubsystem::CaptureStep() const

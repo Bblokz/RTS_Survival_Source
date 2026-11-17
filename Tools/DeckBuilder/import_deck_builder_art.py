@@ -6,6 +6,9 @@ Source PNGs: UISkins/13_Frontstahl_Gunmetal/DeckBuilder/T_Deck_*.png
   T_Deck_Spine_<rarity>      the narrow variant card with its painted spine (made with UISkins/_generator/cards.py,
                              see Saved/CardDesigns/make_spine_frames.py for the shape and the right-hand stripe)
   T_Deck_Section_<section>   the building pictures of the rail
+  T_Deck_Part_*              half-size copies of the hangar variant screen's slice textures (rows, rail entries,
+                             icon well, buttons, tabs). Slate draws box brush corners at texture size, so these are
+                             one texel per UI unit; T_Deck_Panel is scaled for the same reason (corner 26 units).
 
 FDeckBuilderStyle (Source/RTS_Survival/CardSystem/DeckBuilder/DeckBuilderStyle.cpp) points at these by name.
 Re-runnable: existing textures are replaced. Run as a commandlet with run_import_deck_builder_art.ps1.
@@ -18,7 +21,7 @@ import unreal
 HERE = os.path.dirname(os.path.abspath(__file__))
 SOURCE_FOLDER = os.path.abspath(os.path.join(HERE, '..', '..', '..', 'UISkins', '13_Frontstahl_Gunmetal', 'DeckBuilder'))
 DESTINATION = '/Game/RTS_Survival/Textures/GameUI/DeckBuilder'
-EXPECTED_COUNT = 21
+EXPECTED_COUNT = 33
 
 
 def import_textures():

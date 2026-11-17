@@ -3,7 +3,11 @@
 #include "DeckCardCatalog.h"
 
 #include "Engine/DataTable.h"
+#include "RTS_Survival/CardSystem/ERTSCard/CardUnitStructure.h"
+#include "RTS_Survival/GameUI/TrainingUI/TrainingOptions/TrainingOptionLibrary/TrainingOptionLibrary.h"
 #include "RTS_Survival/Player/PlayerUnitVariantManager/PlayerUnitVariantManager.h"
+#include "RTS_Survival/Units/Enums/Enum_UnitType.h"
+#include "RTS_Survival/Units/Variants/UnitVariantPresentationLibrary.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "Slate/SlateBrushAsset.h"
 
@@ -83,14 +87,81 @@ namespace DeckCardCatalogPrivate
 		return 0;
 	}
 
+	/** The library call reports an error for a selector with no subtype, which every non-unit card has. */
+	bool GetHasExactlyOneSubtype(const FCardUnitTypeSelector& Selector)
+	{
+		const int32 SetSubtypes = (Selector.SquadSubtype != ESquadSubtype::Squad_None ? 1 : 0)
+			+ (Selector.NomadicSubtype != ENomadicSubtype::Nomadic_None ? 1 : 0)
+			+ (Selector.TankSubtype != ETankSubtype::Tank_None ? 1 : 0)
+			+ (Selector.AircraftSubtype != EAircraftSubtype::Aircarft_None ? 1 : 0);
+		return SetSubtypes == 1;
+	}
+
+	/** The unit column is the card table's subtype selector; a plain training option is read as well. */
 	FTrainingOption ReadTrainingOption(const FProperty* Column, const uint8* RowData)
 	{
 		const FStructProperty* StructProperty = CastField<FStructProperty>(Column);
-		if (not StructProperty || StructProperty->Struct != FTrainingOption::StaticStruct())
+		if (not StructProperty)
 		{
 			return FTrainingOption();
 		}
-		return *StructProperty->ContainerPtrToValuePtr<FTrainingOption>(RowData);
+		if (StructProperty->Struct == FTrainingOption::StaticStruct())
+		{
+			return *StructProperty->ContainerPtrToValuePtr<FTrainingOption>(RowData);
+		}
+		if (StructProperty->Struct != FCardUnitTypeSelector::StaticStruct())
+		{
+			return FTrainingOption();
+		}
+		const FCardUnitTypeSelector& Selector = *StructProperty->ContainerPtrToValuePtr<FCardUnitTypeSelector>(RowData);
+		return GetHasExactlyOneSubtype(Selector)
+			       ? UTrainingOptionLibrary::GetTrainingOptionFromCardSelector(Selector)
+			       : FTrainingOption();
+	}
+
+	/** @return The Description column of the unit's row in the training options table, a Blueprint struct too. */
+	FText FindTrainingTableDescription(const UDataTable* TrainingOptionsTable, const FTrainingOption& Unit)
+	{
+		if (not IsValid(TrainingOptionsTable) || not TrainingOptionsTable->GetRowStruct())
+		{
+			return FText::GetEmpty();
+		}
+		const FName RowName(*UTrainingOptionLibrary::GetTrainingOptionName(Unit.UnitType, Unit.SubtypeValue));
+		const uint8* RowData = TrainingOptionsTable->FindRowUnchecked(RowName);
+		const FProperty* Column = RowData ? FindColumn(TrainingOptionsTable->GetRowStruct(), DescriptionColumn) : nullptr;
+		return Column ? ReadText(Column, RowData) : FText::GetEmpty();
+	}
+
+	/**
+	 * @brief Training cards only say "set in training UI" in the card table: their name, text and (when the card has
+	 * none) picture are the unit's row in the training options table, as the Blueprint card showed them.
+	 */
+	void ApplyTrainingTablePresentation(const UDataTable* TrainingOptionsTable, FDeckCardDefinition& InOutDefinition)
+	{
+		EDeckSection Section = EDeckSection::Technologies;
+		const bool bIsTrainingCard = DeckBuilder::GetSectionOfCardType(InOutDefinition.CardType, Section)
+			&& Section != EDeckSection::Technologies;
+		if (not bIsTrainingCard || InOutDefinition.TrainingOption.IsNone())
+		{
+			return;
+		}
+		const FText Title = UUnitVariantPresentationLibrary::FindTrainingTableTitle(TrainingOptionsTable,
+		                                                                           InOutDefinition.TrainingOption);
+		InOutDefinition.Title = Title.IsEmpty()
+			                        ? UUnitVariantPresentationLibrary::GetUnitDisplayNameFallback(
+				                        InOutDefinition.TrainingOption)
+			                        : Title;
+		const FText Description = FindTrainingTableDescription(TrainingOptionsTable, InOutDefinition.TrainingOption);
+		if (not Description.IsEmpty())
+		{
+			InOutDefinition.Description = Description;
+		}
+		const USlateBrushAsset* TrainingBrush = UUnitVariantPresentationLibrary::FindTrainingTableImageBrush(
+			TrainingOptionsTable, InOutDefinition.TrainingOption);
+		if (not InOutDefinition.ImageBrush.GetResourceObject() && IsValid(TrainingBrush))
+		{
+			InOutDefinition.ImageBrush = TrainingBrush->Brush;
+		}
 	}
 
 	/** The picture column is either a brush by value or a brush asset; both give the same brush. */
@@ -141,6 +212,7 @@ int32 UDeckCardCatalog::LoadFromTable(const UDataTable* CardTable)
 		return 0;
 	}
 	const UEnum* CardEnum = StaticEnum<ERTSCard>();
+	M_TrainingOptionsTable = UUnitVariantPresentationLibrary::LoadTrainingOptionsTable();
 	const DeckCardCatalogPrivate::FCardTableColumns Columns = DeckCardCatalogPrivate::FindColumns(
 		CardTable->GetRowStruct());
 	for (const TPair<FName, uint8*>& Row : CardTable->GetRowMap())
@@ -153,10 +225,12 @@ int32 UDeckCardCatalog::LoadFromTable(const UDataTable* CardTable)
 			continue;
 		}
 		const ERTSCard Card = static_cast<ERTSCard>(CardValue);
-		const FDeckCardDefinition Definition = DeckCardCatalogPrivate::ReadRow(Card, Columns, Row.Value);
-		UE_LOG(LogRTSDeckCardCatalog, Log, TEXT("DECKCATALOG card=%s type=%s rarity=%d unit=%s tech=%s picture=%s"),
+		FDeckCardDefinition Definition = DeckCardCatalogPrivate::ReadRow(Card, Columns, Row.Value);
+		DeckCardCatalogPrivate::ApplyTrainingTablePresentation(M_TrainingOptionsTable, Definition);
+		UE_LOG(LogRTSDeckCardCatalog, Log, TEXT("DECKCATALOG card=%s type=%s rarity=%d unit=%s title=%s tech=%s picture=%s"),
 		       *Row.Key.ToString(), *Global_GetCardTypeAsString(Definition.CardType),
 		       static_cast<int32>(Definition.Rarity), *Definition.TrainingOption.GetTrainingName(),
+		       *Definition.Title.ToString(),
 		       *Global_GetTechAsString(Definition.Technology),
 		       Definition.ImageBrush.GetResourceObject() ? TEXT("yes") : TEXT("no"));
 		M_Definitions.Add(Card, Definition);

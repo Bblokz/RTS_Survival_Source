@@ -20,7 +20,8 @@ MAP_PATH = "/Game/RTS_Survival/Maps/GerMissions/Ger_2ndOreMountains"
 LAYOUT_FILE = "D:/UE5Projects/RTS_Survival/Saved/OreMountains/terrain/Ore_layout.json"
 SHOTS = "D:/UE5Projects/RTS_Survival/Saved/OreMountains/shots/"
 LS_ROOT = "/Game/RTS_Survival/Materials/ground/Landscape/CastleGrassDesertDry/"
-LANDSCAPE_PARENT = LS_ROOT + "MI_RTS_Landscape_DryCastle_Inst"
+# the map has its own master copy since 2026-11-17 (Docs/Landscape/ls_ore_master_build.py)
+LANDSCAPE_PARENT = "/Game/RTS_Survival/Materials/ground/Landscape/OreMountains/MI_RTS_Landscape_OreMountains_Base"
 LANDSCAPE_MATERIAL = LS_ROOT + "MI_RTS_Landscape_DryCastle_OreMountains"
 LAYER_INFOS = {
     "Desert": LS_ROOT + "DATA/Desert_LayerInfo",
@@ -31,6 +32,9 @@ LAYER_INFOS = {
     "MountainTop": "/Game/RTS_Survival/Maps/GerMissions/Ger_DestroyT35_sharedassets/MountainTop_LayerInfo",
     "Asphalt": "/Game/MilitaryAirport/Landscape/LandscapeMaterial/Asphalt_LayerInfo",
     "DarkEarth": LS_ROOT + "DATA/DarkEarth_LayerInfo",
+    "IronOxide": LS_ROOT + "DATA/IronOxide_LayerInfo",
+    "Ochre": LS_ROOT + "DATA/Ochre_LayerInfo",
+    "SlateScree": LS_ROOT + "DATA/SlateScree_LayerInfo",
 }
 LANDSCAPE_LABEL = "Ore_Landscape"
 RVT_ROOT = "/Game/RTS_Survival/Meshes/RVTs/"

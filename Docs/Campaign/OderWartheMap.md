@@ -20,13 +20,15 @@ python Source/Tools/OderWartheMap/ow_cmd.py Saved/OderWarthe/c_build2.py --timeo
 python Source/Tools/OderWartheMap/ow_cmd.py Saved/OderWarthe/c_waves.py --timeout 580        # wave routes leg by leg
 python Source/Tools/OderWartheMap/ow_cmd.py Saved/OderWarthe/c_nav.py --timeout 580          # the full per-agent nav table
 python Source/Tools/OderWartheMap/ow_cmd.py Saved/OderWarthe/c_chokes.py --timeout 580       # choke clear widths
+python Source/Tools/OderWartheMap/ow_rail_qc.py --paint      # offline rail check -> Saved/OderWarthe/rail_qc (txt + png)
 ```
 
 A paint or height change needs the full build (the landscape is re-imported); a dressing change needs only
 `c_build2.py`.
 
 - Generated actors carry the prefix `OW_` (`OW_D_*` Blueprints, `OW_I_*` instance holders, `OW_M_*` single mesh actors
-  (dragon's teeth), `OW_NB_*` nav blockers, `OW_Decal_*`, `OW_FX_*`, `OW_Note_*`, `OW_Water_*`) under the outliner folder
+  (dragon's teeth), `OW_NB_*` nav blockers, `OW_R_*` bent rail panels, `OW_Decal_*`, `OW_FX_*`, `OW_Note_*`,
+  `OW_Water_*`) under the outliner folder
   `OderWarthe/`. Each step clears and redoes its own actors.
 - The instanced-mesh `abs_z` key is an absolute height; the item's dz is added to it.
 - Materials: the landscape uses `OderWarthe/Map/MI_RTS_Landscape_OderWarthe` (child of the Pripyat landscape instance:
@@ -89,13 +91,42 @@ medium and heavy tanks) and three granite erratics.
   tanks drive round to the gap. Geometry alone does not change the navmesh in this project; blocking is by nav area and
   the agents' query filters (`RTS_NavFilter_*`).
 
-## The five Werke
+## The five Werke (redesigned 2026-11-17)
 
-One drumlin stamp (34 x 26 m semi-axes, plateau, stoss end, local lumps, four old craters, the dug-in portal ramp) and
-one paint set, both in the Werk frame, and one dressing template (`WERK_TEMPLATE`): Werk block, three steel cupolas,
-mast, two Soviet MG pits, rail hedgehogs, wire, crates, the teeth belt, the tunnel portal and three editor notes for the
-hidden HQ targets. Placed by centre and yaw only; the yaws keep every tunnel mouth 108-172 m from every resource and
-station. Identity: heights within 5 cm, paint within 1/255 (bilinear, in the Werk frame); `werk_diff.txt` 0 differences.
+The first drumlin Werke (one 7 m drumlin stamp, the kit block, three cupolas, Soviet pits, hedgehogs, wire, crates) were
+placeholders and are gone. The user picked three designs from three sketch rounds after WWII reference photos; they are
+built as Breakthrough-faction bunker meshes in Blender (`D:/Blender/BlenderProjects/BlenderTanks/CustomMapItems/OderWarthe/Werke`,
+README there) with the faction's Sooted Fortress concrete (own instance `MI_OW_Werk_<Name>_Concrete` under
+`MI_BF_SootedFortress_UVTile`, with its baked curvature map; `M_BF_Trim` for steel), imported by `ow_werk_import.py` into
+`/Game/RTS_Survival/Blueprints/Environment/OderWarthe/Werke`.
+
+| Werk | Design | Mesh |
+|---|---|---|
+| W1, W2, W3 | 7c Kasemattennase: crag-and-tail, two Regelbau 667 casemates and a Werkeingang in the bluff, Leitstand, Tobruks, stepped wing walls | `SM_OW_Werk_Kasemattennase` |
+| W4 | 10 Peilturm: rocky knoll, Marine-Peilstand tower, comb casemate, granite outcrops | `SM_OW_Werk_Peilturm` |
+| W5 | 8b Flankierend: four glacis hillocks, four 667 casemates crossing their fire over the gaps, Leitstand, Werkeingang | `SM_OW_Werk_Flankierend` |
+
+The assignment (`WERK_DESIGN` in `ow_terrain_gen.py`) is the one with the least lake fill and no footprint on a corridor:
+8b and the Peilturm cut the causeway banks at W1-W3. Different designs reveal nothing about the HQ: any of them can hold it.
+
+- **Terrain:** each design's stamp (`werke/c<key>.json` + `.npz`, from the sketch generator `werke/concepts_v3.py` /
+  `make_data.py`) replaces the drumlin, authoritative 4 m past its footprint and gone by 14 m; it fills lake where a
+  footprint reaches it, never touches a corridor deck, and keeps the dug-in portal cut (its berm now only over the
+  portal's own 22 m). The design's own paint (grass, sod on banked roofs, gravel forecourts, mud in trenches, earth on cuts).
+- **The stamp is shaped for the meshes** (`concepts.py`): ground seated 1.3 m round and under every bunker (no gap at a
+  wall foot), kept under every door sill, embrasure, port and slot (front strips, 667 side cuts, door approaches), level
+  benches under cupolas and the mast, and no surface relief over any of it.
+- **Dressing** (`werks()` in `ow_dress_gen.py`): the bunker mesh at the Werk base, the design's cupolas, mast, rocks and
+  teeth (each sunk to the lowest ground under its rim), all-agent nav blockers on every bunker and wing wall, tank-only
+  blockers along each design's teeth line, the tunnel portal, notes for the three HQ targets.
+- **Checks:** `check.txt` (each Werk follows its stamp; hill tops reachable), `werk_diff.txt` (identity per design),
+  `ow_werk_gaps.py` (bunker feet, openings and kit floats against the built landscape heights; all ok), the nav table
+  (`c_nav.py`: per design top point and a crossing of the design's own belt), and in the editor `Saved/OderWarthe/c_werk_trace.py`
+  (traces the real landscape at every foot and kit rim).
+- **Garrisons:** the sketch's `garr_w*` points land on the new hills' flanks (W2's is unreachable); mission scripting should
+  spawn a Werk's garrison at its design's walkable top (`WERK_TOP` in `ow_terrain_gen.py`, Werk frame).
+- **Tank blocking at the belts comes from the tooth meshes themselves** (no tank navmesh between them); the blockers only
+  add a little. Removing teeth (W3's boardwalk) opened a lane, so teeth are dropped only on a corridor deck.
 
 ## Wave routes (proven leg by leg, round 8)
 
@@ -106,6 +137,27 @@ station. Identity: heights within 5 cm, paint within 1/255 (bilinear, in the Wer
 | W3 | Kalau causeway, east ramp | 618 / 619 / 626 m |
 | W4 | Hochwald ford, Packlitz dam, north ramp | 824 / 821 / 822 m |
 | W5 | Kalau causeway, east ramp | 693 / 699 / 702 m |
+
+## The rail yard (metal_c) and the double track (2026-11-17)
+
+Geometry in `ow_rail.py`, shared by the paint (`ow_terrain_gen.py`: ballast bed, `rail_near`, layout `rail_line` /
+`rail_tracks`) and the dressing (`ow_dress_gen.py` `rail_yard()`, `clear_rail_bed()`).
+
+- Track S runs from a buffer stop (the Berlin loading ramp `SM_Berlin_RailRamp`, side platform to the south) through
+  the yard, ESE through the neck between the s4 hill and the north shore, a 300 m curve, and due east to the landscape
+  edge (y 441 m, 91 m past the play edge). Track N leaves S at turnout T1, runs 6 m north of it and also reaches the
+  edge. A crossover (T2 on S, T3 on N) sits in the neck. All of it stays at least 106 m from every Werk centre, 16 m
+  from water and 7 m from the Lubow dam's corridor; metal_c[1] is 9 m off S, the s4 station 35 m.
+- The track mesh `SM_RTS_Railway_Track_01` is a 10 m panel (pivot at its start) with its own 7.75 m ballast. Parallel
+  tracks are 6 m apart and every panel is sunk 22 cm: the mesh shows rails, sleepers and a low ballast crown; the
+  landscape paint is the bed (full to 4.8 m, a 3 m soft edge, round caps).
+- Straights are rigid instances (`OW_I_Rail_Track`, `abs_z`, pitched along the bed). Turnout legs and the curve are
+  spline-mesh panels (`OW_R_*`, built by `step_dress` "rails"), with exact ends and tangents, so every joint meets
+  in position and heading. The legs sit 1 cm under the through track to avoid z-fighting where the sleepers overlap.
+- The bed height is the dry ground (over 1.2 m) blurred twice over 21 m. Every track reads the same field, so the
+  turnouts share one height.
+- `ow_rail_qc.py` checks the items as built (rounded values): joints, turnouts, seating against `OW_height.raw`,
+  clearances, the edge, paint and vegetation on the bed. It writes `rail_qc.txt` and two PNGs.
 
 ## Deviations from the sketch
 
@@ -120,7 +172,7 @@ station. Identity: heights within 5 cm, paint within 1/255 (bilinear, in the Wer
 | Pump house at DF 1 | A walled 5 x 10 m concrete pump house with intake pipes, on the nearest Packlitz shore | Critic R0-9, R7-6 |
 | Sluice: gate across a cut | Intake gate on the upstream face, culvert outlet headwall on the downstream face | The road keeps its 10 m deck; a deck mesh would not carry nav |
 | Block buried in the drumlin | Block cover with grass sod, cupolas on level benches | The block fills the plateau; a mound walls off the hill top (round 8 nav) |
-| (not in the sketch) | Rail line from the rail yard off the east edge | Critic R1-10 |
+| (not in the sketch) | Rail yard north of the metal_c piles, double track off the east edge | Critic R1-10; the user (2026-11-17) |
 
 ## Known items
 

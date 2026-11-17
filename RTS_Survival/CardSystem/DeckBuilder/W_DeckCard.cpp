@@ -3,6 +3,7 @@
 #include "W_DeckCard.h"
 
 #include "Blueprint/WidgetBlueprintLibrary.h"
+#include "Brushes/SlateRoundedBoxBrush.h"
 #include "DeckBuilderWidgetHelpers.h"
 #include "RTS_Survival/Units/Variants/UnitVariantPresentationLibrary.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
@@ -44,9 +45,18 @@ namespace DeckCardLayout
 	constexpr int32 DescriptionFontSize = 8;
 	constexpr int32 RarityFontSize = 8;
 	constexpr int32 EmptySlotFontSize = 10;
-	constexpr int32 VariantLaneFontSize = 12;
+	// The lane's lettering runs down the lane like a spine's, so its box is laid out flat and turned.
+	const FVector2D VariantLaneTextSize(212.f, 18.f);
+	const FVector2D VariantLaneTextPosition(137.f, 149.f);
+	constexpr float VariantLaneTextAngle = 90.f;
+	const FVector2D VariantLaneTextPivot(0.5f, 0.5f);
+	constexpr int32 VariantLaneFontSize = 9;
+	constexpr int32 VariantLaneLetterSpacing = 220;
+	constexpr float VariantLaneCornerRadius = 3.f;
+	constexpr float VariantLaneOutlineWidth = 1.f;
 	const FLinearColor TypeBarColor(0.02f, 0.022f, 0.024f, 0.9f);
-	const FLinearColor VariantLaneColor(0.08f, 0.28f, 0.32f, 0.45f);
+	const FLinearColor VariantLaneColor(0.02f, 0.09f, 0.1f, 0.55f);
+	const FLinearColor VariantLaneOutlineColor(0.25f, 0.94f, 1.f, 0.55f);
 	const FLinearColor DropHighlightColor(0.25f, 0.94f, 1.f, 0.22f);
 	constexpr float DragVisualOpacity = 0.85f;
 	constexpr int32 SpineZOrder = 0;
@@ -133,15 +143,19 @@ void UW_DeckCard::BuildWidgetTree_Art()
 	                                  ContentZOrder);
 
 	M_VariantLane = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass());
-	M_VariantLane->SetBrush(FSlateColorBrush(VariantLaneColor));
+	// An empty socket: dark inside with a thin accent outline, where a variant card's spine would show.
+	M_VariantLane->SetBrush(FSlateRoundedBoxBrush(VariantLaneColor, VariantLaneCornerRadius, VariantLaneOutlineColor,
+	                                              VariantLaneOutlineWidth));
 	M_VariantLane->SetPadding(FMargin(0.f));
-	M_VariantLane->SetHorizontalAlignment(HAlign_Center);
-	M_VariantLane->SetVerticalAlignment(VAlign_Top);
 	M_VariantLane->SetVisibility(ESlateVisibility::Collapsed);
 	DeckBuilderWidgets::PlaceOnCanvas(*M_Canvas, M_VariantLane, VariantLanePosition, VariantLaneSize, ContentZOrder);
 	M_VariantLaneText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
 	M_VariantLaneText->SetJustification(ETextJustify::Center);
-	M_VariantLane->SetContent(M_VariantLaneText);
+	M_VariantLaneText->SetRenderTransformPivot(VariantLaneTextPivot);
+	M_VariantLaneText->SetRenderTransformAngle(VariantLaneTextAngle);
+	M_VariantLaneText->SetVisibility(ESlateVisibility::Collapsed);
+	DeckBuilderWidgets::PlaceOnCanvas(*M_Canvas, M_VariantLaneText, VariantLaneTextPosition, VariantLaneTextSize,
+	                                  ContentZOrder);
 }
 
 void UW_DeckCard::BuildWidgetTree_Texts()
@@ -267,8 +281,11 @@ void UW_DeckCard::SetupCard_Variants(const FDeckBuilderLook& Look, const FDeckCa
 		M_ClippedVariantCards.Add(VariantCard);
 	}
 	const bool bShowsLane = ClippedCount == 0 && Variants.AvailableVariantCount > 0;
-	M_VariantLane->SetVisibility(bShowsLane ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
-	M_VariantLaneText->SetText(FText::Format(NSLOCTEXT("DeckBuilder", "VariantLane", "+{0}"),
+	const ESlateVisibility LaneVisibility = bShowsLane ? ESlateVisibility::HitTestInvisible
+		                                        : ESlateVisibility::Collapsed;
+	M_VariantLane->SetVisibility(LaneVisibility);
+	M_VariantLaneText->SetVisibility(LaneVisibility);
+	M_VariantLaneText->SetText(FText::Format(NSLOCTEXT("DeckBuilder", "VariantLane", "+ {0} AVAILABLE"),
 	                                         FText::AsNumber(Variants.AvailableVariantCount)));
 	// A slot is always as wide as a card with a spine, so the grid stays even; elsewhere the card is only as wide
 	// as what it shows.
@@ -297,7 +314,8 @@ void UW_DeckCard::SetupEmptySlot(UW_DeckBuilderMenu* Menu, const FDeckBuilderLoo
 	ApplyTextStyle(Look);
 	M_Frame->SetBrush(Look.VacantCardFrame);
 	for (UWidget* const HiddenPart : TArray<UWidget*>{M_Picture, M_BuildingWell, M_BuildingIcon, M_TypeBar, M_NameText,
-	                                                  M_DescriptionText, M_RarityText, M_VariantLane})
+	                                                  M_DescriptionText, M_RarityText, M_VariantLane,
+	                                                  M_VariantLaneText})
 	{
 		HiddenPart->SetVisibility(ESlateVisibility::Collapsed);
 	}
@@ -324,7 +342,9 @@ void UW_DeckCard::ApplyTextStyle(const FDeckBuilderLook& Look)
 	          Style.DescriptionColor);
 	StyleText(M_RarityText, DeckBuilderWidgets::MakeFont(Look.BodyFont, RarityFontSize), Style.GoodColor);
 	StyleText(M_EmptySlotText, DeckBuilderWidgets::MakeFont(Look.BodyFont, EmptySlotFontSize), Style.MutedTextColor);
-	StyleText(M_VariantLaneText, DeckBuilderWidgets::MakeFont(Look.HeadingFont, VariantLaneFontSize), Style.AccentColor);
+	StyleText(M_VariantLaneText,
+	          DeckBuilderWidgets::MakeFont(Look.HeadingFont, VariantLaneFontSize, VariantLaneLetterSpacing),
+	          Style.AccentColor);
 }
 
 void UW_DeckCard::SetDropHighlight(const bool bIsHighlighted)

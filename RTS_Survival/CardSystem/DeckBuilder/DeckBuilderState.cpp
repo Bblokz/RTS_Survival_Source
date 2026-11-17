@@ -163,7 +163,7 @@ TArray<FUnitVariantSelection> FDeckBuilderState::GetLooseVariants() const
 	TArray<FUnitVariantSelection> LooseVariants;
 	for (const FUnitVariantSelection& Variant : M_OwnedVariants)
 	{
-		if (GetAttachedVariant(Variant.Unit) == EUnitVariant::Base)
+		if (GetAttachedVariant(Variant.Unit) != Variant.Variant)
 		{
 			LooseVariants.Add(Variant);
 		}

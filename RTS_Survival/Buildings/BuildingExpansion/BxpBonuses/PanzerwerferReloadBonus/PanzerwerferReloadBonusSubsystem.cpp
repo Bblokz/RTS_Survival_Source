@@ -147,8 +147,8 @@ bool UPanzerwerferReloadBonusSubsystem::GetIsPanzerwerfer(const ATankMaster& Tan
 	{
 		return false;
 	}
-	// Tank_Panzerwerfer (the Mechanized Depot's option) has no unit Blueprint yet; the Pz 38(t) R carries the
-	// Panzerwerfer rocket turret, so it counts as one.
+	// Tank_Panzerwerfer is the Mechanized Depot's Panzerwerfer 42 (Maultier); the Pz 38(t) R carries the smaller
+	// Panzerwerfer rocket turret, so it counts as one too.
 	const ETankSubtype Subtype = RTSComponent->GetSubtypeAsTankSubtype();
 	return Subtype == ETankSubtype::Tank_Panzerwerfer || Subtype == ETankSubtype::Tank_Pz38t_R;
 }

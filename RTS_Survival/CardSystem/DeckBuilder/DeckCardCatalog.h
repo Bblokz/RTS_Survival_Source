@@ -42,4 +42,8 @@ private:
 
 	UPROPERTY()
 	TObjectPtr<const UDataTable> M_CardTable;
+
+	// DT_TrainingOptions: name, text and picture of the unit a training card unlocks. Kept so its pictures stay loaded.
+	UPROPERTY()
+	TObjectPtr<const UDataTable> M_TrainingOptionsTable;
 };

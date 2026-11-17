@@ -58,6 +58,64 @@ layout sketch A (`MapDesigner/FrozenLake/frozen_A.layout.json`).
    - An ice layout change (regions in the sketch) needs `fl_terrain_gen.py`, then `fl_ice_gen.py`, then `step_ice_real`
      and a save after the navmesh build (`Saved/FrozenLake/c_ice_real.py` does this and probes the paths per agent).
 
+## Kit meshes (placed 2026-11-17, provisional)
+
+`fl_map_build.step_kits()` places the FrozenLake kit session's Unreal imports
+(`/Game/RTS_Survival/Blueprints/Environment/FrozenLake/<Kit>/Blueprints`) on the sketch's features. All actors are
+labelled `FL_Kit_*`, under `FrozenLake/Kit/`. Rerunning the step clears and redoes them.
+
+**Variants are provisional.** Only Gorge Bridge B was picked by the owner. The others are the options that were
+imported, and you swap a kit by changing its path in `KIT_BP`:
+
+| Kit | Variant used | Where |
+|---|---|---|
+| Cryo pump | B intact; B pump-3-dam at pump 3 | Pumps 1, 2 and 4 on their shore pads; pump 3 in the dam bay. The pipes face the lake (the mesh's -X). Variant C is the alternative, but it is far over its triangle budget. |
+| Drill rig | A four-leg | Rig centre (0, 0), yaw 0. The mesh is modelled with +X north, so its ramps sit at bearings 190, 282 and 40. |
+| Gorge bridge | B blown | Where the south road crosses the outflow gorge, along the road. B repaired is ready for the engineers' repair. |
+| Burnt convoy | C | The south-east convoy site. |
+| Ice kit (sheared) | ridges R06/R10/R14 + RA/RB caps | The five sketch ridge lines: 24 pieces, with the 14/10/6 m modules chosen to fit each line and a little jitter. |
+| | C01 King Tiger shore collar | The frozen King Tiger. The tank itself comes with the scavenge objective. |
+| | C05 crystal heave | The Radixite upwelling. |
+| | E01-E03 lead-edge strips | Around the two steam leads and along both sides of the outflow lead: 38 strips. |
+| | F01-F06 floes | 23 floes on the water in the leads. |
+
+**Not placed:**
+- C02 (the freed collar state, swapped in by the scavenge objective);
+- C03/C04 wreck collars: they need the 1946-47 wreck hulls in the wreck bay first;
+- H01-H03 shell-hole rims: holes are runtime;
+- the Forge dam, road kit, Shield HQ and airfield props, which have not been delivered.
+
+**Checked after placement (editor navmesh, all four agents):**
+- Every agent paths HQ -> Shield HQ, HQ -> airfield, S column -> HQ and N column -> HQ.
+- The probe into the King Tiger collar's hull opening fails for heavies: the opening is sized for the hull.
+- The rig ramps were not probed correctly (the probe point sat on the deck), so they still need a ramp-foot check.
+
+## Trees (placed 2026-11-17)
+
+`fl_tree_gen.py` writes `Saved/FrozenLake/trees/FL_Trees.json`, and `fl_map_build.step_trees()` places the
+`BP_FrozenLake_WinterLarch_A`-`F` Blueprints (labels `FL_Tree_####`, folder `FrozenLake/Trees`). They are
+destructible: medium and heavy tanks crush A-E, and any tank crushes the young F. In the navmesh A-E keep infantry and
+light vehicles out, and F keeps infantry out.
+
+- **794 trees:**
+  - 262 in the sketch's four dead forests, about 6.5 m apart;
+  - 507 in tundra clumps, some of them past the play edge as backdrop;
+  - 25 sparse in the snow ring.
+- **Kept clear:**
+  - 5 m from every road, track and lane;
+  - 8 m from pads;
+  - 6 m from the lake;
+  - 9 m from the gorge, canal and dam;
+  - the HQ build area (75 m), the Shield HQ (65 m), the spawns (25 m), the convoy, both bridges, the radio mast and
+    the airfield runway with its apron;
+  - slopes over 24 degrees.
+- **Checked after placement (editor navmesh, all four agents):**
+  - Every class paths from all three spawns to the HQ.
+  - HQ -> Shield HQ, airfield, convoy, metal yard and Radixite seep all work.
+  - The pumps are reachable for infantry and light tanks. The medium and heavy probe points sit inside the pump
+    building, so their "no path" says nothing about the pumps.
+- **Not tested:** tanks crushing the trees, shells hitting them, or the rendering cost of about 800 tree actors.
+
 ## Snow ruts
 
 Tank trails cut deeper-looking ruts in snow and frost than in the bog. The shared `MF_RTS_LS_TankTrails` is not

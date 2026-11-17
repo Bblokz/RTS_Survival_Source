@@ -42,7 +42,8 @@ SIZE = COMPONENTS * QUADS * QUAD_CM     # 107 100 cm
 SHAPE = (V, V)                          # work arrays: row = north..south, col = west..east
 
 # DryCastle master layers (the Ger_MarderStugMission set)
-LAYERS = ["Desert", "GrassCastle", "RockDesert", "GraySand", "RTSSand", "MountainTop", "Asphalt", "DarkEarth"]
+LAYERS = ["Desert", "GrassCastle", "RockDesert", "GraySand", "RTSSand", "MountainTop", "Asphalt", "DarkEarth",
+          "IronOxide", "Ochre", "SlateScree"]
 LAYER_TRACE = 2
 
 NAV_MAX_SLOPE_DEG = 44.0                # agent_max_slope of all four RecastNavMesh actors in the template
@@ -1078,9 +1079,11 @@ class Gen:
         rock = rock * (0.25 + 0.75 * clear2)
         self.out_masks["wear"] = self.out_masks["wear"] | (self.road2_dist < 650.0)
         asphalt = np.maximum(np.maximum(paving, tar), soot)
+        iron, ochre, slate = self.mineral_layers(locals())
         w = {"Desert": np.ones(SHAPE)}
         for name, layer in (("MountainTop", pale), ("GraySand", dust), ("RTSSand", dark), ("GrassCastle", scrub),
-                            ("RockDesert", rock), ("DarkEarth", earth), ("Asphalt", asphalt)):
+                            ("SlateScree", slate), ("Ochre", ochre), ("RockDesert", rock), ("IronOxide", iron),
+                            ("DarkEarth", earth), ("Asphalt", asphalt)):
             layer = np.clip(0.5 * layer + 0.5 * box_blur(layer, 1), 0.0, 1.0)
             for other in w:
                 w[other] = w[other] * (1.0 - layer)
@@ -1091,6 +1094,56 @@ class Gen:
         ints["Desert"] += 255 - sum(ints.values())
         self.W = {name: ints[name].astype(np.uint8) for name in LAYERS}
         assert int(sum(v.astype(np.int32) for v in self.W.values()).min()) == 255
+
+    def mineral_layers(self, f):
+        """Mineral round (2026-11-17): three layers that break the large single-layer patches (pale MountainTop on the
+        bench and foothills, warm Desert on the valley floor). SlateScree: cool grey gravel sheets 30-60 m across on
+        the pale ground and as scree tongues below the faces. Ochre: yellow-brown limonite stains on the valley floor
+        and the foothills, the halo of every iron showing, the fans of the rills. IronOxide: vivid red, an accent in
+        named places only: tailings tongues at the three adits, seams on the spoil heaps, a few thin vein outcrops
+        across the foothills, rust seeps at cliff feet, the gully banks. None of them on roads, shoulders, tracks,
+        yards, beds, the start apron or the woods floor. Returns (iron, ochre, slate) weights."""
+        broken, grit, wander = f["broken"], f["grit"], f["wander"]
+        n_mid, n_fine, n_micro, n_piece = f["n_mid"], f["n_fine"], f["n_micro"], f["n_piece"]
+        bench, foot, valley, cliff_core = f["bench"], f["foot"], f["valley"], f["cliff_core"]
+        open_ = crisp(f["rd_any"], 950.0, 80.0) * (1.0 - f["worn"]) * (1.0 - crisp(f["work"], 0.2, 0.15))             * (1.0 - f["bed"]) * (1.0 - f["gully_bed"]) * (1.0 - f["thru"]) * (1.0 - f["rill"]) * (1.0 - f["apron_hq"])             * (1.0 - f["pads_m"]) * (1.0 - crisp(f["floor"], 0.3, 0.2)) * (1.0 - crisp(f["body"], 0.3, 0.2))             * (1.0 - f["scorch"]) * crisp(self.track_dist, 420.0, 60.0) * (1.0 - crisp(f["radix"], 0.2, 0.15))
+        ground = open_ * (1.0 - cliff_core)
+
+        # -- slate: sheets on the pale ground, scree tongues on the aprons -------------------------------------------
+        sheet = 0.5 + 0.5 * fbm(201, 48.0, 3) + 0.1 * n_mid
+        slate = 0.88 * broken(sheet, 0.63, 0.3) * np.clip(bench + 0.9 * foot, 0.0, 1.0)
+        slate = np.maximum(slate, 0.8 * broken(sheet, 0.74, 0.3) * valley)
+        slate = np.maximum(slate, 0.7 * broken(f["apron"] * (0.5 + 0.5 * fbm(205, 22.0, 2)), 0.42, 0.3))
+        slate = slate * ground
+
+        # -- iron: named places only -----------------------------------------------------------------------------------
+        iron = np.zeros(SHAPE)
+        for fid in ("adit_1", "adit_2", "adit_3"):
+            d = self.dist_point(self.feature(fid).points[0]) + 2.2 * wander
+            iron = np.maximum(iron, 0.95 * crisp(-d, -1500.0, 110.0) * crisp(0.5 + 0.5 * n_piece + 0.2 * n_micro, 0.42, 0.06))
+        heap_s = f["heap_s"]
+        seam = crisp(0.5 + 0.5 * streak_noise(203, 34.0, 3.2, 112.0) + 0.08 * n_micro, 0.7, 0.04)
+        iron = np.maximum(iron, 0.95 * crisp(heap_s, 0.5, 0.2) * seam)
+        vein = crisp(0.5 + 0.5 * streak_noise(204, 110.0, 3.6, 118.0) + 0.05 * n_fine, 0.9, 0.015)
+        vein = vein * crisp(0.5 + 0.5 * fbm(206, 90.0, 2), 0.6, 0.05) * np.clip(foot + 0.6 * valley + 0.5 * bench, 0.0, 1.0) * self.inside
+        iron = np.maximum(iron, 0.92 * vein)
+        seep = crisp(f["apron"], 0.4, 0.12) * crisp(0.5 + 0.5 * fbm(207, 18.0, 2) + 0.15 * n_micro, 0.82, 0.03)
+        iron = np.maximum(iron, 0.85 * seep)
+        iron = np.maximum(iron, 0.8 * band(f["gd"], 150.0, 330.0, 25.0) * f["in_gully"] * crisp(0.5 + 0.5 * n_piece, 0.55, 0.08))
+        iron_open = open_ * (1.0 - 0.6 * cliff_core)
+        iron = iron * np.maximum(iron_open, crisp(heap_s, 0.5, 0.2) * crisp(f["rd_any"], 950.0, 80.0))
+
+        # -- ochre: stains on the warm ground, the halo of the iron, the rill fans -------------------------------------
+        stain = 0.5 + 0.5 * fbm(202, 36.0, 3) + 0.1 * n_mid
+        ochre = 0.82 * broken(stain, 0.66, 0.3) * np.clip(valley + 0.55 * foot, 0.0, 1.0)
+        ochre = np.maximum(ochre, 0.6 * broken(stain, 0.78, 0.3) * bench)
+        halo = soft(grey((iron > 0.4).astype(np.float64), 4, np.maximum), 3)
+        ochre = np.maximum(ochre, 0.85 * crisp(halo + 0.3 * grit, 0.4, 0.1))
+        ochre = np.maximum(ochre, 0.7 * crisp(f["fan"] + 0.25 * n_micro, 0.55, 0.08))
+        ochre = np.maximum(ochre, 0.55 * f["wash_bank"] * crisp(0.5 + 0.5 * n_piece + 0.2 * n_micro, 0.6, 0.06))
+        ochre = ochre * ground * (1.0 - 0.9 * crisp(slate, 0.4, 0.2))
+        self.out_masks["iron"] = iron > 0.5
+        return iron, ochre, slate
 
     # ---- checks -------------------------------------------------------------------------------------------------
     def reach(self, start, blocked):

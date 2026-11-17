@@ -46,7 +46,10 @@ public:
 	/** @return The collection cards a slot of this section takes. */
 	TArray<ERTSCard> GetCollectionForSection(const EDeckSection Section) const;
 
-	/** @return Owned variants that are not clipped onto their unit: every owned variant of a unit that runs Base. */
+	/**
+	 * @return Owned variants that are not clipped onto their unit. A unit's other variants stay loose while one is
+	 * clipped on, so attaching one of them swaps the two.
+	 */
 	TArray<FUnitVariantSelection> GetLooseVariants() const;
 
 	/** @return The loose variants of units whose card belongs to this section (slotted or in the collection). */

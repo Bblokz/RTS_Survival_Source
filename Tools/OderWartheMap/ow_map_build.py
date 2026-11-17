@@ -416,6 +416,31 @@ def _instance_actor(label, folder, mesh, transforms, collision=True):
     return actor
 
 
+def _spline_rail_actor(label, folder, mesh, segments):
+    """One actor at the origin holding a SplineMeshComponent per bent track panel (turnout legs, curves). Each segment
+    is [start xyz, start tangent, end xyz, end tangent] in world cm (= component space: the actor and every component
+    sit at the origin unrotated). The mesh's X extent (0..1000) maps onto the segment; no collision, no nav: the track
+    must never change the navmesh (the instanced straights have none either)."""
+    actor = actors_sub().spawn_actor_from_class(unreal.Actor, unreal.Vector(0.0, 0.0, 0.0))
+    actor.set_actor_label(label)
+    actor.set_folder_path(folder)
+    sds = unreal.get_engine_subsystem(unreal.SubobjectDataSubsystem)
+    root = sds.k2_gather_subobject_data_for_instance(actor)[0]
+    lib = unreal.SubobjectDataBlueprintFunctionLibrary
+    for seg in segments:
+        handle, fail = sds.add_new_subobject(unreal.AddNewSubobjectParams(parent_handle=root, new_class=unreal.SplineMeshComponent))
+        comp = lib.get_object(lib.get_data(handle))
+        comp.set_static_mesh(mesh)
+        comp.set_mobility(unreal.ComponentMobility.STATIC)
+        comp.set_collision_enabled(unreal.CollisionEnabled.NO_COLLISION)
+        comp.set_editor_property("can_ever_affect_navigation", False)
+        comp.set_relative_location(unreal.Vector(0.0, 0.0, 0.0), False, False)
+        sx, sy, sz, stx, sty, stz, ex, ey, ez, etx, ety, etz = seg
+        comp.set_start_and_end(unreal.Vector(sx, sy, sz), unreal.Vector(stx, sty, stz),
+                               unreal.Vector(ex, ey, ez), unreal.Vector(etx, ety, etz), True)
+    return actor
+
+
 PATH_ROOT = "/Game/RTS_Survival/Blueprints/Environment/Splines/GroundPath/"
 ENV = "/Game/RTS_Survival/Blueprints/Environment/"
 ROCK_ROOT = "/Game/RTS_Survival/Meshes/Nature/Rocks/RockMoss/SM_RTS_RockMoss_"
@@ -676,6 +701,24 @@ def step_dress(only=None):
             actor.set_folder_path(FOLDER + "Notes")
             actor.set_editor_property("is_editor_only_actor", True)
         report["notes"] = (removed, len(data["notes"]))
+    if only in (None, "rails"):
+        # the bent track panels from ow_rail.py (the straights are the OW_I_Rail_Track instances): one OW_R_ actor per
+        # track; the generator wrote their exact ends, so they meet the straight panels without a gap. Last in the step
+        # and guarded (first written 2026-11-17 without an editor): a failure here must not stop the blockers or notes
+        try:
+            removed = clear_prefix(PREFIX + "R_")
+            rails = data.get("rails", {})
+            mesh = unreal.load_asset(rails["mesh"]) if rails.get("tracks") else None
+            placed = 0
+            for name, segments in sorted(rails.get("tracks", {}).items()):
+                if mesh is None:
+                    report.setdefault("missing meshes", []).append(rails["mesh"])
+                    break
+                actor = _spline_rail_actor(PREFIX + "R_" + name, FOLDER + "Rail", mesh, segments)
+                placed += len(actor.get_components_by_class(unreal.SplineMeshComponent))
+            report["rails"] = (removed, placed)
+        except Exception as error:
+            report["rails"] = "FAILED: %r" % (error,)
     log("dress %s" % report)
     return report
 

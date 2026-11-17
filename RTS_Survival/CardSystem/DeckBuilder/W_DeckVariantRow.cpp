@@ -6,21 +6,21 @@
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "W_DeckBuilderMenu.h"
 
-// Layout of a dock row (254 x 90 units).
+// Layout of a dock row (378 x 94 units): two rows across the dock, three lines of description.
 namespace DeckVariantRowLayout
 {
-	const FVector2D RowSize(254.f, 90.f);
-	const FVector2D PicturePosition(12.f, 12.f);
-	const FVector2D PictureSize(54.f, 54.f);
-	const FVector2D LabelPosition(76.f, 11.f);
-	const FVector2D LabelSize(100.f, 12.f);
-	const FVector2D NamePosition(76.f, 24.f);
-	const FVector2D NameSize(166.f, 20.f);
-	const FVector2D DescriptionPosition(76.f, 46.f);
-	const FVector2D DescriptionSize(166.f, 36.f);
-	const FVector2D EquippedTextPosition(150.f, 11.f);
-	const FVector2D EquippedTextSize(68.f, 12.f);
-	const FVector2D MarkerPosition(222.f, 6.f);
+	const FVector2D RowSize(378.f, 94.f);
+	const FVector2D PicturePosition(12.f, 14.f);
+	const FVector2D PictureSize(66.f, 66.f);
+	const FVector2D LabelPosition(90.f, 10.f);
+	const FVector2D LabelSize(120.f, 12.f);
+	const FVector2D NamePosition(90.f, 23.f);
+	const FVector2D NameSize(276.f, 20.f);
+	const FVector2D DescriptionPosition(90.f, 45.f);
+	const FVector2D DescriptionSize(276.f, 43.f);
+	const FVector2D EquippedTextPosition(270.f, 10.f);
+	const FVector2D EquippedTextSize(72.f, 12.f);
+	const FVector2D MarkerPosition(346.f, 5.f);
 	const FVector2D MarkerSize(22.f, 22.f);
 	constexpr int32 LabelFontSize = 7;
 	constexpr int32 LabelLetterSpacing = 150;
@@ -65,6 +65,8 @@ void UW_DeckVariantRow::BuildWidgetTree()
 	M_DescriptionText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
 	M_DescriptionText->SetAutoWrapText(true);
 	M_DescriptionText->SetClipping(EWidgetClipping::ClipToBounds);
+	// A longer text ends in an ellipsis instead of a line cut in half.
+	M_DescriptionText->SetTextOverflowPolicy(ETextOverflowPolicy::MultilineEllipsis);
 	DeckBuilderWidgets::PlaceOnCanvas(*M_Canvas, M_DescriptionText, DescriptionPosition, DescriptionSize);
 	M_EquippedText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
 	M_EquippedText->SetText(NSLOCTEXT("DeckBuilder", "RowEquipped", "EQUIPPED"));

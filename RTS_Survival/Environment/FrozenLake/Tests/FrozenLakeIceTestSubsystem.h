@@ -56,6 +56,8 @@ public:
 	virtual void Tick(float DeltaTime) override;
 	virtual TStatId GetStatId() const override;
 	virtual bool IsTickableInEditor() const override { return false; }
+	// The game starts paused (difficulty picker, mission intros); the test has to tick to press start and unpause.
+	virtual bool IsTickableWhenPaused() const override { return true; }
 
 private:
 	UPROPERTY()
@@ -77,12 +79,14 @@ private:
 	FVector M_HeavySpot = FVector::ZeroVector;
 	double M_PhaseStartSeconds = 0.0;
 	double M_ObserveStartSeconds = 0.0;
+	double M_LastHeartbeatSeconds = 0.0;
 	int32 M_FramesInPhase = 0;
 	float M_PathBeforeLength = -1.f;
 	bool bM_HasCheckedHolePath = false;
 	bool bM_IsSuppressingErrorDialogs = false;
 
 	UFrozenLakeIceSubsystem* GetIceSubsystem() const;
+	void LogHeartbeat();
 	void EnterPhase(EFrozenLakeIceTestPhase NewPhase);
 	double GetSecondsInPhase() const;
 	double GetObservedSeconds() const;

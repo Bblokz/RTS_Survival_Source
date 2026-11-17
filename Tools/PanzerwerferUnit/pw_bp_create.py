@@ -13,7 +13,8 @@ if not EAL.does_asset_exist(TURRET):
 turret = load(TURRET)
 cdo = unreal.get_default_object(turret.generated_class())
 cdo.modify()
-cdo.set_editor_property('Weapon Name', unreal.WeaponName.PANZERWERFER)
+# FName read by Global_GetWeaponNameFromFName (same as the Pz 38(t) rocket variants' turrets).
+cdo.set_editor_property('Weapon Name', 'Panzerwerfer')
 unreal.BlueprintEditorLibrary.compile_blueprint(turret)
 print('turret weapon', unreal.get_default_object(turret.generated_class()).get_editor_property('Weapon Name'))
 save(turret)

@@ -112,8 +112,76 @@ def werk_block_mound(lx, ly):
 
 
 WERK_TRENCH = [(-1700.0, -1600.0), (-2000.0, -800.0), (-1750.0, 0.0), (-2050.0, 800.0), (-1800.0, 1600.0)]
-# critic R1-10: the rail yard (rich metal) sits on one ballast bed that runs off the east edge of the map
-RAIL_LINE = [(3500.0, 15300.0), (4800.0, 21000.0), (3800.0, 30000.0), (3500.0, 45000.0)]
+
+# 2026-11-17: the drumlin is replaced by the picked Werk designs (werke/c<key>.json + .npz, written by the sketch generator
+# werke/make_data.py; the bunkers are the Blender meshes SM_OW_Werk_*, see Source/Docs/Campaign/OderWartheMap.md). Each
+# stamp is the design's hill in the Werk frame (metres over the Werk base, 0.5 m grid, -90..90 m), carved for its bunkers.
+# Assignment: least lake fill with no footprint on a corridor (8b and the Peilturm cut the causeway banks at W1-W3).
+WERK_DESIGN = {"w1": "7c", "w2": "7c", "w3": "7c", "w4": "10", "w5": "8b"}
+WERK_STAMP_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "werke")
+STAMP_FULL_M, STAMP_FADE_M = 4.0, 14.0          # the stamp rules to 4 m past its footprint, fades out by 14 m
+_STAMPS = {}
+# a walkable top point per design (Werk frame cm): the centre now lies inside a bunker (Leitstand, tower)
+WERK_TOP = {"7c": (-1200.0, 0.0), "8b": (800.0, 0.0), "10": (-600.0, -1000.0)}
+
+
+def werk_stamp(key):
+    """(H metres, paint dict, weight) on the stamp grid; weight = 1 within STAMP_FULL_M of the footprint (hill, bunkers,
+    teeth, kit pieces), 0 past STAMP_FADE_M (octagonal distance by dilation)."""
+    if key in _STAMPS:
+        return _STAMPS[key]
+    with open(os.path.join(WERK_STAMP_DIR, "c%s.json" % key)) as handle:
+        info = json.load(handle)
+    data = np.load(os.path.join(WERK_STAMP_DIR, "c%s.npz" % key))
+    H = data["H"].astype(np.float64)
+    n = H.shape[0]
+    ax = np.arange(n) * 0.5 - 90.0
+    gx, gy = np.meshgrid(ax, ax, indexing="xy")
+    foot = np.abs(H) > 0.05
+    for o in info["objs"]:
+        if o["t"] == "kit" and o["k"] != "portal":
+            r = 6.0 if o["k"] in ("cupola", "mast") else 3.0
+            foot |= np.hypot(gx - o["c"][0], gy - o["c"][1]) < r
+    dist = np.full(H.shape, 99.0)
+    dist[foot] = 0.0
+    cur = foot.copy()
+    for k in range(1, int(STAMP_FADE_M / 0.5) + 2):
+        nxt = cur.copy()
+        nxt[1:, :] |= cur[:-1, :]
+        nxt[:-1, :] |= cur[1:, :]
+        nxt[:, 1:] |= cur[:, :-1]
+        nxt[:, :-1] |= cur[:, 1:]
+        if k % 3 != 0:                     # diagonal steps two times in three: an octagon, close to a circle
+            nxt[1:, 1:] |= cur[:-1, :-1]
+            nxt[:-1, :-1] |= cur[1:, 1:]
+            nxt[1:, :-1] |= cur[:-1, 1:]
+            nxt[:-1, 1:] |= cur[1:, :-1]
+        dist[nxt & ~cur] = k * 0.5
+        cur = nxt
+    weight = 1.0 - smoothstep(STAMP_FULL_M, STAMP_FADE_M, dist)
+    paint = {k: data[k].astype(np.float64) for k in ("gravel", "mud", "sod", "earth") if k in data}
+    _STAMPS[key] = (H, paint, weight, info)
+    return _STAMPS[key]
+
+
+def stamp_sample(grid, lx, ly):
+    """Bilinear read of a stamp grid at Werk-frame points in cm (0 outside the stamp)."""
+    n = grid.shape[0]
+    fi = (lx / 100.0 + 90.0) / 0.5
+    fj = (ly / 100.0 + 90.0) / 0.5
+    inside = (fi >= 0) & (fi <= n - 1.001) & (fj >= 0) & (fj <= n - 1.001)
+    fi = np.clip(fi, 0, n - 1.001)
+    fj = np.clip(fj, 0, n - 1.001)
+    i0, j0 = np.floor(fi).astype(int), np.floor(fj).astype(int)
+    ti, tj = fi - i0, fj - j0
+    v = (grid[j0, i0] * (1 - ti) * (1 - tj) + grid[j0, i0 + 1] * ti * (1 - tj) +
+         grid[j0 + 1, i0] * (1 - ti) * tj + grid[j0 + 1, i0 + 1] * ti * tj)
+    return np.where(inside, v, 0.0)
+# critic R1-10: the rail yard (rich metal) and its double track off the east edge. 2026-11-17: the geometry (yard tracks,
+# turnouts, the two tracks to the landscape edge) lives in ow_rail.py, shared with the dressing; RAIL_LINE is track S
+# as a polyline (its [0] is the buffer stop end of the yard)
+import ow_rail  # noqa: E402
+RAIL_LINE = ow_rail.rail_line()
 
 # station hills: feature id -> (extra height cm, radius cm)
 STATION_HILLS = {"s1": (60.0, 1800.0), "s2": (420.0, 3600.0), "s3": (140.0, 3200.0), "s4": (220.0, 2600.0), "s5": (520.0, 3800.0)}
@@ -360,8 +428,8 @@ class Gen:
         self.burn = soft(burn, 3)
         self.burn_core = burn_core
 
-        # 3. werk hills: one identical drumlin stamp in the Werk frame (authoritative inside its footprint, so the five
-        # are identical to the centimetre), worn paths, trench scar and old craters pressed into it, a flat tunnel apron
+        # 3. werk hills: the picked design's stamp (WERK_DESIGN) in the Werk frame, authoritative over its footprint;
+        # where a footprint reaches a lake the stamp fills it (the lakes are cut after this and stay out of it)
         self.werks = {}
         base_ref = soft(Z, 25)
         for k in range(1, 6):
@@ -372,23 +440,10 @@ class Gen:
             base = float(base_ref[self.rc(c)])
             lx = (X - c[0]) * math.cos(yaw) + (Y - c[1]) * math.sin(yaw)
             ly = -(X - c[0]) * math.sin(yaw) + (Y - c[1]) * math.cos(yaw)
-            rho = np.hypot(lx / DRUMLIN_A, ly / DRUMLIN_B)
-            prof = 1.0 - smoothstep(DRUMLIN_TOP, 1.12, rho)
-            # local, deterministic relief (identical in every Werk frame): a lumpy top and a stoss end
-            local_relief = 35.0 * np.sin(lx / 610.0) * np.cos(ly / 470.0) + 25.0 * np.sin((lx + ly) / 390.0)
-            stoss = 1.0 + 0.10 * np.clip(lx / DRUMLIN_A, -1.0, 1.0)
-            hz = base + WERK_HILL * prof * stoss + local_relief * prof
-            for cx_, cy_, cr in WERK_CRATERS:
-                dc = np.hypot(lx - cx_, ly - cy_)
-                hz = hz - 45.0 * smoothstep(cr, cr * 0.3, dc) + 18.0 * smoothstep(cr * 1.5, cr, dc) * smoothstep(cr * 0.8, cr, dc)
-            # r8 (critic R7-5): the cupolas stand on level 7.6 m benches, so every skirt sits flat. (Burying the block
-            # under a mound was tried and dropped: the block fills the plateau, so the mound's flank lands on the
-            # drumlin's 33 degree flank and the sum walls off the hill top for every agent.)
-            for cx_, cy_ in WERK_CUPOLAS:
-                hc = werk_local_height(cx_, cy_)
-                wb = smoothstep(WERK_BENCH[1], WERK_BENCH[0], np.hypot(lx - cx_, ly - cy_))
-                hz = hz * (1.0 - wb) + (base + hc) * wb
-            blend = 1.0 - smoothstep(1.12, DRUMLIN_FOOT, rho)
+            H_s, paint_s, weight_s, _info = werk_stamp(WERK_DESIGN[fid])
+            hz = base + 100.0 * stamp_sample(H_s, lx, ly)
+            blend = stamp_sample(weight_s, lx, ly)
+            rho = np.where(blend > 0.5, 0.0, 2.0)                     # legacy key: inside / outside the stamp
             Z = Z * (1.0 - blend) + hz * blend
             t_pt = c + WERK_TUNNEL * np.array([math.cos(math.radians(bearing)), math.sin(math.radians(bearing))])
             a_pt = c + (-PORTAL_CUT[1] + WERK_APRON_R) * np.array([math.cos(math.radians(bearing)), math.sin(math.radians(bearing))])
@@ -406,7 +461,8 @@ class Gen:
             # the berm: a mound over the portal's roof and flanks (critic R3-1); the cut ramp in front stays open
             bx = (lx - (px0 + 700.0)) / 1500.0
             by = ly / 1050.0                                             # only the portal's own flanks: lanes stay open
-            berm = base + 400.0 * (1.0 - smoothstep(0.55, 1.0, np.hypot(bx, by)))
+            # (2026-11-17) only over the portal's own 22 m: further in, the Werk design's stamp shapes the ground
+            berm = base + 400.0 * (1.0 - smoothstep(0.55, 1.0, np.hypot(bx, by))) * smoothstep(-3700.0, -4000.0, lx)
             front_open = (lx < px0 + 300.0) & (np.abs(ly) < phw + 100.0)
             hz = np.where(front_open, hz, np.maximum(hz, berm))
             bw = 1.0 - smoothstep(0.55, 1.05, np.hypot(bx, by))
@@ -414,8 +470,10 @@ class Gen:
             Z = np.minimum(Z, pcut)
             self.werks[fid] = {"centre": c, "base": base, "yaw": math.degrees(yaw) % 360.0, "tunnel": t_pt,
                                "apron_pt": a_pt, "portal_cut": pcut, "berm": np.where(front_open, -1e9, berm), "portal_floor": base - depth,
-                               "mask": rho <= DRUMLIN_TOP, "hill": rho < DRUMLIN_FOOT + 0.05, "apron": ra < WERK_APRON_R,
-                               "hill_z": hz, "blend": blend, "apron_w": apron, "lx": lx, "ly": ly, "rho": rho}
+                               "mask": blend > 0.95, "hill": blend > 0.5, "apron": ra < WERK_APRON_R,
+                               "hill_z": hz, "blend": blend, "apron_w": apron, "lx": lx, "ly": ly, "rho": rho,
+                               "design": WERK_DESIGN[fid],
+                               "paint": {k: stamp_sample(v, lx, ly) for k, v in paint_s.items()}}
 
         # 4. station hills: broad domes under the masts (kept under 25 degrees)
         for fid, (extra, rad) in STATION_HILLS.items():
@@ -480,7 +538,7 @@ class Gen:
                 p = f.points[0]
                 water &= np.hypot(X - p[0], Y - p[1]) > 900.0
         for wk in self.werks.values():
-            water &= wk["rho"] > DRUMLIN_FOOT + 0.12
+            water &= wk["blend"] < 0.5
             water &= np.hypot(X - wk["tunnel"][0], Y - wk["tunnel"][1]) > WERK_APRON_R + 900.0
             water &= np.hypot(X - wk["apron_pt"][0], Y - wk["apron_pt"][1]) > WERK_APRON_R + 900.0
         water = soft(water, 2) > 0.5
@@ -604,8 +662,10 @@ class Gen:
                 num = soft(np.where(bl, Z, 0.0), 2)
                 den = soft(bl, 2)
                 Z = np.where(bl & (den > 1e-3), num / np.maximum(den, 1e-3), Z)
-        # the werk stamps are authoritative: stamp them again (identity) after every terrain operation
+        # the werk stamps are authoritative: stamp them again after every terrain operation (but never over a corridor)
+        guard = smoothstep(100.0, 500.0, self.road_d)
         for wk in self.werks.values():
+            wk["blend"] = wk["blend"] * guard
             Z = Z * (1.0 - wk["blend"]) + wk["hill_z"] * wk["blend"]
             Z = Z * (1.0 - wk["apron_w"]) + wk["base"] * wk["apron_w"]
             Z = np.maximum(Z, np.where(np.hypot((wk["lx"] - (PORTAL_CUT[0] + 700.0)) / 1500.0, wk["ly"] / 1050.0) < 1.05,
@@ -813,37 +873,22 @@ class Gen:
             return best
 
         for fid, wk in self.werks.items():
-            lx, ly, rho = wk["lx"], wk["ly"], wk["rho"]
-            near = rho < 1.6
-            hill_w = (1.0 - smoothstep(1.15, 1.35, rho)) * near
+            # the design's own paint (sketch generator masks): grass, sod on the banked roofs, gravel forecourts and
+            # courts, mud in trenches and ditches, earth on the steep cuts round the bunkers
+            lx, ly = wk["lx"], wk["ly"]
+            hill_w = np.clip(wk["blend"] * 1.2, 0.0, 1.0)
             for name in LAYERS:
                 W[name] = W[name] * (1.0 - hill_w)
             lpat = 0.5 + 0.5 * np.sin(lx / 330.0 + 1.3) * np.cos(ly / 270.0 - 0.4)
+            pt = wk["paint"]
             W["PripGrass"] += 5.0 * hill_w * (0.6 + 0.4 * lpat)
-            W["PripEarth"] += 7.0 * hill_w * (1.0 - smoothstep(0.35, 0.62, rho)) * (0.7 + 0.3 * lpat)
-            W["PripAsh"] += 1.5 * hill_w * (1.0 - smoothstep(0.2, 0.5, rho)) * lpat
-            for pts in WERK_PATHS:
-                pd = lseg_dist(lx, ly, pts)
-                W["PripEarth"] += 14.0 * hill_w * smoothstep(170.0, 70.0, pd)
-            # r5: dug earth round the block and each cupola, so their earth skirts sit in worked ground, not on grass
-            ragged = 120.0 * np.sin(lx / 140.0 + 0.7) * np.cos(ly / 115.0 + 1.9)
-            for cx_, cy_ in WERK_CUPOLAS:
-                dc = np.hypot(lx - cx_, ly - cy_) + ragged
-                W["PripSand"] += 9.0 * hill_w * smoothstep(820.0, 520.0, dc)
-                W["PripMud"] += 4.0 * hill_w * smoothstep(760.0, 450.0, dc) * (0.5 + 0.5 * lpat)
-            fx_, bx_, hw_ = WERK_BLOCK_BOX
-            fore = (lx < fx_ + 50.0) & (lx > fx_ - 900.0 - ragged) & (np.abs(ly) < hw_ + 200.0 + ragged)
-            W["PripSand"] += 8.0 * hill_w * fore
-            W["PripGravel"] += 4.0 * hill_w * fore * (0.5 + 0.5 * lpat)
-            db = np.maximum(np.maximum(lx - bx_, fx_ - lx), np.abs(ly) - hw_) + ragged     # a sod band round the block
-            W["PripGrass"] += 6.0 * hill_w * smoothstep(500.0, 0.0, db) * (lx > fx_ + 50.0)
-            td = lseg_dist(lx, ly, WERK_TRENCH)
-            W["PripMud"] += 10.0 * hill_w * smoothstep(110.0, 40.0, td)
-            W["PripEarth"] += 6.0 * hill_w * smoothstep(240.0, 110.0, td)
-            for cx_, cy_, cr in WERK_CRATERS:
-                dc = np.hypot(lx - cx_, ly - cy_)
-                W["PripAsh"] += 6.0 * hill_w * smoothstep(cr * 0.9, cr * 0.2, dc)
-                W["PripEarth"] += 6.0 * hill_w * smoothstep(cr * 1.6, cr * 0.9, dc) * smoothstep(cr * 0.5, cr * 0.9, dc)
+            W["PripGrass"] += 4.0 * hill_w * pt.get("sod", 0.0)
+            W["PripMoss"] += 1.5 * hill_w * pt.get("sod", 0.0) * lpat
+            W["PripEarth"] += 9.0 * hill_w * smoothstep(24.0, 36.0, slope) * (0.7 + 0.3 * lpat)
+            W["PripGravel"] += 9.0 * hill_w * pt.get("gravel", 0.0)
+            W["PripSand"] += 4.0 * hill_w * pt.get("gravel", 0.0) * (0.5 + 0.5 * lpat)
+            W["PripMud"] += 11.0 * hill_w * pt.get("mud", 0.0)
+            W["PripEarth"] += 5.0 * hill_w * pt.get("earth", 0.0)
             tp = wk["apron_pt"]
             ra = np.hypot(X - tp[0], Y - tp[1])
             apron = smoothstep(WERK_APRON_R + 500.0, WERK_APRON_R - 200.0, ra)
@@ -904,21 +949,27 @@ class Gen:
         # two narrow ruts (a 4 m two-track, critic R1-6); they stop at the Werk hill feet
         off_hills = np.ones(SHAPE)
         for wk in self.werks.values():
-            off_hills = off_hills * smoothstep(1.1, 1.4, wk["rho"])
+            off_hills = off_hills * (1.0 - wk["blend"])
         rut = smoothstep(80.0, 25.0, np.abs(track_d - 110.0) + 25.0 * n2) * (Z > 60.0) * off_hills
         W["PripEarth"] += 16.0 * rut
         W["PripMud"] += 3.0 * rut * np.clip(n2, 0.0, 1.0)
         self.track_d = track_d
-        # the rail yard's ballast bed and its line off the east edge
-        rail_d = self.line_dist(np.array(RAIL_LINE), 2500.0)
-        yard = np.asarray(RAIL_LINE[0], float)
-        yard_w = 400.0 + 650.0 * smoothstep(9000.0, 5000.0, np.hypot(X - yard[0], Y - yard[1]) + 0.0 * n2)
-        bed = smoothstep(yard_w + 120.0, yard_w, rail_d + 30.0 * n2) * (Z > 60.0)
+        # the rail yard's ballast bed under every track (ow_rail.py): full over the panels' own ballast, a soft broken
+        # edge 3 m wide, a round cap past the buffer stop (2026-11-17: the old bed was one polyline with a 1.2 m edge and
+        # a 10 m blob at the yard that the tracks did not follow). Worn cinder ground round the yard tracks.
+        rail_d = ow_rail.distance(X, Y, 2500.0)
+        bed = ow_rail.bed_weight(rail_d, n2) * smoothstep(30.0, 90.0, Z) * off_hills
+        yard = np.asarray(ow_rail.yard_point(), float)
+        apron = smoothstep(1300.0, 600.0, rail_d + 150.0 * n2) * smoothstep(9000.0, 6000.0, np.hypot(X - yard[0], Y - yard[1]))
+        apron = apron * (1.0 - bed) * smoothstep(30.0, 90.0, Z) * off_hills
         for name in LAYERS:
-            W[name] = W[name] * (1.0 - 0.8 * bed)
+            W[name] = W[name] * (1.0 - 0.8 * bed - 0.5 * apron)
         W["PripGravel"] += 1.0 * bed                # r8 (R7-8): old cinder ballast, darker
         W["PripMud"] += 11.0 * bed * np.clip(n2 + 0.7, 0.3, 1.0)
         W["PripAsh"] += 2.0 * bed
+        W["PripEarth"] += 5.0 * apron
+        W["PripMud"] += 3.0 * apron * np.clip(n2 + 0.5, 0.0, 1.0)
+        W["PripAsh"] += 1.5 * apron
         self.rail_d = rail_d
 
         total = sum(W.values()) + 1e-6
@@ -943,7 +994,7 @@ class Gen:
         m["road"] = on
         m["road_near"] = d < 250.0
         m["track_near"] = track_d < 400.0
-        m["rail_near"] = self.rail_d < 500.0
+        m["rail_near"] = self.rail_d < 600.0
         m["scarp"] = slope > 30.0
         m["ridge_top"] = self.ridge_top
         m["ridge_any"] = self.ridge_any
@@ -980,7 +1031,9 @@ class Gen:
             lines.append("%-5s reach %-26s %s (z %.0f)" % ("ok" if got == want else "FAIL", name, got, Z[self.rc(p)]))
 
         for f in self.spec.features:
-            if f.kind in ("capture", "enemy_base", "enemy_spawn", "enemy_group", "resource") and f.points:
+            # a Werk's garrison spawns on its design's walkable top (WERK_TOP, tested below), not at the sketch's point,
+            # which now lands on the new hills' flanks
+            if f.kind in ("capture", "enemy_spawn", "enemy_group", "resource") and f.points and not f.id.startswith("garr_"):
                 ok(f.id, f.points[0])
         for rid in ("ramp_north", "ramp_prow", "ramp_east"):
             road = self.roads[rid]
@@ -988,30 +1041,42 @@ class Gen:
         others = [(f.id, p) for f in self.spec.features if f.kind == "resource" or f.raw.get("df") == "station" for p in f.points]
         for fid, wk in self.werks.items():
             ok(fid + " tunnel apron", wk["tunnel"])
-            ok(fid + " hill top", wk["centre"])
+            tx_, ty_ = WERK_TOP[wk["design"]]
+            cy_, sy_ = math.cos(math.radians(wk["yaw"])), math.sin(math.radians(wk["yaw"]))
+            ok(fid + " hill top", (wk["centre"][0] + tx_ * cy_ - ty_ * sy_, wk["centre"][1] + tx_ * sy_ + ty_ * cy_))
             near = min((math.hypot(wk["tunnel"][0] - p[0], wk["tunnel"][1] - p[1]) / 100.0, n) for n, p in others)
             lines.append("%-5s %s tunnel mouth: nearest resource/station %s at %.0f m" % ("ok" if near[0] >= 90.0 else "FAIL", fid, near[1], near[0]))
-        # identity (critic R0-1): heights relative to the werk base and the paint, sampled on a grid in the Werk frame
-        # over the drumlin (normalised radius <= 1.1), must match W1
-        ref_h, ref_w = None, None
+        # identity per design: Werke with the same design must match the first of them (heights over the base and paint,
+        # sampled in the Werk frame where the stamp rules); the stamp itself must be reproduced (gap check for the meshes)
+        refs = {}
         for fid, wk in self.werks.items():
             c, yaw = wk["centre"], math.radians(wk["yaw"])
-            hs, ws = [], []
-            for gx in range(-3600, 3601, 300):
-                for gy in range(-2800, 2801, 300):
-                    if math.hypot(gx / DRUMLIN_A, gy / DRUMLIN_B) > 1.1:
+            H_s, _p, weight_s, _i = werk_stamp(wk["design"])
+            hs, ws, want = [], [], []
+            for gx in range(-8000, 8001, 300):
+                for gy in range(-8000, 8001, 300):
+                    if float(stamp_sample(weight_s, np.array(float(gx)), np.array(float(gy)))) < 0.99:
                         continue
                     x = c[0] + gx * math.cos(yaw) - gy * math.sin(yaw)
                     y = c[1] + gx * math.sin(yaw) + gy * math.cos(yaw)
+                    if self.road_d[self.rc((x, y))] < 500.0 or gx < -2500:      # corridors; the tunnel cut and its berm
+                        continue
                     hs.append(self.bilinear(Z, x, y) - wk["base"])          # bilinear: the 1 m grid is turned under
+                    want.append(100.0 * float(stamp_sample(H_s, np.array(float(gx)), np.array(float(gy)))))
                     ws.append([self.bilinear(self.W[n].astype(np.float64), x, y) for n in LAYERS] if self.W else [0])
-            hs, ws = np.array(hs), np.array(ws)
-            if ref_h is None:
-                ref_h, ref_w = hs, ws
-            lines.append("werk %s identity: %d samples, max height difference to w1 %.0f cm (95th pct %.0f cm), "
-                         "paint weight difference 95th pct %.0f / 255" % (
-                             fid, len(hs), np.abs(hs - ref_h).max(), np.percentile(np.abs(hs - ref_h), 95),
-                             np.percentile(np.abs(ws - ref_w), 95)))
+            hs, ws, want = np.array(hs), np.array(ws), np.array(want)
+            dev = np.abs(hs - want)
+            lines.append("%-5s werk %s (%s) follows its stamp: %d samples, max %.0f cm, 95th pct %.0f cm" % (
+                "ok" if np.percentile(dev, 95) < (20.0 if wk["design"] == "8b" else 15.0) else "FAIL", fid, wk["design"], len(hs), dev.max(), np.percentile(dev, 95)))
+            if wk["design"] not in refs:
+                refs[wk["design"]] = (fid, hs, ws)
+                continue
+            rfid, rh, rw = refs[wk["design"]]
+            if len(rh) == len(hs):
+                lines.append("werk %s identity with %s: max height difference %.0f cm (95th pct %.0f cm), paint 95th pct %.0f / 255" % (
+                    fid, rfid, np.abs(hs - rh).max(), np.percentile(np.abs(hs - rh), 95), np.percentile(np.abs(ws - rw), 95)))
+            else:
+                lines.append("werk %s vs %s: different sample sets (a corridor guard cuts one): %d / %d" % (fid, rfid, len(hs), len(rh)))
         # basins (critic R1-8): with every crossing removed, the start must not reach any other basin's station
         crossing = np.zeros(SHAPE, dtype=bool)
         for rid in ("dam_packlitz", "causeway_kalau", "causeway_island", "dam_lubow", "boardwalk_nischlitz",
@@ -1117,9 +1182,11 @@ class Gen:
                        "up_water": UP_WATER},
             "werks": {fid: {"centre": [float(v) for v in wk["centre"]], "base": wk["base"], "yaw": float(wk["yaw"]),
                             "portal_floor": float(wk["portal_floor"]),
-                            "tunnel": [float(v) for v in wk["tunnel"]], "top_r": WERK_TOP_R} for fid, wk in self.werks.items()},
+                            "tunnel": [float(v) for v in wk["tunnel"]], "top_r": WERK_TOP_R, "design": wk["design"]} for fid, wk in self.werks.items()},
             "ponds": [{k: v for k, v in pond.items() if k != "mask"} for pond in self.ponds],
             "rail_line": [list(p) for p in RAIL_LINE],
+            "rail_tracks": {name: [[round(float(a), 1), round(float(b), 1)] for a, b in t["path"].sample(ow_rail.PANEL)]
+                            for name, t in ow_rail.network()["tracks"].items()},
             "algae_tiles": {"tiles": [], "tile_cm": 400.0, "z": 2.0},     # off: 4 m tiles read as squares (r4)
             "drumlin": {"a": DRUMLIN_A, "b": DRUMLIN_B, "top": DRUMLIN_TOP, "foot": DRUMLIN_FOOT},
             "layers": LAYERS, "files": files, "regions": regions, "features": features, "paths": paths, "roads": roads,

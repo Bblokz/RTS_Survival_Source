@@ -589,3 +589,23 @@ patch, lichen crust, soot fall-out, rust wash, ore fines, rock-flour fan). Sourc
 - Build: `ore_map_build.step_rockworks()` (labels `ORE_Rockwork_*`; skips a spot when an actor this tool did not
   place stands within 12 m). In the full rebuild order after `step_crush_rocks()`.
 - Checked: `NAV PROBLEMS 0`; editor views in `Saved/OreMountains/rockworks/map/`. Not fired at on this map.
+
+## Mineral layers and own landscape material (2026-11-17)
+
+- The map has its own landscape master since this round (user decision; the shared master was locked by another
+  session): `Materials/ground/Landscape/OreMountains/M_RTS_Landscape_OreMountains` (copy of the DryCastle master) and
+  `MI_RTS_Landscape_OreMountains_Base`; the map instance `MI_RTS_Landscape_DryCastle_OreMountains` hangs under the base.
+  Builder `Docs/Landscape/ls_ore_master_build.py`. Changes to the shared master's own graph no longer reach this map;
+  changes inside the shared `MF_RTS_LS_*` functions still do.
+- Three layers (builder `Docs/Landscape/ls_ore_layers_build.py`, infos in `CastleGrassDesertDry/DATA/`):
+  `IronOxide` vivid red (0.9 % of the play area above half weight: adit tongues, seams on the spoil heaps, a few thin
+  veins, seeps at cliff feet, gully banks), `Ochre` yellow-brown (3.7 %: stains on valley floor and foothills, the halo
+  of every iron showing, rill fans), `SlateScree` cool grey gravel (4.4 %: sheets on the pale bench and foothills,
+  scree below the faces). Parameters `<Layer>_Tint/_Desaturation/_Roughness/_Tiling/_FarMix`.
+- Paint: `ore_terrain_gen.mineral_layers()`. Not on roads, shoulders, tracks, yards, beds, the start apron, the woods
+  floor, bogs, craters or the Radixite ground. Heights and all placement masks are byte-identical to before (new mask
+  `iron` only), so no other generator had to run.
+- Uniformity (share of the play area where one layer dominates a 15 m window above 0.7): 19 % before, 12 % after.
+- Checked: map instance compiles (343 instructions, as before), `NAV PROBLEMS 0`, views `Saved/OreMountains/critic/min3/`.
+- Open: the three layers are not soft ground for tank trails and not in the ground-surface settings; frame cost of
+  11 painted layers not measured; no rock or cliff foot was looked at on red ground.

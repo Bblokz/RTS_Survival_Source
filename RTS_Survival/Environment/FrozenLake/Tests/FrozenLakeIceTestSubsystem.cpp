@@ -111,6 +111,7 @@ void UFrozenLakeIceTestSubsystem::Tick(const float DeltaTime)
 		}
 	}
 	++M_FramesInPhase;
+	LogHeartbeat();
 	switch (M_Phase)
 	{
 	case EFrozenLakeIceTestPhase::WaitingForGameStart:
@@ -136,6 +137,23 @@ void UFrozenLakeIceTestSubsystem::Tick(const float DeltaTime)
 TStatId UFrozenLakeIceTestSubsystem::GetStatId() const
 {
 	RETURN_QUICK_DECLARE_CYCLE_STAT(UFrozenLakeIceTestSubsystem, STATGROUP_Tickables);
+}
+
+void UFrozenLakeIceTestSubsystem::LogHeartbeat()
+{
+	constexpr double HeartbeatSeconds = 15.0;
+	const double Now = FPlatformTime::Seconds();
+	if (Now - M_LastHeartbeatSeconds < HeartbeatSeconds)
+	{
+		return;
+	}
+	M_LastHeartbeatSeconds = Now;
+	UNavigationSystemV1* NavigationSystem = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld());
+	UE_LOG(LogRTSFrozenLakeIceTest, Display,
+	       TEXT("RTS_FL_ICE_TEST heartbeat phase=%s in_phase=%.0f s shader_jobs=%d nav_building=%s"),
+	       *UEnum::GetValueAsString(M_Phase), GetSecondsInPhase(),
+	       GShaderCompilingManager != nullptr ? GShaderCompilingManager->GetNumRemainingJobs() : -1,
+	       IsValid(NavigationSystem) && NavigationSystem->IsNavigationBuildInProgress() ? TEXT("yes") : TEXT("no"));
 }
 
 UFrozenLakeIceSubsystem* UFrozenLakeIceTestSubsystem::GetIceSubsystem() const

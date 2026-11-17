@@ -710,6 +710,252 @@ def step_water():
     return count
 
 
+# ---- kit meshes (the FrozenLake kit session's Unreal imports, 2026-11-17) ------------------------------------------
+# Provisional picks: only Gorge Bridge B was chosen by the owner; pump B (C is far over its triangle budget), rig A,
+# convoy C and the sheared ice kit are the imported options. Swap a kit by changing its path here and rerunning.
+KIT = FL_ROOT
+KIT_BP = {
+    "pump": KIT + "CryoPump/Blueprints/BP_FL_CryoPump_B_Intact",
+    "pump_dam": KIT + "CryoPump/Blueprints/BP_FL_CryoPump_B_Pump3Dam",
+    "rig": KIT + "DrillRig/Blueprints/BP_FL_DrillRig_A_FourLeg",
+    "bridge_blown": KIT + "GorgeBridge/Blueprints/BP_FL_GorgeBridge_B_Blown",
+    "convoy": KIT + "BurntConvoy/Blueprints/BP_FL_BurntConvoy_C",
+    "ridge_end_a": KIT + "IceKit/Blueprints/BP_FL_Ice_Sheared_RA",
+    "ridge_end_b": KIT + "IceKit/Blueprints/BP_FL_Ice_Sheared_RB",
+    "ridge_06": KIT + "IceKit/Blueprints/BP_FL_Ice_Sheared_R06",
+    "ridge_10": KIT + "IceKit/Blueprints/BP_FL_Ice_Sheared_R10",
+    "ridge_14": KIT + "IceKit/Blueprints/BP_FL_Ice_Sheared_R14",
+    "tiger_collar": KIT + "IceKit/Blueprints/BP_FL_Ice_Sheared_C01",
+    "crystal_heave": KIT + "IceKit/Blueprints/BP_FL_Ice_Sheared_C05",
+    "lead_edge": [KIT + "IceKit/Blueprints/BP_FL_Ice_Sheared_E0%d" % k for k in (1, 2, 3)],
+    "floe": [KIT + "IceKit/Blueprints/BP_FL_Ice_Sheared_F0%d" % k for k in (1, 2, 3, 4, 5, 6)],
+}
+KIT_PREFIX = PREFIX + "Kit_"
+RIDGE_PIECES = [("ridge_14", 1400.0), ("ridge_10", 1000.0), ("ridge_06", 600.0)]
+RIDGE_END_CM = 300.0
+RIDGE_OVERLAP_CM = 40.0
+LEAD_EDGE_STEP_CM = 950.0          # 10 m strips, a little overlap
+LEAD_EDGE_INSET_CM = 60.0          # strip centre this far into the ice from the open-water edge
+FLOE_Z = -22.0                     # floes ride the lead water (water plane at -30)
+POND = {}
+
+
+def _bp_class(path):
+    bp = unreal.load_asset(path)
+    if bp is None:
+        raise RuntimeError("missing kit blueprint " + path)
+    return bp.generated_class()
+
+
+def _kit(label, path, x, y, z, yaw, folder):
+    actor = actors_sub().spawn_actor_from_class(_bp_class(path), unreal.Vector(x, y, z), unreal.Rotator(0.0, 0.0, yaw))
+    actor.set_actor_label(KIT_PREFIX + label)
+    actor.set_folder_path(FOLDER + "Kit/" + folder)
+    return actor
+
+
+def _yaw_along(a, b):
+    """Yaw that turns a piece's local +Y (its length axis) along a -> b."""
+    return math.degrees(math.atan2(b[1] - a[1], b[0] - a[0])) - 90.0
+
+
+def _point_in_poly(p, poly):
+    x, y = p
+    inside = False
+    for (x0, y0), (x1, y1) in zip(poly, poly[1:] + poly[:1]):
+        if (y0 > y) != (y1 > y) and x < (x1 - x0) * (y - y0) / (y1 - y0) + x0:
+            inside = not inside
+    return inside
+
+
+def _ridge_pieces(length):
+    """End caps plus the fewest 14/10/6 m modules whose run is closest to the line length."""
+    best = None
+    middle = length - 2.0 * RIDGE_END_CM
+    for n14 in range(4):
+        for n10 in range(4):
+            for n06 in range(4):
+                run = n14 * 1400.0 + n10 * 1000.0 + n06 * 600.0 - (n14 + n10 + n06 - 1) * RIDGE_OVERLAP_CM
+                score = abs(run - middle) + 50.0 * (n14 + n10 + n06)
+                if best is None or score < best[0]:
+                    best = (score, ["ridge_14"] * n14 + ["ridge_10"] * n10 + ["ridge_06"] * n06)
+    pieces = best[1]
+    # big pieces in the middle of the run, short ones toward the ends
+    pieces.sort(key=lambda k: -dict(RIDGE_PIECES)[k])
+    order = []
+    for i, k in enumerate(pieces):
+        order.insert(len(order) // 2 if i % 2 else len(order), k)
+    return order
+
+
+def _place_ridges(rng):
+    count = 0
+    for reg in LAYOUT["regions"]:
+        if not reg["id"].startswith("ridge_"):
+            continue
+        a, b = reg["raw"]["line"]
+        dx, dy = b[0] - a[0], b[1] - a[1]
+        length = math.hypot(dx, dy)
+        ux, uy = dx / length, dy / length
+        yaw = _yaw_along(a, b)
+        seq = [("ridge_end_a", RIDGE_END_CM)] + [(k, dict(RIDGE_PIECES)[k]) for k in _ridge_pieces(length)] + \
+              [("ridge_end_b", RIDGE_END_CM)]
+        run = sum(s for _, s in seq) - (len(seq) - 1) * RIDGE_OVERLAP_CM
+        t = (length - run) / 2.0
+        for k, size in seq:
+            c = t + size / 2.0
+            side = rng.uniform(-60.0, 60.0)
+            x, y = a[0] + ux * c - uy * side, a[1] + uy * c + ux * side
+            _kit("%s_%02d" % (reg["id"], count), KIT_BP[k], x, y, ICE_Z, yaw + rng.uniform(-5.0, 5.0)
+                 + (180.0 if rng.random() < 0.5 else 0.0), "Ridges")
+            t += size - RIDGE_OVERLAP_CM
+            count += 1
+    return count
+
+
+def _lead_outlines():
+    """(name, closed outline) for the two steam leads, and the outflow lead's two long sides inside the lake."""
+    out = []
+    for rid in ("lead_finger", "lead_ne"):
+        out.append((rid, [tuple(p) for p in region(rid)["points"]], True))
+    reg = region("outflow_lead")
+    (ax, ay), (bx, by) = reg["raw"]["line"]
+    half = reg["raw"]["width"] / 2.0
+    length = math.hypot(bx - ax, by - ay)
+    nx, ny = -(by - ay) / length, (bx - ax) / length
+    lake = [tuple(p) for p in region("lake_ice")["points"]]
+    for sgn in (1.0, -1.0):
+        side = [(ax + nx * half * sgn + (bx - ax) * t, ay + ny * half * sgn + (by - ay) * t)
+                for t in [i / 40.0 for i in range(41)]]
+        out.append(("outflow_lead", [p for p in side if _point_in_poly(p, lake)], False))
+    return out
+
+
+def _place_lead_edges(rng):
+    count = 0
+    for name, pts, closed in _lead_outlines():
+        if len(pts) < 2:
+            continue
+        ring = pts + pts[:1] if closed else pts
+        seg = [(ring[i], ring[i + 1]) for i in range(len(ring) - 1)]
+        total = sum(math.hypot(q[0] - p[0], q[1] - p[1]) for p, q in seg)
+        cx = sum(p[0] for p in pts) / len(pts)
+        cy = sum(p[1] for p in pts) / len(pts)
+        d = LEAD_EDGE_STEP_CM / 2.0
+        while d < total:
+            acc = 0.0
+            for p, q in seg:
+                L = math.hypot(q[0] - p[0], q[1] - p[1])
+                if acc + L >= d:
+                    t = (d - acc) / L
+                    x, y = p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t
+                    ux, uy = (q[0] - p[0]) / L, (q[1] - p[1]) / L
+                    break
+                acc += L
+            # push the strip centre into the ice (away from the lead's middle)
+            nx, ny = -uy, ux
+            if (x - cx) * nx + (y - cy) * ny < 0.0:
+                nx, ny = -nx, -ny
+            if not closed:
+                (ax, ay), (bx, by) = region("outflow_lead")["raw"]["line"]
+                mx, my = (ax + bx) / 2.0, (ay + by) / 2.0
+                if (x - mx) * nx + (y - my) * ny < 0.0:
+                    nx, ny = -nx, -ny
+            px, py = x + nx * LEAD_EDGE_INSET_CM, y + ny * LEAD_EDGE_INSET_CM
+            yaw = _yaw_along((0.0, 0.0), (ux, uy)) + rng.uniform(-4.0, 4.0)
+            _kit("LeadEdge_%s_%02d" % (name, count), rng.choice(KIT_BP["lead_edge"]), px, py, ICE_Z, yaw, "LeadEdges")
+            count += 1
+            d += LEAD_EDGE_STEP_CM
+    return count
+
+
+def _place_floes(rng):
+    count = 0
+    areas = [("lead_finger", [tuple(p) for p in region("lead_finger")["points"]], 6),
+             ("lead_ne", [tuple(p) for p in region("lead_ne")["points"]], 7)]
+    for name, poly, n in areas:
+        xs, ys = [p[0] for p in poly], [p[1] for p in poly]
+        placed, tries = 0, 0
+        while placed < n and tries < 400:
+            tries += 1
+            p = (rng.uniform(min(xs), max(xs)), rng.uniform(min(ys), max(ys)))
+            near_edge = min(math.hypot(p[0] - q[0], p[1] - q[1]) for q in poly) < 300.0
+            if not _point_in_poly(p, poly) or near_edge:
+                continue
+            _kit("Floe_%s_%02d" % (name, count), rng.choice(KIT_BP["floe"][:5]), p[0], p[1], FLOE_Z,
+                 rng.uniform(0.0, 360.0), "Floes")
+            placed += 1
+            count += 1
+    reg = region("outflow_lead")
+    (ax, ay), (bx, by) = reg["raw"]["line"]
+    lake = [tuple(p) for p in region("lake_ice")["points"]]
+    for k in range(10):
+        t = rng.uniform(0.05, 0.9)
+        s = rng.uniform(-450.0, 450.0)
+        L = math.hypot(bx - ax, by - ay)
+        x = ax + (bx - ax) * t - (by - ay) / L * s
+        y = ay + (by - ay) * t + (bx - ax) / L * s
+        if not _point_in_poly((x, y), lake):
+            continue
+        _kit("Floe_outflow_%02d" % count, rng.choice(KIT_BP["floe"]), x, y, FLOE_Z, rng.uniform(0.0, 360.0), "Floes")
+        count += 1
+    return count
+
+
+def step_kits(seed=17):
+    """Places the delivered kit meshes on the sketch's features (provisional picks, see KIT_BP)."""
+    import random
+    require_map()
+    rng = random.Random(seed)
+    removed = clear_prefix(KIT_PREFIX)
+    placed = {}
+    for pid in ("pump_s", "pump_w", "pump_e", "pump_n"):
+        x, y = feature(pid)["points"][0]
+        # the pump faces the lake along its local -X: local +X points away from the lake centre
+        yaw = math.degrees(math.atan2(y, x))
+        _kit(pid, KIT_BP["pump_dam" if pid == "pump_n" else "pump"], x, y, ground_z(x, y), yaw, "Pumps")
+    placed["pumps"] = 4
+    _kit("rig", KIT_BP["rig"], 0.0, 0.0, ICE_Z, 0.0, "Rig")
+    road_a = path("shore_road_s")["points"][-1]
+    road_b = path("shore_road_se")["points"][0]
+    bx, by = feature("blown_bridge")["points"][0]
+    deck_z = (ground_z(*road_a) + ground_z(*road_b)) / 2.0
+    _kit("bridge_blown", KIT_BP["bridge_blown"], bx, by, deck_z - 80.0, _yaw_along(road_a, road_b), "Bridge")
+    cx, cy = feature("convoy_wreck_se")["points"][0]
+    _kit("convoy", KIT_BP["convoy"], cx, cy, ground_z(cx, cy), 35.0, "Convoy")
+    tx, ty = feature("frozen_tiger")["points"][0]
+    _kit("tiger_collar", KIT_BP["tiger_collar"], tx, ty, surface_z(tx, ty), 55.0, "Collars")
+    ux, uy = feature("radixite_upwelling")["points"][0]
+    _kit("crystal_heave", KIT_BP["crystal_heave"], ux, uy, ICE_Z, 20.0, "Collars")
+    placed["ridges"] = _place_ridges(rng)
+    placed["lead_edges"] = _place_lead_edges(rng)
+    placed["floes"] = _place_floes(rng)
+    log("kits placed %s (removed %d)" % (placed, removed))
+    return placed
+
+
+TREES_FILE = "D:/UE5Projects/RTS_Survival/Saved/FrozenLake/trees/FL_Trees.json"
+TREE_BP = FL_ROOT + "WinterLarch/BP_FrozenLake_WinterLarch_%s"
+TREE_PREFIX = PREFIX + "Tree_"
+
+
+def step_trees():
+    """Places the winter larches from fl_tree_gen.py (destructible; medium/heavy tanks crush A-E, any tank F)."""
+    require_map()
+    with open(TREES_FILE, "r") as handle:
+        data = json.load(handle)
+    removed = clear_prefix(TREE_PREFIX)
+    classes = {v: _bp_class(TREE_BP % v) for v in "ABCDEF"}
+    for k, (variant, x, y, yaw, scale) in enumerate(data["trees"]):
+        actor = actors_sub().spawn_actor_from_class(classes[variant], unreal.Vector(x, y, ground_z(x, y)),
+                                                    unreal.Rotator(0.0, 0.0, yaw))
+        actor.set_actor_scale3d(unreal.Vector(scale, scale, scale))
+        actor.set_actor_label("%s%04d" % (TREE_PREFIX, k))
+        actor.set_folder_path(FOLDER + "Trees")
+    log("trees placed %d %s (removed %d)" % (len(data["trees"]), data["counts"], removed))
+    return len(data["trees"])
+
+
 NOTES = [
     ("hq", "START (landing shore)"), ("rig", "FORGE DRILL RIG (objective)"),
     ("shield_garrison", "AI START: Shield HQ"), ("pump_s", "CRYO PUMP 1"), ("pump_w", "CRYO PUMP 2"),

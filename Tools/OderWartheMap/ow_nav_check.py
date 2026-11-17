@@ -77,19 +77,41 @@ def run(verbose=True):
         ("ridge top -> lowland straight over the escarpment", (-15000.0, -16500.0), (-9000.0, -9500.0), "wall"),
         ("across the Mittelsee (no causeway)", (-14500.0, 3000.0), (-14500.0, -6500.0), "wall"),
     ]
+    # the Werk designs (werke/c<key>.json): a walkable top point per design, and a crossing of the design's own teeth belt
+    tops = {"7c": (-1200.0, 0.0), "8b": (800.0, 0.0), "10": (-600.0, -1000.0)}
+    import json as _json
+    import os as _os
     for fid in sorted(L["werks"]):
         w = L["werks"][fid]
-        # from the apron in front of the portal (the portal itself and the Werk block are solid) to the hill top
-        legs.append(("%s tunnel apron -> hill top" % fid, werk(fid, -7900.0, 0.0), werk(fid, 300.0, -1900.0), "go"))
+        with open(_os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "werke", "c%s.json" % w["design"])) as handle:
+            info = _json.load(handle)
+        # from the apron in front of the portal (the portal itself and the bunkers are solid) to the hill top
+        legs.append(("%s tunnel apron -> hill top" % fid, werk(fid, -7900.0, 0.0), werk(fid, *tops[w["design"]]), "go"))
         legs.append(("%s portal floor -> apron" % fid, werk(fid, -5600.0, 0.0), werk(fid, -7900.0, 0.0), "go"))
-        # cross the belt where both ends are dry ground (some fronts look out over a lake)
-        for bdeg in (-10.0, -20.0, -30.0, 10.0, -5.0, 5.0, -45.0, 0.0):          # away from the 36-48 degree vehicle gap
-            br = math.radians(bdeg)
-            outer = werk(fid, 4300.0 * math.cos(br), 4300.0 * math.sin(br))
-            inner = werk(fid, 2400.0 * math.cos(br), 2400.0 * math.sin(br))
-            if omb.ground_z(*outer) > 60.0 and omb.ground_z(*inner) > 60.0:
+        # cross the belt square to its line, 12 m outside to 8 m inside, where both ends are dry and away from the gap
+        pts = info["teeth_line"]
+        seg = [math.hypot(b[0] - a[0], b[1] - a[1]) for a, b in zip(pts[:-1], pts[1:])]
+        total = sum(seg)
+        outer = inner = None
+        for frac in (0.3, 0.7, 0.2, 0.8, 0.4, 0.6, 0.5, 0.1, 0.9):
+            sm = total * frac
+            if any(a - 8.0 <= sm <= b + 8.0 for a, b in info["teeth_gaps"]):
+                continue
+            k, acc = 0, 0.0
+            while k < len(seg) - 1 and acc + seg[k] < sm:
+                acc += seg[k]
+                k += 1
+            t = (sm - acc) / seg[k]
+            (ax, ay), (bx, by) = pts[k], pts[k + 1]
+            px, py = ax + t * (bx - ax), ay + t * (by - ay)
+            nx, ny = (by - ay) / seg[k], -(bx - ax) / seg[k]               # outward: the rows lie right of the line
+            o_ = werk(fid, (px + nx * 18.0) * 100.0, (py + ny * 18.0) * 100.0)
+            i_ = werk(fid, (px - nx * 8.0) * 100.0, (py - ny * 8.0) * 100.0)
+            if omb.ground_z(*o_) > 60.0 and omb.ground_z(*i_) > 60.0:
+                outer, inner = o_, i_
                 break
-        legs.append(("%s through the teeth (front, %+.0f deg)" % (fid, bdeg), outer, inner, "teeth"))
+        if outer is not None:
+            legs.append(("%s through the teeth (at %.0f %% of the belt)" % (fid, frac * 100.0), outer, inner, "teeth"))
     for agent, nav in navs.items():
         agent_of[nav.get_name()] = agent
     station_ids = {tuple(x["points"][0]) for x in L["features"] if x["raw"].get("df") == "station"}

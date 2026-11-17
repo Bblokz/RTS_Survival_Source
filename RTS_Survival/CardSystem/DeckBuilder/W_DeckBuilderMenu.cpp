@@ -8,6 +8,7 @@
 #include "Components/OverlaySlot.h"
 #include "Components/ScaleBox.h"
 #include "Components/ScrollBox.h"
+#include "Components/ScrollBoxSlot.h"
 #include "Components/Spacer.h"
 #include "Components/UniformGridPanel.h"
 #include "Components/UniformGridSlot.h"
@@ -248,7 +249,11 @@ void UW_DeckBuilderMenu::BuildSectionPanel()
 	GridSlot->SetHorizontalAlignment(HAlign_Fill);
 	GridSlot->SetVerticalAlignment(VAlign_Fill);
 	M_SlotGrid = WidgetTree->ConstructWidget<UUniformGridPanel>(UUniformGridPanel::StaticClass());
-	GridScroll->AddChild(M_SlotGrid);
+	// Left-aligned: a section with fewer slots than columns keeps the same spacing as a full row.
+	if (UScrollBoxSlot* const GridScrollSlot = Cast<UScrollBoxSlot>(GridScroll->AddChild(M_SlotGrid)))
+	{
+		GridScrollSlot->SetHorizontalAlignment(HAlign_Left);
+	}
 
 	M_SectionUnavailableText = DeckBuilderWidgets::MakeText(
 		*WidgetTree, NSLOCTEXT("DeckBuilder", "SectionUnavailable", "This section is not part of your army yet."),
@@ -598,8 +603,8 @@ void UW_DeckBuilderMenu::RefreshSectionPanel()
 	                                FText::AsNumber(Section.Cards.Num()), FText::AsNumber(Section.SlotCount));
 	if (M_SelectedSection != EDeckSection::Technologies)
 	{
-		CountText = FText::Format(NSLOCTEXT("DeckBuilder", "SectionCountVariants", "{0}, {1} variants attached"),
-		                          CountText, FText::AsNumber(M_State.GetAttachedVariantCount(M_SelectedSection)));
+		CountText = FText::Format(NSLOCTEXT("DeckBuilder", "SectionCountVariants", "{0}, {1} {1}|plural(one=variant,other=variants) attached"),
+		                          CountText, M_State.GetAttachedVariantCount(M_SelectedSection));
 	}
 	M_SectionCountText->SetText(Section.bIsAvailable ? CountText : FText::GetEmpty());
 	M_SectionUnavailableText->SetVisibility(Section.bIsAvailable ? ESlateVisibility::Collapsed
@@ -1032,35 +1037,99 @@ void UW_DeckBuilderMenu::OnSortByTypeClicked()
 	RefreshCollection();
 }
 
-#if !UE_BUILD_SHIPPING
+namespace DeckBuilderMenuDebug
+{
+	/** The card widgets under a panel, in the order they were added to it. */
+	TArray<UW_DeckCard*> FindCardWidgets(UWidget* Panel)
+	{
+		TArray<UWidget*> Widgets;
+		UWidgetTree::GetChildWidgets(Panel, Widgets);
+		TArray<UW_DeckCard*> CardWidgets;
+		for (UWidget* const Widget : Widgets)
+		{
+			if (UW_DeckCard* const CardWidget = Cast<UW_DeckCard>(Widget))
+			{
+				CardWidgets.Add(CardWidget);
+			}
+		}
+		return CardWidgets;
+	}
+}
+
+bool UW_DeckBuilderMenu::Debug_ReturnFirstSlottedCard()
+{
+	for (const UW_DeckCard* const CardWidget : DeckBuilderMenuDebug::FindCardWidgets(M_SlotGrid))
+	{
+		if (CardWidget->GetIsEmptySlot())
+		{
+			continue;
+		}
+		const int32 CollectionCountBefore = M_State.GetCollection().Num();
+		// What a right-click on the slotted card calls.
+		HandleCardRightClicked(*CardWidget);
+		return M_State.GetCollection().Num() > CollectionCountBefore;
+	}
+	return false;
+}
+
 bool UW_DeckBuilderMenu::Debug_SlotFirstFittingCard()
 {
-	const TArray<ERTSCard> FittingCards = M_State.GetCollectionForSection(M_SelectedSection);
-	if (FittingCards.Num() == 0 || not M_State.SlotCard(FittingCards[0], M_SelectedSection))
+	const TArray<UW_DeckCard*> CollectionWidgets = DeckBuilderMenuDebug::FindCardWidgets(M_CollectionCards);
+	const UW_DeckCard* EmptySlot = nullptr;
+	for (const UW_DeckCard* const SlotWidget : DeckBuilderMenuDebug::FindCardWidgets(M_SlotGrid))
+	{
+		if (SlotWidget->GetIsEmptySlot())
+		{
+			EmptySlot = SlotWidget;
+			break;
+		}
+	}
+	if (CollectionWidgets.Num() == 0 || not EmptySlot)
 	{
 		return false;
 	}
-	HandleCardHovered(FittingCards[0]);
-	RefreshAll();
+	// The drag a collection card starts, dropped on the first empty slot.
+	UDeckCardDragOperation* const Drag = NewObject<UDeckCardDragOperation>(this);
+	Drag->bIsVariant = false;
+	Drag->Card = CollectionWidgets[0]->GetCard();
+	Drag->bIsFromSlot = false;
+	Drag->Section = CollectionWidgets[0]->GetSection();
+	Drag->SlotIndex = CollectionWidgets[0]->GetSlotIndex();
+	const ERTSCard Card = Drag->Card;
+	if (not HandleDropOnCard(*Drag, *EmptySlot))
+	{
+		return false;
+	}
+	HandleCardHovered(Card);
 	return true;
 }
 
 bool UW_DeckBuilderMenu::Debug_AttachFirstLooseVariant()
 {
 	const TArray<FUnitVariantSelection> LooseVariants = M_State.GetLooseVariantsForSection(M_SelectedSection);
-	if (LooseVariants.Num() == 0 || not M_State.AttachVariant(LooseVariants[0]))
+	if (LooseVariants.Num() == 0)
 	{
 		return false;
 	}
-	const FDeckCardDefinition* UnitCard = IsValid(M_Catalog) ? M_Catalog->FindDefinitionOfUnit(LooseVariants[0].Unit)
-		                                      : nullptr;
-	if (UnitCard)
+	// The drag a loose variant card starts, dropped on the slotted card of its unit.
+	UDeckCardDragOperation* const Drag = NewObject<UDeckCardDragOperation>(this);
+	Drag->bIsVariant = true;
+	Drag->Variant = LooseVariants[0];
+	for (const UW_DeckCard* const SlotWidget : DeckBuilderMenuDebug::FindCardWidgets(M_SlotGrid))
 	{
-		M_DockSubject.Kind = FDeckDockSubject::EKind::Card;
-		M_DockSubject.Card = UnitCard->Card;
+		if (not GetIsDropAllowed(*Drag, *SlotWidget))
+		{
+			continue;
+		}
+		const ERTSCard UnitCard = SlotWidget->GetCard();
+		if (not HandleDropOnCard(*Drag, *SlotWidget))
+		{
+			return false;
+		}
+		HandleCardHovered(UnitCard);
+		return true;
 	}
-	RefreshAll();
-	return true;
+	return false;
 }
 
 void UW_DeckBuilderMenu::Debug_ShowWholeCollection(const bool bShowsWholeCollection)
@@ -1085,7 +1154,6 @@ FString UW_DeckBuilderMenu::Debug_DescribeState() const
 	}
 	return Description;
 }
-#endif
 
 bool UW_DeckBuilderMenu::GetIsValidWorldMenu() const
 {

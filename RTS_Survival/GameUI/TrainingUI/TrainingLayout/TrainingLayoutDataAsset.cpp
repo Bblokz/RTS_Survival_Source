@@ -329,7 +329,7 @@ void UTrainingLayoutDataAsset::InitDefaultStrikeDivisionLayout()
 			                             Slot::Tank(ETankSubtype::Tank_Sdkfz_221),
 			                             Slot::Tank(ETankSubtype::Tank_Sdkfz251_Mortar),
 			                             Slot::Tank(ETankSubtype::Tank_Sdkfz251_22),
-			                             Slot::Empty()
+			                             Slot::Tank(ETankSubtype::Tank_Panzerwerfer)
 		                             }),
 		              MakeSubSection(LOCTEXT("SupportWeapons", "Support Weapons"), {
 			                             Slot::Empty(),

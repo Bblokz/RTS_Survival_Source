@@ -17,7 +17,9 @@ import os
 
 import numpy as np
 
-ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+import ow_rail
+
+ROOT =os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 TERRAIN = os.path.join(ROOT, "Saved", "OderWarthe", "terrain")
 KIT_FILE = os.path.join(ROOT, "Saved", "OderWarthe", "assets", "ow_kit.json")
 PRY_ASSETS = os.path.join(ROOT, "Saved", "Pripyat", "assets", "pripyat_assets.json")
@@ -241,87 +243,148 @@ def werk_xy(fid, lx, ly):
     return c[0] + lx * math.cos(yaw) - ly * math.sin(yaw), c[1] + lx * math.sin(yaw) + ly * math.cos(yaw)
 
 
+WERK_MESH_HOME = E + "OderWarthe/Werke/"
+WERK_MESHES = {"7c": "SM_OW_Werk_Kasemattennase", "8b": "SM_OW_Werk_Flankierend", "10": "SM_OW_Werk_Peilturm"}
+WERK_KIT = {"cupola": "SM_OW_SteelCupola", "mast": "SM_OW_WerkMast", "rock1": "SM_OW_Erratic_01", "rock2": "SM_OW_Erratic_02",
+            "rock3": "SM_OW_Erratic_03"}
+WERK_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "werke")
+
+
+def werk_design(key):
+    """The design's concept data (werke/c<key>.json) and its stamp heights (metres over the Werk base, 0.5 m grid)."""
+    with open(os.path.join(WERK_DIR, "c%s.json" % key)) as handle:
+        info = json.load(handle)
+    H = np.load(os.path.join(WERK_DIR, "c%s.npz" % key))["H"].astype(np.float64)
+    return info, H
+
+
+def stamp_h(H, lx, ly):
+    """Stamp height in cm at a Werk-frame point in metres (bilinear)."""
+    n = H.shape[0]
+    fi = min(max((lx + 90.0) / 0.5, 0.0), n - 1.001)
+    fj = min(max((ly + 90.0) / 0.5, 0.0), n - 1.001)
+    i0, j0 = int(fi), int(fj)
+    ti, tj = fi - i0, fj - j0
+    return 100.0 * (H[j0, i0] * (1 - ti) * (1 - tj) + H[j0, i0 + 1] * ti * (1 - tj) + H[j0 + 1, i0] * (1 - ti) * tj +
+                    H[j0 + 1, i0 + 1] * ti * tj)
+
+
+_KIT_BOUNDS = None
+
+
+def rim_sink(mesh_name, x, y, yaw, scale=1.0):
+    """How far (cm, <= 0) to lower a kit piece so the lowest point of the ground under its base rim is still covered:
+    on a slope a piece seated at its centre would hover on the downhill side."""
+    global _KIT_BOUNDS
+    if _KIT_BOUNDS is None:
+        path = os.path.join(TERRAIN, "werk_kit_bounds.json")
+        _KIT_BOUNDS = json.load(open(path)) if os.path.exists(path) else {}
+    b = _KIT_BOUNDS.get(mesh_name)
+    if b is None:
+        return 0.0
+    (mnx, mny, _), (mxx, mxy, _) = b
+    c, s = math.cos(math.radians(yaw)), math.sin(math.radians(yaw))
+    g0 = ground_z_bilinear(x, y)
+    low = g0
+    for fx_, fy_ in ((0.9, 0.0), (-0.9, 0.0), (0.0, 0.9), (0.0, -0.9), (0.65, 0.65), (-0.65, 0.65), (0.65, -0.65), (-0.65, -0.65)):
+        lx = (mxx + mnx) / 2.0 + fx_ * (mxx - mnx) / 2.0
+        ly = (mxy + mny) / 2.0 + fy_ * (mxy - mny) / 2.0
+        low = min(low, ground_z_bilinear(x + (lx * c - ly * s) * scale, y + (lx * s + ly * c) * scale))
+    drop = low - g0
+    # sink only on a slope (and then a little past the lowest point); on flat ground every extra cm makes a tooth lower,
+    # and at about 0.85 m showing the tank navmesh starts to form across the belt
+    return drop - 10.0 if drop < -2.0 else 0.0
+
+
 def werks():
+    """2026-11-17: the picked Werk designs (WERK_DESIGN in ow_terrain_gen.py, per Werk in the layout). Each Werk is its
+    bunker mesh (SM_OW_Werk_*: all the concrete in one mesh, pivot = Werk centre at the base level) plus the OW kit pieces
+    the design places (cupolas, mast, rocks), the dragon's teeth with tank-only blockers, all-agent blockers on every
+    bunker, the tunnel portal and the editor notes. The old drumlin pieces (block, cupolas, Soviet pits, hedgehogs, wire,
+    crates, craters) are gone. Heights: every piece is placed relative to the stamp the terrain generator laid, so a dz
+    from the concept keeps it seated exactly as in the sketch."""
     tooth_paths = kits_like("SM_OW_DragonTooth")
+    n = 0
     for fid in sorted(WERKS):
         w = WERKS[fid]
         yaw = w["yaw"]
+        key = w["design"]
+        info, H = werk_design(key)
         folder = "Werke/" + fid
         tag = "Werk_" + fid
-        hill_z = w["base"] + LAYOUT["levels"]["werk_hill"]
-        keep(w["centre"][0], w["centre"][1], 4600.0)
+        keep(w["centre"][0], w["centre"][1], 7000.0)
         keep(w["tunnel"][0], w["tunnel"][1], 1700.0)
-        # the concrete block and the steel cupolas on the hill top
-        bx, by = werk_xy(fid, *WERK_TEMPLATE["block"][:2])
-        if not piece("Werk_Block", "SM_OW_WerkBlock", bx, by, yaw, dz=-45.0, collision=True):
-            bp(tag + "_Block", D + "Military/BP_Military_Dest_Bunker05", bx, by, yaw, 0.0, folder)
-        for k, (lx, ly) in enumerate(WERK_TEMPLATE["cupolas"]):
-            x, y = werk_xy(fid, lx, ly)
-            piece("Werk_Cupola", "SM_OW_SteelCupola", x, y, yaw + 30.0 * k, dz=-70.0, collision=True,
-                  fallback=STANDIN_DOME, fb_scale=3.0, fb_dz=-110.0)
-        x, y = werk_xy(fid, *WERK_TEMPLATE["mast"])
-        if not piece("Werk_Mast", "SM_OW_WerkMast", x, y, yaw, collision=True):
-            bp(tag + "_Mast", D + "Industrial/Electricity/BP_Electricity_SinglePole1", x, y, yaw, 0.0, folder)
-        # Soviet additions facing the rear (the player's side): MG pits, rail hedgehogs, wire, a net and crates
-        for k, (lx, ly, face) in enumerate(WERK_TEMPLATE["soviet_pits"]):
-            x, y = werk_xy(fid, lx, ly)
-            bp("%s_Pit_%d" % (tag, k), SB + "BP_Cover_RusSandbags_LongArc", x, y, yaw + face - 90.0, 0.0, folder)
-        for k, (lx, ly) in enumerate(WERK_TEMPLATE["hedgehogs"]):
-            x, y = werk_xy(fid, lx, ly)
-            bp("%s_Hedgehog_%d" % (tag, k), BAR + "BP_Military_Dest_LargeHedgehog", x, y, yaw + 17.0 * k, 0.0, folder)
-        for k in range(6):
-            b = math.radians(130.0 + 20.0 * k)
-            x, y = werk_xy(fid, 2300.0 * math.cos(b), 2300.0 * math.sin(b))
-            bp("%s_Wire_%d" % (tag, k), BAR + "BP_Military_Dest_BarbedWireLong", x, y, yaw + math.degrees(b) + 90.0, 0.0, folder)
-        for k, (lx, ly, ty) in enumerate(WERK_TEMPLATE["crates"]):
-            x, y = werk_xy(fid, lx, ly)
-            bp("%s_Crates_%d" % (tag, k), PRY + "Airfield/Blueprints/BP_Prypyat_ServiceCrates", x, y, yaw + ty, 0.0, folder)
-        # dragon's teeth: a German belt of four staggered rows round the front, one identical vehicle gap
-        n = 0
-        for row, r in enumerate(TEETH_ROWS):
-            span = math.radians(TEETH_ARC[1] - TEETH_ARC[0]) * r
-            count = int(span / TEETH_STEP)
-            for i in range(count + 1):
-                b = TEETH_ARC[0] + (TEETH_ARC[1] - TEETH_ARC[0]) * (i + 0.5 * (row % 2)) / max(count, 1)
-                if b > TEETH_ARC[1] or TEETH_GAP[0] <= b <= TEETH_GAP[1]:
+        # the bunker mesh: pivot at the Werk base; the landscape at the centre is base + the stamp there
+        mesh_actor(tag + "_Bunkers", WERK_MESH_HOME + WERK_MESHES[key], w["centre"][0], w["centre"][1], yaw,
+                   -stamp_h(H, 0.0, 0.0), folder)
+        teeth_line, teeth_gaps = info["teeth_line"], info["teeth_gaps"]
+        nb = 0
+        for o in info["objs"]:
+            if o["t"] == "kit" and o["k"] in WERK_KIT:
+                lx, ly = o["c"]
+                x, y = werk_xy(fid, lx * 100.0, ly * 100.0)
+                dz = o["z"] * 100.0 - stamp_h(H, lx, ly)
+                kyaw = (yaw + o["yaw"]) % 360.0
+                dz += rim_sink(WERK_KIT[o["k"]], x, y, kyaw, o.get("s", 1.0))
+                inst("Werk_" + o["k"], kit(WERK_KIT[o["k"]]) or STANDIN_DOME, x, y, kyaw, o.get("s", 1.0), dz,
+                     collision=True)
+            elif o["t"] == "kit" and o["k"].startswith("tooth"):
+                lx, ly = o["c"]
+                x, y = werk_xy(fid, lx * 100.0, ly * 100.0)
+                if at("road_dist", x, y) < 60.0:           # never on a corridor deck (the boardwalk dyke is too narrow for tanks)
                     continue
-                x, y = werk_xy(fid, r * math.cos(math.radians(b)), r * math.sin(math.radians(b)))
-                if tooth_paths:
-                    mesh_actor("%s_Tooth_%03d" % (tag, n), tooth_paths[n % len(tooth_paths)], x, y,
-                               yaw + b + (11.0 * ((i * 7 + row * 3) % 5) - 22.0), 0.0, folder + "/Teeth")
-                else:
-                    STANDINS.add("SM_OW_DragonTooth")
-                    mesh_actor("%s_Tooth_%03d" % (tag, n), STANDIN_CUBE, x, y, yaw + b + 45.0, -10.0, folder + "/Teeth", 1.1)
+                path = kit("SM_OW_DragonTooth_" + ("A" if o["k"] == "toothA" else "B")) or (tooth_paths[0] if tooth_paths else STANDIN_CUBE)
+                kyaw = (yaw + o["yaw"]) % 360.0
+                mesh_actor("%s_Tooth_%03d" % (tag, n), path, x, y, kyaw,
+                           o["z"] * 100.0 - stamp_h(H, lx, ly) + rim_sink(path.split(".")[-1], x, y, kyaw), folder + "/Teeth")
                 n += 1
-        # the belt's nav: tank-only blockers along the arc (infantry walks between the teeth)
-        r_mid = (TEETH_ROWS[0] + TEETH_ROWS[-1]) / 2.0
-        depth = TEETH_ROWS[-1] - TEETH_ROWS[0] + 260.0
-        b0 = TEETH_ARC[0]
-        segs = []
-        while b0 < TEETH_ARC[1]:
-            b1 = min(b0 + 6.0, TEETH_ARC[1])
-            if not (b1 <= TEETH_GAP[0] or b0 >= TEETH_GAP[1]):
-                b1 = max(b0, TEETH_GAP[0]) if b0 < TEETH_GAP[0] else b1
-                if b0 >= TEETH_GAP[0]:
-                    b0 = TEETH_GAP[1]
-                    continue
-            if b1 > b0:
-                segs.append((b0, b1))
-            b0 = b1
-        for k, (s0, s1) in enumerate(segs):
-            bm = math.radians((s0 + s1) / 2.0)
-            half_len = r_mid * math.radians(s1 - s0) / 2.0 + 60.0
-            x, y = werk_xy(fid, r_mid * math.cos(bm), r_mid * math.sin(bm))
-            NAVBLOCKS.append(["%s_Teeth_%02d" % (tag, k), round(x, 1), round(y, 1), 0.0, round((yaw + math.degrees(bm)) % 360.0, 1),
-                              round(depth / 2.0, 1), round(half_len, 1), 250.0, TANK_BLOCK_AREA])
-        # the tunnel mouth: opening faces out of the werk (local -X), flat apron in front of it
+            elif o["t"] == "box" and o.get("fp"):
+                # every bunker blocks every agent (meshes do not reach the navmesh here)
+                lx, ly = o["c"]
+                x, y = werk_xy(fid, lx * 100.0, ly * 100.0)
+                sx, sy, sz = o["s"]
+                nb += 1
+                NAVBLOCKS.append(["%s_Bunker_%02d" % (tag, nb), round(x, 1), round(y, 1), 0.0,
+                                  round((yaw + o["yaw"]) % 360.0, 1), round(sx * 50.0 + 20.0, 1), round(sy * 50.0 + 20.0, 1), 400.0, ""])
+            elif o["t"] == "wedge":
+                (ax, ay), (bx, by) = o["a"], o["b"]
+                x, y = werk_xy(fid, (ax + bx) * 50.0, (ay + by) * 50.0)
+                length = math.hypot(bx - ax, by - ay) * 100.0
+                nb += 1
+                NAVBLOCKS.append(["%s_Wing_%02d" % (tag, nb), round(x, 1), round(y, 1), 0.0,
+                                  round((yaw + math.degrees(math.atan2(by - ay, bx - ax))) % 360.0, 1),
+                                  round(length / 2.0 + 30.0, 1), round(o["th"] * 50.0 + 20.0, 1), 300.0, ""])
+        # the teeth belt's nav: tank-only blockers along the belt line, 6 m pieces, skipping the vehicle gap
+        pts = np.asarray(teeth_line, float)
+        seg = np.hypot(*np.diff(pts, axis=0).T)
+        cum = np.r_[0.0, np.cumsum(seg)]
+        s0, k = 0.0, 0
+        while s0 < cum[-1] - 0.5:
+            s1 = min(s0 + 6.0, cum[-1])
+            if any(not (s1 <= a or s0 >= b) for a, b in teeth_gaps):
+                s0 = next(b for a, b in teeth_gaps if not (s1 <= a or s0 >= b))
+                continue
+            sm = (s0 + s1) / 2.0
+            i = min(int(np.searchsorted(cum, sm) - 1), len(seg) - 1)
+            t = (sm - cum[i]) / seg[i]
+            p = pts[i] + t * (pts[i + 1] - pts[i])
+            ux, uy = (pts[i + 1] - pts[i]) / seg[i]
+            nx, ny = uy, -ux                                         # the rows run outward, right of the line
+            cx, cy = p[0] + nx * 3.3, p[1] + ny * 3.3
+            x, y = werk_xy(fid, cx * 100.0, cy * 100.0)
+            NAVBLOCKS.append(["%s_Teeth_%02d" % (tag, k), round(x, 1), round(y, 1), 0.0,
+                              round((yaw + math.degrees(math.atan2(uy, ux))) % 360.0, 1), round((s1 - s0) * 50.0 + 180.0, 1),
+                              430.0, 250.0, TANK_BLOCK_AREA])
+            k += 1
+            s0 = s1
+        # the tunnel mouth: opening faces out of the werk (local -X), on the dug-in floor the terrain generator cut
         tx, ty = w["tunnel"]
         if not piece("Werk_Tunnel", "SM_OW_TunnelPortal", tx, ty, yaw + 180.0, collision=True):
             bp(tag + "_TunnelStandin", D + "GarrisonableBuildings/Bunkers/BP_Garrison_Bunker_2", tx, ty, yaw + 180.0, 0.0, folder)
         note(fid + "_tunnel", "%s tunnel mouth: wave spawn" % fid.upper(), tx, ty)
-        note(fid + "_garrison", "%s garrison (same at all five)" % fid.upper(), *werk_xy(fid, 0.0, 0.0))
-        for k, (lx, ly, what) in enumerate(WERK_TEMPLATE["hq_slots"]):
-            note("%s_hqslot_%d" % (fid, k), "HQ slot: %s (hidden until the fix)" % what, *werk_xy(fid, lx, ly))
+        note(fid + "_garrison", "%s garrison (%s)" % (fid.upper(), WERK_MESHES[key][10:]), *werk_xy(fid, 0.0, 0.0))
+        for kq, (lx, ly, what) in enumerate(info["hq"]):
+            note("%s_hqslot_%d" % (fid, kq), "HQ slot: %s (hidden until the fix)" % what, *werk_xy(fid, lx * 100.0, ly * 100.0))
     return n
 
 
@@ -403,6 +466,16 @@ def pump_house(px, py, k, sx, sy):
 
 def ground_z_cell(x, y):
     return float(at("height", x, y))
+
+
+def ground_z_bilinear(x, y):
+    hm = M["height"]
+    fx = min(max((x + SIZE / 2.0) / 100.0, 0.0), hm.shape[1] - 1.001)
+    fy = min(max((y + SIZE / 2.0) / 100.0, 0.0), hm.shape[0] - 1.001)
+    ix, iy = int(fx), int(fy)
+    tx, ty = fx - ix, fy - iy
+    return float(hm[iy, ix] * (1 - tx) * (1 - ty) + hm[iy, ix + 1] * tx * (1 - ty) + hm[iy + 1, ix] * (1 - tx) * ty +
+                 hm[iy + 1, ix + 1] * tx * ty)
 
 
 def sandbag_ring(tag, cx, cy, face, folder):
@@ -489,33 +562,86 @@ def resources():
                                               (1700.0, -600.0, "BP_Env_DestroyedPzII", 120.0))):
         bp("Column_%d" % k, D + "Military/DestTanks/" + what, x + dx, y + dy, yaw, 0.0, "Resources/metal_base")
         keep(x + dx, y + dy, 700.0)
-    # the rail yard (rich metal): three sidings on the ballast bed of the line that runs off the east edge (critic R1-10)
+    # the rail yard (rich metal, critic R1-10): tracks, turnouts and the double track off the east edge (ow_rail.py)
     pts = fpoints("metal_c")
     cx = sum(p[0] for p in pts) / len(pts)
     cy = sum(p[1] for p in pts) / len(pts)
-    track = pry("existing_rail_track") or "/Game/RTS_Survival/Meshes/Civilian/Rails/SM_RTS_Railway_Track_01"
-    line = LAYOUT["rail_line"]
-    (ax0, ay0), (ax1, ay1) = line[0], line[1]
-    yaw_line = bearing_yaw(ax1 - ax0, ay1 - ay0)
-    for off in (-450.0, 0.0, 450.0):
-        for i in range(-3, 6):
-            ax = ax0 + 1000.0 * i * math.cos(math.radians(yaw_line)) - off * math.sin(math.radians(yaw_line))
-            ay = ay0 + 1000.0 * i * math.sin(math.radians(yaw_line)) + off * math.cos(math.radians(yaw_line))
-            if not at("water", ax, ay) and not kept_station(ax, ay):
-                inst("RailYard_Track", track, ax, ay, yaw_line, 1.0, -8.0, False)
-    for seg in range(1, len(line) - 1):
-        (bx0, by0), (bx1, by1) = line[seg], line[seg + 1]
-        yaw_s = bearing_yaw(bx1 - bx0, by1 - by0)
-        n = int(math.hypot(bx1 - bx0, by1 - by0) / 1000.0)
-        for i in range(n + 1):
-            ax, ay = bx0 + (bx1 - bx0) * i / max(n, 1), by0 + (by1 - by0) * i / max(n, 1)
-            if not at("water", ax, ay) and not kept_station(ax, ay):
-                inst("RailLine_Track", track, ax, ay, yaw_s, 1.0, -8.0, False)
-    for k, (i, off) in enumerate(((-2.0, 450.0), (1.5, -450.0))):
-        ax = ax0 + 1000.0 * i * math.cos(math.radians(yaw_line)) - off * math.sin(math.radians(yaw_line))
-        ay = ay0 + 1000.0 * i * math.sin(math.radians(yaw_line)) + off * math.cos(math.radians(yaw_line))
-        bp("RailYard_Wagon_%d" % k, D + "PostApo/BP_Dest_PostApo_Container", ax, ay, yaw_line, 0.0, "Resources/metal_c")
-    keep(cx, cy, 2600.0)
+    rail_yard()
+    keep(cx, cy, 2600.0)                         # unchanged disc: a moved keep would reshuffle every later scatter
+
+
+# ---- rail yard (2026-11-17) -----------------------------------------------------------------------------------------
+# The old yard laid three tracks 4.5 m apart (the panel's own ballast is 7.75 m wide: they overlapped), joined the line at
+# a 19 degree kink, spaced the line pieces L / n (gaps) and dropped pieces over water and station discs (more gaps). Now
+# every track is one continuous chain from ow_rail.py: rigid 10 m panels on the straights, pitched along a smoothed bed
+# so both ends sit on it, and spline-mesh panels (OW_R_*, ow_map_build step_dress "rails") on the turnout legs and the
+# curve. No RNG is drawn here: the rail must not shift the scatter of everything placed after it.
+RAILS = {"mesh": ow_rail.TRACK_MESH, "tracks": {}}
+RAIL_GROUP = "Rail_Track"
+RAIL_BED = ow_rail.bed_sampler(M["height"], LAY["corner"], LAY["quad_cm"])
+
+
+def rail_yard():
+    g = INST.setdefault(RAIL_GROUP, {"mesh": ow_rail.TRACK_MESH, "collision": False, "items": [], "shadow": True, "abs_z": 0.0})
+    RAILS["tracks"].clear()
+    for name, items in ow_rail.panels(RAIL_BED).items():
+        bent = []
+        for p in items:
+            if p["kind"] == "rigid":
+                # abs_z 0: dz is the absolute pivot height; yaw / pitch to 0.001 degree (0.1 moves a panel end 0.9 cm)
+                g["items"].append([round(float(p["p0"][0]), 2), round(float(p["p0"][1]), 2), round(p["z0"], 2),
+                                   round(p["yaw"], 3), 1.0, round(p["pitch"], 3), 0.0])
+            else:
+                bent.append([round(float(v), 2) for v in (p["p0"][0], p["p0"][1], p["z0"]) + tuple(p["t0"]) +
+                             (p["p1"][0], p["p1"][1], p["z1"]) + tuple(p["t1"])])
+        if bent:
+            RAILS["tracks"][name] = bent
+    # the loading ramp with its buffer stop closes the lead at the west end (the only dead end in the yard)
+    rx, ry, ryaw = ow_rail.ramp_transform()
+    mesh_actor("RailYard_Ramp", ow_rail.RAMP_MESH, rx, ry, ryaw, 0.0, "Resources/metal_c")
+    # two containers unloaded on the yard's south side, between the ramp and the metal piles (on the ground, 8.5 m off
+    # S: clear of its ballast; the old ones stood on the outer tracks)
+    s_path = ow_rail.network()["tracks"]["S"]["path"]
+    for k, s in enumerate((2000.0, 3200.0)):          # beside the ramp slope foot and past it, 15 m off metal_c[1]
+        (x, y), h = s_path.at(s)
+        rx_, ry_ = -math.sin(h), math.cos(h)                        # right of the run east = south of the yard
+        bp("RailYard_Wagon_%d" % k, D + "PostApo/BP_Dest_PostApo_Container", x + 850.0 * rx_, y + 850.0 * ry_,
+           math.degrees(h), 0.0, "Resources/metal_c")
+
+
+NATURE_PREFIXES = ("Logs", "MarginTree", "Litter", "Tuft_", "Shrub_", "BogSedge_", "Reed_", "Snag_", "Talus_", "Crest_",
+                   "Erratic_")
+
+
+def clear_rail_bed():
+    """Drop the trees, shrubs, tufts, rocks and crater decals that the scatter put on the rail bed or the loading ramp.
+    A filter after the fact (not a dry_ok term), so nothing else in the scatter moves. Returns the number removed."""
+    rx, ry, _ = ow_rail.ramp_transform()
+
+    def near(xs, ys, reach):
+        if not len(xs):
+            return np.zeros(0, dtype=bool)
+        xs, ys = np.asarray(xs, float), np.asarray(ys, float)
+        return (ow_rail.distance(xs, ys, reach + 100.0) < reach) | (np.hypot(xs - rx, ys - ry) < 1600.0)
+
+    removed = 0
+    for group, g in INST.items():
+        if not group.startswith(NATURE_PREFIXES) or not g["items"]:
+            continue
+        reach = 900.0 if group == "MarginTree" else 650.0
+        bad = near([it[0] for it in g["items"]], [it[1] for it in g["items"]], reach)
+        removed += int(bad.sum())
+        g["items"] = [it for it, b in zip(g["items"], bad) if not b]
+    trees = [k for k, b in enumerate(BPS) if b[6].startswith("Trees/")]
+    bad = near([BPS[k][2] for k in trees], [BPS[k][3] for k in trees], 900.0)
+    drop = {k for k, b in zip(trees, bad) if b}
+    BPS[:] = [b for k, b in enumerate(BPS) if k not in drop]
+    removed += len(drop)
+    scars = [k for k, d in enumerate(DECALS) if d[0].startswith(("Crater_", "Debris_"))]
+    bad = near([DECALS[k][2] for k in scars], [DECALS[k][3] for k in scars], 700.0)
+    drop = {k for k, b in zip(scars, bad) if b}
+    DECALS[:] = [d for k, d in enumerate(DECALS) if k not in drop]
+    return removed + len(drop)
 
 
 # ---- crossings ------------------------------------------------------------------------------------------------------
@@ -809,11 +935,6 @@ WERK_CRATERS = [(2100.0, -1500.0, 260.0), (-2600.0, 1900.0, 320.0), (1500.0, 190
 def decals():
     """Thirty-year-old battle scars: the Werk craters (template, Werk frame), shell craters on the open lowland in front
     of the belts (1945), soot under the wrecked column, and scorch round the smouldering peat."""
-    for fid in sorted(WERKS):
-        yaw = WERKS[fid]["yaw"]
-        for k, (lx, ly, r) in enumerate(WERK_CRATERS):
-            x, y = werk_xy(fid, lx, ly)
-            decal("Werk_%s_Crater_%d" % (fid, k), DECAL_SETS["crater"][k % 3], x, y, r * 2.6, yaw + 37.0 * k)
     n = 0
     targets = []
     for rid in ("dam_packlitz", "causeway_kalau", "causeway_island", "dam_lubow"):
@@ -883,11 +1004,13 @@ def werk_diff():
         sets[fid] = sorted(own)
         foreign[fid] = other
     lines = []
-    ref = sets["w1"]
-    for fid in sorted(sets):
-        a, b = set(ref), set(sets[fid])
-        lines.append("%s: %d template pieces; differs from w1 by %d / %d; foreign objects within 60 m: %d %s" % (
-            fid, len(sets[fid]), len(a - b), len(b - a), len(foreign[fid]), foreign[fid][:6]))
+    first = {}
+    for fid in sorted(sets):                      # identity only between Werke of the same design
+        key = WERKS[fid]["design"]
+        rf = first.setdefault(key, fid)
+        a, b = set(sets[rf]), set(sets[fid])
+        lines.append("%s (%s): %d pieces; differs from %s by %d / %d; foreign objects within 60 m: %d %s" % (
+            fid, key, len(sets[fid]), rf, len(a - b), len(b - a), len(foreign[fid]), foreign[fid][:6]))
     text = "\n".join(lines)
     with open(os.path.join(TERRAIN, "werk_diff.txt"), "w") as handle:
         handle.write(text + "\n")
@@ -904,8 +1027,9 @@ def main():
     peat_fires()
     trees = nature()
     print("craters %d, decals %d" % (decals(), len(DECALS)))
+    print("rail bed cleared of %d trees / shrubs / rocks / craters" % clear_rail_bed())
     out = {"bps": BPS, "inst": INST, "notes": NOTES, "fx": FX, "splines": SPLINES, "decals": DECALS, "meshes": MESHES, "navblocks": NAVBLOCKS,
-           "standins": sorted(STANDINS)}
+           "rails": RAILS, "standins": sorted(STANDINS)}
     with open(os.path.join(TERRAIN, "OW_dress.json"), "w") as handle:
         json.dump(out, handle)
     print("blueprint actors %d (trees %d), instance groups %d with %d instances, teeth %d, notes %d, fx %d" % (

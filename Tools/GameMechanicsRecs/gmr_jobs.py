@@ -846,7 +846,10 @@ def batch_berlin_poi():
         # Take 1 used the low hero angle: mostly sky with the tower small; a normal height, closer.
         poi("POI_Berlin_ZooTower", "Berlin", (-14625, -43889, 0), 0, "fire", 2800, look_height=1000),
         # Take 1's Scale camera stood behind a ruin wall on the -Y side (black frames): film from the yard side.
+        # 2026-11-17 map update: the default route grazes a walled foundation (local X -900..300, Y -3900..-3000)
+        # and half the squad lagged ~30 m behind, so the Scale shot aimed at empty ground; 9 m to +Y is open.
         poi("POI_Berlin_RailYard", "Berlin", (-3792, 13389, 0), 0, "storm", 2400, look_height=500,
+            patrol=("Scavengers", (-1.5, -0.925), (1.5, -0.625)),
             scale=pan("Scale", 9, 15, "tag:Patrol", "", 90, pitch=16, dist=3000, focal=24, off1=(0, 0, 500),
                       look=(0, 0, 150), vpitch=20, vfocal=18)),
         # (Anhalter Bf has no set piece on the map, only empty lots: scouted 2026-11-17.)
