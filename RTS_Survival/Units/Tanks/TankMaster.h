@@ -360,6 +360,12 @@ public:
 	void Debug_StartEngineFire();
 
 	/**
+	 * @brief The tank went through the ice (UFrozenLakeIceSubsystem) and lies under it: dies where it is with the
+	 * quiet scavenging death, so the game state, selection and AI are cleaned up like any other death.
+	 */
+	void DieSunkThroughIce();
+
+	/**
 	 * @brief Testing aid: kills this tank with a regular death of the given variant, as if a projectile flying along
 	 * KillShotDirection hit it (zero for a death without a killing projectile).
 	 * @param Variant The regular death to play; overrides the shuffle for this death only.

@@ -409,6 +409,15 @@ void ATankMaster::Debug_DieRegularDeath(const ERegularDeathVariant Variant, cons
 	M_IncomingProjectileDirection = FVector::ZeroVector;
 }
 
+void ATankMaster::DieSunkThroughIce()
+{
+	if (not IsUnitAlive())
+	{
+		return;
+	}
+	UnitDies(ERTSDeathType::Scavenging);
+}
+
 void ATankMaster::DestroyAndSpawnActorsWithDeathEffects(const FDestroySpawnActorsParameters& SpawnParams,
                                                         const FCollapseFX& CollapseFX, const bool bTossTurret,
                                                         const bool bExplodeFuel)

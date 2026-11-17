@@ -73,7 +73,7 @@ environmental storytelling for the Act 2 truth (the war that happened across Eur
 ### 1. Load, not just class
 
 - Each patch of ice carries the **total weight of everything standing on it**, not just the heaviest unit.
-- Light vehicles are safe. Mediums crack it. Heavies break through.
+- On grey ice, light vehicles are safe, mediums crack it and heavies break through. Black ice holds infantry only.
 - **Bunching up breaks it too**, so spacing matters. A blob of mediums can do what one heavy does.
 - **Standing still adds stress over time**, and firing from the ice adds more (recoil). Tank destroyers cannot camp on the
   lake; the ice is for moving across, not holding.
@@ -88,11 +88,15 @@ The player plans routes at a glance, and sees the thaw spread:
 
 | Colour | Meaning | Who can cross |
 |---|---|---|
-| White | Thick | Everything, with spacing for heavies |
-| Grey | Thin | Lights, spaced mediums |
-| Black | Dangerous | Lights and infantry only |
-| Orange glow from below | About to open | Nobody should stop here |
+| White | Thick (heavy ice) | Everything: heavy, medium and light tanks and infantry, with spacing for heavies |
+| Grey | Thin (medium ice) | Medium and light tanks and infantry |
+| Black | Dangerous (infantry ice) | Infantry only |
+| Dark wet cracks with a pale cyan pulse | About to open | Nobody should stop here |
 | Open water | Hole | Nobody (vehicles sink) |
+
+Decided 2026-11-17: these are the three ice types the shaders and the nav areas use (black = infantry only, so light
+tanks need grey or white ice). The "about to open" warning is a cold cyan pulse, not orange, so it is never mistaken for
+the amber Radixite vein under the black ice. See [FrozenLakeIce.md](FrozenLakeIce.md).
 
 **(open)** whether cracks under a unit (stress) show separately from thickness, e.g. a spreading crack decal under a
 stopped medium tank.

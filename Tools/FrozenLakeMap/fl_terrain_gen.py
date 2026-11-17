@@ -41,20 +41,22 @@ V = COMPONENTS * QUADS + 1
 SIZE = COMPONENTS * QUADS * QUAD_CM
 SHAPE = (V, V)                          # work arrays: row = north..south, col = west..east
 
-LAYERS = ["FLSnow", "FLFrost", "FLScorched", "FLDryGrass", "FLGravel", "FLMud", "FLAsh"]
+LAYERS = ["FLSnow", "FLFrost", "FLMoss", "FLLichen", "FLHeath", "FLPeat", "FLGranite", "FLGravel", "FLBurnt"]
 
 NAV_MAX_SLOPE_DEG = 44.0
 BANK = math.tan(math.radians(60.0))     # cm of height per cm of run on every blocking bank
 LAND = 180.0                            # dry ground round the lake
 LAND_ROLL = 70.0                        # +- roll of the open ground (fbm), flattened on pads and roads
 SHORE_RUN = 1100.0                      # the shore climbs from the waterline to LAND over this run (about 9 degrees)
-BED_EDGE = -60.0                        # lake bed right at the waterline edge
+SHORE_DIP = 25.0                        # the ground at the outline sits this far under the ice plane
+BED_EDGE = -60.0                        # lake bed 3 m in from the outline
 BED_DEEP = -450.0                       # lake bed far from the shore
 BED_RUN = 2500.0                        # from BED_EDGE to BED_DEEP over this run
 DAM_CROWN = 560.0                       # Forge dam crest (5.6 m over the ice, 3.8 m over the land behind)
 DAM_TOP_HALF = 300.0                    # half the crest width (the sketch's 6 m wall)
 CUT_FLOOR = -380.0                      # gorge and canal water floor
-FROST_EDGE_BAND = 9                     # cells of frost crust between snow and scorched ground
+SNOW_PATCH_MAX = 0.9                    # snow patches over the tundra reach this weight at most (moss shows through)
+FROST_EDGE_BAND = 9                    # cells of frost crust between snow and scorched ground
 
 
 def box_blur(a, r):
@@ -241,23 +243,32 @@ class Gen:
         flat_soft = soft(flat, 6)
         land = LAND + roll * (1.0 - np.clip(flat_soft * 1.4, 0.0, 1.0))
         # shore: the waterline edge sits at 0 and climbs to the land over SHORE_RUN (pads keep their flat top)
+        # One continuous profile over the signed distance to the true outline (not the 1 m mask, whose staircase made a
+        # sawtooth where the ground crossed the ice plane): the ground dips 25 cm under the ice at the outline, crosses
+        # the ice level about 1.3 m inland (the ice mesh tucks 1.5 m under the shore, where the ground is ~5 cm up),
+        # then climbs to the land. Inside, the bed falls away under the ice.
         shore_t = smoothstep(0.0, SHORE_RUN, d_out)
-        Z = np.where(lake, 0.0, land * shore_t)
-        # lake bed under the ice plane
-        bed = BED_EDGE + (BED_DEEP - BED_EDGE) * smoothstep(0.0, BED_RUN, d_in) + fbm(21, 40) * 40.0 * smoothstep(0.0, BED_RUN, d_in)
-        Z = np.where(lake, bed, Z)
+        z_land = land * shore_t - SHORE_DIP * (1.0 - smoothstep(0.0, 200.0, d_out))
+        depth_t = smoothstep(0.0, BED_RUN, d_in)
+        z_bed = -SHORE_DIP + (BED_EDGE + SHORE_DIP) * smoothstep(0.0, 300.0, d_in) + (BED_DEEP - BED_EDGE) * depth_t \
+            + fbm(21, 40) * 40.0 * depth_t
+        Z = np.where(lake, z_bed, z_land)
 
         # roads: blend toward the 7 m-blurred ground so they read as graded, never cutting a bank
         road_mask = np.zeros(SHAPE, dtype=bool)
+        road_w = np.zeros(SHAPE)                # smooth road weight from the exact distance (1 m masks zigzag)
         for pid in ("shore_road_w", "shore_road_s", "shore_road_se", "east_track"):
             p = self.path(pid)
             half = (p.width or 900.0) / 2.0
             d = self.line_dist(p.pts)
             road_mask |= (d < half) & ~lake
+            road_w = np.maximum(road_w, 1.0 - smoothstep(half - 120.0, half + 180.0, d))
+        road_w = np.where(lake, 0.0, road_w)
         smooth = box_blur(Z, 7)
-        rw = soft(road_mask, 3)
+        rw = np.maximum(road_w, soft(road_mask, 3))
         Z = np.where(lake, Z, Z * (1 - rw) + np.maximum(smooth, 30.0) * rw)
         self.road_mask = road_mask
+        self.road_w = road_w
 
         # gorge (pump 1 outflow) and spillway canal: water cut with 60 degree banks
         cuts = np.zeros(SHAPE, dtype=bool)
@@ -311,46 +322,74 @@ class Gen:
         frost = warp(self.masks["frost"], 77, 9.0, 60)
         d_frost_out = dist_outside(frost, FROST_EDGE_BAND + 2)
         d_frost_in = dist_outside(~frost, FROST_EDGE_BAND + 2)
-        # snow inside the pump range, a band of frost crust at its rim, scorched dry ground outside
+        # snow inside the pump range, a band of frost crust at its rim; outside it the thawed Karelian bog (the Forge's
+        # cold stops at the pumps' range): moss, lichen on rises, heath patches, wet peat in hollows, granite on slopes
         crust = (d_frost_in > 0) & (d_frost_in <= FROST_EDGE_BAND // 2) | (d_frost_out > 0) & (d_frost_out <= FROST_EDGE_BAND // 2)
         snow = frost & ~crust
-        speckle = noise(41, 9) * 0.5 + 0.5
-        W["FLSnow"] += np.where(snow, 1.0, 0.0)
-        W["FLFrost"] += np.where(crust, 1.0, 0.0)
-        outside = ~frost & ~crust
-        W["FLScorched"] += np.where(outside, 0.75 + 0.25 * speckle, 0.0)
-        W["FLDryGrass"] += np.where(outside, 0.25 * (1 - speckle), 0.0)
-        # bare earth shows through thin snow on slopes over 14 degrees and on the dam banks
-        bare = smoothstep(14.0, 30.0, self.slope) * (snow | crust)
-        W["FLSnow"] *= (1 - bare)
-        W["FLFrost"] += bare
-        # dead forest floors: dry grass and frost-bitten earth
+        snow_s, crust_s = soft(snow, 2), soft(crust, 2)
+        outside_s = np.clip(1.0 - snow_s - crust_s, 0.0, 1.0)
+        W["FLSnow"] += snow_s
+        W["FLFrost"] += crust_s
+        # relief: hollows (below the 15 m mean) hold water, rises dry out
+        relief = self.Z - box_blur(self.Z, 15)
+        hollow = smoothstep(-2.0, -12.0, relief)
+        rise = smoothstep(2.0, 12.0, relief)
+        patch = noise(51, 26) * 0.5 + 0.5              # bog / heath patches
+        tuft = noise(53, 9) * 0.5 + 0.5                # small tufts
+        grain = noise(59, 4) * 0.5 + 0.5               # breaks patch edges into clumps
+        wet_field = np.clip(hollow + smoothstep(0.62, 0.80, noise(57, 55) * 0.5 + 0.5) * 0.8, 0.0, 1.0)
+        peat = wet_field * (0.55 + 0.45 * tuft)
+        lichen = rise * (0.5 + 0.5 * tuft) * (1.0 - wet_field)
+        heath = (smoothstep(0.50, 0.78, patch) * (0.35 + 0.65 * grain) + 0.18 * smoothstep(0.55, 0.85, grain))             * (1.0 - wet_field) * (0.6 + 0.4 * (1.0 - tuft))
+        moss = np.clip(1.0 - peat - lichen - heath, 0.15, 1.0)
+        for name, w in (("FLPeat", peat), ("FLLichen", lichen), ("FLHeath", heath), ("FLMoss", moss)):
+            W[name] += outside_s * w
+        # lingering snow patches over the bog (owner 2026-11-17): drifts in the hollows and in broken patches, the
+        # wind-scoured rises stay bare; partial weights let the height blend break the patch edges up
+        drift_field = noise(71, 32) * 0.6 + noise(75, 11) * 0.3 + noise(77, 5) * 0.1
+        drift = smoothstep(0.10, 0.32, drift_field) * (0.45 + 0.55 * grain)
+        snow_patch = np.clip(drift + hollow * 0.35 * (noise(73, 14) * 0.5 + 0.5), 0.0, 1.0) * (1.0 - 0.8 * rise)
+        snow_patch = snow_patch * outside_s * SNOW_PATCH_MAX
+        for name in ("FLPeat", "FLLichen", "FLHeath", "FLMoss"):
+            W[name] *= (1.0 - snow_patch)
+        W["FLSnow"] += snow_patch
+        # granite: slopes over 14 degrees (frost crust inside the ring, bare granite outside) and glacial outcrops on
+        # the highest rises
+        steep = smoothstep(14.0, 30.0, self.slope)
+        outcrop = smoothstep(0.66, 0.78, noise(61, 24) * 0.5 + 0.5) * rise * outside_s
+        bare = np.clip(steep + outcrop, 0.0, 1.0)
+        for name in LAYERS:
+            W[name] *= (1 - bare)
+        W["FLFrost"] += bare * (snow_s + crust_s)
+        W["FLGranite"] += bare * outside_s
+        # dead forest floors (the Forge killed them): burnt floor with heath, frosted inside the ring
         forest = self.region("dead_forest_nw", "dead_forest_se", "dead_forest_w", "dead_forest_ne")
         forest_s = soft(forest, 3)
         for name in LAYERS:
-            W[name] *= (1 - 0.6 * forest_s)
-        W["FLDryGrass"] += 0.6 * forest_s * np.where(frost, 0.3, 1.0)
-        W["FLFrost"] += 0.6 * forest_s * np.where(frost, 0.7, 0.0)
+            W[name] *= (1 - 0.7 * forest_s)
+        W["FLBurnt"] += 0.7 * forest_s * np.where(frost, 0.3, 0.75)
+        W["FLHeath"] += 0.7 * forest_s * np.where(frost, 0.0, 0.25)
+        W["FLFrost"] += 0.7 * forest_s * np.where(frost, 0.7, 0.0)
         # roads and pads: gravel (under snow inside the frost: half and half)
         pads = self.region("player_shelf", "shield_pad", "landing_field", "pump_s_pad", "pump_w_pad", "pump_n_pad",
                            "pump_e_pad")
-        hard = soft(self.road_mask, 2) * 0.9 + soft(pads & ~self.lake, 3) * 0.5
+        hard = self.road_w * 0.9 + soft(pads & ~self.lake, 3) * 0.5
         hard = np.clip(hard, 0.0, 0.95) * np.where(frost, 0.55, 1.0)
         for name in LAYERS:
             W[name] *= (1 - hard)
         W["FLGravel"] += hard
-        # scorched craters and the burnt convoy: ash
+        # scorched craters and the burnt convoy: burnt floor
         burnt = soft(self.masks["scorch_se"], 4)
         conv = self.feature("convoy_wreck_se").points[0]
         burnt = np.maximum(burnt, smoothstep(2600.0, 1200.0, np.hypot(self.X - conv[0], self.Y - conv[1])) * 0.8)
         for name in LAYERS:
             W[name] *= (1 - burnt)
-        W["FLAsh"] += burnt
-        # lake bed, gorge and canal floors under ice / water: mud
+        W["FLBurnt"] += burnt
+        # lake bed, gorge and canal floors under ice / water: peat
         wet = self.lake | self.cuts | (self.Z < 0.0)
         for name in LAYERS:
             W[name] = np.where(wet, 0.0, W[name])
-        W["FLMud"] = np.where(wet, 1.0, W["FLMud"])
+        W["FLPeat"] = np.where(wet, 1.0, W["FLPeat"])
         # normalise to 255 per vertex
         total = sum(W.values())
         total = np.where(total <= 1e-6, 1.0, total)
@@ -448,9 +487,9 @@ class Gen:
         print("wrote %s" % OUT)
 
     def preview(self):
-        colours = {"FLSnow": (236, 238, 242), "FLFrost": (196, 196, 192), "FLScorched": (166, 128, 88),
-                   "FLDryGrass": (176, 156, 104), "FLGravel": (140, 136, 128), "FLMud": (60, 52, 46),
-                   "FLAsh": (90, 88, 86)}
+        colours = {"FLSnow": (236, 238, 242), "FLFrost": (196, 196, 192), "FLMoss": (112, 118, 62),
+                   "FLLichen": (196, 200, 176), "FLHeath": (128, 72, 52), "FLPeat": (52, 42, 34),
+                   "FLGranite": (140, 140, 136), "FLGravel": (150, 146, 138), "FLBurnt": (60, 56, 54)}
         rgb = np.zeros((V, V, 3))
         for name, col in colours.items():
             rgb += (self.W[name].astype(np.float64) / 255.0)[:, :, None] * np.array(col)[None, None, :]
