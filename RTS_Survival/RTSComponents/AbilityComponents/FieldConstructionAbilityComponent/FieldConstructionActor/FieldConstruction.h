@@ -31,8 +31,18 @@ protected:
 
 	bool GetIsValidFieldConstructionMesh();
 
+	/**
+	 * @brief Sets the collision of all meshes for the owner of the construction.
+	 * @param OwningPlayer Side the Blueprint was authored for; only used when the construction's own RTS component
+	 * has no player as owner (the builder's owner on that component wins).
+	 * @param bBlockPlayerProjectiles Whether allied shots hit the construction too.
+	 * @param bOverlapTanks Whether vehicles overlap (crush) the construction.
+	 */
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void SetupCollision(const int32 OwningPlayer, const bool bBlockPlayerProjectiles, const bool bOverlapTanks);
+
+	/** Bound to the RTS component: redoes what depends on the owner once the construction is handed to its builder. */
+	virtual void OnOwningPlayerChanged(uint8 OldOwningPlayer, uint8 NewOwningPlayer);
 
 public:
 	/**
@@ -45,6 +55,20 @@ public:
 	void StopConstructionMaterialTimer();
 
 private:
+	// What the Blueprint last asked of SetupCollision; applied again with the new owner when the owner changes.
+	struct FFieldConstructionCollisionRequest
+	{
+		bool bIsSet = false;
+		int32 OwningPlayerFromBlueprint = 0;
+		bool bBlockPlayerProjectiles = false;
+		bool bOverlapTanks = false;
+	};
+
+	FFieldConstructionCollisionRequest M_CollisionRequest;
+
+	void BeginPlay_BindToOwningPlayerChanges();
+	void ApplyCollisionRequest();
+
 	UPROPERTY()
 	TArray<TObjectPtr<UMaterialInterface>> M_OriginalMaterials;
 
