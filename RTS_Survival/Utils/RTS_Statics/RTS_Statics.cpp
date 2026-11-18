@@ -6,6 +6,7 @@
 #include "RTS_Survival/FOWSystem/FowManager/FowManager.h"
 #include "RTS_Survival/Game/GameState/CPPGameState.h"
 #include "RTS_Survival/Game/GameState/GameExplosionManager/ExplosionManager.h"
+#include "RTS_Survival/Game/Players/RTSPlayers.h"
 #include "RTS_Survival/Game/RTSGameInstance/RTSGameInstance.h"
 #include "RTS_Survival/GameUI/Pooled_AnimatedVerticalText/Pooling/WorldSubSystem/AnimatedTextWorldSubsystem.h"
 #include "RTS_Survival/GameUI/Pooled_AnimatedVerticalIcons/AnimatedIconWorldSubsystem.h"
@@ -299,19 +300,71 @@ UGameExplosionsManager* FRTS_Statics::GetGameExplosionsManager(const UObject* Wo
 	return nullptr;
 }
 
+namespace RTSStaticsEnemyController
+{
+	const UEnemyControllerSubsystem* GetEnemyControllerSubsystem(const UObject* WorldContextObject)
+	{
+		if (not IsValid(WorldContextObject))
+		{
+			return nullptr;
+		}
+		const UWorld* World = WorldContextObject->GetWorld();
+		if (not IsValid(World))
+		{
+			return nullptr;
+		}
+		return World->GetSubsystem<UEnemyControllerSubsystem>();
+	}
+}
+
 AEnemyController* FRTS_Statics::GetEnemyController(const UObject* WorldContextObject)
 {
-	if (IsValid(WorldContextObject); UWorld* World = WorldContextObject->GetWorld())
+	const UEnemyControllerSubsystem* EMS = RTSStaticsEnemyController::GetEnemyControllerSubsystem(WorldContextObject);
+	if (not IsValid(EMS))
 	{
-		UEnemyControllerSubsystem* EMS = World->GetSubsystem<UEnemyControllerSubsystem>();
-		// Retrieve the manager pointer
-		AEnemyController* EnemyController = EMS->GetEnemyController();
-		if (IsValid(EnemyController))
-		{
-			return EnemyController;
-		}
+		return nullptr;
+	}
+	// Retrieve the manager pointer
+	AEnemyController* EnemyController = EMS->GetEnemyController();
+	if (IsValid(EnemyController))
+	{
+		return EnemyController;
 	}
 	return nullptr;
+}
+
+AEnemyController* FRTS_Statics::GetEnemyControllerForPlayer(const UObject* WorldContextObject, const int32 Player)
+{
+	if (not FRTSPlayers::IsValidAIPlayer(Player))
+	{
+		// Human, neutral and unset owners have no controller of their own: they get the one every caller got.
+		return GetEnemyController(WorldContextObject);
+	}
+	const UEnemyControllerSubsystem* EMS = RTSStaticsEnemyController::GetEnemyControllerSubsystem(WorldContextObject);
+	if (not IsValid(EMS))
+	{
+		return nullptr;
+	}
+	return EMS->GetEnemyControllerForPlayer(Player);
+}
+
+AEnemyController* FRTS_Statics::GetEnemyControllerOfUnit(const AActor* Unit)
+{
+	if (not IsValid(Unit))
+	{
+		return nullptr;
+	}
+	return GetEnemyControllerForPlayer(Unit, FRTSPlayers::GetOwningPlayerOfActor(Unit));
+}
+
+TArray<AEnemyController*> FRTS_Statics::GetAllEnemyControllers(const UObject* WorldContextObject)
+{
+	const UEnemyControllerSubsystem* EMS = RTSStaticsEnemyController::GetEnemyControllerSubsystem(WorldContextObject);
+	if (not IsValid(EMS))
+	{
+		return TArray<AEnemyController*>();
+	}
+	return EMS->GetAllEnemyControllers();
 }
 
 UGameUnitManager* FRTS_Statics::GetGameUnitManager(const UObject* WorldContextObject)

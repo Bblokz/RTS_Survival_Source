@@ -140,14 +140,33 @@ public:
 
 	/**
 	 * @brief Check if the actor is a valid target for the unit, is alive and
-	 * is visible in the FOW.
+	 * is visible in the FOW to the player that wants to target it. Says nothing about hostility.
 	 * @param ActorToCheck The actor to check for target validity.
-	 * @param EnemyPlayerOfActor The enemy of th actor targeted.
-	 * @return True if the actor is valid, alive and visible in fow.
-	 * @note If player 1 is the enemy then this actor must not be hidden in fow (visible to player 1).
-	 * @note if Player 1 is the ally then this actor must be in the enemy vision (tagged with enemy vision).
+	 * @param ViewerPlayer The player whose unit wants to target the actor.
+	 * @return True if the actor is valid, alive and visible in fow to the viewer.
+	 * @note If player 1 is the viewer then this actor must not be hidden in fow (visible to player 1).
+	 * @note If an AI player is the viewer then a unit of player 1 must be in the enemy vision (tagged with enemy
+	 * vision); a unit of an AI player is always seen, also while only the fog hides it.
 	 */
-	static bool RTSIsVisibleTarget(AActor* ActorToCheck, const int32 EnemyPlayerOfActor);
+	static bool RTSIsVisibleTarget(AActor* ActorToCheck, const int32 ViewerPlayer);
+
+	/**
+	 * @brief RTSIsVisibleTarget for callers that already know the actor is alive and who owns it; saves the lookup
+	 * of the owner in loops over the units of one player.
+	 * @param AliveActor Valid actor that is alive.
+	 * @param TargetOwner Owning player of the actor; INDEX_NONE when nobody owns it.
+	 * @param ViewerPlayer The player whose unit wants to target the actor.
+	 * @return True if the viewer sees the actor.
+	 */
+	static bool RTSIsVisibleTargetOfOwner(const AActor* AliveActor, const int32 TargetOwner, const int32 ViewerPlayer);
+
+	/**
+	 * @brief The visibility of RTSIsVisibleTarget for all players at once, for the async target snapshot.
+	 * @param AliveActor Valid actor that is alive.
+	 * @param TargetOwner Owning player of the actor; INDEX_NONE when nobody owns it.
+	 * @return Bits of the players whose units see the actor (FRTSPlayers::GetPlayerBit); zero when nobody does.
+	 */
+	static uint8 RTSGetVisibleToMask(const AActor* AliveActor, const int32 TargetOwner);
 
 
 	static void DebugWeapons(const FString& Message, FColor Color, const bool bIsTrace = false);
