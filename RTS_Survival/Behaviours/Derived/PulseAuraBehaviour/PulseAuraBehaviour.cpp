@@ -99,11 +99,12 @@ void UPulseAuraBehaviour::ExecutePulse()
 
 	const FVector PulseOrigin = M_OwningActor->GetActorLocation() + M_PulseAuraSettings.RadiusOffset;
 	const TWeakObjectPtr<UPulseAuraBehaviour> WeakThis(this);
+	// The authored rule is read from the owner's side: Player = the owner and its allies, Enemy = its hostiles.
 	FRTS_AOE::ApplyToActorsAsync(
 		M_OwningActor.Get(),
 		PulseOrigin,
 		M_PulseAuraSettings.Radius,
-		GetResolvedOverlapRule(),
+		FAoeInstigator::FromOwnerRelativeLogic(M_OwningPlayer, M_PulseAuraSettings.OverlapRule),
 		[WeakThis](AActor& FoundActor)
 		{
 			if (not WeakThis.IsValid())
@@ -136,24 +137,6 @@ void UPulseAuraBehaviour::ApplyBehavioursToTargetActor(AActor& TargetActor) cons
 		}
 
 		TargetBehaviourComp->AddBehaviour(BehaviourClassToApply);
-	}
-}
-
-ETriggerOverlapLogic UPulseAuraBehaviour::GetResolvedOverlapRule() const
-{
-	if (M_OwningPlayer == 1)
-	{
-		return M_PulseAuraSettings.OverlapRule;
-	}
-
-	switch (M_PulseAuraSettings.OverlapRule)
-	{
-	case ETriggerOverlapLogic::OverlapPlayer:
-		return ETriggerOverlapLogic::OverlapEnemy;
-	case ETriggerOverlapLogic::OverlapEnemy:
-		return ETriggerOverlapLogic::OverlapPlayer;
-	default:
-		return ETriggerOverlapLogic::OverlapBoth;
 	}
 }
 

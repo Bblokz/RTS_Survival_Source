@@ -18,6 +18,7 @@
 #include "RTS_Survival/Collapse/FRTS_Collapse/FRTS_Collapse.h"
 #include "RTS_Survival/Collapse/VerticalCollapse/FRTS_VerticalCollapse.h"
 #include "RTS_Survival/FOWSystem/FowComponent/FowComp.h"
+#include "RTS_Survival/Game/Players/RTSPlayers.h"
 #include "RTS_Survival/GlobalAbilitySystem/GlobalAbilitiesManager/GlobalAbilitiesManager.h"
 #include "RTS_Survival/Player/CPPController.h"
 #include "RTS_Survival/Resources/ResourceDropOff/ResourceDropOff.h"
@@ -32,6 +33,7 @@
 #include "RTS_Survival/Utils/RTSBlueprintFunctionLibrary.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/CollisionSetup/FRTS_CollisionSetup.h"
+#include "RTS_Survival/Utils/CollisionSetup/RTSPlayerCollision.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 #include "RTS_Survival/Weapons/HullWeaponComponent/HullWeaponComponent.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/AttachedWeaponAbilityComponent/AttachedWeaponAbilityComponent.h"
@@ -415,6 +417,11 @@ void ABuildingExpansion::AddAdditionalHealth(const float AddedHp, const float Ad
 
 void ABuildingExpansion::SetupCollisionHitByEnemy(TArray<UPrimitiveComponent*> Primitives)
 {
+	// Hit by the players hostile to the owner. Blueprints may call this before the RTS component is cached, and an
+	// expansion without a player as owner keeps the human side this call was written for.
+	const int32 OwnerOfActor = FRTSPlayers::GetOwningPlayerOfActor(this);
+	const int32 OwningPlayer = FRTSPlayers::IsValidPlayer(OwnerOfActor) ? OwnerOfActor : RTSPlayers::HumanPlayer;
+	const ECollisionChannel OwnerObjectChannel = FRTSPlayerCollision::GetOwnerObjectChannel(OwningPlayer);
 	for (auto EachPrimitive : Primitives)
 	{
 		if (not IsValid(EachPrimitive))
@@ -422,9 +429,9 @@ void ABuildingExpansion::SetupCollisionHitByEnemy(TArray<UPrimitiveComponent*> P
 			continue;
 		}
 		EachPrimitive->SetCollisionResponseToAllChannels(ECR_Ignore);
-		EachPrimitive->SetCollisionResponseToChannel(COLLISION_TRACE_PLAYER, ECR_Block);
+		FRTSPlayerCollision::SetWeaponHitResponses(EachPrimitive, OwningPlayer);
 		EachPrimitive->SetCollisionResponseToChannel(COLLISION_TRACE_LANDSCAPE, ECR_Overlap);
-		EachPrimitive->SetCollisionObjectType(COLLISION_OBJ_PLAYER);
+		EachPrimitive->SetCollisionObjectType(OwnerObjectChannel);
 	}
 }
 
@@ -842,7 +849,7 @@ FBxpData ABuildingExpansion::GetBxpData(const EBuildingExpansionType BxpSubType,
 	}
 	if (ACPPGameState* RTSGameState = FRTS_Statics::GetGameState(this))
 	{
-		const bool bOwnedByPlayer = RTSComponent->GetOwningPlayer() == 1;
+		const bool bOwnedByPlayer = FRTSPlayers::IsHumanPlayer(RTSComponent->GetOwningPlayer());
 		BxpData = bOwnedByPlayer
 			          ? RTSGameState->GetPlayerBxpData(BxpSubType, BxpRequesting)
 			          : RTSGameState->GetEnemyBxpData(BxpSubType, BxpRequesting);
@@ -1150,7 +1157,7 @@ void ABuildingExpansion::ApplyFieldDefenseDiscount()
 		return;
 	}
 	// Only the player's prices change: an enemy's office makes nothing cheaper.
-	if (not GetIsValidRTSComponent() || RTSComponent->GetOwningPlayer() != 1)
+	if (not GetIsValidRTSComponent() || not FRTSPlayers::IsHumanPlayer(RTSComponent->GetOwningPlayer()))
 	{
 		return;
 	}
@@ -1190,7 +1197,7 @@ void ABuildingExpansion::ApplyGlobalAbilityCooldownBonus()
 		return;
 	}
 	// Only the player's abilities: an enemy's cipher room speeds up nothing (as the office's discount).
-	if (not GetIsValidRTSComponent() || RTSComponent->GetOwningPlayer() != 1)
+	if (not GetIsValidRTSComponent() || not FRTSPlayers::IsHumanPlayer(RTSComponent->GetOwningPlayer()))
 	{
 		return;
 	}
@@ -1872,7 +1879,7 @@ void ABuildingExpansion::PostInit_SetupAbilities()
 		// built) learn it in InitBuildingExpansion, which sets the abilities from the same data.
 		return;
 	}
-	if (RTSComp->GetOwningPlayer() == 1)
+	if (FRTSPlayers::IsHumanPlayer(RTSComp->GetOwningPlayer()))
 	{
 		const FBxpData BxpData = FRTS_Statics::BP_GetPlayerBxpData(MyBxpType,
 		                                                           this, bIsValidData);

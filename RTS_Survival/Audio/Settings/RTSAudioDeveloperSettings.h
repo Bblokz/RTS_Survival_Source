@@ -7,6 +7,7 @@
 
 #include "RTSAudioDeveloperSettings.generated.h"
 
+class UAircraftGunAudioDataAsset;
 class UBulletFlyByDataAsset;
 class USoundClass;
 class USoundMix;
@@ -39,4 +40,9 @@ public:
 	 * small-arms tracer passes close to the point the camera looks at. Keep the asset in an always-cooked folder. */
 	UPROPERTY(Config, EditAnywhere, Category="Bullet Fly By")
 	TSoftObjectPtr<UBulletFlyByDataAsset> BulletFlyByData;
+
+	/** Aircraft strafe MG and 20 mm cannon sounds (fire loops, impact churn, tails), played by UAircraftGunAudioPlayer.
+	 * Unset: aircraft guns keep their Blueprint launch and impact sounds. Keep the asset in an always-cooked folder. */
+	UPROPERTY(Config, EditAnywhere, Category="Aircraft Guns")
+	TSoftObjectPtr<UAircraftGunAudioDataAsset> AircraftGunAudioData;
 };
