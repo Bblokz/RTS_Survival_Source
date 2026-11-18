@@ -19,6 +19,7 @@
 #include "RTS_Survival/Game/GameState/GameExplosionManager/ExplosionManager.h"
 #include "RTS_Survival/RTSCollisionTraceChannels.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
+#include "RTS_Survival/Utils/CollisionSetup/RTSPlayerCollision.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/RTSBlueprintFunctionLibrary.h"
 #include "RTS_Survival/Utils/RTS_Statics/SubSystems/ExplosionManagerSubsystem/ExplosionManagerSubsystem.h"
@@ -29,7 +30,6 @@
 
 namespace PitDefense
 {
-	constexpr int32 PlayerOwnerIndex = 1;
 	constexpr float SandbagEffectHeight = 100.f;
 	constexpr float BloodEffectHeight = 90.f;
 	constexpr float ExplosionPreferredDistance = 160.f;
@@ -268,10 +268,8 @@ void UPitDefenseComponent::ConfigureWeaponHitCollision(const ABuildingExpansion&
 	// The crew and gun meshes have no collision, so without this the cursor passes through the gun to the ground:
 	// hovering or clicking the gun then shows no attack marker and issues no attack on the pit.
 	M_WeaponHitCollider->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
-	const ECollisionChannel WeaponTraceChannel = RTSComponent->GetOwningPlayer() == PitDefense::PlayerOwnerIndex
-		? COLLISION_TRACE_PLAYER
-		: COLLISION_TRACE_ENEMY;
-	M_WeaponHitCollider->SetCollisionResponseToChannel(WeaponTraceChannel, ECR_Block);
+	// The weapons of players hostile to the pit's owner hit the gun; its own and allied shots pass through.
+	FRTSPlayerCollision::SetWeaponHitResponses(M_WeaponHitCollider, RTSComponent->GetOwningPlayer());
 	M_WeaponHitCollider->SetGenerateOverlapEvents(true);
 }
 

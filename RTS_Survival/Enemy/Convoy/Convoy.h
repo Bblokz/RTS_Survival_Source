@@ -19,6 +19,7 @@ class UConvoyDefinition;
 DECLARE_MULTICAST_DELEGATE_OneParam(FOnConvoyEventNative, const FConvoyEvent& /*Event*/);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnConvoyEventDynamic, const FConvoyEvent&, Event);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnConvoyFinishedDynamic, AConvoy*, Convoy, EConvoyOutcome, Outcome);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnConvoyTruckCapturedDynamic, AConvoy*, Convoy, AActor*, Truck);
 
 /** @brief Runtime state of one unit in a convoy. */
 USTRUCT()
@@ -182,6 +183,34 @@ public:
 	/** @return The units of the convoy that are still alive (tanks and squad controllers). */
 	TArray<AActor*> GetAliveUnits() const;
 
+	/** @return Living escort vehicles and squads (members still spawning do not count). */
+	UFUNCTION(BlueprintPure, Category = "Convoy")
+	int32 GetAliveEscortCount() const;
+
+	/** @return True when a living escort stands within Radius (2D) of Location. */
+	bool GetIsAnyEscortAliveNear(const FVector& Location, float Radius) const;
+
+	/** @return Trucks that surrendered and left the convoy alive; they count neither as destroyed nor as escaped. */
+	UFUNCTION(BlueprintPure, Category = "Convoy")
+	int32 GetCapturedTruckCount() const { return M_CapturedTruckCount; }
+
+	/** @return One truck's share of the convoy's cargo (what its cache pays). */
+	const FConvoyCargoValue& GetCargoPerTruck() const { return M_CargoPerTruck; }
+
+	/** @return True while Unit is a spawned, living member of this convoy that has not been released. */
+	bool GetIsActiveMember(const AActor* Unit) const;
+
+	/**
+	 * @brief Hands a living truck over to whoever captured it: it leaves the column alive and counts as captured.
+	 * The convoy never captures a truck by itself; only trucks that can surrender call this.
+	 * @param Truck The truck actor of this convoy.
+	 * @return True when Truck was an active truck of this convoy and is now released as captured.
+	 */
+	bool ReleaseCapturedTruck(AActor* Truck);
+
+	/** @return The running convoy Unit is an active member of, or nullptr. */
+	static AConvoy* FindConvoyOfActiveMember(const AActor* Unit);
+
 	FOnConvoyEventNative OnConvoyEventNative;
 
 	UPROPERTY(BlueprintAssignable, Category = "Convoy")
@@ -189,6 +218,10 @@ public:
 
 	UPROPERTY(BlueprintAssignable, Category = "Convoy")
 	FOnConvoyFinishedDynamic OnConvoyFinished;
+
+	// A truck surrendered and left the convoy alive; it now belongs to its captor.
+	UPROPERTY(BlueprintAssignable, Category = "Convoy")
+	FOnConvoyTruckCapturedDynamic OnTruckCaptured;
 
 protected:
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
@@ -228,6 +261,7 @@ private:
 	FTimerHandle M_TickTimer;
 	FTimerHandle M_SelfDestroyTimer;
 	int32 M_NextCacheId = 0;
+	int32 M_CapturedTruckCount = 0;
 
 	static int32 M_NextFreeConvoyId;
 
@@ -252,6 +286,7 @@ private:
 	void BindMemberDeath(FConvoyMember& Member);
 	void OnSpawningComplete();
 	FConvoyMember* FindMember(int32 MemberId);
+	const FConvoyMember* FindActiveMemberByActor(const AActor* Unit) const;
 
 	// ---------------- Column (ConvoyColumn.cpp)
 	void TickConvoy();
@@ -284,12 +319,18 @@ private:
 	void UpdateEngagedEscorts(double Now);
 	void EndCombat(double Now);
 	void UpdateTrucksLost(double Now);
-	uint8 GetHostilePlayer() const;
+	/** @return Bits of the players the convoy's owner fights; a convoy without a valid owner counts as the first AI player's. */
+	uint8 GetHostilePlayersMask() const;
 
 	// ---------------- Members and cargo (ConvoyCargo.cpp)
 	void UpdateDeaths();
 	void OnMemberDied(int32 MemberId);
 	void HandleTruckLost(FConvoyMember& Member);
+	// The column has no truck left (destroyed or captured): the escorts stop keeping station.
+	void OnLastTruckGone(const FString& Reason);
+	/** @return TrucksStopped when any truck was captured, else TrucksDestroyed. */
+	EConvoyOutcome GetOutcomeWithoutTrucks() const;
+	void RemoveConvoyIconIfAttachedTo(const AActor* Actor);
 	void ScheduleCargoCache(const FConvoyMember& Truck);
 	void SpawnCargoCache(int32 CacheId);
 	void OnCacheScavenged(int32 CacheId);

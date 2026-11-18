@@ -2034,6 +2034,9 @@ namespace DeveloperSettings
 		namespace FoW
 		{
 			inline const FName TagUnitInEnemyVision = "IsInEnemyVision";
+			// On an AI-owned unit while the fog, and nothing else, hides it from the human: other AI players
+			// still see such a unit. Set and cleared by UFowComp only.
+			inline const FName TagUnitHiddenByFog = "IsHiddenByFog";
 			inline constexpr float VisibleEnoughToRevealEnemy = 0.10;
 			// Note that enemy vision is binary as either a player unit is in enemy vision which means that the particle
 			// associated with this unit has size 1 or not in which case the size is zero.

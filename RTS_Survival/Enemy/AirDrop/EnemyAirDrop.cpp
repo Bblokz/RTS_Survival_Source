@@ -19,8 +19,6 @@
 
 namespace EnemyAirDropConstants
 {
-	// The enemy controller sets up its global abilities manager for player 2.
-	constexpr int32 EnemyPlayer = 2;
 	// How often a Start When Destroyed air drop looks at its linked actor.
 	constexpr float LinkWatchIntervalSeconds = 0.5f;
 
@@ -446,12 +444,15 @@ void AEnemyAirDrop::ExecuteDropAbilities(const int32 DropNumber, const TArray<UG
 			CargoPlane->OnUnitReleased.AddUObject(this, &AEnemyAirDrop::HandleCargoUnitReleased);
 		}
 	}
+	// The manager is the one of the enemy controller this air drop runs on; the abilities get that controller's player.
+	const AEnemyController* EnemyController = M_EnemyController.Get();
+	const int32 DropOwningPlayer = IsValid(EnemyController) ? EnemyController->GetControlledPlayer() : GetEnemyPlayer();
 	bM_IsLaunching = true;
 	for (UGlobalAbility* Ability : Abilities)
 	{
 		// The same owner, manager and controller the enemy's loaded abilities get (the manager has no player
 		// controller), so the aircraft start on the enemy's edge and the units are the enemy AI's.
-		Ability->InitGlobalAbility(EnemyAirDropConstants::EnemyPlayer, &Manager, nullptr);
+		Ability->InitGlobalAbility(DropOwningPlayer, &Manager, nullptr);
 		Ability->ExecuteAbilityAtLocation(LandingPoint);
 	}
 	bM_IsLaunching = false;

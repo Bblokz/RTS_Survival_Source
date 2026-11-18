@@ -2,6 +2,7 @@
 
 #include "Convoy.h"
 
+#include "EngineUtils.h"
 #include "Engine/World.h"
 #include "TimerManager.h"
 #include "RTS_Survival/Enemy/Convoy/ConvoyDefinition.h"
@@ -270,6 +271,68 @@ TArray<AActor*> AConvoy::GetAliveUnits() const
 		}
 	}
 	return Units;
+}
+
+int32 AConvoy::GetAliveEscortCount() const
+{
+	int32 Count = 0;
+	for (const FConvoyMember& Member : M_Members)
+	{
+		Count += Member.Role != EConvoyUnitRole::Truck and Member.GetIsAlive() ? 1 : 0;
+	}
+	return Count;
+}
+
+bool AConvoy::GetIsAnyEscortAliveNear(const FVector& Location, const float Radius) const
+{
+	const float RadiusSquared = FMath::Square(Radius);
+	for (const FConvoyMember& Member : M_Members)
+	{
+		if (Member.Role == EConvoyUnitRole::Truck or not Member.GetIsAlive())
+		{
+			continue;
+		}
+		if (FVector::DistSquared2D(Member.Location, Location) <= RadiusSquared)
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
+bool AConvoy::GetIsActiveMember(const AActor* Unit) const
+{
+	return FindActiveMemberByActor(Unit) != nullptr;
+}
+
+AConvoy* AConvoy::FindConvoyOfActiveMember(const AActor* Unit)
+{
+	UWorld* World = IsValid(Unit) ? Unit->GetWorld() : nullptr;
+	if (World == nullptr)
+	{
+		return nullptr;
+	}
+	for (TActorIterator<AConvoy> It(World); It; ++It)
+	{
+		AConvoy* Convoy = *It;
+		if (IsValid(Convoy) and Convoy->GetIsColumnActive() and Convoy->GetIsActiveMember(Unit))
+		{
+			return Convoy;
+		}
+	}
+	return nullptr;
+}
+
+const FConvoyMember* AConvoy::FindActiveMemberByActor(const AActor* Unit) const
+{
+	if (Unit == nullptr)
+	{
+		return nullptr;
+	}
+	return M_Members.FindByPredicate([Unit](const FConvoyMember& Member)
+	{
+		return Member.Actor.Get() == Unit and Member.GetIsAlive();
+	});
 }
 
 FConvoyMember* AConvoy::FindMember(const int32 MemberId)
