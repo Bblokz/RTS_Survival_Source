@@ -178,7 +178,12 @@ void UWallTankBreachComponent::OnWallCollisionSetUp(UPrimitiveComponent* const W
 	// Only the human player's tanks breach: AI-side units never raise overlap events on the wall (their response is
 	// left as the wall had it, unless that was an overlap).
 	WallMesh->SetCollisionResponseToChannel(COLLISION_OBJ_PLAYER, ECR_Overlap);
-	if (WallMesh->GetCollisionResponseToChannel(COLLISION_OBJ_ENEMY) == ECR_Overlap)
+	if (Settings.bAnyVehicleBreaks)
+	{
+		// Wire fences: the AI's vehicles flatten them too.
+		WallMesh->SetCollisionResponseToChannel(COLLISION_OBJ_ENEMY, ECR_Overlap);
+	}
+	else if (WallMesh->GetCollisionResponseToChannel(COLLISION_OBJ_ENEMY) == ECR_Overlap)
 	{
 		WallMesh->SetCollisionResponseToChannel(COLLISION_OBJ_ENEMY, ECR_Ignore);
 	}
@@ -202,8 +207,8 @@ void UWallTankBreachComponent::Debug_StartCrossing(AActor* const Tank)
 	if (not GetIsBreachingTank(Tank))
 	{
 		UE_LOG(LogWallTankBreach, Warning,
-		       TEXT("RTS_WALL_BREACH debug crossing ignored: %s is no medium/heavy tank of the other side"),
-		       *GetNameSafe(Tank));
+		       TEXT("RTS_WALL_BREACH debug crossing ignored: %s may not breach %s"), *GetNameSafe(Tank),
+		       *GetNameSafe(GetOwner()));
 		return;
 	}
 	StartCrossing(Tank);
@@ -255,6 +260,12 @@ bool UWallTankBreachComponent::GetIsBreachingTank(const AActor* const Actor) con
 		return false;
 	}
 	const ERTSNavAgents AgentType = NavAgent->GetRTSNavAgentType();
+	if (Settings.bAnyVehicleBreaks)
+	{
+		// Wire fences: any vehicle of any side, whoever owns the fence.
+		return AgentType == ERTSNavAgents::LightTank || AgentType == ERTSNavAgents::MediumTank
+			|| AgentType == ERTSNavAgents::HeavyTank;
+	}
 	const bool bIsAllowedClass = AgentType == ERTSNavAgents::HeavyTank
 		|| (AgentType == ERTSNavAgents::MediumTank && not Settings.bHeavyTanksOnly);
 	if (not bIsAllowedClass)
@@ -609,8 +620,16 @@ void UWallTankBreachComponent::SlowTank(FWallTankCrossing& Crossing)
 		return;
 	}
 	// Breaking through costs momentum; heavier hulls keep more of it.
-	const bool bIsHeavy = Tank->GetRTSNavAgentType() == ERTSNavAgents::HeavyTank;
-	const float SpeedShare = bIsHeavy ? Settings.HeavyTankPushSpeedShare : Settings.MediumTankPushSpeedShare;
+	const ERTSNavAgents AgentType = Tank->GetRTSNavAgentType();
+	float SpeedShare = Settings.MediumTankPushSpeedShare;
+	if (AgentType == ERTSNavAgents::HeavyTank)
+	{
+		SpeedShare = Settings.HeavyTankPushSpeedShare;
+	}
+	else if (AgentType == ERTSNavAgents::LightTank)
+	{
+		SpeedShare = Settings.LightTankPushSpeedShare;
+	}
 	Tank->SetMobilityRestriction(this, SpeedShare, WallTankBreachConstants::PushTurnRateShare,
 	                             WallTankBreachConstants::PushAccelerationShare);
 	Crossing.bIsSlowed = true;
@@ -1525,6 +1544,10 @@ TSubclassOf<UNavArea> UWallTankBreachComponent::GetWallNavArea()
 				"from URTSWallGateNavQueryFilter; Rus walls block every unit (no tank plans a breach)."));
 		}
 		return UNavArea_Null::StaticClass();
+	}
+	if (Settings.bAnyVehicleBreaks)
+	{
+		return UNavArea_BreachableAnyVehicle::StaticClass();
 	}
 	if (Settings.bHeavyTanksOnly)
 	{

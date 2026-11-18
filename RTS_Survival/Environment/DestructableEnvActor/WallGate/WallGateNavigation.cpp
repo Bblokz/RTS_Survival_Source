@@ -6,6 +6,7 @@
 #include "NavAreas/NavArea_Null.h"
 #include "GameFramework/Controller.h"
 #include "GameFramework/Pawn.h"
+#include "RTS_Survival/Game/Players/RTSPlayers.h"
 #include "RTS_Survival/Navigation/RTSNavAgents/IRTSNavAgent/IRTSNavAgent.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "WallGate.h"
@@ -15,6 +16,8 @@ namespace WallGateNavigationConstants
 	constexpr uint8 HumanPlayerIndex = RTSWallSides::HumanPlayerIndex;
 	const FColor PlayerSideAreaColour = FColor(40, 160, 255);
 	const FColor EnemySideAreaColour = FColor(255, 120, 40);
+	const FColor Player3AreaColour = FColor(200, 60, 200);
+	const FColor Player4AreaColour = FColor(60, 200, 90);
 	const FColor BreachableWallColour = FColor(150, 90, 60);
 	// A tank breaks a wall only when the way round is more than about this far (cm of path) longer: a gap or gate right
 	// beside it wins, a long way round does not.
@@ -29,6 +32,9 @@ namespace WallGateNavigationConstants
 	// Cost per cm through a breachable wall for queries without the RTS filter: an obstacle's (NavArea_Obstacle).
 	constexpr float BreachableWallUnfilteredCost = 1000000.f;
 	constexpr float BreachableWallTankCost = 1.f;
+	// Wire fences (any vehicle): a vehicle flattens one as if it were open ground; a gate or gap within a metre or so
+	// still wins. Fences stand in chained runs, so the entering cost stays small (an oblique path enters several).
+	constexpr float AnyVehicleFenceEnteringCost = 100.f;
 }
 
 namespace
@@ -68,6 +74,16 @@ UNavArea_BreachableWallEnemyOwned::UNavArea_BreachableWallEnemyOwned(const FObje
 	FixedAreaEnteringCost = WallGateNavigationConstants::BreachableWallEnteringCost;
 }
 
+UNavArea_BreachableAnyVehicle::UNavArea_BreachableAnyVehicle(const FObjectInitializer& ObjectInitializer)
+	: Super(ObjectInitializer)
+{
+	DrawColor = WallGateNavigationConstants::BreachableWallColour;
+	// Plain ground for queries without the RTS filter (convoy routes, planners), as the fence's old BlockCharLight area
+	// was: a fence never seals off a route; only infantry with the RTS filter go round.
+	DefaultCost = 1.f;
+	FixedAreaEnteringCost = WallGateNavigationConstants::AnyVehicleFenceEnteringCost;
+}
+
 UNavArea_WallGatePlayerSide::UNavArea_WallGatePlayerSide(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
 {
@@ -78,6 +94,39 @@ UNavArea_WallGateEnemySide::UNavArea_WallGateEnemySide(const FObjectInitializer&
 	: Super(ObjectInitializer)
 {
 	DrawColor = WallGateNavigationConstants::EnemySideAreaColour;
+}
+
+UNavArea_WallGatePlayer3::UNavArea_WallGatePlayer3(const FObjectInitializer& ObjectInitializer)
+	: Super(ObjectInitializer)
+{
+	DrawColor = WallGateNavigationConstants::Player3AreaColour;
+}
+
+UNavArea_WallGatePlayer4::UNavArea_WallGatePlayer4(const FObjectInitializer& ObjectInitializer)
+	: Super(ObjectInitializer)
+{
+	DrawColor = WallGateNavigationConstants::Player4AreaColour;
+}
+
+TSubclassOf<UNavArea> RTSWallGateNavAreas::GetClosedGateAreaOfPlayer(const int32 Player)
+{
+	constexpr int32 ThirdPlayer = 3;
+	constexpr int32 FourthPlayer = 4;
+	static_assert(RTSPlayers::MaxPlayers == FourthPlayer, "One closed gate area class per player.");
+	switch (FRTSPlayers::NormalizePlayer(Player))
+	{
+	case RTSPlayers::HumanPlayer:
+		return UNavArea_WallGatePlayerSide::StaticClass();
+	case RTSPlayers::FirstAIPlayer:
+		return UNavArea_WallGateEnemySide::StaticClass();
+	case ThirdPlayer:
+		return UNavArea_WallGatePlayer3::StaticClass();
+	case FourthPlayer:
+		return UNavArea_WallGatePlayer4::StaticClass();
+	default:
+		// The neutral owner: allied to nobody, so nobody plans through.
+		return nullptr;
+	}
 }
 
 URTSWallGateNavQueryFilter::URTSWallGateNavQueryFilter(const FObjectInitializer& ObjectInitializer)
@@ -95,16 +144,22 @@ void URTSWallGateNavQueryFilter::InitializeFilter(const ANavigationData& NavData
 	const bool bHasKnownSide = TryGetQuerierOwningPlayer(Querier, OwningPlayer);
 	const bool bIsHumanPlayer = OwningPlayer == WallGateNavigationConstants::HumanPlayerIndex;
 	ExcludeBreachableWalls(NavData, Querier, bHasKnownSide, bIsHumanPlayer, Filter);
-	if (not bHasKnownSide)
+	ExcludeClosedGatesOfNonAllies(NavData, bHasKnownSide, OwningPlayer, Filter);
+}
+
+void URTSWallGateNavQueryFilter::ExcludeClosedGatesOfNonAllies(const ANavigationData& NavData,
+                                                               const bool bHasKnownSide, const uint8 QuerierPlayer,
+                                                               FNavigationQueryFilter& Filter)
+{
+	for (int32 GatePlayer = RTSPlayers::HumanPlayer; GatePlayer <= RTSPlayers::MaxPlayers; ++GatePlayer)
 	{
-		// Unknown side: no closed gate lets it through.
-		ExcludeArea(NavData, UNavArea_WallGatePlayerSide::StaticClass(), Filter);
-		ExcludeArea(NavData, UNavArea_WallGateEnemySide::StaticClass(), Filter);
-		return;
+		// Unknown side: no closed gate lets it through. Neutral units are allied to nobody, so neither does any.
+		if (bHasKnownSide && FRTSPlayers::AreAllied(GatePlayer, QuerierPlayer))
+		{
+			continue;
+		}
+		ExcludeArea(NavData, RTSWallGateNavAreas::GetClosedGateAreaOfPlayer(GatePlayer), Filter);
 	}
-	ExcludeArea(NavData, bIsHumanPlayer
-		                     ? UNavArea_WallGateEnemySide::StaticClass()
-		                     : UNavArea_WallGatePlayerSide::StaticClass(), Filter);
 }
 
 void URTSWallGateNavQueryFilter::ExcludeBreachableWalls(const ANavigationData& NavData, const UObject* Querier,
@@ -134,6 +189,17 @@ void URTSWallGateNavQueryFilter::ExcludeBreachableWalls(const ANavigationData& N
 	{
 		ExcludeArea(NavData, UNavArea_BreachableWallHeavyOnly::StaticClass(), Filter);
 	}
+	// Wire fences: every vehicle of every side drives through; infantry and unknown queriers go round.
+	if (bHasKnownSide && GetIsQuerierVehicle(Querier))
+	{
+		OpenBreachableArea(NavData, UNavArea_BreachableAnyVehicle::StaticClass(), Filter,
+		                   WallGateNavigationConstants::BreachableWallTankCost,
+		                   WallGateNavigationConstants::AnyVehicleFenceEnteringCost);
+	}
+	else
+	{
+		ExcludeArea(NavData, UNavArea_BreachableAnyVehicle::StaticClass(), Filter);
+	}
 }
 
 void URTSWallGateNavQueryFilter::OpenBreachableArea(const ANavigationData& NavData, const UClass* AreaClass,
@@ -155,6 +221,18 @@ bool URTSWallGateNavQueryFilter::GetIsQuerierHeavyTank(const UObject* Querier)
 {
 	const IRTSNavAgentInterface* const NavAgent = Cast<IRTSNavAgentInterface>(GetQuerierActor(Querier));
 	return NavAgent != nullptr && NavAgent->GetRTSNavAgentType() == ERTSNavAgents::HeavyTank;
+}
+
+bool URTSWallGateNavQueryFilter::GetIsQuerierVehicle(const UObject* Querier)
+{
+	const IRTSNavAgentInterface* const NavAgent = Cast<IRTSNavAgentInterface>(GetQuerierActor(Querier));
+	if (NavAgent == nullptr)
+	{
+		return false;
+	}
+	const ERTSNavAgents AgentType = NavAgent->GetRTSNavAgentType();
+	return AgentType == ERTSNavAgents::LightTank || AgentType == ERTSNavAgents::MediumTank
+		|| AgentType == ERTSNavAgents::HeavyTank;
 }
 
 bool URTSWallGateNavQueryFilter::GetIsQuerierMediumOrHeavyTank(const UObject* Querier)

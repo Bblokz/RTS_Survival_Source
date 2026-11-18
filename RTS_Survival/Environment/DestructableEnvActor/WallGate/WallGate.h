@@ -47,7 +47,8 @@ enum class EWallGateState : uint8
 UENUM(BlueprintType)
 enum class EWallGateNavMode : uint8
 {
-	// Allowed units plan through a closed gate, others don't. Needs the RTS nav filters reparented onto
+	// Units of the allowed player and its allies plan through a closed gate, others don't (one doorway area per
+	// player, see RTSWallGateNavAreas). Needs the RTS nav filters reparented onto
 	// URTSWallGateNavQueryFilter; without that the gate falls back to BlockEveryone and reports an error.
 	PlayerAwareArea,
 	// A closed gate blocks every unit's planning (NavArea_Null); allowed units only route through it once it is open.
@@ -89,11 +90,12 @@ struct FWallGateMotionState
 };
 
 /**
- * @brief A gate in a wall that opens by itself for the allowed player's units (default the enemy AI) and closes again
- * when none are near. Detection runs on a timer over the unit registry; the leaf animates through its baked VAT
- * (custom primitive data 3) at 30 Hz only while moving. The doorway is a navigation area that follows the gate state.
- * Works with zero Blueprint graph nodes: it creates its RTS component, sets up the frame's wall collision and blocks
- * navigation at the frame's collision boxes itself.
+ * @brief A gate in a wall that opens by itself for units of the allowed player (default the enemy AI) and its allies,
+ * never for hostile players, and closes again when none are near. Detection runs on a timer over the unit registry
+ * and reads the current relations each scan, so team changes apply within one scan; the leaf animates through its
+ * baked VAT (custom primitive data 3) at 30 Hz only while moving. The doorway is a navigation area of the allowed
+ * player that follows the gate state. Works with zero Blueprint graph nodes: it creates its RTS component, sets up
+ * the frame's wall collision and blocks navigation at the frame's collision boxes itself.
  */
 UCLASS()
 class RTS_SURVIVAL_API AWallGate : public AWallActor
@@ -136,6 +138,19 @@ public:
 	UFUNCTION(BlueprintPure, Category="WallGate")
 	bool GetIsGatePassable() const { return M_Motion.bIsPassable; }
 
+	uint8 GetAllowedPlayer() const { return AllowedPlayer; }
+
+	/**
+	 * @brief Hands the gate to another player's side at runtime: from now on that player's units and its allies open
+	 * it and plan through it while closed. A capture of the gate (its RTS owner changing) calls this by itself.
+	 * @param NewAllowedPlayer Player 1..4; the neutral owner 0 keeps the gate shut for everyone.
+	 */
+	UFUNCTION(BlueprintCallable, Category="WallGate")
+	void SetAllowedPlayer(const uint8 NewAllowedPlayer);
+
+	// False when NavMode PlayerAwareArea fell back to BlockEveryone (RTS nav filters not gate aware); set at BeginPlay.
+	bool GetUsesPlayerAwareNavArea() const { return bM_UsePlayerAwareNavArea; }
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
@@ -155,11 +170,16 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="WallGate")
 	TObjectPtr<UWallGateFrameNavModifier> FrameNavModifier;
 
-	// Only this player's units open the gate (and, with PlayerAwareArea, plan through it while closed).
+	// Units of this player and of its allies open the gate (and, with PlayerAwareArea, plan through it while closed);
+	// hostile players' units never do. Left at the class default it follows the gate's RTS owner at BeginPlay (a gate
+	// placed or spawned for player 3 opens for player 3); a value changed from the default is kept even when it
+	// differs from the owner (the owner alone decides whose shots pass the gate). When the owner changes at runtime and
+	// this was the old owner, it follows the new owner (a captured gate opens for its captor's side).
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="WallGate|Access")
 	uint8 AllowedPlayer = WallGateDefaults::EnemyAIPlayer;
 
-	// Allowed units within this distance (2D, from the doorway centre, both sides) open the gate.
+	// Allowed units (the allowed player's and its allies') within this distance (2D, from the doorway centre, both
+	// sides) open the gate.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="WallGate|Access", meta=(ClampMin="0.0"))
 	float OpenRadius = 1400.f;
 
@@ -243,13 +263,32 @@ private:
 	void BeginPlay_SetupLeafCollision();
 	void BeginPlay_SetupNavigation();
 	void BeginPlay_StartDetection();
+	// An AllowedPlayer left at the class default takes the owner the gate begins play with (spawned for a player).
+	void BeginPlay_ResolveAllowedPlayer();
+	// Follows runtime owner changes (captures) of the gate's RTS component.
+	void BeginPlay_BindOwnerChange();
 
 	// Without index 3 in the defaults a hole write (index 8+) would zero-fill it, which reads as fully open.
 	void EnsureClosedDefaultPrimitiveData() const;
 
 	void OnDetectionTimer();
+	// Any live unit of the allowed player or one of its allies (relations as they are now) within OpenRadius.
 	bool GetIsAllowedUnitInRange() const;
+
+	/**
+	 * @brief Walks one player's tanks and squad units in the registry, without copying the lists.
+	 * @param Player Player whose units count.
+	 * @param Centre Doorway centre.
+	 * @param RadiusSquared Squared 2D reach.
+	 * @return True when a live unit of that player is within reach.
+	 */
+	bool GetIsUnitOfPlayerInRange(uint8 Player, const FVector& Centre, double RadiusSquared) const;
 	bool GetIsAnyUnitInDoorway() const;
+
+	void OnGateOwnerChanged(uint8 OldOwner, uint8 NewOwner);
+	// A shut gate shows the allowed player's area right away; a passable or wrecked one keeps its open doorway and
+	// picks the area up when it closes.
+	void ApplyClosedNavAreaIfShut() const;
 
 	/**
 	 * @brief Reverses or starts the leaf motion from the current progress, so a reversal never snaps.
@@ -267,7 +306,8 @@ private:
 	FVector GetDoorwayWorldCentre() const;
 	UStaticMeshComponent* FindFrameMesh() const;
 
-	// The doorway area while closed: the allowed side's gate area, or NavArea_Null for BlockEveryone.
+	// The doorway area while closed: the allowed player's gate area, or NavArea_Null for BlockEveryone and for a
+	// neutral allowed player.
 	TSubclassOf<UNavArea> GetClosedNavAreaClass() const;
 
 	// PlayerAwareArea only works when every RTS nav filter derives from URTSWallGateNavQueryFilter.
@@ -288,4 +328,6 @@ private:
 	bool bM_UsePlayerAwareNavArea = false;
 
 	FTimerHandle M_DetectionTimerHandle;
+
+	FDelegateHandle M_OwnerChangedHandle;
 };

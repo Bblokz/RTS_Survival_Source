@@ -9,10 +9,12 @@
 #include "NavAreas/NavArea_Default.h"
 #include "NavAreas/NavArea_Null.h"
 #include "RTS_Survival/Game/GameState/GameUnitManager/GameUnitManager.h"
+#include "RTS_Survival/Game/Players/RTSPlayers.h"
 #include "RTS_Survival/Navigation/NavQueryFilterSettings/RTSNavQueryFilterSettings.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/Units/Squads/SquadUnit/SquadUnit.h"
 #include "RTS_Survival/Units/Tanks/TankMaster.h"
+#include "RTS_Survival/Utils/CollisionSetup/RTSPlayerCollision.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "WallGateNavigation.h"
 
@@ -23,7 +25,6 @@ namespace WallGateConstants
 	// Same rate as the nomadic deploy VAT; the gate only ticks while the leaf moves.
 	constexpr float MotionTickIntervalSeconds = 1.f / 30.f;
 	constexpr float MinMoveDurationSeconds = 0.05f;
-	constexpr uint8 HumanPlayerIndex = 1;
 	// URTSComponent reports -1 as unset; a wall is never placed in a formation.
 	constexpr float WallFormationInnerRadius = 0.f;
 	// Opening runs the progress down to 0, closing back up to 1.
@@ -59,13 +60,13 @@ namespace WallGateConstants
 
 	/**
 	 * @brief Whether a live unit's centre lies in the padded doorway box.
-	 * @param Units Registry list of one side.
+	 * @param Units Registry list of one player.
 	 * @param LeafTransform The leaf component's world transform.
 	 * @param PaddedLeafSpaceBox Doorway box in leaf space, already padded.
 	 * @return True when any unit stands in the doorway.
 	 */
 	template <typename TUnit>
-	bool GetIsAnyUnitInsideBox(const TArray<TUnit*>& Units, const FTransform& LeafTransform,
+	bool GetIsAnyUnitInsideBox(const TConstArrayView<TUnit*> Units, const FTransform& LeafTransform,
 	                           const FBox& PaddedLeafSpaceBox)
 	{
 		for (TUnit* const Unit : Units)
@@ -182,8 +183,81 @@ void AWallGate::BeginPlay()
 	WriteLeafProgress(M_Motion.Progress);
 	BeginPlay_SetupFrameCollision();
 	BeginPlay_SetupLeafCollision();
+	// Before the navigation set-up: the closed doorway area is the allowed player's.
+	BeginPlay_ResolveAllowedPlayer();
 	BeginPlay_SetupNavigation();
 	BeginPlay_StartDetection();
+	BeginPlay_BindOwnerChange();
+}
+
+void AWallGate::BeginPlay_ResolveAllowedPlayer()
+{
+	const URTSComponent* const GateRTSComponent = GetRTSComponent();
+	if (not IsValid(GateRTSComponent))
+	{
+		return;
+	}
+	const uint8 GateOwner = GateRTSComponent->GetOwningPlayer();
+	if (FRTSPlayers::NormalizePlayer(GateOwner) == FRTSPlayers::NormalizePlayer(AllowedPlayer))
+	{
+		return;
+	}
+	// The owner was set before BeginPlay (placed with another owner, or spawned for a player), which broadcasts no
+	// owner change. An AllowedPlayer left at the class default follows the owner, as a runtime capture does.
+	const AWallGate* const ClassDefaults = GetClass()->GetDefaultObject<AWallGate>();
+	const bool bIsAllowedPlayerClassDefault = IsValid(ClassDefaults)
+		&& FRTSPlayers::NormalizePlayer(ClassDefaults->AllowedPlayer) == FRTSPlayers::NormalizePlayer(AllowedPlayer);
+	if (bIsAllowedPlayerClassDefault && not FRTSPlayers::IsNeutralOwner(GateOwner))
+	{
+		AllowedPlayer = GateOwner;
+		return;
+	}
+	// Supported but unusual: the authored AllowedPlayer decides who opens the gate, the owner whose shots pass it.
+	UE_LOG(LogWallGate, Warning, TEXT("RTS_WALL_GATE %s: AllowedPlayer %d differs from the gate's owner %d; the gate "
+		       "opens for player %d and its allies, while the shots of player %d and its allies pass it."), *GetName(),
+	       AllowedPlayer, GateOwner, AllowedPlayer, GateOwner);
+}
+
+void AWallGate::BeginPlay_BindOwnerChange()
+{
+	URTSComponent* const GateRTSComponent = GetRTSComponent();
+	if (not IsValid(GateRTSComponent))
+	{
+		return;
+	}
+	M_OwnerChangedHandle = GateRTSComponent->OnOwningPlayerChanged.AddUObject(this, &AWallGate::OnGateOwnerChanged);
+}
+
+void AWallGate::OnGateOwnerChanged(const uint8 OldOwner, const uint8 NewOwner)
+{
+	// A gate authored for another player than its owner keeps that player; one that let its owner's side through
+	// now lets the new owner's side through.
+	if (FRTSPlayers::NormalizePlayer(AllowedPlayer) != FRTSPlayers::NormalizePlayer(OldOwner))
+	{
+		return;
+	}
+	SetAllowedPlayer(NewOwner);
+}
+
+void AWallGate::SetAllowedPlayer(const uint8 NewAllowedPlayer)
+{
+	if (AllowedPlayer == NewAllowedPlayer)
+	{
+		return;
+	}
+	AllowedPlayer = NewAllowedPlayer;
+	ApplyClosedNavAreaIfShut();
+	UE_LOG(LogWallGate, Log, TEXT("RTS_WALL_GATE %s allowed_player=%d"), *GetName(), AllowedPlayer);
+}
+
+void AWallGate::ApplyClosedNavAreaIfShut() const
+{
+	// SetGatePassable(false) reads the allowed player again when the gate shuts; a wreck never blocks.
+	if (M_Motion.bIsPassable || M_Motion.State == EWallGateState::Wrecked || not GetIsValidGateNavModifier())
+	{
+		return;
+	}
+	GateNavModifier->SetAreaClass(GetClosedNavAreaClass());
 }
 
 void AWallGate::BeginPlay_SetupFrameCollision()
@@ -210,6 +284,9 @@ void AWallGate::BeginPlay_SetupLeafCollision()
 	{
 		GateLeafMesh->SetCollisionObjectType(FrameMesh->GetCollisionObjectType());
 		GateLeafMesh->SetCollisionResponseToChannels(FrameMesh->GetCollisionResponseToChannels());
+		// The responses do not say whose body it is: without the frame's owner bit the gate owner's own shots
+		// would hit the leaf.
+		FRTSPlayerCollision::CopyOwnerMaskFilter(FrameMesh, GateLeafMesh);
 		M_LeafBlockingCollision = FrameMesh->GetCollisionEnabled();
 	}
 	else
@@ -260,6 +337,12 @@ void AWallGate::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	{
 		World->GetTimerManager().ClearTimer(M_DetectionTimerHandle);
 	}
+	URTSComponent* const GateRTSComponent = GetRTSComponent();
+	if (IsValid(GateRTSComponent))
+	{
+		GateRTSComponent->OnOwningPlayerChanged.Remove(M_OwnerChangedHandle);
+	}
+	M_OwnerChangedHandle.Reset();
 	Super::EndPlay(EndPlayReason);
 }
 
@@ -296,24 +379,38 @@ void AWallGate::OnDetectionTimer()
 
 bool AWallGate::GetIsAllowedUnitInRange() const
 {
-	if (not GetIsValidGameUnitManger())
+	// Read every scan: a team change opens (or stops opening) the gate for the new allies from the next scan on.
+	// Zero for a neutral allowed player, which opens the gate for nobody.
+	const uint8 AlliedPlayersMask = FRTSPlayers::GetFriendlyMask(AllowedPlayer);
+	if (AlliedPlayersMask == 0 || not GetIsValidGameUnitManger())
 	{
 		return false;
 	}
 	const FVector Centre = GetDoorwayWorldCentre();
 	const double RadiusSquared = FMath::Square(static_cast<double>(OpenRadius));
-	const TArray<ATankMaster*> Tanks = M_GameUnitManager->GetPlayerTanks(AllowedPlayer);
-	for (ATankMaster* const Tank : Tanks)
+	for (int32 Player = RTSPlayers::HumanPlayer; Player <= RTSPlayers::MaxPlayers; ++Player)
 	{
-		if (WallGateConstants::GetIsUnitOfPlayerWithin(Tank, AllowedPlayer, Centre, RadiusSquared))
+		if (FRTSPlayers::IsPlayerInMask(Player, AlliedPlayersMask)
+			&& GetIsUnitOfPlayerInRange(static_cast<uint8>(Player), Centre, RadiusSquared))
 		{
 			return true;
 		}
 	}
-	const TArray<ASquadUnit*> SquadUnits = M_GameUnitManager->GetSquadUnitsOfPlayer(AllowedPlayer);
-	for (ASquadUnit* const SquadUnit : SquadUnits)
+	return false;
+}
+
+bool AWallGate::GetIsUnitOfPlayerInRange(const uint8 Player, const FVector& Centre, const double RadiusSquared) const
+{
+	for (ATankMaster* const Tank : M_GameUnitManager->GetTanksOfPlayerView(Player))
 	{
-		if (WallGateConstants::GetIsUnitOfPlayerWithin(SquadUnit, AllowedPlayer, Centre, RadiusSquared))
+		if (WallGateConstants::GetIsUnitOfPlayerWithin(Tank, Player, Centre, RadiusSquared))
+		{
+			return true;
+		}
+	}
+	for (ASquadUnit* const SquadUnit : M_GameUnitManager->GetSquadUnitsOfPlayerView(Player))
+	{
+		if (WallGateConstants::GetIsUnitOfPlayerWithin(SquadUnit, Player, Centre, RadiusSquared))
 		{
 			return true;
 		}
@@ -331,17 +428,19 @@ bool AWallGate::GetIsAnyUnitInDoorway() const
 	const FTransform LeafTransform = GateLeafMesh->GetComponentTransform();
 	const FVector LeafScale = LeafTransform.GetScale3D().GetAbs().ComponentMax(FVector(UE_KINDA_SMALL_NUMBER));
 	const FBox PaddedBox = LeafSpaceBox.ExpandBy(FVector(DoorwayClearancePadding) / LeafScale);
-	// The registry splits units into the human player and everyone else; both sides count here.
-	constexpr uint8 AnyAIPlayer = WallGateDefaults::EnemyAIPlayer;
-	const TArray<ATankMaster*> HumanTanks = M_GameUnitManager->GetPlayerTanks(WallGateConstants::HumanPlayerIndex);
-	const TArray<ATankMaster*> AITanks = M_GameUnitManager->GetPlayerTanks(AnyAIPlayer);
-	const TArray<ASquadUnit*> HumanSquadUnits = M_GameUnitManager->GetSquadUnitsOfPlayer(
-		WallGateConstants::HumanPlayerIndex);
-	const TArray<ASquadUnit*> AISquadUnits = M_GameUnitManager->GetSquadUnitsOfPlayer(AnyAIPlayer);
-	return WallGateConstants::GetIsAnyUnitInsideBox(HumanTanks, LeafTransform, PaddedBox)
-		|| WallGateConstants::GetIsAnyUnitInsideBox(AITanks, LeafTransform, PaddedBox)
-		|| WallGateConstants::GetIsAnyUnitInsideBox(HumanSquadUnits, LeafTransform, PaddedBox)
-		|| WallGateConstants::GetIsAnyUnitInsideBox(AISquadUnits, LeafTransform, PaddedBox);
+	// The registry keeps the units of each player apart; the units of every player count here.
+	for (int32 Player = RTSPlayers::HumanPlayer; Player <= RTSPlayers::MaxPlayers; ++Player)
+	{
+		const uint8 PlayerIndex = static_cast<uint8>(Player);
+		if (WallGateConstants::GetIsAnyUnitInsideBox<ATankMaster>(
+				M_GameUnitManager->GetTanksOfPlayerView(PlayerIndex), LeafTransform, PaddedBox)
+			|| WallGateConstants::GetIsAnyUnitInsideBox<ASquadUnit>(
+				M_GameUnitManager->GetSquadUnitsOfPlayerView(PlayerIndex), LeafTransform, PaddedBox))
+		{
+			return true;
+		}
+	}
+	return false;
 }
 
 void AWallGate::StartMoving(const EWallGateState NewState)
@@ -591,11 +690,12 @@ TSubclassOf<UNavArea> AWallGate::GetClosedNavAreaClass() const
 	{
 		return UNavArea_Null::StaticClass();
 	}
-	if (AllowedPlayer == WallGateConstants::HumanPlayerIndex)
+	const TSubclassOf<UNavArea> AllowedPlayerArea = RTSWallGateNavAreas::GetClosedGateAreaOfPlayer(AllowedPlayer);
+	if (not AllowedPlayerArea)
 	{
-		return UNavArea_WallGatePlayerSide::StaticClass();
+		return UNavArea_Null::StaticClass();
 	}
-	return UNavArea_WallGateEnemySide::StaticClass();
+	return AllowedPlayerArea;
 }
 
 bool AWallGate::GetAreRTSNavFiltersGateAware()

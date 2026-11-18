@@ -33,6 +33,11 @@ struct FWallTankBreachSettings
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category="Breach")
 	bool bHeavyTanksOnly = false;
 
+	// Every vehicle (light, medium and heavy, of every player) breaks this obstacle, whoever owns it (wire fences);
+	// infantry go round. Overrides bHeavyTanksOnly and the human-player-only rule; nav uses UNavArea_BreachableAnyVehicle.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category="Breach")
+	bool bAnyVehicleBreaks = false;
+
 	// A wall without an owner (no RTS component, the Berlin ruins) counts as not the human player's: his tanks break it.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category="Breach")
 	bool bBreachUnownedWall = false;
@@ -86,7 +91,10 @@ struct FWallTankBreachSettings
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category="Breach", meta=(ClampMin="0.0"))
 	float HealthDamageScale = 1.f;
 
-	// While the hull pushes through, the tank is held to this share of its travel speed (medium, heavy).
+	// While the hull pushes through, the tank is held to this share of its travel speed (light, medium, heavy).
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category="Breach", meta=(ClampMin="0.05", ClampMax="1.0"))
+	float LightTankPushSpeedShare = 0.4f;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category="Breach", meta=(ClampMin="0.05", ClampMax="1.0"))
 	float MediumTankPushSpeedShare = 0.4f;
 
@@ -244,7 +252,10 @@ private:
 	void OnWallEndOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp,
 	                      int32 OtherBodyIndex);
 
-	/** @return True for a medium or heavy tank of the human player against a wall of the AI side. */
+	/**
+	 * @return True for a medium or heavy tank of the human player against a wall of the AI side; with
+	 * bAnyVehicleBreaks for any vehicle of any side.
+	 */
 	bool GetIsBreachingTank(const AActor* Actor) const;
 	/** @return The wall's owning player; false when the wall has no RTS component. */
 	bool TryGetWallOwningPlayer(uint8& OutOwningPlayer) const;
