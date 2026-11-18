@@ -26,7 +26,10 @@
 #include "NiagaraSystem.h"
 #include "RTS_Survival/Behaviours/Derived/BehaviourVehicleStunned/BehVehicleStunned.h"
 #include "RTS_Survival/GameUI/Pooled_AnimatedVerticalText/Pooling/WorldSubSystem/AnimatedTextWorldSubsystem.h"
+#include "RTS_Survival/Game/Players/RTSPlayers.h"
 #include "RTS_Survival/Utils/AOE/FRTS_AOE.h"
+#include "RTS_Survival/Utils/CollisionSetup/RTSPlayerCollision.h"
+#include "RTS_Survival/Utils/RTSMapTests/DamageHooks/DamageMapTestHooks.h"
 #include "RTS_Survival/Utils/RTSRichTextConverters/FRTSRichTextConverter.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 #include "RTS_Survival/Weapons/WeaponData/FRTSWeaponHelpers/FRTSWeaponHelpers.h"
@@ -1883,14 +1886,8 @@ void AProjectile::ApplyAccelerationFactor(const float Factor, const bool bUseGra
 
 void AProjectile::SetupTraceChannel(const int NewOwningPlayer)
 {
-	if (NewOwningPlayer == 1)
-	{
-		M_TraceChannel = COLLISION_TRACE_ENEMY;
-	}
-	else
-	{
-		M_TraceChannel = COLLISION_TRACE_PLAYER;
-	}
+	// Only half of the filter: BuildProjectileTraceParams adds the ignore mask of the owner to every trace.
+	M_TraceChannel = FRTSPlayerCollision::GetWeaponTraceChannel(NewOwningPlayer);
 }
 
 
@@ -1967,6 +1964,7 @@ void AProjectile::OnHitActor(
 		const FDamageEvent& DamageEvent = ModuleDamageEvent != nullptr
 			                                  ? static_cast<const FDamageEvent&>(*ModuleDamageEvent)
 			                                  : static_cast<const FDamageEvent&>(M_DamageEvent);
+		RTS_MAPTEST_DAMAGE_ATTACKER_WEAPON_SCOPE(M_OwningPlayer, M_ProjectileOwner);
 		if (HitActor->TakeDamage(M_FullDamage * DamageMlt, DamageEvent, nullptr, this) == 0 && M_ProjectileOwner)
 		{
 			M_ProjectileOwner->OnProjectileKilledActor(HitActor);
@@ -1984,6 +1982,7 @@ void AProjectile::OnHitActor(
 
 void AProjectile::DamageActorWithShrapnel(AActor* HitActor)
 {
+	RTS_MAPTEST_DAMAGE_ATTACKER_WEAPON_SCOPE(M_OwningPlayer, M_ProjectileOwner);
 	HitActor->TakeDamage(M_ShrapnelDamage, M_DamageEvent, nullptr, this);
 }
 
@@ -2286,6 +2285,8 @@ FCollisionQueryParams AProjectile::BuildProjectileTraceParams() const
 	FCollisionQueryParams TraceParams(FName(TEXT("ProjectileTrace")), false, this);
 	TraceParams.bTraceComplex = false;
 	TraceParams.bReturnPhysicalMaterial = true;
+	// Read per trace: the shell flies through the units of its owner and of whoever is allied with it right now.
+	FRTSPlayerCollision::ApplyWeaponIgnoreMask(TraceParams, M_OwningPlayer);
 	TraceParams.AddIgnoredActors(M_ActorsToIgnore);
 	for (const TWeakObjectPtr<AActor>& IgnoredActor : M_BouncedActorsToIgnore)
 	{
@@ -2698,9 +2699,12 @@ void AProjectile::OnOverPenetratingArmorHit(AActor* HitActor, const FHitResult& 
 	const FDamageEvent& DamageEvent = ModuleDamageEvent != nullptr
 		                                  ? static_cast<const FDamageEvent&>(*ModuleDamageEvent)
 		                                  : static_cast<const FDamageEvent&>(M_DamageEvent);
-	if (HitActor->TakeDamage(M_FullDamage * DamageMlt, DamageEvent, nullptr, this) == 0 && M_ProjectileOwner)
 	{
-		M_ProjectileOwner->OnProjectileKilledActor(HitActor);
+		RTS_MAPTEST_DAMAGE_ATTACKER_WEAPON_SCOPE(M_OwningPlayer, M_ProjectileOwner);
+		if (HitActor->TakeDamage(M_FullDamage * DamageMlt, DamageEvent, nullptr, this) == 0 && M_ProjectileOwner)
+		{
+			M_ProjectileOwner->OnProjectileKilledActor(HitActor);
+		}
 	}
 	ApplyRadixiteDamageBehaviour(HitActor);
 	SpawnExplosionHandleAOE(HitResult.Location, HitRotation, HitSurface, HitActor);
@@ -2879,7 +2883,7 @@ void AProjectile::ArmorCalc_FireProjectile(UArmorCalculation* ArmorCalculation, 
 
 void AProjectile::ProjectileHitPropagateNotification(const bool bBounced)
 {
-	if (M_OwningPlayer != 1 || bM_AlreadyNotified)
+	if (not FRTSPlayers::IsHumanPlayer(M_OwningPlayer) || bM_AlreadyNotified)
 	{
 		// no proagation and hence voice lines if owning player is 1.
 		return;
@@ -3311,9 +3315,6 @@ void AProjectile::HandleAoe(const FVector& HitLocation, AActor* HitActor)
 	{
 		RTSFunctionLibrary::PrintString(HitLocation, this, "AOE FallOff = " + FString::SanitizeFloat(DamageFallOff));
 	}
-	ETriggerOverlapLogic OverlapLogic = M_OwningPlayer == 1
-		                                    ? ETriggerOverlapLogic::OverlapEnemy
-		                                    : ETriggerOverlapLogic::OverlapPlayer;
 	FRTS_AOE::DealDamageVsRearArmorInRadiusAsync(
 		this,
 		HitLocation,
@@ -3324,7 +3325,7 @@ void AProjectile::HandleAoe(const FVector& HitLocation, AActor* HitActor)
 		1,
 		MaxArmorDamaged,
 		ERTSDamageType::Kinetic,
-		OverlapLogic,
+		FAoeInstigator::HostilesOf(M_OwningPlayer),
 		EShieldDamageSource::Shrapnel,
 		ActorsToIgnore,
 		// Shell splash reaches external vehicle modules; the directly hit actor is ignored above.

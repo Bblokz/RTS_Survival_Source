@@ -9,6 +9,8 @@
 #include "RTS_Survival/RTSCollisionTraceChannels.h"
 #include "RTS_Survival/RTSComponents/ArmorCalculationComponent/ArmorCalculation.h"
 #include "RTS_Survival/Utils/AOE/FRTS_AOE.h"
+#include "RTS_Survival/Utils/CollisionSetup/RTSPlayerCollision.h"
+#include "RTS_Survival/Utils/RTSMapTests/DamageHooks/DamageMapTestHooks.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Weapons/ICBM/ICBMLaunchComponent/ICBMLaunchComponent.h"
 #include "RTS_Survival/Weapons/WeaponData/FRTSWeaponHelpers/FRTSWeaponHelpers.h"
@@ -293,10 +295,12 @@ void AICBMActor::PerformAsyncLineTrace()
 
 	FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(ICBMTrace), false, this);
 	QueryParams.bReturnPhysicalMaterial = true;
+	// The missile passes through the units of its owner and its allies.
+	FRTSPlayerCollision::ApplyWeaponIgnoreMask(QueryParams, M_OwningPlayer);
 	FTraceDelegate TraceDelegate;
 	TraceDelegate.BindUObject(this, &AICBMActor::OnAsyncTraceComplete);
 
-	const ECollisionChannel TraceChannel = M_OwningPlayer == 1 ? COLLISION_TRACE_ENEMY : COLLISION_TRACE_PLAYER;
+	const ECollisionChannel TraceChannel = FRTSPlayerCollision::GetWeaponTraceChannel(M_OwningPlayer);
 	World->AsyncLineTraceByChannel(
 		EAsyncTraceType::Single,
 		TraceStart,
@@ -408,6 +412,7 @@ void AICBMActor::ApplyDirectDamage(const FHitResult& HitResult, AActor* HitActor
 		DamageToApply,
 		HitResult,
 		GetActorForwardVector());
+	RTS_MAPTEST_DAMAGE_ATTACKER_SCOPE(M_OwningPlayer);
 	AdjustedHitActor->TakeDamage(DamageToApply, DamageEvent, nullptr, this);
 }
 
@@ -428,10 +433,6 @@ void AICBMActor::ApplyAOEDamage(const FVector& ImpactLocation, AActor* PrimaryHi
 		M_LaunchSettings.WeaponData.ShrapnelParticles,
 		AOEMaxParticlesScaleDamageFallOffExponent,
 		AOEMinParticlesScaleDamageFallOffExponent);
-	const ETriggerOverlapLogic OverlapLogic = M_OwningPlayer == 1
-		? ETriggerOverlapLogic::OverlapEnemy
-		: ETriggerOverlapLogic::OverlapPlayer;
-
 	FRTS_AOE::DealDamageVsRearArmorInRadiusAsync(
 		this,
 		ImpactLocation,
@@ -442,7 +443,7 @@ void AICBMActor::ApplyAOEDamage(const FVector& ImpactLocation, AActor* PrimaryHi
 		1,
 		MaxArmorDamaged,
 		M_LaunchSettings.WeaponData.DamageType,
-		OverlapLogic,
+		FAoeInstigator::HostilesOf(M_OwningPlayer),
 		EShieldDamageSource::AreaOfEffect,
 		ActorsToIgnore);
 }

@@ -13,7 +13,9 @@
 #include "RTS_Survival/Game/GameState/GameUnitManager/GameUnitManager.h"
 #include "RTS_Survival/Game/GameState/GameUnitManager/TargetPreference/TargetPreference.h"
 #include "RTS_Survival/GameUI/Healthbar/AmmoHealthBar/AmmoHpBarTrackerState/FAmmoHpBarTrackerState.h"
+#include "RTS_Survival/Game/Players/RTSPlayers.h"
 #include "RTS_Survival/MasterObjects/HealthBase/HpPawnMaster.h"
+#include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/RTSComponents/SelectionComponent.h"
 #include "RTS_Survival/RTSComponents/VehicleFireFeedbackComponent/VehicleFireFeedbackComponent.h"
 #include "RTS_Survival/Weapons/SmallArmsProjectileManager/SmallArmsProjectileManager.h"
@@ -154,6 +156,54 @@ void ACPPTurretsMaster::InitTurretOwner(AActor* NewTurretOwner)
 		TurretOwner.SetInterface(Cast<ITurretOwner>(NewTurretOwner));
 		TurretOwner.SetObject(NewTurretOwner);
 	}
+	BindToOwningPlayerChangesOf(NewTurretOwner);
+	// A turret whose player is already known and that is handed to another owner (an adopted team weapon) takes
+	// over the player of that owner; a new turret keeps resolving it on first use in GetOwningPlayer.
+	constexpr int32 UnresolvedOwningPlayer = -1;
+	if (M_OwningPlayer == UnresolvedOwningPlayer || TurretOwner.GetInterface() == nullptr)
+	{
+		return;
+	}
+	const int32 PlayerOfNewOwner = TurretOwner.GetInterface()->GetOwningPlayer();
+	if (FRTSPlayers::IsValidPlayer(PlayerOfNewOwner) && PlayerOfNewOwner != M_OwningPlayer)
+	{
+		ApplyOwningPlayerToWeapons(PlayerOfNewOwner);
+	}
+}
+
+void ACPPTurretsMaster::BindToOwningPlayerChangesOf(const AActor* NewTurretOwner)
+{
+	if (URTSComponent* PreviousRTSComponent = M_OwnerRTSComponentListenedTo.Get())
+	{
+		PreviousRTSComponent->OnOwningPlayerChanged.RemoveAll(this);
+	}
+	M_OwnerRTSComponentListenedTo.Reset();
+	URTSComponent* OwnerRTSComponent = IsValid(NewTurretOwner)
+		                                   ? NewTurretOwner->FindComponentByClass<URTSComponent>()
+		                                   : nullptr;
+	if (not IsValid(OwnerRTSComponent))
+	{
+		return;
+	}
+	OwnerRTSComponent->OnOwningPlayerChanged.AddUObject(this, &ACPPTurretsMaster::OnTurretOwnerChangedPlayer);
+	M_OwnerRTSComponentListenedTo = OwnerRTSComponent;
+}
+
+void ACPPTurretsMaster::OnTurretOwnerChangedPlayer(const uint8 /*OldOwningPlayer*/, const uint8 NewOwningPlayer)
+{
+	ApplyOwningPlayerToWeapons(NewOwningPlayer);
+}
+
+void ACPPTurretsMaster::ApplyOwningPlayerToWeapons(const int32 NewOwningPlayer)
+{
+	SetOwningPlayer(NewOwningPlayer);
+	for (UWeaponState* Weapon : M_TWeapons)
+	{
+		if (IsValid(Weapon) && Weapon->GetOwningPlayer() != NewOwningPlayer)
+		{
+			Weapon->ChangeOwningPlayer(NewOwningPlayer);
+		}
+	}
 }
 
 bool ACPPTurretsMaster::EnsureWorldIsValid()
@@ -168,7 +218,9 @@ bool ACPPTurretsMaster::EnsureWorldIsValid()
 
 void ACPPTurretsMaster::SetOwningPlayer(const int32 NewOwningPlayer)
 {
-	M_OwningPlayer = NewOwningPlayer;
+	// Weapon setup passes the owner of its init struct, which Blueprints may leave at 0: the turret then fights for
+	// the player of the unit it is mounted on.
+	M_OwningPlayer = FRTSWeaponHelpers::ResolveWeaponOwningPlayer(NewOwningPlayer, this);
 	TargetingData.InitTargetStruct(M_OwningPlayer);
 }
 
@@ -1730,8 +1782,9 @@ void ACPPTurretsMaster::SetTarget(AActor* NewTarget)
 			TargetType = Global_GetTargetPreferenceAsString(TestHpPawn->GetTargetPreference());
 		}
 
-		const FColor DebugColor = GetOwningPlayer() == 1 ? FColor::Green : FColor::Red;
-		const FString DebugString = GetOwningPlayer() == 1 ? "Targeted by P1" : "Targeted By Enemy";
+		const bool bIsHumanTurret = FRTSPlayers::IsHumanPlayer(GetOwningPlayer());
+		const FColor DebugColor = bIsHumanTurret ? FColor::Green : FColor::Red;
+		const FString DebugString = bIsHumanTurret ? "Targeted by P1" : "Targeted By Enemy";
 		const FVector DebugLocation = NewTarget->GetActorLocation() + FVector(0, 0, 300);
 
 		DrawDebugString(GetWorld(), DebugLocation, TargetType + DebugString, nullptr, DebugColor, 2.0f, false);

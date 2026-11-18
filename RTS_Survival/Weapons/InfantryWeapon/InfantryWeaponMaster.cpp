@@ -7,6 +7,7 @@
 #include "RTS_Survival/Game/GameState/CPPGameState.h"
 #include "RTS_Survival/Game/GameState/GameUnitManager/GameUnitManager.h"
 #include "RTS_Survival/Game/GameState/GameUnitManager/TargetPreference/TargetPreference.h"
+#include "RTS_Survival/Game/Players/RTSPlayers.h"
 #include "RTS_Survival/Player/CPPController.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/Units/Squads/SquadUnit/SquadUnit.h"
@@ -42,8 +43,17 @@ AInfantryWeaponMaster::AInfantryWeaponMaster()
 
 void AInfantryWeaponMaster::SetOwningPlayer(const int32 PlayerIndex)
 {
-	M_OwningPlayer = PlayerIndex;
+	// Weapon setup passes the owner of its init struct, which Blueprints may leave at 0: the weapon then fights for
+	// the player of the soldier that carries it.
+	const AActor* WeaponHolder = IsValid(M_OwningSquadUnit) ? static_cast<const AActor*>(M_OwningSquadUnit) : this;
+	M_OwningPlayer = FRTSWeaponHelpers::ResolveWeaponOwningPlayer(PlayerIndex, WeaponHolder);
 	M_TargetingData.InitTargetStruct(M_OwningPlayer);
+	// The weapon state fires for the same player; an owner that still is no real player is not handed on.
+	const bool bHasStateOfOtherPlayer = IsValid(WeaponState) && WeaponState->GetOwningPlayer() != M_OwningPlayer;
+	if (bHasStateOfOtherPlayer && FRTSPlayers::IsValidPlayer(M_OwningPlayer))
+	{
+		WeaponState->ChangeOwningPlayer(M_OwningPlayer);
+	}
 }
 
 void AInfantryWeaponMaster::SetAutoEngageTargets(const bool bUseLastTarget)
