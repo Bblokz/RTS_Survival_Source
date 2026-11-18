@@ -2,6 +2,9 @@
 
 #include "UWeaponStateMultiProjectile.h"
 
+#include "RTS_Survival/Audio/AircraftGuns/AircraftGunAudioPlayer.h"
+#include "RTS_Survival/Physics/RTSSurfaceSubtypes.h"
+
 #include "NiagaraFunctionLibrary.h"
 #include "Kismet/GameplayStatics.h"
 #include "RTS_Survival/Weapons/WeaponData/FRTSWeaponHelpers/FRTSWeaponHelpers.h"
@@ -168,8 +171,35 @@ FName UWeaponStateMultiProjectile::ResolveSocketOrFallback(const FName& Requeste
 	return NAME_None;
 }
 
+void UWeaponStateMultiProjectile::SetAircraftGunAudio(UAircraftGunAudioPlayer* GunAudio)
+{
+	M_AircraftGunAudio = GunAudio;
+	if (GunAudio == nullptr)
+	{
+		return;
+	}
+	USoundCue* const GroundImpact = GunAudio->GetGroundImpactPerProjectile();
+	if (GroundImpact == nullptr)
+	{
+		return;
+	}
+	// Projectiles copy the weapon's impact table when fired, so this reaches every round from now on.
+	for (const ERTSSurfaceType GroundSurface : {ERTSSurfaceType::Sand, ERTSSurfaceType::Stone})
+	{
+		if (FRTSSurfaceImpactData* const ImpactData = M_WeaponVfx.SurfaceImpactEffects.Find(GroundSurface))
+		{
+			ImpactData->ImpactSound = GroundImpact;
+		}
+	}
+}
+
 void UWeaponStateMultiProjectile::PlayLaunchSoundOnce()
 {
+	if (IsValid(M_AircraftGunAudio))
+	{
+		M_AircraftGunAudio->OnVolleyFired();
+		return;
+	}
 	if (!M_WeaponVfx.LaunchSound || not ConsumeLaunchSoundForShot())
 	{
 		return;

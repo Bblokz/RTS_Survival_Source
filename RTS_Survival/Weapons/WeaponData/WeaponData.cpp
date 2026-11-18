@@ -6,6 +6,9 @@
 #include "RTS_Survival/Environment/ImpactDecals/LandscapeImpactDecalSubsystem.h"
 #include "RTS_Survival/RTSCollisionTraceChannels.h"
 #include "RTS_Survival/Player/CPPController.h"
+#include "RTS_Survival/Utils/CollisionSetup/RTSPlayerCollision.h"
+#include "RTS_Survival/Game/Players/RTSPlayers.h"
+#include "RTS_Survival/Utils/RTSMapTests/DamageHooks/DamageMapTestHooks.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Weapons/CPPWeaponsMaster.h"
 #include "RTS_Survival/Weapons/Projectile/Projectile.h"
@@ -37,6 +40,23 @@
 #include "RTS_Survival/Subsystems/CameraShakeSubsystem/RTSCameraShakeSubsystem.h"
 #include "RTS_Survival/Weapons/SmallArmsProjectileManager/MuzzleVfx/SmallArmsMuzzleRoundAudit.h"
 #include "RTS_Survival/Weapons/AircraftWeapon/AircraftStrafeGun/AircraftStrafeShotRecorder.h"
+
+namespace WeaponStateOwnerResolution
+{
+	/**
+	 * @brief A Blueprint that leaves the owner pin at 0 means the player of the unit the weapon sits on; only when that
+	 * unit has no owner either does 0 fall back to the human player, as it always did.
+	 * @param NewOwningPlayer Owner the weapon setup or owner change was called with.
+	 * @param WeaponMesh Mesh the weapon fires from; its actor is the unit or a child actor of it.
+	 * @return The player the weapon state fires for; never the neutral owner.
+	 */
+	int32 ResolveWeaponStateOwner(const int32 NewOwningPlayer, const UMeshComponent* WeaponMesh)
+	{
+		const AActor* WeaponHolder = IsValid(WeaponMesh) ? WeaponMesh->GetOwner() : nullptr;
+		const int32 ResolvedOwner = FRTSWeaponHelpers::ResolveWeaponOwningPlayer(NewOwningPlayer, WeaponHolder);
+		return FRTSPlayers::IsNeutralOwner(ResolvedOwner) ? RTSPlayers::HumanPlayer : ResolvedOwner;
+	}
+}
 
 namespace WeaponDataSmallArmsMuzzleAudit
 {
@@ -904,6 +924,8 @@ void UWeaponState::RegisterActorToIgnoreForReason(
 
 void UWeaponState::AppendIgnoredActorsToQuery(FCollisionQueryParams& QueryParams) const
 {
+	// Every trace of this weapon passes here: without the mask a shot hits the units of its own player and allies.
+	FRTSPlayerCollision::ApplyWeaponIgnoreMask(QueryParams, OwningPlayer);
 	for (const FWeaponIgnoredActorEntry& Entry : M_IgnoredActorEntries)
 	{
 		AActor* IgnoredActor = Entry.Actor.Get();
@@ -1217,15 +1239,9 @@ bool UWeaponState::ChangeWeaponShellType(const EWeaponShellType NewShellType)
 
 void UWeaponState::ChangeOwningPlayer(const int32 NewOwningPlayer)
 {
-	OwningPlayer = NewOwningPlayer;
-	if (OwningPlayer == 1)
-	{
-		TraceChannel = COLLISION_TRACE_ENEMY;
-	}
-	else
-	{
-		TraceChannel = COLLISION_TRACE_PLAYER;
-	}
+	// Same rule as at init: a weapon never fires for the neutral owner, whose queries would ignore nobody.
+	OwningPlayer = WeaponStateOwnerResolution::ResolveWeaponStateOwner(NewOwningPlayer, MeshComponent);
+	TraceChannel = FRTSPlayerCollision::GetWeaponTraceChannel(OwningPlayer);
 }
 
 void UWeaponState::OverwriteCachedWeaponData(const FWeaponData& NewWeaponData)
@@ -1275,9 +1291,8 @@ void UWeaponState::InitWeaponState(
 	const int32 NewMinBurstAmount,
 	const bool bNewCreateShellCasingOnEveryRandomBurst, const bool bIsLaserOrFlame)
 {
-	const int32 NormalizedOwner = (NewOwningPlayer == 0) ? 1 : NewOwningPlayer;
-	OwningPlayer = NormalizedOwner;
-	TraceChannel = (OwningPlayer == 1) ? COLLISION_TRACE_ENEMY : COLLISION_TRACE_PLAYER;
+	OwningPlayer = WeaponStateOwnerResolution::ResolveWeaponStateOwner(NewOwningPlayer, NewMeshComponent);
+	TraceChannel = FRTSPlayerCollision::GetWeaponTraceChannel(OwningPlayer);
 
 	WeaponIndex = NewWeaponIndex;
 	M_WeaponName = NewWeaponName;
@@ -1630,6 +1645,7 @@ bool UWeaponState::FluxDamageHitActor_DidActorDie(
 
 	DamageEvent.DamageTypeClass = DamageTypeClass;
 
+	RTS_MAPTEST_DAMAGE_ATTACKER_WEAPON_SCOPE(OwningPlayer, this);
 	const float Result = HitActor->TakeDamage(Dmg, DamageEvent, /*Instigator=*/nullptr, /*Causer=*/nullptr);
 	return Result == 0.f;
 }

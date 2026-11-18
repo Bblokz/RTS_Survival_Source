@@ -55,6 +55,14 @@ public:
 
 	inline int32 GetProjectileCount() const { return M_FireSocketNames.Num(); }
 
+	/**
+	 * @brief Aircraft cannons: the gun audio's fire loop replaces the per-volley launch sound, and its per-projectile
+	 * ground impact (when set) replaces the weapon's sand and stone impact sound.
+	 * @param GunAudio Made by UAircraftWeapon; null keeps the Blueprint sounds.
+	 */
+	void SetAircraftGunAudio(class UAircraftGunAudioPlayer* GunAudio);
+	class UAircraftGunAudioPlayer* GetAircraftGunAudio() const { return M_AircraftGunAudio; }
+
 protected:
 	/** Spawns one projectile per configured socket. */
 	virtual void FireWeaponSystem() override;
@@ -71,6 +79,9 @@ private:
 	/** The sockets we will fire from. */
 	UPROPERTY()
 	TArray<FName> M_FireSocketNames;
+
+	UPROPERTY()
+	TObjectPtr<class UAircraftGunAudioPlayer> M_AircraftGunAudio;
 
 	/** Whether we've already logged a sockets warning once. */
 	UPROPERTY()

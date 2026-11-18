@@ -742,7 +742,13 @@ public:
 	 */
 	bool ChangeWeaponShellType(const EWeaponShellType NewShellType);
 
+	/**
+	 * @brief Hands the weapon to another player: from the next shot on it traces on that player's channel and skips
+	 * that player's units and allies. Weapon owners call it when their unit changes owner at runtime.
+	 */
 	void ChangeOwningPlayer(const int32 NewOwningPlayer);
+
+	int32 GetOwningPlayer() const { return OwningPlayer; }
 
 	/**
 	 * @brief Overwrites the cached weapon data directly, bypassing lookup by enum/game state.
@@ -799,7 +805,8 @@ protected:
 	// call this once in InitWeaponState and whenever WeaponData.DamageType changes
 	void RefreshDamageTypeClass();
 
-	// Determines the collision channel used for weapon traces.
+	// Determines the collision channel used for weapon traces; always from FRTSPlayerCollision for the owning player
+	// and only complete together with the ignore mask AppendIgnoredActorsToQuery sets.
 	ECollisionChannel TraceChannel;
 
 	// The weapon component either static mesh or skeletal mesh.
@@ -912,6 +919,11 @@ protected:
 	// Weak references prevent cargo or cover providers from being kept alive by a weapon.
 	TArray<FWeaponIgnoredActorEntry> M_IgnoredActorEntries;
 
+	/**
+	 * @brief Every trace of the weapon calls this on its params: it adds the ignored actors and the ignore mask of
+	 * the owning player, without which a shot hits the units of its own player and allies.
+	 * @param QueryParams Params of a trace by channel; an object-type query does not read the mask.
+	 */
 	void AppendIgnoredActorsToQuery(FCollisionQueryParams& QueryParams) const;
 	TArray<AActor*> BuildValidIgnoredActorArray() const;
 
