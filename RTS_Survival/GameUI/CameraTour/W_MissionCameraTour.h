@@ -13,6 +13,7 @@ class UCanvasPanelSlot;
 class UPanelWidget;
 class USizeBox;
 class UTextBlock;
+class UW_Portrait;
 
 /**
  * @brief Overlay of a mission camera tour: cinema bars and one caption per shot (title between two brass rules, a
@@ -45,6 +46,20 @@ public:
 
 	/** @param CaptionShown 0..1 fade of the caption (the session eases it in and out per shot). */
 	void SetCaptionVisibility(const float CaptionShown) const;
+
+	/**
+	 * @brief Adds a copy of the HUD portrait above the bars, so a voice line during the tour shows its speaker and
+	 * words while the HUD is hidden. The portrait manager then shows its portraits on the copy.
+	 * @param PortraitClass Class of the HUD portrait (W_BP_Portrait: its brushes and shaders are BP defaults).
+	 * @param ViewportPosition Top-left of the HUD portrait in viewport units (DPI scaled); ignored when bFillScreen.
+	 * @param ViewportSize Size of the HUD portrait in viewport units; ignored when bFillScreen.
+	 * @param bFillScreen Stretch the copy over the whole screen (when the HUD portrait's place is unknown).
+	 * @return The hidden copy, or nullptr when it could not be created.
+	 */
+	UW_Portrait* AddPortraitCopy(TSubclassOf<UW_Portrait> PortraitClass, const FVector2D& ViewportPosition,
+	                             const FVector2D& ViewportSize, const bool bFillScreen);
+
+	UW_Portrait* GetPortraitCopy() const { return M_PortraitCopy; }
 
 	void CloseTour();
 
@@ -94,6 +109,9 @@ private:
 
 	UPROPERTY()
 	TObjectPtr<UTextBlock> M_SubtitleText;
+
+	UPROPERTY()
+	TObjectPtr<UW_Portrait> M_PortraitCopy;
 
 	bool bM_ShowLetterbox = true;
 	float M_LetterboxHeightFraction = 0.1f;

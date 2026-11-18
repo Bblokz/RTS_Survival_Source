@@ -37,6 +37,9 @@ public:
 
 	void StopLine();
 
+	/** The words of the current sentence that are on screen now (empty between sentences and lines). */
+	const FString& GetShownText() const { return M_ShownText; }
+
 protected:
 	virtual void NativeOnInitialized() override;
 	virtual void NativeDestruct() override;
