@@ -189,6 +189,9 @@ private:
 	void ThinkStep();
 	// Read every think step so a mission can switch building on and off at runtime.
 	bool GetIsBuildingAllowed() const;
+	// The AI player of the owning controller: trenches start at its pits and are dug as its trenches. The first
+	// AI player without an enemy controller as owner.
+	int32 GetControlledPlayer() const;
 	void UpdateBasesFromStrategicAI();
 	/** @return Index of the base nearest the location within the grouping radius; INDEX_NONE when none is. */
 	int32 FindBaseNear(const FVector& Location, const float Radius) const;

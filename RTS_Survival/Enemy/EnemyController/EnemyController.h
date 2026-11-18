@@ -11,6 +11,7 @@
 #include "RTS_Survival/Enemy/EnemyController/EnemyDirectControlComponent/EnemyDirectControlComponent.h"
 #include "RTS_Survival/Enemy/StrategicAI/StochasticDecisionTree/StochasticDecisionTree.h"
 #include "RTS_Survival/Enemy/TrainingAndUnitCreation/EnemyAITechLevel/EnemyAITechLevel.h"
+#include "RTS_Survival/Game/Players/RTSPlayers.h"
 #include "RTS_Survival/GlobalAbilitySystem/GlobalAbilitiesManager/GlobalAbilitiesManager.h"
 #include "EnemyController.generated.h"
 
@@ -37,6 +38,8 @@ class URTSGameInstance;
 
 /**
  * @brief Coordinates enemy formations and wave orchestration for AI-controlled assaults.
+ * Place one per AI player in a map and set ControlledPlayer: everything the controller spawns, counts and orders
+ * belongs to that player. Find it with FRTS_Statics::GetEnemyControllerForPlayer.
  */
 UCLASS()
 class RTS_SURVIVAL_API AEnemyController : public AActorObjectsMaster
@@ -46,6 +49,28 @@ class RTS_SURVIVAL_API AEnemyController : public AActorObjectsMaster
 public:
 	// Sets default values for this actor's properties
 	AEnemyController(const FObjectInitializer& ObjectInitializer);
+
+	/** @return The AI player this controller plays (FirstAIPlayer..MaxPlayers). */
+	UFUNCTION(BlueprintPure, Category = "Enemy Controller")
+	int32 GetControlledPlayer() const;
+
+	/**
+	 * @brief Owner to hand to the async spawner for a unit this controller creates.
+	 * @return INDEX_NONE for the first AI player, whose units keep the owner of their Blueprint as they always did;
+	 * the controlled player for every other AI player.
+	 */
+	int32 GetSpawnOwnerOverride() const;
+
+	/**
+	 * @brief Whether this controller may take a unit under its command.
+	 * @param Unit Squad controller, tank or other unit actor.
+	 * @return False only for a unit of another AI player, which has a controller of its own. Human, neutral and
+	 * unset owners are accepted, as they were when there was one controller.
+	 */
+	bool GetCanControlUnit(const AActor* Unit) const;
+
+	/** Logs a unit this controller spawned that came up for another player (a Blueprint with a different owner). */
+	void LogSpawnedUnitOwnerMismatch(const AActor* SpawnedUnit) const;
 
 	UStochasticDecisionTree* GetStrategicDecisionTree();
 
@@ -439,6 +464,11 @@ protected:
 
 	virtual void PostInitializeComponents() override;
 
+	// The AI player this controller plays: 2, 3 or 4. A map holds at most one controller per player; a second one
+	// for the same player is reported and ignored.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Enemy Controller", meta = (ClampMin = "2", ClampMax = "4"))
+	int32 ControlledPlayer = RTSPlayers::FirstAIPlayer;
+
 	UPROPERTY(EditAnywhere, Instanced, BlueprintReadOnly, Category="Strategic AI|Brain",
 		meta=(AllowPrivateAccess="true"))
 	TObjectPtr<UStochasticDecisionTree> M_StochasticDecisionTree = nullptr;
@@ -469,6 +499,8 @@ private:
 	void BeginPlay_InitStochasticDecisionTree();
 	void BeginPlay_MoveAISettingsToStrategicAIBlackboard() const;
 	void BeginPlay_InitEnemyGlobalAbilities();
+	// Runs before the controller registers: a ControlledPlayer that is no AI player is reported and set to the first.
+	void PostInitializeComponents_ValidateControlledPlayer();
 
 	UPROPERTY()
 	TObjectPtr<UEnemyFormationController> M_FormationController;

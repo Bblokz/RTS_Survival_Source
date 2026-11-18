@@ -69,7 +69,9 @@ enum class EConvoyOutcome : uint8
 	// Every truck was destroyed.
 	TrucksDestroyed,
 	// Stopped from code (EndConvoy) or the world ended.
-	Aborted
+	Aborted,
+	// No truck reached the exit: every truck was destroyed or captured, and at least one was captured.
+	TrucksStopped
 };
 
 /** What the trucks do while their escort fights. */
@@ -131,7 +133,9 @@ enum class EConvoyEventType : uint8
 	ReachedExit,
 	Despawned,
 	RestrictionCleared,
-	Finished
+	Finished,
+	// A truck surrendered: it left the convoy alive and belongs to its captor (neither destroyed nor escaped).
+	TruckCaptured
 };
 
 /** One truck class in a convoy definition. */

@@ -16,8 +16,10 @@
 #include "RTS_Survival/Enemy/EnemyWaves/EnemyWaveController.h"
 #include "RTS_Survival/Game/RTSGameInstance/RTSGameInstance.h"
 #include "RTS_Survival/Player/AsyncRTSAssetsSpawner/RTSAsyncSpawner.h"
+#include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 #include "RTS_Survival/Utils/RTS_Statics/SubSystems/EnemyControllerSubsystem/EnemyControllerSubsystem.h"
+#include "RTS_Survival/Utils/UnitSpawning/RTSUnitOwnerSpawning.h"
 
 namespace EnemyControllerFieldConstruction
 {
@@ -55,6 +57,10 @@ namespace EnemyControllerFieldConstruction
 				return;
 			}
 
+			if (EnemyController.IsValid())
+			{
+				EnemyController->LogSpawnedUnitOwnerMismatch(SquadController);
+			}
 			SpawnedSquadControllers.Add(SquadController);
 		}
 
@@ -134,6 +140,39 @@ AEnemyController::AEnemyController(const FObjectInitializer& ObjectInitializer)
 	{
 		M_EnemyRetreatController->InitRetreatController(this);
 	}
+}
+
+int32 AEnemyController::GetControlledPlayer() const
+{
+	return ControlledPlayer;
+}
+
+int32 AEnemyController::GetSpawnOwnerOverride() const
+{
+	return FRTSUnitOwnerSpawning::GetOwnerOverrideForAIPlayer(ControlledPlayer);
+}
+
+bool AEnemyController::GetCanControlUnit(const AActor* Unit) const
+{
+	const int32 UnitOwner = FRTSPlayers::GetOwningPlayerOfActor(Unit);
+	const bool bIsUnitOfOtherAIPlayer = FRTSPlayers::IsValidAIPlayer(UnitOwner) && UnitOwner != ControlledPlayer;
+	return not bIsUnitOfOtherAIPlayer;
+}
+
+void AEnemyController::LogSpawnedUnitOwnerMismatch(const AActor* SpawnedUnit) const
+{
+	if (not IsValid(SpawnedUnit))
+	{
+		return;
+	}
+	const URTSComponent* RTSComponent = SpawnedUnit->FindComponentByClass<URTSComponent>();
+	if (not IsValid(RTSComponent) || RTSComponent->GetOwningPlayer() == ControlledPlayer)
+	{
+		return;
+	}
+	// Not an error: the first AI player's units keep the owner of their Blueprint, as convoys also only log.
+	UE_LOG(LogTemp, Warning, TEXT("Enemy controller of player %d spawned %s, which is owned by player %d."),
+	       ControlledPlayer, *SpawnedUnit->GetName(), RTSComponent->GetOwningPlayer());
 }
 
 UStochasticDecisionTree* AEnemyController::GetStrategicDecisionTree()
@@ -489,7 +528,7 @@ void AEnemyController::CreateFieldConstructionOrderFromWaveElements(
 			SpawnRequest.SpawnLocation,
 			WeakEnemyController,
 			CurrentSpawnRequestId,
-			OnSpawned, FRotator::ZeroRotator))
+			OnSpawned, FRotator::ZeroRotator, GetSpawnOwnerOverride()))
 		{
 			SpawnContext->RegisterSpawnFailure();
 			SpawnContext->NotifySpawnComplete();
@@ -815,6 +854,14 @@ void AEnemyController::AddTrainingComponentToAIBlackboard(UTrainerComponent* Ene
 		RTSFunctionLibrary::ReportError("Provided trainer component for blackboard is not set up as enemy trainer!");
 		return;
 	}
+	if (not GetCanControlUnit(EnemyTrainer->GetOwner()))
+	{
+		// The blackboard's trainers are where this controller spawns the units it trains.
+		RTSFunctionLibrary::ReportError(
+			"Enemy trainer " + EnemyTrainer->GetName() + " belongs to another AI player than player " +
+			FString::FromInt(ControlledPlayer) + "; it is not added to this controller's blackboard.");
+		return;
+	}
 	UEnemyStrategicAIComponent* const StrategicAIComponent = GetEnemyStrategicAIComponent();
 	if (not IsValid(StrategicAIComponent))
 	{
@@ -864,7 +911,7 @@ void AEnemyController::BeginPlay_InitEnemyGlobalAbilities()
 	FVector StartPositionForAbilities = OverrideEnemyStartPosition.IsNearlyZero() ?  GetActorLocation() : OverrideEnemyStartPosition;
 	UGameUnitManager* GameUnitManager = FRTS_Statics::GetGameUnitManager(this);
 	M_EnemyGlobalAbilitiesManager->InitGlobalAbilitiesManager(
-		2,
+		ControlledPlayer,
 		AbilityTypes,
 		nullptr,
 		nullptr,
@@ -880,9 +927,23 @@ void AEnemyController::BeginPlay_InitEnemyGlobalAbilities()
 	}
 }
 
+void AEnemyController::PostInitializeComponents_ValidateControlledPlayer()
+{
+	if (FRTSPlayers::IsValidAIPlayer(ControlledPlayer))
+	{
+		return;
+	}
+	RTSFunctionLibrary::ReportError(
+		"Enemy controller " + GetName() + " has ControlledPlayer " + FString::FromInt(ControlledPlayer) +
+		", which is no AI player (2-4). It plays player " + FString::FromInt(RTSPlayers::FirstAIPlayer) +
+		" instead.");
+	ControlledPlayer = RTSPlayers::FirstAIPlayer;
+}
+
 void AEnemyController::PostInitializeComponents()
 {
 	Super::PostInitializeComponents();
+	PostInitializeComponents_ValidateControlledPlayer();
 
 	// Register this controller with the world subsystem
 	UWorld* World = GetWorld();
