@@ -4,6 +4,7 @@
 #include "GlobalAbilitiesManager.h"
 
 #include "RTS_Survival/Game/GameState/GameUnitManager/GameUnitManager.h"
+#include "RTS_Survival/Game/Players/RTSPlayers.h"
 #include "RTS_Survival/Buildings/BuildingExpansion/BuildingExpansionEnums.h"
 #include "RTS_Survival/GlobalAbilitySystem/GlobalAbilities/GlobalAbility.h"
 #include "RTS_Survival/GlobalAbilitySystem/DevSettings/RTSGlobalAbilitySettings.h"
@@ -1151,40 +1152,47 @@ bool UGlobalAbilitiesManager::CheckDoesEnemyHaveUnit(const FTrainingOption& Unit
 	case EAllUnitType::UNType_Aircraft:
 		return CheckDoesEnemyHaveAircraft(UnitId);
 	case EAllUnitType::UNType_StandaloneTurret:
-		{
-			constexpr int32 EnemyPlayerIndex = 2;
-			return IsValid(M_GameUnitManager.Get()->FindUnitForPlayer(UnitId, EnemyPlayerIndex));
-		}
+		return IsValid(M_GameUnitManager.Get()->FindUnitForPlayer(UnitId, GetEnemyUnitRequirementPlayer()));
 	}
 	return true;
+}
+
+uint8 UGlobalAbilitiesManager::GetEnemyUnitRequirementPlayer() const
+{
+	// Each AI player's manager unlocks its abilities with that player's own units.
+	const int32 RequirementPlayer = FRTSPlayers::IsValidAIPlayer(M_OwningPlayer)
+		                                ? M_OwningPlayer
+		                                : RTSPlayers::FirstAIPlayer;
+	return static_cast<uint8>(RequirementPlayer);
 }
 
 bool UGlobalAbilitiesManager::CheckDoesEnemyHaveSquad(const FTrainingOption& UnitId) const
 {
 	const ESquadSubtype SquadSubtype = static_cast<ESquadSubtype>(UnitId.SubtypeValue);
-	return M_GameUnitManager.Get()->GetHasEnemySquadOfType(SquadSubtype);
+	return M_GameUnitManager.Get()->GetHasSquadOfTypeForPlayer(GetEnemyUnitRequirementPlayer(), SquadSubtype);
 }
 
 bool UGlobalAbilitiesManager::CheckDoesEnemyHaveTank(const FTrainingOption& UnitId) const
 {
 	const ETankSubtype TankSubtype = static_cast<ETankSubtype>(UnitId.SubtypeValue);
-	return M_GameUnitManager.Get()->GetHasEnemyTankOfType(TankSubtype);
+	return M_GameUnitManager.Get()->GetHasTankOfTypeForPlayer(GetEnemyUnitRequirementPlayer(), TankSubtype);
 }
 
 bool UGlobalAbilitiesManager::CheckDoesEnemyHaveNomadic(const FTrainingOption& UnitId) const
 {
 	const ENomadicSubtype NomadicSubtype = static_cast<ENomadicSubtype>(UnitId.SubtypeValue);
-	return M_GameUnitManager.Get()->GetHasEnemyNomadicOfType(NomadicSubtype);
+	return M_GameUnitManager.Get()->GetHasNomadicOfTypeForPlayer(GetEnemyUnitRequirementPlayer(), NomadicSubtype);
 }
 
 bool UGlobalAbilitiesManager::CheckDoesEnemyHaveBuildingExpansion(const FTrainingOption& UnitId) const
 {
 	const EBuildingExpansionType BuildingExpansionSubtype = static_cast<EBuildingExpansionType>(UnitId.SubtypeValue);
-	return M_GameUnitManager.Get()->GetHasEnemyBxpOfType(BuildingExpansionSubtype);
+	return M_GameUnitManager.Get()->GetHasBxpOfTypeForPlayer(
+		GetEnemyUnitRequirementPlayer(), BuildingExpansionSubtype);
 }
 
 bool UGlobalAbilitiesManager::CheckDoesEnemyHaveAircraft(const FTrainingOption& UnitId) const
 {
 	const EAircraftSubtype AircraftSubtype = static_cast<EAircraftSubtype>(UnitId.SubtypeValue);
-	return M_GameUnitManager.Get()->GetHasEnemyAircraftOfType(AircraftSubtype);
+	return M_GameUnitManager.Get()->GetHasAircraftOfTypeForPlayer(GetEnemyUnitRequirementPlayer(), AircraftSubtype);
 }

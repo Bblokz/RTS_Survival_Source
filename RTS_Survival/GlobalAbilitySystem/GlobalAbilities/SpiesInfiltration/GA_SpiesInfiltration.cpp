@@ -4,6 +4,7 @@
 
 #include "RTS_Survival/DeveloperSettings.h"
 #include "RTS_Survival/Game/GameState/GameUnitManager/GameUnitManager.h"
+#include "RTS_Survival/Game/Players/RTSPlayers.h"
 #include "RTS_Survival/GlobalAbilitySystem/GlobalAbilities/ReconFlight/GlobalAbilityVisionBubble.h"
 #include "RTS_Survival/Units/Squads/SquadUnit/SquadUnit.h"
 #include "RTS_Survival/Units/Tanks/TankMaster.h"
@@ -18,6 +19,26 @@ namespace SpiesInfiltrationPrivate
 		{
 			Actors.Swap(Index, FMath::RandRange(0, Index));
 		}
+	}
+
+	/**
+	 * @return Players whose hidden units the spies of this owner look for: every player the human fights; for an
+	 * AI player only the human, if it fights the human, as the fog never hides AI players from each other.
+	 */
+	uint8 GetPlayersToSpyOn(const int32 OwningPlayer)
+	{
+		const uint8 HostileMask = FRTSPlayers::GetHostileMask(OwningPlayer);
+		return FRTSPlayers::IsHumanPlayer(OwningPlayer)
+			       ? HostileMask
+			       : static_cast<uint8>(HostileMask & RTSPlayers::HumanPlayerBit);
+	}
+
+	// The fog hides AI units from the human; human units carry a tag while the AI players see them.
+	bool GetIsHiddenFromOwner(const AActor& Unit, const bool bOwnedByHuman)
+	{
+		return bOwnedByHuman
+			       ? Unit.IsHidden()
+			       : not Unit.Tags.Contains(DeveloperSettings::GamePlay::FoW::TagUnitInEnemyVision);
 	}
 }
 
@@ -47,28 +68,23 @@ TArray<AActor*> UGA_SpiesInfiltration::GetHiddenOpponentUnits() const
 	{
 		return HiddenUnits;
 	}
-	const bool bOwnedByPlayer = GetOwningPlayer() == 1;
-	const uint8 Opponent = bOwnedByPlayer ? 2 : 1;
-	// The fog hides enemy units from the player; player units carry a tag while the enemy sees them.
-	auto IsHiddenFromOwner = [bOwnedByPlayer](const AActor* Unit)
-	{
-		return bOwnedByPlayer
-			       ? Unit->IsHidden()
-			       : not Unit->Tags.Contains(DeveloperSettings::GamePlay::FoW::TagUnitInEnemyVision);
-	};
+	using SpiesInfiltrationPrivate::GetIsHiddenFromOwner;
+	const bool bOwnedByHuman = FRTSPlayers::IsHumanPlayer(GetOwningPlayer());
+	// Every opponent of the owner, not one fixed side: with more than two players several can hide units.
+	const uint8 OpponentsMask = SpiesInfiltrationPrivate::GetPlayersToSpyOn(GetOwningPlayer());
 
-	for (ATankMaster* Tank : GameUnitManager->GetPlayerTanks(Opponent))
+	for (ATankMaster* Tank : GameUnitManager->GetTanksOfPlayers(OpponentsMask))
 	{
-		if (RTSFunctionLibrary::RTSIsValid(Tank) && IsHiddenFromOwner(Tank))
+		if (RTSFunctionLibrary::RTSIsValid(Tank) && GetIsHiddenFromOwner(*Tank, bOwnedByHuman))
 		{
 			HiddenUnits.Add(Tank);
 		}
 	}
 	// A squad counts once, or one squad could take every pick; a soldier that is in sight shows the squad anyway.
 	TSet<const AActor*> SquadsAlreadyAdded;
-	for (ASquadUnit* SquadUnit : GameUnitManager->GetSquadUnitsOfPlayer(Opponent))
+	for (ASquadUnit* SquadUnit : GameUnitManager->GetSquadUnitsOfPlayers(OpponentsMask))
 	{
-		if (not RTSFunctionLibrary::RTSIsValid(SquadUnit) || not IsHiddenFromOwner(SquadUnit))
+		if (not RTSFunctionLibrary::RTSIsValid(SquadUnit) || not GetIsHiddenFromOwner(*SquadUnit, bOwnedByHuman))
 		{
 			continue;
 		}

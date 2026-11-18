@@ -4088,7 +4088,8 @@ void ICommands::ExecuteRegisterUnitAsBlackboardIdleCommand()
 		return;
 	}
 
-	AEnemyController* EnemyController = FRTS_Statics::GetEnemyController(OwnerActor);
+	// The unit goes on the blackboard of the controller that plays its own player.
+	AEnemyController* EnemyController = FRTS_Statics::GetEnemyControllerOfUnit(OwnerActor);
 	if (not IsValid(EnemyController))
 	{
 		DoneExecutingCommand(EAbilityID::IdRegisterUnitAsBlackboardIdle);

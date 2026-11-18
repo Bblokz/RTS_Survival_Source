@@ -230,6 +230,9 @@ private:
 	// Returns true if the player has this unit.
 	bool CheckDoesPlayerHaveUnit(const FTrainingOption& UnitId)const;
 	bool CheckDoesEnemyHaveUnit(const FTrainingOption& UnitId) const;
+	// The AI player whose units satisfy the "enemy" unit requirements: the owner of an AI manager, the first AI
+	// player for any other owner.
+	uint8 GetEnemyUnitRequirementPlayer() const;
 	bool CheckDoesPlayerHaveSquad(const FTrainingOption& UnitId) const;
 	bool CheckDoesPlayerHaveTank(const FTrainingOption& UnitId) const;
 	bool CheckDoesPlayerHaveNomadic(const FTrainingOption& UnitId) const;
