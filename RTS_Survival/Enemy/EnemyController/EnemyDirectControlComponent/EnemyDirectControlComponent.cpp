@@ -524,6 +524,16 @@ bool UEnemyDirectControlComponent::RegisterDirectControlUnit(AActor* UnitActor)
 		return false;
 	}
 
+	// The controller was validated by GetValidStrategicAIComponent. A unit of another AI player belongs on that
+	// player's blackboard: this controller must never order it.
+	if (not M_EnemyController->GetCanControlUnit(UnitActor))
+	{
+		RTSFunctionLibrary::ReportError(
+			"Enemy direct control component of player " + FString::FromInt(M_EnemyController->GetControlledPlayer()) +
+			" was handed a unit of another AI player and does not register it: " + UnitActor->GetName());
+		return false;
+	}
+
 	FStrategicAIBlackboard& Blackboard = StrategicAIComponent->GetEditableStrategicAIBlackboard();
 
 	if (TryGetCommandsInterface(UnitActor) == nullptr)

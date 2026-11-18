@@ -837,7 +837,7 @@ void UEnemyWaveController::SubmitSpawnRequestForWave(
 	const FVector& SpawnLocation,
 	const int32 WaveID)
 {
-	if (not FindAttackWaveByID(WaveID) || not GetIsValidAsyncSpawner())
+	if (not FindAttackWaveByID(WaveID) || not GetIsValidAsyncSpawner() || not EnsureEnemyControllerIsValid())
 	{
 		OnWaveUnitFailedToSpawn(TrainingOption, WaveID);
 		return;
@@ -869,13 +869,15 @@ void UEnemyWaveController::SubmitSpawnRequestForWave(
 		}
 	};
 
+	// Wave units belong to the player of the controller that owns this wave.
 	const bool bRequestStarted = AsyncSpawner->AsyncSpawnOptionAtLocation(
 		TrainingOption,
 		SpawnLocation,
 		this,
 		WaveID,
 		OnSpawned,
-		FRotator::ZeroRotator);
+		FRotator::ZeroRotator,
+		M_EnemyController->GetSpawnOwnerOverride());
 	if (bRequestStarted || *RequestResolved)
 	{
 		return;
@@ -919,6 +921,10 @@ void UEnemyWaveController::OnUnitSpawnedForWave(const FTrainingOption& TrainingO
 		return;
 	}
 
+	if (M_EnemyController.IsValid())
+	{
+		M_EnemyController->LogSpawnedUnitOwnerMismatch(SpawnedActor);
+	}
 	AttackWave->SpawnedWaveUnits.Add(SpawnedActor);
 	CompletePendingSpawnForWave(ID);
 }

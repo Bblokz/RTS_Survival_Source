@@ -12,7 +12,8 @@ void UEnemyControllerBlueprintFunctionLibrary::AddUnitToDirectControl(AActor* Un
 	{
 		return;
 	}
-	auto EnemyController = FRTS_Statics::GetEnemyController(UnitToAdd);
+	// The controller that plays the unit's own player takes it under direct control.
+	AEnemyController* EnemyController = FRTS_Statics::GetEnemyControllerOfUnit(UnitToAdd);
 	if(not IsValid(EnemyController))
 	{
 		return;	
