@@ -11,6 +11,7 @@
 #include "MissionMapTestLibrary.generated.h"
 
 class ANomadicVehicle;
+class UMissionBase;
 enum class EBuildingExpansionType : uint8;
 
 /**
@@ -98,4 +99,22 @@ public:
 	static void MapTest_GetLocationIntroState(const UObject* WorldContextObject, bool& bOutIntroPlaying,
 	                                          bool& bOutScreenHandedBack, FVector& OutCameraLocation,
 	                                          FRotator& OutCameraRotation);
+
+	// ---- Mission chain walking (C++ only, for the mission chain audit) ----
+
+	/** @return The missions the map's mission manager has active now; empty without a manager or map tests. */
+	static TArray<UMissionBase*> MapTest_GetActiveMissions(const UObject* WorldContextObject);
+
+	/** @return True when the mission started but waits for its trigger (an area the player must reach, a timer). */
+	static bool MapTest_GetIsMissionWaitingForTrigger(const UMissionBase* Mission);
+
+	/** @return True when the mission is past its trigger and running (not complete). */
+	static bool MapTest_GetIsMissionRunning(const UMissionBase* Mission);
+
+	/**
+	 * @brief Fires a waiting mission's trigger the way UMissionTrigger does when its condition is met, so an
+	 * unattended run walks a mission chain whose next step waits for the player.
+	 * @return False when the mission was not waiting for its trigger.
+	 */
+	static bool MapTest_FireMissionTrigger(UMissionBase* Mission);
 };

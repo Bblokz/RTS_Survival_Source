@@ -223,3 +223,60 @@ bool UMissionMapTestLibrary::MapTest_HasAbility(AActor* Unit, const EAbilityID A
 	ICommands* Commands = Cast<ICommands>(Unit);
 	return Commands != nullptr && Commands->HasAbility(Ability);
 }
+
+TArray<UMissionBase*> UMissionMapTestLibrary::MapTest_GetActiveMissions(const UObject* WorldContextObject)
+{
+	TArray<UMissionBase*> ActiveMissions;
+#if RTS_WITH_MAP_TESTS
+	UWorld* const World = IsValid(WorldContextObject) ? WorldContextObject->GetWorld() : nullptr;
+	if (World == nullptr)
+	{
+		return ActiveMissions;
+	}
+	for (TActorIterator<AMissionManager> It(World); It; ++It)
+	{
+		for (UMissionBase* const Mission : It->GetActiveMissions())
+		{
+			if (IsValid(Mission))
+			{
+				ActiveMissions.Add(Mission);
+			}
+		}
+	}
+#endif
+	return ActiveMissions;
+}
+
+bool UMissionMapTestLibrary::MapTest_GetIsMissionWaitingForTrigger(const UMissionBase* Mission)
+{
+#if RTS_WITH_MAP_TESTS
+	return IsValid(Mission) && Mission->MissionState.bIsMissionStarted && not Mission->MissionState.bIsTriggered
+		&& not Mission->MissionState.bIsMissionComplete;
+#else
+	return false;
+#endif
+}
+
+bool UMissionMapTestLibrary::MapTest_GetIsMissionRunning(const UMissionBase* Mission)
+{
+#if RTS_WITH_MAP_TESTS
+	return IsValid(Mission) && Mission->MissionState.bIsMissionStarted && Mission->MissionState.bIsTriggered
+		&& not Mission->MissionState.bIsMissionComplete;
+#else
+	return false;
+#endif
+}
+
+bool UMissionMapTestLibrary::MapTest_FireMissionTrigger(UMissionBase* Mission)
+{
+#if RTS_WITH_MAP_TESTS
+	if (not MapTest_GetIsMissionWaitingForTrigger(Mission))
+	{
+		return false;
+	}
+	Mission->OnTriggerActivated();
+	return true;
+#else
+	return false;
+#endif
+}

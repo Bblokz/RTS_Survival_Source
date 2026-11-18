@@ -26,6 +26,7 @@
 #include "NavigationSystem.h"
 #include "PhysicsEngine/BodyInstance.h"
 #include "RTS_Survival/DeveloperSettings.h"
+#include "RTS_Survival/Game/Players/RTSPlayers.h"
 #include "RTS_Survival/Navigation/CoverFinder/CoverFinderDeveloperSettings.h"
 #include "RTS_Survival/Navigation/CoverFinder/CoverFinderWorker.h"
 #include "RTS_Survival/Navigation/CoverFinder/CoverSocketSource.h"
@@ -34,6 +35,7 @@
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/RTSCollisionTraceChannels.h"
 #include "RTS_Survival/Units/Squads/SquadUnit/SquadUnit.h"
+#include "RTS_Survival/Utils/CollisionSetup/RTSPlayerCollision.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "ShowFlags.h"
 #include "UnrealClient.h"
@@ -254,23 +256,6 @@ namespace CoverFinderWorldSubsystemPrivate
 		return IsValid(Cast<ACharacter>(Actor)) ||
 			IsValid(Cast<ACharacter>(Actor->GetAttachParentActor())) ||
 			IsValid(Cast<ACharacter>(Actor->GetOwner()));
-	}
-
-	/** @return Owning player of the actor or of the unit that owns it; INDEX_NONE for map geometry. */
-	int32 FindOwningPlayer(const AActor* Actor)
-	{
-		constexpr int32 MaximumOwnerDepth = 4;
-		const AActor* OwnershipActor = Actor;
-		for (int32 OwnerDepth = 0; OwnerDepth < MaximumOwnerDepth && IsValid(OwnershipActor); ++OwnerDepth)
-		{
-			const URTSComponent* RTSComponent = OwnershipActor->FindComponentByClass<URTSComponent>();
-			if (IsValid(RTSComponent))
-			{
-				return RTSComponent->GetOwningPlayer();
-			}
-			OwnershipActor = OwnershipActor->GetOwner();
-		}
-		return INDEX_NONE;
 	}
 
 	bool GetIsLandscapeComponent(const UPrimitiveComponent* PrimitiveComponent)
@@ -1412,14 +1397,14 @@ void URTSCoverFinderWorldSubsystem::UnregisterSquadUnit(ASquadUnit* SquadUnit)
 
 float URTSCoverFinderWorldSubsystem::GetAutomaticCoverSearchRadius(const ASquadUnit& SquadUnit) const
 {
-	constexpr int32 EnemyOwningPlayer = 2;
 	constexpr float MinimumSearchRadius = 100.0f;
 	const URTSCoverFinderDeveloperSettings* CoverSettings = GetCoverFinderSettings();
 	if (not IsValid(CoverSettings))
 	{
 		return MinimumSearchRadius;
 	}
-	const float SearchRadius = SquadUnit.GetOwningPlayer() == EnemyOwningPlayer
+	// Every AI player's soldiers use the AI's radius; unset owners keep the default one, as before.
+	const float SearchRadius = FRTSPlayers::IsValidAIPlayer(SquadUnit.GetOwningPlayer())
 		? CoverSettings->M_EnemyAutomaticCoverSearchRadius
 		: CoverSettings->M_AutomaticCoverSearchRadius;
 	return FMath::Max(MinimumSearchRadius, SearchRadius);
@@ -1970,11 +1955,12 @@ bool URTSCoverFinderWorldSubsystem::GetHasTargetSpecificFiringLane(
 	{
 		return false;
 	}
-	const ECollisionChannel TargetTraceChannel = SquadUnit.GetOwningPlayer() == 1
-		? COLLISION_TRACE_ENEMY
-		: COLLISION_TRACE_PLAYER;
+	// The lane is traced like the soldier's own shot: on its weapon channel, passing through its own and allied units.
+	const int32 SquadOwningPlayer = SquadUnit.GetOwningPlayer();
+	const ECollisionChannel TargetTraceChannel = FRTSPlayerCollision::GetWeaponTraceChannel(SquadOwningPlayer);
 	FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(RTSCoverFiringLane), true);
 	QueryParams.AddIgnoredActor(&SquadUnit);
+	FRTSPlayerCollision::ApplyWeaponIgnoreMask(QueryParams, SquadOwningPlayer);
 	FHitResult HitResult;
 	++M_TacticalPerformanceSnapshot.FiringLaneTracesLastFrame;
 	const FVector LaneStart = BuildFiringLaneStart(SquadUnit, CoverPoint);
@@ -1986,12 +1972,12 @@ bool URTSCoverFinderWorldSubsystem::GetHasTargetSpecificFiringLane(
 		QueryParams);
 	const AActor* HitActor = HitResult.GetActor();
 	// Another enemy standing in front of the target is still something this unit may shoot, so the lane stays open.
-	constexpr int32 PlayerOwnedTeam = 1;
 	const int32 HitOwningPlayer = bBlockingHit
-		? CoverFinderWorldSubsystemPrivate::FindOwningPlayer(HitActor)
+		? FRTSPlayerCollision::GetOwningPlayerOfHit(HitActor, HitResult.GetComponent())
 		: INDEX_NONE;
-	const bool bHitOtherEnemy = HitOwningPlayer > 0 &&
-		(HitOwningPlayer == PlayerOwnedTeam) != (SquadUnit.GetOwningPlayer() == PlayerOwnedTeam);
+	// INDEX_NONE (map geometry) and neutral owners must not count: AreHostile reads any odd owner as the first AI
+	// player.
+	const bool bHitOtherEnemy = HitOwningPlayer > 0 && FRTSPlayers::AreHostile(SquadOwningPlayer, HitOwningPlayer);
 	const bool bHitTarget = bBlockingHit && (HitActor == &TargetActor || bHitOtherEnemy ||
 		(IsValid(HitActor) && HitActor->IsOwnedBy(&TargetActor)) ||
 		(IsValid(HitActor) && TargetActor.IsOwnedBy(HitActor)));
