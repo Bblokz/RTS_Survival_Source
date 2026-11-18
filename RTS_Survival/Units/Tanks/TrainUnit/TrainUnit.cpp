@@ -59,8 +59,7 @@ void ATrainUnit::SetupTrainMeshCollision(const TArray<UMeshComponent*>& MeshComp
 		return;
 	}
 
-	const bool bOwnedByPlayer1 = RTSComponent->GetOwningPlayer() == 1;
-	FRTS_CollisionSetup::SetupCollisionForTrainMeshes(MeshComponents, bOwnedByPlayer1);
+	FRTS_CollisionSetup::SetupTrainMeshesCollision(MeshComponents, RTSComponent->GetOwningPlayer());
 }
 
 void ATrainUnit::SetupTrainComposition(UMeshComponent* InLocomotiveMesh, const TArray<UMeshComponent*>& InCartMeshes)

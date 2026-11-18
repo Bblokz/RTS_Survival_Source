@@ -31,6 +31,7 @@
 #include "RTS_Survival/RTSComponents/NavCollision/RTSNavCollision.h"
 #include "RTS_Survival/Units/Aircraft/AirBase/AircraftOwnerComp/AircraftOwnerComp.h"
 #include "RTS_Survival/Units/Squads/Reinforcement/ReinforcementPoint.h"
+#include "RTS_Survival/Game/Players/RTSPlayers.h"
 #include "RTS_Survival/Utils/CollisionSetup/FRTS_CollisionSetup.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 
@@ -448,16 +449,17 @@ void ANomadicVehicle::PostInitializeComponents()
 
 void ANomadicVehicle::SetupMountCollision(UMeshComponent* MountMesh)
 {
-	bool bOwnedByPlayer1 = false;
+	// Without an RTS component the mount is set up as that of the first AI player, as it always was.
+	int32 OwningPlayer = RTSPlayers::FirstAIPlayer;
 	if (GetIsValidRTSComponent())
 	{
-		bOwnedByPlayer1 = RTSComponent->GetOwningPlayer() == 1;
+		OwningPlayer = RTSComponent->GetOwningPlayer();
 	}
 	if (EnsureRTSOverlapEvasionComponent())
 	{
 		RTSOverlapEvasionComponent->TrackOverlapMeshOfOwner(this, MountMesh);
 	}
-	FRTS_CollisionSetup::SetupCollisionForNomadicMount(MountMesh, bOwnedByPlayer1);
+	FRTS_CollisionSetup::SetupNomadicMountCollision(MountMesh, OwningPlayer);
 }
 
 void ANomadicVehicle::ExecuteMoveCommand(const FVector MoveToLocation)
@@ -1990,14 +1992,7 @@ void ANomadicVehicle::SetupChassisMeshCollision()
 {
 	if (IsValid(RTSComponent))
 	{
-		if (RTSComponent->GetOwningPlayer() == 1)
-		{
-			FRTS_CollisionSetup::SetupNomadicMvtPlayer(ChassisMesh);
-		}
-		else
-		{
-			FRTS_CollisionSetup::SetupNomadicMvtEnemy(ChassisMesh);
-		}
+		FRTS_CollisionSetup::SetupNomadicMovementMeshCollision(ChassisMesh, RTSComponent->GetOwningPlayer());
 	}
 }
 
