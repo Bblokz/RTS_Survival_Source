@@ -11,6 +11,7 @@
 #include "NiagaraFunctionLibrary.h"
 #include "NiagaraSystem.h"
 #include "RTS_Survival/Enemy/EnemyController/EnemyController.h"
+#include "RTS_Survival/Game/Players/RTSPlayers.h"
 #include "RTS_Survival/FOWSystem/FowManager/FowManager.h"
 #include "RTS_Survival/Game/RTSGameInstance/RTSGameInstance.h"
 #include "RTS_Survival/Missions/MissionClasses/DontLoseCommanderMission/DontLoseCommanderMission.h"
@@ -419,7 +420,8 @@ void AMissionManager::ExecuteGlobalAbility(UGlobalAbility* GlobalAbility, const 
 	}
 	UGlobalAbilitiesManager* AbilitiesManager = nullptr;
 	ACPPController* PlayerController = FRTS_Statics::GetRTSController(this);
-	AEnemyController* EnemyController = FRTS_Statics::GetEnemyController(this);
+	// The manager of the AI player the ability is executed for; any other owner gets the default controller's.
+	AEnemyController* EnemyController = FRTS_Statics::GetEnemyControllerForPlayer(this, OwningPlayer);
 	if (OwningPlayer == 1 && IsValid(PlayerController))
 	{
 		AbilitiesManager = PlayerController->GetGlobalAbilitiesManager();
@@ -2172,7 +2174,7 @@ bool AMissionManager::EnsureValidSpawnCommandQueueAsyncSpawner(ARTSAsyncSpawner*
 	return false;
 }
 
-bool AMissionManager::EnsureEnemyControllerIsValid(AEnemyController* EnemyController) const
+bool AMissionManager::EnsureEnemyControllerIsValid(const AEnemyController* EnemyController) const
 {
 	if (IsValid(EnemyController))
 	{
@@ -2186,27 +2188,32 @@ bool AMissionManager::EnsureEnemyControllerIsValid(AEnemyController* EnemyContro
 TArray<AActor*> AMissionManager::GetEnemyActorsForQueryType(const EEnemyUnitQueryType EnemyUnitQueryType) const
 {
 	TArray<AActor*> EnemyActors;
-	AEnemyController* EnemyController = FRTS_Statics::GetEnemyController(this);
-	if (not EnsureEnemyControllerIsValid(EnemyController))
+	const TArray<AEnemyController*> EnemyControllers = FRTS_Statics::GetAllEnemyControllers(this);
+	if (EnemyControllers.IsEmpty())
 	{
+		(void)EnsureEnemyControllerIsValid(nullptr);
 		return EnemyActors;
 	}
 
-	if (EnemyUnitQueryType == EEnemyUnitQueryType::TrackTanks)
+	const bool bTrackTanks = EnemyUnitQueryType == EEnemyUnitQueryType::TrackTanks
+		|| EnemyUnitQueryType == EEnemyUnitQueryType::TrackTanksAndSquads;
+	const bool bTrackSquads = EnemyUnitQueryType == EEnemyUnitQueryType::TrackSquads
+		|| EnemyUnitQueryType == EEnemyUnitQueryType::TrackTanksAndSquads;
+	for (const AEnemyController* EnemyController : EnemyControllers)
 	{
-		return EnemyController->GetAllTankActorsInFormations();
-	}
-
-	if (EnemyUnitQueryType == EEnemyUnitQueryType::TrackSquads)
-	{
-		return EnemyController->GetAllSquadControllerActorsInFormations();
-	}
-
-	if (EnemyUnitQueryType == EEnemyUnitQueryType::TrackTanksAndSquads)
-	{
-		EnemyActors = EnemyController->GetAllTankActorsInFormations();
-		EnemyActors.Append(EnemyController->GetAllSquadControllerActorsInFormations());
-		return EnemyActors;
+		// The mission's enemies are the AI players the human fights; an AI player allied to the human is not tracked.
+		if (not IsValid(EnemyController) || not FRTSPlayers::IsHostileToHuman(EnemyController->GetControlledPlayer()))
+		{
+			continue;
+		}
+		if (bTrackTanks)
+		{
+			EnemyActors.Append(EnemyController->GetAllTankActorsInFormations());
+		}
+		if (bTrackSquads)
+		{
+			EnemyActors.Append(EnemyController->GetAllSquadControllerActorsInFormations());
+		}
 	}
 
 	return EnemyActors;
@@ -2657,7 +2664,23 @@ void AMissionManager::SetGameCampaignGenerationSettingsWithBackupSettingsFromPIE
 
 void AMissionManager::PropagateGameDifficultyToEnemyStrategicAI(const FRTSGameDifficulty& GameDifficulty) const
 {
-	AEnemyController* EnemyAIController = FRTS_Statics::GetEnemyController(this);
+	// Every AI player's controller plays at the mission's difficulty.
+	const TArray<AEnemyController*> EnemyAIControllers = FRTS_Statics::GetAllEnemyControllers(this);
+	if (EnemyAIControllers.IsEmpty())
+	{
+		(void)EnsureEnemyControllerIsValid(nullptr);
+		return;
+	}
+	for (const AEnemyController* EnemyAIController : EnemyAIControllers)
+	{
+		PropagateGameDifficultyToEnemyController(EnemyAIController, GameDifficulty);
+	}
+}
+
+void AMissionManager::PropagateGameDifficultyToEnemyController(
+	const AEnemyController* EnemyAIController,
+	const FRTSGameDifficulty& GameDifficulty) const
+{
 	if (not EnsureEnemyControllerIsValid(EnemyAIController))
 	{
 		return;
@@ -2677,13 +2700,20 @@ void AMissionManager::PropagateGameDifficultyToEnemyStrategicAI(const FRTSGameDi
 
 void AMissionManager::StartEnemyStrategicAIThinkingFromMission() const
 {
-	AEnemyController* EnemyAIController = FRTS_Statics::GetEnemyController(this);
-	if (not EnsureEnemyControllerIsValid(EnemyAIController))
+	// Every AI player's controller that waits for the mission trigger starts thinking.
+	const TArray<AEnemyController*> EnemyAIControllers = FRTS_Statics::GetAllEnemyControllers(this);
+	if (EnemyAIControllers.IsEmpty())
 	{
+		(void)EnsureEnemyControllerIsValid(nullptr);
 		return;
 	}
-
-	EnemyAIController->StartStrategicAIThinkingFromMission();
+	for (AEnemyController* EnemyAIController : EnemyAIControllers)
+	{
+		if (IsValid(EnemyAIController))
+		{
+			EnemyAIController->StartStrategicAIThinkingFromMission();
+		}
+	}
 }
 
 

@@ -2,8 +2,11 @@
 
 #include "MissionCameraTourSession.h"
 
+#include "Blueprint/SlateBlueprintLibrary.h"
 #include "Kismet/GameplayStatics.h"
 #include "RTS_Survival/GameUI/CameraTour/W_MissionCameraTour.h"
+#include "RTS_Survival/GameUI/Portrait/PortraitWidget/W_Portrait.h"
+#include "RTS_Survival/Player/PortraitManager/PortraitManager.h"
 #include "RTS_Survival/Missions/MissionClasses/MissionBase/MissionBase.h"
 #include "RTS_Survival/Player/CPPController.h"
 #include "RTS_Survival/Player/Camera/CameraController/PlayerCameraController.h"
@@ -169,6 +172,81 @@ void UMissionCameraTourSession::TickRunning()
 	}
 }
 
+UPlayerPortraitManager* UMissionCameraTourSession::GetPortraitManager() const
+{
+	return M_PlayerController.IsValid() ? M_PlayerController->GetPlayerPortraitManager() : nullptr;
+}
+
+UMissionCameraTourSession::FHudPortraitPlace UMissionCameraTourSession::GetHudPortraitPlace() const
+{
+	FHudPortraitPlace Place;
+	const UPlayerPortraitManager* const PortraitManager = GetPortraitManager();
+	UW_Portrait* const HudPortrait = IsValid(PortraitManager) ? PortraitManager->GetHudPortraitWidget() : nullptr;
+	if (not IsValid(HudPortrait))
+	{
+		return Place;
+	}
+	Place.PortraitClass = HudPortrait->GetClass();
+	// The portrait is laid out while hidden between lines (Hidden, not Collapsed), so its geometry is current.
+	const FGeometry& Geometry = HudPortrait->GetCachedGeometry();
+	const FVector2D LocalSize(Geometry.GetLocalSize());
+	if (LocalSize.X < 1.0 || LocalSize.Y < 1.0)
+	{
+		return Place;
+	}
+	FVector2D PixelTopLeft;
+	FVector2D ViewportTopLeft;
+	FVector2D PixelBottomRight;
+	FVector2D ViewportBottomRight;
+	USlateBlueprintLibrary::AbsoluteToViewport(M_Mission.Get(), FVector2D(Geometry.GetAbsolutePosition()),
+	                                           PixelTopLeft, ViewportTopLeft);
+	USlateBlueprintLibrary::AbsoluteToViewport(M_Mission.Get(), FVector2D(Geometry.LocalToAbsolute(LocalSize)),
+	                                           PixelBottomRight, ViewportBottomRight);
+	const FVector2D ViewportSize = ViewportBottomRight - ViewportTopLeft;
+	if (ViewportSize.X < 1.0 || ViewportSize.Y < 1.0)
+	{
+		return Place;
+	}
+	Place.ViewportPosition = ViewportTopLeft;
+	Place.ViewportSize = ViewportSize;
+	Place.bHasRect = true;
+	return Place;
+}
+
+void UMissionCameraTourSession::HostPortraitOnTour(const FHudPortraitPlace& HudPortraitPlace)
+{
+	if (not GetIsValidWidget(false) || HudPortraitPlace.PortraitClass == nullptr)
+	{
+		return;
+	}
+	UPlayerPortraitManager* const PortraitManager = GetPortraitManager();
+	if (not IsValid(PortraitManager))
+	{
+		return;
+	}
+	UW_Portrait* const PortraitCopy = M_Widget->AddPortraitCopy(HudPortraitPlace.PortraitClass,
+	                                                            HudPortraitPlace.ViewportPosition,
+	                                                            HudPortraitPlace.ViewportSize,
+	                                                            not HudPortraitPlace.bHasRect);
+	if (PortraitCopy == nullptr)
+	{
+		return;
+	}
+	PortraitManager->SetCinematicPortraitHost(PortraitCopy);
+}
+
+void UMissionCameraTourSession::ReleaseTourPortrait() const
+{
+	if (not GetIsValidWidget(false) || M_Widget->GetPortraitCopy() == nullptr)
+	{
+		return;
+	}
+	if (UPlayerPortraitManager* const PortraitManager = GetPortraitManager())
+	{
+		PortraitManager->ClearCinematicPortraitHost(M_Widget->GetPortraitCopy());
+	}
+}
+
 bool UMissionCameraTourSession::TryTakeScreen()
 {
 	if (not M_Mission.IsValid() || not GetIsValidPlayerController(false))
@@ -188,12 +266,15 @@ bool UMissionCameraTourSession::TryTakeScreen()
 	{
 		return false;
 	}
+	// Read where the HUD portrait sits while the HUD is still laid out; the takeover hides it.
+	const FHudPortraitPlace HudPortraitPlace = GetHudPortraitPlace();
 	if (not M_Mission->OnCinematicTakeOverFromMission(true))
 	{
 		return false;
 	}
 	M_Widget = UW_MissionCameraTour::ShowTour(M_PlayerController.Get(), M_Settings.bShowLetterbox,
 	                                          M_Settings.LetterboxHeightFraction);
+	HostPortraitOnTour(HudPortraitPlace);
 	if (M_Settings.StartSound != nullptr)
 	{
 		UGameplayStatics::PlaySound2D(M_Mission.Get(), M_Settings.StartSound);
@@ -358,6 +439,8 @@ void UMissionCameraTourSession::CompleteSession(const EMissionCameraTourEnd EndR
 	}
 	if (GetIsValidWidget(false))
 	{
+		// A line still playing moves back to the HUD portrait, which shows again below.
+		ReleaseTourPortrait();
 		M_Widget->CloseTour();
 	}
 	M_Widget = nullptr;

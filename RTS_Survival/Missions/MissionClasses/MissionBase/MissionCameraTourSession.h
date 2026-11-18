@@ -12,7 +12,9 @@
 class ACPPController;
 class UMissionBase;
 class UPlayerCameraController;
+class UPlayerPortraitManager;
 class UW_MissionCameraTour;
+class UW_Portrait;
 
 /** How a camera tour session ended; decides what the mission reports to its Blueprint. */
 enum class EMissionCameraTourEnd : uint8
@@ -102,6 +104,25 @@ private:
 	bool bM_HasCameraPose = false;
 	bool bM_IsRunning = false;
 	bool bM_HasCompleted = false;
+
+	/** The HUD portrait's class and screen rect, read before the takeover hides the HUD. */
+	struct FHudPortraitPlace
+	{
+		TSubclassOf<UW_Portrait> PortraitClass = nullptr;
+		FVector2D ViewportPosition = FVector2D::ZeroVector;
+		FVector2D ViewportSize = FVector2D::ZeroVector;
+		// False when the HUD portrait was never laid out; the copy then fills the screen (its canvas places it).
+		bool bHasRect = false;
+	};
+
+	FHudPortraitPlace GetHudPortraitPlace() const;
+	UPlayerPortraitManager* GetPortraitManager() const;
+
+	/** The HUD is hidden during the tour: a portrait copy on the overlay shows speaker and words of voice lines. */
+	void HostPortraitOnTour(const FHudPortraitPlace& HudPortraitPlace);
+
+	/** Hands portraits back to the HUD portrait. */
+	void ReleaseTourPortrait() const;
 
 	void TickWaitingForScreen(const float DeltaTime);
 	void TickRunning();

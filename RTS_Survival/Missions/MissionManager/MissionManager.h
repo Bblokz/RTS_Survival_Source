@@ -394,6 +394,8 @@ public:
 
 	// The end screen once the mission ended (tests and tools); null before.
 	UW_MissionEnd* GetMissionEndWidget() const { return M_MissionEndWidget; }
+	// Map tests walk a mission chain from the missions that are active.
+	const TArray<UMissionBase*>& GetActiveMissions() const { return M_ActiveMissions; }
 	AMissionDebriefStage* GetDebriefStage() const { return M_DebriefStage; }
 	void CallBackOnMissionWhenEnemyUnitsDestroyed(
 		const EEnemyUnitQueryType EnemyUnitQueryType,
@@ -653,7 +655,8 @@ private:
 	bool EnsureValidSpawnCommandQueueState(FMissionSpawnCommandQueueState* SpawnCommandQueueState) const;
 	bool EnsureValidTowAsyncSpawner(class ARTSAsyncSpawner* RTSAsyncSpawner) const;
 	bool EnsureValidSpawnCommandQueueAsyncSpawner(class ARTSAsyncSpawner* RTSAsyncSpawner) const;
-	bool EnsureEnemyControllerIsValid(AEnemyController* EnemyController) const;
+	bool EnsureEnemyControllerIsValid(const AEnemyController* EnemyController) const;
+	// The formation units of every enemy controller whose player fights the human.
 	TArray<AActor*> GetEnemyActorsForQueryType(const EEnemyUnitQueryType EnemyUnitQueryType) const;
 	void RegisterTrackedEnemyActor(AActor* EnemyActor);
 	void UnregisterTrackedEnemyActor(AActor* EnemyActor);
@@ -724,5 +727,9 @@ private:
 	void SetGameCampaignGenerationSettingsWithBackupSettingsFromPIE();
 	int32 M_NextSeededSpawnBatchRequestId = 1;
 
+	// Reaches the controller of every AI player.
 	void PropagateGameDifficultyToEnemyStrategicAI(const FRTSGameDifficulty& GameDifficulty) const;
+	void PropagateGameDifficultyToEnemyController(
+		const AEnemyController* EnemyAIController,
+		const FRTSGameDifficulty& GameDifficulty) const;
 };

@@ -12,6 +12,7 @@
 #include "RTS_Survival/Units/TeamWeapons/TeamWeaponController.h"
 #include "RTS_Survival/RTSCollisionTraceChannels.h"
 #include "RTS_Survival/Enemy/EnemyController/EnemyController.h"
+#include "RTS_Survival/Game/Players/RTSPlayers.h"
 #include "RTS_Survival/Environment/DestructableEnvActor/DestructableEnvActor.h"
 #include "RTS_Survival/FOWSystem/FowManager/FowManager.h"
 #include "RTS_Survival/Audio/Settings/RTSAudioDeveloperSettings.h"
@@ -1787,8 +1788,8 @@ bool UMissionBase::EnemyInBuilding_GetIsEnemySquad(const ASquadController* Enter
 		return false;
 	}
 
-	constexpr uint8 EnemyPlayerIndex = 2;
-	return RTSComponent->GetOwningPlayer() == EnemyPlayerIndex;
+	// A mission's "enemy" is any AI player; unset and neutral owners never counted and still do not.
+	return FRTSPlayers::IsValidAIPlayer(RTSComponent->GetOwningPlayer());
 }
 
 void UMissionBase::EnemyInBuilding_ClearTracking()
