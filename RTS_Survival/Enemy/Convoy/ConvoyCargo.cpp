@@ -123,6 +123,11 @@ bool AConvoy::ReleaseCapturedTruck(AActor* Truck)
 	// Leaves alive: restriction and death binding cleared, so a later death is not a lost convoy truck.
 	ReleaseMember(*Member, false);
 	++M_CapturedTruckCount;
+	if (M_LastThreatTime < 0.0)
+	{
+		// Escorts left without trucks guard the last threat; a capture without a fight leaves them this spot.
+		M_LastThreatLocation = Member->Location;
+	}
 	RemoveConvoyIconIfAttachedTo(Truck);
 	Broadcast(EConvoyEventType::TruckCaptured, Member,
 	          FString::Printf(TEXT("%s trucks_left=%d captured=%d"), *Member->UnitName, GetAliveTruckCount(),
