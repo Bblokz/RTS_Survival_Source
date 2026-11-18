@@ -259,13 +259,14 @@ void URTSCheatManager::RTSDebugEnemy() const
 	{
 		return;
 	}
-	// Get the enemy controller
-	const AEnemyController* EnemyController = Subsystem->GetEnemyController();
-	if (!IsValid(EnemyController))
+	// Get the enemy controllers: one per AI player
+	for (const AEnemyController* EnemyController : Subsystem->GetAllEnemyControllers())
 	{
-		return;
+		if (IsValid(EnemyController))
+		{
+			EnemyController->DebugAllActiveFormations();
+		}
 	}
-	EnemyController->DebugAllActiveFormations();
 }
 
 void URTSCheatManager::RTSDebugFormation() const
