@@ -178,12 +178,12 @@ public:
 	bool StopFireByHandle(int32 FireHandle);
 
 	/**
-	 * @brief Start (or refresh) a burning ground area that damages the other side every manager tick.
+	 * @brief Start (or refresh) a burning ground area that damages hostile units every manager tick.
 	 * Overlapping requests of the same player merge into one area; at the cap the area closest to burning out is
 	 * replaced. The flames are one pooled GroundFire Niagara per area, stopped when the area burns out.
 	 * @param Settings Radius, duration, damage per second and armor pen of the burn; ignored when not enabled.
 	 * @param GroundLocation Centre of the burning area on the ground.
-	 * @param OwningPlayer Player that caused the fire; it damages the units of the other side.
+	 * @param OwningPlayer Player that caused the fire; it damages the units of the players hostile to it.
 	 * @return Which area burns for this request and whether it merged or replaced one.
 	 */
 	FRTSGroundFireRequestResult RequestGroundFire(const FRTSGroundFireSettings& Settings,

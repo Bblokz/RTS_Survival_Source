@@ -78,8 +78,13 @@ void USupplyTruckComponent::BeginPlay_BindTruckDeath()
 
 void USupplyTruckComponent::BeginPlay_AddMiniMapIcon()
 {
+	AddMiniMapIconIfPlayerTruck();
+}
+
+void USupplyTruckComponent::AddMiniMapIconIfPlayerTruck()
+{
 	// Custom icons ignore the fog of war, so only the player's own trucks get one.
-	if (GetTruckOwningPlayer() != SupplyPointConstants::PlayerOwner)
+	if (not M_MiniMapIconId.IsNone() or GetTruckOwningPlayer() != SupplyPointConstants::PlayerOwner)
 	{
 		return;
 	}
@@ -180,6 +185,31 @@ void USupplyTruckComponent::ReturnToBase()
 	SetSupplyTruckState(bIsInOrNearBay and M_SupplyPoint.IsValid()
 		                    ? ESupplyTruckState::DrivingToExit
 		                    : ESupplyTruckState::DrivingToBase);
+}
+
+void USupplyTruckComponent::StartDeliveryRun(const FTransform& DeliveryTransform, const FSupplyTruckCargo& Cargo)
+{
+	if (bM_HasRunEnded)
+	{
+		return;
+	}
+	M_OwnDeliveryTransform = DeliveryTransform;
+	bM_HasOwnDeliveryTransform = true;
+	M_Cargo = Cargo;
+	AddMiniMapIconIfPlayerTruck();
+	SetSupplyTruckState(ESupplyTruckState::DrivingToBase);
+}
+
+void USupplyTruckComponent::StartDeliveryRunToBase(const FSupplyTruckCargo& Cargo)
+{
+	if (bM_HasRunEnded)
+	{
+		return;
+	}
+	bM_HasOwnDeliveryTransform = false;
+	M_Cargo = Cargo;
+	AddMiniMapIconIfPlayerTruck();
+	SetSupplyTruckState(ESupplyTruckState::DrivingToBase);
 }
 
 void USupplyTruckComponent::OnLoadingStarted(const float Duration)
@@ -327,9 +357,8 @@ void USupplyTruckComponent::UpdateDriveToPoint()
 
 void USupplyTruckComponent::UpdateDriveToBase()
 {
-	USupplyPointSubsystem* SupplySubsystem = USupplyPointSubsystem::Get(this);
 	FTransform BaseTransform;
-	if (SupplySubsystem == nullptr or not SupplySubsystem->GetSupplyBaseTransform(GetTruckOwningPlayer(), BaseTransform))
+	if (not GetDeliveryTransform(BaseTransform))
 	{
 		// No base right now (HQ destroyed or not delivered yet): wait where we are.
 		M_DriveState.bHasOrder = false;
@@ -347,6 +376,18 @@ void USupplyTruckComponent::UpdateDriveToBase()
 	{
 		IssueMoveOrder(Goal, BaseTransform.Rotator());
 	}
+}
+
+bool USupplyTruckComponent::GetDeliveryTransform(FTransform& OutDeliveryTransform) const
+{
+	if (bM_HasOwnDeliveryTransform)
+	{
+		OutDeliveryTransform = M_OwnDeliveryTransform;
+		return true;
+	}
+	const USupplyPointSubsystem* SupplySubsystem = USupplyPointSubsystem::Get(this);
+	return SupplySubsystem != nullptr
+		and SupplySubsystem->GetSupplyBaseTransform(GetTruckOwningPlayer(), OutDeliveryTransform);
 }
 
 bool USupplyTruckComponent::GetGoalOfState(FVector& OutGoal, FRotator& OutFinalRotation) const

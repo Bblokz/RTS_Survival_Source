@@ -33,6 +33,7 @@
 #include "RTS_Survival/Utils/RTSBlueprintFunctionLibrary.h"
 #include "RTS_Survival/Utils/RTSRichTextConverters/FRTSRichTextConverter.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
+#include "RTS_Survival/Utils/UnitSpawning/RTSUnitOwnerSpawning.h"
 #include "RTS_Survival/Weapons/BombComponent/BombComponent.h"
 #include "Serialization/AsyncPackageLoader.h"
 
@@ -3603,7 +3604,9 @@ UEnemyStrategicAIComponent* AAircraftMaster::AircraftDrop_GetEnemyStrategicAICom
 		return nullptr;
 	}
 
-	AEnemyController* EnemyController = FRTS_Statics::GetEnemyController(this);
+	// Dropped units go to the controller of the AI player the drop was made for.
+	AEnemyController* EnemyController = FRTS_Statics::GetEnemyControllerForPlayer(
+		this, M_AircraftDropRequest.OwningPlayer);
 	if (not IsValid(EnemyController))
 	{
 		return nullptr;

@@ -54,6 +54,17 @@ public:
 	/** Sends the truck home with whatever it carries; used when its supply point is lost. */
 	void ReturnToBase();
 
+	/**
+	 * @brief Sends the truck straight to a drop-off of its own instead of the owner's base; it pays the cargo there
+	 * on arrival like a run home (captured convoy trucks driving to a mission drop-off).
+	 * @param DeliveryTransform Navmesh spot to deliver at; the truck ends facing its rotation.
+	 * @param Cargo What the truck carries and pays on arrival.
+	 */
+	void StartDeliveryRun(const FTransform& DeliveryTransform, const FSupplyTruckCargo& Cargo);
+
+	/** Sends the truck to its owner's base with this cargo, without a supply point (fallback for a missing drop-off). */
+	void StartDeliveryRunToBase(const FSupplyTruckCargo& Cargo);
+
 	// Called by the supply point while the truck stands in the bay.
 	void OnLoadingStarted(float Duration);
 	void OnLoadingFinished(const FSupplyTruckCargo& LoadedCargo);
@@ -92,6 +103,8 @@ private:
 	void BeginPlay_MakeUncontrollable();
 	void BeginPlay_BindTruckDeath();
 	void BeginPlay_AddMiniMapIcon();
+	// Only the player's own trucks get an icon; a truck that changed owner after BeginPlay gets it when it is sent.
+	void AddMiniMapIconIfPlayerTruck();
 	void BeginPlay_StartSupplyRunUpdates();
 
 	bool GetIsValidTruck() const;
@@ -106,6 +119,8 @@ private:
 	bool GetIsDrivingState() const;
 	void AbandonSupplyRun();
 	bool GetGoalOfState(FVector& OutGoal, FRotator& OutFinalRotation) const;
+	/** @return False when there is nowhere to deliver right now; the own drop-off wins over the owner's base. */
+	bool GetDeliveryTransform(FTransform& OutDeliveryTransform) const;
 	bool GetHasReachedGoal(const FVector& Goal) const;
 	void OnGoalReached();
 	void OnParkedInBay();
@@ -131,6 +146,10 @@ private:
 	FDelegateHandle M_TruckDeathHandle;
 
 	FName M_MiniMapIconId = NAME_None;
+
+	// Set by StartDeliveryRun: the truck delivers here instead of at its owner's base.
+	FTransform M_OwnDeliveryTransform;
+	bool bM_HasOwnDeliveryTransform = false;
 
 	// Set when the run ended (delivered or destroyed) so the end is reported once.
 	bool bM_HasRunEnded = false;
