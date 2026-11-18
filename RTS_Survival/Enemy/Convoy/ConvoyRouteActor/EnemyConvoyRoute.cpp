@@ -244,6 +244,8 @@ int32 AEnemyConvoyRoute::GetGuardTierIndex(const int32 ConvoyIndex) const
 FConvoyStartParams AEnemyConvoyRoute::BuildStartParams(const int32 ConvoyIndex) const
 {
 	FConvoyStartParams Params;
+	// The convoy drives for the AI player this route is placed for.
+	Params.OwningPlayer = GetEnemyPlayer();
 	Params.GuardTierIndex = GetGuardTierIndex(ConvoyIndex);
 	Params.CargoMultiplier = Escort.CargoMultiplier;
 	Params.bShowOnMinimap = bShowOnMinimap;
@@ -314,6 +316,11 @@ void AEnemyConvoyRoute::TryFinishRoute()
 
 void AEnemyConvoyRoute::HandleConvoyEvent(const FConvoyEvent& Event)
 {
+	if (Event.Type == EConvoyEventType::TruckCaptured)
+	{
+		CountCapturedTruck(Event);
+		return;
+	}
 	if (Event.Type != EConvoyEventType::TruckDestroyed)
 	{
 		return;
@@ -325,6 +332,18 @@ void AEnemyConvoyRoute::HandleConvoyEvent(const FConvoyEvent& Event)
 	}
 	Tally->DestroyedTruckCount++;
 	M_DestroyedTruckCount++;
+}
+
+void AEnemyConvoyRoute::CountCapturedTruck(const FConvoyEvent& Event)
+{
+	FEnemyConvoyRouteConvoyTally* Tally = FindTally(Event.ConvoyId);
+	if (Tally == nullptr)
+	{
+		return;
+	}
+	Tally->CapturedTruckCount++;
+	M_CapturedTruckCount++;
+	OnConvoyTruckCaptured.Broadcast(this, Tally->Convoy.Get(), Event.Actor.Get());
 }
 
 void AEnemyConvoyRoute::HandleConvoyFinished(AConvoy* Convoy, const EConvoyOutcome Outcome)
@@ -367,12 +386,18 @@ void AEnemyConvoyRoute::CountFinishedConvoy(const FEnemyConvoyRouteConvoyTally& 
 	if (Outcome == EConvoyOutcome::Escaped)
 	{
 		M_EscapedConvoyCount++;
-		M_EscapedTruckCount += FMath::Max(Tally.TruckCount - Tally.DestroyedTruckCount, 0);
+		// Captured trucks left the convoy before it reached the exit.
+		M_EscapedTruckCount += FMath::Max(Tally.TruckCount - Tally.DestroyedTruckCount - Tally.CapturedTruckCount, 0);
 		return;
 	}
 	if (Outcome == EConvoyOutcome::TrucksDestroyed)
 	{
 		M_DestroyedConvoyCount++;
+		return;
+	}
+	if (Outcome == EConvoyOutcome::TrucksStopped)
+	{
+		M_StoppedConvoyCount++;
 	}
 }
 

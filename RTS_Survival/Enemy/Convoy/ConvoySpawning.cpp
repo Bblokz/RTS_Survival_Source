@@ -14,6 +14,7 @@
 #include "RTS_Survival/Units/Tanks/TankMaster.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
+#include "RTS_Survival/Utils/UnitSpawning/RTSUnitOwnerSpawning.h"
 
 namespace ConvoySpawningConstants
 {
@@ -205,14 +206,17 @@ void AConvoy::SpawnMember(const int32 MemberIndex, const FTrainingOption& Option
 			WeakThis->OnMemberSpawned(MemberId, SpawnedActor);
 		}
 	};
+	// A convoy of a later AI player gets its units spawned for that player; the human's and the first AI player's
+	// keep the owner of their Blueprint (a mismatch is logged in SetupSpawnedMember).
+	const int32 OwningPlayerOverride = FRTSUnitOwnerSpawning::GetOwnerOverrideForAIPlayer(M_Params.OwningPlayer);
 	bool bRequested = false;
 	if (IsValid(Spawner))
 	{
 		bRequested = ExactClass.IsNull()
 			             ? Spawner->AsyncSpawnOptionAtLocation(Option, SpawnLocation, this, MemberId, OnSpawned,
-			                                                   SpawnRotation)
+			                                                   SpawnRotation, OwningPlayerOverride)
 			             : Spawner->AsyncSpawnClassAtLocation(ExactClass, Option, SpawnLocation, this, MemberId,
-			                                                  OnSpawned, SpawnRotation);
+			                                                  OnSpawned, SpawnRotation, OwningPlayerOverride);
 	}
 	if (not bRequested)
 	{

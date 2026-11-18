@@ -20,6 +20,8 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnEnemyConvoyRouteConvoyStarted, A
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FOnEnemyConvoyRouteConvoyFinished, AEnemyConvoyRoute*, Route,
                                                AConvoy*, Convoy, EConvoyOutcome, Outcome);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnEnemyConvoyRouteFinished, AEnemyConvoyRoute*, Route);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FOnEnemyConvoyRouteTruckCaptured, AEnemyConvoyRoute*, Route,
+                                               AConvoy*, Convoy, AActor*, Truck);
 
 /**
  * Escort strength per difficulty as an index into the convoy definition's guard tiers (clamped to the last tier).
@@ -115,6 +117,8 @@ struct FEnemyConvoyRouteConvoyTally
 	int32 ConvoyId = INDEX_NONE;
 	int32 TruckCount = 0;
 	int32 DestroyedTruckCount = 0;
+	// Trucks that surrendered: neither destroyed nor escaped.
+	int32 CapturedTruckCount = 0;
 	FDelegateHandle EventHandle;
 };
 
@@ -165,6 +169,14 @@ public:
 	UFUNCTION(BlueprintPure, NotBlueprintable, Category = "Convoy Route")
 	int32 GetDestroyedTruckCount() const { return M_DestroyedTruckCount; }
 
+	// Trucks that surrendered and left their convoy alive (they count as stopped, not as destroyed or escaped).
+	UFUNCTION(BlueprintPure, NotBlueprintable, Category = "Convoy Route")
+	int32 GetCapturedTruckCount() const { return M_CapturedTruckCount; }
+
+	// Convoys that lost every truck with at least one of them captured (all-destroyed ones are in GetDestroyedConvoyCount).
+	UFUNCTION(BlueprintPure, NotBlueprintable, Category = "Convoy Route")
+	int32 GetStoppedConvoyCount() const { return M_StoppedConvoyCount; }
+
 	/** @return The placed route with this RouteId, or null (reports an error) when there is none. */
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Convoy Route",
 		meta = (WorldContext = "WorldContextObject"))
@@ -181,6 +193,10 @@ public:
 	// No convoy will start any more and every started one is done.
 	UPROPERTY(BlueprintAssignable, Category = "Convoy Route")
 	FOnEnemyConvoyRouteFinished OnRouteFinished;
+
+	// A truck of a convoy on this route surrendered; it now belongs to its captor.
+	UPROPERTY(BlueprintAssignable, Category = "Convoy Route")
+	FOnEnemyConvoyRouteTruckCaptured OnConvoyTruckCaptured;
 
 	virtual FColor GetPlacementColor() const override;
 	virtual FString GetConfigurationProblem() const override;
@@ -268,6 +284,8 @@ private:
 	int32 M_DestroyedConvoyCount = 0;
 	int32 M_EscapedTruckCount = 0;
 	int32 M_DestroyedTruckCount = 0;
+	int32 M_CapturedTruckCount = 0;
+	int32 M_StoppedConvoyCount = 0;
 
 	bool bM_IsRunning = false;
 	// Set once no further convoy will start this run; the route finishes when the started ones are done too.
@@ -291,6 +309,7 @@ private:
 	void HandleConvoyFinished(AConvoy* Convoy, EConvoyOutcome Outcome);
 
 	void HandleConvoyEvent(const FConvoyEvent& Event);
+	void CountCapturedTruck(const FConvoyEvent& Event);
 	FEnemyConvoyRouteConvoyTally* FindTally(const int32 ConvoyId);
 	void CountFinishedConvoy(const FEnemyConvoyRouteConvoyTally& Tally, const EConvoyOutcome Outcome);
 	void UnbindAllConvoys();

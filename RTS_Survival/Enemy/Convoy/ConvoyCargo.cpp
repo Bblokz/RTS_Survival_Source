@@ -74,6 +74,11 @@ void AConvoy::HandleTruckLost(FConvoyMember& Member)
 	{
 		return;
 	}
+	OnLastTruckGone(M_CapturedTruckCount > 0 ? TEXT("every truck destroyed or captured") : TEXT("every truck destroyed"));
+}
+
+void AConvoy::OnLastTruckGone(const FString& Reason)
+{
 	// The last truck is gone: the escorts stop keeping station and are no longer slowed.
 	for (FConvoyMember& Escort : M_Members)
 	{
@@ -93,7 +98,61 @@ void AConvoy::HandleTruckLost(FConvoyMember& Member)
 		}
 		Escort.bHasOrder = false;
 	}
-	SetState(EConvoyState::TrucksLost, TEXT("every truck destroyed"));
+	SetState(EConvoyState::TrucksLost, Reason);
+}
+
+EConvoyOutcome AConvoy::GetOutcomeWithoutTrucks() const
+{
+	return M_CapturedTruckCount > 0 ? EConvoyOutcome::TrucksStopped : EConvoyOutcome::TrucksDestroyed;
+}
+
+bool AConvoy::ReleaseCapturedTruck(AActor* Truck)
+{
+	if (M_Outcome != EConvoyOutcome::None or not IsValid(Truck))
+	{
+		return false;
+	}
+	FConvoyMember* Member = M_Members.FindByPredicate([Truck](const FConvoyMember& Candidate)
+	{
+		return Candidate.Actor.Get() == Truck;
+	});
+	if (Member == nullptr or Member->Role != EConvoyUnitRole::Truck or not Member->GetIsAlive())
+	{
+		return false;
+	}
+	// Leaves alive: restriction and death binding cleared, so a later death is not a lost convoy truck.
+	ReleaseMember(*Member, false);
+	++M_CapturedTruckCount;
+	RemoveConvoyIconIfAttachedTo(Truck);
+	Broadcast(EConvoyEventType::TruckCaptured, Member,
+	          FString::Printf(TEXT("%s trucks_left=%d captured=%d"), *Member->UnitName, GetAliveTruckCount(),
+	                          M_CapturedTruckCount));
+	if (M_Outcome == EConvoyOutcome::None and M_State != EConvoyState::TrucksLost)
+	{
+		if (GetAliveTruckCount() > 0)
+		{
+			AssignSlots();
+			Broadcast(EConvoyEventType::SlotReassigned, nullptr, FString::Printf(TEXT("trucks=%d"), GetAliveTruckCount()));
+		}
+		else
+		{
+			OnLastTruckGone(TEXT("every truck destroyed or captured"));
+		}
+	}
+	OnTruckCaptured.Broadcast(this, Truck);
+	return true;
+}
+
+void AConvoy::RemoveConvoyIconIfAttachedTo(const AActor* Actor)
+{
+	if (M_ConvoyIconId == NAME_None or M_IconActor.Get() != Actor)
+	{
+		return;
+	}
+	// The mark follows the front truck of the column; UpdateMinimapIcon puts it on the next one.
+	URTSBlueprintFunctionLibrary::BP_RemoveCustomMiniMapIcon(this, M_ConvoyIconId);
+	M_ConvoyIconId = NAME_None;
+	M_IconActor.Reset();
 }
 
 void AConvoy::ScheduleCargoCache(const FConvoyMember& Truck)
