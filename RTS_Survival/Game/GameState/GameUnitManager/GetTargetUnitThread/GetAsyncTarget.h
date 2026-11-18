@@ -8,7 +8,79 @@
 #include "RTS_Survival/Enemy/StrategicAI/Requests/StrategicAIRequests.h"
 #include "RTS_Survival/Game/GameState/GameUnitManager/AsyncUnitDetailedState/AsyncUnitDetailedState.h"
 #include "RTS_Survival/Game/GameState/GameUnitManager/TargetPreference/TargetPreference.h"
+#include "RTS_Survival/Game/Players/RTSPlayers.h"
 #include "Templates/Function.h"
+
+namespace AsyncTargetConstants
+{
+	// Weapons ask for 3 to 8 targets; searches and answers of that size need no heap allocation.
+	inline constexpr int32 InlineTargetsPerRequest = 8;
+}
+
+/** One targetable unit as the async target thread sees it. */
+struct FAsyncTargetUnit
+{
+	FVector Location = FVector::ZeroVector;
+
+	// Only resolved on the game thread; the thread hands it back untouched and never tests it.
+	TWeakObjectPtr<AActor> Actor;
+
+	ETargetPreference TargetType = ETargetPreference::None;
+
+	// Bit of the player that owns the unit (FRTSPlayers::GetPlayerBit).
+	uint8 OwnerBit = 0;
+
+	// Bits of the players whose units see this unit.
+	uint8 VisibleToMask = 0;
+};
+
+/**
+ * @brief Every unit that at least one player can target right now; built on the game thread, read by the thread.
+ * Units are grouped by owning player so a request only walks the units of the players it fights.
+ */
+struct FAsyncTargetSnapshot
+{
+	TArray<FAsyncTargetUnit> Units;
+
+	// Units of player P are Units[FirstUnitOfPlayer[P]] up to, but not including, Units[FirstUnitOfPlayer[P + 1]].
+	int32 FirstUnitOfPlayer[RTSPlayers::PlayerArraySize + 1] = {};
+
+	// Per viewing player: bits of the owners with at least one unit that this player sees. A request that has
+	// nothing to find (a weapon far from any enemy) is answered from this without walking any unit.
+	uint8 VisibleOwnersOfViewer[RTSPlayers::PlayerArraySize] = {};
+};
+
+/** Targets found for one request, closest first. Weak: a unit can be gone before the answer reaches the game thread. */
+using FAsyncTargetResult = TArray<TWeakObjectPtr<AActor>, TInlineAllocator<AsyncTargetConstants::InlineTargetsPerRequest>>;
+
+/**
+ * @brief One search for the closest targets around a location.
+ * Who the requester is and who it fights is copied in on the game thread: the thread never reads FRTSPlayers
+ * relations, which can change while a request waits.
+ */
+struct FAsyncTargetRequest
+{
+	FVector SearchLocation = FVector::ZeroVector;
+
+	float SearchRadius = 0.f;
+
+	// Targets closer than this radius are excluded.
+	float MinimumSearchRadius = 0.f;
+
+	int32 NumTargets = 0;
+
+	ETargetPreference TargetPreference = ETargetPreference::None;
+
+	// Normalized player that asks (FRTSPlayers::NormalizePlayer).
+	uint8 RequestingPlayer = 0;
+
+	uint8 RequesterBit = 0;
+
+	// Bits of the players the requester fights; only their units are searched.
+	uint8 HostileMask = 0;
+
+	TFunction<void(const FAsyncTargetResult&)> Callback;
+};
 
 /**
  * @brief A thread as runnable class that processes actor target requests asynchronously.
@@ -26,18 +98,16 @@ public:
 	virtual void Stop() override;
 
 	/**
-	 * @brief Schedules an update to the mapping of IDs to locations.
-	 * @param NewActorData The new mapping of Actor IDs to their locations.
+	 * @brief Schedules an update to the units the thread searches.
+	 * @param NewSnapshot The new snapshot of all targetable units; replaces the previous one as a whole.
 	 */
-	void ScheduleUpdateActorData(const TMap<uint32, TPair<ETargetPreference, FVector>>& NewEnemyActorData,
-	                             const TMap<uint32, TPair<ETargetPreference,
-	                                                      FVector>>& NewPlayerActorData);
+	void ScheduleUpdateActorData(FAsyncTargetSnapshot&& NewSnapshot);
 
 	/**
 	 * @brief Schedules an update to the detailed unit data used for strategic AI processing.
-	 * @param NewDetailedUnitStates Latest detailed unit snapshot for both players.
+	 * @param NewDetailedUnitStates Latest detailed unit snapshot for all players.
 	 */
-	void ScheduleUpdateDetailedActorData(const TArray<FAsyncDetailedUnitState>& NewDetailedUnitStates);
+	void ScheduleUpdateDetailedActorData(TArray<FAsyncDetailedUnitState>&& NewDetailedUnitStates);
 
 	/**
 	 * @brief Adds a strategic AI request batch to the async queue.
@@ -51,40 +121,13 @@ public:
 
 	/**
 	 * @brief Adds a target request to the queue.
-	 * @param RequestID Unique ID for the request.
-	 * @param SearchLocation The location from which to search.
-	 * @param SearchRadius The radius within which to search.
-	 * @param NumTargets The number of closest targets to find.
-	 * @param OwningPlayer The player that owns this request; determines which group of actors
-	 * are considered.
-	 * @param TargetPreference The preference for the target type.
-	 * @param MinimumSearchRadius Targets closer than this radius are excluded.
-	 * @param Callback The callback function to invoke with the result.
+	 * @param Request Where to search, for whom and what to call with the result.
+	 * @note Every request is answered with exactly one call of its callback on the game thread, also when no
+	 * target was found.
 	 */
-	void AddTargetRequest(
-		uint32 RequestID,
-		const FVector& SearchLocation,
-		float SearchRadius,
-		int32 NumTargets,
-		int32 OwningPlayer,
-		ETargetPreference TargetPreference,
-		float MinimumSearchRadius,
-		TFunction<void(const TArray<uint32>&)> Callback);
+	void AddTargetRequest(FAsyncTargetRequest&& Request);
 
 private:
-	/** Structure representing a target request */
-	struct FTargetRequest
-	{
-		uint32 RequestID;
-		FVector SearchLocation;
-		float SearchRadius;
-		int32 NumTargets;
-		int32 OwningPlayer;
-		ETargetPreference TargetPreference;
-		float MinimumSearchRadius;
-		TFunction<void(const TArray<uint32>&)> Callback;
-	};
-
 	/** Structure representing a strategic AI request batch */
 	struct FStrategicAIRequest
 	{
@@ -101,24 +144,28 @@ private:
 		TArray<FEnemyBasePointSatelliteBuildings> SatelliteBuildingsByBase;
 	};
 
-	/** Mapping of Actor IDs to their Target-type and location */
-	TMap<uint32, TPair<ETargetPreference, FVector>> M_PlayerActorData;
-	TMap<uint32, TPair<ETargetPreference, FVector>> M_EnemyActorData;
+	/** The targets of one request, waiting to be handed to its callback on the game thread. */
+	struct FTargetAnswer
+	{
+		TFunction<void(const FAsyncTargetResult&)> Callback;
+		FAsyncTargetResult Targets;
+	};
+
+	/** Latest snapshot of the targetable units of all players. */
+	FAsyncTargetSnapshot M_Snapshot;
 
 	/** Detailed unit state snapshot used by strategic AI requests. */
 	TArray<FAsyncDetailedUnitState> M_DetailedUnitStates;
 
-	/** Latest async base-cluster result used to keep construction candidates outside enemy bases. */
-	FEnemyBaseClusterAsyncCache M_EnemyBaseClusterAsyncCache;
+	// Latest async base-cluster result per requesting player, used to keep its construction candidates outside
+	// its bases. One per player: each enemy controller asks about its own bases.
+	FEnemyBaseClusterAsyncCache M_EnemyBaseClusterAsyncCacheOfPlayer[RTSPlayers::PlayerArraySize];
 
 	/** Queue of target requests */
-	TQueue<FTargetRequest> M_RequestQueue;
+	TQueue<FAsyncTargetRequest> M_RequestQueue;
 
 	/** Queue of pending actor data updates */
-	TQueue<TMap<uint32, TPair<ETargetPreference, FVector>>> M_PendingPlayerActorDataUpdates;
-
-	/** Queue of pending actor data updates */
-	TQueue<TMap<uint32, TPair<ETargetPreference, FVector>>> M_PendingEnemyActorDataUpdates;
+	TQueue<FAsyncTargetSnapshot> M_PendingSnapshots;
 
 	/** Queue of pending detailed unit data updates */
 	TQueue<TArray<FAsyncDetailedUnitState>> M_PendingDetailedUnitStateUpdates;

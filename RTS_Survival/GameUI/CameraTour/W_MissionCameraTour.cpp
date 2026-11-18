@@ -17,6 +17,7 @@
 #include "Styling/CoreStyle.h"
 #include "UObject/ConstructorHelpers.h"
 #include "RTS_Survival/GameUI/Portrait/PortraitSubtitle/SubtitleStyleDefaults.h"
+#include "RTS_Survival/GameUI/Portrait/PortraitWidget/W_Portrait.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 
 namespace MissionCameraTourWidgetConstants
@@ -33,6 +34,8 @@ namespace MissionCameraTourWidgetConstants
 	// Caption layout distance from the screen bottom when the bars are off.
 	constexpr float NoLetterboxLayoutFraction = 0.035f;
 	const FVector2D ShadowOffset(1.5f, 1.5f);
+	// Least gap between the tour portrait's subtitle box and the left screen edge.
+	constexpr float PortraitScreenMargin = 24.f;
 }
 
 UW_MissionCameraTour::UW_MissionCameraTour(const FObjectInitializer& ObjectInitializer)
@@ -83,8 +86,62 @@ void UW_MissionCameraTour::NativeOnInitialized()
 	BuildWidgetTree();
 }
 
+UW_Portrait* UW_MissionCameraTour::AddPortraitCopy(const TSubclassOf<UW_Portrait> PortraitClass,
+                                                   const FVector2D& ViewportPosition, const FVector2D& ViewportSize,
+                                                   const bool bFillScreen)
+{
+	if (M_PortraitCopy != nullptr)
+	{
+		return M_PortraitCopy;
+	}
+	UCanvasPanel* const Canvas = IsValid(WidgetTree) ? Cast<UCanvasPanel>(WidgetTree->RootWidget) : nullptr;
+	if (PortraitClass == nullptr || Canvas == nullptr || GetOwningPlayer() == nullptr)
+	{
+		RTSFunctionLibrary::ReportError("UW_MissionCameraTour::AddPortraitCopy needs a portrait class, the built "
+			"canvas and an owning player.");
+		return nullptr;
+	}
+	M_PortraitCopy = CreateWidget<UW_Portrait>(GetOwningPlayer(), PortraitClass);
+	if (not IsValid(M_PortraitCopy))
+	{
+		RTSFunctionLibrary::ReportError("UW_MissionCameraTour::AddPortraitCopy could not create the portrait.");
+		M_PortraitCopy = nullptr;
+		return nullptr;
+	}
+	// The subtitle box is centred under the portrait and wider than it; near the left screen edge (where the HUD keeps
+	// the portrait) it hangs off screen, so the copy moves right until the whole box shows.
+	float ShiftRight = 0.f;
+	float SubtitleLeftEdge = 0.f;
+	if (M_PortraitCopy->GetSubtitleLeftEdge(SubtitleLeftEdge))
+	{
+		const float CopyLeft = bFillScreen ? 0.f : static_cast<float>(ViewportPosition.X);
+		ShiftRight = FMath::Max(0.f, MissionCameraTourWidgetConstants::PortraitScreenMargin
+		                             - (CopyLeft + SubtitleLeftEdge));
+	}
+	// Added last: drawn above the bars and the caption.
+	UCanvasPanelSlot* const PortraitSlot = Canvas->AddChildToCanvas(M_PortraitCopy);
+	if (bFillScreen)
+	{
+		PortraitSlot->SetAnchors(FAnchors(0.f, 0.f, 1.f, 1.f));
+		PortraitSlot->SetOffsets(FMargin(ShiftRight, 0.f, -ShiftRight, 0.f));
+	}
+	else
+	{
+		PortraitSlot->SetAnchors(FAnchors(0.f, 0.f));
+		PortraitSlot->SetAlignment(FVector2D::ZeroVector);
+		PortraitSlot->SetPosition(ViewportPosition + FVector2D(ShiftRight, 0.f));
+		PortraitSlot->SetSize(ViewportSize);
+	}
+	M_PortraitCopy->HidePortrait();
+	return M_PortraitCopy;
+}
+
 void UW_MissionCameraTour::CloseTour()
 {
+	if (M_PortraitCopy != nullptr)
+	{
+		M_PortraitCopy->HidePortrait();
+	}
 	RemoveFromParent();
 }
 

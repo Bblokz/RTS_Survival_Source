@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "GameUnitAddRemoveDelegates/FGameUnitAddRemoveDelegates.h"
+#include "RTS_Survival/Game/Players/RTSPlayers.h"
 #include "RTS_Survival/Game/UserSettings/GameplaySettings/HealthbarVisibilityStrategy/HealthBarVisibilityStrategy.h"
 #include "RTS_Survival/Units/Aircraft/AircraftMaster/AAircraftMaster.h"
 #include "RTS_Survival/Units/Squads/SquadUnit/SquadUnit.h"
@@ -18,6 +19,7 @@
 
 class AAircraftMaster;
 class ANomadicVehicle;
+class ASquadController;
 class UTechnologyEffect;
 enum class EAircraftSubtype : uint8;
 enum class EBuildingExpansionType : uint8;
@@ -33,6 +35,51 @@ class ASquadUnit;
 class ATankMaster;
 struct FStrategicAIRequestBatch;
 struct FStrategicAIResultBatch;
+struct FAsyncTargetSnapshot;
+
+/**
+ * @brief Everything the unit manager keeps for one player: its alive units per kind and how many of each
+ * subtype it has. UGameUnitManager holds one per player number.
+ */
+USTRUCT()
+struct FGameUnitsOfPlayer
+{
+	GENERATED_BODY()
+
+	/** @brief contains all SquadUnits currently alive, for this player. */
+	UPROPERTY()
+	TArray<ASquadUnit*> SquadUnits;
+
+	/** @brief contains all TankMasters currently alive, for this player; nomadic vehicles are in here too. */
+	UPROPERTY()
+	TArray<ATankMaster*> TankMasters;
+
+	UPROPERTY()
+	TArray<AAircraftMaster*> AircraftMasters;
+
+	UPROPERTY()
+	TArray<ABuildingExpansion*> Bxps;
+
+	// Every other registered actor with health (standalone turrets, test turret owners).
+	UPROPERTY()
+	TArray<AActor*> Actors;
+
+	UPROPERTY()
+	TMap<ETankSubtype, int32> TankCountByType;
+
+	UPROPERTY()
+	TMap<ESquadSubtype, int32> SquadCountByType;
+
+	UPROPERTY()
+	TMap<ENomadicSubtype, int32> NomadicCountByType;
+
+	UPROPERTY()
+	TMap<EBuildingExpansionType, int32> BxpCountByType;
+
+	UPROPERTY()
+	TMap<EAircraftSubtype, int32> AircraftCountByType;
+};
+
 /**
  * Contains all the units for all the players in the game.
  */
@@ -76,9 +123,10 @@ public:
 	 * @param SearchLocation The location from which to search.
 	 * @param SearchRadius The radius within which to search.
 	 * @param NumTargets The number of closest targets to find.
-	 * @param OwningPlayer The player owning this request.
+	 * @param OwningPlayer The player owning this request; only units of players hostile to it are found.
 	 * @param PrefferedTarget The preferred target type.
-	 * @param Callback The callback function to invoke with the result.
+	 * @param Callback The callback function to invoke with the result. Called exactly once per request, with an
+	 * empty array when there is no target; the units in it are alive and hostile to the requester at that moment.
 	 * @param MinimumSearchRadius Targets closer than this radius are excluded from the result.
 	 */
 	void RequestClosestTargets(
@@ -100,9 +148,35 @@ public:
 
 	/**
  * @brief Returns all currently alive UnitMasters of the provided player.
- * @param Player The player of which we want the UnitMasters.
+ * @param Player The player of which we want the UnitMasters; exactly this player, not "every enemy".
  */
 	TArray<ASquadUnit*> GetSquadUnitsOfPlayer(const uint8 Player) const;
+
+	/**
+	 * @brief Returns all alive squad units of a group of players, e.g. FRTSPlayers::GetHostileMask(Player).
+	 * @param PlayerMask Bits of the players of which we want the squad units (FRTSPlayers::GetPlayerBit).
+	 */
+	TArray<ASquadUnit*> GetSquadUnitsOfPlayers(const uint8 PlayerMask) const;
+
+	/**
+	 * @brief Returns all alive tanks (nomadic vehicles included) of a group of players.
+	 * @param PlayerMask Bits of the players of which we want the tanks (FRTSPlayers::GetPlayerBit).
+	 */
+	TArray<ATankMaster*> GetTanksOfPlayers(const uint8 PlayerMask) const;
+
+	/**
+	 * @brief GetSquadUnitsOfPlayer without the copy, for callers that only walk the units.
+	 * @param Player The player that owns the squad units.
+	 * @return View into the manager's own array: do not keep it, and do not add or remove units while using it.
+	 */
+	TConstArrayView<ASquadUnit*> GetSquadUnitsOfPlayerView(const uint8 Player) const;
+
+	/**
+	 * @brief GetPlayerTanks without the copy, for callers that only walk the units.
+	 * @param Player The player that owns the tanks.
+	 * @return View into the manager's own array: do not keep it, and do not add or remove units while using it.
+	 */
+	TConstArrayView<ATankMaster*> GetTanksOfPlayerView(const uint8 Player) const;
 
 	/**
 	 * @brief adds the given UM to the array for the corresponding player.
@@ -166,7 +240,7 @@ public:
 
 	/**
 	 * @brief: Returns all alive tanks of the provided player
-	 * @param Player The player that owns the tanks
+	 * @param Player The player that owns the tanks; exactly this player, not "every enemy".
 	 */
 	TArray<ATankMaster*> GetPlayerTanks(const uint8 Player) const;
 
@@ -181,16 +255,24 @@ public:
 	void ApplyTechToBuildingExpansionsOfPlayer(UTechnologyEffect* TechEffect, const TArray<EBuildingExpansionType>& BxpSubtypes, uint8 Player) const;
 	void ApplyTechToAircraftOfPlayer(UTechnologyEffect* TechEffect, const TArray<EAircraftSubtype>& AircraftSubtypes, uint8 Player) const;
 
+	// "Player" is the human player.
 	bool GetHasPlayerTankOfType(ETankSubtype TankSubtype) const;
 	bool GetHasPlayerSquadOfType(ESquadSubtype SquadSubtype) const;
 	bool GetHasPlayerNomadicOfType(ENomadicSubtype NomadicSubtype) const;
 	bool GetHasPlayerBxpOfType(EBuildingExpansionType BxpSubtype) const;
 	bool GetHasPlayerAircraftOfType(EAircraftSubtype AircraftSubtype) const;
+	// "Enemy" is any AI player: true when at least one of them has a unit of the type.
 	bool GetHasEnemyTankOfType(ETankSubtype TankSubtype) const;
 	bool GetHasEnemySquadOfType(ESquadSubtype SquadSubtype) const;
 	bool GetHasEnemyNomadicOfType(ENomadicSubtype NomadicSubtype) const;
 	bool GetHasEnemyBxpOfType(EBuildingExpansionType BxpSubtype) const;
 	bool GetHasEnemyAircraftOfType(EAircraftSubtype AircraftSubtype) const;
+	// Exactly the given player.
+	bool GetHasTankOfTypeForPlayer(uint8 Player, ETankSubtype TankSubtype) const;
+	bool GetHasSquadOfTypeForPlayer(uint8 Player, ESquadSubtype SquadSubtype) const;
+	bool GetHasNomadicOfTypeForPlayer(uint8 Player, ENomadicSubtype NomadicSubtype) const;
+	bool GetHasBxpOfTypeForPlayer(uint8 Player, EBuildingExpansionType BxpSubtype) const;
+	bool GetHasAircraftOfTypeForPlayer(uint8 Player, EAircraftSubtype AircraftSubtype) const;
 
 	int32 GetPlayerSquadCountOfTypes(const uint8 Player, const TArray<ESquadSubtype>& SquadTypes) const;
 	int32 GetPlayerTankCountOfTypes(const uint8 Player, const TArray<ETankSubtype>& TankTypes) const;
@@ -285,47 +367,26 @@ private:
 	void ShutdownAsyncTargetThread();
 
 	/** Periodically updates the actor data on the async thread
-	 * @note We only add data of those actors that are visible in the fow, this means if the player
-	 * sees no enemy units the async target thread has zero targets.
+	 * @note We only add data of those actors that are visible in the fow to at least one active player that fights
+	 * their owner, this means if
+	 * the player sees no enemy units and no AI unit sees a player unit, a two-player game has zero targets.
 	 */
 	void UpdateActorData();
 
 	void UpdateDetailedActorData();
 
-	/** @brief contains all SquadUnits currently alive, for the player. */
+	// Alive units and subtype counters per player, indexed by player number (1..RTSPlayers::MaxPlayers).
+	// Slot 0 belongs to the neutral owner and stays empty: neutral things are never registered.
 	UPROPERTY()
-	TArray<ASquadUnit*> M_SquadUnitAlivePlayer;
+	FGameUnitsOfPlayer M_UnitsOfPlayer[RTSPlayers::PlayerArraySize];
 
+	/** @return The storage of a player; unset owners (222) share that of the first AI player. */
+	FGameUnitsOfPlayer& GetUnitsOfPlayer(uint8 Player);
+	const FGameUnitsOfPlayer& GetUnitsOfPlayer(uint8 Player) const;
 
-	/** @brief contains all SquadUnits currently alive, for the enemy player. */
-	UPROPERTY()
-	TArray<ASquadUnit*> M_SquadUnitsAliveEnemy;
-
-	/** @brief contains all TankMasters currently alive, for the player. */
-	UPROPERTY()
-	TArray<ATankMaster*> M_TankMastersAlivePlayer;
-
-	/** @brief contains all TankMasters currently alive, for the player. */
-	UPROPERTY()
-	TArray<ATankMaster*> M_TankMastersAliveEnemy;
-
-	UPROPERTY()
-	TArray<AAircraftMaster*> M_AircraftMastersAlivePlayer;
-
-	UPROPERTY()
-	TArray<AAircraftMaster*> M_AircraftMastersAliveEnemy;
-
-	UPROPERTY()
-	TArray<ABuildingExpansion*> M_BxpAlivePlayer;
-	
-	UPROPERTY()
-	TArray<ABuildingExpansion*> M_BxpAliveEnemy;
-
-	UPROPERTY()
-	TArray<AActor*> M_ActorsAlivePlayer;
-
-	UPROPERTY()
-	TArray<AActor*> M_ActorsAliveEnemy;
+	// Controllers of the squads that have at least one registered soldier, over all players; the controllers
+	// themselves are not registered.
+	TSet<ASquadController*> GatherSquadControllersOfAllPlayers() const;
 
 	AActor* FindGenericActorUnitForPlayer(
 		const FTrainingOption& TrainingOption,
@@ -368,47 +429,10 @@ private:
 	void IncrementAircraftCounter(AAircraftMaster* Aircraft, uint8 Player);
 	void DecrementAircraftCounter(AAircraftMaster* Aircraft, uint8 Player);
 
-	UPROPERTY()
-	TMap<ETankSubtype, int32> M_PlayerHasTankOfType;
-
-	UPROPERTY()
-	TMap<ETankSubtype, int32> M_EnemyHasTankOfType;
-
-	UPROPERTY()
-	TMap<ESquadSubtype, int32> M_PlayerHasSquadOfType;
-
-	UPROPERTY()
-	TMap<ESquadSubtype, int32> M_EnemyHasSquadOfType;
-
-	UPROPERTY()
-	TMap<ENomadicSubtype, int32> M_PlayerHasNomadicOfType;
-
-	UPROPERTY()
-	TMap<ENomadicSubtype, int32> M_EnemyHasNomadicOfType;
-
-	UPROPERTY()
-	TMap<EBuildingExpansionType, int32> M_PlayerHasBxpOfType;
-
-	UPROPERTY()
-	TMap<EBuildingExpansionType, int32> M_EnemyHasBxpOfType;
-
-	UPROPERTY()
-	TMap<EAircraftSubtype, int32> M_PlayerHasAircraftOfType;
-
-	UPROPERTY()
-	TMap<EAircraftSubtype, int32> M_EnemyHasAircraftOfType;
-
 	// -------------- ASYNC TARGET FINDING ---------------
 
 	/** Pointer to the FRunnable of the async GetTargetUnit thread type */
 	FGetAsyncTarget* M_AsyncTargetProcessor;
-
-	/** Mapping of Actor IDs enemy units */
-	UPROPERTY()
-	TMap<uint32, AActor*> M_EnemyActorIDToActorMap;
-	// Mapping of actor IDs to player units.
-	UPROPERTY()
-	TMap<uint32, AActor*> M_PlayerActorIDToActorMap;
 
 	/** Timer handle for periodic actor data updates */
 	FTimerHandle M_ActorDataUpdateTimerHandle;
@@ -433,25 +457,20 @@ private:
 	float M_DetailedActorDataUpdateInterval;
 
 	/**
-	 * @brief Called when target IDs are received from the async thread.
-	 * @param TargetIDs The array of target Actor IDs.
-	 * @param Callback The original callback function provided by the requester.
-	 * @param OwningPlayer
+	 * @brief Helper to get one snapshot with valid target data computed over all different unit arrays of all
+	 * players, grouped by owning player.
+	 * @param OutSnapshot The cumulated data over all different unit type arrays, those units are valid targets
+	 *  and are visible to at least one player.
 	 */
-	void OnTargetIDsReceived(
-		const TArray<uint32>& TargetIDs,
-		TFunction<void(const TArray<AActor*>&)> Callback, int32 OwningPlayer);
-
-	TPair<ETargetPreference, FVector> CreatePair(const FVector& ActorLocation, const ETargetPreference& Preference);
+	void BuildAsyncTargetSnapshot(FAsyncTargetSnapshot& OutSnapshot) const;
 
 	/**
-	 * @brief Helper to get one array with valid target data computed over all different unit arrays.
-	 * @param bGetPlayerUnits Whether to look through the player units or the enemy units. 
-	 * @param OutActorData The cumulated data over all different unit type arrays, those units are valid targets
-	 *  and are visible.
+	 * @brief Adds the targetable units of one player to the snapshot, in the order generic actors, tanks,
+	 * squad units, aircraft, building expansions.
+	 * @param Player Player number whose units are added.
+	 * @param OutSnapshot Snapshot to append to.
 	 */
-	void GetAsyncActorData(const bool bGetPlayerUnits,
-	                       TMap<uint32, TPair<ETargetPreference, FVector>>& OutActorData);
+	void AppendAsyncTargetUnitsOfPlayer(int32 Player, FAsyncTargetSnapshot& OutSnapshot) const;
 
 	AActor* FindTankUnitOfPlayer(const ETankSubtype TankSubtype, const int32 OwningPlayer) const;
 	AActor* FindAircraftUnitOfPlayer(const EAircraftSubtype AircraftSubtype, const int32 OwningPlayer) const;
@@ -464,16 +483,10 @@ private:
 template <typename T>
 FORCEINLINE void UGameUnitManager::CleanupActorArray(TArray<T*>& ActorArray)
 {
-	TArray<T*> ValidActors;
-	ValidActors.Reserve(ActorArray.Num());
-
-	for (T* EachActor : ActorArray)
+	// In place and keeping the order: no new array for every list on every clean-up.
+	ActorArray.RemoveAll([](const T* EachActor)
 	{
-		if (IsValid(EachActor)) // use UE's IsValid to avoid adding extra includes in the header
-		{
-			ValidActors.Add(EachActor);
-		}
-	}
-
-	ActorArray = MoveTemp(ValidActors);
+		return not IsValid(EachActor); // use UE's IsValid to avoid adding extra includes in the header
+	});
 }
+
