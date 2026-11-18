@@ -183,7 +183,13 @@ void UEnemyStrategicAIComponent::RegisterDroppedUnitWithBlackboardWhenReady(AAct
 	}
 
 	const URTSComponent* RTSComponent = DroppedUnit->FindComponentByClass<URTSComponent>();
-	if (not IsValid(RTSComponent) || RTSComponent->GetOwningPlayer() == 1)
+	if (not IsValid(RTSComponent) || FRTSPlayers::IsHumanPlayer(RTSComponent->GetOwningPlayer()))
+	{
+		return;
+	}
+	// A unit dropped for another AI player goes on that player's blackboard, never on this one.
+	const AEnemyController* EnemyController = Cast<AEnemyController>(GetOwner());
+	if (IsValid(EnemyController) && not EnemyController->GetCanControlUnit(DroppedUnit))
 	{
 		return;
 	}
@@ -1000,6 +1006,9 @@ void UEnemyStrategicAIComponent::TrainingSpawnBatchTimerTick(const int32 BatchID
 
 	const FVector TrainingLocation = SpawnBatch->SpawnLocation;
 	const TWeakObjectPtr<UEnemyStrategicAIComponent> WeakThis(this);
+	// Trained units belong to the player of the owning controller.
+	const AEnemyController* EnemyController = Cast<AEnemyController>(GetOwner());
+	const int32 OwningPlayerOverride = IsValid(EnemyController) ? EnemyController->GetSpawnOwnerOverride() : INDEX_NONE;
 	const bool bRequestStarted = RTSAsyncSpawner->AsyncSpawnOptionAtLocation(
 		TrainingOption,
 		TrainingLocation,
@@ -1013,7 +1022,7 @@ void UEnemyStrategicAIComponent::TrainingSpawnBatchTimerTick(const int32 BatchID
 			}
 
 			WeakThis->OnBlackboardUnitSpawned(SpawnedTrainingOption, SpawnedActor, ID, TrainingLocation);
-		}, FRotator::ZeroRotator);
+		}, FRotator::ZeroRotator, OwningPlayerOverride);
 
 #if defined(RTS_WITH_ENEMY_AI_SHIPPING_TESTS) && RTS_WITH_ENEMY_AI_SHIPPING_TESTS
 	M_ShippingTest_TrainingSpawnRequestCount += bRequestStarted ? 1 : 0;
@@ -1062,6 +1071,10 @@ void UEnemyStrategicAIComponent::OnBlackboardUnitSpawned(
 	if (not IsValid(SpawnedActor))
 	{
 		return;
+	}
+	if (const AEnemyController* EnemyController = Cast<AEnemyController>(GetOwner()))
+	{
+		EnemyController->LogSpawnedUnitOwnerMismatch(SpawnedActor);
 	}
 
 #if defined(RTS_WITH_ENEMY_AI_SHIPPING_TESTS) && RTS_WITH_ENEMY_AI_SHIPPING_TESTS
@@ -1304,7 +1317,8 @@ void UEnemyStrategicAIComponent::TrainingRequirements_ThinkStep()
 		return;
 	}
 
-	constexpr uint8 EnemyPlayerIndex = 2;
+	// Tech levels unlock from the buildings of the player this controller plays.
+	const uint8 EnemyPlayerIndex = static_cast<uint8>(GetControlledPlayer());
 	FEnemyLevelTraining& EnemyLevelTraining = M_TrainingState.EnemyLevelTraining;
 	// This accumulates all the buidling types needed for the various tech levels;
 	const TArray<EBuildingExpansionType> RequiredBxpTypes = EnemyLevelTraining.GetUniqueBuildingTypesForTechLevels();
@@ -1387,6 +1401,16 @@ bool UEnemyStrategicAIComponent::EnsureEnemyControllerIsValid() const
 		this);
 
 	return false;
+}
+
+int32 UEnemyStrategicAIComponent::GetControlledPlayer() const
+{
+	const AEnemyController* EnemyController = Cast<AEnemyController>(GetOwner());
+	if (not IsValid(EnemyController))
+	{
+		return RTSPlayers::FirstAIPlayer;
+	}
+	return EnemyController->GetControlledPlayer();
 }
 
 
@@ -1557,6 +1581,11 @@ void UEnemyStrategicAIComponent::ProcessStrategicAIRequests()
 
 	FStrategicAIRequestBatch RequestsToSend = MoveTemp(M_PendingRequests);
 	M_PendingRequests = FStrategicAIRequestBatch();
+	// Stamped at every send: the async thread cannot read player relations, and teams may change during a game.
+	const int32 ControlledPlayer = GetControlledPlayer();
+	RequestsToSend.Requester.RequestingPlayer = ControlledPlayer;
+	RequestsToSend.Requester.HostileMask = FRTSPlayers::GetHostileMask(ControlledPlayer);
+	RequestsToSend.Requester.FriendlyMask = FRTSPlayers::GetFriendlyMask(ControlledPlayer);
 
 	TWeakObjectPtr<UEnemyStrategicAIComponent> WeakThis(this);
 	GameUnitManager->RequestStrategicAIRequests(
@@ -1582,6 +1611,7 @@ void UEnemyStrategicAIComponent::OnStrategicAIResultsReceived(const FStrategicAI
 	ProcessPlayerUnitBulkLocationsResults(ResultBatch.PlayerUnitBulkLocationsResults);
 	ProcessConstructionLocationsResults(ResultBatch.ConstructionLocationsResults);
 	ProcessMineLocationsResults(ResultBatch.MineLocationsResults);
+	OnStrategicAIResultsApplied.Broadcast(ResultBatch);
 }
 
 void UEnemyStrategicAIComponent::ProcessClosestFlankableEnemyHeavyResults(

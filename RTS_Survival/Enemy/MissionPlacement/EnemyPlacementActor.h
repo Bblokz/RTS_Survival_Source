@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "RTS_Survival/Game/Difficulty/GameDifficulty.h"
+#include "RTS_Survival/Game/Players/RTSPlayers.h"
 
 #include "EnemyPlacementActor.generated.h"
 
@@ -34,6 +35,14 @@ public:
 
 	/** @return A short problem shown on the editor label in yellow; empty when the setup is usable. */
 	virtual FString GetConfigurationProblem() const;
+
+	/** @return The AI player this actor works for (FirstAIPlayer..MaxPlayers). */
+	int32 GetEnemyPlayer() const;
+
+	// The AI player this actor works for: it runs on the enemy controller with this ControlledPlayer and its
+	// units are that player's. Leave it at 2 in a map with one enemy controller.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Enemy Player", meta = (ClampMin = "2", ClampMax = "4"))
+	int32 EnemyPlayer = RTSPlayers::FirstAIPlayer;
 
 protected:
 	virtual void OnConstruction(const FTransform& Transform) override;
@@ -95,5 +104,10 @@ private:
 
 	void ScheduleEnemyAIReadyCheck(const float DelaySeconds);
 	void CheckEnemyAIReady();
+	/**
+	 * @return The enemy controller of this actor's player. An actor left on the first AI player gets the default
+	 * controller, as every placed actor did when a map had one controller.
+	 */
+	AEnemyController* FindEnemyControllerOfEnemyPlayer() const;
 	FString GetEditorLabelText() const;
 };

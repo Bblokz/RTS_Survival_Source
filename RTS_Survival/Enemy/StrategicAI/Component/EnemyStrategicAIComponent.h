@@ -197,6 +197,10 @@ public:
 	const FStrategicAIResultBatch& GetLatestStrategicAIResults() const;
 	const FStrategicAIBlackboard& GetStrategicAIBlackboard() const;
 
+	// Fires on the game thread after a result batch of the async thread was applied to the blackboard (tests).
+	DECLARE_MULTICAST_DELEGATE_OneParam(FOnStrategicAIResultsApplied, const FStrategicAIResultBatch&);
+	FOnStrategicAIResultsApplied OnStrategicAIResultsApplied;
+
 	// Also gates the base trenches the AI digs (UEnemyBaseTrenchComponent).
 	bool GetIsAllowedBuilding() const;
 	FStrategicAIBlackboard& GetEditableStrategicAIBlackboard();
@@ -490,6 +494,9 @@ private:
 	TArray<FAIThinkingTimerData*> M_AIThinkTimers;
 
 	bool EnsureEnemyControllerIsValid() const;
+	// The AI player of the owning controller: whose units this component counts, trains and asks the async
+	// thread about. The first AI player when the component has no enemy controller as owner.
+	int32 GetControlledPlayer() const;
 	bool EnsureStochasticDecisionTreeIsValid() const;
 	void CacheGenerationSeedFromGameInstance();
 	int32 GetSeededIndex(const int32 OptionCount, const int32 DecisionSalt = 0) const;

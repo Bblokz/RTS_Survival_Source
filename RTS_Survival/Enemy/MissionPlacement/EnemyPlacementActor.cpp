@@ -211,10 +211,25 @@ void AEnemyPlacementActor::ScheduleEnemyAIReadyCheck(const float DelaySeconds)
 	}), DelaySeconds, false);
 }
 
+int32 AEnemyPlacementActor::GetEnemyPlayer() const
+{
+	return FRTSPlayers::IsValidAIPlayer(EnemyPlayer) ? EnemyPlayer : RTSPlayers::FirstAIPlayer;
+}
+
+AEnemyController* AEnemyPlacementActor::FindEnemyControllerOfEnemyPlayer() const
+{
+	const int32 PlacementPlayer = GetEnemyPlayer();
+	if (PlacementPlayer == RTSPlayers::FirstAIPlayer)
+	{
+		return FRTS_Statics::GetEnemyController(this);
+	}
+	return FRTS_Statics::GetEnemyControllerForPlayer(this, PlacementPlayer);
+}
+
 void AEnemyPlacementActor::CheckEnemyAIReady()
 {
 	using namespace EnemyPlacementActorConstants;
-	AEnemyController* EnemyController = FRTS_Statics::GetEnemyController(this);
+	AEnemyController* EnemyController = FindEnemyControllerOfEnemyPlayer();
 	ERTSGameDifficulty Difficulty = ERTSGameDifficulty::Normal;
 	const bool bHasDifficulty = EnemyPlacement::TryGetGameDifficulty(this, Difficulty);
 	const bool bHasController = IsValid(EnemyController) || not GetNeedsEnemyController();
