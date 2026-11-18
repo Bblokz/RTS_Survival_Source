@@ -2867,9 +2867,29 @@ void ASquadUnit::OnProjectileHit(const bool bBounced)
 	}
 }
 
+void ASquadUnit::BeginPlay_BindToOwningPlayerChanges()
+{
+	if (not IsValid(RTSComponent))
+	{
+		return;
+	}
+	RTSComponent->OnOwningPlayerChanged.AddUObject(this, &ASquadUnit::OnOwningPlayerChanged);
+}
+
+void ASquadUnit::OnOwningPlayerChanged(const uint8 /*OldOwningPlayer*/, const uint8 NewOwningPlayer)
+{
+	OwningPlayer = NewOwningPlayer;
+	FRTS_CollisionSetup::SetupInfantryCapsuleCollision(GetCapsuleComponent(), NewOwningPlayer);
+	if (IsValid(M_InfantryWeapon))
+	{
+		M_InfantryWeapon->SetOwningPlayer(NewOwningPlayer);
+	}
+}
+
 void ASquadUnit::BeginPlay()
 {
 	Super::BeginPlay();
+	BeginPlay_BindToOwningPlayerChanges();
 	// A spawn point set under the terrain (or a squad grid point under a hill) starts the unit inside the landscape,
 	// where it falls through the world: one trace now instead of any check later.
 	// The origin is the capsule centre, so any depth under the surface already means the soldier is inside it.

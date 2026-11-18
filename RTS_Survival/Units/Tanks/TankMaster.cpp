@@ -6,6 +6,7 @@
 #include "AITankMaster.h"
 #include "Components/AudioComponent.h"
 #include "RTS_Survival/DeveloperSettings.h"
+#include "RTS_Survival/Game/Players/RTSPlayers.h"
 #include "RTS_Survival/RTSComponents/RTSOptimizer/RTSOptimizer.h"
 #include "RTS_Survival/Units/Ragdoll/RTSRagdollSettings.h"
 #include "RTS_Survival/Units/Ragdoll/RTSRagdollSubsystem.h"
@@ -834,12 +835,13 @@ void ATankMaster::SetupCollisionForMeshAttachedToTracks(UMeshComponent* MeshToSe
 {
 	(void)bIsHarvester;
 
-	bool bOwnedByPlayer1 = false;
+	// Without an RTS component the mesh is set up as that of the first AI player, as it always was.
+	int32 OwningPlayer = RTSPlayers::FirstAIPlayer;
 	if (GetIsValidRTSComponent())
 	{
-		bOwnedByPlayer1 = RTSComponent->GetOwningPlayer() == 1;
+		OwningPlayer = RTSComponent->GetOwningPlayer();
 	}
-	FRTS_CollisionSetup::SetupCollisionForMeshAttachedToTracks(MeshToSetup, bOwnedByPlayer1);
+	FRTS_CollisionSetup::SetupTrackAttachedMeshCollision(MeshToSetup, OwningPlayer);
 }
 
 

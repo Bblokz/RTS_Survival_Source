@@ -8,6 +8,7 @@
 #include "DrawDebugHelpers.h"
 #include "Engine/World.h"
 #include "RTS_Survival/DeveloperSettings.h"
+#include "RTS_Survival/Game/Players/RTSPlayers.h"
 #include "RTS_Survival/RTSCollisionTraceChannels.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/CollisionSetup/TriggerOverlapLogic.h"
@@ -174,7 +175,9 @@ void UReinforcementPoint::RequestSquadOverlapCheck()
 
 	const FVector OriginLocation = GetSearchOriginLocation();
 	const FCollisionShape SphereShape = FCollisionShape::MakeSphere(M_ReinforcementActivationRadius);
-	const ETriggerOverlapLogic OverlapLogic = (M_OwningPlayer == 1)
+	// Reinforcements are per player: only the object channel of the owner's own side is searched, and the result
+	// handler drops the squads of other players on that channel (allied AI players included).
+	const ETriggerOverlapLogic OverlapLogic = FRTSPlayers::IsHumanPlayer(M_OwningPlayer)
 		                                          ? ETriggerOverlapLogic::OverlapPlayer
 		                                          : ETriggerOverlapLogic::OverlapEnemy;
 	const FCollisionObjectQueryParams ObjectQueryParams = BuildObjectQueryParams(OverlapLogic);

@@ -899,6 +899,10 @@ private:
 
 	void SetOwningPlayerAndStartFow(const int32 NewOwningPlayer, const float NewVisionRange);
 
+	// A soldier handed to another player at runtime: its capsule and weapon must fight for the new player.
+	void BeginPlay_BindToOwningPlayerChanges();
+	void OnOwningPlayerChanged(uint8 OldOwningPlayer, uint8 NewOwningPlayer);
+
 
 	/** The AI controller for this squad unit. */
 	UPROPERTY()
