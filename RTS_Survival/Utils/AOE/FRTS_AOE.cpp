@@ -13,6 +13,8 @@
 #include "RTS_Survival/RTSComponents/ShieldComponent/ShieldComponent.h"
 #include "RTS_Survival/RTSComponents/ShieldComponent/ShieldOwner/ShieldOwner.h"
 #include "RTS_Survival/RTSCollisionTraceChannels.h"
+#include "RTS_Survival/Utils/CollisionSetup/RTSPlayerCollision.h"
+#include "RTS_Survival/Utils/RTSMapTests/DamageHooks/DamageMapTestHooks.h"
 #include "RTS_Survival/Weapons/WeaponData/FRTSWeaponHelpers/FRTSWeaponHelpers.h"
 
 namespace
@@ -43,13 +45,16 @@ namespace
 		AActor& HitActor,
 		const float DamageToApply,
 		FDamageEvent& DamageEvent,
-		const TWeakObjectPtr<AActor>& WeakDamageCauser)
+		const TWeakObjectPtr<AActor>& WeakDamageCauser,
+		const int32 AttackingPlayer)
 	{
 		if (DamageToApply <= 0.f)
 		{
 			return;
 		}
 
+		// Here and not at the caller of the sweep: this runs from the async sweep's callback.
+		RTS_MAPTEST_DAMAGE_ATTACKER_SCOPE(AttackingPlayer);
 		HitActor.TakeDamage(
 			DamageToApply,
 			DamageEvent,
@@ -73,12 +78,13 @@ namespace
 		const uint32 ExplosionId,
 		const FDamageEvent& BasicDamageEvent,
 		const TWeakObjectPtr<AActor>& WeakDamageCauser,
-		const EWeaponShellType DamageShellType)
+		const EWeaponShellType DamageShellType,
+		const int32 AttackingPlayer)
 	{
 		FVehicleModuleDamageEvent ModuleDamageEvent = FVehicleModuleDamageEvent::MakeExplosionEvent(
 			&ArmorCalculation, EVehicleModuleDelivery::Splash, Epicenter, AttenuatedDamage, ExplosionId,
 			BasicDamageEvent.DamageTypeClass, DamageShellType);
-		ApplyDamageToActor(HitActor, AttenuatedDamage, ModuleDamageEvent, WeakDamageCauser);
+		ApplyDamageToActor(HitActor, AttenuatedDamage, ModuleDamageEvent, WeakDamageCauser, AttackingPlayer);
 	}
 
 	float CalculateRearArmorDamageMultiplier(
@@ -134,15 +140,109 @@ namespace
 	}
 }
 
+FAoeInstigator FAoeInstigator::HostilesOf(const int32 InOwningPlayer)
+{
+	FAoeInstigator Instigator;
+	Instigator.OwningPlayer = InOwningPlayer;
+	Instigator.Targets = EAoeTargets::Hostiles;
+	return Instigator;
+}
+
+FAoeInstigator FAoeInstigator::AlliesOf(const int32 InOwningPlayer)
+{
+	FAoeInstigator Instigator;
+	Instigator.OwningPlayer = InOwningPlayer;
+	Instigator.Targets = EAoeTargets::Allies;
+	return Instigator;
+}
+
+FAoeInstigator FAoeInstigator::FromOwnerRelativeLogic(const int32 InOwningPlayer,
+                                                      const ETriggerOverlapLogic OwnerRelativeLogic)
+{
+	FAoeInstigator Instigator;
+	Instigator.OwningPlayer = InOwningPlayer;
+	Instigator.Targets = EAoeTargets::HostilesAndAllies;
+	if (OwnerRelativeLogic == ETriggerOverlapLogic::OverlapPlayer)
+	{
+		Instigator.Targets = EAoeTargets::Allies;
+	}
+	else if (OwnerRelativeLogic == ETriggerOverlapLogic::OverlapEnemy)
+	{
+		Instigator.Targets = EAoeTargets::Hostiles;
+	}
+	return Instigator;
+}
+
 FRTS_AOE::FRTS_AOE() = default;
 
 FRTS_AOE::~FRTS_AOE() = default;
+
+FRTS_AOE::FAoeSweepTargets FRTS_AOE::MakeLiteralSweepTargets(const ETriggerOverlapLogic OverlapLogic)
+{
+	FAoeSweepTargets SweepTargets;
+	SweepTargets.OverlapLogic = OverlapLogic;
+	return SweepTargets;
+}
+
+FRTS_AOE::FAoeSweepTargets FRTS_AOE::MakeOwnerRelativeSweepTargets(const FAoeInstigator& Instigator)
+{
+	FAoeSweepTargets SweepTargets;
+	SweepTargets.AttackingPlayer = Instigator.OwningPlayer;
+	if (Instigator.Targets == EAoeTargets::HostilesAndAllies)
+	{
+		// Everybody in range: both sides and no owner check, the same as the literal OverlapBoth.
+		return SweepTargets;
+	}
+	SweepTargets.OverlapLogic = Instigator.Targets == EAoeTargets::Allies
+		                            ? FRTSPlayerCollision::GetOverlapLogicForAlliesOf(Instigator.OwningPlayer)
+		                            : FRTSPlayerCollision::GetOverlapLogicForHostilesOf(Instigator.OwningPlayer);
+	SweepTargets.UnitOwnerFilter = Instigator;
+	return SweepTargets;
+}
+
+bool FRTS_AOE::GetIsHitReachedByInstigator(const FHitResult& Hit, const FAoeInstigator& Instigator)
+{
+	const AActor* HitActor = Hit.GetActor();
+	const UPrimitiveComponent* HitComponent = Hit.GetComponent();
+	// Destructibles are reached whoever owns them, as before four players: own walls take own splash.
+	if (IsValid(HitComponent) && HitComponent->GetCollisionObjectType() == ECC_Destructible)
+	{
+		return true;
+	}
+	if (Instigator.Targets == EAoeTargets::Allies)
+	{
+		return FRTSPlayerCollision::IsHitAlliedToPlayer(HitActor, HitComponent, Instigator.OwningPlayer);
+	}
+	return FRTSPlayerCollision::IsHitDamageableByPlayer(HitActor, HitComponent, Instigator.OwningPlayer);
+}
 
 void FRTS_AOE::ApplyToActorsAsync(
 	AActor* InstigatorActor,
 	const FVector& Epicenter,
 	const float Radius,
 	const ETriggerOverlapLogic OverlapLogic,
+	TFunction<void(AActor&)> OnActorFound)
+{
+	SweepAndApplyToActors(InstigatorActor, Epicenter, Radius, MakeLiteralSweepTargets(OverlapLogic),
+	                      MoveTemp(OnActorFound));
+}
+
+void FRTS_AOE::ApplyToActorsAsync(
+	AActor* InstigatorActor,
+	const FVector& Epicenter,
+	const float Radius,
+	const FAoeInstigator& Instigator,
+	TFunction<void(AActor&)> OnActorFound)
+{
+	SweepAndApplyToActors(InstigatorActor, Epicenter, Radius, MakeOwnerRelativeSweepTargets(Instigator),
+	                      MoveTemp(OnActorFound));
+}
+
+void FRTS_AOE::SweepAndApplyToActors(
+	AActor* InstigatorActor,
+	const FVector& Epicenter,
+	const float Radius,
+	const FAoeSweepTargets& SweepTargets,
 	TFunction<void(AActor&)> OnActorFound)
 {
 	if (not OnActorFound)
@@ -154,7 +254,7 @@ void FRTS_AOE::ApplyToActorsAsync(
 		InstigatorActor,
 		Epicenter,
 		Radius,
-		BuildObjectQueryParams(OverlapLogic),
+		SweepTargets,
 		TArray<TWeakObjectPtr<AActor>>(),
 		[OnActorFound = MoveTemp(OnActorFound)](TArray<FHitResult>&& HitResults)
 		{
@@ -182,6 +282,36 @@ void FRTS_AOE::DealDamageInRadiusAsync(
 	const EShieldDamageSource ShieldDamageSource,
 	const TArray<TWeakObjectPtr<AActor>>& ActorsToIgnore)
 {
+	SweepAndDealDamageInRadius(DamageCauser, Epicenter, Radius, BaseDamage, DamageFalloffExponent, DamageType,
+	                           MakeLiteralSweepTargets(OverlapLogic), ShieldDamageSource, ActorsToIgnore);
+}
+
+void FRTS_AOE::DealDamageInRadiusAsync(
+	AActor* DamageCauser,
+	const FVector& Epicenter,
+	const float Radius,
+	const float BaseDamage,
+	const float DamageFalloffExponent,
+	const ERTSDamageType DamageType,
+	const FAoeInstigator& Instigator,
+	const EShieldDamageSource ShieldDamageSource,
+	const TArray<TWeakObjectPtr<AActor>>& ActorsToIgnore)
+{
+	SweepAndDealDamageInRadius(DamageCauser, Epicenter, Radius, BaseDamage, DamageFalloffExponent, DamageType,
+	                           MakeOwnerRelativeSweepTargets(Instigator), ShieldDamageSource, ActorsToIgnore);
+}
+
+void FRTS_AOE::SweepAndDealDamageInRadius(
+	AActor* DamageCauser,
+	const FVector& Epicenter,
+	const float Radius,
+	const float BaseDamage,
+	const float DamageFalloffExponent,
+	const ERTSDamageType DamageType,
+	const FAoeSweepTargets& SweepTargets,
+	const EShieldDamageSource ShieldDamageSource,
+	const TArray<TWeakObjectPtr<AActor>>& ActorsToIgnore)
+{
 	if (not IsValid(DamageCauser))
 	{
 		return;
@@ -195,13 +325,15 @@ void FRTS_AOE::DealDamageInRadiusAsync(
 
 	const float SafeFalloffExponent = FMath::Max(DamageFalloffExponent, 0.f);
 	const TWeakObjectPtr<AActor> WeakDamageCauser = DamageCauser;
+	const int32 AttackingPlayer = SweepTargets.AttackingPlayer;
 	StartAsyncSphereSweep(
 		DamageCauser,
 		Epicenter,
 		SafeRadius,
-		BuildObjectQueryParams(OverlapLogic),
+		SweepTargets,
 		ActorsToIgnore,
-		[WeakDamageCauser, Epicenter, BaseDamage, SafeRadius, SafeFalloffExponent, DamageType, ShieldDamageSource](
+		[WeakDamageCauser, Epicenter, BaseDamage, SafeRadius, SafeFalloffExponent, DamageType, ShieldDamageSource,
+			AttackingPlayer](
 		TArray<FHitResult>&& HitResults)
 		{
 			FRTSBlastDamageEvent DamageEvent = FRTSWeaponHelpers::MakeBlastDamageEvent(DamageType, Epicenter);
@@ -233,7 +365,7 @@ void FRTS_AOE::DealDamageInRadiusAsync(
 					continue;
 				}
 
-				ApplyDamageToActor(*HitActor, DamageToApply, DamageEvent, WeakDamageCauser);
+				ApplyDamageToActor(*HitActor, DamageToApply, DamageEvent, WeakDamageCauser, AttackingPlayer);
 			}
 		});
 }
@@ -256,6 +388,8 @@ namespace
 		bool bDamagesVehicleModules = false;
 		uint32 ModuleExplosionId = 0;
 		EWeaponShellType ModuleDamageShellType = static_cast<EWeaponShellType>(0);
+		// Player the damage is attributed to in map tests; INDEX_NONE when no player caused the explosion.
+		int32 AttackingPlayer = INDEX_NONE;
 	};
 
 	void ApplyRearArmorAoeToActor(
@@ -285,7 +419,7 @@ namespace
 				                FString::Printf(TEXT("No Armor found, dmg: %.1f"), DamageToApply), nullptr,
 				                FColor::White, 5.f);
 			}
-			ApplyDamageToActor(HitActor, DamageToApply, DamageEvent, Params.WeakDamageCauser);
+			ApplyDamageToActor(HitActor, DamageToApply, DamageEvent, Params.WeakDamageCauser, Params.AttackingPlayer);
 			return;
 		}
 
@@ -323,10 +457,10 @@ namespace
 		{
 			ApplyDamageWithModuleSplash(HitActor, *ArmorCalculation, AdjustedDamage, Params.Epicenter,
 			                            Params.ModuleExplosionId, DamageEvent, Params.WeakDamageCauser,
-			                            Params.ModuleDamageShellType);
+			                            Params.ModuleDamageShellType, Params.AttackingPlayer);
 			return;
 		}
-		ApplyDamageToActor(HitActor, AdjustedDamage, DamageEvent, Params.WeakDamageCauser);
+		ApplyDamageToActor(HitActor, AdjustedDamage, DamageEvent, Params.WeakDamageCauser, Params.AttackingPlayer);
 	}
 
 	/**
@@ -415,6 +549,52 @@ void FRTS_AOE::DealDamageVsRearArmorInRadiusAsync(
 	const EWeaponShellType ModuleDamageShellType,
 	const EAoeFalloffDistance FalloffDistance)
 {
+	SweepAndDealDamageVsRearArmor(DamageCauser, Epicenter, Radius, BaseDamage, DamageFalloffExponent,
+	                              FullDmgArmorPen, ArmorPenFallOff, MaxArmorPen, DamageType,
+	                              MakeLiteralSweepTargets(OverlapLogic), ShieldDamageSource, ActorsToIgnore,
+	                              ModuleSplashPolicy, ModuleDamageShellType, FalloffDistance);
+}
+
+void FRTS_AOE::DealDamageVsRearArmorInRadiusAsync(
+	AActor* DamageCauser,
+	const FVector& Epicenter,
+	const float Radius,
+	const float BaseDamage,
+	const float DamageFalloffExponent,
+	const float FullDmgArmorPen,
+	const float ArmorPenFallOff,
+	const float MaxArmorPen,
+	const ERTSDamageType DamageType,
+	const FAoeInstigator& Instigator,
+	const EShieldDamageSource ShieldDamageSource,
+	const TArray<TWeakObjectPtr<AActor>>& ActorsToIgnore,
+	const EVehicleModuleSplashPolicy ModuleSplashPolicy,
+	const EWeaponShellType ModuleDamageShellType,
+	const EAoeFalloffDistance FalloffDistance)
+{
+	SweepAndDealDamageVsRearArmor(DamageCauser, Epicenter, Radius, BaseDamage, DamageFalloffExponent,
+	                              FullDmgArmorPen, ArmorPenFallOff, MaxArmorPen, DamageType,
+	                              MakeOwnerRelativeSweepTargets(Instigator), ShieldDamageSource, ActorsToIgnore,
+	                              ModuleSplashPolicy, ModuleDamageShellType, FalloffDistance);
+}
+
+void FRTS_AOE::SweepAndDealDamageVsRearArmor(
+	AActor* DamageCauser,
+	const FVector& Epicenter,
+	const float Radius,
+	const float BaseDamage,
+	const float DamageFalloffExponent,
+	const float FullDmgArmorPen,
+	const float ArmorPenFallOff,
+	const float MaxArmorPen,
+	const ERTSDamageType DamageType,
+	const FAoeSweepTargets& SweepTargets,
+	const EShieldDamageSource ShieldDamageSource,
+	const TArray<TWeakObjectPtr<AActor>>& ActorsToIgnore,
+	const EVehicleModuleSplashPolicy ModuleSplashPolicy,
+	const EWeaponShellType ModuleDamageShellType,
+	const EAoeFalloffDistance FalloffDistance)
+{
 	if (not IsValid(DamageCauser))
 	{
 		return;
@@ -440,11 +620,12 @@ void FRTS_AOE::DealDamageVsRearArmorInRadiusAsync(
 	Params.bDamagesVehicleModules = ModuleSplashPolicy == EVehicleModuleSplashPolicy::DamageExternalModules;
 	Params.ModuleExplosionId = Params.bDamagesVehicleModules ? ++GModuleSplashExplosionSerial : 0;
 	Params.ModuleDamageShellType = ModuleDamageShellType;
+	Params.AttackingPlayer = SweepTargets.AttackingPlayer;
 	StartAsyncSphereSweep(
 		DamageCauser,
 		Epicenter,
 		SafeRadius,
-		BuildObjectQueryParams(OverlapLogic),
+		SweepTargets,
 		ActorsToIgnore,
 		[Params, FalloffDistance](TArray<FHitResult>&& HitResults)
 		{
@@ -504,7 +685,7 @@ void FRTS_AOE::DealDamageAndCustomArmorHandlingInRadiusAsync(
 		DamageCauser,
 		Epicenter,
 		SafeRadius,
-		BuildObjectQueryParams(OverlapLogic),
+		MakeLiteralSweepTargets(OverlapLogic),
 		ActorsToIgnore,
 		[
 			WeakDamageCauser,
@@ -558,7 +739,8 @@ void FRTS_AOE::DealDamageAndCustomArmorHandlingInRadiusAsync(
 					continue;
 				}
 
-				ApplyDamageToActor(*HitActor, DamageToApply, DamageEvent, WeakDamageCauser);
+				// The authored entry point: no player to attribute the damage to.
+				ApplyDamageToActor(*HitActor, DamageToApply, DamageEvent, WeakDamageCauser, INDEX_NONE);
 			}
 		});
 }
@@ -580,7 +762,7 @@ void FRTS_AOE::ApplyBehaviourInRadiusAsync(
 		InstigatorActor,
 		Epicenter,
 		Radius,
-		BuildObjectQueryParams(OverlapLogic),
+		MakeLiteralSweepTargets(OverlapLogic),
 		ActorsToIgnore,
 		[BehaviourClass](TArray<FHitResult>&& HitResults)
 		{
@@ -624,7 +806,7 @@ void FRTS_AOE::StartAsyncSphereSweep(
 	AActor* InstigatorActor,
 	const FVector& Epicenter,
 	const float Radius,
-	const FCollisionObjectQueryParams& ObjectQueryParams,
+	const FAoeSweepTargets& SweepTargets,
 	const TArray<TWeakObjectPtr<AActor>>& ActorsToIgnore,
 	TFunction<void(TArray<FHitResult>&&)> OnSweepComplete)
 {
@@ -671,12 +853,15 @@ void FRTS_AOE::StartAsyncSphereSweep(
 	}
 
 	const FCollisionShape SphereShape = FCollisionShape::MakeSphere(Radius);
+	// No ignore mask on this sweep: it would also skip the instigator's own destructibles, which splash damages.
+	const FCollisionObjectQueryParams ObjectQueryParams = BuildObjectQueryParams(SweepTargets.OverlapLogic);
+	const TOptional<FAoeInstigator> UnitOwnerFilter = SweepTargets.UnitOwnerFilter;
 
 	FTraceDelegate TraceDelegate;
 	const TWeakObjectPtr<AActor> WeakInstigator = InstigatorActor;
 
 	TraceDelegate.BindLambda(
-		[WeakInstigator, OnSweepComplete = MoveTemp(OnSweepComplete), IgnoredActors](
+		[WeakInstigator, OnSweepComplete = MoveTemp(OnSweepComplete), IgnoredActors, UnitOwnerFilter](
 		const FTraceHandle& /*TraceHandle*/,
 		FTraceDatum& TraceDatum) mutable
 		{
@@ -693,12 +878,22 @@ void FRTS_AOE::StartAsyncSphereSweep(
 			});
 			AsyncTask(
 				ENamedThreads::GameThread,
-				[WeakInstigator, OnSweepComplete = MoveTemp(OnSweepComplete), HitResults = MoveTemp(HitResults)]()
+				[WeakInstigator, OnSweepComplete = MoveTemp(OnSweepComplete), HitResults = MoveTemp(HitResults),
+					UnitOwnerFilter]()
 			mutable
 				{
 					if (not WeakInstigator.IsValid())
 					{
 						return;
+					}
+					if (UnitOwnerFilter.IsSet())
+					{
+						// On the game thread and at the moment the effect lands: relations may have changed since.
+						const FAoeInstigator& Instigator = UnitOwnerFilter.GetValue();
+						HitResults.RemoveAll([&Instigator](const FHitResult& Hit)
+						{
+							return not GetIsHitReachedByInstigator(Hit, Instigator);
+						});
 					}
 
 					OnSweepComplete(MoveTemp(HitResults));
