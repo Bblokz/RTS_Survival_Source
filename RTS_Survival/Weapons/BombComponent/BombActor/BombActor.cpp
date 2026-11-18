@@ -9,6 +9,8 @@
 #include "RTS_Survival/RTSCollisionTraceChannels.h"
 #include "RTS_Survival/Physics/FRTS_PhysicsHelper.h"
 #include "RTS_Survival/Utils/AOE/FRTS_AOE.h"
+#include "RTS_Survival/Utils/CollisionSetup/RTSPlayerCollision.h"
+#include "RTS_Survival/Utils/RTSMapTests/DamageHooks/DamageMapTestHooks.h"
 #include "RTS_Survival/Weapons/WeaponData/FRTSWeaponHelpers/FRTSWeaponHelpers.h"
 
 ABombActor::ABombActor()
@@ -75,7 +77,8 @@ void ABombActor::InitBombActor(const FWeaponData& NewWeaponData,
 	}
 	M_InitialSpeed = InitialSpeed;
 
-	M_TraceChannel = OwningPlayer == 1 ? COLLISION_TRACE_ENEMY : COLLISION_TRACE_PLAYER;
+	// Only half of the filter: PreformAsyncLineTrace adds the ignore mask of the owner to every trace.
+	M_TraceChannel = FRTSPlayerCollision::GetWeaponTraceChannel(OwningPlayer);
 }
 
 void ABombActor::ActivateBomb(const FTransform& LaunchTransform, const TWeakObjectPtr<AActor> TargetActor)
@@ -301,6 +304,8 @@ void ABombActor::PreformAsyncLineTrace()
 	FCollisionQueryParams Params(FName(TEXT("BombTrace")), false, this);
 	Params.bTraceComplex = false;
 	Params.bReturnPhysicalMaterial = true;
+	// The bomb falls through the units of its owner and its allies.
+	FRTSPlayerCollision::ApplyWeaponIgnoreMask(Params, M_OwningPlayer);
 
 	FTraceDelegate TraceDel;
 	TraceDel.BindUObject(this, &ABombActor::OnAsyncTraceComplete);
@@ -358,6 +363,7 @@ void ABombActor::OnHitActor(
 	const float FluxRatio = M_WeaponData.DamageFlux / 100;
 	M_DamageEvent.HitInfo.Location = HitLocation;
 	const float FullDamage = M_WeaponData.BaseDamage * (1 + FMath::RandRange(-FluxRatio, FluxRatio));
+	RTS_MAPTEST_DAMAGE_ATTACKER_SCOPE(M_OwningPlayer);
 	if (HitActor->TakeDamage(FullDamage, M_DamageEvent, nullptr, this) == 0)
 	{
 		if (M_Owner.IsValid())
@@ -387,10 +393,6 @@ void ABombActor::HandleAoe(const FVector& HitLocation, AActor* PrimaryHitActor)
 		M_WeaponData.ShrapnelParticles,
 		AOEMaxParticlesScaleDamageFallOffExponent,
 		AOEMinParticlesScaleDamageFallOffExponent);
-	const ETriggerOverlapLogic OverlapLogic = M_OwningPlayer == 1
-		? ETriggerOverlapLogic::OverlapEnemy
-		: ETriggerOverlapLogic::OverlapPlayer;
-
 	FRTS_AOE::DealDamageVsRearArmorInRadiusAsync(
 		this,
 		HitLocation,
@@ -401,7 +403,7 @@ void ABombActor::HandleAoe(const FVector& HitLocation, AActor* PrimaryHitActor)
 		1.0f,
 		MaxArmorDamaged,
 		M_WeaponData.DamageType,
-		OverlapLogic,
+		FAoeInstigator::HostilesOf(M_OwningPlayer),
 		EShieldDamageSource::AreaOfEffect,
 		ActorsToIgnore);
 }
