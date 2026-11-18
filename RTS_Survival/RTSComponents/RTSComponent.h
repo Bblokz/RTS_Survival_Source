@@ -19,7 +19,9 @@ class ANomadicVehicle;
 class ASquadController;
 class ATankMaster;
 class UTacticalAIComp;
+class UGameUnitManager;
 DECLARE_MULTICAST_DELEGATE(FOnSubTypeInitialized);
+DECLARE_MULTICAST_DELEGATE_TwoParams(FOnOwningPlayerChanged, uint8 /*OldOwner*/, uint8 /*NewOwner*/);
 class RTS_SURVIVAL_API ACPPGameState;
 enum class EAllUnitType : uint8;
 
@@ -39,6 +41,11 @@ public:
 
 	// Delegate called when the subtype is initialized.
 	FOnSubTypeInitialized OnSubTypeInitialized;
+
+	// Called when the owning player changes after this component began play. By then the unit is registered under
+	// its new owner, carries the new owner's collision mask and has the tactical AI its owner needs.
+	// A change before BeginPlay only writes the value and does not call this.
+	FOnOwningPlayerChanged OnOwningPlayerChanged;
 
 	inline EAllUnitType GetUnitType() const { return UnitType; };
 	inline void SetUnitType(const EAllUnitType NewUnitType) { UnitType = NewUnitType; };
@@ -150,8 +157,8 @@ protected:
 	 * @brief Sets the Player that owns this unit, which determines the team the unit belongs to.
 	 * Additionally the unit will be assigned to the correct storage in the provided GameState Object.
 	 * @param NewOwningPlayer The player team that this unit will be assigned to.
-	 * @note If the game has started this function will add the unit to gameState, if this fails it will try
-	 * again in BeginPlay.
+	 * @note Before BeginPlay this only writes the value; BeginPlay adds the unit to gameState. After BeginPlay
+	 * the unit moves to the storage of the new player right away and OnOwningPlayerChanged is called.
 	 */
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void ChangeOwningPlayer(const uint8 NewOwningPlayer);
@@ -179,6 +186,29 @@ private:
 	 */
 	bool AddUnitToGameState() const;
 
+	// Silent: null when the world or its game state is not there (yet).
+	UGameUnitManager* FindGameUnitManager() const;
+
+	/**
+	 * @brief Puts the owner in the unit manager's storage of a player; which list depends on the owner's class.
+	 * @param GameUnitManager Manager of the world.
+	 * @param ParentActor Owner of this component.
+	 * @param Player Player the owner is registered for.
+	 * @return False when the owner is of a class the unit manager does not keep.
+	 */
+	bool AddOwnerToUnitManager(UGameUnitManager& GameUnitManager, AActor& ParentActor, uint8 Player) const;
+
+	/**
+	 * @brief Takes the owner out of the unit manager's storage, from the list that fits the owner's class.
+	 * @param GameUnitManager Manager of the world.
+	 * @param ParentActor Owner of this component.
+	 * @param Player Player the owner was registered for.
+	 */
+	void RemoveOwnerFromUnitManager(UGameUnitManager& GameUnitManager, AActor& ParentActor, uint8 Player) const;
+
+	// Moves the owner from the storage of the old player to that of the new one after a runtime owner change.
+	void MoveOwnerInGameState(uint8 OldOwningPlayer, uint8 NewOwningPlayer) const;
+
 	// A unit registers with the game unit manager in BeginPlay, before its Blueprint or init function sets its
 	// subtype; this moves its count to the subtype it has now.
 	void RecountSubtypeInGameState() const;
@@ -203,7 +233,14 @@ private:
 
 	FTimerHandle M_UnitInCombatTimerHandle;
 
-	void BeginPlay_DetermineCreateTacticalAI();
+	// Units of every player but the human get a tactical AI component: at BeginPlay and when a unit changes to
+	// such an owner later.
+	void DetermineCreateTacticalAI();
+	// After a runtime owner change: creates the tactical AI for a unit the human lost, removes it from one the
+	// human gained.
+	void UpdateTacticalAIForOwner();
+	// Silent: units of the human have none.
+	bool GetHasTacticalAI() const;
 	void CreateTankTacticalAIAtOwner();
 	void CreateSquadTacticalAIAtOwner();
 	UPROPERTY()

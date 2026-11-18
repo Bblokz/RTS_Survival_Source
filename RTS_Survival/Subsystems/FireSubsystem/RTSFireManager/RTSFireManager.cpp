@@ -4,6 +4,7 @@
 #include "NiagaraComponent.h"
 #include "NiagaraSystem.h"
 #include "Engine/World.h"
+#include "RTS_Survival/Game/Players/RTSPlayers.h"
 #include "RTS_Survival/Subsystems/FireSubsystem/FirePoolSettings/RTSFirePoolSettings.h"
 #include "RTS_Survival/Utils/AOE/FRTS_AOE.h"
 #include "RTS_Survival/RTSCollisionTraceChannels.h"
@@ -546,9 +547,11 @@ void ARTSFireManager::PutOutGroundFireAt(const int32 AreaIndex)
 
 void ARTSFireManager::DealGroundFireDamage(const FRTSGroundFireArea& Area, const float BurnSeconds)
 {
-	const ETriggerOverlapLogic OverlapLogic = Area.OwningPlayer == 1
-		                                          ? ETriggerOverlapLogic::OverlapEnemy
-		                                          : ETriggerOverlapLogic::OverlapPlayer;
+	// The fire burns the units of the players hostile to whoever started it. A fire without an owner keeps burning
+	// for the AI side, as it did when there were two sides.
+	const int32 FirePlayer = FRTSPlayers::IsNeutralOwner(Area.OwningPlayer)
+		                         ? RTSPlayers::FirstAIPlayer
+		                         : Area.OwningPlayer;
 	const TArray<TWeakObjectPtr<AActor>> NoActorsToIgnore;
 	// One async overlap per area per tick; measured to each victim's hull like the molotov burn.
 	FRTS_AOE::DealDamageVsRearArmorInRadiusAsync(
@@ -561,7 +564,7 @@ void ARTSFireManager::DealGroundFireDamage(const FRTSGroundFireArea& Area, const
 		Area.Settings.ArmorPenFallOff,
 		Area.Settings.MaxArmorPen,
 		ERTSDamageType::Fire,
-		OverlapLogic,
+		FAoeInstigator::HostilesOf(FirePlayer),
 		EShieldDamageSource::Flamethrower,
 		NoActorsToIgnore,
 		EVehicleModuleSplashPolicy::Ignore,

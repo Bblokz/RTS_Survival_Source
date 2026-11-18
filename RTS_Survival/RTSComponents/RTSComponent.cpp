@@ -8,7 +8,11 @@
 
 #include "RTS_Survival/Game/GameState/CPPGameState.h"
 #include "RTS_Survival/Game/GameState/GameUnitManager/GameUnitManager.h"
+#include "RTS_Survival/Game/Players/RTSPlayers.h"
+#include "RTS_Survival/MasterObjects/HealthBase/HPActorObjectsMaster.h"
+#include "RTS_Survival/MasterObjects/HealthBase/HpPawnMaster.h"
 #include "RTS_Survival/UnitTests/TestTurrets/ATestTurretOwner.h"
+#include "RTS_Survival/Utils/CollisionSetup/RTSPlayerCollision.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 #include "RTS_Survival/Units/Tanks/TankMaster.h"
@@ -103,48 +107,108 @@ FString URTSComponent::GetDisplayName(bool& bOutIsValidString) const
 
 void URTSComponent::DeregisterFromGameState() const
 {
-	if (const UWorld* World = GetWorld())
+	if (GetWorld() == nullptr)
 	{
-		AActor* ParentActor = GetOwner();
-		ACPPGameState* GameState = Cast<ACPPGameState>(World->GetGameState());
-		UGameUnitManager* GameUnitManager = nullptr;
-		if (IsValid(GameState))
-		{
-			GameUnitManager = GameState->GetGameUnitManager();
-		}
-		if (IsValid(ParentActor) && IsValid(GameUnitManager) && bAddToGameState)
-		{
-			if (ParentActor->IsA(ASquadUnit::StaticClass()))
-			{
-				ASquadUnit* SquadUnit = Cast<ASquadUnit>(ParentActor);
-				GameUnitManager->RemoveSquadUnitForPlayer(SquadUnit, OwningPlayer);
-			}
-			else if (ParentActor->IsA(ATankMaster::StaticClass()))
-			{
-				ATankMaster* Tank = Cast<ATankMaster>(ParentActor);
-				GameUnitManager->RemoveTankForPlayer(Tank, OwningPlayer);
-			}
-			else if(ParentActor->IsA(AAircraftMaster::StaticClass()))
-			{
-				AAircraftMaster* Aircraft =  Cast<AAircraftMaster>(ParentActor);
-				GameUnitManager->RemoveAircraftForPlayer(Aircraft, OwningPlayer);
-			}
-			else if (ParentActor->IsA(ABuildingExpansion::StaticClass()))
-			{
-				ABuildingExpansion* Bxp = Cast<ABuildingExpansion>(ParentActor);
-				GameUnitManager->RemoveBxpForPlayer(Bxp, OwningPlayer);
-			}
-			else
-			{
-				GameUnitManager->RemoveActorForPlayer(ParentActor, OwningPlayer);
-			}
-		}
-		else
-		{
-			RTSFunctionLibrary::ReportError("Could not obtain valid"
-				"GameUnitManager in URTSComponent::DeregisterFromGameState");
-		}
+		return;
 	}
+	AActor* ParentActor = GetOwner();
+	UGameUnitManager* GameUnitManager = FindGameUnitManager();
+	if (not IsValid(ParentActor) || not IsValid(GameUnitManager) || not bAddToGameState)
+	{
+		RTSFunctionLibrary::ReportError("Could not obtain valid"
+			"GameUnitManager in URTSComponent::DeregisterFromGameState");
+		return;
+	}
+	RemoveOwnerFromUnitManager(*GameUnitManager, *ParentActor, OwningPlayer);
+}
+
+UGameUnitManager* URTSComponent::FindGameUnitManager() const
+{
+	const UWorld* World = GetWorld();
+	if (World == nullptr)
+	{
+		return nullptr;
+	}
+	const ACPPGameState* GameState = Cast<ACPPGameState>(World->GetGameState());
+	if (not IsValid(GameState))
+	{
+		return nullptr;
+	}
+	return GameState->GetGameUnitManager();
+}
+
+bool URTSComponent::AddOwnerToUnitManager(UGameUnitManager& GameUnitManager, AActor& ParentActor,
+                                          const uint8 Player) const
+{
+	if (ASquadUnit* SquadUnit = Cast<ASquadUnit>(&ParentActor))
+	{
+		GameUnitManager.AddSquadUnitForPlayer(SquadUnit, Player);
+		return true;
+	}
+	if (ATankMaster* Tank = Cast<ATankMaster>(&ParentActor))
+	{
+		GameUnitManager.AddTankForPlayer(Tank, Player);
+		return true;
+	}
+	if (AAircraftMaster* Aircraft = Cast<AAircraftMaster>(&ParentActor))
+	{
+		GameUnitManager.AddAircraftForPlayer(Aircraft, Player);
+		return true;
+	}
+	if (ABuildingExpansion* Bxp = Cast<ABuildingExpansion>(&ParentActor))
+	{
+		GameUnitManager.AddBxpForPlayer(Bxp, Player);
+		return true;
+	}
+	// Test turret owners, standalone turrets and every other pawn or actor with health share the generic list.
+	if (ParentActor.IsA(ATestTurretOwner::StaticClass())
+		|| ParentActor.IsA(AHpPawnMaster::StaticClass())
+		|| ParentActor.IsA(AHPActorObjectsMaster::StaticClass()))
+	{
+		GameUnitManager.AddActorForPlayer(&ParentActor, Player);
+		return true;
+	}
+	return false;
+}
+
+void URTSComponent::RemoveOwnerFromUnitManager(UGameUnitManager& GameUnitManager, AActor& ParentActor,
+                                               const uint8 Player) const
+{
+	if (ASquadUnit* SquadUnit = Cast<ASquadUnit>(&ParentActor))
+	{
+		GameUnitManager.RemoveSquadUnitForPlayer(SquadUnit, Player);
+		return;
+	}
+	if (ATankMaster* Tank = Cast<ATankMaster>(&ParentActor))
+	{
+		GameUnitManager.RemoveTankForPlayer(Tank, Player);
+		return;
+	}
+	if (AAircraftMaster* Aircraft = Cast<AAircraftMaster>(&ParentActor))
+	{
+		GameUnitManager.RemoveAircraftForPlayer(Aircraft, Player);
+		return;
+	}
+	if (ABuildingExpansion* Bxp = Cast<ABuildingExpansion>(&ParentActor))
+	{
+		GameUnitManager.RemoveBxpForPlayer(Bxp, Player);
+		return;
+	}
+	GameUnitManager.RemoveActorForPlayer(&ParentActor, Player);
+}
+
+void URTSComponent::MoveOwnerInGameState(const uint8 OldOwningPlayer, const uint8 NewOwningPlayer) const
+{
+	AActor* ParentActor = GetOwner();
+	UGameUnitManager* GameUnitManager = FindGameUnitManager();
+	// Silent: an owner that is not kept in the game state has nothing to move.
+	if (not bAddToGameState || not IsValid(ParentActor) || not IsValid(GameUnitManager))
+	{
+		return;
+	}
+	// Moves the unit between the lists of the two players (target search, tech counts, base clusters).
+	RemoveOwnerFromUnitManager(*GameUnitManager, *ParentActor, OldOwningPlayer);
+	AddOwnerToUnitManager(*GameUnitManager, *ParentActor, NewOwningPlayer);
 }
 
 void URTSComponent::SetUnitSubtype(
@@ -276,7 +340,13 @@ void URTSComponent::BeginPlay()
 			(void)AddUnitToGameState();
 		}
 	}
-	BeginPlay_DetermineCreateTacticalAI();
+	// Marks the bodies of the unit with its owner so the shots of that player and its allies pass through them.
+	// Neutral things carry no mark.
+	if (not FRTSPlayers::IsNeutralOwner(OwningPlayer))
+	{
+		FRTSPlayerCollision::ApplyOwnerMaskToActor(GetOwner(), OwningPlayer);
+	}
+	DetermineCreateTacticalAI();
 }
 
 void URTSComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -297,109 +367,43 @@ void URTSComponent::SetOwningPlayerRuntime(const uint8 NewOwningPlayer)
 
 void URTSComponent::ChangeOwningPlayer(const uint8 NewOwningPlayer)
 {
-	if (NewOwningPlayer > 0 && OwningPlayer != NewOwningPlayer)
+	if (FRTSPlayers::IsNeutralOwner(NewOwningPlayer) || OwningPlayer == NewOwningPlayer)
 	{
-		if (const UWorld* World = GetWorld())
-		{
-			ACPPGameState* GameState = Cast<ACPPGameState>(World->GetGameState());
-			UGameUnitManager* GameUnitManager = nullptr;
-			if (IsValid(GameState))
-			{
-				GameUnitManager = GameState->GetGameUnitManager();
-			}
-			AActor* ParentActor = GetOwner();
-			if (IsValid(ParentActor) && IsValid(GameUnitManager) && bAddToGameState)
-			{
-				if (ParentActor->IsA(ASquadUnit::StaticClass()))
-				{
-					ASquadUnit* SquadUnit = Cast<ASquadUnit>(ParentActor);
-					GameUnitManager->RemoveSquadUnitForPlayer(SquadUnit, OwningPlayer);
-					GameUnitManager->AddSquadUnitForPlayer(SquadUnit, NewOwningPlayer);
-				}
-				else if (ParentActor->IsA(ATankMaster::StaticClass()))
-				{
-					ATankMaster* Tank = Cast<ATankMaster>(ParentActor);
-					GameUnitManager->RemoveTankForPlayer(Tank, OwningPlayer);
-					GameUnitManager->AddTankForPlayer(Tank, NewOwningPlayer);
-				}
-				else if (ParentActor->IsA(AStandaloneTurret::StaticClass()))
-				{
-					GameUnitManager->RemoveActorForPlayer(ParentActor, OwningPlayer);
-					GameUnitManager->AddActorForPlayer(ParentActor, NewOwningPlayer);
-				}
-				else if (ParentActor->IsA(ABuildingExpansion::StaticClass()) && ParentActor->HasActorBegunPlay())
-				{
-					// Moves the expansion between the player and enemy lists (tech counts, base clusters).
-					// Before BeginPlay it is not registered yet; BeginPlay registers it with the new owner.
-					GameUnitManager->AddBxpForPlayer(Cast<ABuildingExpansion>(ParentActor), NewOwningPlayer);
-				}
-			}
-		}
-		OwningPlayer = NewOwningPlayer;
+		return;
 	}
+	const uint8 OldOwningPlayer = OwningPlayer;
+	OwningPlayer = NewOwningPlayer;
+	// Before BeginPlay nothing is set up for the old owner yet: BeginPlay registers the unit, marks its collision
+	// and creates its tactical AI, all for the owner it has by then.
+	if (not HasBegunPlay())
+	{
+		return;
+	}
+	MoveOwnerInGameState(OldOwningPlayer, NewOwningPlayer);
+	UpdateTacticalAIForOwner();
+	// Between the human and an AI player the collision side changes too; between AI players only the owner bit.
+	FRTSPlayerCollision::ApplySideChangeToActor(GetOwner(), OldOwningPlayer, NewOwningPlayer);
+	FRTSPlayerCollision::ApplyOwnerMaskToActor(GetOwner(), NewOwningPlayer);
+	// Weapons that hold this unit as a target check again whether it is still hostile.
+	FRTSPlayers::NotifyUnitOwnerChanged();
+	OnOwningPlayerChanged.Broadcast(OldOwningPlayer, NewOwningPlayer);
 }
 
 bool URTSComponent::AddUnitToGameState() const
 {
-	if (const UWorld* World = GetWorld())
+	if (GetWorld() == nullptr)
 	{
-		ACPPGameState* GameState = Cast<ACPPGameState>(World->GetGameState());
-		UGameUnitManager* GameUnitManager = nullptr;
-		if (IsValid(GameState))
-		{
-			GameUnitManager = GameState->GetGameUnitManager();
-		}
-		AActor* ParentActor = GetOwner();
-		if (IsValid(GameUnitManager) && IsValid(ParentActor))
-		{
-			if (ParentActor->IsA(ASquadUnit::StaticClass()))
-			{
-				ASquadUnit* SquadUnit = Cast<ASquadUnit>(ParentActor);
-				GameUnitManager->AddSquadUnitForPlayer(SquadUnit, OwningPlayer);
-				return true;
-			}
-			if (ParentActor->IsA(ATankMaster::StaticClass()))
-			{
-				ATankMaster* Tank = Cast<ATankMaster>(ParentActor);
-				GameUnitManager->AddTankForPlayer(Tank, OwningPlayer);
-				return true;
-			}
-			if (ParentActor->IsA(AAircraftMaster::StaticClass()))
-			{
-				AAircraftMaster* Aircraft = Cast<AAircraftMaster>(ParentActor);
-				GameUnitManager->AddAircraftForPlayer(Aircraft, OwningPlayer);
-				return true;
-			}
-			if(ParentActor->IsA(ABuildingExpansion::StaticClass()))
-			{
-				ABuildingExpansion* Bxp = Cast<ABuildingExpansion>(ParentActor);
-				GameUnitManager->AddBxpForPlayer(Bxp, OwningPlayer);
-				return true;
-			}
-			if (ParentActor->IsA(ATestTurretOwner::StaticClass()))
-			{
-				ATestTurretOwner* TurretOwner = Cast<ATestTurretOwner>(ParentActor);
-				GameUnitManager->AddActorForPlayer(TurretOwner, OwningPlayer);
-				return true;
-			}
-			if (ParentActor->IsA(AHpPawnMaster::StaticClass()))
-			{
-				AHpPawnMaster* HpPawnMaster = Cast<AHpPawnMaster>(ParentActor);
-				GameUnitManager->AddActorForPlayer(HpPawnMaster, OwningPlayer);
-			}
-			if (ParentActor->IsA(AHPActorObjectsMaster::StaticClass()))
-			{
-				AHPActorObjectsMaster* HpActorObjectsMaster = Cast<AHPActorObjectsMaster>(ParentActor);
-				GameUnitManager->AddActorForPlayer(HpActorObjectsMaster, OwningPlayer);
-			}
-		}
-		else
-		{
-			RTSFunctionLibrary::ReportError("Could not obtain valid"
-				"GameUnitManager in URTSComponent::AddUnitToGameState");
-		}
-	} // Game Has Started
-	return false;
+		return false;
+	}
+	UGameUnitManager* GameUnitManager = FindGameUnitManager();
+	AActor* ParentActor = GetOwner();
+	if (not IsValid(GameUnitManager) || not IsValid(ParentActor))
+	{
+		RTSFunctionLibrary::ReportError("Could not obtain valid"
+			"GameUnitManager in URTSComponent::AddUnitToGameState");
+		return false;
+	}
+	return AddOwnerToUnitManager(*GameUnitManager, *ParentActor, OwningPlayer);
 }
 
 void URTSComponent::CheckExposedUVariables()
@@ -431,9 +435,30 @@ void URTSComponent::CheckExposedUVariables()
 	}
 }
 
-void URTSComponent::BeginPlay_DetermineCreateTacticalAI()
+void URTSComponent::UpdateTacticalAIForOwner()
 {
-	if(OwningPlayer == 1 )
+	const bool bOwnerNeedsTacticalAI = not FRTSPlayers::IsHumanPlayer(OwningPlayer);
+	if (bOwnerNeedsTacticalAI == GetHasTacticalAI())
+	{
+		return;
+	}
+	if (bOwnerNeedsTacticalAI)
+	{
+		DetermineCreateTacticalAI();
+		return;
+	}
+	M_EnemyTatcicalAIComp->DestroyComponent();
+	M_EnemyTatcicalAIComp = nullptr;
+}
+
+bool URTSComponent::GetHasTacticalAI() const
+{
+	return M_EnemyTatcicalAIComp.IsValid();
+}
+
+void URTSComponent::DetermineCreateTacticalAI()
+{
+	if (FRTSPlayers::IsHumanPlayer(OwningPlayer))
 	{
 		return;
 	}
