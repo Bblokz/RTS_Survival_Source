@@ -26,6 +26,7 @@
 #include "RTS_Survival/RTSComponents/RTSOptimizer/RTSStandaloneTurretOptimizer/RTSStandaloneTurretOptimizer.h"
 #include "RTS_Survival/RTSComponents/SelectionComponent.h"
 #include "RTS_Survival/Units/Enums/Enum_UnitType.h"
+#include "RTS_Survival/Utils/CollisionSetup/RTSPlayerCollision.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 #include "RTS_Survival/Weapons/FlameThrowerWeapon/UWeaponStateFlameThrower.h"
@@ -244,6 +245,13 @@ void AStandaloneTurret::BeginPlay_InitTargetingAndCollision()
 		return;
 	}
 
+	RefreshOwningPlayerConfiguration();
+	// UpdateEngagement refreshes too, but a turret that is not engaging must change sides at once as well.
+	RTSComponent->OnOwningPlayerChanged.AddUObject(this, &AStandaloneTurret::OnOwningPlayerChanged);
+}
+
+void AStandaloneTurret::OnOwningPlayerChanged(const uint8 /*OldOwningPlayer*/, const uint8 /*NewOwningPlayer*/)
+{
 	RefreshOwningPlayerConfiguration();
 }
 
@@ -467,6 +475,8 @@ UMeshComponent* AStandaloneTurret::PrepareDestroyedMeshSwapComponent(UMeshCompon
 	DestroyedMeshComponent->SetCollisionEnabled(ComponentToSwapOn->GetCollisionEnabled());
 	DestroyedMeshComponent->SetCollisionObjectType(ComponentToSwapOn->GetCollisionObjectType());
 	DestroyedMeshComponent->SetCollisionResponseToChannels(ComponentToSwapOn->GetCollisionResponseToChannels());
+	// The responses do not say whose body it is: without the owner bit the turret's own player would hit the wreck.
+	FRTSPlayerCollision::CopyOwnerMaskFilter(ComponentToSwapOn, DestroyedMeshComponent);
 	DestroyedMeshComponent->SetGenerateOverlapEvents(ComponentToSwapOn->GetGenerateOverlapEvents());
 	DestroyedMeshComponent->SetCanEverAffectNavigation(ComponentToSwapOn->CanEverAffectNavigation());
 	DestroyedMeshComponent->SetReceivesDecals(true);
@@ -1271,11 +1281,8 @@ void AStandaloneTurret::SetupTargetableCollision() const
 	M_TurretMesh->SetCanEverAffectNavigation(true);
 	M_TurretMesh->SetReceivesDecals(true);
 
-	constexpr int32 PlayerOwnerIndex = 1;
-	const ECollisionChannel WeaponTraceChannel = RTSComponent->GetOwningPlayer() == PlayerOwnerIndex
-		? COLLISION_TRACE_PLAYER
-		: COLLISION_TRACE_ENEMY;
-	M_TurretMesh->SetCollisionResponseToChannel(WeaponTraceChannel, ECR_Block);
+	// The weapons of players hostile to the owner hit the turret.
+	FRTSPlayerCollision::SetWeaponHitResponses(M_TurretMesh, RTSComponent->GetOwningPlayer());
 }
 
 void AStandaloneTurret::RefreshOwningPlayerConfiguration()

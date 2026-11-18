@@ -22,6 +22,7 @@ struct FInitWeaponStateRailwayCannon;
 struct FInitWeaponStateDirectHit;
 struct FInitWeaponStateProjectile;
 class ITurretOwner;
+class URTSComponent;
 class UVehicleFireFeedbackComponent;
 // Forward Declaration.
 class RTS_SURVIVAL_API ATankMaster;
@@ -470,6 +471,22 @@ private:
 
 	bool EnsureWorldIsValid();
 	void SetOwningPlayer(const int32 NewOwningPlayer);
+
+	/**
+	 * @brief Listens for a runtime owner change of the unit this turret is mounted on; a turret has no RTS component
+	 * of its own and would otherwise keep firing for the old player.
+	 * @param NewTurretOwner Actor that owns the turret; the listener moves with it when the turret is handed over.
+	 */
+	void BindToOwningPlayerChangesOf(const AActor* NewTurretOwner);
+
+	void OnTurretOwnerChangedPlayer(uint8 OldOwningPlayer, uint8 NewOwningPlayer);
+
+	/** Makes the turret and all its weapons fire for this player; weapons already owned by it are left alone. */
+	void ApplyOwningPlayerToWeapons(int32 NewOwningPlayer);
+
+	// RTS component of the turret owner we listen to for owner changes; kept to unbind when the turret is handed over.
+	UPROPERTY()
+	TWeakObjectPtr<URTSComponent> M_OwnerRTSComponentListenedTo;
 
 	/**
 	 * @brief Engages timers for this turret to automatically search for targets to engage.

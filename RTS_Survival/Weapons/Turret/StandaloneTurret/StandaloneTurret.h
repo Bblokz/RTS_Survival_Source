@@ -470,6 +470,7 @@ private:
 	void OnProjectileManagerLoaded(const TObjectPtr<ASmallArmsProjectileManager>& ProjectileManager);
 	void SetupTargetableCollision() const;
 	void RefreshOwningPlayerConfiguration();
+	void OnOwningPlayerChanged(uint8 OldOwningPlayer, uint8 NewOwningPlayer);
 	void CompleteActiveAttackCommand();
 	void UnitDies_RemoveFromSelection();
 	void OnVerticalDestructionComplete();

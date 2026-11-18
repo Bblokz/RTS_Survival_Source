@@ -44,6 +44,16 @@ namespace FRTSWeaponHelpers
 
 	AActor* GetHitActorAdjustedForChildActorComponents(AActor* OriginalHitActor);
 
+	/**
+	 * @brief Blueprints may leave the owner pin of a weapon init struct at 0; the weapon then belongs to the player
+	 * of the unit it sits on, not to the neutral owner (who fights nobody).
+	 * @param OwnerFromInitStruct Owner the weapon setup was called with.
+	 * @param WeaponHolder Actor the weapon sits on (the unit, or a child actor of it such as a turret).
+	 * @return OwnerFromInitStruct when it is a player; else the owner of the holder or its parent actors; else
+	 * OwnerFromInitStruct unchanged.
+	 */
+	RTS_SURVIVAL_API int32 ResolveWeaponOwningPlayer(int32 OwnerFromInitStruct, const AActor* WeaponHolder);
+
 	bool GetCanArmorPlateDamageEngine(const EArmorPlate PlateHit);
 
 	void SetupProjectileManagerForWeapon(UWeaponState* Weapon, ASmallArmsProjectileManager* ProjectileManager);

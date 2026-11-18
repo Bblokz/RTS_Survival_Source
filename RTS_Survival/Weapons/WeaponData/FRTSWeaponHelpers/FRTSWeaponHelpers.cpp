@@ -1,6 +1,7 @@
 #include "FRTSWeaponHelpers.h"
 
 #include "RTS_Survival/Buildings/BuildingExpansion/BuildingExpansion.h"
+#include "RTS_Survival/Game/Players/RTSPlayers.h"
 #include "RTS_Survival/RTSComponents/ArmorCalculationComponent/ArmorCalculation.h"
 #include "RTS_Survival/Units/Aircraft/AircraftMaster/AAircraftMaster.h"
 #include "RTS_Survival/Units/RTSDeathType/RTSDeathType.h"
@@ -12,6 +13,16 @@
 #include "RTS_Survival/Weapons/WeaponData/WeaponData.h"
 #include "RTS_Survival/Weapons/WeaponData/MultiProjectileWeapon/UWeaponStateMultiProjectile.h"
 #include "RTS_Survival/Weapons/WeaponData/MultiTraceWeapon/WeaponStateMultiTrace.h"
+
+int32 FRTSWeaponHelpers::ResolveWeaponOwningPlayer(const int32 OwnerFromInitStruct, const AActor* WeaponHolder)
+{
+	if (FRTSPlayers::IsValidPlayer(OwnerFromInitStruct))
+	{
+		return OwnerFromInitStruct;
+	}
+	const int32 HolderOwner = FRTSPlayers::GetOwningPlayerOfActor(WeaponHolder);
+	return HolderOwner != INDEX_NONE ? HolderOwner : OwnerFromInitStruct;
+}
 
 UArmorCalculation* FRTSWeaponHelpers::GetArmorAndActorOrParentFromHit(const FHitResult& HitResult, AActor*& OutHitActor)
 {
