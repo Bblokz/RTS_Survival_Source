@@ -28,7 +28,14 @@ sound.
 
 Behaviour, the same as `Show Location Intro`: it waits while the screen is busy (another cinematic, an info takeover,
 the tech tree, a `MoveCamera` move) and is skipped after 45 unpaused seconds (`bWasShown` false); one tour per mission
-at a time; a takeover stops a playing portrait and mutes voice lines, so play lines after the event. Mission failure
+at a time; a takeover stops a playing portrait and mutes voice lines, so play lines after the event.
+
+Portraits during a tour: the HUD (with its portrait) is hidden, so the tour overlay adds its own copy of the HUD
+portrait widget (same class, W_BP_Portrait) at the HUD portrait's screen place, above the bars, and the portrait manager
+shows portraits on it until the tour ends (`UPlayerPortraitManager::SetCinematicPortraitHost` /
+`ClearCinematicPortraitHost`). A `PlayPortrait` during the tour therefore shows the speaker with the word-timed
+subtitle box like in play; a line still playing when the tour ends moves back to the HUD portrait, its words still
+following the audio. Mission failure
 and clean-up end it and hand the screen back (no event). `GetIsCameraTourPlaying` and `GetCameraTourShotIndex`
 (-1 when no shot shows) are there for Blueprints and tests.
 
@@ -62,8 +69,8 @@ trigger):
    `StartUnloading(Truck)`. The squads, truck and crane are ordinary enemy actors afterwards: the player fights them.
 4. **Tour:** waits until the squads have spawned (at most `MaxSecondsWaitingForBaseLife`), then plays `TourShots`.
    Optional `TourVoiceLine` on `TourVoiceLinePortrait`: it starts `TourVoiceLineDelaySeconds` after the first shot
-   shows, because the tour's takeover stops any portrait already playing. While the tour runs only the voice is
-   heard: the portrait box is part of the hidden HUD. A tour that never showed plays the line once it hands the
+   shows, because the tour's takeover stops any portrait already playing. The portrait and its subtitle show on
+   the tour overlay's portrait copy (see above). A tour that never showed plays the line once it hands the
    screen back, before `ObjectiveVoiceLine`. On `Ger_IntroMission` it is `IntroMission_SecureLineTour` (19.7 s,
    tested by `Source/Tools/IntroMission/tour_voice_line_headless_test.py`).
 5. **Objective:** `ObjectiveTitle` / `ObjectiveDescription` (`{Destroyed}` and `{Total}` are filled in) on the mission

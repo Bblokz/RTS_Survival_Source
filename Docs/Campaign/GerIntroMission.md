@@ -85,10 +85,10 @@ class defaults written by `Source/Tools/IntroMission/setup_secure_line_mission.p
 4. **Air support:** after 7.5 s, `IntroMission_StukaSupport` plays on the advisor portrait ("Verdammt! Zeir position
    is tougher zan expected! HQ provides two Ju-87 ground attack aircraft zu aid in bringing zat base down!"). After 9 s
    a copy of `GA_Ju87Strafing` is flown at the base centre (800, 500). `SetMissionStrafeOverrides` sets 2 aircraft,
-   60 s, and `bAirSupportStaysOnTarget`.
+   150 s (was 60 s; +90 s on 2026-11-18, user request), and `bAirSupportStaysOnTarget`.
    - Without that last option the strafe ability makes one run and then hunts the nearest enemies anywhere. With it,
      the new opt-in `FStrafeAircraftSettings::bRepeatRunsOverTarget` (`AAircraftMaster::OnAttackMoveCompleted`) keeps
-     every run over the target until the 60 s are up.
+     every run over the target until the 150 s are up.
 
 Audition takes are in BlenderTanks `Announcer/AAAGerMissions/IntroMission/Audition_RampAssault/`, takes A/B/C for
 each line. The user picked take A of both (2026-11-16); B and C were deleted.

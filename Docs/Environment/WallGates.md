@@ -218,3 +218,10 @@ Pipeline (`Source/Tools/RusWallGates/`, Blender 4.0 + editor python):
 Open: Development editor rebuild + reparenting the four `RTS_NavFilter_*` Blueprints onto
 `URTSWallGateNavQueryFilter` (until then each gate logs an error and uses `BlockEveryone`); gates not yet placed in
 any map; an A banner/flag variant and a camo-skin (`T_SovietConcrete_Camoe`) child are easy follow-ups.
+
+## Four players (2026-11-18)
+
+Superseded where it differs: a gate opens only for its `AllowedPlayer` (the gate's owner unless set apart) and that
+player's allies, and a closed doorway blocks path planning for every player not allied to it, with one closed-gate nav
+area per player (`NavArea_WallGatePlayerSide` = P1, `NavArea_WallGateEnemySide` = P2, `NavArea_WallGatePlayer3/4`).
+See `Docs/Multiplayer/FourPlayerRefactorPlan.md` section 12; test `Tools/WallGates/run_wall_gate_relations_test.ps1`.

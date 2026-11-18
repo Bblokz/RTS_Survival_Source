@@ -52,7 +52,7 @@ timer-driven strafe aim point, for comparisons.
 - **Timing:** the tracer starts at once from the projectile pool. The impact (and damage) waits until it gets there.
   One non-looping timer per gun checks arrivals at 60 Hz.
 - **No sky puffs:** a round that never reaches the ground draws nothing.
-- **Sound:** one impact sound per gun per 0.12 s.
+- **Sound:** a fire loop on the aircraft and an impact churn loop at the zone; see [Strafe sound](#strafe-sound).
 - **Air-to-air** targets (an `AAircraftMaster`) keep the regular converging multi-trace fire.
 
 Damage per round, rate of fire, ammo and armour penetration are the weapon's own. Hit chance now comes from the
@@ -98,6 +98,83 @@ Gotchas:
 
 Size and lifetime scale with calibre, (calibre / 7.92)^0.6. Dirt colour follows the ground surface: dirt, sand or stone.
 Without the system (asset missing), ground rounds fall back to the regular trace impact.
+
+## Strafe sound
+
+The aircraft MGs fire RandomBurst volleys: every gun fires once per volley, many volleys a second, and every round draws
+4 spurts. Before 2026-11-18 a volley played the Blueprint's single Puma MG shot and each gun played one sand thud per
+0.12 s. That gave a few thin shots and a few thuds under a dense band of spurts.
+
+`UAircraftGunAudioPlayer` (`Audio/AircraftGuns/`) now holds two looping voices per gun, each baked at the real rate of
+fire:
+
+- **Fire loop:** attached to the aircraft. It starts on the first volley and stays on while volleys keep coming. The
+  player measures the volley interval while firing. When no volley comes for 2.5 intervals (clamped to 0.14 - 0.45 s),
+  the loop fades out in 0.06 s and a fire tail plays: the last round and its echo. Each burst starts the loop at a random
+  point and a random pitch (0.96 - 1.04).
+- **Impact loop:** starts at the first round that lands. It follows the zone, and every arriving round pulls it 30 % of
+  the way to that round. It ends when no round has arrived for the fire loop's gap plus one volley interval, with an
+  impact tail: the last hits thinning out, then dirt pattering down. Stone ground switches to the hard loop, with more ricochets and less thud.
+- **Unit hits:** a clang cluster (3 - 6 clangs and a ricochet), at most one per 0.12 s per gun. It plays on top of the
+  regular per-round metal impact of the trace path.
+- **Guns:** a weapon with 3 or more fire sockets (Bf 110) uses the "many guns" loops, at twice the density.
+
+The player replaces the per-volley launch sound and the throttled impact sound. The muzzle flashes stay. Air-to-air fire
+keeps the fire loop. `-AircraftStrafeLegacyGuns` keeps every old sound.
+
+**20 mm cannons:** these are `SetupMultiProjectileWeapon` weapons in the 15 - 25 mm range: the MG 151/20 of the Me 410
+and the Fw 189. They get the cannon fire loop (2 guns at 720 rpm). `Cue_Aircraft20mm_Impact` replaces their sand and
+stone impact sound, so every projectile that lands plays a Minengeschoss crack-pop with dirt and a thud. The MK 108
+(30 mm, Ho 229) is a strafe gun (below); the BK 5 and the bombs keep their Blueprint sounds.
+
+**30 mm strafe cannon:** the Ho 229's Blueprint sets up its MK 108s with `SetupMultiProjectileWeapon`.
+`UAircraftWeapon::SetupMultiProjectileWeapon` turns every weapon that `UWeaponStateAircraftStrafeGun::GetIsStrafeCannon`
+lists into a strafe gun instead, with the same sockets, VFX, burst settings and weapon data. So the cannon gets the
+beaten zone, the impacts timed to its tracers, the dirt spurts and the pocks (both scale with calibre), and the steep
+strafe dives. Damage stays direct hits only: the projectile MK 108 did no splash either (shell splash starts at 45 mm).
+`-AircraftStrafeLegacyGuns` brings the projectiles back. Strafe guns of 28 mm and up use the HeavyCannon sound set:
+version A "Hammer" from `build_30mm_versions.py`, 600 rpm a cannon, with an impact churn of heavy HE bursts at about
+13 a second. It plays 3.5 dB above the MG set.
+
+Which aircraft get what. All strafe MGs use the MG 15 weapon data, so the number of fire sockets picks the loop. The
+gun sounds are made when the weapon is set up, and the strafe QA spawns every aircraft Blueprint and lists them
+(`AIRCRAFT_GUN_AUDIO` lines, 2026-11-18):
+
+| Aircraft | Gun | Sound set |
+| --- | --- | --- |
+| Bf 110, Bf 109 | MG 15, 4 sockets | MG, 4-gun loops |
+| Ju 87, Ju 87 (airborne), Ju 87 G | MG 15, 2 sockets | MG, 2-gun loops |
+| Me 410 (all three), Fw 189 | MG 151/20 | Cannon + 20 mm impacts; their BK 5 keeps its own |
+| Ho 229 | MK 108 (30 mm), fired as a strafe gun | 30 mm set ("Hammer") |
+| Il-2, Pe-2, Pe-8, Ju 390 | MG 15 | MG set by the same code; their Blueprints add no weapon at spawn, so the QA could not list them |
+
+| Asset (`/Game/RTS_Survival/Sounds/WeaponSounds/AircraftGuns`) | What |
+| --- | --- |
+| `DA_AircraftGunAudio` | `UAircraftGunAudioDataAsset`: MG set, cannon set, cannon calibre range, attenuation and concurrency. Set in RTS Audio Settings (`AircraftGunAudioData`) |
+| `S_AircraftMG_FireLoop_Pair` / `_Quad` | 2 / 4 guns at 1050 rpm, 2.4 s seamless loops |
+| `S_AircraftMG_ImpactLoop_Soft/Hard_Pair/Quad` | 26 / 46 hits a second plus ricochets, thuds and a sand churn bed, 3 s loops |
+| `S_AircraftMG_FireTail_1-3`, `S_AircraftMG_ImpactTail_1-3`, `S_AircraftMG_MetalCluster_1-6` | burst ends, unit hits |
+| `S_Aircraft20mm_FireLoop_Pair`, `S_Aircraft20mm_FireTail_1-3`, `Cue_Aircraft20mm_Impact` (8 waves) | 20 mm |
+| `S_Aircraft30mm_FireLoop`, `_FireTail_1-3`, `_ImpactLoop`, `_ImpactTail_1-3` | 30 mm strafe cannon (unit hits use the MG clang clusters) |
+| `Att_AircraftGun_Fire` / `_Impact` | spatialized, linear: full volume to 30 m / 25 m, silent at 150 m / 105 m |
+| `SC_AircraftGun_Fire` / `_Impact` | 10 voices each, stop quietest |
+
+Rebuild:
+
+1. `python Source/Tools/AircraftStrafeAudio/build_aircraft_gun_sounds.py [preview]` renders every wave offline from the
+   project's raw sound library (`D:/UE_Assets/Sounds`, through `_SfxBuilders/sfxlib.py`). The loops are built on a
+   circular buffer, so they are seamless without a crossfade. With `preview`, it also writes
+   `Saved/AircraftGunAudio/preview_*.wav`: a strafe pass run through the player's rules, next to the old sound.
+2. `bash Source/Tools/AircraftStrafeAudio/run_import.sh` imports the waves in a DebugGame commandlet and makes the cue,
+   the attenuations, the concurrencies and the data asset. A re-run skips unchanged waves but resets the data asset's
+   values.
+
+The strafe QA run checks the audio by counts, because a `-nosound` run cannot listen. The burst logic runs without an
+audio device. The `STRAFE_AUDIO` line and its checks:
+- one fire loop per burst, not per volley;
+- every burst ends with a tail;
+- the impact loop gets every round;
+- a spawned Me 410's MG 151/20 has the cannon set and the 20 mm ground impact.
 
 ## QA test
 

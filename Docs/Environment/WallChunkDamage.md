@@ -978,6 +978,40 @@ vehicles can drive through those walls; right now they avoid them".
   (paths through for all four agent types). Passed in run `berlin6`; the Rus wall test passed again after (`r20`).
 - **Maps:** the B pieces on Ger_Berlin need no map change (the mesh never carved the navmesh; the boxes switch at play).
 
+### Wire fence: every vehicle breaks it (2026-11-18)
+
+Owner's request: `BP_Industrial_Dest_FenceWire` should react to vehicles like the Soviet concrete (take damage from
+the crossing, not die outright), crushable and damageable by all vehicles, light ones too.
+
+- **Mode:** `FWallTankBreachSettings::bAnyVehicleBreaks`: light, medium and heavy vehicles of every player break it,
+  whoever owns it (the fence has no RTS component); infantry go round. The mesh overlaps `COLLISION_OBJ_ENEMY` too, so
+  AI vehicles raise the overlap. Push speed shares: light 0.75, medium 0.85, heavy 0.9 (`LightTankPushSpeedShare` new).
+- **Nav:** `UNavArea_BreachableAnyVehicle`: plain ground for unfiltered queries and planners
+  (`URTSClosedBreachableWallsQueryFilter` leaves it open), as the old `BlockCharLight` area was. `URTSWallGateNavQueryFilter` opens it for any Light/Medium/Heavy querier of a known side (cost 1,
+  entering cost 100: fences stand in chained runs) and excludes it for characters. The BP's own
+  `RTSNavCollisionEnvObstacle` (`RTS_NavArea_BlockCharLight`) is switched off at play like the Rus wall modifiers.
+- **Old crush replaced:** the BP still calls `SetupCrushDestructionOverlap` (instant kill by medium/heavy);
+  `ADestructableEnvActor::SetupCrushDestructionOverlap` now returns early on any actor with a
+  `UWallTankBreachComponent`, so the breach decides (no Berlin ruin or Rus wall calls it).
+- **Holes:** field mode, `M_Fence_WallHolesField` (field master of the masked `M_Fence`, chain-link alpha kept) and
+  `MI_SM_RTS_Fence_Wire_1_Fence_WallHolesField` (no rebar, two-sided). Wall line mesh x = -8 from y -7 to 358
+  (chain-link plane; posts lean to -80), thickness 10. VSlope 0.15, EdgeBand 30, stub 4 cm, 8 rubble pieces of the
+  fence debris, no decal, small dust, the fence's metal destruction cue, top falls after 0.15 s.
+- **Health:** the BP sets its health to 125 at BeginPlay. A Luchs (262 cm hull) tears ~92 % of a 3.6 m panel (10 HP
+  left, one post stub stands); a Pz IV or Tiger takes 99.6 % and the 95 % rule kills it into the BP's own destroyed
+  mesh (with `MI_Fence`). A chained neighbour is held up (free-end rule) and only clipped by wide hulls (Tiger).
+- **Setup:** `Tools/WallChunks/Breach/fence_breach_setup.py` (`run_fence_breach_setup.sh`); new authoring args
+  `AnyVehicle=1 NoDecal=1 LightShare= MediumShare= HeavyShare= StubHeight= EdgeBand= DustScale= HealthScale=
+  TopDelay= TopDuration= RubblePieces=`.
+- **Test:** `BREACH_SCRIPT=fence_breach_test.py sh run_breach_test.sh <run>` (applies the setup in memory first):
+  rows of 5 chained fences; player Luchs, Pz IV, Tiger, Puma, Kettenkrad and an enemy (player 2) Luchs each cross the
+  middle one (`FENCE_FROM_DISK=1` tests the saved Blueprint without the in-memory setup). Run `fence2` (2026-11-18,
+  ALL PASSED): all six breached, crossed straight (|dx| <= 25 cm), fence damaged; before: all vehicle
+  paths through the row, infantry round; after: the gap open for everyone. Shell hits: a 75 mm test hit cuts a hole;
+  a 20 mm hit cuts none (its 17 cm hole is under `MinHoleRadius`, as in slot mode) but takes health.
+- **Saved and checked (2026-11-18):** Blueprint saved after the Development rebuild; run `fence3_disk`
+  (`FENCE_FROM_DISK=1 BREACH_EXE=UnrealEditor.exe`, the saved asset on the Development editor): ALL PASSED.
+
 ### Adversarial reviews after completion (2026-11-16)
 
 Two read-only reviews of the finished work (code, logs, pictures). What changed:
