@@ -5,7 +5,9 @@
 
 #include "Components/StaticMeshComponent.h"
 #include "Engine/World.h"
+#include "RTS_Survival/Game/Players/RTSPlayers.h"
 #include "RTS_Survival/RTSComponents/CargoMechanic/Cargo/Cargo.h"
+#include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/Utils/CollisionSetup/FRTS_CollisionSetup.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "TimerManager.h"
@@ -23,6 +25,22 @@ AFieldConstruction::AFieldConstruction(const FObjectInitializer& ObjectInitializ
 void AFieldConstruction::BeginPlay()
 {
 	Super::BeginPlay();
+	BeginPlay_BindToOwningPlayerChanges();
+}
+
+void AFieldConstruction::BeginPlay_BindToOwningPlayerChanges()
+{
+	URTSComponent* OwnRTSComponent = FindComponentByClass<URTSComponent>();
+	if (not IsValid(OwnRTSComponent))
+	{
+		return;
+	}
+	OwnRTSComponent->OnOwningPlayerChanged.AddUObject(this, &AFieldConstruction::OnOwningPlayerChanged);
+}
+
+void AFieldConstruction::OnOwningPlayerChanged(const uint8 /*OldOwningPlayer*/, const uint8 /*NewOwningPlayer*/)
+{
+	ApplyCollisionRequest();
 }
 
 void AFieldConstruction::PostInitializeComponents()
@@ -80,6 +98,25 @@ void AFieldConstruction::OnUnitDies_HandleGarrisonState()
 
 void AFieldConstruction::SetupCollision(const int32 OwningPlayer, const bool bBlockPlayerProjectiles, const bool bOverlapTanks)
 {
+	M_CollisionRequest.bIsSet = true;
+	M_CollisionRequest.OwningPlayerFromBlueprint = OwningPlayer;
+	M_CollisionRequest.bBlockPlayerProjectiles = bBlockPlayerProjectiles;
+	M_CollisionRequest.bOverlapTanks = bOverlapTanks;
+	ApplyCollisionRequest();
+}
+
+void AFieldConstruction::ApplyCollisionRequest()
+{
+	if (not M_CollisionRequest.bIsSet)
+	{
+		return;
+	}
+	// The Blueprints pass a literal side by faction. The owner on the construction's own RTS component is the
+	// player it was built for and wins whenever it is a player.
+	const int32 OwnOwningPlayer = FRTSPlayers::GetOwningPlayerOfActor(this);
+	const int32 CollisionOwningPlayer = FRTSPlayers::IsValidPlayer(OwnOwningPlayer)
+		                                    ? OwnOwningPlayer
+		                                    : M_CollisionRequest.OwningPlayerFromBlueprint;
 	TArray<UMeshComponent*> MeshComponents;
 	GetComponents<UMeshComponent>(MeshComponents);
 	for (UMeshComponent* MeshComp : MeshComponents)
@@ -88,7 +125,9 @@ void AFieldConstruction::SetupCollision(const int32 OwningPlayer, const bool bBl
 		{
 			continue;
 		}
-		FRTS_CollisionSetup::SetupFieldConstructionMeshCollision(MeshComp, OwningPlayer, bBlockPlayerProjectiles, bOverlapTanks);
+		FRTS_CollisionSetup::SetupFieldConstructionMeshCollision(MeshComp, CollisionOwningPlayer,
+		                                                         M_CollisionRequest.bBlockPlayerProjectiles,
+		                                                         M_CollisionRequest.bOverlapTanks);
 	}
 }
 
