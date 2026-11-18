@@ -32,7 +32,20 @@ void UBehaviourComp::BeginPlay()
 	Super::BeginPlay();
 
 	BeginPlay_InitMutations();
+	BeginPlay_AddStartingBehaviours();
 	UpdateComponentTickEnabled();
+}
+
+void UBehaviourComp::BeginPlay_AddStartingBehaviours()
+{
+	for (const TSubclassOf<UBehaviour>& BehaviourClass : StartingBehaviours)
+	{
+		if (not BehaviourClass)
+		{
+			continue;
+		}
+		AddBehaviour(BehaviourClass);
+	}
 }
 
 void UBehaviourComp::EndPlay(const EEndPlayReason::Type EndPlayReason)
