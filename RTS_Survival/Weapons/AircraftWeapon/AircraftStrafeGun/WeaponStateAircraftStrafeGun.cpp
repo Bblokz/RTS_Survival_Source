@@ -7,11 +7,13 @@
 #include "LandscapeProxy.h"
 #include "PhysicalMaterials/PhysicalMaterial.h"
 #include "TimerManager.h"
+#include "RTS_Survival/Audio/AircraftGuns/AircraftGunAudioPlayer.h"
 #include "RTS_Survival/DeveloperSettings.h"
 #include "RTS_Survival/RTSCollisionTraceChannels.h"
 #include "RTS_Survival/Physics/FRTS_PhysicsHelper.h"
 #include "RTS_Survival/Physics/RTSSurfaceSubtypes.h"
 #include "RTS_Survival/Units/Aircraft/AircraftMaster/AAircraftMaster.h"
+#include "RTS_Survival/Utils/CollisionSetup/RTSPlayerCollision.h"
 #include "RTS_Survival/Weapons/AircraftWeapon/AircraftStrafeGun/AircraftStrafeShotRecorder.h"
 #include "RTS_Survival/Weapons/SmallArmsProjectileManager/SmallArmsProjectileManager.h"
 #include "RTS_Survival/Weapons/WeaponData/WeaponOwner/WeaponOwner.h"
@@ -31,11 +33,6 @@ namespace AircraftStrafeGunPrivate
 	{
 		const FVector Flat = FVector(Direction.X, Direction.Y, 0.f).GetSafeNormal();
 		return Flat.IsNearlyZero() ? Fallback : Flat;
-	}
-
-	ECollisionChannel GetVictimObjectType(const int32 OwningPlayer)
-	{
-		return OwningPlayer == 1 ? COLLISION_OBJ_ENEMY : COLLISION_OBJ_PLAYER;
 	}
 
 	float GetTracerFlightSeconds(const FVector& From, const FVector& To)
@@ -72,6 +69,47 @@ void UWeaponStateAircraftStrafeGun::FireWeaponSystem()
 		return;
 	}
 	RequestGroundProbe(Volley);
+}
+
+void UWeaponStateAircraftStrafeGun::CreateLaunchVfx(
+	const FVector& LaunchLocation,
+	const FVector& ForwardVector,
+	const bool bCreateShellCase)
+{
+	UAircraftGunAudioPlayer* const GunAudio = GetOrCreateGunAudio();
+	if (GunAudio == nullptr)
+	{
+		Super::CreateLaunchVfx(LaunchLocation, ForwardVector, bCreateShellCase);
+		return;
+	}
+	// The fire loop is the sound of every volley; the Blueprint's single shot would only stutter on top of it.
+	USoundCue* const BlueprintLaunchSound = M_WeaponVfx.LaunchSound;
+	M_WeaponVfx.LaunchSound = nullptr;
+	Super::CreateLaunchVfx(LaunchLocation, ForwardVector, bCreateShellCase);
+	M_WeaponVfx.LaunchSound = BlueprintLaunchSound;
+	GunAudio->OnVolleyFired();
+}
+
+UAircraftGunAudioPlayer* UWeaponStateAircraftStrafeGun::GetOrCreateGunAudio()
+{
+	if (bM_HasTriedCreatingGunAudio)
+	{
+		return M_GunAudio;
+	}
+	if (not IsValid(MeshComponent))
+	{
+		return nullptr;
+	}
+	bM_HasTriedCreatingGunAudio = true;
+	// 30 mm strafe cannons (the MK 108) use the heavy cannon set; rifle-calibre MGs the MG set.
+	const UAircraftGunAudioDataAsset* const AudioData = UAircraftGunAudioDataAsset::Get();
+	const EAircraftGunAudioKind Kind = AudioData != nullptr && AudioData->GetIsHeavyCannonCalibre(WeaponData.WeaponCalibre)
+		                                   ? EAircraftGunAudioKind::HeavyCannon
+		                                   : EAircraftGunAudioKind::MachineGun;
+	M_GunAudio = UAircraftGunAudioPlayer::Create(this, Kind, MeshComponent,
+	                                             M_FireSocketNames.Num(),
+	                                             GetNameSafe(MeshComponent->GetOwner()) + TEXT(".") + GetName());
+	return M_GunAudio;
 }
 
 bool UWeaponStateAircraftStrafeGun::GetShouldUseRegularMultiTrace() const
@@ -301,8 +339,11 @@ TArray<UWeaponStateAircraftStrafeGun::FStrafeUnitCandidate> UWeaponStateAircraft
 	{
 		ZoneRadius = FMath::Max(ZoneRadius, FVector::Dist2D(Round.AimPoint, Ground.Point));
 	}
+	// The object channels hostile units can be on; allied AI units share one with hostile ones, so each overlap is
+	// checked against its owner below.
 	FCollisionObjectQueryParams ObjectQueryParams;
-	ObjectQueryParams.AddObjectTypesToQuery(AircraftStrafeGunPrivate::GetVictimObjectType(OwningPlayer));
+	FRTSPlayerCollision::AddObjectTypesForOverlapLogic(
+		ObjectQueryParams, FRTSPlayerCollision::GetOverlapLogicForHostilesOf(OwningPlayer));
 	FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(AircraftStrafeUnitSearch), false);
 	AppendIgnoredActorsToQuery(QueryParams);
 	TArray<FOverlapResult> Overlaps;
@@ -317,6 +358,10 @@ TArray<UWeaponStateAircraftStrafeGun::FStrafeUnitCandidate> UWeaponStateAircraft
 			return Candidate.Actor.Get() == OverlapActor;
 		});
 		if (not IsValid(OverlapActor) || bIsKnown)
+		{
+			continue;
+		}
+		if (not FRTSPlayerCollision::IsHitDamageableByPlayer(OverlapActor, Overlap.GetComponent(), OwningPlayer))
 		{
 			continue;
 		}
@@ -487,7 +532,7 @@ void UWeaponStateAircraftStrafeGun::ApplyRoundImpact(const FStrafeRoundInFlight&
 	{
 		DrawGroundImpact(Round);
 	}
-	PlayThrottledImpactSound(Round.ImpactLocation);
+	PlayRoundImpactSound(Round);
 }
 
 void UWeaponStateAircraftStrafeGun::ApplyQueuedRoundThroughTracePath(
@@ -528,6 +573,19 @@ void UWeaponStateAircraftStrafeGun::DrawGroundImpact(const FStrafeRoundInFlight&
 		Batcher->AddImpact(EAircraftStrafeImpactGroup::Ground, ExtraSpurt, Round.ImpactNormal,
 		                   WeaponData.WeaponCalibre, Round.Surface);
 	}
+}
+
+void UWeaponStateAircraftStrafeGun::PlayRoundImpactSound(const FStrafeRoundInFlight& Round)
+{
+	UAircraftGunAudioPlayer* const GunAudio = GetOrCreateGunAudio();
+	if (GunAudio == nullptr)
+	{
+		PlayThrottledImpactSound(Round.ImpactLocation);
+		return;
+	}
+	const bool bHitUnit = Round.UnitHits.Num() > 0;
+	GunAudio->OnRoundArrived(Round.ImpactLocation, bHitUnit ? EAircraftStrafeImpactSurface::Metal : Round.Surface,
+	                         bHitUnit);
 }
 
 void UWeaponStateAircraftStrafeGun::PlayThrottledImpactSound(const FVector& Location)

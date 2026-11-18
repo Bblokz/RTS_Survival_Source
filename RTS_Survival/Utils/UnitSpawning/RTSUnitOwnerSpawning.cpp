@@ -8,6 +8,7 @@
 #include "Engine/SimpleConstructionScript.h"
 #include "Engine/World.h"
 #include "GameFramework/Pawn.h"
+#include "RTS_Survival/Game/Players/RTSPlayers.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/Units/Squads/SquadUnit/SquadUnit.h"
 #include "RTS_Survival/Utils/CollisionSetup/FRTS_CollisionSetup.h"
@@ -64,6 +65,28 @@ namespace RTSUnitOwnerSpawningPrivate
 		}
 	}
 
+	// Some unit Blueprints (tracked tanks, assault tanks, trains) have an int variable of this name of their own;
+	// their construction script copies it to the RTS component when it is not zero.
+	const TCHAR* const ActorOwningPlayerVariableName = TEXT("OwningPlayer");
+
+	/**
+	 * @brief Gives the unit's own Blueprint owner variable the forced owner, so a construction script that copies
+	 * that variable to the RTS component (and defaults it to a player) cannot undo the owner inside FinishSpawning.
+	 * Does nothing for classes without such an int variable.
+	 * @param Unit Deferred-spawned unit whose construction script has not run yet.
+	 * @param OwningPlayer Player the unit is spawned for.
+	 */
+	void SetActorOwningPlayerVariable(AActor& Unit, const uint8 OwningPlayer)
+	{
+		// A Blueprint int is an FIntProperty; a variable of that name with another type is left alone.
+		const FIntProperty* OwnerVariable = FindFProperty<FIntProperty>(Unit.GetClass(), ActorOwningPlayerVariableName);
+		if (OwnerVariable == nullptr)
+		{
+			return;
+		}
+		OwnerVariable->SetPropertyValue_InContainer(&Unit, OwningPlayer);
+	}
+
 	void RestoreRTSComponentTemplateOwners(const TArray<TPair<TWeakObjectPtr<UObject>, uint8>>& Restore)
 	{
 		const FByteProperty* OwnerProperty = FindFProperty<FByteProperty>(URTSComponent::StaticClass(), TEXT("OwningPlayer"));
@@ -78,7 +101,8 @@ namespace RTSUnitOwnerSpawningPrivate
 }
 
 AActor* FRTSUnitOwnerSpawning::SpawnUnitForPlayer(UWorld& World, UClass* UnitClass, const FTransform& Transform,
-                                                  const uint8 OwningPlayer)
+                                                  const uint8 OwningPlayer,
+                                                  const ESpawnActorCollisionHandlingMethod CollisionHandling)
 {
 	using namespace RTSUnitOwnerSpawningPrivate;
 	if (not IsValid(UnitClass))
@@ -87,8 +111,7 @@ AActor* FRTSUnitOwnerSpawning::SpawnUnitForPlayer(UWorld& World, UClass* UnitCla
 	}
 	TArray<TPair<TWeakObjectPtr<UObject>, uint8>> TemplateOwnersToRestore;
 	OverrideRTSComponentTemplateOwners(UnitClass, OwningPlayer, TemplateOwnersToRestore);
-	AActor* Unit = World.SpawnActorDeferred<AActor>(UnitClass, Transform, nullptr, nullptr,
-	                                                ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+	AActor* Unit = World.SpawnActorDeferred<AActor>(UnitClass, Transform, nullptr, nullptr, CollisionHandling);
 	if (IsValid(Unit))
 	{
 		// Components the C++ class creates exist already; Blueprint-added ones took the template value above.
@@ -96,6 +119,8 @@ AActor* FRTSUnitOwnerSpawning::SpawnUnitForPlayer(UWorld& World, UClass* UnitCla
 		{
 			RTSComponent->SetOwningPlayerRuntime(OwningPlayer);
 		}
+		// Before the construction script runs in FinishSpawning.
+		SetActorOwningPlayerVariable(*Unit, OwningPlayer);
 		Unit->FinishSpawning(Transform);
 	}
 	RestoreRTSComponentTemplateOwners(TemplateOwnersToRestore);
@@ -105,6 +130,13 @@ AActor* FRTSUnitOwnerSpawning::SpawnUnitForPlayer(UWorld& World, UClass* UnitCla
 		Pawn->SpawnDefaultController();
 	}
 	return Unit;
+}
+
+int32 FRTSUnitOwnerSpawning::GetOwnerOverrideForAIPlayer(const int32 OwningPlayer)
+{
+	const bool bIsLaterAIPlayer = FRTSPlayers::IsValidAIPlayer(OwningPlayer)
+		&& OwningPlayer != RTSPlayers::FirstAIPlayer;
+	return bIsLaterAIPlayer ? OwningPlayer : INDEX_NONE;
 }
 
 void FRTSUnitOwnerSpawning::MatchSoldierToSquadOwner(ASquadUnit* Soldier, const uint8 SquadOwner)

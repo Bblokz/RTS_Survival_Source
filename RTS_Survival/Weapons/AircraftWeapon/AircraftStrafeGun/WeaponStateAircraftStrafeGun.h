@@ -8,6 +8,7 @@
 #include "WeaponStateAircraftStrafeGun.generated.h"
 
 class ALandscapeProxy;
+class UAircraftGunAudioPlayer;
 
 namespace AircraftStrafeGunSettings
 {
@@ -52,7 +53,8 @@ namespace AircraftStrafeGunSettings
 	constexpr float ArrivalCheckIntervalSeconds = 1.f / 60.f;
 	// Rounds in the air per gun before new arrivals are applied instantly instead of queued.
 	constexpr int32 MaxRoundsInFlight = 256;
-	// One impact sound per gun at most this often; a strafe is dozens of impacts per second.
+	// Without aircraft gun audio data: one impact sound per gun at most this often (a strafe is dozens of impacts per
+	// second). With it, UAircraftGunAudioPlayer plays a fire loop and an impact churn loop instead.
 	constexpr float ImpactSoundIntervalSeconds = 0.12f;
 }
 
@@ -72,12 +74,26 @@ public:
 	// True when the command line asks for the old aircraft MG behaviour (A/B comparisons in the strafe test).
 	static bool GetIsLegacyAircraftGunsRequested();
 
+	// Aircraft cannons set up as projectile weapons in their Blueprint that UAircraftWeapon fires as strafe guns.
+	static bool GetIsStrafeCannon(const EWeaponName WeaponName) { return WeaponName == EWeaponName::MK108_30MM_Horten; }
+	// Tracer visual of the strafe cannons (a Blueprint projectile system does not apply to pooled tracers).
+	static constexpr int32 StrafeCannonTracerType = 1;
+
 	virtual void FireWeaponSystem() override;
+
+	// Makes the fire loop + impact churn player (UAircraftGunAudioPlayer) now instead of on the first volley; called by
+	// UAircraftWeapon when the weapon is set up. Does nothing without aircraft gun audio data.
+	void InitGunAudio() { (void)GetOrCreateGunAudio(); }
+	UAircraftGunAudioPlayer* GetGunAudio() const { return M_GunAudio; }
 
 protected:
 	// The strafe gun fires its tracers when a volley is resolved; only queued rounds skip the base tracer. Air-to-air
 	// and fallback fire go through the regular multi-trace path and keep theirs.
 	virtual bool GetFiresTracerOnTraceComplete() const override { return not bM_IsApplyingQueuedRound; }
+
+	// Every volley: muzzle flashes as before; the per-volley launch sound is replaced by the gun audio's fire loop.
+	virtual void CreateLaunchVfx(const FVector& LaunchLocation, const FVector& ForwardVector,
+	                             bool bCreateShellCase = true) override;
 
 private:
 	struct FStrafeGunAim
@@ -151,6 +167,10 @@ private:
 	TArray<FStrafeRoundInFlight> M_RoundsInFlight;
 	FTimerHandle M_ArrivalTimerHandle;
 	float M_LastImpactSoundTime = -1.f;
+	// Fire loop + impact churn of this gun; null when the RTS Audio Settings have no aircraft gun data.
+	UPROPERTY()
+	TObjectPtr<UAircraftGunAudioPlayer> M_GunAudio;
+	bool bM_HasTriedCreatingGunAudio = false;
 	// True only while a queued round runs the base trace path (damage, regular impact): its tracer already flew.
 	bool bM_IsApplyingQueuedRound = false;
 
@@ -193,7 +213,9 @@ private:
 	// Runs the regular trace path (armour, damage, impact) for a queued round without a second tracer.
 	void ApplyQueuedRoundThroughTracePath(FTraceDatum& TraceDatum, const FStrafeRoundInFlight& Round);
 	void DrawGroundImpact(const FStrafeRoundInFlight& Round);
+	void PlayRoundImpactSound(const FStrafeRoundInFlight& Round);
 	void PlayThrottledImpactSound(const FVector& Location);
+	UAircraftGunAudioPlayer* GetOrCreateGunAudio();
 	UAircraftStrafeImpactBatcher* GetReadyStrafeImpactBatcher() const;
 	void StartArrivalTimerIfNeeded();
 };
