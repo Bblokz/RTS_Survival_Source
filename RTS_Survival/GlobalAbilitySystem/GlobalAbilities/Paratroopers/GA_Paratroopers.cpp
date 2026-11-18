@@ -24,6 +24,7 @@
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/RTSBlueprintFunctionLibrary.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
+#include "RTS_Survival/Utils/UnitSpawning/RTSUnitOwnerSpawning.h"
 
 namespace ParatroopersConstants
 {
@@ -394,7 +395,10 @@ void UGA_Paratroopers::SpawnSquadForRun(const int32 RunId, const ESquadSubtype S
 			}
 			WeakThis->OnSquadSpawned(RunId, SpawnedActor);
 		},
-		FRotator::ZeroRotator);
+		FRotator::ZeroRotator,
+		// A later AI player's paratroopers are spawned for it; the human's and the first AI player's keep the
+		// owner of their Blueprint.
+		FRTSUnitOwnerSpawning::GetOwnerOverrideForAIPlayer(GetOwningPlayer()));
 	if (bRequested)
 	{
 		return;
@@ -1055,7 +1059,8 @@ void UGA_Paratroopers::ReleaseSquad(ASquadController* Squad) const
 	{
 		return;
 	}
-	AEnemyController* EnemyController = FRTS_Statics::GetEnemyController(this);
+	// The squad lands for the AI player that owns this ability; that player's controller takes command of it.
+	AEnemyController* EnemyController = FRTS_Statics::GetEnemyControllerForPlayer(this, GetOwningPlayer());
 	if (not IsValid(EnemyController))
 	{
 		return;
