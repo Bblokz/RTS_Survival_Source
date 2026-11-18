@@ -13,6 +13,7 @@
 #include "RTS_Survival/CaptureMechanic/CaptureMechanicHelpers.h"
 #include "RTS_Survival/CaptureMechanic/CaptureInterface/CaptureInterface.h"
 #include "RTS_Survival/Game/GameState/CPPGameState.h"
+#include "RTS_Survival/Game/Players/RTSPlayers.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/RTSCollisionTraceChannels.h"
 #include "RTS_Survival/PickupItems/Items/WeaponPickUp/WeaponPickup.h"
@@ -37,6 +38,7 @@
 #include "RTS_Survival/Scavenging/ScavengeObject/ScavengableObject.h"
 #include "RTS_Survival/Scavenging/ScavengerComponent/ScavengerComponent.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
+#include "RTS_Survival/Utils/UnitSpawning/RTSUnitOwnerSpawning.h"
 #include "Kismet/GameplayStatics.h"
 #include "RTS_Survival/Audio/SpacialVoiceLinePlayer/SpatialVoiceLinePlayer.h"
 #include "RTS_Survival/FOWSystem/FowComponent/FowComp.h"
@@ -3738,6 +3740,21 @@ void ASquadController::RegisterReinforcedUnit(ASquadUnit* ReinforcedUnit)
 	UpdateReinforcementAvailability();
 }
 
+void ASquadController::MatchSoldierToSquadOwner(ASquadUnit* Soldier) const
+{
+	if (not GetIsValidRTSComponent())
+	{
+		return;
+	}
+	const uint8 SquadOwner = RTSComponent->GetOwningPlayer();
+	if (not FRTSPlayers::IsValidPlayer(SquadOwner))
+	{
+		// A squad without a real owner (unset, neutral) leaves its soldiers as their Blueprint made them.
+		return;
+	}
+	FRTSUnitOwnerSpawning::MatchSoldierToSquadOwner(Soldier, SquadOwner);
+}
+
 void ASquadController::OnSquadFullyReinforced()
 {
 	ACPPGameState* GameState = FRTS_Statics::GetGameState(this);
@@ -4232,6 +4249,8 @@ void ASquadController::OnSquadUnitClassLoaded(TSoftClassPtr<ASquadUnit> LoadedCl
 				UnitClass, Spawnlocation, FRotator::ZeroRotator, SpawnParameters);
 			if (IsValid(SpawnedUnit))
 			{
+				// The soldier belongs to the player of its squad, whatever owner its own Blueprint has.
+				MatchSoldierToSquadOwner(SpawnedUnit);
 				// Set the squad controller reference on the unit
 				SpawnedUnit->SetSquadController(this);
 				M_TSquadUnits.Add(SpawnedUnit);

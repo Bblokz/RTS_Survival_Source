@@ -427,6 +427,10 @@ private:
 	bool TrackStrafeAircraft();
 	// Logs the measured MG rounds (FAircraftStrafeShotRecorder), checks them for the strafe gun and writes the CSV.
 	void FinishAircraftStrafeQA();
+	// Burst counts of the strafe gun audio, then the 20 mm cannon audio set-up on a spawned Me 410.
+	void CheckStrafeGunAudio();
+	// Spawns every aircraft Blueprint once and checks each strafe MG and 15-25 mm cannon got its gun sounds.
+	void CheckGunAudioOfEveryAircraft();
 	// Views the target from an oblique camera and takes screenshots at fixed times after the first round.
 	void TickStrafeScreenshots(const float SecondsSinceFirstShot);
 	// Places the QA camera (made once) to look at LookAt from behind and above, and makes it the view.

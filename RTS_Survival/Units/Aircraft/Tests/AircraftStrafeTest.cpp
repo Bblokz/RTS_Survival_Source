@@ -32,6 +32,13 @@
 #include "RTS_Survival/Weapons/WeaponData/WeaponData.h"
 #include "RTS_Survival/Weapons/AircraftWeapon/AircraftStrafeGun/AircraftStrafeShotRecorder.h"
 #include "RTS_Survival/Weapons/AircraftWeapon/AircraftStrafeGun/WeaponStateAircraftStrafeGun.h"
+#include "RTS_Survival/Audio/AircraftGuns/AircraftGunAudioPlayer.h"
+#include "AssetRegistry/AssetRegistryModule.h"
+#include "AssetRegistry/IAssetRegistry.h"
+#include "Engine/Blueprint.h"
+#include "Misc/PackageName.h"
+#include "RTS_Survival/Physics/RTSSurfaceSubtypes.h"
+#include "RTS_Survival/Weapons/WeaponData/MultiProjectileWeapon/UWeaponStateMultiProjectile.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogRTSAircraftStrafeTest, Log, All);
 
@@ -39,6 +46,8 @@ namespace AircraftStrafeTestPrivate
 {
 	const TCHAR* const DefaultStrafeAircraftClassMarker = TEXT("Ger_Aircraft_Horten229_Airborne");
 	constexpr int32 ExpectedAircraftCount = 2;
+	// Every aircraft Blueprint under this folder is spawned once after the strafe to check which gun sounds it got.
+	const TCHAR* const AircraftBlueprintFolder = TEXT("/Game/RTS_Survival/Blueprints/Aircraft");
 	constexpr int32 StrafingPlayer = 1;
 	// The aircraft come in from the edge of the map before the first pass.
 	constexpr float StrafeTimeoutSeconds = 150.f;
@@ -78,6 +87,8 @@ namespace AircraftStrafeTestPrivate
 
 	// Strafe gun acceptance (the legacy guns are only measured, for the comparison).
 	constexpr int32 MinMeasuredShots = 100;
+	// The Ho 229's MK 108 strafe cannons fire 3-6 round bursts with a 0.45 s cooldown: two aircraft land about 50.
+	constexpr int32 MinMeasuredStrafeCannonShots = 30;
 	constexpr float MinGroundHitShare = 0.9f;
 	constexpr float MaxOffNoseShare = 0.02f;
 	// Impacts may land at most one arrival-check interval plus a frame off the tracer's arrival.
@@ -403,7 +414,9 @@ void UAircraftTestSubsystem::FinishAircraftStrafeQA()
 		// Legacy guns are the "before" of the comparison: measured, not judged.
 		return;
 	}
-	Check(FAircraftStrafeShotRecorder::GetShotCount() >= MinMeasuredShots, TEXT("strafe_gun_enough_rounds"),
+	const bool bIsStrafeCannonUnderTest = GetStrafeAircraftClassMarker().Contains(TEXT("Horten229"));
+	Check(FAircraftStrafeShotRecorder::GetShotCount()
+	      >= (bIsStrafeCannonUnderTest ? MinMeasuredStrafeCannonShots : MinMeasuredShots), TEXT("strafe_gun_enough_rounds"),
 	      FString::Printf(TEXT("shots=%d"), FAircraftStrafeShotRecorder::GetShotCount()));
 	Check(FAircraftStrafeShotRecorder::GetGroundHitShare() >= MinGroundHitShare, TEXT("strafe_gun_rounds_hit_ground"),
 	      FString::Printf(TEXT("share=%.2f"), FAircraftStrafeShotRecorder::GetGroundHitShare()));
@@ -427,6 +440,133 @@ void UAircraftTestSubsystem::FinishAircraftStrafeQA()
 	Check(GroundImpactsDrawn >= FAircraftStrafeShotRecorder::GetImpactCount(), TEXT("strafe_gun_impact_system_draws"),
 	      FString::Printf(TEXT("ground_impacts=%lld rounds=%d"), GroundImpactsDrawn,
 	                      FAircraftStrafeShotRecorder::GetImpactCount()));
+	CheckStrafeGunAudio();
+}
+
+void UAircraftTestSubsystem::CheckStrafeGunAudio()
+{
+	using namespace AircraftStrafeTestPrivate;
+	// A -nosound run cannot listen: the burst logic runs without an audio device, so its counts are checked instead.
+	const UAircraftGunAudioPlayer::FTestCounters& Audio = UAircraftGunAudioPlayer::GetTestCounters();
+	UE_LOG(LogRTSAircraftStrafeTest, Display,
+	       TEXT("RTS_AIRCRAFT_TEST STRAFE_AUDIO players=%d volleys=%d fire_loop_starts=%d fire_tails=%d rounds=%d "
+		       "impact_loop_starts=%d impact_loop_switches=%d impact_tails=%d unit_hit_clusters=%d"),
+	       Audio.PlayersCreated, Audio.Volleys, Audio.FireLoopStarts, Audio.FireTails, Audio.RoundsArrived,
+	       Audio.ImpactLoopStarts, Audio.ImpactLoopSwitches, Audio.ImpactTails, Audio.UnitHitClusters);
+	Check(Audio.PlayersCreated >= ExpectedAircraftCount, TEXT("strafe_audio_player_per_gun"),
+	      FString::Printf(TEXT("players=%d"), Audio.PlayersCreated));
+	// One fire loop per burst, not per volley; every burst but the ones still firing at the end got its tail.
+	Check(Audio.FireLoopStarts > 0 && Audio.FireLoopStarts * 2 <= Audio.Volleys, TEXT("strafe_audio_fire_loop_per_burst"),
+	      FString::Printf(TEXT("fire_loop_starts=%d volleys=%d"), Audio.FireLoopStarts, Audio.Volleys));
+	Check(Audio.FireTails >= Audio.FireLoopStarts - Audio.PlayersCreated, TEXT("strafe_audio_bursts_end_with_tail"),
+	      FString::Printf(TEXT("fire_tails=%d fire_loop_starts=%d"), Audio.FireTails, Audio.FireLoopStarts));
+	// The recorder also counts rounds that end in the air (no impact, no sound): allow for those few.
+	Check(Audio.RoundsArrived >= FAircraftStrafeShotRecorder::GetImpactCount() * 0.9f && Audio.ImpactLoopStarts > 0
+	      && Audio.ImpactLoopStarts * 4 <= Audio.RoundsArrived, TEXT("strafe_audio_impact_churn_per_burst"),
+	      FString::Printf(TEXT("impact_loop_starts=%d rounds=%d recorded_impacts=%d"), Audio.ImpactLoopStarts,
+	                      Audio.RoundsArrived, FAircraftStrafeShotRecorder::GetImpactCount()));
+	Check(Audio.ImpactTails >= Audio.ImpactLoopStarts - Audio.PlayersCreated, TEXT("strafe_audio_impacts_end_with_tail"),
+	      FString::Printf(TEXT("impact_tails=%d impact_loop_starts=%d"), Audio.ImpactTails, Audio.ImpactLoopStarts));
+
+	CheckGunAudioOfEveryAircraft();
+}
+
+void UAircraftTestSubsystem::CheckGunAudioOfEveryAircraft()
+{
+	using namespace AircraftStrafeTestPrivate;
+	// Every aircraft Blueprint is spawned once, high above the anchor, and its weapons are read right after BeginPlay
+	// (where the Blueprints set them up): every strafe MG needs the MG set, every 15-25 mm projectile gun the cannon set
+	// with the 20 mm ground impact. Everything else keeps its own sounds and is only listed.
+	const UAircraftGunAudioDataAsset* const Data = UAircraftGunAudioDataAsset::Get();
+	FARFilter Filter;
+	Filter.PackagePaths.Add(FName(AircraftBlueprintFolder));
+	Filter.bRecursivePaths = true;
+	Filter.ClassPaths.Add(UBlueprint::StaticClass()->GetClassPathName());
+	TArray<FAssetData> Blueprints;
+	IAssetRegistry::GetChecked().GetAssets(Filter, Blueprints);
+	int32 AircraftChecked = 0;
+	int32 StrafeGuns = 0;
+	int32 StrafeGunsWithAudio = 0;
+	int32 Cannons = 0;
+	int32 CannonsWithAudio = 0;
+	for (const FAssetData& Blueprint : Blueprints)
+	{
+		FString GeneratedClassPath;
+		if (not Blueprint.GetTagValue(FBlueprintTags::GeneratedClassPath, GeneratedClassPath))
+		{
+			continue;
+		}
+		const FString ClassPath = FPackageName::ExportTextPathToObjectPath(GeneratedClassPath);
+		const UClass* const AircraftClass = LoadClass<AActor>(nullptr, *ClassPath);
+		if (not IsValid(AircraftClass) || not AircraftClass->IsChildOf(AAircraftMaster::StaticClass())
+			|| AircraftClass->HasAnyClassFlags(CLASS_Abstract))
+		{
+			continue;
+		}
+		const FTransform SpawnTransform(FRotator::ZeroRotator,
+		                                M_Anchor + FVector(0.f, 3000.f * AircraftChecked, 9000.f));
+		AActor* const Spawned = SpawnUnitForPlayer(ClassPath, SpawnTransform, StrafingPlayer);
+		const AAircraftMaster* const Aircraft = Cast<AAircraftMaster>(Spawned);
+		if (not IsValid(Aircraft))
+		{
+			continue;
+		}
+		++AircraftChecked;
+		FString WeaponList;
+		for (UWeaponState* const Weapon : Aircraft->GetAllAircraftWeapons())
+		{
+			if (not IsValid(Weapon))
+			{
+				continue;
+			}
+			const FString WeaponName = Global_GetWeaponEnumAsString(Weapon->GetRawWeaponData().WeaponName);
+			const float Calibre = Weapon->GetRawWeaponData().WeaponCalibre;
+			if (const UWeaponStateAircraftStrafeGun* const StrafeGun = Cast<UWeaponStateAircraftStrafeGun>(Weapon))
+			{
+				const UAircraftGunAudioPlayer* const GunAudio = StrafeGun->GetGunAudio();
+				++StrafeGuns;
+				const bool bIsHeavy = Data != nullptr && Data->GetIsHeavyCannonCalibre(Calibre);
+				const EAircraftGunAudioKind WantedKind = bIsHeavy ? EAircraftGunAudioKind::HeavyCannon
+					                                         : EAircraftGunAudioKind::MachineGun;
+				const bool bIsWired = GunAudio != nullptr && GunAudio->GetKind() == WantedKind;
+				StrafeGunsWithAudio += bIsWired ? 1 : 0;
+				const TCHAR* const SetText = bIsHeavy
+					                             ? TEXT("30 mm set")
+					                             : (GunAudio != nullptr && GunAudio->GetUsesManyGunLoops()
+						                                ? TEXT("MG set, 4-gun loops")
+						                                : TEXT("MG set, 2-gun loops"));
+				WeaponList += FString::Printf(TEXT(" [%s %.0fmm strafe %s: %s]"), *WeaponName, Calibre,
+				                              bIsHeavy ? TEXT("cannon") : TEXT("MG"),
+				                              GunAudio == nullptr ? TEXT("NO AUDIO") : (bIsWired ? SetText : TEXT("WRONG SET")));
+				continue;
+			}
+			const UWeaponStateMultiProjectile* const Projectile = Cast<UWeaponStateMultiProjectile>(Weapon);
+			if (IsValid(Projectile) && Data != nullptr && Data->GetIsCannonCalibre(Calibre))
+			{
+				const UAircraftGunAudioPlayer* const GunAudio = Projectile->GetAircraftGunAudio();
+				const FRTSSurfaceImpactData* const SandImpact = Projectile->GetWeaponVfx() != nullptr
+					                                                ? Projectile->GetWeaponVfx()->SurfaceImpactEffects.Find(ERTSSurfaceType::Sand)
+					                                                : nullptr;
+				const bool bIsWired = GunAudio != nullptr && GunAudio->GetKind() == EAircraftGunAudioKind::Cannon
+					&& SandImpact != nullptr && SandImpact->ImpactSound != nullptr
+					&& SandImpact->ImpactSound == GunAudio->GetGroundImpactPerProjectile();
+				++Cannons;
+				CannonsWithAudio += bIsWired ? 1 : 0;
+				WeaponList += FString::Printf(TEXT(" [%s %.0fmm cannon: %s]"), *WeaponName, Calibre,
+				                              bIsWired ? TEXT("cannon set + 20 mm impact") : TEXT("NOT WIRED"));
+				continue;
+			}
+			WeaponList += FString::Printf(TEXT(" [%s %.0fmm: own sounds]"), *WeaponName, Calibre);
+		}
+		UE_LOG(LogRTSAircraftStrafeTest, Display, TEXT("RTS_AIRCRAFT_TEST AIRCRAFT_GUN_AUDIO %s:%s"),
+		       *AircraftClass->GetName(), WeaponList.IsEmpty() ? TEXT(" no weapons") : *WeaponList);
+		Spawned->Destroy();
+	}
+	Check(AircraftChecked > 0 && StrafeGuns > 0 && StrafeGunsWithAudio == StrafeGuns,
+	      TEXT("strafe_audio_every_strafe_mg_wired"),
+	      FString::Printf(TEXT("aircraft=%d strafe_mgs=%d wired=%d"), AircraftChecked, StrafeGuns, StrafeGunsWithAudio));
+	Check(Cannons > 0 && CannonsWithAudio == Cannons, TEXT("strafe_audio_every_20mm_cannon_wired"),
+	      FString::Printf(TEXT("cannons=%d wired=%d"), Cannons, CannonsWithAudio));
 }
 
 bool UAircraftTestSubsystem::TrackStrafeAircraft()

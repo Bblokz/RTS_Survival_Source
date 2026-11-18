@@ -453,6 +453,14 @@ public:
 	 */
 	void RegisterReinforcedUnit(ASquadUnit* ReinforcedUnit);
 
+	/**
+	 * @brief A soldier spawns with the owner of its own Blueprint; this gives it, its weapons and its capsule the
+	 * owner of this squad, so the soldiers of a squad spawned for another player fight for that player.
+	 * Does nothing when the soldier already has the squad's owner.
+	 * @param Soldier Freshly spawned soldier of this squad.
+	 */
+	void MatchSoldierToSquadOwner(ASquadUnit* Soldier) const;
+
 	void OnSquadFullyReinforced();
 
 	/**
