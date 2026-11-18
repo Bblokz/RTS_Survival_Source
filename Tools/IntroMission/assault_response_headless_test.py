@@ -1,5 +1,5 @@
 """Throwaway-editor PIE test of the Secure-the-Line assault response (ramp trigger -> Mosin line, Soviet air drops,
-advisor line + 2 Ju 87s strafing the base for 60 s). 2026-11-16.
+advisor line + 2 Ju 87s strafing the base for 150 s). 2026-11-16.
 
     UnrealEditor-Win64-DebugGame.exe RTS_Survival.uproject
       -ini:Engine:[/Script/EngineSettings.GameMapsSettings]:EditorStartupMap=/Game/RTS_Survival/Maps/GerMissions/Ger_IntroMission

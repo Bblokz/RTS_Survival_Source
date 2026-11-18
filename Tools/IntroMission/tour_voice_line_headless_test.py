@@ -11,6 +11,8 @@ saved), applies setup_secure_line_mission's defaults to the mission CDO and to t
 saved), cuts the chain to [ClearSovietRig without trigger] like secure_line_headless_test and checks:
 the line starts after the first tour shot shows (not before, the takeover would stop it), an audio component is
 really playing it while the tour runs, at a non-zero volume, and it is not cut when the tour hands the screen back.
+2026-11-18: the portrait shows on the tour overlay's copy of W_BP_Portrait (the HUD is hidden) with its word-timed
+subtitle, a `shot showui` screenshot is taken mid-line, and portraits go back to the HUD widget after the tour.
 """
 import importlib
 import json
@@ -98,6 +100,38 @@ def line_components(world):
     return out
 
 
+def portrait_manager(world):
+    pc = unreal.GameplayStatics.get_player_controller(world, 0)
+    return pc.call_method('GetPlayerPortraitManager') if pc is not None else None
+
+
+def sample_tour_portrait(portraits):
+    """Keeps what the active portrait shows while the line plays over the tour."""
+    active = portraits.call_method('GetActivePortraitWidget')
+    if active is None or active == S.get('hud_portrait'):
+        return
+    S['tour_portrait'] = active
+    text = active.call_method('GetShownSubtitleText')
+    if text:
+        words = S.setdefault('tour_subtitle_samples', [])
+        if not words or words[-1] != text:
+            words.append(text)
+
+
+def check_tour_portrait():
+    copy = S.get('tour_portrait')
+    hud = S.get('hud_portrait')
+    vis = str(copy.get_visibility()) if copy is not None else None
+    opacity = copy.get_render_opacity() if copy is not None else 0.0
+    check('portrait_on_tour_overlay', copy is not None and hud is not None and copy != hud
+          and copy.get_class() == hud.get_class(), f'active {copy}, hud {hud}')
+    check('tour_portrait_visible', vis is not None and 'HIDDEN' not in vis.upper() and 'COLLAPSED' not in vis.upper()
+          and opacity > 0.3, f'visibility {vis}, opacity {round(opacity, 2)}')
+    samples = S.get('tour_subtitle_samples', [])
+    check('tour_subtitle_words', len(samples) >= 3 and any(len(s.split()) >= 3 for s in samples),
+          f'{len(samples)} distinct texts, last: {samples[-1] if samples else None!r}')
+
+
 def tick(delta):
     S['t'] += delta
     phase = S['phase']
@@ -162,6 +196,12 @@ def tick(delta):
         if 'line_wall' in S and playing:
             S['line_last_wall'] = wall()
 
+        portraits = portrait_manager(world) if world is not None else None
+        if phase == 'wait_tour' and portraits is not None and 'hud_portrait' not in S:
+            S['hud_portrait'] = portraits.call_method('GetActivePortraitWidget')
+        if phase == 'tour' and portraits is not None and 'line_wall' in S:
+            sample_tour_portrait(portraits)
+
         if phase == 'wait_tour':
             if m is not None and m.call_method('GetIsCameraTourPlaying') and m.call_method('GetCameraTourShotIndex') >= 0:
                 S['tour_wall'] = wall()
@@ -189,6 +229,14 @@ def tick(delta):
                 check('line_starts_after_first_shot', 0.5 < delay < 2.5 and S['line_shot'] is not None
                       and S['line_shot'] >= 0, f'{round(delay, 2)} s after the first shot (shot {S["line_shot"]})')
                 check('played_flag', m.call_method('GetHasTourVoiceLinePlayed'))
+            if 'line_wall' in S and 'checked_portrait' not in S and wall() - S['line_wall'] > 5.0:
+                S['checked_portrait'] = True
+                check_tour_portrait()
+            # Own tick, after the timing checks: the screenshot stalls the game for seconds.
+            if 'checked_portrait' in S and 'shot_wall' not in S and wall() - S['line_wall'] > 6.0:
+                S['shot_wall'] = wall()
+                unreal.SystemLibrary.execute_console_command(world, 'shot showui')
+                log('shot showui (portrait + subtitle over the tour)')
             if m is not None and m.call_method('GetHasTourFinished'):
                 S['tour_end_wall'] = wall()
                 check('tour_length', 30.0 < S['tour_end_wall'] - S['tour_wall'] < 45.0,
@@ -200,6 +248,15 @@ def tick(delta):
             return
 
         if phase == 'after':
+            if 'checked_handback' not in S and portraits is not None:
+                S['checked_handback'] = True
+                active = portraits.call_method('GetActivePortraitWidget')
+                copy = S.get('tour_portrait')
+                copy_vis = str(copy.get_visibility()) if copy is not None else None
+                check('portrait_back_on_hud', active is not None and active == S.get('hud_portrait')
+                      and (copy is None or not copy.is_in_viewport() or 'HIDDEN' in copy_vis.upper()),
+                      f'active {active}, hud {S.get("hud_portrait")}, tour copy {copy} visibility {copy_vis}, '
+                      f'line still playing {portraits.call_method("GetIsPortraitPlaying")}')
             if elapsed > 3.0:
                 heard = S.get('line_last_wall', 0) - S.get('line_wall', 0)
                 check('line_played_through', heard > 18.5,

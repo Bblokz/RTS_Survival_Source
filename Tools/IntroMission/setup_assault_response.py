@@ -105,7 +105,7 @@ def apply_defaults(cdo):
     resp.set_editor_property('air_support_ability', ability_enum().GA_JU87_STRAFING)
     resp.set_editor_property('air_support_strike_delay_seconds', 9.0)
     resp.set_editor_property('air_support_aircraft_count', 2)
-    resp.set_editor_property('air_support_strafe_seconds', 60.0)
+    resp.set_editor_property('air_support_strafe_seconds', 150.0)  # 2026-11-18 user: +90 s
     resp.set_editor_property('air_support_target', vec(STRIKE_TARGET))
     resp.set_editor_property('air_support_stays_on_target', True)   # runs keep going over the base
     cdo.set_editor_property('assault_response', resp)

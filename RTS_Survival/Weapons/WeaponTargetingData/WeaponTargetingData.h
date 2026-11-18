@@ -92,9 +92,19 @@ private:
 	void RerollSwitchThreshold();
 	bool GetIsValidTargetActor() const;
 
+	/**
+	 * @brief Re-judges the held actor target after teams or unit owners changed; costs one compare otherwise.
+	 * @return True when the target has an owner that is now allied with the weapon's owner.
+	 */
+	bool GetHasTargetBecomeAllied() const;
+
 	/** Owning player index used for visibility/validity checks. */
 	UPROPERTY()
 	int32 M_OwningPlayer = -1;
+
+	// FRTSPlayers::GetRelationsVersion at the moment the held target was last judged hostile; mutable because the
+	// const validity check stores the new version once it has re-judged the target.
+	mutable uint32 M_TargetRelationsVersion = 0;
 
 	/** Explicit target mode. */
 	UPROPERTY()
