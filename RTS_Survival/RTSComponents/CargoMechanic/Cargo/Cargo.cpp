@@ -9,6 +9,7 @@
 #include "Engine/StaticMeshSocket.h"
 #include "RTS_Survival/Behaviours/Behaviour.h"
 #include "RTS_Survival/Behaviours/BehaviourComp.h"
+#include "RTS_Survival/Game/Players/RTSPlayers.h"
 #include "RTS_Survival/GameUI/Healthbar/GarrisonHealthBar/W_GarrisonHealthBar.h"
 #include "RTS_Survival/RTSComponents/HealthComponent.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
@@ -284,7 +285,8 @@ bool UCargo::IsOccupiedByEnemy(ASquadController*& OutValidEnemySquad) const
 		{
 			continue;
 		}
-		return RTSComp->GetOwningPlayer() == 2;
+		// Asked by the human's command decoder: occupants of any AI player that fights the human count as the enemy.
+		return FRTSPlayers::IsHostileToHuman(RTSComp->GetOwningPlayer());
 	}
 	return false;
 }

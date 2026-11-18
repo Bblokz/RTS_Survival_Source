@@ -11,6 +11,7 @@
 #include "RTS_Survival/GameUI/Healthbar/W_HealthBar.h"
 #include "RTS_Survival/GameUI/MiniMap/CombatPings/RTSCombatPingSubsystem.h"
 #include "RTS_Survival/UnitData/ArmorAndResistanceData.h"
+#include "RTS_Survival/Utils/RTSMapTests/DamageHooks/DamageMapTestHooks.h"
 #include "RTS_Survival/Weapons/WeaponData/WeaponData.h"
 #include "RTS_Survival/Weapons/WeaponData/FRTSWeaponHelpers/FRTSWeaponHelpers.h"
 
@@ -171,6 +172,14 @@ bool UHealthComponent::TakeDamage(float& InOutDamage, const ERTSDamageType Damag
 
 	CurrentHealth = FMath::Clamp(PreviousHealth - AppliedDamage, 0.f, MaxHealth);
 	InOutDamage = AppliedDamage;
+
+#if RTS_WITH_MAP_TESTS
+	// Map tests (four-player skirmish) count who really hurt whom here: the one place every loss of health passes.
+	if (FDamageMapTestHooks::GetHasListeners())
+	{
+		FDamageMapTestHooks::ReportDamageApplied(GetOwner(), AppliedDamage, CurrentHealth <= 0.f);
+	}
+#endif
 
 	OnUnitInCombat();
 	UpdateHealthBar();

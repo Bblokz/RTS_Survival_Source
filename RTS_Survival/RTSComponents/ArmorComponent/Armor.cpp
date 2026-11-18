@@ -4,6 +4,7 @@
 #include "Armor.h"
 
 #include "RTS_Survival/DeveloperSettings.h"
+#include "RTS_Survival/Game/Players/RTSPlayers.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/Utils/CollisionSetup/FRTS_CollisionSetup.h"
 
@@ -41,14 +42,7 @@ void UArmor::BeginPlay()
 		URTSComponent* RTSComponent = MyOwner->FindComponentByClass<URTSComponent>();
 		if (IsValid(RTSComponent))
 		{
-			if(RTSComponent->GetOwningPlayer() == 1)
-			{
-				FRTS_CollisionSetup::SetupPlayerArmorMeshCollision(this);
-			}
-			else
-			{
-				FRTS_CollisionSetup::SetupEnemyArmorMeshCollision(this);
-			}
+			FRTS_CollisionSetup::SetupArmorMeshCollision(this, RTSComponent->GetOwningPlayer());
 		}
 		else
 		{
@@ -56,7 +50,7 @@ void UArmor::BeginPlay()
 				"\n Owner of component: " + MyOwner->GetName() + " does not have a RTS component."
 				"function: UArmor::BeginPlay()"
 				"\n Setting up collision as enemy armor part by default...");
-			FRTS_CollisionSetup::SetupEnemyArmorMeshCollision(this);
+			FRTS_CollisionSetup::SetupArmorMeshCollision(this, RTSPlayers::FirstAIPlayer);
 		}
 	}
 }

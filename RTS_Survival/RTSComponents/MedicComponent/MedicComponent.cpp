@@ -8,8 +8,10 @@
 #include "MedicPatientSubsystem.h"
 #include "RTS_Survival/GameUI/Pooled_AnimatedVerticalIcons/AnimatedIconTypes.h"
 #include "RTS_Survival/GameUI/Pooled_AnimatedVerticalIcons/AnimatedIconWidgetPoolManager.h"
+#include "RTS_Survival/Game/Players/RTSPlayers.h"
 #include "RTS_Survival/Player/Abilities.h"
 #include "RTS_Survival/RTSCollisionTraceChannels.h"
+#include "RTS_Survival/Utils/CollisionSetup/RTSPlayerCollision.h"
 #include "RTS_Survival/RTSComponents/HealthComponent.h"
 #include "RTS_Survival/Units/SquadController.h"
 #include "RTS_Survival/Units/Squads/SquadUnit/AnimSquadUnit/SquadUnitAnimInstance.h"
@@ -24,7 +26,6 @@ DEFINE_LOG_CATEGORY_STATIC(LogRTSMedic, Log, All);
 
 namespace MedicComponentConstants
 {
-	constexpr int32 PlayerOwnedTeam = 1;
 	// How often a medic with a patient checks on it: whether it moved, can still be healed, is due a heal tick.
 	constexpr float PatientUpdateInterval = 0.25f;
 	// A soldier with this part of its health or more needs no medic.
@@ -214,8 +215,9 @@ bool UMedicComponent::GetIsValidPatient(ASquadUnit* Candidate) const
 		return false;
 	}
 	const UHealthComponent* PatientHealth = Candidate->GetHealthComponent();
+	// Soldiers of allied players are treated like the medic's own.
 	const bool bIsInjuredAlly = IsValid(PatientHealth) &&
-		Candidate->GetOwningPlayer() == OwnerUnit->GetOwningPlayer() &&
+		FRTSPlayers::AreAllied(OwnerUnit->GetOwningPlayer(), Candidate->GetOwningPlayer()) &&
 		PatientHealth->GetHealthPercentage() < MedicComponentConstants::FullHealthFraction;
 	return bIsInjuredAlly && not Candidate->GetIsSquadInsideCargo();
 }
@@ -235,11 +237,11 @@ void UMedicComponent::StartPatientSearch()
 	{
 		return;
 	}
+	// The object channels the medic's own and allied soldiers can be on. No weapon ignore mask here: it would skip
+	// exactly the bodies this search is looking for. GetIsValidPatient drops the hostile soldiers on those channels.
 	FCollisionObjectQueryParams ObjectQueryParams;
-	ObjectQueryParams.AddObjectTypesToQuery(
-		OwnerUnit->GetOwningPlayer() == MedicComponentConstants::PlayerOwnedTeam
-			? COLLISION_OBJ_PLAYER
-			: COLLISION_OBJ_ENEMY);
+	FRTSPlayerCollision::AddObjectTypesForOverlapLogic(
+		ObjectQueryParams, FRTSPlayerCollision::GetOverlapLogicForAlliesOf(OwnerUnit->GetOwningPlayer()));
 	FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(RTS_Medic_PatientSearch), false, OwnerUnit);
 
 	const TWeakObjectPtr<UMedicComponent> WeakThis(this);
