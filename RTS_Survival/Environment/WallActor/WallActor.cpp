@@ -9,6 +9,7 @@
 #include "RTS_Survival/Environment/DestructableEnvActor/WallChunkDamage/WallHoleDamageComponent.h"
 #include "RTS_Survival/Environment/DestructableEnvActor/WallChunkDamage/WallTankBreachComponent.h"
 #include "RTS_Survival/Environment/DestructableEnvActor/WallGate/WallGateNavigation.h"
+#include "RTS_Survival/Game/Players/RTSPlayers.h"
 #include "RTS_Survival/Weapons/Projectile/Projectile.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/Utils/CollisionSetup/FRTS_CollisionSetup.h"
@@ -98,10 +99,12 @@ bool AWallActor::GetIsDamageFromOwnSide(const AActor* const DamageCauser, const 
 	{
 		return false;
 	}
-	// Two sides: the human player and the AI (every other player).
-	const bool bIsPlayerWall = RTSComponent->GetOwningPlayer() == RTSWallSides::HumanPlayerIndex;
-	const bool bIsPlayerAttack = AttackingPlayer == RTSWallSides::HumanPlayerIndex;
-	return bIsPlayerWall == bIsPlayerAttack;
+	// The wall only takes damage from players that fight its owner. A neutral damage source keeps counting as the
+	// AI side and an unowned wall can only be damaged by the human, as both did when there were two sides.
+	const int32 AttackerOrAISide = FRTSPlayers::IsNeutralOwner(AttackingPlayer)
+		                               ? RTSPlayers::FirstAIPlayer
+		                               : static_cast<int32>(AttackingPlayer);
+	return not FRTSPlayers::CanPlayerDamageOwner(AttackerOrAISide, RTSComponent->GetOwningPlayer());
 }
 
 bool AWallActor::GetIsShotThroughBreach(const FDamageEvent& DamageEvent) const

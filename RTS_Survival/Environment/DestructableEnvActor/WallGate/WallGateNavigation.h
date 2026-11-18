@@ -25,8 +25,9 @@ namespace RTSWallSides
 }
 
 /**
- * @brief Doorway area of a closed wall gate that only player 1's units may plan through (gate AllowedPlayer == 1).
- * Only URTSWallGateNavQueryFilter tells the sides apart; any other filter treats it as plain ground.
+ * @brief Doorway area of a closed wall gate whose allowed player is player 1: only units of player 1 and its allies
+ * plan through it. Only URTSWallGateNavQueryFilter tells the players apart; any other filter treats it as plain ground.
+ * There is one doorway area class per player (RTSWallGateNavAreas::GetClosedGateAreaOfPlayer).
  */
 UCLASS(Config=Engine)
 class RTS_SURVIVAL_API UNavArea_WallGatePlayerSide : public UNavArea
@@ -38,8 +39,9 @@ public:
 };
 
 /**
- * @brief Doorway area of a closed wall gate that only the AI side's units (any player but 1) may plan through.
- * The default for Soviet wall gates (AllowedPlayer 2).
+ * @brief Doorway area of a closed wall gate whose allowed player is player 2 (the default of the Soviet wall gates):
+ * only units of player 2 and its allies plan through it. The name predates four players and is kept, so saved
+ * navigation data and two-player games stay as they were.
  */
 UCLASS(Config=Engine)
 class RTS_SURVIVAL_API UNavArea_WallGateEnemySide : public UNavArea
@@ -49,6 +51,37 @@ class RTS_SURVIVAL_API UNavArea_WallGateEnemySide : public UNavArea
 public:
 	UNavArea_WallGateEnemySide(const FObjectInitializer& ObjectInitializer);
 };
+
+/** @brief Doorway area of a closed wall gate whose allowed player is player 3: player 3 and its allies plan through. */
+UCLASS(Config=Engine)
+class RTS_SURVIVAL_API UNavArea_WallGatePlayer3 : public UNavArea
+{
+	GENERATED_BODY()
+
+public:
+	UNavArea_WallGatePlayer3(const FObjectInitializer& ObjectInitializer);
+};
+
+/** @brief Doorway area of a closed wall gate whose allowed player is player 4: player 4 and its allies plan through. */
+UCLASS(Config=Engine)
+class RTS_SURVIVAL_API UNavArea_WallGatePlayer4 : public UNavArea
+{
+	GENERATED_BODY()
+
+public:
+	UNavArea_WallGatePlayer4(const FObjectInitializer& ObjectInitializer);
+};
+
+namespace RTSWallGateNavAreas
+{
+	/**
+	 * @brief A closed gate marks its doorway with the area of its allowed player; a query filter lets a unit through
+	 * the areas of its own player and its allies only, so one fixed area per player covers every team setup.
+	 * @param Player Allowed player of the gate; unset owners (222) count as player 2, like everywhere else.
+	 * @return The doorway area of that player, or null for the neutral owner (no player may pass).
+	 */
+	RTS_SURVIVAL_API TSubclassOf<UNavArea> GetClosedGateAreaOfPlayer(int32 Player);
+}
 
 /**
  * @brief A breachable wall of player 1 (UWallTankBreachComponent). Only the human player's tanks break walls, so no
@@ -91,9 +124,25 @@ public:
 };
 
 /**
- * @brief Parent of the RTS_NavFilter_* Blueprints so each unit plans through closed wall gates of its own side only;
- * built per querier (AI controller -> pawn -> URTSComponent owning player), the other side's gate area is excluded.
- * Queries without a known unit treat every closed gate as closed.
+ * @brief An obstacle every vehicle drives through, whoever owns it (wire fences): light, medium and heavy vehicles of
+ * every player plan through it; infantry go round. Plain ground for unfiltered queries and for
+ * URTSClosedBreachableWallsQueryFilter (a fence never closes a route for a planner).
+ */
+UCLASS(Config=Engine)
+class RTS_SURVIVAL_API UNavArea_BreachableAnyVehicle : public UNavArea
+{
+	GENERATED_BODY()
+
+public:
+	UNavArea_BreachableAnyVehicle(const FObjectInitializer& ObjectInitializer);
+};
+
+/**
+ * @brief Parent of the RTS_NavFilter_* Blueprints so each unit plans only through closed wall gates of its own player
+ * and its allies; built per querier (AI controller -> pawn -> URTSComponent owning player), the doorway areas of every
+ * other player are excluded. Relations are read when the filter is built (each new path request); a path planned
+ * before a team change keeps its filter, also on repaths, until the unit gets its next move.
+ * Queries without a known unit, and units of the neutral owner, treat every closed gate as closed.
  * @note Reparent RTS_NavFilter_Characters / _LightTanks / _MediumTanks / _HeavyTanks onto this class; until then wall
  * gates fall back to blocking everyone while closed.
  */
@@ -128,8 +177,19 @@ private:
 	 */
 	static void ExcludeBreachableWalls(const ANavigationData& NavData, const UObject* Querier, bool bHasKnownSide,
 	                                   bool bIsHumanPlayer, FNavigationQueryFilter& Filter);
+
+	/**
+	 * @brief Closed gates: the querier plans through the doorway areas of its own player and its allies only.
+	 * @param NavData Navigation data the filter is built for.
+	 * @param bHasKnownSide False when no unit stands behind the querier (every closed gate is closed then).
+	 * @param QuerierPlayer Owning player of the querier's unit.
+	 * @param Filter Filter to exclude the closed doorway areas in.
+	 */
+	static void ExcludeClosedGatesOfNonAllies(const ANavigationData& NavData, bool bHasKnownSide, uint8 QuerierPlayer,
+	                                          FNavigationQueryFilter& Filter);
 	static bool GetIsQuerierMediumOrHeavyTank(const UObject* Querier);
 	static bool GetIsQuerierHeavyTank(const UObject* Querier);
+	static bool GetIsQuerierVehicle(const UObject* Querier);
 	// Lets the querier through a breachable area: plain ground plus the entering cost (the area's own cost blocks).
 	static void OpenBreachableArea(const ANavigationData& NavData, const UClass* AreaClass, FNavigationQueryFilter& Filter,
 	                               float TankCost, float EnteringCost);

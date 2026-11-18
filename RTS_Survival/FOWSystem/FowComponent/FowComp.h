@@ -162,6 +162,31 @@ private:
     /** The Fog of War behavior of this component (active or passive). */
     EFowBehaviour M_FowBehaviour;
 
+	// Set once StartFow picked a behaviour; before that an owner change has nothing to switch.
+	bool bM_HasStartedFow = false;
+
+	// True while the fog hides the owner and the owner was not hidden already when the fog came; decides whether
+	// the owner carries TagUnitHiddenByFog (only while its collision is on). Passive behaviours only.
+	bool bM_OwnerHiddenByFog = false;
+
+	/**
+	 * @brief The owning unit changed player at runtime: a unit that went from the human to an AI player (or back)
+	 * swaps between giving the human vision and being hidden by the human's fog.
+	 * @param OldOwner Player the unit belonged to.
+	 * @param NewOwner Player the unit belongs to now.
+	 */
+	void OnOwnerOwningPlayerChanged(uint8 OldOwner, uint8 NewOwner);
+
+	/**
+	 * @brief Changes the behaviour of a component that already started; leaves the manager's list of the old
+	 * behaviour first, as the manager picks the list to remove from by the behaviour.
+	 * @param NewBehaviour Behaviour that fits the new owner.
+	 */
+	void SwitchFowBehaviour(EFowBehaviour NewBehaviour);
+
+	// Takes the enemy-vision tag and the fog mark off the owner and shows it again if the fog was what hid it.
+	void ClearFogStateOnOwner() const;
+
 	UPROPERTY()
 	EAllUnitType M_UnitType = EAllUnitType::UNType_None;
 

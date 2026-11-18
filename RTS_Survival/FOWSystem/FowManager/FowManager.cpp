@@ -1176,7 +1176,9 @@ void AFowManager::OnReceivedEnemyVisionUpdate(const TArray<FBasicParticleData>& 
 		if (M_CurrentPlayerCompsForEnemyVisionReadBack.IsValidIndex(PlayerIndex))
 		{
 			TWeakObjectPtr<UFowComp> PlayerComp = M_CurrentPlayerCompsForEnemyVisionReadBack[PlayerIndex];
-			if (PlayerComp.IsValid())
+			// A unit that changed owner since the request no longer gives the player vision: this answer is not
+			// about its new behaviour.
+			if (PlayerComp.IsValid() && PlayerComp->GetFowBehaviour() == EFowBehaviour::Fow_Active)
 			{
 				// The Size represents visibility (0.0f for hidden, 1.0f for visible)
 				const float Visibility = ParticleData.Size;
@@ -1313,7 +1315,8 @@ void AFowManager::OnReceivedReadBackUpdate(const TArray<FBasicParticleData>& Dat
 		if (GetValidParticleIndex(EachElm.Velocity, Index))
 		{
 			TWeakObjectPtr<UFowComp> PassiveComp = M_CurrentReadBackPassiveComponents[Index];
-			if (PassiveComp.IsValid())
+			// A unit that changed owner to the player since the request is no longer hidden by the fog.
+			if (PassiveComp.IsValid() && PassiveComp->GetFowBehaviour() != EFowBehaviour::Fow_Active)
 			{
 				PassiveComp->OnFowVisibilityUpdated(EachElm.Size);
 			}
