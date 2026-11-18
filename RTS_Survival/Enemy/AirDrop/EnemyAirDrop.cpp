@@ -408,6 +408,7 @@ UGA_AircraftDrop* AEnemyAirDrop::CreateCargoPlaneCopy(const TArray<ETankSubtype>
 	}
 	Copy->SetDropPayload(Vehicles, Squads);
 	Copy->SetRopeSlungTanks(Delivery.bRopeSlungVehicles);
+	Copy->SetHandPayloadToEnemyAI(Delivery.bHandUnitsToEnemyAI);
 	return Copy;
 }
 
@@ -440,6 +441,10 @@ void AEnemyAirDrop::ExecuteDropAbilities(const int32 DropNumber, const TArray<UG
 	{
 		Run.Abilities.Add(Ability);
 		Ability->OnGlobalAbilityEnded.AddUObject(this, &AEnemyAirDrop::HandleAbilityEnded);
+		if (UGA_AircraftDrop* CargoPlane = Cast<UGA_AircraftDrop>(Ability))
+		{
+			CargoPlane->OnUnitReleased.AddUObject(this, &AEnemyAirDrop::HandleCargoUnitReleased);
+		}
 	}
 	bM_IsLaunching = true;
 	for (UGlobalAbility* Ability : Abilities)
@@ -530,6 +535,14 @@ void AEnemyAirDrop::HandleAbilityEnded(UGlobalAbility* Ability)
 	}
 }
 
+void AEnemyAirDrop::HandleCargoUnitReleased(UGA_AircraftDrop* Ability, AActor* Unit)
+{
+	if (IsValid(Unit))
+	{
+		OnUnitDelivered.Broadcast(this, Unit);
+	}
+}
+
 void AEnemyAirDrop::FinishRunIfDone(const int32 DropNumber)
 {
 	if (bM_IsLaunching)
@@ -570,6 +583,10 @@ void AEnemyAirDrop::UnbindRun(const FEnemyAirDropRun& Run)
 		if (IsValid(Ability))
 		{
 			Ability->OnGlobalAbilityEnded.RemoveAll(this);
+		}
+		if (UGA_AircraftDrop* CargoPlane = Cast<UGA_AircraftDrop>(Ability))
+		{
+			CargoPlane->OnUnitReleased.RemoveAll(this);
 		}
 	}
 }

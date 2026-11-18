@@ -96,6 +96,11 @@ struct FAircraftDropRequest
 	UPROPERTY(BlueprintReadWrite)
 	bool bSquadsWalkOutOfCargoDoor = false;
 
+	// Enemy drops only: the released units join the enemy AI's direct control. False when a mission orders them
+	// itself (it listens to OnAircraftDropPayloadReleased / OnAircraftDropSquadReleased).
+	UPROPERTY(BlueprintReadWrite)
+	bool bHandPayloadToEnemyAI = true;
+
 	UPROPERTY(BlueprintReadWrite)
 	TObjectPtr<USoundBase> DropOffSound = nullptr;
 

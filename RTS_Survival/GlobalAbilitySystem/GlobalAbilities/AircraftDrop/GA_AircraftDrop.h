@@ -10,6 +10,10 @@
 
 class AAircraftMaster;
 class ATankMaster;
+class UGA_AircraftDrop;
+
+// A vehicle (released on the ground) or a squad (spawned at the landed aircraft) of one of this ability's drops.
+DECLARE_MULTICAST_DELEGATE_TwoParams(FOnAircraftDropUnitReleased, UGA_AircraftDrop* /*Ability*/, AActor* /*Unit*/);
 class USoundAttenuation;
 class USoundBase;
 class USoundConcurrency;
@@ -104,7 +108,19 @@ public:
 	/** @brief On a copy: vehicles hang on ropes and are lowered while the aircraft hovers (see bRopeSlungTanks). */
 	void SetRopeSlungTanks(const bool bRopeSlung) { M_AircraftDropSettings.bRopeSlungTanks = bRopeSlung; }
 
+	/**
+	 * @brief On a copy: false keeps the dropped units out of the enemy AI's direct control, for a mission that
+	 * orders them itself through OnUnitReleased. Default true.
+	 */
+	void SetHandPayloadToEnemyAI(const bool bHandToEnemyAI) { bM_HandPayloadToEnemyAI = bHandToEnemyAI; }
+
+	// Every vehicle and squad this ability's aircraft deliver, as each is released.
+	FOnAircraftDropUnitReleased OnUnitReleased;
+
 private:
+	bool bM_HandPayloadToEnemyAI = true;
+
+	void BindAircraftReleaseEvents(AAircraftMaster* Aircraft);
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (AllowPrivateAccess = "true"))
 	FAircraftDropGlobalAbilitySettings M_AircraftDropSettings;
 

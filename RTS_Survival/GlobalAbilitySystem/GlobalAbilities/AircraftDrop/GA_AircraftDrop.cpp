@@ -180,6 +180,7 @@ void UGA_AircraftDrop::SpawnTankDropAircraft(
 	++M_ActiveAircraftCount;
 	SpawnedAircraft->OnDestroyed.AddUniqueDynamic(this, &UGA_AircraftDrop::OnSpawnedAircraftDestroyed);
 	SpawnedAircraft->SetUnitSelectable(false);
+	BindAircraftReleaseEvents(SpawnedAircraft);
 
 	ARTSAsyncSpawner* AsyncSpawner = FRTS_Statics::GetAsyncSpawner(this);
 	if (not IsValid(AsyncSpawner))
@@ -262,7 +263,31 @@ void UGA_AircraftDrop::SpawnSquadDropAircraft(
 	++M_ActiveAircraftCount;
 	SpawnedAircraft->OnDestroyed.AddUniqueDynamic(this, &UGA_AircraftDrop::OnSpawnedAircraftDestroyed);
 	SpawnedAircraft->SetUnitSelectable(false);
+	BindAircraftReleaseEvents(SpawnedAircraft);
 	SpawnedAircraft->OrderAircraftDrop(DropRequest);
+}
+
+void UGA_AircraftDrop::BindAircraftReleaseEvents(AAircraftMaster* Aircraft)
+{
+	if (not IsValid(Aircraft))
+	{
+		return;
+	}
+	TWeakObjectPtr<UGA_AircraftDrop> WeakThis(this);
+	Aircraft->OnAircraftDropPayloadReleased.AddLambda([WeakThis](AAircraftMaster*, ATankMaster* ReleasedTank)
+	{
+		if (WeakThis.IsValid() && IsValid(ReleasedTank))
+		{
+			WeakThis->OnUnitReleased.Broadcast(WeakThis.Get(), ReleasedTank);
+		}
+	});
+	Aircraft->OnAircraftDropSquadReleased.AddLambda([WeakThis](AAircraftMaster*, AActor* ReleasedSquad)
+	{
+		if (WeakThis.IsValid() && IsValid(ReleasedSquad))
+		{
+			WeakThis->OnUnitReleased.Broadcast(WeakThis.Get(), ReleasedSquad);
+		}
+	});
 }
 
 FAircraftDropRequest UGA_AircraftDrop::BuildBaseDropRequest(
@@ -282,6 +307,7 @@ FAircraftDropRequest UGA_AircraftDrop::BuildBaseDropRequest(
 		: M_AircraftDropSettings.HowLongStayLanded;
 	DropRequest.RadiusSpawnSquads = M_AircraftDropSettings.RadiusSpawnSquads;
 	DropRequest.bSquadsWalkOutOfCargoDoor = M_AircraftDropSettings.bSquadsWalkOutOfCargoDoor;
+	DropRequest.bHandPayloadToEnemyAI = bM_HandPayloadToEnemyAI;
 	DropRequest.DropOffSound = M_AircraftDropSettings.DropOffSound;
 	DropRequest.DropOffSoundAttenuation = M_AircraftDropSettings.DropOffSoundAttenuation;
 	DropRequest.DropOffSoundConcurrency = M_AircraftDropSettings.DropOffSoundConcurrency;

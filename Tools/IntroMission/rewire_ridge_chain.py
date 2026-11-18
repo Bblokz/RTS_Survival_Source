@@ -4,6 +4,8 @@ Result on the level's BP_MissionManager:
   Missions[0] = Mission_Intro_MoveTo -> SovietPatrols -> HangarT26s -> RidgeArmor   (NextMission chain)
   Missions[1] = Mission_Intro_ClearSovietRig  trigger: Mission Class Completed = Mission_Intro_RidgeArmor
   Missions[2] = Mission_Intro_BaseBuilding    trigger: Mission Class Completed = Mission_Intro_ClearSovietRig
+  Missions[3] = Mission_Intro_SovietCounterattack  trigger: Mission Class Completed = Mission_Intro_BaseBuilding
+                (only when that Blueprint exists)
 Missions[1] and [2] are activated at begin play and wait on their trigger (the manager ticks it), so a finished mission
 hands on without one more level of NextMission nesting under Missions[0].
 
@@ -13,6 +15,8 @@ save. Call rewire() and save the map yourself. Running it again keeps instances 
 import unreal
 
 MISSION_DIR = '/Game/RTS_Survival/Blueprints/Missions/GerCampaign/IntroMission/'
+COUNTERATTACK_BP = 'Mission_Intro_SovietCounterattack'
+COUNTERATTACK_DA = 'DA_Intro_SovietCounterattack'
 
 
 def mission_class(name):
@@ -81,6 +85,21 @@ def rewire(world=None):
     if made:
         changes.append('Missions[2] = new Mission_Intro_BaseBuilding (trigger: ClearSovietRig completed)')
     missions[1], missions[2] = rig, base
+
+    # Missions[3]: the Soviet counterattack (prepare-to-defend timer + waves) once the base building tutorial is done.
+    if unreal.EditorAssetLibrary.does_asset_exist(MISSION_DIR + COUNTERATTACK_BP):
+        counter_cls = mission_class(COUNTERATTACK_BP)
+        while len(missions) < 4:
+            missions.append(None)
+        counter, made = ensure_triggered_mission(manager, missions[3], counter_cls, base_cls)
+        if made:
+            changes.append('Missions[3] = new Mission_Intro_SovietCounterattack (trigger: BaseBuilding completed)')
+        # The map instance holds its own data asset reference (a value equal to the CDO's came back empty on load).
+        settings = unreal.load_asset(MISSION_DIR + COUNTERATTACK_DA)
+        if counter.get_editor_property('settings') != settings or made:
+            counter.set_editor_property('settings', settings)
+            changes.append('Missions[3].Settings = ' + COUNTERATTACK_DA)
+        missions[3] = counter
     manager.set_editor_property('missions', missions)
     return changes
 

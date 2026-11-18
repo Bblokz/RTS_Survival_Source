@@ -52,6 +52,8 @@ class UAircraftOwnerComp;
 DECLARE_MULTICAST_DELEGATE_OneParam(FOnAircraftStraightRunPassedPoint, AAircraftMaster*);
 DECLARE_MULTICAST_DELEGATE_TwoParams(FOnAircraftDropPayloadReleased, AAircraftMaster* /*Aircraft*/,
                                      ATankMaster* /*ReleasedTank*/);
+DECLARE_MULTICAST_DELEGATE_TwoParams(FOnAircraftDropSquadReleased, AAircraftMaster* /*Aircraft*/,
+                                     AActor* /*ReleasedSquad*/);
 
 UCLASS()
 class AAircraftMaster : public ASelectablePawnMaster, public IExperienceInterface, public IRTSUnit
@@ -188,6 +190,10 @@ public:
 	// Fired once per tank drop (rope-slung or not) after the tank is detached, placed on the ground, selectable and
 	// has its weapons back.
 	FOnAircraftDropPayloadReleased OnAircraftDropPayloadReleased;
+
+	// Fired once per squad of a landed squad drop, the moment the squad has spawned at the aircraft (before its
+	// walk out of the cargo door). Not fired when the aircraft is already gone by the time the squad spawns.
+	FOnAircraftDropSquadReleased OnAircraftDropSquadReleased;
 
 	/**
 	 * @brief While held, a straight run keeps flying past its end point instead of destroying itself, so payload that

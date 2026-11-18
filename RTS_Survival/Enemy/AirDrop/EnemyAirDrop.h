@@ -19,6 +19,8 @@ class UTexture2D;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnEnemyAirDropDropEvent, AEnemyAirDrop*, AirDrop, int32, DropNumber);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnEnemyAirDropFinished, AEnemyAirDrop*, AirDrop);
+// A vehicle or squad of a cargo plane drop was released on the ground (squads: spawned at the landed aircraft).
+DECLARE_MULTICAST_DELEGATE_TwoParams(FOnEnemyAirDropUnitDelivered, AEnemyAirDrop* /*AirDrop*/, AActor* /*Unit*/);
 
 /** How the units of a placed air drop arrive; also picks the shape drawn above each landing point. */
 UENUM(BlueprintType)
@@ -117,6 +119,11 @@ struct FEnemyAirDropDeliverySettings
 	// line for).
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Delivery")
 	bool bWarnPlayer = true;
+
+	// Cargo plane drops: the landed units join the enemy AI's direct control. Off for a mission that orders them
+	// itself (it listens to OnUnitDelivered). Parachuting squads always go to the enemy AI.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Delivery")
+	bool bHandUnitsToEnemyAI = true;
 };
 
 /** When the air drop starts and how often it comes; the same rules as the wave spawner and the convoy route. */
@@ -246,6 +253,9 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "Air Drop")
 	FOnEnemyAirDropFinished OnAirDropFinished;
 
+	// Each vehicle and squad a cargo plane of this air drop releases (not parachuted squads).
+	FOnEnemyAirDropUnitDelivered OnUnitDelivered;
+
 	virtual FColor GetPlacementColor() const override;
 	virtual FString GetConfigurationProblem() const override;
 
@@ -344,6 +354,7 @@ private:
 
 	// ----- Ability callbacks -----
 	void HandleAbilityEnded(UGlobalAbility* Ability);
+	void HandleCargoUnitReleased(UGA_AircraftDrop* Ability, AActor* Unit);
 	void FinishRunIfDone(const int32 DropNumber);
 	void UnbindAllRuns();
 	void UnbindRun(const FEnemyAirDropRun& Run);

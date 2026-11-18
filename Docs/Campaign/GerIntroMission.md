@@ -8,6 +8,7 @@ The map's `BP_MissionManager` runs `UMissionBase` Blueprint children from
 - **`Missions[1]`:** `ClearSovietRig`, with a `MissionTrigger` of type "Mission Class Completed"
   (`UMissionClassCompletedMissionTrigger`) watching `Mission_Intro_RidgeArmor`.
 - **`Missions[2]`:** `BaseBuilding`, with the same trigger type watching `Mission_Intro_ClearSovietRig`.
+- **`Missions[3]`:** `SovietCounterattack`, with the same trigger type watching `Mission_Intro_BaseBuilding`.
 
 The manager activates every `Missions[]` entry at begin play. A mission with a trigger then waits, and the manager ticks
 its trigger until the watched class has completed (`AMissionManager::GetHasCompletedMissionClassExact`), so a finished
@@ -25,6 +26,7 @@ again (`rewire()` then save the map; `describe()` prints the layout).
 | 4 | `Mission_Intro_RidgeArmor` | Soviet armour comes out of the ridge gate, eight T-26s flank from the convoy's map edge, and German heavy reinforcements arrive from the west map edge (below). The `IntroMission_HeavyArmorApproaching` line plays (take 4, 16.7 s). | Both Soviet groups are destroyed: the ridge wave (5 on Normal, 6 on Hard, 7 on Brutal and Ironman) and the 8 T-26s. Each group shows as a survival-style division marker on the minimap until its last tank dies. |
 | 5 | `Mission_Intro_ClearSovietRig` ("Secure the Line", a `USecureBaseMission`, 2026-11-16) | The ridge tanks are dead but the Soviet base on the ridge still stands. The fog lifts over the base for 60 s, destroy markers and minimap icons go on its 7 buildings (both cooling towers, both barracks, both MG guard towers, the long camo bunker), the base comes alive (4 Mosin squads and 1 PTRS squad marching, a Zil fuel truck driving up to the rear wall where a crane unloads it) and a 30 s camera tour shows each target with a caption. Then the objective counts the destroyed buildings. See below. | All 7 buildings are destroyed. |
 | 6 | `Mission_Intro_BaseBuilding` | The base-building tutorial (below). Its trigger waits for ClearSovietRig, so the HQ glider and the "ridgeline is secured" line only come once the Soviet base is destroyed. | The barracks and forge are deployed. |
+| 7 | `Mission_Intro_SovietCounterattack` (`Missions[3]`, trigger: BaseBuilding completed; 2026-11-18) | "Prepare to defend" countdown (per difficulty), then "Survive" for waves x interval while Soviet waves come from the centre (8400,-1500), the landing field's 4 pads (Pe-8s, batches of 4) and a cargo train to the station, each spawn's share attack-moving to the player HQ. Data: `DA_Intro_SovietCounterattack`. See [SovietCounterattackMission.md](../Missions/SovietCounterattackMission.md). | Every Soviet unit of the attack is dead (after the Survive timer ran out; they are counted and marked on the minimap). |
 
 The ground behind the Soviet base (three curved roads, the train station on its ridge, the concrete depot behind the
 depot ridge, ponds, and the 60 m map extension) is described in [IntroMissionRear.md](IntroMissionRear.md).

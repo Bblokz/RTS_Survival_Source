@@ -3404,25 +3404,38 @@ void AAircraftMaster::AircraftDrop_SpawnSquad(const ESquadSubtype SquadSubtype, 
 	const TWeakObjectPtr<UEnemyStrategicAIComponent> WeakEnemyStrategicAIComponent(EnemyStrategicAIComponent);
 	const FVector OutsideLocation = AircraftDrop_GetProjectedSquadSpawnLocation(SquadIndex);
 	const bool bWalkOutOfCargoDoor = M_AircraftDropRequest.bSquadsWalkOutOfCargoDoor;
+	const bool bHandPayloadToEnemyAI = M_AircraftDropRequest.bHandPayloadToEnemyAI;
+	const TWeakObjectPtr<AAircraftMaster> WeakAircraft(const_cast<AAircraftMaster*>(this));
 	const FVector SpawnLocation = bWalkOutOfCargoDoor ? AircraftDrop_GetProjectedCargoDoorLocation() : OutsideLocation;
 	AsyncSpawner->AsyncSpawnOptionAtLocation(
 		SquadTrainingOption,
 		SpawnLocation,
 		CallbackOwner,
 		SquadIndex,
-		[WeakEnemyStrategicAIComponent, bWalkOutOfCargoDoor, SpawnLocation, OutsideLocation](
+		[WeakEnemyStrategicAIComponent, WeakAircraft, bWalkOutOfCargoDoor, bHandPayloadToEnemyAI, SpawnLocation,
+			OutsideLocation](
 		const FTrainingOption&, AActor* SpawnedActor, const int32)
 		{
 			if (bWalkOutOfCargoDoor)
 			{
 				AircraftDrop_OrderSquadWalkOut(SpawnedActor, SpawnLocation, OutsideLocation);
 			}
-			if (WeakEnemyStrategicAIComponent.IsValid())
+			// A mission that orders the payload itself listens on the aircraft; with the aircraft already gone
+			// nobody would order the squad, so it goes to the enemy AI after all.
+			const bool bMissionTakesSquad = not bHandPayloadToEnemyAI && WeakAircraft.IsValid();
+			if (WeakEnemyStrategicAIComponent.IsValid() && not bMissionTakesSquad)
 			{
 				WeakEnemyStrategicAIComponent->RegisterDroppedUnitWithBlackboardWhenReady(SpawnedActor);
 			}
+			if (WeakAircraft.IsValid() && IsValid(SpawnedActor))
+			{
+				WeakAircraft->OnAircraftDropSquadReleased.Broadcast(WeakAircraft.Get(), SpawnedActor);
+			}
 		},
-		FRotator::ZeroRotator);
+		FRotator::ZeroRotator,
+		// A later AI player's squads are spawned for it; the human's and the first AI player's keep the owner
+		// of their Blueprint.
+		FRTSUnitOwnerSpawning::GetOwnerOverrideForAIPlayer(M_AircraftDropRequest.OwningPlayer));
 }
 
 FVector AAircraftMaster::AircraftDrop_GetProjectedCargoDoorLocation() const
@@ -3569,6 +3582,11 @@ void AAircraftMaster::AircraftDrop_DetachTank()
 
 void AAircraftMaster::AircraftDrop_RegisterEnemyPayloadUnit(AActor* DroppedUnit) const
 {
+	if (not M_AircraftDropRequest.bHandPayloadToEnemyAI)
+	{
+		// The mission that asked for this drop orders the unit (OnAircraftDropPayloadReleased).
+		return;
+	}
 	UEnemyStrategicAIComponent* EnemyStrategicAIComponent = AircraftDrop_GetEnemyStrategicAIComponent();
 	if (not IsValid(EnemyStrategicAIComponent))
 	{
