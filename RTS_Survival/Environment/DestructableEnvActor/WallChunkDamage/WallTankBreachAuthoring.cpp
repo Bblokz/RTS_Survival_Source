@@ -259,6 +259,35 @@ namespace WallTankBreachAuthoring
 		{
 			Settings.NavBlockHalfDepth = FCString::Atof(*NavHalfDepth);
 		}
+		Settings.bAnyVehicleBreaks = GetArg(Line, TEXT("AnyVehicle")) == TEXT("1");
+		if (GetArg(Line, TEXT("NoDecal")) == TEXT("1"))
+		{
+			Settings.bSpawnRubbleDecal = false;
+		}
+		const TPair<const TCHAR*, float*> FloatArgs[] = {
+			{TEXT("LightShare"), &Settings.LightTankPushSpeedShare},
+			{TEXT("MediumShare"), &Settings.MediumTankPushSpeedShare},
+			{TEXT("HeavyShare"), &Settings.HeavyTankPushSpeedShare},
+			{TEXT("StubHeight"), &Settings.StubHeight},
+			{TEXT("EdgeBand"), &Settings.EdgeBand},
+			{TEXT("DustScale"), &Settings.DustScale},
+			{TEXT("HealthScale"), &Settings.HealthDamageScale},
+			{TEXT("TopDelay"), &Settings.TopCollapseDelay},
+			{TEXT("TopDuration"), &Settings.TopCollapseDuration},
+		};
+		for (const TPair<const TCHAR*, float*>& FloatArg : FloatArgs)
+		{
+			const FString Value = GetArg(Line, FloatArg.Key);
+			if (not Value.IsEmpty())
+			{
+				*FloatArg.Value = FCString::Atof(*Value);
+			}
+		}
+		const FString RubblePieces = GetArg(Line, TEXT("RubblePieces"));
+		if (not RubblePieces.IsEmpty())
+		{
+			Settings.RubblePieces = FCString::Atoi(*RubblePieces);
+		}
 		return Settings;
 	}
 
@@ -326,7 +355,9 @@ namespace WallTankBreachAuthoring
 		TEXT("RTS.WallBreach.ConfigureRusWall"),
 		TEXT("Field holes + tank breaches on a wall BP. Args: Blueprint= Materials=a|b [Path=x,y;x,y] [Thickness=] "
 			"[NavArea=] [NavBlocker=] [Dust=] [Sound=] [Attenuation=] [Concurrency=] [HeavyOnly=1] [Unowned=1] "
-			"[KillOnFall=1] [NavHalfDepth=] [SideMargin=] [VSlope=] [MeshNoNav=<mesh component name>]"),
+			"[KillOnFall=1] [NavHalfDepth=] [SideMargin=] [VSlope=] [MeshNoNav=<mesh component name>] [AnyVehicle=1] "
+			"[NoDecal=1] [LightShare=] [MediumShare=] [HeavyShare=] [StubHeight=] [EdgeBand=] [DustScale=] "
+			"[HealthScale=] [TopDelay=] [TopDuration=] [RubblePieces=]"),
 		FConsoleCommandWithArgsDelegate::CreateStatic(&ConfigureRusWall));
 }
 

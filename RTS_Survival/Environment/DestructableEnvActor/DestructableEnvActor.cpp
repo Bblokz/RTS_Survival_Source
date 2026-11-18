@@ -30,6 +30,7 @@
 #include "VerticalCollapseOnCrushed/FVerticalCollapseOnCrushed.h"
 #include "WallChunkDamage/WallChunkDamageComponent.h"
 #include "WallChunkDamage/WallHoleDamageComponent.h"
+#include "WallChunkDamage/WallTankBreachComponent.h"
 #include "WreckHoleDamage/WreckHoleDamageComponent.h"
 
 namespace
@@ -73,6 +74,11 @@ void ADestructableEnvActor::SetupCrushDestructionOverlap(UPrimitiveComponent* Ov
 		return;
 	}
 
+	if (IsValid(FindComponentByClass<UWallTankBreachComponent>()))
+	{
+		// A breachable obstacle (wire fences): vehicles cut a gap and take health for it instead of killing it outright.
+		return;
+	}
 	RTS_ENSURE(OverlapComponent && OverlapComponent->GetGenerateOverlapEvents());
 	RTS_ENSURE(OverlapComponent && OverlapComponent->GetCollisionResponseToChannel(COLLISION_OBJ_PLAYER) == ECR_Overlap);
 	M_CrushDeathType = CrushDeathType;

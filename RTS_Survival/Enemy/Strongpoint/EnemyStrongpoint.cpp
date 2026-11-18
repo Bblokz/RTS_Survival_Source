@@ -234,8 +234,12 @@ bool AEnemyStrongpoint::SpawnPostDefender(const int32 PostIndex)
 			WeakThis->HandleDefenderSpawned(SpawnedPostIndex, SpawnedUnit);
 		}
 	};
+	// The garrison belongs to the player of the enemy controller this strongpoint runs on.
+	const int32 OwningPlayerOverride = M_EnemyController.IsValid()
+		                                   ? M_EnemyController->GetSpawnOwnerOverride()
+		                                   : INDEX_NONE;
 	const bool bStarted = AsyncSpawner->AsyncSpawnOptionAtLocation(Option, Location, this, PostIndex, OnSpawned,
-	                                                               Rotation);
+	                                                               Rotation, OwningPlayerOverride);
 	// A request that failed before loading still counts as started when its callback already ran.
 	return bStarted || *bResolved;
 }
@@ -245,6 +249,10 @@ void AEnemyStrongpoint::HandleDefenderSpawned(const int32 PostIndex, AActor* Spa
 	M_PendingSpawns = FMath::Max(M_PendingSpawns - 1, 0);
 	if (IsValid(SpawnedUnit) && Posts.IsValidIndex(PostIndex))
 	{
+		if (M_EnemyController.IsValid())
+		{
+			M_EnemyController->LogSpawnedUnitOwnerMismatch(SpawnedUnit);
+		}
 		FEnemyStrongpointDefender& Defender = M_Defenders.AddDefaulted_GetRef();
 		Defender.Unit = SpawnedUnit;
 		Defender.PostIndex = PostIndex;
@@ -623,13 +631,27 @@ float AEnemyStrongpoint::GetTrenchArcDegrees() const
 	{
 		return EnemyStrongpointConstants::FallbackTrenchArcDegrees;
 	}
+	// The arc of the controller this strongpoint runs on; in a map with one controller, that one's.
+	const UEnemyBaseTrenchComponent* FirstBaseTrenches = nullptr;
 	for (TActorIterator<AEnemyController> It(World); It; ++It)
 	{
 		const UEnemyBaseTrenchComponent* BaseTrenches = It->GetEnemyBaseTrenchComponent();
-		if (IsValid(BaseTrenches))
+		if (not IsValid(BaseTrenches))
+		{
+			continue;
+		}
+		if (It->GetControlledPlayer() == GetEnemyPlayer())
 		{
 			return BaseTrenches->GetSettings().PerimeterArcDegrees;
 		}
+		if (FirstBaseTrenches == nullptr)
+		{
+			FirstBaseTrenches = BaseTrenches;
+		}
+	}
+	if (FirstBaseTrenches != nullptr)
+	{
+		return FirstBaseTrenches->GetSettings().PerimeterArcDegrees;
 	}
 	return EnemyStrongpointConstants::FallbackTrenchArcDegrees;
 }
