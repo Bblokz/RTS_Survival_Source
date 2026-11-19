@@ -10,6 +10,7 @@
 #include "Interface/BuildingExpansionOwner.h"
 #include "Kismet/KismetMathLibrary.h"
 #include "RTS_Survival/RTSCollisionTraceChannels.h"
+#include "RTS_Survival/Collapse/DestroySpawnActorsParameters.h"
 #include "RTS_Survival/Behaviours/BehaviourComp.h"
 #include "RTS_Survival/Buildings/EnergyComponent/BuildingExpansionEnergyComponent.h"
 #include "RTS_Survival/Buildings/BuildingExpansion/PitDefense/PitDefenseComponent.h"
@@ -606,7 +607,20 @@ bool ABuildingExpansion::GetHasBlueprintDeath() const
 
 void ABuildingExpansion::DestroyAndSpawnActors(const FDestroySpawnActorsParameters& SpawnParams, FCollapseFX CollapseFX)
 {
-	Super::DestroyAndSpawnActors(SpawnParams, CollapseFX);
+	if (DeathSpawnClassesToSkip.IsEmpty())
+	{
+		Super::DestroyAndSpawnActors(SpawnParams, CollapseFX);
+		return;
+	}
+	FDestroySpawnActorsParameters FilteredParams = SpawnParams;
+	FilteredParams.ActorsToSpawn.RemoveAll([this](const FDestroySpawnActor& Entry)
+	{
+		return DeathSpawnClassesToSkip.ContainsByPredicate([&Entry](const TSoftClassPtr<AActor>& Skip)
+		{
+			return not Skip.IsNull() && Skip.ToSoftObjectPath() == Entry.ActorToSpawn.ToSoftObjectPath();
+		});
+	});
+	Super::DestroyAndSpawnActors(FilteredParams, CollapseFX);
 }
 
 void ABuildingExpansion::SetTurretsToAutoEngage()

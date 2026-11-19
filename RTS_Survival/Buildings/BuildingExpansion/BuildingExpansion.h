@@ -234,7 +234,12 @@ protected:
 	virtual void DestroyAndSpawnActors(
 		const FDestroySpawnActorsParameters& SpawnParams,
 		FCollapseFX CollapseFX) override final;
-	
+
+	// DestroyAndSpawnActors leaves these classes out of whatever the death graph spawns, e.g. loot piles that would
+	// block player buildings on the ruin (Rus barracks / cooling towers, 2026-11-18).
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Death")
+	TArray<TSoftClassPtr<AActor>> DeathSpawnClassesToSkip;
+
 	UFUNCTION(BlueprintImplementableEvent)
 	void BP_OnUnitDies();
 
