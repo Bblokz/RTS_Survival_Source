@@ -60,6 +60,15 @@ GROUPS = [
         ("T_ExtraIcon_V2", "teal", "medic / heal"),
         ("T_CargoGarrisionClass_Icon", "teal", "transport / garrison"),
     ]),
+    ("Building expansions (left corner = option category, 2026-11-19 proposal)", [
+        ("T_HQ_Icon", "panzergrau", "defence: fortification"),
+        ("T_MetalStorageClass_Icon_V2", "sand", "economy: resources"),
+        ("T_ResearchBuilding", "olive", "tech"),
+    ]),
+    ("Building expansion roles (right corner)", [
+        ("T_EnergyBuilidngClass_Icon_V2", "teal", "energy supply"),
+        ("T_RadixiteStorageClass_Icon_V2", "teal", "radixite storage"),
+    ]),
     ("Aircraft", [
         ("T_CASAircraftClass_Icon_V3_Clean", "amber", "strafing ground attack"),
         ("T_BombAircraftClass_Icon_V2", "plum", "bombs, explosive"),

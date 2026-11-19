@@ -1,0 +1,310 @@
+{
+  "BTX_GerHQRadar": {
+    "name": "HQ Radar",
+    "tooltip": "Weapon range aura",
+    "description": "A rotating radar dish on the HQ. Friendly units within 30 m get <Text_Accent>+20% weapon range</>.",
+    "facts": "Ger_Bxp_HQRadar BP: URadiusImprovedRangeAura, Radius 3000 (read from asset), BehaviourTypes = BP_Beh_Weapon_20Range (RangeMlt 1.2 read from asset, text '+20%'); base IsValidTarget accepts any actor in the searched relation (AOEBehaviourComponent.cpp:114). Energy -5, cost 200 R / 180 M (Source/RTS_Survival/Game/GameState/BxpDataHelpers/BxpDataHelpers.h:431-449, Source/RTS_Survival/DeveloperSettings.h:927).",
+    "offered_by": "both doctrines: HQ (Tech) Source/RTS_Survival/Game/GameState/CPPGameState.cpp:9591"
+  },
+  "BTX_GerHQPlatform": {
+    "name": "Flak Platform",
+    "tooltip": "Anti-air platform",
+    "description": "A raised platform with a 3.7 cm Flak 36 firing <Text_Weapon>6-round clips</>. The height gives it <Text_Accent>double range</> (+100%).",
+    "facts": "Turret RTS_BP_EmbTurret_37mmFlak, weapon Flak36_37MM: MagCapacity 6, reload 5 s (Source/RTS_Survival/Game/GameState/CPPGameState.cpp:4030); BP adds BP_Beh_Weapon_HQDoubleRange to the turret (RangeMlt 2.0 read from asset, text '+100%'). Health T1BxpHealth*1.25, energy -5 (Source/RTS_Survival/Game/GameState/BxpDataHelpers/BxpDataHelpers.h:451-469). Old row had the typo 'though'.",
+    "offered_by": "both doctrines: HQ (Defense) Source/RTS_Survival/Game/GameState/CPPGameState.cpp:9592 and Airbase Source/RTS_Survival/Game/GameState/CPPGameState.cpp:10063"
+  },
+  "BTX_GerHQHarvester": {
+    "name": "Harvester Hub",
+    "tooltip": "Economy research",
+    "description": "A research platform on the HQ. Unlocks <Text_Accent>economy research</>: harvester capacity and speed, scavenging speed and reward, stronger repairs and Barricades.",
+    "facts": "Ger_Bxp_HQHarvesterHub BP has ResearchTechnologyAbility comps for Tech_HarvesterCapacity (+50 R / +25 M per Pz I harvester), Tech_HarvesterSpeed (2x harvest anim rate), Tech_ScavengingSpeed (x1.25), Tech_ScavengingReward (x1.2), Tech_RepairUpgrade (repair x1.33), Tech_Barricades (building health x1.2) - see TechTree/Technologies/GerTechnologies/*/TE_*.cpp. No energy; cost 300 R / 150 M (Source/RTS_Survival/Game/GameState/BxpDataHelpers/BxpDataHelpers.h:410-428).",
+    "offered_by": "both doctrines: HQ (Economic) Source/RTS_Survival/Game/GameState/CPPGameState.cpp:9593"
+  },
+  "BTX_GerHQRepairBay": {
+    "name": "Repair Bay",
+    "tooltip": "Repairs nearby units",
+    "description": "A repair pad with two welding cranes. Repairs damaged vehicles and buildings within 35 m by <Text_Accent>10 HP per second</>.",
+    "facts": "Ger_Bxp_HQRepairBay BP: URadiusRepairAura Radius 3500 (read from asset), BehaviourTypes Behaviour_TickRepair_10_3Sec ('10 HP/s over 3 Seconds', re-applied every 2.25 s tick); targets = tanks/nomadic vehicles and building expansions (RepairHelpers.h:37-49). Health T1BxpHealth*3, energy -5 (Source/RTS_Survival/Game/GameState/BxpDataHelpers/BxpDataHelpers.h:491-509).",
+    "offered_by": "both doctrines: HQ (Economic) Source/RTS_Survival/Game/GameState/CPPGameState.cpp:9594"
+  },
+  "BTX_GerHQTower": {
+    "name": "Guard Tower",
+    "tooltip": "Long-range tank gun",
+    "description": "A Panzer IV turret on a tall tower, armed with a <Text_Weapon>7.5 cm KwK 40 L/48</>. The height gives it <Text_Accent>triple range</> (+200%).",
+    "facts": "Ger_Bxp_HQTower BP: child turret Ger_Turret_PanzerIV_F2NoMSmoke, weapon KwK40_L48_75MM (so 'Panzer IV turret' in the old row is correct); BP adds BP_Beh_Weapon_HQTrippleRange (display text '+200%'; float not decoded from asset). BxpData: Health = RoundToNearestMultipleOfFive(15) = 15 HP (likely bug), build T1BxpBuildTime*5, energy -8 (Source/RTS_Survival/Game/GameState/BxpDataHelpers/BxpDataHelpers.h:471-489).",
+    "offered_by": "both doctrines: HQ (Defense) Source/RTS_Survival/Game/GameState/CPPGameState.cpp:9595"
+  },
+  "BTX_RefConverter": {
+    "name": "Radixite Converter",
+    "tooltip": "Radixite to vehicle parts",
+    "description": "Turns radixite into vehicle parts while switched on: 15 radixite for 5 parts every 6.7 s, <Text_Accent>45 vehicle parts per minute</>.",
+    "facts": "Ger_Ref_Converter BP ConversionSettings read from asset: TickRate 6.667, ResourceDeltas Radixite -15 / VehicleParts +5 (option B, uncommitted). BxpData EnergySupply = +10 (Source/RTS_Survival/Game/GameState/BxpDataHelpers/BxpDataHelpers.h:188) although positive means supply elsewhere; cost 200 R / 100 M.",
+    "offered_by": "both doctrines: Refinery (Economic) Source/RTS_Survival/Game/GameState/CPPGameState.cpp:9692"
+  },
+  "BTX_RefKaskade": {
+    "name": "Kaskade Distillation",
+    "tooltip": "Radixite storage",
+    "description": "Three distillation columns and a bank of glass receivers. Adds <Text_Accent>+750 radixite storage</> to this refinery.",
+    "facts": "ExtraResourceStorage Radixite = RefKaskadeExtraRadixiteStorage = RefineryRadixiteStorage/2 = 750 (Source/RTS_Survival/Game/GameState/BxpDataHelpers/BxpDataHelpers.h:210-215, Source/RTS_Survival/DeveloperSettings.h:83-85). Cost 300 R / 200 M, no energy.",
+    "offered_by": "Strike Division only: Refinery (Economic) Source/RTS_Survival/Game/GameState/CPPGameState.cpp:1047-1050"
+  },
+  "BTX_RefFlakStand": {
+    "name": "Flak Stand",
+    "tooltip": "Anti-air stand",
+    "description": "A steel stand over the storage tanks with a 3.7 cm Flak 37 and two crew, firing <Text_Weapon>6-round clips</>. The height gives it <Text_Accent>double range</>.",
+    "facts": "Turret RTS_BP_EmbTurret_SD_FlakStand37, weapon Flak36_37MM_Pit: 6-round clip, 4.5 s clip change (Source/RTS_Survival/Game/GameState/CPPGameState.cpp:4040); BP adds BP_Beh_Weapon_HQDoubleRange (RangeMlt 2.0). Health T1BxpHealth*2, cost 420 R / 220 M (Source/RTS_Survival/Game/GameState/BxpDataHelpers/BxpDataHelpers.h:218-238). Old row said 8-round mags.",
+    "offered_by": "Strike Division only: Refinery (Defense), replaces the 37mm Flak there Source/RTS_Survival/Game/GameState/CPPGameState.cpp:1037-1050"
+  },
+  "BTX_GerBarracksRadixReactor": {
+    "name": "Radix Reactor",
+    "tooltip": "Infantry research",
+    "description": "A radixite reactor for the barracks: <Text_Accent>+8 energy</>. Unlocks Light Bringers (with a Communication Center) and infantry kit, ghillie suit and entrenching research.",
+    "facts": "EnergySupply 8 (Source/RTS_Survival/Game/GameState/BxpDataHelpers/BxpDataHelpers.h:354). Light Bringers need Comm Center + this BXP (Source/RTS_Survival/GameUI/TrainingUI/TrainingMenuManager.cpp:2780-2799). BP research comps: Tech_Infantry_Kit (line infantry health x1.15), Tech_Sniper_Ghillie (sniper/Gebirgsjager health x1.33), Tech_Pioneer_Entrenching (field defence build speed x1.35). Light Bringers are in both doctrine barracks layouts.",
+    "offered_by": "both doctrines: Barracks (Tech) Source/RTS_Survival/Game/GameState/CPPGameState.cpp:9769"
+  },
+  "BTX_GerBarrackFuelCell": {
+    "name": "Fuel Cell",
+    "tooltip": "Support research",
+    "description": "A fuel cell bank for the barracks: <Text_Accent>+5 energy</>. Unlocks the Sniper Team (with a Communication Center) and the Flak 88 Ground Role research.",
+    "facts": "EnergySupply 5 (Source/RTS_Survival/Game/GameState/BxpDataHelpers/BxpDataHelpers.h:372). Sniper Team and Feuer Sturm need Comm Center + this BXP (Source/RTS_Survival/GameUI/TrainingUI/TrainingMenuManager.cpp:2639-2707); Feuer Sturm left out of the text because only the Breakthrough barracks layout lists it (Source/RTS_Survival/GameUI/TrainingUI/TrainingLayout/TrainingLayoutDataAsset.cpp:414). BP research comp: Tech_Flak88_GroundRole (ground-fire mode for the 8.8 cm Flak team weapon).",
+    "offered_by": "both doctrines: Barracks (Tech) Source/RTS_Survival/Game/GameState/CPPGameState.cpp:9768"
+  },
+  "BTX_GerBarracksSniperLoft": {
+    "name": "Sniper Loft",
+    "tooltip": "Sniper post",
+    "description": "A timber loft with a <Text_Weapon>Kar98k sniper</> behind sandbags. Covers the front half circle and <Text_Accent>sees 80 m</>.",
+    "facts": "Turret Ger_EIT_Sniper_Kar98, weapon Kar_Sniper (5-round mag, 6 s reload, sniper range) (Source/RTS_Survival/Game/GameState/CPPGameState.cpp:2733). VisionRadius GerBarracksSniperLoftVisionRadius 8000 (Source/RTS_Survival/DeveloperSettings.h:1134). Health T1BxpHealth*1.5, cost 340 R / 160 M (Source/RTS_Survival/Game/GameState/BxpDataHelpers/BxpDataHelpers.h:376-397).",
+    "offered_by": "Strike Division only: Barracks (Defense) Source/RTS_Survival/Game/GameState/CPPGameState.cpp:1061-1063"
+  },
+  "BTX_GerLFactoryRadixiteReactor": {
+    "name": "Forge Reactor",
+    "tooltip": "Vehicle research",
+    "description": "A radixite reactor for the forge: <Text_Accent>+10 energy</>. Unlocks vehicle research: autocannon damage, auto loaders, spall liners, rangefinders, tungsten 8.8 cm shells, shell hoists.",
+    "facts": "EnergySupply 10 (Source/RTS_Survival/Game/GameState/BxpDataHelpers/BxpDataHelpers.h:618). BP research comps list Tech_AutoLoader, Tech_Spalliners (medium armour health x1.2), Tech_StereoRangefinder (casemate TD range/accuracy), Tech_Tungsten88 (long 8.8 pen), Tech_Assault_ShellHoist (heavy assault gun reload -30%) and Tech_AutoCannonDamage (TEBP_Ger_AutoCannonDamage: autocannon damage +33%). Components: AutoCannonTech, SpallLinersTech, RangefinderTungstenTech, ShellHoistTech (Docs/Abilities/GermanTechBatch2.md, Tools/TechSetup/setup_tech_batch2.py RESEARCH_HOSTS). VisionRadius = 100 (line 607).",
+    "offered_by": "both doctrines: Forge (Economic) Source/RTS_Survival/Game/GameState/CPPGameState.cpp:9863"
+  },
+  "BTX_GerLFactoryFuelStorage": {
+    "name": "Fuel Storage",
+    "tooltip": "Flame and half-track research",
+    "description": "Fuel tanks for the forge: <Text_Accent>+5 energy</>. Unlocks flame weapon research and Armoured Troop Bay: half-tracks get +20% hull armour and their passengers bail out.",
+    "facts": "EnergySupply 5 (Source/RTS_Survival/Game/GameState/BxpDataHelpers/BxpDataHelpers.h:637). BP research comps list Tech_HalfTrack_ArmoredBay (TE_ArmoredTroopBay: hull armour x1.2, passengers bail out at 50% health) plus components FlameRadixiteDmg (Tech_FlameDamage; TE_FlameDamage C++ recolours flame VFX, no damage change found in C++) and FlameRangeOrRailReload (Tech_FlameRange; no C++ effect class or TEBP found). VisionRadius = 100 (line 626).",
+    "offered_by": "both doctrines: Forge (Economic) Source/RTS_Survival/Game/GameState/CPPGameState.cpp:9864"
+  },
+  "BTX_GerForgeSchreckFrame": {
+    "name": "Panzerschreck Frame",
+    "tooltip": "Anti-tank post",
+    "description": "A steel frame over the front arch with a Panzerschreck team on a raised deck, firing <Text_Weapon>88mm HEAT rockets</>. <Text_Accent>Strong against tanks up close</>.",
+    "facts": "Turret RTS_BP_EmbTurret_GerPit_Panzerschreck, weapon PanzerSchreck_Pit: HEAT, 1 rocket, 8 s reload, small-arms range (Source/RTS_Survival/Game/GameState/CPPGameState.cpp:4781). Health T1BxpHealth*2, cost 380 R / 220 M (Source/RTS_Survival/Game/GameState/BxpDataHelpers/BxpDataHelpers.h:641-662).",
+    "offered_by": "Strike Division only: Forge (Defense) Source/RTS_Survival/Game/GameState/CPPGameState.cpp:1051-1053"
+  },
+  "BTX_GerMetalVaultSmelter": {
+    "name": "Smelter",
+    "tooltip": "Metal to vehicle parts",
+    "description": "A firebrick cupola in the vault tower. Smelts metal into vehicle parts while switched on: 25 metal for 5 parts every 10 s, <Text_Accent>30 parts per minute</>.",
+    "facts": "Ger_Bxp_MetalVaultSmelter ConversionSettings read from asset: TickRate 10, Metal -25 / VehicleParts +5. EnergySupply +10 (Source/RTS_Survival/Game/GameState/BxpDataHelpers/BxpDataHelpers.h:265), same sign question as the converter. Cost 250 R / 100 M.",
+    "offered_by": "Strike Division only: Metal Vault (Economic) Source/RTS_Survival/Game/GameState/CPPGameState.cpp:1054-1056"
+  },
+  "BTX_GerMechDepotRadioVan": {
+    "name": "Radio Van",
+    "tooltip": "Long-range sight",
+    "description": "A Kfz. 17 radio van with a 12 m aerial tower on the container. Gives the depot <Text_Accent>90 m of sight</>, the widest of any expansion.",
+    "facts": "VisionRadius GerMechDepotRadioVanVisionRadius 9000 (Source/RTS_Survival/DeveloperSettings.h:1131; only the Soviet mega bunker sees further). Energy -10, no weapon, cost 320 R / 180 M (Source/RTS_Survival/Game/GameState/BxpDataHelpers/BxpDataHelpers.h:283-304).",
+    "offered_by": "Strike Division only: Mechanized Depot (Tech) Source/RTS_Survival/Game/GameState/CPPGameState.cpp:1057-1060"
+  },
+  "BTX_GerMechDepotWurfrahmenShop": {
+    "name": "Wurfrahmen Shop",
+    "tooltip": "Faster rocket reloads",
+    "description": "A lean-to where a 251 is fitted with Wurfrahmen 40 racks. While it stands, your Panzerwerfers <Text_Accent>reload 25% faster</>.",
+    "facts": "PanzerwerferReloadMlt = 0.75 (Source/RTS_Survival/DeveloperSettings.h:1027, Source/RTS_Survival/Game/GameState/BxpDataHelpers/BxpDataHelpers.h:326), applied as ReloadSpeedMlt by BehaviourWeaponWurfrahmenShop.cpp:27 (reload time x0.75). Energy -5, cost 360 R / 220 M.",
+    "offered_by": "Strike Division only: Mechanized Depot (Tech) Source/RTS_Survival/Game/GameState/CPPGameState.cpp:1057-1060"
+  },
+  "BTX_GerCommObservationPost": {
+    "name": "Observation Post",
+    "tooltip": "Forward sight",
+    "description": "A small concrete bunker with a stereo rangefinder on a sandbag wing end. Unarmed; <Text_Accent>sees 45 m</> from the wing.",
+    "facts": "Only effect in code: VisionRadius T2BxpVisionRadius 4500 (Source/RTS_Survival/Game/GameState/BxpDataHelpers/BxpDataHelpers.h:521-540; comment 'gameplay role (artillery spotting) is still open'). Reinforced, health T1BxpHealth*1.5, energy -5, cost 250 R / 150 M. Comm Center itself sees 3000.",
+    "offered_by": "both doctrines: Communication Center (Tech) Source/RTS_Survival/Game/GameState/CPPGameState.cpp:9917"
+  },
+  "BTX_GerCommMG42Nests": {
+    "name": "MG42 Nests",
+    "tooltip": "Anti-infantry nests",
+    "description": "A raised MG42 nest on each wing end, each with a gunner and a loader. <Text_Weapon>MG 42 on 100-round belts</>. <Text_Accent>Strong against infantry</>.",
+    "facts": "Turrets Ger_BP_EmbTurret_TwinMG42 (+ _Left via PitAdditionalTurretComponent), weapon Ger_PitMG42_7_92MM: 10-round bursts, 100-round belt, 6 s reload (Source/RTS_Survival/Game/GameState/CPPGameState.cpp:3136). Health BxpHeavyBunkerHealth*0.75, cost 360 R / 160 M (Source/RTS_Survival/Game/GameState/BxpDataHelpers/BxpDataHelpers.h:126-130).",
+    "offered_by": "both doctrines: Communication Center (Defense) Source/RTS_Survival/Game/GameState/CPPGameState.cpp:9918"
+  },
+  "BTX_GerCommRequisitionOffice": {
+    "name": "Requisition Office",
+    "tooltip": "Cheaper field defences",
+    "description": "A requisition cabin hung on the tower. While it stands, <Text_Accent>field defences cost 25% less</>, field trenches included.",
+    "facts": "FieldDefenseCostMlt = 0.75 (Source/RTS_Survival/DeveloperSettings.h:1016, Source/RTS_Survival/Game/GameState/BxpDataHelpers/BxpDataHelpers.h:562), registered with the game state on build (BuildingExpansion.cpp:1187-1204); applies to the Global_GetIsFieldDefenseBxpType list incl. the trench per-metre price (BuildingExpansionEnums.h:459-481). Energy -5, cost 300 R / 180 M.",
+    "offered_by": "both doctrines: Communication Center (Economic) Source/RTS_Survival/Game/GameState/CPPGameState.cpp:9919"
+  },
+  "BTX_GerCommCipherRoom": {
+    "name": "Cipher Room",
+    "tooltip": "Faster commander abilities",
+    "description": "A cipher cabin hung over the inner yard. While it stands, <Text_Accent>commander ability cooldowns are 20% shorter</>.",
+    "facts": "GlobalAbilityCooldownMlt = 0.8 (Source/RTS_Survival/DeveloperSettings.h:1020, Source/RTS_Survival/Game/GameState/BxpDataHelpers/BxpDataHelpers.h:587), registered with UGlobalAbilitiesManager (BuildingExpansion.cpp:1227-1245). Energy -10, cost 400 R / 220 M.",
+    "offered_by": "both doctrines: Communication Center (Tech) Source/RTS_Survival/Game/GameState/CPPGameState.cpp:9920"
+  },
+  "BTX_37mmFlak": {
+    "name": "37mm Flak",
+    "tooltip": "Anti-air gun",
+    "description": "A small emplacement with a 3.7 cm Flak 36 firing <Text_Weapon>6-round clips</>. <Text_Accent>Good against aircraft and light vehicles</>.",
+    "facts": "Turret RTS_BP_EmbTurret_37mmFlak, weapon Flak36_37MM: MagCapacity 6, reload 5 s, pen 45 mm (Source/RTS_Survival/Game/GameState/CPPGameState.cpp:4030). BxpData T1 health/vision, cost 140 R / 80 M (Source/RTS_Survival/Game/GameState/CPPGameState.cpp:8881-8890). Old row said '8-Round Mags' and 'An 37mm'.",
+    "offered_by": "both doctrines: every German building's Defense slot (HQ, Gamma, Refinery (Breakthrough only), Metal Vault, Barracks, Mech Depot, Forge, Comm Center, Armory, Med Tank Factory, Training Centre, Airbase, Experimental Factory)"
+  },
+  "BXT_88mmFlak": {
+    "name": "88mm Flak",
+    "tooltip": "Heavy anti-tank gun",
+    "description": "A heavy emplacement with the 8.8 cm Flak 37, firing <Text_Weapon>APHE, APCR and HE</> with a 5 s reload. <Text_Accent>Highly effective against armoured targets</>.",
+    "facts": "Turret RTS_BP_EmbTurret_88mmFlak, weapon Flak37_88MM: APHE/APCR/HE, 1 round, 5 s reload (Source/RTS_Survival/Game/GameState/CPPGameState.cpp:5007). BxpData health T1*1.5, cost 420 R / 320 M (Source/RTS_Survival/Game/GameState/CPPGameState.cpp:8892-8901).",
+    "offered_by": "not offered: has data but is in no option list or layout"
+  },
+  "BTX_LeFH_150mm": {
+    "name": "leFH 18 Howitzer",
+    "tooltip": "Light howitzer",
+    "description": "A 10.5 cm leFH 18 howitzer emplacement firing <Text_Weapon>105mm HE shells</> every 8 s. <Text_Accent>Long-range fire</> against infantry and positions.",
+    "facts": "BP RTS_BP_BXP_LeFH105mm, turret RTS_BP_EmbTurret_LeFH_105mm, weapon LeFH_18_105MM: HE, 8 s reload, HowitzerArtilleryRange (Source/RTS_Survival/Game/GameState/CPPGameState.cpp:5136). The type and display string say 150mm but the gun is 105mm. Cost 450 R / 225 M (Source/RTS_Survival/Game/GameState/CPPGameState.cpp:8954-8963).",
+    "offered_by": "both doctrines: HQ expansion (Defense) Source/RTS_Survival/Game/GameState/CPPGameState.cpp:9589"
+  },
+  "BXT_SolarLarge": {
+    "name": "Solar Trailer",
+    "tooltip": "Energy supply",
+    "description": "A radixite solar trailer parked beside the Gamma Facility. Provides <Text_Accent>+10 energy</>.",
+    "facts": "EnergySupply 10, health T1*1.25, cost 155 R / 90 M (Source/RTS_Survival/Game/GameState/CPPGameState.cpp:8914-8924, Source/RTS_Survival/DeveloperSettings.h:901-902). Socket expansion.",
+    "offered_by": "both doctrines: Gamma Facility (Economic) Source/RTS_Survival/Game/GameState/CPPGameState.cpp:9657"
+  },
+  "BXT_SolarSmall": {
+    "name": "Small Solar Panel",
+    "tooltip": "Energy supply",
+    "description": "A small free-standing radixite solar panel.",
+    "facts": "BxpData never sets EnergySupply, so it is 0 (Source/RTS_Survival/Game/GameState/CPPGameState.cpp:8903-8912); no gameplay effect found. Add '+X energy' once the data is set.",
+    "offered_by": "not offered: has data but is in no option list or layout"
+  },
+  "BTX_GerMarderStugFactory": {
+    "name": "Marder StuG Factory",
+    "tooltip": "Tank destroyer works",
+    "description": "A walled assembly hall for Marder and StuG tank destroyers, with <Text_Accent>7000 HP</> of reinforced walls.",
+    "facts": "BxpData: health 7000, reinforced, cost 2000 R / 1000 M, vision 3x T1 (Source/RTS_Survival/Game/GameState/CPPGameState.cpp:8969-8998). BP RTS_BP_GerStugMarderFactory uses the flak bunker mesh + a container and a MarderStug mission 'FactoryLost_LostGame' voice line; no training options, requirements or bonuses reference the type.",
+    "offered_by": "both doctrines: Medium Tank Factory (Tech) Source/RTS_Survival/Game/GameState/CPPGameState.cpp:9990"
+  },
+  "BTX_GerCapturedB4Pit": {
+    "name": "Captured B-4 Pit",
+    "tooltip": "Super-heavy howitzer",
+    "description": "A captured Soviet <Text_Weapon>B-4 203mm howitzer</> on a turntable; its crew crane-loads every shell (12 s). <Text_Accent>Longest range of any gun pit</>.",
+    "facts": "Weapon B4_203MM_Pit: reload 12 s, range HowitzerArtilleryRange*1.25 = 12100 vs sFH 18 11600 (Source/RTS_Survival/Game/GameState/CPPGameState.cpp:5182). BxpData shared with the Soviet pit: vision MegaBunkerVisionRadius 10000, health heavy bunker*1.5, cost 1600 R / 900 M (Source/RTS_Survival/Game/GameState/CPPGameState.cpp:9316-9332).",
+    "offered_by": "both doctrines: HQ expansion (Defense) Source/RTS_Survival/Game/GameState/CPPGameState.cpp:9590"
+  },
+  "BTX_GerPak40Pit": {
+    "name": "Pak 40 Pit",
+    "tooltip": "Anti-tank gun",
+    "description": "A 7.5 cm Pak 40 in a low sandbag ring; gun and crew turn a full circle. Fires <Text_Weapon>APCR</> every 5.9 s. <Text_Accent>Strong against tanks</>.",
+    "facts": "Turret RTS_BP_EmbTurret_GerPit_Pak40, weapon Pak40_3_L46_75MM_TW: APCR only, 148 mm pen, 5.9 s reload (Source/RTS_Survival/Game/GameState/CPPGameState.cpp:4453). Health heavy bunker*0.9, cost 380 R / 200 M (Source/RTS_Survival/Game/GameState/BxpDataHelpers/BxpDataHelpers.h:109). Old row was the 37mm Flak text.",
+    "offered_by": "both doctrines: HQ Field Defenses tab, no requirement Source/RTS_Survival/GameUI/TrainingUI/TrainingLayout/TrainingLayoutDataAsset.cpp:217"
+  },
+  "BTX_GerLeFH18Pit": {
+    "name": "leFH 18 Pit",
+    "tooltip": "Light howitzer pit",
+    "description": "A 10.5 cm leFH 18 in a high sandbag ring with a four-man crew. Fires <Text_Weapon>105mm HE</> every 8 s. <Text_Accent>Long-range fire</> on infantry and positions.",
+    "facts": "Weapon LeFH_18_105MM_TW: HE, 8 s reload, HowitzerArtilleryRange 9680 (Source/RTS_Survival/Game/GameState/CPPGameState.cpp:5139). Health heavy bunker*1.1, cost 620 R / 320 M (Source/RTS_Survival/Game/GameState/BxpDataHelpers/BxpDataHelpers.h:110). Needs the Communication Center (Source/RTS_Survival/GameUI/TrainingUI/TrainingMenuManager.cpp:3026-3028). Old row was the 37mm Flak text.",
+    "offered_by": "both doctrines: HQ Field Defenses tab, needs Comm Center Source/RTS_Survival/GameUI/TrainingUI/TrainingLayout/TrainingLayoutDataAsset.cpp:222"
+  },
+  "BTX_GerSFH18Pit": {
+    "name": "sFH 18 Pit",
+    "tooltip": "Heavy howitzer pit",
+    "description": "A 15 cm sFH 18 in a high sandbag ring with a four-man crew. Fires <Text_Weapon>150mm HE</> every 14.4 s and <Text_Accent>outranges the leFH 18 by 20%</>.",
+    "facts": "Weapon sFH18_150MM_TW = sIG 33 data (14.4 s reload) with range HowitzerArtilleryRange*1.2 = 11600 (Source/RTS_Survival/Game/GameState/CPPGameState.cpp:5254-5262; the comment there says 10600, the formula gives 11600). Health heavy bunker*1.25, cost 950 R / 520 M (Source/RTS_Survival/Game/GameState/BxpDataHelpers/BxpDataHelpers.h:111). Needs Comm Center.",
+    "offered_by": "both doctrines: HQ Field Defenses tab, needs Comm Center Source/RTS_Survival/GameUI/TrainingUI/TrainingLayout/TrainingLayoutDataAsset.cpp:223"
+  },
+  "BTX_GerFlak37Pit": {
+    "name": "Flak 37 Pit",
+    "tooltip": "Anti-air pit",
+    "description": "A 3.7 cm Flak 37 in a sandbag ring; a loader's mate passes up <Text_Weapon>6-round clips</> (4.5 s change). <Text_Accent>Good against aircraft and light vehicles</>.",
+    "facts": "Turret RTS_BP_EmbTurret_GerPit_Flak37, weapon Flak36_37MM_Pit: 6-round clip, 4.5 s reload (Source/RTS_Survival/Game/GameState/CPPGameState.cpp:4040). Health heavy bunker*0.9, cost 420 R / 220 M (Source/RTS_Survival/Game/GameState/BxpDataHelpers/BxpDataHelpers.h:112). Old row was the generic 37mm Flak text with 8-round mags.",
+    "offered_by": "both doctrines: HQ Field Defenses tab, no requirement Source/RTS_Survival/GameUI/TrainingUI/TrainingLayout/TrainingLayoutDataAsset.cpp:218"
+  },
+  "BTX_GerFlak88Pit": {
+    "name": "Flak 88 Emplacement",
+    "tooltip": "Heavy anti-tank gun",
+    "description": "An 8.8 cm Flak behind high sandbag walls with a three-man drill. Fires <Text_Weapon>APHE, APCR and HE</> every 5 s. <Text_Accent>Strong against tanks at long range</>.",
+    "facts": "Turret RTS_BP_EmbTurret_GerPit_Flak88, weapon Flak37_88MM: APHE/APCR/HE, 5 s reload, HeavyCannonRange (Source/RTS_Survival/Game/GameState/CPPGameState.cpp:5007); pitch limited to 0-10 deg (Docs/Units/GerFlak88Pit.md). Health heavy bunker*1.3, cost 560 R / 360 M. Needs Comm Center.",
+    "offered_by": "both doctrines: HQ Field Defenses tab, needs Comm Center Source/RTS_Survival/GameUI/TrainingUI/TrainingLayout/TrainingLayoutDataAsset.cpp:225"
+  },
+  "BTX_GerMortarPit": {
+    "name": "Mortar Pit",
+    "tooltip": "Indirect fire",
+    "description": "An 8 cm mortar and its two-man crew in a square sandbag pit. Lobs <Text_Weapon>80mm HE</> over cover every 10 s. <Text_Accent>Good against infantry in cover</>.",
+    "facts": "Turret RTS_BP_EmbTurret_GerPit_Mortar, weapon Mortar_80MM_TW: HE, 1 round, 10 s reload (Source/RTS_Survival/Game/GameState/CPPGameState.cpp:2210). Health heavy bunker*0.8, cost 340 R / 160 M (Source/RTS_Survival/Game/GameState/BxpDataHelpers/BxpDataHelpers.h:139).",
+    "offered_by": "both doctrines: HQ Field Defenses tab, no requirement Source/RTS_Survival/GameUI/TrainingUI/TrainingLayout/TrainingLayoutDataAsset.cpp:219"
+  },
+  "BTX_GerPuppchenPit": {
+    "name": "Puppchen Pit",
+    "tooltip": "Rocket anti-tank gun",
+    "description": "A Raketenwerfer 43 'Puppchen' in a small bag ring. Fires <Text_Weapon>88mm HEAT rockets</> every 6 s, further than a Panzerschreck. <Text_Accent>Strong against tanks</>.",
+    "facts": "Weapon Raketenwerfer43_88MM: HEAT, 6 s reload, LightCannonRange vs Panzerschreck small-arms range (Source/RTS_Survival/Game/GameState/CPPGameState.cpp:4794). Health heavy bunker*0.55, cost 280 R / 130 M, 15 s build (Source/RTS_Survival/Game/GameState/BxpDataHelpers/BxpDataHelpers.h:114-117).",
+    "offered_by": "both doctrines: HQ Field Defenses tab, no requirement Source/RTS_Survival/GameUI/TrainingUI/TrainingLayout/TrainingLayoutDataAsset.cpp:220"
+  },
+  "BTX_GerPanzerschreckPit": {
+    "name": "Panzerschreck Foxhole",
+    "tooltip": "Cheap anti-tank post",
+    "description": "A Panzerschreck team in a foxhole behind a ring of bags, firing <Text_Weapon>88mm HEAT rockets</> every 8 s. <Text_Accent>The cheapest anti-tank defence</>, but fragile.",
+    "facts": "Weapon PanzerSchreck_Pit: HEAT, 8 s reload, small-arms range (Source/RTS_Survival/Game/GameState/CPPGameState.cpp:4781). Health heavy bunker*0.4 (lowest), cost 160 R / 60 M (cheapest field defence), 12 s build (Source/RTS_Survival/Game/GameState/BxpDataHelpers/BxpDataHelpers.h:118-121).",
+    "offered_by": "both doctrines: HQ Field Defenses tab, no requirement Source/RTS_Survival/GameUI/TrainingUI/TrainingLayout/TrainingLayoutDataAsset.cpp:224"
+  },
+  "BTX_GerRailPakBunker": {
+    "name": "Rail Pak Bunker",
+    "tooltip": "Rail anti-tank bunker",
+    "description": "A concrete pillbox with a rail-fitted Pak 40 on its roof, firing <Text_Weapon>50mm rail slugs</> that punch through targets. <Text_Accent>Twice as tough as a Pak 40 pit</>.",
+    "facts": "Turret RTS_BP_EmbTurret_GerRailPak, weapon RailGun50MM via SetupRailgunWeapon (rail projectile, over-penetration), 10 s reload (Source/RTS_Survival/Game/GameState/CPPGameState.cpp:3335, Docs/Units/GerRailPakBunker.md). Health heavy bunker*1.8 vs Pak 40 pit 0.9, cost 850 R / 420 M (Source/RTS_Survival/Game/GameState/BxpDataHelpers/BxpDataHelpers.h:131-135). Needs Comm Center.",
+    "offered_by": "Breakthrough only: HQ Field Defenses tab, needs Comm Center Source/RTS_Survival/GameUI/TrainingUI/TrainingLayout/TrainingLayoutDataAsset.cpp:400-403"
+  },
+  "BTX_GerTwinMG42Pit": {
+    "name": "Twin MG42 Pit",
+    "tooltip": "Anti-infantry pit",
+    "description": "Two MG 42 nests joined by an ammunition corridor, each with a gunner and a loader. <Text_Weapon>100-round belts</>, 6 s reload. <Text_Accent>Strong against infantry</>.",
+    "facts": "Turrets Ger_BP_EmbTurret_TwinMG42 + _Left, weapon Ger_PitMG42_7_92MM: 10-round bursts, 100-round belt, 6 s reload (Source/RTS_Survival/Game/GameState/CPPGameState.cpp:3136). Health heavy bunker*0.75, cost 320 R / 140 M (Source/RTS_Survival/Game/GameState/BxpDataHelpers/BxpDataHelpers.h:122-125).",
+    "offered_by": "both doctrines: HQ Field Defenses tab, no requirement Source/RTS_Survival/GameUI/TrainingUI/TrainingLayout/TrainingLayoutDataAsset.cpp:221"
+  },
+  "BTX_GerFieldTrench": {
+    "name": "Field Trench",
+    "tooltip": "Infantry cover",
+    "description": "A trench you drag out from the HQ; it is dug piece by piece for <Text_Accent>10 radixite per metre</>. Soldiers inside take trench cover.",
+    "facts": "GerFieldTrench_RadixitePerMetre 10 (Source/RTS_Survival/DeveloperSettings.h:1038, Source/RTS_Survival/Game/GameState/BxpDataHelpers/BxpDataHelpers.h:156-160); ARTSFieldTrench pays per piece as it digs and hands its cargo sockets to the cover finder as trench cover (Buildings/FieldTrench/RTSFieldTrench.h:66-71). Requisition Office discount applies.",
+    "offered_by": "both doctrines: HQ Barriers tab Source/RTS_Survival/GameUI/TrainingUI/TrainingLayout/TrainingLayoutDataAsset.cpp:257-259"
+  },
+  "BXT_GerFLakBunker": {
+    "name": "Flak Bunker",
+    "tooltip": "Heavy flak bunker",
+    "description": "A concrete bunker with a 3.7 cm and an 8.8 cm Flak, able to switch to <Text_Weapon>shrapnel rounds</>. <Text_Accent>Very tough</>: 2.5x heavy bunker health.",
+    "facts": "BP Ger_BXP_FlakBunker: turrets RTS_BP_EmbTurret_37mmFlak + RTS_BP_EmbTurret_GerPit_Flak88, ApplyBehaviourAbility FlakShrapnelRounds. Health BxpHeavyBunkerHealth*2.5, cost 1600 R / 1500 M (Source/RTS_Survival/Game/GameState/CPPGameState.cpp:8939-8952).",
+    "offered_by": "not offered: has data but is in no option list or layout"
+  },
+  "BTX_20mmFlak": {
+    "name": "20mm Flak",
+    "tooltip": "Light anti-air gun",
+    "description": "A light 2 cm Flak emplacement.",
+    "facts": "No FBxpData entry in CPPGameState/BxpDataHelpers; BP RTS_BP_BXP_20mmFlak has no turret or weapon; only a construction-rules footprint (BxpConstructionRulesHelpers.h:96) and it is FBxpOptionData's default ExpansionType (BxpOptionData.cpp:5).",
+    "offered_by": "not offered: no data, no turret, in no option list"
+  },
+  "BTX_Pak38": {
+    "name": "Pak 38",
+    "tooltip": "Anti-tank gun",
+    "description": "A 5 cm Pak 38 emplacement firing <Text_Weapon>APHE</> with a quick 3.3 s reload. <Text_Accent>Good against light and medium tanks</>.",
+    "facts": "Turret RTS_BP_EmbTurret_Pak38, weapon Pak38_50MM: APHE, 1 round, 3.3 s reload, raised accuracy (Source/RTS_Survival/Game/GameState/CPPGameState.cpp:4316). BxpData health T1*1.75 reinforced, cost 250 R / 150 M (Source/RTS_Survival/Game/GameState/CPPGameState.cpp:8928-8937).",
+    "offered_by": "not offered: has data but is in no option list or layout"
+  },
+  "BTX_Ger37MMCaptureBunker": {
+    "name": "37mm Flak Bunker",
+    "tooltip": "Captured flak bunker",
+    "description": "A concrete bunker with a 3.7 cm Flak 36 firing <Text_Weapon>6-round clips</>. Once captured it <Text_Accent>fights for you</>.",
+    "facts": "BP Ger_Bxp_CaptureBunker37mm: child turret RTS_BP_EmbTurret_37mmFlak, weapon Flak36_37MM (6-round clip, 5 s reload, Source/RTS_Survival/Game/GameState/CPPGameState.cpp:4030). Map placed as BP_CaptureBunker_37MM (child of BP_CaptureActor, AmountCaptureUnitsNeeded), which spawns this BXP for the capturer. BxpData: health T2BxpHealth*2 = 1760, T1 vision, cost 700 R / 300 M, armed abilities (Source/RTS_Survival/Game/GameState/BxpDataHelpers/BxpDataHelpers.h:49-65).",
+    "offered_by": "not offered: map-placed capture point (BP_CaptureBunker_37MM; survival start content, SurvivalStartContentSettings.cpp:273)"
+  },
+  "BTX_GerTurretCaptureBunker": {
+    "name": "Turret Bunker",
+    "tooltip": "Captured turret bunker",
+    "description": "A concrete bunker with a Jaguar turret and its <Text_Weapon>35mm autocannon</> on 5-round clips. Once captured it <Text_Accent>fights for you</>.",
+    "facts": "BP Ger_Bxp_CaptureBunkerTurret: child turret Ger_Turret_Jaguar35mm, weapon Kwk32_35MM (35 mm, MagCapacity 5, reload 5 s, burst fire; Source/RTS_Survival/Game/GameState/CPPGameState.cpp:3688-3701). Map placed as BP_CaptureBunker_Turret (child of BP_CaptureActor). BxpData: health T2BxpHealth*4 = 3520, T1 vision, cost 700 R / 300 M (Source/RTS_Survival/Game/GameState/BxpDataHelpers/BxpDataHelpers.h:68-84). Weapon enum display string says 'Kwk32 30MM' but calibre is 35.",
+    "offered_by": "not offered: map-placed capture point (BP_CaptureBunker_Turret; SurvivalStartContentSettings.cpp:274)"
+  }
+}

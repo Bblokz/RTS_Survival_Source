@@ -2,6 +2,7 @@
 
 
 #include "BuildingExpansion.h"
+#include "RTS_Survival/Environment/DestructableEnvActor/WallChunkDamage/WallHoleDamageComponent.h"
 
 #include "BuildingExpansionEnums.h"
 #include "NiagaraComponent.h"
@@ -563,6 +564,39 @@ void ABuildingExpansion::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	{
 		// Never provide packed as true here as that would mean we allow to unpack a destroyed bxp with no costs.
 		M_Owner->DestroyBuildingExpansion(this, false);
+	}
+}
+
+void ABuildingExpansion::OnHealthChanged(const EHealthLevel PercentageLeft, const bool bIsHealing)
+{
+	if (not IsValid(BuildingMeshComponent) || not IsValid(FindComponentByClass<UWallHoleDamageComponent>()))
+	{
+		Super::OnHealthChanged(PercentageLeft, bIsHealing);
+		return;
+	}
+	// Procedural holes live in the building mesh's slot materials (hole instances) and its bounds; the legacy
+	// handler's mesh or material swaps would wipe them, so both are put back while its explosions still play.
+	UStaticMesh* const MeshBeforeHandler = BuildingMeshComponent->GetStaticMesh();
+	TArray<UMaterialInterface*> MaterialsBeforeHandler;
+	for (int32 Slot = 0; Slot < BuildingMeshComponent->GetNumMaterials(); ++Slot)
+	{
+		MaterialsBeforeHandler.Add(BuildingMeshComponent->GetMaterial(Slot));
+	}
+	Super::OnHealthChanged(PercentageLeft, bIsHealing);
+	if (not IsValid(BuildingMeshComponent))
+	{
+		return;
+	}
+	if (IsValid(MeshBeforeHandler) && BuildingMeshComponent->GetStaticMesh() != MeshBeforeHandler)
+	{
+		BuildingMeshComponent->SetStaticMesh(MeshBeforeHandler);
+	}
+	for (int32 Slot = 0; Slot < MaterialsBeforeHandler.Num(); ++Slot)
+	{
+		if (BuildingMeshComponent->GetMaterial(Slot) != MaterialsBeforeHandler[Slot])
+		{
+			BuildingMeshComponent->SetMaterial(Slot, MaterialsBeforeHandler[Slot]);
+		}
 	}
 }
 

@@ -1,0 +1,3551 @@
+{
+ "rows_all": [
+  {
+   "Name": "BXT_Invalid",
+   "Built_ImageBrush": "/Script/Engine.SlateBrushAsset'/Game/RTS_Survival/Blueprints/GameUI/BuildingUI/SB_DEFAULT.SB_DEFAULT'",
+   "Description": "",
+   "Tooltip": ""
+  },
+  {
+   "Name": "BTX_37mmFlak",
+   "Built_ImageBrush": "/Script/Engine.SlateBrushAsset'/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_Flak37_Brush.T_Ger_Bxp_Flak37_Brush'",
+   "Description": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_37mmFlak_Description\", \"A small emplacement with a 3.7 cm Flak 36 firing <Text_Weapon>6-round clips</>. <Text_Accent>Good against aircraft and light vehicles</>.\")",
+   "Tooltip": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_37mmFlak_Tooltip\", \"Anti-air gun\")"
+  },
+  {
+   "Name": "BXT_88mmFlak",
+   "Built_ImageBrush": "/Script/Engine.SlateBrushAsset'/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_Flak88_Brush.T_Ger_Bxp_Flak88_Brush'",
+   "Description": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BXT_88mmFlak_Description\", \"A heavy emplacement with the 8.8 cm Flak 37, firing <Text_Weapon>APHE, APCR and HE</> with a 5 s reload. <Text_Accent>Highly effective against armoured targets</>.\")",
+   "Tooltip": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BXT_88mmFlak_Tooltip\", \"Heavy anti-tank gun\")"
+  },
+  {
+   "Name": "BXT_SolarSmall",
+   "Built_ImageBrush": "None",
+   "Description": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BXT_SolarSmall_Description\", \"A small free-standing radixite solar panel.\")",
+   "Tooltip": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BXT_SolarSmall_Tooltip\", \"Energy supply\")"
+  },
+  {
+   "Name": "BTX_GerHQRadar",
+   "Built_ImageBrush": "/Script/Engine.SlateBrushAsset'/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_HQRadarPlacard_Brush.T_Ger_Bxp_HQRadarPlacard_Brush'",
+   "Description": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerHQRadar_Description\", \"A rotating radar dish on the HQ. Friendly units within 30 m get <Text_Accent>+20% weapon range</>.\")",
+   "Tooltip": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerHQRadar_Tooltip\", \"Weapon range aura\")"
+  },
+  {
+   "Name": "BTX_GerHQPlatform",
+   "Built_ImageBrush": "/Script/Engine.SlateBrushAsset'/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_HQPlatform_Brush.T_Ger_Bxp_HQPlatform_Brush'",
+   "Description": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerHQPlatform_Description\", \"A raised platform with a 3.7 cm Flak 36 firing <Text_Weapon>6-round clips</>. The height gives it <Text_Accent>double range</> (+100%).\")",
+   "Tooltip": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerHQPlatform_Tooltip\", \"Anti-air platform\")"
+  },
+  {
+   "Name": "BTX_GerHQHarvester",
+   "Built_ImageBrush": "/Script/Engine.SlateBrushAsset'/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_HQHarvesterHub_Brush.T_Ger_Bxp_HQHarvesterHub_Brush'",
+   "Description": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerHQHarvester_Description\", \"A research platform on the HQ. Unlocks <Text_Accent>economy research</>: harvester capacity and speed, scavenging speed and reward, stronger repairs and Barricades.\")",
+   "Tooltip": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerHQHarvester_Tooltip\", \"Economy research\")"
+  },
+  {
+   "Name": "BTX_GerHQRepairBay",
+   "Built_ImageBrush": "/Script/Engine.SlateBrushAsset'/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_HQRepairBay_Brush.T_Ger_Bxp_HQRepairBay_Brush'",
+   "Description": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerHQRepairBay_Description\", \"A repair pad with two welding cranes. Repairs damaged vehicles and buildings within 35 m by <Text_Accent>10 HP per second</>.\")",
+   "Tooltip": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerHQRepairBay_Tooltip\", \"Repairs nearby units\")"
+  },
+  {
+   "Name": "BTX_GerHQTower",
+   "Built_ImageBrush": "/Script/Engine.SlateBrushAsset'/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_HQTower_Brush.T_Ger_Bxp_HQTower_Brush'",
+   "Description": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerHQTower_Description\", \"A Panzer IV turret on a tall tower, armed with a <Text_Weapon>7.5 cm KwK 40 L/48</>. The height gives it <Text_Accent>triple range</> (+200%).\")",
+   "Tooltip": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerHQTower_Tooltip\", \"Long-range tank gun\")"
+  },
+  {
+   "Name": "BTX_GerLFactoryRadixiteReactor",
+   "Built_ImageBrush": "/Script/Engine.SlateBrushAsset'/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_ForgeRadixReactor_Brush.T_Ger_Bxp_ForgeRadixReactor_Brush'",
+   "Description": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerLFactoryRadixiteReactor_Description\", \"A radixite reactor for the forge: <Text_Accent>+10 energy</>. Unlocks vehicle research: autocannon damage, auto loaders, spall liners, rangefinders, tungsten 8.8 cm shells, shell hoists.\")",
+   "Tooltip": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerLFactoryRadixiteReactor_Tooltip\", \"Vehicle research\")"
+  },
+  {
+   "Name": "BTX_GerLFactoryFuelStorage",
+   "Built_ImageBrush": "/Script/Engine.SlateBrushAsset'/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_ForgeFuelStorage_Brush.T_Ger_Bxp_ForgeFuelStorage_Brush'",
+   "Description": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerLFactoryFuelStorage_Description\", \"Fuel tanks for the forge: <Text_Accent>+5 energy</>. Unlocks flame weapon research and Armoured Troop Bay: half-tracks get +20% hull armour and their passengers bail out.\")",
+   "Tooltip": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerLFactoryFuelStorage_Tooltip\", \"Flame and half-track research\")"
+  },
+  {
+   "Name": "BTX_GerBarrackFuelCell",
+   "Built_ImageBrush": "/Script/Engine.SlateBrushAsset'/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_BarracksFuelCell_Brush.T_Ger_Bxp_BarracksFuelCell_Brush'",
+   "Description": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerBarrackFuelCell_Description\", \"A fuel cell bank for the barracks: <Text_Accent>+5 energy</>. Unlocks the Sniper Team (with a Communication Center) and the Flak 88 Ground Role research.\")",
+   "Tooltip": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerBarrackFuelCell_Tooltip\", \"Support research\")"
+  },
+  {
+   "Name": "BTX_GerBarracksRadixReactor",
+   "Built_ImageBrush": "/Script/Engine.SlateBrushAsset'/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_BarracksRadixReactor_Brush.T_Ger_Bxp_BarracksRadixReactor_Brush'",
+   "Description": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerBarracksRadixReactor_Description\", \"A radixite reactor for the barracks: <Text_Accent>+8 energy</>. Unlocks Light Bringers (with a Communication Center) and infantry kit, ghillie suit and entrenching research.\")",
+   "Tooltip": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerBarracksRadixReactor_Tooltip\", \"Infantry research\")"
+  },
+  {
+   "Name": "BTX_RefConverter",
+   "Built_ImageBrush": "/Script/Engine.SlateBrushAsset'/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_RefConverter_Brush.T_Ger_Bxp_RefConverter_Brush'",
+   "Description": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_RefConverter_Description\", \"Turns radixite into vehicle parts while switched on: 15 radixite for 5 parts every 6.7 s, <Text_Accent>45 vehicle parts per minute</>.\")",
+   "Tooltip": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_RefConverter_Tooltip\", \"Radixite to vehicle parts\")"
+  },
+  {
+   "Name": "BTX_GerCapturedB4Pit",
+   "Built_ImageBrush": "/Script/Engine.SlateBrushAsset'/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_PitCapturedB4_Brush.T_Ger_Bxp_PitCapturedB4_Brush'",
+   "Description": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerCapturedB4Pit_Description\", \"A captured Soviet <Text_Weapon>B-4 203mm howitzer</> on a turntable; its crew crane-loads every shell (12 s). <Text_Accent>Longest range of any gun pit</>.\")",
+   "Tooltip": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerCapturedB4Pit_Tooltip\", \"Super-heavy howitzer\")"
+  },
+  {
+   "Name": "BTX_GerPak40Pit",
+   "Built_ImageBrush": "/Script/Engine.SlateBrushAsset'/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_PitPak40_Brush.T_Ger_Bxp_PitPak40_Brush'",
+   "Description": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerPak40Pit_Description\", \"A 7.5 cm Pak 40 in a low sandbag ring; gun and crew turn a full circle. Fires <Text_Weapon>APCR</> every 5.9 s. <Text_Accent>Strong against tanks</>.\")",
+   "Tooltip": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerPak40Pit_Tooltip\", \"Anti-tank gun\")"
+  },
+  {
+   "Name": "BTX_GerLeFH18Pit",
+   "Built_ImageBrush": "/Script/Engine.SlateBrushAsset'/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_PitLeFH18_Brush.T_Ger_Bxp_PitLeFH18_Brush'",
+   "Description": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerLeFH18Pit_Description\", \"A 10.5 cm leFH 18 in a high sandbag ring with a four-man crew. Fires <Text_Weapon>105mm HE</> every 8 s. <Text_Accent>Long-range fire</> on infantry and positions.\")",
+   "Tooltip": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerLeFH18Pit_Tooltip\", \"Light howitzer pit\")"
+  },
+  {
+   "Name": "BTX_GerSFH18Pit",
+   "Built_ImageBrush": "/Script/Engine.SlateBrushAsset'/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_PitSFH18_Brush.T_Ger_Bxp_PitSFH18_Brush'",
+   "Description": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerSFH18Pit_Description\", \"A 15 cm sFH 18 in a high sandbag ring with a four-man crew. Fires <Text_Weapon>150mm HE</> every 14.4 s and <Text_Accent>outranges the leFH 18 by 20%</>.\")",
+   "Tooltip": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerSFH18Pit_Tooltip\", \"Heavy howitzer pit\")"
+  },
+  {
+   "Name": "BTX_GerFlak37Pit",
+   "Built_ImageBrush": "/Script/Engine.SlateBrushAsset'/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_PitFlak37_Brush.T_Ger_Bxp_PitFlak37_Brush'",
+   "Description": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerFlak37Pit_Description\", \"A 3.7 cm Flak 37 in a sandbag ring; a loader\\'s mate passes up <Text_Weapon>6-round clips</> (4.5 s change). <Text_Accent>Good against aircraft and light vehicles</>.\")",
+   "Tooltip": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerFlak37Pit_Tooltip\", \"Anti-air pit\")"
+  },
+  {
+   "Name": "BTX_RefKaskade",
+   "Built_ImageBrush": "/Script/Engine.SlateBrushAsset'/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_RefKaskade_Brush.T_Ger_Bxp_RefKaskade_Brush'",
+   "Description": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_RefKaskade_Description\", \"Three distillation columns and a bank of glass receivers. Adds <Text_Accent>+750 radixite storage</> to this refinery.\")",
+   "Tooltip": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_RefKaskade_Tooltip\", \"Radixite storage\")"
+  },
+  {
+   "Name": "BTX_GerForgeSchreckFrame",
+   "Built_ImageBrush": "/Script/Engine.SlateBrushAsset'/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_ForgeSchreckFrame_Brush.T_Ger_Bxp_ForgeSchreckFrame_Brush'",
+   "Description": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerForgeSchreckFrame_Description\", \"A steel frame over the front arch with a Panzerschreck team on a raised deck, firing <Text_Weapon>88mm HEAT rockets</>. <Text_Accent>Strong against tanks up close</>.\")",
+   "Tooltip": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerForgeSchreckFrame_Tooltip\", \"Anti-tank post\")"
+  },
+  {
+   "Name": "BTX_RefFlakStand",
+   "Built_ImageBrush": "/Script/Engine.SlateBrushAsset'/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_RefFlakStand_Brush.T_Ger_Bxp_RefFlakStand_Brush'",
+   "Description": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_RefFlakStand_Description\", \"A steel stand over the storage tanks with a 3.7 cm Flak 37 and two crew, firing <Text_Weapon>6-round clips</>. The height gives it <Text_Accent>double range</>.\")",
+   "Tooltip": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_RefFlakStand_Tooltip\", \"Anti-air stand\")"
+  },
+  {
+   "Name": "BTX_GerMetalVaultSmelter",
+   "Built_ImageBrush": "/Script/Engine.SlateBrushAsset'/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_MetalVaultSmelter_Brush.T_Ger_Bxp_MetalVaultSmelter_Brush'",
+   "Description": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerMetalVaultSmelter_Description\", \"A firebrick cupola in the vault tower. Smelts metal into vehicle parts while switched on: 25 metal for 5 parts every 10 s, <Text_Accent>30 parts per minute</>.\")",
+   "Tooltip": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerMetalVaultSmelter_Tooltip\", \"Metal to vehicle parts\")"
+  },
+  {
+   "Name": "BTX_GerMechDepotRadioVan",
+   "Built_ImageBrush": "/Script/Engine.SlateBrushAsset'/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_MechDepotRadioVan_Brush.T_Ger_Bxp_MechDepotRadioVan_Brush'",
+   "Description": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerMechDepotRadioVan_Description\", \"A Kfz. 17 radio van with a 12 m aerial tower on the container. Gives the depot <Text_Accent>90 m of sight</>, the widest of any expansion.\")",
+   "Tooltip": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerMechDepotRadioVan_Tooltip\", \"Long-range sight\")"
+  },
+  {
+   "Name": "BTX_GerMechDepotWurfrahmenShop",
+   "Built_ImageBrush": "/Script/Engine.SlateBrushAsset'/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_MechDepotWurfrahmenShop_Brush.T_Ger_Bxp_MechDepotWurfrahmenShop_Brush'",
+   "Description": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerMechDepotWurfrahmenShop_Description\", \"A lean-to where a 251 is fitted with Wurfrahmen 40 racks. While it stands, your Panzerwerfers <Text_Accent>reload 25% faster</>.\")",
+   "Tooltip": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerMechDepotWurfrahmenShop_Tooltip\", \"Faster rocket reloads\")"
+  },
+  {
+   "Name": "BTX_GerBarracksSniperLoft",
+   "Built_ImageBrush": "/Script/Engine.SlateBrushAsset'/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_BarracksSniperLoft_Brush.T_Ger_Bxp_BarracksSniperLoft_Brush'",
+   "Description": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerBarracksSniperLoft_Description\", \"A timber loft with a <Text_Weapon>Kar98k sniper</> behind sandbags. Covers the front half circle and <Text_Accent>sees 80 m</>.\")",
+   "Tooltip": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerBarracksSniperLoft_Tooltip\", \"Sniper post\")"
+  },
+  {
+   "Name": "BTX_20mmFlak",
+   "Built_ImageBrush": "/Script/Engine.SlateBrushAsset'/Game/RTS_Survival/Blueprints/GameUI/BuildingUI/ExpansionOptions/SB_OptionImage_37mmFLak.SB_OptionImage_37mmFLak'",
+   "Description": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_20mmFlak_Description\", \"A light 2 cm Flak emplacement.\")",
+   "Tooltip": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_20mmFlak_Tooltip\", \"Light anti-air gun\")"
+  },
+  {
+   "Name": "BTX_GerCommCipherRoom",
+   "Built_ImageBrush": "/Script/Engine.SlateBrushAsset'/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_CommCipherRoom_Brush.T_Ger_Bxp_CommCipherRoom_Brush'",
+   "Description": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerCommCipherRoom_Description\", \"A cipher cabin hung over the inner yard. While it stands, <Text_Accent>commander ability cooldowns are 20% shorter</>.\")",
+   "Tooltip": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerCommCipherRoom_Tooltip\", \"Faster commander abilities\")"
+  },
+  {
+   "Name": "BTX_GerCommMG42Nests",
+   "Built_ImageBrush": "/Script/Engine.SlateBrushAsset'/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_CommMG42Nests_Brush.T_Ger_Bxp_CommMG42Nests_Brush'",
+   "Description": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerCommMG42Nests_Description\", \"A raised MG42 nest on each wing end, each with a gunner and a loader. <Text_Weapon>MG 42 on 100-round belts</>. <Text_Accent>Strong against infantry</>.\")",
+   "Tooltip": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerCommMG42Nests_Tooltip\", \"Anti-infantry nests\")"
+  },
+  {
+   "Name": "BTX_GerCommObservationPost",
+   "Built_ImageBrush": "/Script/Engine.SlateBrushAsset'/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_CommObservationPost_Brush.T_Ger_Bxp_CommObservationPost_Brush'",
+   "Description": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerCommObservationPost_Description\", \"A small concrete bunker with a stereo rangefinder on a sandbag wing end. Unarmed; <Text_Accent>sees 45 m</> from the wing.\")",
+   "Tooltip": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerCommObservationPost_Tooltip\", \"Forward sight\")"
+  },
+  {
+   "Name": "BTX_GerCommRequisitionOffice",
+   "Built_ImageBrush": "/Script/Engine.SlateBrushAsset'/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_CommRequisitionOffice_Brush.T_Ger_Bxp_CommRequisitionOffice_Brush'",
+   "Description": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerCommRequisitionOffice_Description\", \"A requisition cabin hung on the tower. While it stands, <Text_Accent>field defences cost 25% less</>, field trenches included.\")",
+   "Tooltip": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerCommRequisitionOffice_Tooltip\", \"Cheaper field defences\")"
+  },
+  {
+   "Name": "BTX_GerFieldTrench",
+   "Built_ImageBrush": "/Script/Engine.SlateBrushAsset'/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_FieldTrench_Brush.T_Ger_Bxp_FieldTrench_Brush'",
+   "Description": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerFieldTrench_Description\", \"A trench you drag out from the HQ; it is dug piece by piece for <Text_Accent>10 radixite per metre</>. Soldiers inside take trench cover.\")",
+   "Tooltip": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerFieldTrench_Tooltip\", \"Infantry cover\")"
+  },
+  {
+   "Name": "BTX_GerFlak88Pit",
+   "Built_ImageBrush": "/Script/Engine.SlateBrushAsset'/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_PitFlak88_Brush.T_Ger_Bxp_PitFlak88_Brush'",
+   "Description": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerFlak88Pit_Description\", \"An 8.8 cm Flak behind high sandbag walls with a three-man drill. Fires <Text_Weapon>APHE, APCR and HE</> every 5 s. <Text_Accent>Strong against tanks at long range</>.\")",
+   "Tooltip": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerFlak88Pit_Tooltip\", \"Heavy anti-tank gun\")"
+  },
+  {
+   "Name": "BTX_GerMarderStugFactory",
+   "Built_ImageBrush": "/Script/Engine.SlateBrushAsset'/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_MarderStugFactory_Brush.T_Ger_Bxp_MarderStugFactory_Brush'",
+   "Description": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerMarderStugFactory_Description\", \"A walled assembly hall for Marder and StuG tank destroyers, with <Text_Accent>7000 HP</> of reinforced walls.\")",
+   "Tooltip": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerMarderStugFactory_Tooltip\", \"Tank destroyer works\")"
+  },
+  {
+   "Name": "BTX_GerMortarPit",
+   "Built_ImageBrush": "/Script/Engine.SlateBrushAsset'/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_PitMortar_Brush.T_Ger_Bxp_PitMortar_Brush'",
+   "Description": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerMortarPit_Description\", \"An 8 cm mortar and its two-man crew in a square sandbag pit. Lobs <Text_Weapon>80mm HE</> over cover every 10 s. <Text_Accent>Good against infantry in cover</>.\")",
+   "Tooltip": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerMortarPit_Tooltip\", \"Indirect fire\")"
+  },
+  {
+   "Name": "BTX_GerPanzerschreckPit",
+   "Built_ImageBrush": "/Script/Engine.SlateBrushAsset'/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_PitPanzerschreck_Brush.T_Ger_Bxp_PitPanzerschreck_Brush'",
+   "Description": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerPanzerschreckPit_Description\", \"A Panzerschreck team in a foxhole behind a ring of bags, firing <Text_Weapon>88mm HEAT rockets</> every 8 s. <Text_Accent>The cheapest anti-tank defence</>, but fragile.\")",
+   "Tooltip": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerPanzerschreckPit_Tooltip\", \"Cheap anti-tank post\")"
+  },
+  {
+   "Name": "BTX_GerPuppchenPit",
+   "Built_ImageBrush": "/Script/Engine.SlateBrushAsset'/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_PitPuppchen_Brush.T_Ger_Bxp_PitPuppchen_Brush'",
+   "Description": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerPuppchenPit_Description\", \"A Raketenwerfer 43 \\'Puppchen\\' in a small bag ring. Fires <Text_Weapon>88mm HEAT rockets</> every 6 s, further than a Panzerschreck. <Text_Accent>Strong against tanks</>.\")",
+   "Tooltip": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerPuppchenPit_Tooltip\", \"Rocket anti-tank gun\")"
+  },
+  {
+   "Name": "BTX_GerRailPakBunker",
+   "Built_ImageBrush": "/Script/Engine.SlateBrushAsset'/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_RailPakBunker_Brush.T_Ger_Bxp_RailPakBunker_Brush'",
+   "Description": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerRailPakBunker_Description\", \"A concrete pillbox with a rail-fitted Pak 40 on its roof, firing <Text_Weapon>50mm rail slugs</> that punch through targets. <Text_Accent>Twice as tough as a Pak 40 pit</>.\")",
+   "Tooltip": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerRailPakBunker_Tooltip\", \"Rail anti-tank bunker\")"
+  },
+  {
+   "Name": "BTX_GerTwinMG42Pit",
+   "Built_ImageBrush": "/Script/Engine.SlateBrushAsset'/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_PitTwinMG42_Brush.T_Ger_Bxp_PitTwinMG42_Brush'",
+   "Description": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerTwinMG42Pit_Description\", \"Two MG 42 nests joined by an ammunition corridor, each with a gunner and a loader. <Text_Weapon>100-round belts</>, 6 s reload. <Text_Accent>Strong against infantry</>.\")",
+   "Tooltip": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerTwinMG42Pit_Tooltip\", \"Anti-infantry pit\")"
+  },
+  {
+   "Name": "BTX_LeFH_150mm",
+   "Built_ImageBrush": "/Script/Engine.SlateBrushAsset'/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_LeFH150_Brush.T_Ger_Bxp_LeFH150_Brush'",
+   "Description": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_LeFH_150mm_Description\", \"A 10.5 cm leFH 18 howitzer emplacement firing <Text_Weapon>105mm HE shells</> every 8 s. <Text_Accent>Long-range fire</> against infantry and positions.\")",
+   "Tooltip": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_LeFH_150mm_Tooltip\", \"Light howitzer\")"
+  },
+  {
+   "Name": "BTX_Pak38",
+   "Built_ImageBrush": "/Script/Engine.SlateBrushAsset'/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_Pak38_Brush.T_Ger_Bxp_Pak38_Brush'",
+   "Description": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_Pak38_Description\", \"A 5 cm Pak 38 emplacement firing <Text_Weapon>APHE</> with a quick 3.3 s reload. <Text_Accent>Good against light and medium tanks</>.\")",
+   "Tooltip": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_Pak38_Tooltip\", \"Anti-tank gun\")"
+  },
+  {
+   "Name": "BXT_GerFLakBunker",
+   "Built_ImageBrush": "/Script/Engine.SlateBrushAsset'/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_FlakBunker_Brush.T_Ger_Bxp_FlakBunker_Brush'",
+   "Description": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BXT_GerFLakBunker_Description\", \"A concrete bunker with a 3.7 cm and an 8.8 cm Flak, able to switch to <Text_Weapon>shrapnel rounds</>. <Text_Accent>Very tough</>: 2.5x heavy bunker health.\")",
+   "Tooltip": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BXT_GerFLakBunker_Tooltip\", \"Heavy flak bunker\")"
+  },
+  {
+   "Name": "BXT_SolarLarge",
+   "Built_ImageBrush": "/Script/Engine.SlateBrushAsset'/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_SolarLarge_Brush.T_Ger_Bxp_SolarLarge_Brush'",
+   "Description": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BXT_SolarLarge_Description\", \"A radixite solar trailer parked beside the Gamma Facility. Provides <Text_Accent>+10 energy</>.\")",
+   "Tooltip": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BXT_SolarLarge_Tooltip\", \"Energy supply\")"
+  },
+  {
+   "Name": "BTX_Ger37MMCaptureBunker",
+   "Built_ImageBrush": "/Script/Engine.SlateBrushAsset'/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_CaptureBunker37mm_Brush.T_Ger_Bxp_CaptureBunker37mm_Brush'",
+   "Description": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_Ger37MMCaptureBunker_Description\", \"A concrete bunker with a 3.7 cm Flak 36 firing <Text_Weapon>6-round clips</>. Once captured it <Text_Accent>fights for you</>.\")",
+   "Tooltip": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_Ger37MMCaptureBunker_Tooltip\", \"Captured flak bunker\")"
+  },
+  {
+   "Name": "BTX_GerTurretCaptureBunker",
+   "Built_ImageBrush": "/Script/Engine.SlateBrushAsset'/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_CaptureBunkerTurret_Brush.T_Ger_Bxp_CaptureBunkerTurret_Brush'",
+   "Description": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerTurretCaptureBunker_Description\", \"A concrete bunker with a Jaguar turret and its <Text_Weapon>35mm autocannon</> on 5-round clips. Once captured it <Text_Accent>fights for you</>.\")",
+   "Tooltip": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerTurretCaptureBunker_Tooltip\", \"Captured turret bunker\")"
+  }
+ ],
+ "spawn_keys": {
+  "BXT_88MM_FLAK: 12>": "<Object '/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/Childs/88mmFlak/RTS_BP_BXP_Flak88.RTS_BP_BXP_Flak88_C' (0x000009D4E9D37000) Class 'BlueprintGeneratedClass'>",
+  "BTX_20MM_FLAK: 13>": "<Object '/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/Childs/RTS_BP_BXP_20mmFlak.RTS_BP_BXP_20mmFlak_C' (0x000009D4D77EA100) Class 'BlueprintGeneratedClass'>",
+  "BXT_SOLAR_SMALL: 41>": "<Object '/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/Childs/Economic/BXP_Solar_Small.BXP_Solar_Small_C' (0x000009D4D77E3800) Class 'BlueprintGeneratedClass'>",
+  "BXT_SOLAR_LARGE: 42>": "<Object '/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/Childs/Economic/BigSolarEXP/BXP_Solar_Big.BXP_Solar_Big_C' (0x000009D4E4AF6200) Class 'BlueprintGeneratedClass'>",
+  "BTX_37MM_FLAK: 15>": "<Object '/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/Childs/37mmFlak/RTS_BP_BXP_37mmFlak.RTS_BP_BXP_37mmFlak_C' (0x000009D4E5602300) Class 'BlueprintGeneratedClass'>",
+  "BTX_PAK38: 16>": "<Object '/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/Childs/Pak38/RTS_BP_BXP_Pak38.RTS_BP_BXP_Pak38_C' (0x000009D4E6642300) Class 'BlueprintGeneratedClass'>",
+  "BTX_LE_FH_150MM: 17>": "<Object '/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/Childs/LeFH105/RTS_BP_BXP_LeFH105mm.RTS_BP_BXP_LeFH105mm_C' (0x000009D4F38C3F00) Class 'BlueprintGeneratedClass'>",
+  "BTX_GER_HQ_RADAR: 1>": "<Object '/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/HQ/HQRadar/Ger_Bxp_HQRadar.Ger_Bxp_HQRadar_C' (0x000009D4F52B0000) Class 'BlueprintGeneratedClass'>",
+  "BTX_GER_HQ_PLATFORM: 2>": "<Object '/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/HQ/HQFlakDefense/Ger_Bxp_HQPlatform.Ger_Bxp_HQPlatform_C' (0x000009D4F4DF1C00) Class 'BlueprintGeneratedClass'>",
+  "BTX_GER_HQ_HARVESTER: 3>": "<Object '/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/HQ/HarvesterHub/Ger_Bxp_HQHarvesterHub.Ger_Bxp_HQHarvesterHub_C' (0x000009D4F52BCB00) Class 'BlueprintGeneratedClass'>",
+  "BTX_GER_HQ_REPAIR_BAY: 4>": "<Object '/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/HQ/RepairHub/Ger_Bxp_HQRepairBay.Ger_Bxp_HQRepairBay_C' (0x000009D4F793AF00) Class 'BlueprintGeneratedClass'>",
+  "BTX_GER_HQ_TOWER: 5>": "<Object '/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/HQ/HQTower/Ger_Bxp_HQTower.Ger_Bxp_HQTower_C' (0x000009D4E4CBE700) Class 'BlueprintGeneratedClass'>",
+  "BTX_GER_L_FACTORY_FUEL_STORAGE: 10>": "<Object '/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/Forge/RadixFuel/Ger_Bxp_LFactoryFuelExpansion.Ger_Bxp_LFactoryFuelExpansion_C' (0x000009D4F5DCE000) Class 'BlueprintGeneratedClass'>",
+  "BTX_GER_L_FACTORY_RADIXITE_REACTOR: 9>": "<Object '/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/Forge/RadixReactor/Ger_Bxp_LFactoryRadixiteReactor.Ger_Bxp_LFactoryRadixiteReactor_C' (0x000009D4F7014600) Class 'BlueprintGeneratedClass'>",
+  "BTX_GER_BARRACKS_RADIX_REACTOR: 7>": "<Object '/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/Barracks/RadixReactor/Ger_Bxp_BarracksReactorExpansion.Ger_Bxp_BarracksReactorExpansion_C' (0x000009D4F701A100) Class 'BlueprintGeneratedClass'>",
+  "BTX_GER_BARRACK_FUEL_CELL: 8>": "<Object '/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/Barracks/FuelCell/Ger_Bxp_BarracksFuelExpansion.Ger_Bxp_BarracksFuelExpansion_C' (0x000009D4F5DC9A00) Class 'BlueprintGeneratedClass'>",
+  "BTX_REF_CONVERTER: 6>": "<Object '/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/Refinery/RadixConvert/Ger_Ref_Converter.Ger_Ref_Converter_C' (0x000009D4F71C2300) Class 'BlueprintGeneratedClass'>",
+  "BTX_RUS_B4_HOWITZER_PIT: 50>": "<Object '/Game/RTS_Survival/Blueprints/Squads/TeamWeapons/Soviet/B4_203MM/Pit/Rus_BXP_B4HowitzerPit.Rus_BXP_B4HowitzerPit_C' (0x000009D4FC6E6900) Class 'BlueprintGeneratedClass'>",
+  "BTX_GER_CAPTURED_B4_PIT: 51>": "<Object '/Game/RTS_Survival/Blueprints/Squads/TeamWeapons/Soviet/B4_203MM/Pit/Ger_BXP_CapturedB4Pit.Ger_BXP_CapturedB4Pit_C' (0x000009D4FF2A1C00) Class 'BlueprintGeneratedClass'>",
+  "BTX_GER_PAK40_PIT: 53>": "<Object '/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerPits/Ger_BXP_GerPit_Pak40.Ger_BXP_GerPit_Pak40_C' (0x000009D501460700) Class 'BlueprintGeneratedClass'>",
+  "BTX_GER_LE_FH18_PIT: 54>": "<Object '/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerPits/Ger_BXP_GerPit_LeFH18.Ger_BXP_GerPit_LeFH18_C' (0x000009D4FF2A6900) Class 'BlueprintGeneratedClass'>",
+  "BTX_GER_SFH18_PIT: 55>": "<Object '/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerPits/Ger_BXP_GerPit_SFH18.Ger_BXP_GerPit_SFH18_C' (0x000009D504559A00) Class 'BlueprintGeneratedClass'>",
+  "BTX_RUS_ML20_PIT: 58>": "<Object '/Game/RTS_Survival/Blueprints/Squads/TeamWeapons/Soviet/ML20_152MM/Pit/Rus_BXP_ML20Pit.Rus_BXP_ML20Pit_C' (0x000009D507153F00) Class 'BlueprintGeneratedClass'>",
+  "BTX_GER_FLAK37_PIT: 60>": "<Object '/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerPits/Ger_BXP_GerPit_Flak37.Ger_BXP_GerPit_Flak37_C' (0x000009D4F9B66900) Class 'BlueprintGeneratedClass'>",
+  "BTX_GER_PUPPCHEN_PIT: 63>": "<Object '/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerPits/Ger_BXP_GerPit_Puppchen.Ger_BXP_GerPit_Puppchen_C' (0x000009D509A74D00) Class 'BlueprintGeneratedClass'>",
+  "BTX_GER_PANZERSCHRECK_PIT: 64>": "<Object '/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerPits/Ger_BXP_GerPit_Panzerschreck.Ger_BXP_GerPit_Panzerschreck_C' (0x000009D5099CAF00) Class 'BlueprintGeneratedClass'>",
+  "BTX_GER_RAIL_PAK_BUNKER: 65>": "<Object '/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerPits/RailPakBunker/Ger_BXP_RailPakBunker.Ger_BXP_RailPakBunker_C' (0x000009D50DCB1500) Class 'BlueprintGeneratedClass'>",
+  "BTX_GER_FLAK88_PIT: 66>": "<Object '/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerPits/Ger_BXP_GerPit_Flak88.Ger_BXP_GerPit_Flak88_C' (0x000009D5087E4D00) Class 'BlueprintGeneratedClass'>",
+  "BTX_GER_MORTAR_PIT: 67>": "<Object '/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerPits/Ger_BXP_GerPit_Mortar.Ger_BXP_GerPit_Mortar_C' (0x000009D5109C0000) Class 'BlueprintGeneratedClass'>",
+  "BTX_RUS120_MORTAR_PIT: 68>": "<Object '/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/RusMortarPit/Rus_BXP_120MortarPit.Rus_BXP_120MortarPit_C' (0x000009D511BD1500) Class 'BlueprintGeneratedClass'>",
+  "BTX_GER_TWIN_MG42_PIT: 69>": "<Object '/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerPits/TwinMG42Pit/Ger_BXP_GerPit_TwinMG42.Ger_BXP_GerPit_TwinMG42_C' (0x000009D5125CE700) Class 'BlueprintGeneratedClass'>",
+  "BTX_GER_COMM_OBSERVATION_POST: 72>": "<Object '/Game/RTS_Survival/Blueprints/GroundVehicles/BaseAndNomadic/ChildBlueprints/GerT2/CommunicationsCenter/BXPs/ObservationPost/Ger_Bxp_CommObservationPost.Ger_Bxp_CommObservationPost_C' (0x000009D5141DD900) Class 'BlueprintGeneratedClass'>",
+  "BTX_GER_COMM_MG42_NESTS: 73>": "<Object '/Game/RTS_Survival/Blueprints/GroundVehicles/BaseAndNomadic/ChildBlueprints/GerT2/CommunicationsCenter/BXPs/MG42Nests/Ger_Bxp_CommMG42Nests.Ger_Bxp_CommMG42Nests_C' (0x000009D50E12BD00) Class 'BlueprintGeneratedClass'>",
+  "BTX_REF_KASKADE: 74>": "<Object '/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/Refinery/Kaskade/Ger_Bxp_RefineryKaskade.Ger_Bxp_RefineryKaskade_C' (0x000009D5141DCB00) Class 'BlueprintGeneratedClass'>",
+  "BTX_GER_FORGE_SCHRECK_FRAME: 76>": "<Object '/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/Forge/SchreckFrame/Ger_Bxp_LFactorySchreckFrame.Ger_Bxp_LFactorySchreckFrame_C' (0x000009D511BDEE00) Class 'BlueprintGeneratedClass'>",
+  "BTX_REF_FLAK_STAND: 75>": "<Object '/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/Refinery/FlakStand/Ger_Bxp_RefineryFlakStand.Ger_Bxp_RefineryFlakStand_C' (0x000009D511BDF500) Class 'BlueprintGeneratedClass'>",
+  "BTX_GER_METAL_VAULT_SMELTER: 77>": "<Object '/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/MetalVault/Smelter/Ger_Bxp_MetalVaultSmelter.Ger_Bxp_MetalVaultSmelter_C' (0x000009D515B53100) Class 'BlueprintGeneratedClass'>",
+  "BTX_GER_MECH_DEPOT_RADIO_VAN: 80>": "<Object '/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/MechDepot/RadioVan/Ger_Bxp_MechDepotRadioVan.Ger_Bxp_MechDepotRadioVan_C' (0x000009D515B58500) Class 'BlueprintGeneratedClass'>",
+  "BTX_GER_MECH_DEPOT_WURFRAHMEN_SHOP: 81>": "<Object '/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/MechDepot/WurfrahmenShop/Ger_Bxp_MechDepotWurfrahmenShop.Ger_Bxp_MechDepotWurfrahmenShop_C' (0x000009D516D40700) Class 'BlueprintGeneratedClass'>",
+  "BTX_GER_BARRACKS_SNIPER_LOFT: 82>": "<Object '/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/Barracks/SniperLoft/Ger_Bxp_BarracksSniperLoft.Ger_Bxp_BarracksSniperLoft_C' (0x000009D517FBE700) Class 'BlueprintGeneratedClass'>",
+  "BTX_GER_COMM_REQUISITION_OFFICE: 78>": "<Object '/Game/RTS_Survival/Blueprints/GroundVehicles/BaseAndNomadic/ChildBlueprints/GerT2/CommunicationsCenter/BXPs/RequisitionOffice/Ger_Bxp_CommRequisitionOffice.Ger_Bxp_CommRequisitionOffice_C' (0x000009D5155D3100) Class 'BlueprintGeneratedClass'>",
+  "BTX_GER_COMM_CIPHER_ROOM: 79>": "<Object '/Game/RTS_Survival/Blueprints/GroundVehicles/BaseAndNomadic/ChildBlueprints/GerT2/CommunicationsCenter/BXPs/CipherRoom/Ger_Bxp_CommCipherRoom.Ger_Bxp_CommCipherRoom_C' (0x000009D515B5C400) Class 'BlueprintGeneratedClass'>"
+ },
+ "results": [
+  {
+   "type": "BTX_GerHQRadar",
+   "bp": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/HQ/HQRadar/Ger_Bxp_HQRadar",
+   "components": [
+    {
+     "name": "Audio_GEN_VARIABLE",
+     "class": "AudioComponent"
+    },
+    {
+     "name": "Radar_GEN_VARIABLE",
+     "class": "StaticMeshComponent",
+     "mesh": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/HQ/HQRadar/BM/SM_Ger_Bxp_HQRadar_Radar.SM_Ger_Bxp_HQRadar_Radar",
+     "materials": []
+    },
+    {
+     "name": "ProgressBarWidget_GEN_VARIABLE",
+     "class": "WidgetComponent"
+    },
+    {
+     "name": "SelectedDecal_GEN_VARIABLE",
+     "class": "DecalComponent"
+    },
+    {
+     "name": "bpSelectionArea_GEN_VARIABLE",
+     "class": "BoxComponent"
+    },
+    {
+     "name": "BuildingMeshComponent",
+     "class": "StaticMeshComponent",
+     "mesh": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/HQ/HQRadar/BM/SM_Ger_Bxp_HQRadar_BuildingMesh.SM_Ger_Bxp_HQRadar_BuildingMesh",
+     "materials": []
+    },
+    {
+     "name": "RTS_GEN_VARIABLE",
+     "class": "RTSComponent"
+    },
+    {
+     "name": "BehaviourComp_GEN_VARIABLE",
+     "class": "BehaviourComp"
+    },
+    {
+     "name": "Health_GEN_VARIABLE",
+     "class": "HealthComponent"
+    },
+    {
+     "name": "RotatingMovement_GEN_VARIABLE",
+     "class": "RotatingMovementComponent"
+    },
+    {
+     "name": "Selection_GEN_VARIABLE",
+     "class": "SelectionComponent"
+    },
+    {
+     "name": "NavModifier_GEN_VARIABLE",
+     "class": "NavModifierComponent"
+    },
+    {
+     "name": "RadiusImprovedRangeAura_GEN_VARIABLE",
+     "class": "RadiusImprovedRangeAura"
+    },
+    {
+     "name": "BuildingExpansionEnergy_GEN_VARIABLE",
+     "class": "BuildingExpansionEnergyComponent"
+    },
+    {
+     "name": "WallHoleDamage_GEN_VARIABLE",
+     "class": "WallHoleDamageComponent"
+    }
+   ],
+   "wall_holes": [
+    "WallHoleDamage_GEN_VARIABLE"
+   ],
+   "damage_refs": [],
+   "dt_row": {
+    "Name": "BTX_GerHQRadar",
+    "Built_ImageBrush": "/Script/Engine.SlateBrushAsset'/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_HQRadarPlacard_Brush.T_Ger_Bxp_HQRadarPlacard_Brush'",
+    "Description": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerHQRadar_Description\", \"A rotating radar dish on the HQ. Friendly units within 30 m get <Text_Accent>+20% weapon range</>.\")",
+    "Tooltip": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerHQRadar_Tooltip\", \"Weapon range aura\")"
+   },
+   "spawner": null,
+   "preview": null
+  },
+  {
+   "type": "BTX_GerHQPlatform",
+   "bp": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/HQ/HQFlakDefense/Ger_Bxp_HQPlatform",
+   "components": [
+    {
+     "name": "bpSelectionArea_GEN_VARIABLE",
+     "class": "BoxComponent"
+    },
+    {
+     "name": "Flak_GEN_VARIABLE",
+     "class": "ChildActorComponent"
+    },
+    {
+     "name": "ProgressBarWidget_GEN_VARIABLE",
+     "class": "WidgetComponent"
+    },
+    {
+     "name": "SelectedDecal_GEN_VARIABLE",
+     "class": "DecalComponent"
+    },
+    {
+     "name": "BuildingMeshComponent",
+     "class": "StaticMeshComponent",
+     "mesh": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/HQ/HQFlakDefense/BM/SM_Ger_Bxp_HQFlakPosition_BuildingMesh.SM_Ger_Bxp_HQFlakPosition_BuildingMesh",
+     "materials": []
+    },
+    {
+     "name": "RTS_GEN_VARIABLE",
+     "class": "RTSComponent"
+    },
+    {
+     "name": "NavModifier_GEN_VARIABLE",
+     "class": "NavModifierComponent"
+    },
+    {
+     "name": "BehaviourComp_GEN_VARIABLE",
+     "class": "BehaviourComp"
+    },
+    {
+     "name": "Health_GEN_VARIABLE",
+     "class": "HealthComponent"
+    },
+    {
+     "name": "BuildingExpansionEnergy_GEN_VARIABLE",
+     "class": "BuildingExpansionEnergyComponent"
+    },
+    {
+     "name": "WallHoleDamage_GEN_VARIABLE",
+     "class": "WallHoleDamageComponent"
+    },
+    {
+     "name": "Selection_GEN_VARIABLE",
+     "class": "SelectionComponent"
+    }
+   ],
+   "wall_holes": [
+    "WallHoleDamage_GEN_VARIABLE"
+   ],
+   "damage_refs": [],
+   "dt_row": {
+    "Name": "BTX_GerHQPlatform",
+    "Built_ImageBrush": "/Script/Engine.SlateBrushAsset'/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_HQPlatform_Brush.T_Ger_Bxp_HQPlatform_Brush'",
+    "Description": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerHQPlatform_Description\", \"A raised platform with a 3.7 cm Flak 36 firing <Text_Weapon>6-round clips</>. The height gives it <Text_Accent>double range</> (+100%).\")",
+    "Tooltip": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerHQPlatform_Tooltip\", \"Anti-air platform\")"
+   },
+   "spawner": null,
+   "preview": null
+  },
+  {
+   "type": "BTX_GerHQHarvester",
+   "bp": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/HQ/HarvesterHub/Ger_Bxp_HQHarvesterHub",
+   "components": [
+    {
+     "name": "BuildingMeshComponent",
+     "class": "StaticMeshComponent",
+     "mesh": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/HQ/HarvesterHub/BM/SM_Ger_Bxp_HarvesterHub_BuildingMesh.SM_Ger_Bxp_HarvesterHub_BuildingMesh",
+     "materials": []
+    },
+    {
+     "name": "ProgressBarWidget_GEN_VARIABLE",
+     "class": "WidgetComponent"
+    },
+    {
+     "name": "SelectedDecal_GEN_VARIABLE",
+     "class": "DecalComponent"
+    },
+    {
+     "name": "bpSelectionArea_GEN_VARIABLE",
+     "class": "BoxComponent"
+    },
+    {
+     "name": "Selection_GEN_VARIABLE",
+     "class": "SelectionComponent"
+    },
+    {
+     "name": "Health_GEN_VARIABLE",
+     "class": "HealthComponent"
+    },
+    {
+     "name": "RTS_GEN_VARIABLE",
+     "class": "RTSComponent"
+    },
+    {
+     "name": "NavModifier_GEN_VARIABLE",
+     "class": "NavModifierComponent"
+    },
+    {
+     "name": "BehaviourComp_GEN_VARIABLE",
+     "class": "BehaviourComp"
+    },
+    {
+     "name": "HarvesterSpeedTech_GEN_VARIABLE",
+     "class": "ResearchTechnologyAbilityComp"
+    },
+    {
+     "name": "HarvesterCapacityTech_GEN_VARIABLE",
+     "class": "ResearchTechnologyAbilityComp"
+    },
+    {
+     "name": "ScavengerSpeedTech_GEN_VARIABLE",
+     "class": "ResearchTechnologyAbilityComp"
+    },
+    {
+     "name": "ScavengingRewardTech_GEN_VARIABLE",
+     "class": "ResearchTechnologyAbilityComp"
+    },
+    {
+     "name": "BarriersTech_GEN_VARIABLE",
+     "class": "ResearchTechnologyAbilityComp"
+    },
+    {
+     "name": "RepairUpgrade_GEN_VARIABLE",
+     "class": "ResearchTechnologyAbilityComp"
+    },
+    {
+     "name": "WallHoleDamage_GEN_VARIABLE",
+     "class": "WallHoleDamageComponent"
+    }
+   ],
+   "wall_holes": [
+    "WallHoleDamage_GEN_VARIABLE"
+   ],
+   "damage_refs": [],
+   "dt_row": {
+    "Name": "BTX_GerHQHarvester",
+    "Built_ImageBrush": "/Script/Engine.SlateBrushAsset'/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_HQHarvesterHub_Brush.T_Ger_Bxp_HQHarvesterHub_Brush'",
+    "Description": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerHQHarvester_Description\", \"A research platform on the HQ. Unlocks <Text_Accent>economy research</>: harvester capacity and speed, scavenging speed and reward, stronger repairs and Barricades.\")",
+    "Tooltip": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerHQHarvester_Tooltip\", \"Economy research\")"
+   },
+   "spawner": null,
+   "preview": null
+  },
+  {
+   "type": "BTX_GerHQRepairBay",
+   "bp": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/HQ/RepairHub/Ger_Bxp_HQRepairBay",
+   "components": [
+    {
+     "name": "SelectedDecal_GEN_VARIABLE",
+     "class": "DecalComponent"
+    },
+    {
+     "name": "RepairCrane2_GEN_VARIABLE",
+     "class": "ChildActorComponent"
+    },
+    {
+     "name": "RepairCrane1_GEN_VARIABLE",
+     "class": "ChildActorComponent"
+    },
+    {
+     "name": "ProgressBarWidget_GEN_VARIABLE",
+     "class": "WidgetComponent"
+    },
+    {
+     "name": "bpSelectionArea_GEN_VARIABLE",
+     "class": "BoxComponent"
+    },
+    {
+     "name": "BuildingMeshComponent",
+     "class": "StaticMeshComponent",
+     "mesh": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/HQ/RepairHub/BM/SM_Ger_Bxp_HQRepairHub.SM_Ger_Bxp_HQRepairHub",
+     "materials": []
+    },
+    {
+     "name": "NavModifier_GEN_VARIABLE",
+     "class": "NavModifierComponent"
+    },
+    {
+     "name": "BehaviourComp_GEN_VARIABLE",
+     "class": "BehaviourComp"
+    },
+    {
+     "name": "Selection_GEN_VARIABLE",
+     "class": "SelectionComponent"
+    },
+    {
+     "name": "Health_GEN_VARIABLE",
+     "class": "HealthComponent"
+    },
+    {
+     "name": "RTS_GEN_VARIABLE",
+     "class": "RTSComponent"
+    },
+    {
+     "name": "RadiusRepairAura_GEN_VARIABLE",
+     "class": "RadiusRepairAura"
+    },
+    {
+     "name": "BuildingExpansionEnergy_GEN_VARIABLE",
+     "class": "BuildingExpansionEnergyComponent"
+    },
+    {
+     "name": "WallHoleDamage_GEN_VARIABLE",
+     "class": "WallHoleDamageComponent"
+    }
+   ],
+   "wall_holes": [
+    "WallHoleDamage_GEN_VARIABLE"
+   ],
+   "damage_refs": [],
+   "dt_row": {
+    "Name": "BTX_GerHQRepairBay",
+    "Built_ImageBrush": "/Script/Engine.SlateBrushAsset'/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_HQRepairBay_Brush.T_Ger_Bxp_HQRepairBay_Brush'",
+    "Description": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerHQRepairBay_Description\", \"A repair pad with two welding cranes. Repairs damaged vehicles and buildings within 35 m by <Text_Accent>10 HP per second</>.\")",
+    "Tooltip": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerHQRepairBay_Tooltip\", \"Repairs nearby units\")"
+   },
+   "spawner": null,
+   "preview": null
+  },
+  {
+   "type": "BTX_GerHQTower",
+   "bp": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/HQ/HQTower/Ger_Bxp_HQTower",
+   "components": [
+    {
+     "name": "bpSelectionArea_GEN_VARIABLE",
+     "class": "BoxComponent"
+    },
+    {
+     "name": "PzIVTurret_GEN_VARIABLE",
+     "class": "ChildActorComponent"
+    },
+    {
+     "name": "ProgressBarWidget_GEN_VARIABLE",
+     "class": "WidgetComponent"
+    },
+    {
+     "name": "SelectedDecal_GEN_VARIABLE",
+     "class": "DecalComponent"
+    },
+    {
+     "name": "BuildingMeshComponent",
+     "class": "StaticMeshComponent",
+     "mesh": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/HQ/HQTower/BuildingMesh/SM_Ger_Bxp_HQTower_BuildingMesh.SM_Ger_Bxp_HQTower_BuildingMesh",
+     "materials": []
+    },
+    {
+     "name": "RTS_GEN_VARIABLE",
+     "class": "RTSComponent"
+    },
+    {
+     "name": "NavModifier_GEN_VARIABLE",
+     "class": "NavModifierComponent"
+    },
+    {
+     "name": "BehaviourComp_GEN_VARIABLE",
+     "class": "BehaviourComp"
+    },
+    {
+     "name": "Health_GEN_VARIABLE",
+     "class": "HealthComponent"
+    },
+    {
+     "name": "BuildingExpansionEnergy_GEN_VARIABLE",
+     "class": "BuildingExpansionEnergyComponent"
+    },
+    {
+     "name": "WallHoleDamage_GEN_VARIABLE",
+     "class": "WallHoleDamageComponent"
+    },
+    {
+     "name": "Selection_GEN_VARIABLE",
+     "class": "SelectionComponent"
+    }
+   ],
+   "wall_holes": [
+    "WallHoleDamage_GEN_VARIABLE"
+   ],
+   "damage_refs": [],
+   "dt_row": {
+    "Name": "BTX_GerHQTower",
+    "Built_ImageBrush": "/Script/Engine.SlateBrushAsset'/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_HQTower_Brush.T_Ger_Bxp_HQTower_Brush'",
+    "Description": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerHQTower_Description\", \"A Panzer IV turret on a tall tower, armed with a <Text_Weapon>7.5 cm KwK 40 L/48</>. The height gives it <Text_Accent>triple range</> (+200%).\")",
+    "Tooltip": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerHQTower_Tooltip\", \"Long-range tank gun\")"
+   },
+   "spawner": null,
+   "preview": null
+  },
+  {
+   "type": "BTX_RefConverter",
+   "bp": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/Refinery/RadixConvert/Ger_Ref_Converter",
+   "components": [
+    {
+     "name": "bpSelectionArea_GEN_VARIABLE",
+     "class": "BoxComponent"
+    },
+    {
+     "name": "AnimPart_GEN_VARIABLE",
+     "class": "SkeletalMeshComponent"
+    },
+    {
+     "name": "ProgressBarWidget_GEN_VARIABLE",
+     "class": "WidgetComponent"
+    },
+    {
+     "name": "SelectedDecal_GEN_VARIABLE",
+     "class": "DecalComponent"
+    },
+    {
+     "name": "BuildingMeshComponent",
+     "class": "StaticMeshComponent",
+     "mesh": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/Refinery/RadixConvert/BuildingMeshes/SM_GerRefinery_Converter.SM_GerRefinery_Converter",
+     "materials": []
+    },
+    {
+     "name": "RTS_GEN_VARIABLE",
+     "class": "RTSComponent"
+    },
+    {
+     "name": "NavModifier_GEN_VARIABLE",
+     "class": "NavModifierComponent"
+    },
+    {
+     "name": "BehaviourComp_GEN_VARIABLE",
+     "class": "BehaviourComp"
+    },
+    {
+     "name": "ResourceConverter_GEN_VARIABLE",
+     "class": "ResourceConverterComponent"
+    },
+    {
+     "name": "Health_GEN_VARIABLE",
+     "class": "HealthComponent"
+    },
+    {
+     "name": "WallHoleDamage_GEN_VARIABLE",
+     "class": "WallHoleDamageComponent"
+    },
+    {
+     "name": "Selection_GEN_VARIABLE",
+     "class": "SelectionComponent"
+    }
+   ],
+   "wall_holes": [
+    "WallHoleDamage_GEN_VARIABLE"
+   ],
+   "damage_refs": [],
+   "dt_row": {
+    "Name": "BTX_RefConverter",
+    "Built_ImageBrush": "/Script/Engine.SlateBrushAsset'/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_RefConverter_Brush.T_Ger_Bxp_RefConverter_Brush'",
+    "Description": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_RefConverter_Description\", \"Turns radixite into vehicle parts while switched on: 15 radixite for 5 parts every 6.7 s, <Text_Accent>45 vehicle parts per minute</>.\")",
+    "Tooltip": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_RefConverter_Tooltip\", \"Radixite to vehicle parts\")"
+   },
+   "spawner": null,
+   "preview": null
+  },
+  {
+   "type": "BTX_RefKaskade",
+   "bp": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/Refinery/Kaskade/Ger_Bxp_RefineryKaskade",
+   "components": [
+    {
+     "name": "ProgressBarWidget_GEN_VARIABLE",
+     "class": "WidgetComponent"
+    },
+    {
+     "name": "SelectedDecal_GEN_VARIABLE",
+     "class": "DecalComponent"
+    },
+    {
+     "name": "bpSelectionArea_GEN_VARIABLE",
+     "class": "BoxComponent"
+    },
+    {
+     "name": "BuildingMeshComponent",
+     "class": "StaticMeshComponent",
+     "mesh": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/Refinery/Kaskade/SM_GerRefinery_Kaskade.SM_GerRefinery_Kaskade",
+     "materials": []
+    },
+    {
+     "name": "RTS_GEN_VARIABLE",
+     "class": "RTSComponent"
+    },
+    {
+     "name": "Health_GEN_VARIABLE",
+     "class": "HealthComponent"
+    },
+    {
+     "name": "NavModifier_GEN_VARIABLE",
+     "class": "NavModifierComponent"
+    },
+    {
+     "name": "BehaviourComp_GEN_VARIABLE",
+     "class": "BehaviourComp"
+    },
+    {
+     "name": "WallHoleDamage_GEN_VARIABLE",
+     "class": "WallHoleDamageComponent"
+    },
+    {
+     "name": "Selection_GEN_VARIABLE",
+     "class": "SelectionComponent"
+    }
+   ],
+   "wall_holes": [
+    "WallHoleDamage_GEN_VARIABLE"
+   ],
+   "damage_refs": [],
+   "dt_row": {
+    "Name": "BTX_RefKaskade",
+    "Built_ImageBrush": "/Script/Engine.SlateBrushAsset'/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_RefKaskade_Brush.T_Ger_Bxp_RefKaskade_Brush'",
+    "Description": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_RefKaskade_Description\", \"Three distillation columns and a bank of glass receivers. Adds <Text_Accent>+750 radixite storage</> to this refinery.\")",
+    "Tooltip": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_RefKaskade_Tooltip\", \"Radixite storage\")"
+   },
+   "spawner": null,
+   "preview": null
+  },
+  {
+   "type": "BTX_RefFlakStand",
+   "bp": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/Refinery/FlakStand/Ger_Bxp_RefineryFlakStand",
+   "components": [
+    {
+     "name": "bpSelectionArea_GEN_VARIABLE",
+     "class": "BoxComponent"
+    },
+    {
+     "name": "Flak_GEN_VARIABLE",
+     "class": "ChildActorComponent"
+    },
+    {
+     "name": "ProgressBarWidget_GEN_VARIABLE",
+     "class": "WidgetComponent"
+    },
+    {
+     "name": "SelectedDecal_GEN_VARIABLE",
+     "class": "DecalComponent"
+    },
+    {
+     "name": "BuildingMeshComponent",
+     "class": "StaticMeshComponent",
+     "mesh": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/Refinery/FlakStand/SM_GerRefinery_FlakStand.SM_GerRefinery_FlakStand",
+     "materials": []
+    },
+    {
+     "name": "RTS_GEN_VARIABLE",
+     "class": "RTSComponent"
+    },
+    {
+     "name": "NavModifier_GEN_VARIABLE",
+     "class": "NavModifierComponent"
+    },
+    {
+     "name": "BehaviourComp_GEN_VARIABLE",
+     "class": "BehaviourComp"
+    },
+    {
+     "name": "Health_GEN_VARIABLE",
+     "class": "HealthComponent"
+    },
+    {
+     "name": "BuildingExpansionEnergy_GEN_VARIABLE",
+     "class": "BuildingExpansionEnergyComponent"
+    },
+    {
+     "name": "WallHoleDamage_GEN_VARIABLE",
+     "class": "WallHoleDamageComponent"
+    },
+    {
+     "name": "Selection_GEN_VARIABLE",
+     "class": "SelectionComponent"
+    }
+   ],
+   "wall_holes": [
+    "WallHoleDamage_GEN_VARIABLE"
+   ],
+   "damage_refs": [],
+   "dt_row": {
+    "Name": "BTX_RefFlakStand",
+    "Built_ImageBrush": "/Script/Engine.SlateBrushAsset'/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_RefFlakStand_Brush.T_Ger_Bxp_RefFlakStand_Brush'",
+    "Description": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_RefFlakStand_Description\", \"A steel stand over the storage tanks with a 3.7 cm Flak 37 and two crew, firing <Text_Weapon>6-round clips</>. The height gives it <Text_Accent>double range</>.\")",
+    "Tooltip": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_RefFlakStand_Tooltip\", \"Anti-air stand\")"
+   },
+   "spawner": null,
+   "preview": null
+  },
+  {
+   "type": "BTX_GerBarracksRadixReactor",
+   "bp": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/Barracks/RadixReactor/Ger_Bxp_BarracksReactorExpansion",
+   "components": [
+    {
+     "name": "bpSelectionArea_GEN_VARIABLE",
+     "class": "BoxComponent"
+    },
+    {
+     "name": "SelectedDecal_GEN_VARIABLE",
+     "class": "DecalComponent"
+    },
+    {
+     "name": "ProgressBarWidget_GEN_VARIABLE",
+     "class": "WidgetComponent"
+    },
+    {
+     "name": "BuildingMeshComponent",
+     "class": "StaticMeshComponent",
+     "mesh": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/Barracks/RadixReactor/SM_GerBarracks_RadixReactor.SM_GerBarracks_RadixReactor",
+     "materials": []
+    },
+    {
+     "name": "RTS_GEN_VARIABLE",
+     "class": "RTSComponent"
+    },
+    {
+     "name": "Health_GEN_VARIABLE",
+     "class": "HealthComponent"
+    },
+    {
+     "name": "BehaviourComp_GEN_VARIABLE",
+     "class": "BehaviourComp"
+    },
+    {
+     "name": "NavModifier_GEN_VARIABLE",
+     "class": "NavModifierComponent"
+    },
+    {
+     "name": "Selection_GEN_VARIABLE",
+     "class": "SelectionComponent"
+    },
+    {
+     "name": "InfantryKitTech_GEN_VARIABLE",
+     "class": "ResearchTechnologyAbilityComp"
+    },
+    {
+     "name": "GhillieSuitsTech_GEN_VARIABLE",
+     "class": "ResearchTechnologyAbilityComp"
+    },
+    {
+     "name": "EntrenchingToolsTech_GEN_VARIABLE",
+     "class": "ResearchTechnologyAbilityComp"
+    },
+    {
+     "name": "WallHoleDamage_GEN_VARIABLE",
+     "class": "WallHoleDamageComponent"
+    }
+   ],
+   "wall_holes": [
+    "WallHoleDamage_GEN_VARIABLE"
+   ],
+   "damage_refs": [],
+   "dt_row": {
+    "Name": "BTX_GerBarracksRadixReactor",
+    "Built_ImageBrush": "/Script/Engine.SlateBrushAsset'/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_BarracksRadixReactor_Brush.T_Ger_Bxp_BarracksRadixReactor_Brush'",
+    "Description": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerBarracksRadixReactor_Description\", \"A radixite reactor for the barracks: <Text_Accent>+8 energy</>. Unlocks Light Bringers (with a Communication Center) and infantry kit, ghillie suit and entrenching research.\")",
+    "Tooltip": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerBarracksRadixReactor_Tooltip\", \"Infantry research\")"
+   },
+   "spawner": null,
+   "preview": null
+  },
+  {
+   "type": "BTX_GerBarrackFuelCell",
+   "bp": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/Barracks/FuelCell/Ger_Bxp_BarracksFuelExpansion",
+   "components": [
+    {
+     "name": "bpSelectionArea_GEN_VARIABLE",
+     "class": "BoxComponent"
+    },
+    {
+     "name": "ProgressBarWidget_GEN_VARIABLE",
+     "class": "WidgetComponent"
+    },
+    {
+     "name": "SelectedDecal_GEN_VARIABLE",
+     "class": "DecalComponent"
+    },
+    {
+     "name": "BuildingMeshComponent",
+     "class": "StaticMeshComponent",
+     "mesh": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/Barracks/FuelCell/SM_GerBarracks_FuelCell.SM_GerBarracks_FuelCell",
+     "materials": []
+    },
+    {
+     "name": "RTS_GEN_VARIABLE",
+     "class": "RTSComponent"
+    },
+    {
+     "name": "Health_GEN_VARIABLE",
+     "class": "HealthComponent"
+    },
+    {
+     "name": "NavModifier_GEN_VARIABLE",
+     "class": "NavModifierComponent"
+    },
+    {
+     "name": "BehaviourComp_GEN_VARIABLE",
+     "class": "BehaviourComp"
+    },
+    {
+     "name": "Flak88GroundRoleTech_GEN_VARIABLE",
+     "class": "ResearchTechnologyAbilityComp"
+    },
+    {
+     "name": "WallHoleDamage_GEN_VARIABLE",
+     "class": "WallHoleDamageComponent"
+    },
+    {
+     "name": "Selection_GEN_VARIABLE",
+     "class": "SelectionComponent"
+    }
+   ],
+   "wall_holes": [
+    "WallHoleDamage_GEN_VARIABLE"
+   ],
+   "damage_refs": [],
+   "dt_row": {
+    "Name": "BTX_GerBarrackFuelCell",
+    "Built_ImageBrush": "/Script/Engine.SlateBrushAsset'/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_BarracksFuelCell_Brush.T_Ger_Bxp_BarracksFuelCell_Brush'",
+    "Description": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerBarrackFuelCell_Description\", \"A fuel cell bank for the barracks: <Text_Accent>+5 energy</>. Unlocks the Sniper Team (with a Communication Center) and the Flak 88 Ground Role research.\")",
+    "Tooltip": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerBarrackFuelCell_Tooltip\", \"Support research\")"
+   },
+   "spawner": null,
+   "preview": null
+  },
+  {
+   "type": "BTX_GerBarracksSniperLoft",
+   "bp": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/Barracks/SniperLoft/Ger_Bxp_BarracksSniperLoft",
+   "components": [
+    {
+     "name": "bpSelectionArea_GEN_VARIABLE",
+     "class": "BoxComponent"
+    },
+    {
+     "name": "Howitzer_GEN_VARIABLE",
+     "class": "ChildActorComponent"
+    },
+    {
+     "name": "ProgressBarWidget_GEN_VARIABLE",
+     "class": "WidgetComponent"
+    },
+    {
+     "name": "SelectedDecal_GEN_VARIABLE",
+     "class": "DecalComponent"
+    },
+    {
+     "name": "BuildingMeshComponent",
+     "class": "StaticMeshComponent",
+     "mesh": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/Barracks/SniperLoft/Meshes/SM_GerBarracks_SniperLoft.SM_GerBarracks_SniperLoft",
+     "materials": []
+    },
+    {
+     "name": "RTS_GEN_VARIABLE",
+     "class": "RTSComponent"
+    },
+    {
+     "name": "NavModifier_GEN_VARIABLE",
+     "class": "NavModifierComponent"
+    },
+    {
+     "name": "BehaviourComp_GEN_VARIABLE",
+     "class": "BehaviourComp"
+    },
+    {
+     "name": "PitDefense_GEN_VARIABLE",
+     "class": "PitDefenseComponent"
+    },
+    {
+     "name": "Health_GEN_VARIABLE",
+     "class": "HealthComponent"
+    },
+    {
+     "name": "WallHoleDamage_GEN_VARIABLE",
+     "class": "WallHoleDamageComponent"
+    },
+    {
+     "name": "Selection_GEN_VARIABLE",
+     "class": "SelectionComponent"
+    }
+   ],
+   "wall_holes": [
+    "WallHoleDamage_GEN_VARIABLE"
+   ],
+   "damage_refs": [],
+   "dt_row": {
+    "Name": "BTX_GerBarracksSniperLoft",
+    "Built_ImageBrush": "/Script/Engine.SlateBrushAsset'/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_BarracksSniperLoft_Brush.T_Ger_Bxp_BarracksSniperLoft_Brush'",
+    "Description": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerBarracksSniperLoft_Description\", \"A timber loft with a <Text_Weapon>Kar98k sniper</> behind sandbags. Covers the front half circle and <Text_Accent>sees 80 m</>.\")",
+    "Tooltip": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerBarracksSniperLoft_Tooltip\", \"Sniper post\")"
+   },
+   "spawner": null,
+   "preview": null
+  },
+  {
+   "type": "BTX_GerLFactoryRadixiteReactor",
+   "bp": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/Forge/RadixReactor/Ger_Bxp_LFactoryRadixiteReactor",
+   "components": [
+    {
+     "name": "BuildingMeshComponent",
+     "class": "StaticMeshComponent",
+     "mesh": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/Forge/RadixReactor/Meshes/SM_GerForge_RadixReactor.SM_GerForge_RadixReactor",
+     "materials": []
+    },
+    {
+     "name": "ProgressBarWidget_GEN_VARIABLE",
+     "class": "WidgetComponent"
+    },
+    {
+     "name": "SelectedDecal_GEN_VARIABLE",
+     "class": "DecalComponent"
+    },
+    {
+     "name": "bpSelectionArea_GEN_VARIABLE",
+     "class": "BoxComponent"
+    },
+    {
+     "name": "Selection_GEN_VARIABLE",
+     "class": "SelectionComponent"
+    },
+    {
+     "name": "Health_GEN_VARIABLE",
+     "class": "HealthComponent"
+    },
+    {
+     "name": "RTS_GEN_VARIABLE",
+     "class": "RTSComponent"
+    },
+    {
+     "name": "NavModifier_GEN_VARIABLE",
+     "class": "NavModifierComponent"
+    },
+    {
+     "name": "BehaviourComp_GEN_VARIABLE",
+     "class": "BehaviourComp"
+    },
+    {
+     "name": "SpallLinersTech_GEN_VARIABLE",
+     "class": "ResearchTechnologyAbilityComp"
+    },
+    {
+     "name": "AutoCannonTech_GEN_VARIABLE",
+     "class": "ResearchTechnologyAbilityComp"
+    },
+    {
+     "name": "AutoLoader_GEN_VARIABLE",
+     "class": "ResearchTechnologyAbilityComp"
+    },
+    {
+     "name": "RangefinderTungstenTech_GEN_VARIABLE",
+     "class": "ResearchTechnologyAbilityComp"
+    },
+    {
+     "name": "ShellHoistTech_GEN_VARIABLE",
+     "class": "ResearchTechnologyAbilityComp"
+    },
+    {
+     "name": "WallHoleDamage_GEN_VARIABLE",
+     "class": "WallHoleDamageComponent"
+    }
+   ],
+   "wall_holes": [
+    "WallHoleDamage_GEN_VARIABLE"
+   ],
+   "damage_refs": [],
+   "dt_row": {
+    "Name": "BTX_GerLFactoryRadixiteReactor",
+    "Built_ImageBrush": "/Script/Engine.SlateBrushAsset'/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_ForgeRadixReactor_Brush.T_Ger_Bxp_ForgeRadixReactor_Brush'",
+    "Description": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerLFactoryRadixiteReactor_Description\", \"A radixite reactor for the forge: <Text_Accent>+10 energy</>. Unlocks vehicle research: autocannon damage, auto loaders, spall liners, rangefinders, tungsten 8.8 cm shells, shell hoists.\")",
+    "Tooltip": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerLFactoryRadixiteReactor_Tooltip\", \"Vehicle research\")"
+   },
+   "spawner": null,
+   "preview": null
+  },
+  {
+   "type": "BTX_GerLFactoryFuelStorage",
+   "bp": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/Forge/RadixFuel/Ger_Bxp_LFactoryFuelExpansion",
+   "components": [
+    {
+     "name": "bpSelectionArea_GEN_VARIABLE",
+     "class": "BoxComponent"
+    },
+    {
+     "name": "SelectedDecal_GEN_VARIABLE",
+     "class": "DecalComponent"
+    },
+    {
+     "name": "ProgressBarWidget_GEN_VARIABLE",
+     "class": "WidgetComponent"
+    },
+    {
+     "name": "BuildingMeshComponent",
+     "class": "StaticMeshComponent",
+     "mesh": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/Forge/RadixFuel/Meshes/SM_GerForge_FuelStorage.SM_GerForge_FuelStorage",
+     "materials": []
+    },
+    {
+     "name": "RTS_GEN_VARIABLE",
+     "class": "RTSComponent"
+    },
+    {
+     "name": "Health_GEN_VARIABLE",
+     "class": "HealthComponent"
+    },
+    {
+     "name": "BehaviourComp_GEN_VARIABLE",
+     "class": "BehaviourComp"
+    },
+    {
+     "name": "NavModifier_GEN_VARIABLE",
+     "class": "NavModifierComponent"
+    },
+    {
+     "name": "Selection_GEN_VARIABLE",
+     "class": "SelectionComponent"
+    },
+    {
+     "name": "FlameRangeOrRailReload_GEN_VARIABLE",
+     "class": "ResearchTechnologyAbilityComp"
+    },
+    {
+     "name": "FlameRadixiteDmg_GEN_VARIABLE",
+     "class": "ResearchTechnologyAbilityComp"
+    },
+    {
+     "name": "ArmoredTroopBayTech_GEN_VARIABLE",
+     "class": "ResearchTechnologyAbilityComp"
+    },
+    {
+     "name": "WallHoleDamage_GEN_VARIABLE",
+     "class": "WallHoleDamageComponent"
+    }
+   ],
+   "wall_holes": [
+    "WallHoleDamage_GEN_VARIABLE"
+   ],
+   "damage_refs": [],
+   "dt_row": {
+    "Name": "BTX_GerLFactoryFuelStorage",
+    "Built_ImageBrush": "/Script/Engine.SlateBrushAsset'/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_ForgeFuelStorage_Brush.T_Ger_Bxp_ForgeFuelStorage_Brush'",
+    "Description": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerLFactoryFuelStorage_Description\", \"Fuel tanks for the forge: <Text_Accent>+5 energy</>. Unlocks flame weapon research and Armoured Troop Bay: half-tracks get +20% hull armour and their passengers bail out.\")",
+    "Tooltip": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerLFactoryFuelStorage_Tooltip\", \"Flame and half-track research\")"
+   },
+   "spawner": null,
+   "preview": null
+  },
+  {
+   "type": "BTX_GerForgeSchreckFrame",
+   "bp": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/Forge/SchreckFrame/Ger_Bxp_LFactorySchreckFrame",
+   "components": [
+    {
+     "name": "bpSelectionArea_GEN_VARIABLE",
+     "class": "BoxComponent"
+    },
+    {
+     "name": "Howitzer_GEN_VARIABLE",
+     "class": "ChildActorComponent"
+    },
+    {
+     "name": "ProgressBarWidget_GEN_VARIABLE",
+     "class": "WidgetComponent"
+    },
+    {
+     "name": "SelectedDecal_GEN_VARIABLE",
+     "class": "DecalComponent"
+    },
+    {
+     "name": "BuildingMeshComponent",
+     "class": "StaticMeshComponent",
+     "mesh": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/Forge/SchreckFrame/Meshes/SM_GerForge_SchreckFrame.SM_GerForge_SchreckFrame",
+     "materials": []
+    },
+    {
+     "name": "RTS_GEN_VARIABLE",
+     "class": "RTSComponent"
+    },
+    {
+     "name": "NavModifier_GEN_VARIABLE",
+     "class": "NavModifierComponent"
+    },
+    {
+     "name": "BehaviourComp_GEN_VARIABLE",
+     "class": "BehaviourComp"
+    },
+    {
+     "name": "PitDefense_GEN_VARIABLE",
+     "class": "PitDefenseComponent"
+    },
+    {
+     "name": "Health_GEN_VARIABLE",
+     "class": "HealthComponent"
+    },
+    {
+     "name": "WallHoleDamage_GEN_VARIABLE",
+     "class": "WallHoleDamageComponent"
+    },
+    {
+     "name": "Selection_GEN_VARIABLE",
+     "class": "SelectionComponent"
+    }
+   ],
+   "wall_holes": [
+    "WallHoleDamage_GEN_VARIABLE"
+   ],
+   "damage_refs": [],
+   "dt_row": {
+    "Name": "BTX_GerForgeSchreckFrame",
+    "Built_ImageBrush": "/Script/Engine.SlateBrushAsset'/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_ForgeSchreckFrame_Brush.T_Ger_Bxp_ForgeSchreckFrame_Brush'",
+    "Description": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerForgeSchreckFrame_Description\", \"A steel frame over the front arch with a Panzerschreck team on a raised deck, firing <Text_Weapon>88mm HEAT rockets</>. <Text_Accent>Strong against tanks up close</>.\")",
+    "Tooltip": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerForgeSchreckFrame_Tooltip\", \"Anti-tank post\")"
+   },
+   "spawner": null,
+   "preview": null
+  },
+  {
+   "type": "BTX_GerMetalVaultSmelter",
+   "bp": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/MetalVault/Smelter/Ger_Bxp_MetalVaultSmelter",
+   "components": [
+    {
+     "name": "bpSelectionArea_GEN_VARIABLE",
+     "class": "BoxComponent"
+    },
+    {
+     "name": "ProgressBarWidget_GEN_VARIABLE",
+     "class": "WidgetComponent"
+    },
+    {
+     "name": "SelectedDecal_GEN_VARIABLE",
+     "class": "DecalComponent"
+    },
+    {
+     "name": "BuildingMeshComponent",
+     "class": "StaticMeshComponent",
+     "mesh": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/MetalVault/Smelter/SM_GerMetalVault_Smelter.SM_GerMetalVault_Smelter",
+     "materials": []
+    },
+    {
+     "name": "RTS_GEN_VARIABLE",
+     "class": "RTSComponent"
+    },
+    {
+     "name": "Health_GEN_VARIABLE",
+     "class": "HealthComponent"
+    },
+    {
+     "name": "NavModifier_GEN_VARIABLE",
+     "class": "NavModifierComponent"
+    },
+    {
+     "name": "BehaviourComp_GEN_VARIABLE",
+     "class": "BehaviourComp"
+    },
+    {
+     "name": "ResourceConverter_GEN_VARIABLE",
+     "class": "ResourceConverterComponent"
+    },
+    {
+     "name": "WallHoleDamage_GEN_VARIABLE",
+     "class": "WallHoleDamageComponent"
+    },
+    {
+     "name": "Selection_GEN_VARIABLE",
+     "class": "SelectionComponent"
+    }
+   ],
+   "wall_holes": [
+    "WallHoleDamage_GEN_VARIABLE"
+   ],
+   "damage_refs": [],
+   "dt_row": {
+    "Name": "BTX_GerMetalVaultSmelter",
+    "Built_ImageBrush": "/Script/Engine.SlateBrushAsset'/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_MetalVaultSmelter_Brush.T_Ger_Bxp_MetalVaultSmelter_Brush'",
+    "Description": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerMetalVaultSmelter_Description\", \"A firebrick cupola in the vault tower. Smelts metal into vehicle parts while switched on: 25 metal for 5 parts every 10 s, <Text_Accent>30 parts per minute</>.\")",
+    "Tooltip": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerMetalVaultSmelter_Tooltip\", \"Metal to vehicle parts\")"
+   },
+   "spawner": null,
+   "preview": null
+  },
+  {
+   "type": "BTX_GerMechDepotRadioVan",
+   "bp": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/MechDepot/RadioVan/Ger_Bxp_MechDepotRadioVan",
+   "components": [
+    {
+     "name": "bpSelectionArea_GEN_VARIABLE",
+     "class": "BoxComponent"
+    },
+    {
+     "name": "ProgressBarWidget_GEN_VARIABLE",
+     "class": "WidgetComponent"
+    },
+    {
+     "name": "SelectedDecal_GEN_VARIABLE",
+     "class": "DecalComponent"
+    },
+    {
+     "name": "BuildingMeshComponent",
+     "class": "StaticMeshComponent",
+     "mesh": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/MechDepot/RadioVan/Meshes/SM_GerMechDepot_RadioVan.SM_GerMechDepot_RadioVan",
+     "materials": []
+    },
+    {
+     "name": "RTS_GEN_VARIABLE",
+     "class": "RTSComponent"
+    },
+    {
+     "name": "Health_GEN_VARIABLE",
+     "class": "HealthComponent"
+    },
+    {
+     "name": "NavModifier_GEN_VARIABLE",
+     "class": "NavModifierComponent"
+    },
+    {
+     "name": "BehaviourComp_GEN_VARIABLE",
+     "class": "BehaviourComp"
+    },
+    {
+     "name": "WallHoleDamage_GEN_VARIABLE",
+     "class": "WallHoleDamageComponent"
+    },
+    {
+     "name": "BxpEnergy_GEN_VARIABLE",
+     "class": "BuildingExpansionEnergyComponent"
+    },
+    {
+     "name": "Selection_GEN_VARIABLE",
+     "class": "SelectionComponent"
+    }
+   ],
+   "wall_holes": [
+    "WallHoleDamage_GEN_VARIABLE"
+   ],
+   "damage_refs": [],
+   "dt_row": {
+    "Name": "BTX_GerMechDepotRadioVan",
+    "Built_ImageBrush": "/Script/Engine.SlateBrushAsset'/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_MechDepotRadioVan_Brush.T_Ger_Bxp_MechDepotRadioVan_Brush'",
+    "Description": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerMechDepotRadioVan_Description\", \"A Kfz. 17 radio van with a 12 m aerial tower on the container. Gives the depot <Text_Accent>90 m of sight</>, the widest of any expansion.\")",
+    "Tooltip": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerMechDepotRadioVan_Tooltip\", \"Long-range sight\")"
+   },
+   "spawner": null,
+   "preview": null
+  },
+  {
+   "type": "BTX_GerMechDepotWurfrahmenShop",
+   "bp": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/MechDepot/WurfrahmenShop/Ger_Bxp_MechDepotWurfrahmenShop",
+   "components": [
+    {
+     "name": "bpSelectionArea_GEN_VARIABLE",
+     "class": "BoxComponent"
+    },
+    {
+     "name": "ProgressBarWidget_GEN_VARIABLE",
+     "class": "WidgetComponent"
+    },
+    {
+     "name": "SelectedDecal_GEN_VARIABLE",
+     "class": "DecalComponent"
+    },
+    {
+     "name": "BuildingMeshComponent",
+     "class": "StaticMeshComponent",
+     "mesh": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/MechDepot/WurfrahmenShop/Meshes/SM_GerMechDepot_WurfrahmenShop.SM_GerMechDepot_WurfrahmenShop",
+     "materials": []
+    },
+    {
+     "name": "RTS_GEN_VARIABLE",
+     "class": "RTSComponent"
+    },
+    {
+     "name": "Health_GEN_VARIABLE",
+     "class": "HealthComponent"
+    },
+    {
+     "name": "NavModifier_GEN_VARIABLE",
+     "class": "NavModifierComponent"
+    },
+    {
+     "name": "BehaviourComp_GEN_VARIABLE",
+     "class": "BehaviourComp"
+    },
+    {
+     "name": "WallHoleDamage_GEN_VARIABLE",
+     "class": "WallHoleDamageComponent"
+    },
+    {
+     "name": "BxpEnergy_GEN_VARIABLE",
+     "class": "BuildingExpansionEnergyComponent"
+    },
+    {
+     "name": "Selection_GEN_VARIABLE",
+     "class": "SelectionComponent"
+    }
+   ],
+   "wall_holes": [
+    "WallHoleDamage_GEN_VARIABLE"
+   ],
+   "damage_refs": [],
+   "dt_row": {
+    "Name": "BTX_GerMechDepotWurfrahmenShop",
+    "Built_ImageBrush": "/Script/Engine.SlateBrushAsset'/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_MechDepotWurfrahmenShop_Brush.T_Ger_Bxp_MechDepotWurfrahmenShop_Brush'",
+    "Description": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerMechDepotWurfrahmenShop_Description\", \"A lean-to where a 251 is fitted with Wurfrahmen 40 racks. While it stands, your Panzerwerfers <Text_Accent>reload 25% faster</>.\")",
+    "Tooltip": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerMechDepotWurfrahmenShop_Tooltip\", \"Faster rocket reloads\")"
+   },
+   "spawner": null,
+   "preview": null
+  },
+  {
+   "type": "BTX_GerCommObservationPost",
+   "bp": "/Game/RTS_Survival/Blueprints/GroundVehicles/BaseAndNomadic/ChildBlueprints/GerT2/CommunicationsCenter/BXPs/ObservationPost/Ger_Bxp_CommObservationPost",
+   "components": [
+    {
+     "name": "ProgressBarWidget_GEN_VARIABLE",
+     "class": "WidgetComponent"
+    },
+    {
+     "name": "SelectedDecal_GEN_VARIABLE",
+     "class": "DecalComponent"
+    },
+    {
+     "name": "bpSelectionArea_GEN_VARIABLE",
+     "class": "BoxComponent"
+    },
+    {
+     "name": "BuildingMeshComponent",
+     "class": "StaticMeshComponent",
+     "mesh": "/Game/RTS_Survival/Blueprints/GroundVehicles/BaseAndNomadic/ChildBlueprints/GerT2/CommunicationsCenter/BXPs/ObservationPost/SM_GerCommCenter_ObservationPost.SM_GerCommCenter_ObservationPost",
+     "materials": []
+    },
+    {
+     "name": "RTS_GEN_VARIABLE",
+     "class": "RTSComponent"
+    },
+    {
+     "name": "Health_GEN_VARIABLE",
+     "class": "HealthComponent"
+    },
+    {
+     "name": "NavModifier_GEN_VARIABLE",
+     "class": "NavModifierComponent"
+    },
+    {
+     "name": "BehaviourComp_GEN_VARIABLE",
+     "class": "BehaviourComp"
+    },
+    {
+     "name": "WallHoleDamage_GEN_VARIABLE",
+     "class": "WallHoleDamageComponent"
+    },
+    {
+     "name": "Selection_GEN_VARIABLE",
+     "class": "SelectionComponent"
+    }
+   ],
+   "wall_holes": [
+    "WallHoleDamage_GEN_VARIABLE"
+   ],
+   "damage_refs": [],
+   "dt_row": {
+    "Name": "BTX_GerCommObservationPost",
+    "Built_ImageBrush": "/Script/Engine.SlateBrushAsset'/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_CommObservationPost_Brush.T_Ger_Bxp_CommObservationPost_Brush'",
+    "Description": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerCommObservationPost_Description\", \"A small concrete bunker with a stereo rangefinder on a sandbag wing end. Unarmed; <Text_Accent>sees 45 m</> from the wing.\")",
+    "Tooltip": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerCommObservationPost_Tooltip\", \"Forward sight\")"
+   },
+   "spawner": null,
+   "preview": null
+  },
+  {
+   "type": "BTX_GerCommMG42Nests",
+   "bp": "/Game/RTS_Survival/Blueprints/GroundVehicles/BaseAndNomadic/ChildBlueprints/GerT2/CommunicationsCenter/BXPs/MG42Nests/Ger_Bxp_CommMG42Nests",
+   "components": [
+    {
+     "name": "SelectedDecal_GEN_VARIABLE",
+     "class": "DecalComponent"
+    },
+    {
+     "name": "MG42Right_GEN_VARIABLE",
+     "class": "ChildActorComponent"
+    },
+    {
+     "name": "Howitzer_GEN_VARIABLE",
+     "class": "ChildActorComponent"
+    },
+    {
+     "name": "ProgressBarWidget_GEN_VARIABLE",
+     "class": "WidgetComponent"
+    },
+    {
+     "name": "bpSelectionArea_GEN_VARIABLE",
+     "class": "BoxComponent"
+    },
+    {
+     "name": "BuildingMeshComponent",
+     "class": "StaticMeshComponent",
+     "mesh": "/Game/RTS_Survival/Blueprints/GroundVehicles/BaseAndNomadic/ChildBlueprints/GerT2/CommunicationsCenter/BXPs/MG42Nests/SM_GerCommCenter_MG42Nests.SM_GerCommCenter_MG42Nests",
+     "materials": []
+    },
+    {
+     "name": "NavModifier_GEN_VARIABLE",
+     "class": "NavModifierComponent"
+    },
+    {
+     "name": "BehaviourComp_GEN_VARIABLE",
+     "class": "BehaviourComp"
+    },
+    {
+     "name": "Selection_GEN_VARIABLE",
+     "class": "SelectionComponent"
+    },
+    {
+     "name": "PitDefense_GEN_VARIABLE",
+     "class": "PitDefenseComponent"
+    },
+    {
+     "name": "Health_GEN_VARIABLE",
+     "class": "HealthComponent"
+    },
+    {
+     "name": "RTS_GEN_VARIABLE",
+     "class": "RTSComponent"
+    },
+    {
+     "name": "AdditionalTurretSetup_GEN_VARIABLE",
+     "class": "PitAdditionalTurretComponent"
+    },
+    {
+     "name": "WallHoleDamage_GEN_VARIABLE",
+     "class": "WallHoleDamageComponent"
+    }
+   ],
+   "wall_holes": [
+    "WallHoleDamage_GEN_VARIABLE"
+   ],
+   "damage_refs": [],
+   "dt_row": {
+    "Name": "BTX_GerCommMG42Nests",
+    "Built_ImageBrush": "/Script/Engine.SlateBrushAsset'/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_CommMG42Nests_Brush.T_Ger_Bxp_CommMG42Nests_Brush'",
+    "Description": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerCommMG42Nests_Description\", \"A raised MG42 nest on each wing end, each with a gunner and a loader. <Text_Weapon>MG 42 on 100-round belts</>. <Text_Accent>Strong against infantry</>.\")",
+    "Tooltip": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerCommMG42Nests_Tooltip\", \"Anti-infantry nests\")"
+   },
+   "spawner": null,
+   "preview": null
+  },
+  {
+   "type": "BTX_GerCommRequisitionOffice",
+   "bp": "/Game/RTS_Survival/Blueprints/GroundVehicles/BaseAndNomadic/ChildBlueprints/GerT2/CommunicationsCenter/BXPs/RequisitionOffice/Ger_Bxp_CommRequisitionOffice",
+   "components": [
+    {
+     "name": "ProgressBarWidget_GEN_VARIABLE",
+     "class": "WidgetComponent"
+    },
+    {
+     "name": "SelectedDecal_GEN_VARIABLE",
+     "class": "DecalComponent"
+    },
+    {
+     "name": "bpSelectionArea_GEN_VARIABLE",
+     "class": "BoxComponent"
+    },
+    {
+     "name": "BuildingMeshComponent",
+     "class": "StaticMeshComponent",
+     "mesh": "/Game/RTS_Survival/Blueprints/GroundVehicles/BaseAndNomadic/ChildBlueprints/GerT2/CommunicationsCenter/BXPs/RequisitionOffice/SM_GerCommCenter_RequisitionOffice.SM_GerCommCenter_RequisitionOffice",
+     "materials": []
+    },
+    {
+     "name": "RTS_GEN_VARIABLE",
+     "class": "RTSComponent"
+    },
+    {
+     "name": "Health_GEN_VARIABLE",
+     "class": "HealthComponent"
+    },
+    {
+     "name": "NavModifier_GEN_VARIABLE",
+     "class": "NavModifierComponent"
+    },
+    {
+     "name": "BehaviourComp_GEN_VARIABLE",
+     "class": "BehaviourComp"
+    },
+    {
+     "name": "WallHoleDamage_GEN_VARIABLE",
+     "class": "WallHoleDamageComponent"
+    },
+    {
+     "name": "Selection_GEN_VARIABLE",
+     "class": "SelectionComponent"
+    }
+   ],
+   "wall_holes": [
+    "WallHoleDamage_GEN_VARIABLE"
+   ],
+   "damage_refs": [],
+   "dt_row": {
+    "Name": "BTX_GerCommRequisitionOffice",
+    "Built_ImageBrush": "/Script/Engine.SlateBrushAsset'/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_CommRequisitionOffice_Brush.T_Ger_Bxp_CommRequisitionOffice_Brush'",
+    "Description": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerCommRequisitionOffice_Description\", \"A requisition cabin hung on the tower. While it stands, <Text_Accent>field defences cost 25% less</>, field trenches included.\")",
+    "Tooltip": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerCommRequisitionOffice_Tooltip\", \"Cheaper field defences\")"
+   },
+   "spawner": null,
+   "preview": null
+  },
+  {
+   "type": "BTX_GerCommCipherRoom",
+   "bp": "/Game/RTS_Survival/Blueprints/GroundVehicles/BaseAndNomadic/ChildBlueprints/GerT2/CommunicationsCenter/BXPs/CipherRoom/Ger_Bxp_CommCipherRoom",
+   "components": [
+    {
+     "name": "ProgressBarWidget_GEN_VARIABLE",
+     "class": "WidgetComponent"
+    },
+    {
+     "name": "SelectedDecal_GEN_VARIABLE",
+     "class": "DecalComponent"
+    },
+    {
+     "name": "bpSelectionArea_GEN_VARIABLE",
+     "class": "BoxComponent"
+    },
+    {
+     "name": "BuildingMeshComponent",
+     "class": "StaticMeshComponent",
+     "mesh": "/Game/RTS_Survival/Blueprints/GroundVehicles/BaseAndNomadic/ChildBlueprints/GerT2/CommunicationsCenter/BXPs/CipherRoom/SM_GerCommCenter_CipherRoom.SM_GerCommCenter_CipherRoom",
+     "materials": []
+    },
+    {
+     "name": "RTS_GEN_VARIABLE",
+     "class": "RTSComponent"
+    },
+    {
+     "name": "Health_GEN_VARIABLE",
+     "class": "HealthComponent"
+    },
+    {
+     "name": "NavModifier_GEN_VARIABLE",
+     "class": "NavModifierComponent"
+    },
+    {
+     "name": "BehaviourComp_GEN_VARIABLE",
+     "class": "BehaviourComp"
+    },
+    {
+     "name": "WallHoleDamage_GEN_VARIABLE",
+     "class": "WallHoleDamageComponent"
+    },
+    {
+     "name": "Selection_GEN_VARIABLE",
+     "class": "SelectionComponent"
+    }
+   ],
+   "wall_holes": [
+    "WallHoleDamage_GEN_VARIABLE"
+   ],
+   "damage_refs": [],
+   "dt_row": {
+    "Name": "BTX_GerCommCipherRoom",
+    "Built_ImageBrush": "/Script/Engine.SlateBrushAsset'/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_CommCipherRoom_Brush.T_Ger_Bxp_CommCipherRoom_Brush'",
+    "Description": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerCommCipherRoom_Description\", \"A cipher cabin hung over the inner yard. While it stands, <Text_Accent>commander ability cooldowns are 20% shorter</>.\")",
+    "Tooltip": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerCommCipherRoom_Tooltip\", \"Faster commander abilities\")"
+   },
+   "spawner": null,
+   "preview": null
+  },
+  {
+   "type": "BTX_37mmFlak",
+   "bp": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/Childs/37mmFlak/RTS_BP_BXP_37mmFlak",
+   "components": [
+    {
+     "name": "bpSelectionArea_GEN_VARIABLE",
+     "class": "BoxComponent"
+    },
+    {
+     "name": "Flak_GEN_VARIABLE",
+     "class": "ChildActorComponent"
+    },
+    {
+     "name": "ProgressBarWidget_GEN_VARIABLE",
+     "class": "WidgetComponent"
+    },
+    {
+     "name": "SelectedDecal_GEN_VARIABLE",
+     "class": "DecalComponent"
+    },
+    {
+     "name": "BuildingMeshComponent",
+     "class": "StaticMeshComponent",
+     "mesh": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/Childs/37mmFlak/SM_BXP_37mm_BuildingMesh.SM_BXP_37mm_BuildingMesh",
+     "materials": []
+    },
+    {
+     "name": "RTS_GEN_VARIABLE",
+     "class": "RTSComponent"
+    },
+    {
+     "name": "NavModifier_GEN_VARIABLE",
+     "class": "NavModifierComponent"
+    },
+    {
+     "name": "BehaviourComp_GEN_VARIABLE",
+     "class": "BehaviourComp"
+    },
+    {
+     "name": "Health_GEN_VARIABLE",
+     "class": "HealthComponent"
+    },
+    {
+     "name": "WallHoleDamage_GEN_VARIABLE",
+     "class": "WallHoleDamageComponent"
+    },
+    {
+     "name": "Selection_GEN_VARIABLE",
+     "class": "SelectionComponent"
+    }
+   ],
+   "wall_holes": [
+    "WallHoleDamage_GEN_VARIABLE"
+   ],
+   "damage_refs": [],
+   "dt_row": {
+    "Name": "BTX_37mmFlak",
+    "Built_ImageBrush": "/Script/Engine.SlateBrushAsset'/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_Flak37_Brush.T_Ger_Bxp_Flak37_Brush'",
+    "Description": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_37mmFlak_Description\", \"A small emplacement with a 3.7 cm Flak 36 firing <Text_Weapon>6-round clips</>. <Text_Accent>Good against aircraft and light vehicles</>.\")",
+    "Tooltip": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_37mmFlak_Tooltip\", \"Anti-air gun\")"
+   },
+   "spawner": null,
+   "preview": null
+  },
+  {
+   "type": "BXT_88mmFlak",
+   "bp": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/Childs/88mmFlak/RTS_BP_BXP_Flak88",
+   "components": [
+    {
+     "name": "bpSelectionArea_GEN_VARIABLE",
+     "class": "BoxComponent"
+    },
+    {
+     "name": "Flak_GEN_VARIABLE",
+     "class": "ChildActorComponent"
+    },
+    {
+     "name": "ProgressBarWidget_GEN_VARIABLE",
+     "class": "WidgetComponent"
+    },
+    {
+     "name": "SelectedDecal_GEN_VARIABLE",
+     "class": "DecalComponent"
+    },
+    {
+     "name": "BuildingMeshComponent",
+     "class": "StaticMeshComponent",
+     "mesh": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/Childs/88mmFlak/SM_Flak88_BuildingMesh.SM_Flak88_BuildingMesh",
+     "materials": []
+    },
+    {
+     "name": "RTS_GEN_VARIABLE",
+     "class": "RTSComponent"
+    },
+    {
+     "name": "NavModifier_GEN_VARIABLE",
+     "class": "NavModifierComponent"
+    },
+    {
+     "name": "BehaviourComp_GEN_VARIABLE",
+     "class": "BehaviourComp"
+    },
+    {
+     "name": "Health_GEN_VARIABLE",
+     "class": "HealthComponent"
+    },
+    {
+     "name": "WallHoleDamage_GEN_VARIABLE",
+     "class": "WallHoleDamageComponent"
+    },
+    {
+     "name": "Selection_GEN_VARIABLE",
+     "class": "SelectionComponent"
+    }
+   ],
+   "wall_holes": [
+    "WallHoleDamage_GEN_VARIABLE"
+   ],
+   "damage_refs": [],
+   "dt_row": {
+    "Name": "BXT_88mmFlak",
+    "Built_ImageBrush": "/Script/Engine.SlateBrushAsset'/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_Flak88_Brush.T_Ger_Bxp_Flak88_Brush'",
+    "Description": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BXT_88mmFlak_Description\", \"A heavy emplacement with the 8.8 cm Flak 37, firing <Text_Weapon>APHE, APCR and HE</> with a 5 s reload. <Text_Accent>Highly effective against armoured targets</>.\")",
+    "Tooltip": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BXT_88mmFlak_Tooltip\", \"Heavy anti-tank gun\")"
+   },
+   "spawner": null,
+   "preview": null
+  },
+  {
+   "type": "BTX_20mmFlak",
+   "bp": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/Childs/RTS_BP_BXP_20mmFlak",
+   "components": [
+    {
+     "name": "ProgressBarWidget_GEN_VARIABLE",
+     "class": "WidgetComponent"
+    },
+    {
+     "name": "SelectedDecal_GEN_VARIABLE",
+     "class": "DecalComponent"
+    },
+    {
+     "name": "bpSelectionArea_GEN_VARIABLE",
+     "class": "BoxComponent"
+    },
+    {
+     "name": "BuildingMeshComponent",
+     "class": "StaticMeshComponent",
+     "mesh": "/Game/ResearchMegaPack/SecretBase/Meshes/SM_Box_13.SM_Box_13",
+     "materials": []
+    },
+    {
+     "name": "RTS_GEN_VARIABLE",
+     "class": "RTSComponent"
+    },
+    {
+     "name": "Health_GEN_VARIABLE",
+     "class": "HealthComponent"
+    },
+    {
+     "name": "NavModifier_GEN_VARIABLE",
+     "class": "NavModifierComponent"
+    },
+    {
+     "name": "BehaviourComp_GEN_VARIABLE",
+     "class": "BehaviourComp"
+    },
+    {
+     "name": "Selection_GEN_VARIABLE",
+     "class": "SelectionComponent"
+    }
+   ],
+   "wall_holes": [],
+   "damage_refs": [],
+   "dt_row": {
+    "Name": "BTX_20mmFlak",
+    "Built_ImageBrush": "/Script/Engine.SlateBrushAsset'/Game/RTS_Survival/Blueprints/GameUI/BuildingUI/ExpansionOptions/SB_OptionImage_37mmFLak.SB_OptionImage_37mmFLak'",
+    "Description": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_20mmFlak_Description\", \"A light 2 cm Flak emplacement.\")",
+    "Tooltip": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_20mmFlak_Tooltip\", \"Light anti-air gun\")"
+   },
+   "spawner": null,
+   "preview": null
+  },
+  {
+   "type": "BTX_Pak38",
+   "bp": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/Childs/Pak38/RTS_BP_BXP_Pak38",
+   "components": [
+    {
+     "name": "Pak_GEN_VARIABLE",
+     "class": "ChildActorComponent"
+    },
+    {
+     "name": "ProgressBarWidget_GEN_VARIABLE",
+     "class": "WidgetComponent"
+    },
+    {
+     "name": "SelectedDecal_GEN_VARIABLE",
+     "class": "DecalComponent"
+    },
+    {
+     "name": "bpSelectionArea_GEN_VARIABLE",
+     "class": "BoxComponent"
+    },
+    {
+     "name": "BuildingMeshComponent",
+     "class": "StaticMeshComponent",
+     "mesh": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/Childs/Pak38/BuildingMeshes/SM_PakBunker_BuildingMesh.SM_PakBunker_BuildingMesh",
+     "materials": []
+    },
+    {
+     "name": "RTS_GEN_VARIABLE",
+     "class": "RTSComponent"
+    },
+    {
+     "name": "NavModifier_GEN_VARIABLE",
+     "class": "NavModifierComponent"
+    },
+    {
+     "name": "BehaviourComp_GEN_VARIABLE",
+     "class": "BehaviourComp"
+    },
+    {
+     "name": "Health_GEN_VARIABLE",
+     "class": "HealthComponent"
+    },
+    {
+     "name": "Selection_GEN_VARIABLE",
+     "class": "SelectionComponent"
+    }
+   ],
+   "wall_holes": [],
+   "damage_refs": [],
+   "dt_row": {
+    "Name": "BTX_Pak38",
+    "Built_ImageBrush": "/Script/Engine.SlateBrushAsset'/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_Pak38_Brush.T_Ger_Bxp_Pak38_Brush'",
+    "Description": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_Pak38_Description\", \"A 5 cm Pak 38 emplacement firing <Text_Weapon>APHE</> with a quick 3.3 s reload. <Text_Accent>Good against light and medium tanks</>.\")",
+    "Tooltip": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_Pak38_Tooltip\", \"Anti-tank gun\")"
+   },
+   "spawner": null,
+   "preview": null
+  },
+  {
+   "type": "BTX_LeFH_150mm",
+   "bp": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/Childs/LeFH105/RTS_BP_BXP_LeFH105mm",
+   "components": [
+    {
+     "name": "bpSelectionArea_GEN_VARIABLE",
+     "class": "BoxComponent"
+    },
+    {
+     "name": "Howitzer_GEN_VARIABLE",
+     "class": "ChildActorComponent"
+    },
+    {
+     "name": "ProgressBarWidget_GEN_VARIABLE",
+     "class": "WidgetComponent"
+    },
+    {
+     "name": "SelectedDecal_GEN_VARIABLE",
+     "class": "DecalComponent"
+    },
+    {
+     "name": "BuildingMeshComponent",
+     "class": "StaticMeshComponent",
+     "mesh": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/Childs/88mmFlak/SM_Flak88_BuildingMesh.SM_Flak88_BuildingMesh",
+     "materials": []
+    },
+    {
+     "name": "RTS_GEN_VARIABLE",
+     "class": "RTSComponent"
+    },
+    {
+     "name": "NavModifier_GEN_VARIABLE",
+     "class": "NavModifierComponent"
+    },
+    {
+     "name": "BehaviourComp_GEN_VARIABLE",
+     "class": "BehaviourComp"
+    },
+    {
+     "name": "Health_GEN_VARIABLE",
+     "class": "HealthComponent"
+    },
+    {
+     "name": "WallHoleDamage_GEN_VARIABLE",
+     "class": "WallHoleDamageComponent"
+    },
+    {
+     "name": "Selection_GEN_VARIABLE",
+     "class": "SelectionComponent"
+    }
+   ],
+   "wall_holes": [
+    "WallHoleDamage_GEN_VARIABLE"
+   ],
+   "damage_refs": [],
+   "dt_row": {
+    "Name": "BTX_LeFH_150mm",
+    "Built_ImageBrush": "/Script/Engine.SlateBrushAsset'/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_LeFH150_Brush.T_Ger_Bxp_LeFH150_Brush'",
+    "Description": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_LeFH_150mm_Description\", \"A 10.5 cm leFH 18 howitzer emplacement firing <Text_Weapon>105mm HE shells</> every 8 s. <Text_Accent>Long-range fire</> against infantry and positions.\")",
+    "Tooltip": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_LeFH_150mm_Tooltip\", \"Light howitzer\")"
+   },
+   "spawner": null,
+   "preview": null
+  },
+  {
+   "type": "BXT_SolarSmall",
+   "bp": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/Childs/Economic/BXP_Solar_Small",
+   "components": [
+    {
+     "name": "ProgressBarWidget_GEN_VARIABLE",
+     "class": "WidgetComponent"
+    },
+    {
+     "name": "SelectedDecal_GEN_VARIABLE",
+     "class": "DecalComponent"
+    },
+    {
+     "name": "bpSelectionArea_GEN_VARIABLE",
+     "class": "BoxComponent"
+    },
+    {
+     "name": "BuildingMeshComponent",
+     "class": "StaticMeshComponent",
+     "mesh": null,
+     "materials": []
+    },
+    {
+     "name": "RTS_GEN_VARIABLE",
+     "class": "RTSComponent"
+    },
+    {
+     "name": "Health_GEN_VARIABLE",
+     "class": "HealthComponent"
+    },
+    {
+     "name": "NavModifier_GEN_VARIABLE",
+     "class": "NavModifierComponent"
+    },
+    {
+     "name": "BehaviourComp_GEN_VARIABLE",
+     "class": "BehaviourComp"
+    },
+    {
+     "name": "Selection_GEN_VARIABLE",
+     "class": "SelectionComponent"
+    }
+   ],
+   "wall_holes": [],
+   "damage_refs": [],
+   "dt_row": {
+    "Name": "BXT_SolarSmall",
+    "Built_ImageBrush": "None",
+    "Description": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BXT_SolarSmall_Description\", \"A small free-standing radixite solar panel.\")",
+    "Tooltip": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BXT_SolarSmall_Tooltip\", \"Energy supply\")"
+   },
+   "spawner": null,
+   "preview": null
+  },
+  {
+   "type": "BXT_SolarLarge",
+   "bp": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/Childs/Economic/BigSolarEXP/BXP_Solar_Big",
+   "components": [
+    {
+     "name": "ProgressBarWidget_GEN_VARIABLE",
+     "class": "WidgetComponent"
+    },
+    {
+     "name": "SelectedDecal_GEN_VARIABLE",
+     "class": "DecalComponent"
+    },
+    {
+     "name": "bpSelectionArea_GEN_VARIABLE",
+     "class": "BoxComponent"
+    },
+    {
+     "name": "BuildingMeshComponent",
+     "class": "StaticMeshComponent",
+     "mesh": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/Childs/Economic/BigSolarEXP/SM_GerGamma_SolarTrailer.SM_GerGamma_SolarTrailer",
+     "materials": []
+    },
+    {
+     "name": "RTS_GEN_VARIABLE",
+     "class": "RTSComponent"
+    },
+    {
+     "name": "Health_GEN_VARIABLE",
+     "class": "HealthComponent"
+    },
+    {
+     "name": "NavModifier_GEN_VARIABLE",
+     "class": "NavModifierComponent"
+    },
+    {
+     "name": "BehaviourComp_GEN_VARIABLE",
+     "class": "BehaviourComp"
+    },
+    {
+     "name": "WallHoleDamage_GEN_VARIABLE",
+     "class": "WallHoleDamageComponent"
+    },
+    {
+     "name": "Selection_GEN_VARIABLE",
+     "class": "SelectionComponent"
+    }
+   ],
+   "wall_holes": [
+    "WallHoleDamage_GEN_VARIABLE"
+   ],
+   "damage_refs": [],
+   "dt_row": {
+    "Name": "BXT_SolarLarge",
+    "Built_ImageBrush": "/Script/Engine.SlateBrushAsset'/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_SolarLarge_Brush.T_Ger_Bxp_SolarLarge_Brush'",
+    "Description": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BXT_SolarLarge_Description\", \"A radixite solar trailer parked beside the Gamma Facility. Provides <Text_Accent>+10 energy</>.\")",
+    "Tooltip": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BXT_SolarLarge_Tooltip\", \"Energy supply\")"
+   },
+   "spawner": null,
+   "preview": null
+  },
+  {
+   "type": "BXT_GerFLakBunker",
+   "bp": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/Bunkers/FlakBunker/Ger_BXP_FlakBunker",
+   "components": [
+    {
+     "name": "ProgressBarWidget_GEN_VARIABLE",
+     "class": "WidgetComponent"
+    },
+    {
+     "name": "GeometryCollection_GEN_VARIABLE",
+     "class": "GeometryCollectionComponent"
+    },
+    {
+     "name": "Flak88_GEN_VARIABLE",
+     "class": "ChildActorComponent"
+    },
+    {
+     "name": "Flak37_GEN_VARIABLE",
+     "class": "ChildActorComponent"
+    },
+    {
+     "name": "SelectedDecal_GEN_VARIABLE",
+     "class": "DecalComponent"
+    },
+    {
+     "name": "Sandbags_GEN_VARIABLE",
+     "class": "StaticMeshComponent",
+     "mesh": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/Bunkers/FlakBunker/Mesh/SM_FlakBunkerSandBags.SM_FlakBunkerSandBags",
+     "materials": []
+    },
+    {
+     "name": "bpSelectionArea_GEN_VARIABLE",
+     "class": "BoxComponent"
+    },
+    {
+     "name": "BuildingMeshComponent",
+     "class": "StaticMeshComponent",
+     "mesh": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/Bunkers/FlakBunker/Mesh/SM_Ger_FlakBunker.SM_Ger_FlakBunker",
+     "materials": []
+    },
+    {
+     "name": "Health_GEN_VARIABLE",
+     "class": "HealthComponent"
+    },
+    {
+     "name": "RTS_GEN_VARIABLE",
+     "class": "RTSComponent"
+    },
+    {
+     "name": "BehaviourComp_GEN_VARIABLE",
+     "class": "BehaviourComp"
+    },
+    {
+     "name": "Selection_GEN_VARIABLE",
+     "class": "SelectionComponent"
+    },
+    {
+     "name": "NavModifier_GEN_VARIABLE",
+     "class": "NavModifierComponent"
+    },
+    {
+     "name": "Cargo_GEN_VARIABLE",
+     "class": "Cargo"
+    },
+    {
+     "name": "ShrapnellRounds_GEN_VARIABLE",
+     "class": "ApplyBehaviourAbilityComponent"
+    },
+    {
+     "name": "WallHoleDamage_GEN_VARIABLE",
+     "class": "WallHoleDamageComponent"
+    }
+   ],
+   "wall_holes": [
+    "WallHoleDamage_GEN_VARIABLE"
+   ],
+   "damage_refs": [
+    "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/Bunkers/FlakBunker/Material/MI_GerFlankBunker_Damaged"
+   ],
+   "dt_row": {
+    "Name": "BXT_GerFLakBunker",
+    "Built_ImageBrush": "/Script/Engine.SlateBrushAsset'/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_FlakBunker_Brush.T_Ger_Bxp_FlakBunker_Brush'",
+    "Description": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BXT_GerFLakBunker_Description\", \"A concrete bunker with a 3.7 cm and an 8.8 cm Flak, able to switch to <Text_Weapon>shrapnel rounds</>. <Text_Accent>Very tough</>: 2.5x heavy bunker health.\")",
+    "Tooltip": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BXT_GerFLakBunker_Tooltip\", \"Heavy flak bunker\")"
+   },
+   "spawner": null,
+   "preview": null
+  },
+  {
+   "type": "BTX_Ger37MMCaptureBunker",
+   "bp": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/CaptureBunkers/Ger_Bxp_CaptureBunker37mm",
+   "components": [
+    {
+     "name": "SM_CaptureBunker37_GerCamo_GEN_VARIABLE",
+     "class": "StaticMeshComponent",
+     "mesh": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/CaptureBunkers/Meshes/SM_CaptureBunker37_GerCamo.SM_CaptureBunker37_GerCamo",
+     "materials": []
+    },
+    {
+     "name": "Flak_GEN_VARIABLE",
+     "class": "ChildActorComponent"
+    },
+    {
+     "name": "ProgressBarWidget_GEN_VARIABLE",
+     "class": "WidgetComponent"
+    },
+    {
+     "name": "SelectedDecal_GEN_VARIABLE",
+     "class": "DecalComponent"
+    },
+    {
+     "name": "bpSelectionArea_GEN_VARIABLE",
+     "class": "BoxComponent"
+    },
+    {
+     "name": "BuildingMeshComponent",
+     "class": "StaticMeshComponent",
+     "mesh": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/CaptureBunkers/Meshes/SM_CaptureBunker37mm.SM_CaptureBunker37mm",
+     "materials": []
+    },
+    {
+     "name": "NavModifier_GEN_VARIABLE",
+     "class": "NavModifierComponent"
+    },
+    {
+     "name": "BehaviourComp_GEN_VARIABLE",
+     "class": "BehaviourComp"
+    },
+    {
+     "name": "RTS_GEN_VARIABLE",
+     "class": "RTSComponent"
+    },
+    {
+     "name": "Health_GEN_VARIABLE",
+     "class": "HealthComponent"
+    },
+    {
+     "name": "WallHoleDamage_GEN_VARIABLE",
+     "class": "WallHoleDamageComponent"
+    },
+    {
+     "name": "Selection_GEN_VARIABLE",
+     "class": "SelectionComponent"
+    }
+   ],
+   "wall_holes": [
+    "WallHoleDamage_GEN_VARIABLE"
+   ],
+   "damage_refs": [],
+   "dt_row": {
+    "Name": "BTX_Ger37MMCaptureBunker",
+    "Built_ImageBrush": "/Script/Engine.SlateBrushAsset'/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_CaptureBunker37mm_Brush.T_Ger_Bxp_CaptureBunker37mm_Brush'",
+    "Description": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_Ger37MMCaptureBunker_Description\", \"A concrete bunker with a 3.7 cm Flak 36 firing <Text_Weapon>6-round clips</>. Once captured it <Text_Accent>fights for you</>.\")",
+    "Tooltip": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_Ger37MMCaptureBunker_Tooltip\", \"Captured flak bunker\")"
+   },
+   "spawner": null,
+   "preview": null
+  },
+  {
+   "type": "BTX_GerTurretCaptureBunker",
+   "bp": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/CaptureBunkers/Ger_Bxp_CaptureBunkerTurret",
+   "components": [
+    {
+     "name": "CaptureBunkerTurret_Camo_GEN_VARIABLE",
+     "class": "StaticMeshComponent",
+     "mesh": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/CaptureBunkers/Meshes/CaptureBunkerTurret_Camo.CaptureBunkerTurret_Camo",
+     "materials": []
+    },
+    {
+     "name": "Flak_GEN_VARIABLE",
+     "class": "ChildActorComponent"
+    },
+    {
+     "name": "ProgressBarWidget_GEN_VARIABLE",
+     "class": "WidgetComponent"
+    },
+    {
+     "name": "SelectedDecal_GEN_VARIABLE",
+     "class": "DecalComponent"
+    },
+    {
+     "name": "bpSelectionArea_GEN_VARIABLE",
+     "class": "BoxComponent"
+    },
+    {
+     "name": "BuildingMeshComponent",
+     "class": "StaticMeshComponent",
+     "mesh": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/CaptureBunkers/Meshes/SM_CaptureBunkerTurret.SM_CaptureBunkerTurret",
+     "materials": []
+    },
+    {
+     "name": "NavModifier_GEN_VARIABLE",
+     "class": "NavModifierComponent"
+    },
+    {
+     "name": "BehaviourComp_GEN_VARIABLE",
+     "class": "BehaviourComp"
+    },
+    {
+     "name": "RTS_GEN_VARIABLE",
+     "class": "RTSComponent"
+    },
+    {
+     "name": "Health_GEN_VARIABLE",
+     "class": "HealthComponent"
+    },
+    {
+     "name": "WallHoleDamage_GEN_VARIABLE",
+     "class": "WallHoleDamageComponent"
+    },
+    {
+     "name": "Selection_GEN_VARIABLE",
+     "class": "SelectionComponent"
+    }
+   ],
+   "wall_holes": [
+    "WallHoleDamage_GEN_VARIABLE"
+   ],
+   "damage_refs": [],
+   "dt_row": {
+    "Name": "BTX_GerTurretCaptureBunker",
+    "Built_ImageBrush": "/Script/Engine.SlateBrushAsset'/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_CaptureBunkerTurret_Brush.T_Ger_Bxp_CaptureBunkerTurret_Brush'",
+    "Description": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerTurretCaptureBunker_Description\", \"A concrete bunker with a Jaguar turret and its <Text_Weapon>35mm autocannon</> on 5-round clips. Once captured it <Text_Accent>fights for you</>.\")",
+    "Tooltip": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerTurretCaptureBunker_Tooltip\", \"Captured turret bunker\")"
+   },
+   "spawner": null,
+   "preview": null
+  },
+  {
+   "type": "BTX_GerMarderStugFactory",
+   "bp": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/RTS_BP_GerStugMarderFactory",
+   "components": [
+    {
+     "name": "Box1_GEN_VARIABLE",
+     "class": "BoxComponent"
+    },
+    {
+     "name": "Box_GEN_VARIABLE",
+     "class": "BoxComponent"
+    },
+    {
+     "name": "ProgressBarWidget_GEN_VARIABLE",
+     "class": "WidgetComponent"
+    },
+    {
+     "name": "SelectedDecal_GEN_VARIABLE",
+     "class": "DecalComponent"
+    },
+    {
+     "name": "bpSelectionArea_GEN_VARIABLE",
+     "class": "BoxComponent"
+    },
+    {
+     "name": "BuildingMeshComponent",
+     "class": "StaticMeshComponent",
+     "mesh": "/Game/RTS_Survival/Meshes/Industrial/Container/SM_Industrial_container_blue.SM_Industrial_container_blue",
+     "materials": []
+    },
+    {
+     "name": "NavModifier_GEN_VARIABLE",
+     "class": "NavModifierComponent"
+    },
+    {
+     "name": "BehaviourComp_GEN_VARIABLE",
+     "class": "BehaviourComp"
+    },
+    {
+     "name": "RTS_GEN_VARIABLE",
+     "class": "RTSComponent"
+    },
+    {
+     "name": "Health_GEN_VARIABLE",
+     "class": "HealthComponent"
+    },
+    {
+     "name": "Selection_GEN_VARIABLE",
+     "class": "SelectionComponent"
+    }
+   ],
+   "wall_holes": [],
+   "damage_refs": [],
+   "dt_row": {
+    "Name": "BTX_GerMarderStugFactory",
+    "Built_ImageBrush": "/Script/Engine.SlateBrushAsset'/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_MarderStugFactory_Brush.T_Ger_Bxp_MarderStugFactory_Brush'",
+    "Description": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerMarderStugFactory_Description\", \"A walled assembly hall for Marder and StuG tank destroyers, with <Text_Accent>7000 HP</> of reinforced walls.\")",
+    "Tooltip": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerMarderStugFactory_Tooltip\", \"Tank destroyer works\")"
+   },
+   "spawner": null,
+   "preview": null
+  },
+  {
+   "type": "BTX_GerPak40Pit",
+   "bp": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerPits/Ger_BXP_GerPit_Pak40",
+   "components": [
+    {
+     "name": "bpSelectionArea_GEN_VARIABLE",
+     "class": "BoxComponent"
+    },
+    {
+     "name": "Howitzer_GEN_VARIABLE",
+     "class": "ChildActorComponent"
+    },
+    {
+     "name": "SelectedDecal_GEN_VARIABLE",
+     "class": "DecalComponent"
+    },
+    {
+     "name": "ProgressBarWidget_GEN_VARIABLE",
+     "class": "WidgetComponent"
+    },
+    {
+     "name": "BuildingMeshComponent",
+     "class": "StaticMeshComponent",
+     "mesh": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerPits/Meshes/SM_GerPit_Pak.SM_GerPit_Pak",
+     "materials": []
+    },
+    {
+     "name": "RTS_GEN_VARIABLE",
+     "class": "RTSComponent"
+    },
+    {
+     "name": "NavModifier_GEN_VARIABLE",
+     "class": "NavModifierComponent"
+    },
+    {
+     "name": "Selection_GEN_VARIABLE",
+     "class": "SelectionComponent"
+    },
+    {
+     "name": "Health_GEN_VARIABLE",
+     "class": "HealthComponent"
+    },
+    {
+     "name": "BehaviourComp_GEN_VARIABLE",
+     "class": "BehaviourComp"
+    },
+    {
+     "name": "PitDefense_GEN_VARIABLE",
+     "class": "PitDefenseComponent"
+    },
+    {
+     "name": "TrenchAnchors_GEN_VARIABLE",
+     "class": "FieldTrenchAnchorComponent"
+    },
+    {
+     "name": "WallHoleDamage_GEN_VARIABLE",
+     "class": "WallHoleDamageComponent"
+    }
+   ],
+   "wall_holes": [
+    "WallHoleDamage_GEN_VARIABLE"
+   ],
+   "damage_refs": [],
+   "dt_row": {
+    "Name": "BTX_GerPak40Pit",
+    "Built_ImageBrush": "/Script/Engine.SlateBrushAsset'/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_PitPak40_Brush.T_Ger_Bxp_PitPak40_Brush'",
+    "Description": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerPak40Pit_Description\", \"A 7.5 cm Pak 40 in a low sandbag ring; gun and crew turn a full circle. Fires <Text_Weapon>APCR</> every 5.9 s. <Text_Accent>Strong against tanks</>.\")",
+    "Tooltip": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerPak40Pit_Tooltip\", \"Anti-tank gun\")"
+   },
+   "spawner": null,
+   "preview": null
+  },
+  {
+   "type": "BTX_GerLeFH18Pit",
+   "bp": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerPits/Ger_BXP_GerPit_LeFH18",
+   "components": [
+    {
+     "name": "bpSelectionArea_GEN_VARIABLE",
+     "class": "BoxComponent"
+    },
+    {
+     "name": "Howitzer_GEN_VARIABLE",
+     "class": "ChildActorComponent"
+    },
+    {
+     "name": "SelectedDecal_GEN_VARIABLE",
+     "class": "DecalComponent"
+    },
+    {
+     "name": "ProgressBarWidget_GEN_VARIABLE",
+     "class": "WidgetComponent"
+    },
+    {
+     "name": "BuildingMeshComponent",
+     "class": "StaticMeshComponent",
+     "mesh": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerPits/Meshes/SM_GerPit_Howitzer.SM_GerPit_Howitzer",
+     "materials": []
+    },
+    {
+     "name": "RTS_GEN_VARIABLE",
+     "class": "RTSComponent"
+    },
+    {
+     "name": "NavModifier_GEN_VARIABLE",
+     "class": "NavModifierComponent"
+    },
+    {
+     "name": "Selection_GEN_VARIABLE",
+     "class": "SelectionComponent"
+    },
+    {
+     "name": "Health_GEN_VARIABLE",
+     "class": "HealthComponent"
+    },
+    {
+     "name": "BehaviourComp_GEN_VARIABLE",
+     "class": "BehaviourComp"
+    },
+    {
+     "name": "PitDefense_GEN_VARIABLE",
+     "class": "PitDefenseComponent"
+    },
+    {
+     "name": "TrenchAnchors_GEN_VARIABLE",
+     "class": "FieldTrenchAnchorComponent"
+    },
+    {
+     "name": "WallHoleDamage_GEN_VARIABLE",
+     "class": "WallHoleDamageComponent"
+    }
+   ],
+   "wall_holes": [
+    "WallHoleDamage_GEN_VARIABLE"
+   ],
+   "damage_refs": [],
+   "dt_row": {
+    "Name": "BTX_GerLeFH18Pit",
+    "Built_ImageBrush": "/Script/Engine.SlateBrushAsset'/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_PitLeFH18_Brush.T_Ger_Bxp_PitLeFH18_Brush'",
+    "Description": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerLeFH18Pit_Description\", \"A 10.5 cm leFH 18 in a high sandbag ring with a four-man crew. Fires <Text_Weapon>105mm HE</> every 8 s. <Text_Accent>Long-range fire</> on infantry and positions.\")",
+    "Tooltip": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerLeFH18Pit_Tooltip\", \"Light howitzer pit\")"
+   },
+   "spawner": null,
+   "preview": null
+  },
+  {
+   "type": "BTX_GerSFH18Pit",
+   "bp": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerPits/Ger_BXP_GerPit_SFH18",
+   "components": [
+    {
+     "name": "bpSelectionArea_GEN_VARIABLE",
+     "class": "BoxComponent"
+    },
+    {
+     "name": "Howitzer_GEN_VARIABLE",
+     "class": "ChildActorComponent"
+    },
+    {
+     "name": "SelectedDecal_GEN_VARIABLE",
+     "class": "DecalComponent"
+    },
+    {
+     "name": "ProgressBarWidget_GEN_VARIABLE",
+     "class": "WidgetComponent"
+    },
+    {
+     "name": "BuildingMeshComponent",
+     "class": "StaticMeshComponent",
+     "mesh": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerPits/Meshes/SM_GerPit_Howitzer.SM_GerPit_Howitzer",
+     "materials": []
+    },
+    {
+     "name": "RTS_GEN_VARIABLE",
+     "class": "RTSComponent"
+    },
+    {
+     "name": "NavModifier_GEN_VARIABLE",
+     "class": "NavModifierComponent"
+    },
+    {
+     "name": "Selection_GEN_VARIABLE",
+     "class": "SelectionComponent"
+    },
+    {
+     "name": "Health_GEN_VARIABLE",
+     "class": "HealthComponent"
+    },
+    {
+     "name": "BehaviourComp_GEN_VARIABLE",
+     "class": "BehaviourComp"
+    },
+    {
+     "name": "PitDefense_GEN_VARIABLE",
+     "class": "PitDefenseComponent"
+    },
+    {
+     "name": "TrenchAnchors_GEN_VARIABLE",
+     "class": "FieldTrenchAnchorComponent"
+    },
+    {
+     "name": "WallHoleDamage_GEN_VARIABLE",
+     "class": "WallHoleDamageComponent"
+    }
+   ],
+   "wall_holes": [
+    "WallHoleDamage_GEN_VARIABLE"
+   ],
+   "damage_refs": [],
+   "dt_row": {
+    "Name": "BTX_GerSFH18Pit",
+    "Built_ImageBrush": "/Script/Engine.SlateBrushAsset'/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_PitSFH18_Brush.T_Ger_Bxp_PitSFH18_Brush'",
+    "Description": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerSFH18Pit_Description\", \"A 15 cm sFH 18 in a high sandbag ring with a four-man crew. Fires <Text_Weapon>150mm HE</> every 14.4 s and <Text_Accent>outranges the leFH 18 by 20%</>.\")",
+    "Tooltip": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerSFH18Pit_Tooltip\", \"Heavy howitzer pit\")"
+   },
+   "spawner": null,
+   "preview": null
+  },
+  {
+   "type": "BTX_GerFlak37Pit",
+   "bp": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerPits/Ger_BXP_GerPit_Flak37",
+   "components": [
+    {
+     "name": "bpSelectionArea_GEN_VARIABLE",
+     "class": "BoxComponent"
+    },
+    {
+     "name": "Howitzer_GEN_VARIABLE",
+     "class": "ChildActorComponent"
+    },
+    {
+     "name": "SelectedDecal_GEN_VARIABLE",
+     "class": "DecalComponent"
+    },
+    {
+     "name": "ProgressBarWidget_GEN_VARIABLE",
+     "class": "WidgetComponent"
+    },
+    {
+     "name": "BuildingMeshComponent",
+     "class": "StaticMeshComponent",
+     "mesh": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerPits/Meshes/SM_GerPit_Flak.SM_GerPit_Flak",
+     "materials": []
+    },
+    {
+     "name": "RTS_GEN_VARIABLE",
+     "class": "RTSComponent"
+    },
+    {
+     "name": "NavModifier_GEN_VARIABLE",
+     "class": "NavModifierComponent"
+    },
+    {
+     "name": "Selection_GEN_VARIABLE",
+     "class": "SelectionComponent"
+    },
+    {
+     "name": "Health_GEN_VARIABLE",
+     "class": "HealthComponent"
+    },
+    {
+     "name": "BehaviourComp_GEN_VARIABLE",
+     "class": "BehaviourComp"
+    },
+    {
+     "name": "PitDefense_GEN_VARIABLE",
+     "class": "PitDefenseComponent"
+    },
+    {
+     "name": "TrenchAnchors_GEN_VARIABLE",
+     "class": "FieldTrenchAnchorComponent"
+    },
+    {
+     "name": "WallHoleDamage_GEN_VARIABLE",
+     "class": "WallHoleDamageComponent"
+    }
+   ],
+   "wall_holes": [
+    "WallHoleDamage_GEN_VARIABLE"
+   ],
+   "damage_refs": [],
+   "dt_row": {
+    "Name": "BTX_GerFlak37Pit",
+    "Built_ImageBrush": "/Script/Engine.SlateBrushAsset'/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_PitFlak37_Brush.T_Ger_Bxp_PitFlak37_Brush'",
+    "Description": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerFlak37Pit_Description\", \"A 3.7 cm Flak 37 in a sandbag ring; a loader\\'s mate passes up <Text_Weapon>6-round clips</> (4.5 s change). <Text_Accent>Good against aircraft and light vehicles</>.\")",
+    "Tooltip": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerFlak37Pit_Tooltip\", \"Anti-air pit\")"
+   },
+   "spawner": null,
+   "preview": null
+  },
+  {
+   "type": "BTX_GerFlak88Pit",
+   "bp": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerPits/Ger_BXP_GerPit_Flak88",
+   "components": [
+    {
+     "name": "bpSelectionArea_GEN_VARIABLE",
+     "class": "BoxComponent"
+    },
+    {
+     "name": "Howitzer_GEN_VARIABLE",
+     "class": "ChildActorComponent"
+    },
+    {
+     "name": "SelectedDecal_GEN_VARIABLE",
+     "class": "DecalComponent"
+    },
+    {
+     "name": "ProgressBarWidget_GEN_VARIABLE",
+     "class": "WidgetComponent"
+    },
+    {
+     "name": "BuildingMeshComponent",
+     "class": "StaticMeshComponent",
+     "mesh": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerPits/Meshes/SM_GerFlak88Pit.SM_GerFlak88Pit",
+     "materials": []
+    },
+    {
+     "name": "RTS_GEN_VARIABLE",
+     "class": "RTSComponent"
+    },
+    {
+     "name": "NavModifier_GEN_VARIABLE",
+     "class": "NavModifierComponent"
+    },
+    {
+     "name": "Selection_GEN_VARIABLE",
+     "class": "SelectionComponent"
+    },
+    {
+     "name": "Health_GEN_VARIABLE",
+     "class": "HealthComponent"
+    },
+    {
+     "name": "BehaviourComp_GEN_VARIABLE",
+     "class": "BehaviourComp"
+    },
+    {
+     "name": "TrenchAnchors_GEN_VARIABLE",
+     "class": "FieldTrenchAnchorComponent"
+    },
+    {
+     "name": "WallHoleDamage_GEN_VARIABLE",
+     "class": "WallHoleDamageComponent"
+    },
+    {
+     "name": "PitDefense_GEN_VARIABLE",
+     "class": "PitDefenseComponent"
+    }
+   ],
+   "wall_holes": [
+    "WallHoleDamage_GEN_VARIABLE"
+   ],
+   "damage_refs": [],
+   "dt_row": {
+    "Name": "BTX_GerFlak88Pit",
+    "Built_ImageBrush": "/Script/Engine.SlateBrushAsset'/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_PitFlak88_Brush.T_Ger_Bxp_PitFlak88_Brush'",
+    "Description": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerFlak88Pit_Description\", \"An 8.8 cm Flak behind high sandbag walls with a three-man drill. Fires <Text_Weapon>APHE, APCR and HE</> every 5 s. <Text_Accent>Strong against tanks at long range</>.\")",
+    "Tooltip": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerFlak88Pit_Tooltip\", \"Heavy anti-tank gun\")"
+   },
+   "spawner": null,
+   "preview": null
+  },
+  {
+   "type": "BTX_GerMortarPit",
+   "bp": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerPits/Ger_BXP_GerPit_Mortar",
+   "components": [
+    {
+     "name": "bpSelectionArea_GEN_VARIABLE",
+     "class": "BoxComponent"
+    },
+    {
+     "name": "Howitzer_GEN_VARIABLE",
+     "class": "ChildActorComponent"
+    },
+    {
+     "name": "SelectedDecal_GEN_VARIABLE",
+     "class": "DecalComponent"
+    },
+    {
+     "name": "ProgressBarWidget_GEN_VARIABLE",
+     "class": "WidgetComponent"
+    },
+    {
+     "name": "BuildingMeshComponent",
+     "class": "StaticMeshComponent",
+     "mesh": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerPits/Meshes/SM_GerFlak88Pit.SM_GerFlak88Pit",
+     "materials": []
+    },
+    {
+     "name": "RTS_GEN_VARIABLE",
+     "class": "RTSComponent"
+    },
+    {
+     "name": "NavModifier_GEN_VARIABLE",
+     "class": "NavModifierComponent"
+    },
+    {
+     "name": "Selection_GEN_VARIABLE",
+     "class": "SelectionComponent"
+    },
+    {
+     "name": "Health_GEN_VARIABLE",
+     "class": "HealthComponent"
+    },
+    {
+     "name": "BehaviourComp_GEN_VARIABLE",
+     "class": "BehaviourComp"
+    },
+    {
+     "name": "TrenchAnchors_GEN_VARIABLE",
+     "class": "FieldTrenchAnchorComponent"
+    },
+    {
+     "name": "WallHoleDamage_GEN_VARIABLE",
+     "class": "WallHoleDamageComponent"
+    },
+    {
+     "name": "PitDefense_GEN_VARIABLE",
+     "class": "PitDefenseComponent"
+    }
+   ],
+   "wall_holes": [
+    "WallHoleDamage_GEN_VARIABLE"
+   ],
+   "damage_refs": [],
+   "dt_row": {
+    "Name": "BTX_GerMortarPit",
+    "Built_ImageBrush": "/Script/Engine.SlateBrushAsset'/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_PitMortar_Brush.T_Ger_Bxp_PitMortar_Brush'",
+    "Description": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerMortarPit_Description\", \"An 8 cm mortar and its two-man crew in a square sandbag pit. Lobs <Text_Weapon>80mm HE</> over cover every 10 s. <Text_Accent>Good against infantry in cover</>.\")",
+    "Tooltip": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerMortarPit_Tooltip\", \"Indirect fire\")"
+   },
+   "spawner": null,
+   "preview": null
+  },
+  {
+   "type": "BTX_GerPuppchenPit",
+   "bp": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerPits/Ger_BXP_GerPit_Puppchen",
+   "components": [
+    {
+     "name": "bpSelectionArea_GEN_VARIABLE",
+     "class": "BoxComponent"
+    },
+    {
+     "name": "Howitzer_GEN_VARIABLE",
+     "class": "ChildActorComponent"
+    },
+    {
+     "name": "ProgressBarWidget_GEN_VARIABLE",
+     "class": "WidgetComponent"
+    },
+    {
+     "name": "SelectedDecal_GEN_VARIABLE",
+     "class": "DecalComponent"
+    },
+    {
+     "name": "BuildingMeshComponent",
+     "class": "StaticMeshComponent",
+     "mesh": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerPits/Meshes/SM_GerPuppchenPit.SM_GerPuppchenPit",
+     "materials": []
+    },
+    {
+     "name": "RTS_GEN_VARIABLE",
+     "class": "RTSComponent"
+    },
+    {
+     "name": "NavModifier_GEN_VARIABLE",
+     "class": "NavModifierComponent"
+    },
+    {
+     "name": "BehaviourComp_GEN_VARIABLE",
+     "class": "BehaviourComp"
+    },
+    {
+     "name": "Health_GEN_VARIABLE",
+     "class": "HealthComponent"
+    },
+    {
+     "name": "PitDefense_GEN_VARIABLE",
+     "class": "PitDefenseComponent"
+    },
+    {
+     "name": "WallHoleDamage_GEN_VARIABLE",
+     "class": "WallHoleDamageComponent"
+    },
+    {
+     "name": "Selection_GEN_VARIABLE",
+     "class": "SelectionComponent"
+    }
+   ],
+   "wall_holes": [
+    "WallHoleDamage_GEN_VARIABLE"
+   ],
+   "damage_refs": [],
+   "dt_row": {
+    "Name": "BTX_GerPuppchenPit",
+    "Built_ImageBrush": "/Script/Engine.SlateBrushAsset'/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_PitPuppchen_Brush.T_Ger_Bxp_PitPuppchen_Brush'",
+    "Description": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerPuppchenPit_Description\", \"A Raketenwerfer 43 \\'Puppchen\\' in a small bag ring. Fires <Text_Weapon>88mm HEAT rockets</> every 6 s, further than a Panzerschreck. <Text_Accent>Strong against tanks</>.\")",
+    "Tooltip": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerPuppchenPit_Tooltip\", \"Rocket anti-tank gun\")"
+   },
+   "spawner": null,
+   "preview": null
+  },
+  {
+   "type": "BTX_GerPanzerschreckPit",
+   "bp": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerPits/Ger_BXP_GerPit_Panzerschreck",
+   "components": [
+    {
+     "name": "bpSelectionArea_GEN_VARIABLE",
+     "class": "BoxComponent"
+    },
+    {
+     "name": "Howitzer_GEN_VARIABLE",
+     "class": "ChildActorComponent"
+    },
+    {
+     "name": "ProgressBarWidget_GEN_VARIABLE",
+     "class": "WidgetComponent"
+    },
+    {
+     "name": "SelectedDecal_GEN_VARIABLE",
+     "class": "DecalComponent"
+    },
+    {
+     "name": "BuildingMeshComponent",
+     "class": "StaticMeshComponent",
+     "mesh": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerPits/Meshes/SM_GerPanzerschreckPit.SM_GerPanzerschreckPit",
+     "materials": []
+    },
+    {
+     "name": "RTS_GEN_VARIABLE",
+     "class": "RTSComponent"
+    },
+    {
+     "name": "NavModifier_GEN_VARIABLE",
+     "class": "NavModifierComponent"
+    },
+    {
+     "name": "BehaviourComp_GEN_VARIABLE",
+     "class": "BehaviourComp"
+    },
+    {
+     "name": "Health_GEN_VARIABLE",
+     "class": "HealthComponent"
+    },
+    {
+     "name": "PitDefense_GEN_VARIABLE",
+     "class": "PitDefenseComponent"
+    },
+    {
+     "name": "WallHoleDamage_GEN_VARIABLE",
+     "class": "WallHoleDamageComponent"
+    },
+    {
+     "name": "Selection_GEN_VARIABLE",
+     "class": "SelectionComponent"
+    }
+   ],
+   "wall_holes": [
+    "WallHoleDamage_GEN_VARIABLE"
+   ],
+   "damage_refs": [],
+   "dt_row": {
+    "Name": "BTX_GerPanzerschreckPit",
+    "Built_ImageBrush": "/Script/Engine.SlateBrushAsset'/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_PitPanzerschreck_Brush.T_Ger_Bxp_PitPanzerschreck_Brush'",
+    "Description": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerPanzerschreckPit_Description\", \"A Panzerschreck team in a foxhole behind a ring of bags, firing <Text_Weapon>88mm HEAT rockets</> every 8 s. <Text_Accent>The cheapest anti-tank defence</>, but fragile.\")",
+    "Tooltip": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerPanzerschreckPit_Tooltip\", \"Cheap anti-tank post\")"
+   },
+   "spawner": null,
+   "preview": null
+  },
+  {
+   "type": "BTX_GerRailPakBunker",
+   "bp": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerPits/RailPakBunker/Ger_BXP_RailPakBunker",
+   "components": [
+    {
+     "name": "bpSelectionArea_GEN_VARIABLE",
+     "class": "BoxComponent"
+    },
+    {
+     "name": "Howitzer_GEN_VARIABLE",
+     "class": "ChildActorComponent"
+    },
+    {
+     "name": "ProgressBarWidget_GEN_VARIABLE",
+     "class": "WidgetComponent"
+    },
+    {
+     "name": "SelectedDecal_GEN_VARIABLE",
+     "class": "DecalComponent"
+    },
+    {
+     "name": "BuildingMeshComponent",
+     "class": "StaticMeshComponent",
+     "mesh": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerPits/RailPakBunker/Meshes/SM_GerRailPakBunker.SM_GerRailPakBunker",
+     "materials": []
+    },
+    {
+     "name": "RTS_GEN_VARIABLE",
+     "class": "RTSComponent"
+    },
+    {
+     "name": "NavModifier_GEN_VARIABLE",
+     "class": "NavModifierComponent"
+    },
+    {
+     "name": "BehaviourComp_GEN_VARIABLE",
+     "class": "BehaviourComp"
+    },
+    {
+     "name": "Health_GEN_VARIABLE",
+     "class": "HealthComponent"
+    },
+    {
+     "name": "WallHoleDamage_GEN_VARIABLE",
+     "class": "WallHoleDamageComponent"
+    },
+    {
+     "name": "Selection_GEN_VARIABLE",
+     "class": "SelectionComponent"
+    }
+   ],
+   "wall_holes": [
+    "WallHoleDamage_GEN_VARIABLE"
+   ],
+   "damage_refs": [],
+   "dt_row": {
+    "Name": "BTX_GerRailPakBunker",
+    "Built_ImageBrush": "/Script/Engine.SlateBrushAsset'/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_RailPakBunker_Brush.T_Ger_Bxp_RailPakBunker_Brush'",
+    "Description": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerRailPakBunker_Description\", \"A concrete pillbox with a rail-fitted Pak 40 on its roof, firing <Text_Weapon>50mm rail slugs</> that punch through targets. <Text_Accent>Twice as tough as a Pak 40 pit</>.\")",
+    "Tooltip": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerRailPakBunker_Tooltip\", \"Rail anti-tank bunker\")"
+   },
+   "spawner": null,
+   "preview": null
+  },
+  {
+   "type": "BTX_GerTwinMG42Pit",
+   "bp": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerPits/TwinMG42Pit/Ger_BXP_GerPit_TwinMG42",
+   "components": [
+    {
+     "name": "MG42Right_GEN_VARIABLE",
+     "class": "ChildActorComponent"
+    },
+    {
+     "name": "Howitzer_GEN_VARIABLE",
+     "class": "ChildActorComponent"
+    },
+    {
+     "name": "ProgressBarWidget_GEN_VARIABLE",
+     "class": "WidgetComponent"
+    },
+    {
+     "name": "SelectedDecal_GEN_VARIABLE",
+     "class": "DecalComponent"
+    },
+    {
+     "name": "bpSelectionArea_GEN_VARIABLE",
+     "class": "BoxComponent"
+    },
+    {
+     "name": "BuildingMeshComponent",
+     "class": "StaticMeshComponent",
+     "mesh": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerPits/TwinMG42Pit/Meshes/SM_GerPit_TwinMG42_Sandbags.SM_GerPit_TwinMG42_Sandbags",
+     "materials": []
+    },
+    {
+     "name": "RTS_GEN_VARIABLE",
+     "class": "RTSComponent"
+    },
+    {
+     "name": "BehaviourComp_GEN_VARIABLE",
+     "class": "BehaviourComp"
+    },
+    {
+     "name": "Health_GEN_VARIABLE",
+     "class": "HealthComponent"
+    },
+    {
+     "name": "PitDefense_GEN_VARIABLE",
+     "class": "PitDefenseComponent"
+    },
+    {
+     "name": "Selection_GEN_VARIABLE",
+     "class": "SelectionComponent"
+    },
+    {
+     "name": "NavModifier_GEN_VARIABLE",
+     "class": "NavModifierComponent"
+    },
+    {
+     "name": "AdditionalTurretSetup_GEN_VARIABLE",
+     "class": "PitAdditionalTurretComponent"
+    },
+    {
+     "name": "TrenchAnchors_GEN_VARIABLE",
+     "class": "FieldTrenchAnchorComponent"
+    },
+    {
+     "name": "WallHoleDamage_GEN_VARIABLE",
+     "class": "WallHoleDamageComponent"
+    }
+   ],
+   "wall_holes": [
+    "WallHoleDamage_GEN_VARIABLE"
+   ],
+   "damage_refs": [],
+   "dt_row": {
+    "Name": "BTX_GerTwinMG42Pit",
+    "Built_ImageBrush": "/Script/Engine.SlateBrushAsset'/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_PitTwinMG42_Brush.T_Ger_Bxp_PitTwinMG42_Brush'",
+    "Description": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerTwinMG42Pit_Description\", \"Two MG 42 nests joined by an ammunition corridor, each with a gunner and a loader. <Text_Weapon>100-round belts</>, 6 s reload. <Text_Accent>Strong against infantry</>.\")",
+    "Tooltip": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerTwinMG42Pit_Tooltip\", \"Anti-infantry pit\")"
+   },
+   "spawner": null,
+   "preview": null
+  },
+  {
+   "type": "BTX_GerCapturedB4Pit",
+   "bp": "/Game/RTS_Survival/Blueprints/Squads/TeamWeapons/Soviet/B4_203MM/Pit/Ger_BXP_CapturedB4Pit",
+   "components": [
+    {
+     "name": "SelectedDecal_GEN_VARIABLE",
+     "class": "DecalComponent"
+    },
+    {
+     "name": "Sandbags_GEN_VARIABLE",
+     "class": "StaticMeshComponent",
+     "mesh": "/Game/RTS_Survival/Blueprints/Squads/TeamWeapons/Soviet/B4_203MM/Pit/Meshes/SM_B4Pit_Sandbags.SM_B4Pit_Sandbags",
+     "materials": []
+    },
+    {
+     "name": "Howitzer_GEN_VARIABLE",
+     "class": "ChildActorComponent"
+    },
+    {
+     "name": "ProgressBarWidget_GEN_VARIABLE",
+     "class": "WidgetComponent"
+    },
+    {
+     "name": "bpSelectionArea_GEN_VARIABLE",
+     "class": "BoxComponent"
+    },
+    {
+     "name": "BuildingMeshComponent",
+     "class": "StaticMeshComponent",
+     "mesh": "/Game/RTS_Survival/Blueprints/Squads/TeamWeapons/Soviet/B4_203MM/Pit/Meshes/SM_B4Pit_Emplacement.SM_B4Pit_Emplacement",
+     "materials": []
+    },
+    {
+     "name": "NavModifier_GEN_VARIABLE",
+     "class": "NavModifierComponent"
+    },
+    {
+     "name": "BehaviourComp_GEN_VARIABLE",
+     "class": "BehaviourComp"
+    },
+    {
+     "name": "RTS_GEN_VARIABLE",
+     "class": "RTSComponent"
+    },
+    {
+     "name": "Health_GEN_VARIABLE",
+     "class": "HealthComponent"
+    },
+    {
+     "name": "PitDefense_GEN_VARIABLE",
+     "class": "PitDefenseComponent"
+    },
+    {
+     "name": "WallHoleDamage_GEN_VARIABLE",
+     "class": "WallHoleDamageComponent"
+    },
+    {
+     "name": "Selection_GEN_VARIABLE",
+     "class": "SelectionComponent"
+    }
+   ],
+   "wall_holes": [
+    "WallHoleDamage_GEN_VARIABLE"
+   ],
+   "damage_refs": [],
+   "dt_row": {
+    "Name": "BTX_GerCapturedB4Pit",
+    "Built_ImageBrush": "/Script/Engine.SlateBrushAsset'/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_PitCapturedB4_Brush.T_Ger_Bxp_PitCapturedB4_Brush'",
+    "Description": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerCapturedB4Pit_Description\", \"A captured Soviet <Text_Weapon>B-4 203mm howitzer</> on a turntable; its crew crane-loads every shell (12 s). <Text_Accent>Longest range of any gun pit</>.\")",
+    "Tooltip": "NSLOCTEXT(\"DT_Items [46946556BC7EA84DA27BC2EAA16C45C3]\", \"BTX_GerCapturedB4Pit_Tooltip\", \"Super-heavy howitzer\")"
+   },
+   "spawner": null,
+   "preview": null
+  },
+  {
+   "type": "HQLaserPlatform",
+   "bp": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/HQ/HQLaser/Ger_Bxp_HQLaserPlatform",
+   "components": [
+    {
+     "name": "bpSelectionArea_GEN_VARIABLE",
+     "class": "BoxComponent"
+    },
+    {
+     "name": "Laser_GEN_VARIABLE",
+     "class": "ChildActorComponent"
+    },
+    {
+     "name": "ProgressBarWidget_GEN_VARIABLE",
+     "class": "WidgetComponent"
+    },
+    {
+     "name": "SelectedDecal_GEN_VARIABLE",
+     "class": "DecalComponent"
+    },
+    {
+     "name": "BuildingMeshComponent",
+     "class": "StaticMeshComponent",
+     "mesh": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/HQ/HQLaser/BM/SM_Ger_Bxp_HqLaser_BuildingMesh.SM_Ger_Bxp_HqLaser_BuildingMesh",
+     "materials": []
+    },
+    {
+     "name": "RTS_GEN_VARIABLE",
+     "class": "RTSComponent"
+    },
+    {
+     "name": "NavModifier_GEN_VARIABLE",
+     "class": "NavModifierComponent"
+    },
+    {
+     "name": "BehaviourComp_GEN_VARIABLE",
+     "class": "BehaviourComp"
+    },
+    {
+     "name": "Health_GEN_VARIABLE",
+     "class": "HealthComponent"
+    },
+    {
+     "name": "BuildingExpansionEnergy_GEN_VARIABLE",
+     "class": "BuildingExpansionEnergyComponent"
+    },
+    {
+     "name": "WallHoleDamage_GEN_VARIABLE",
+     "class": "WallHoleDamageComponent"
+    },
+    {
+     "name": "Selection_GEN_VARIABLE",
+     "class": "SelectionComponent"
+    }
+   ],
+   "wall_holes": [
+    "WallHoleDamage_GEN_VARIABLE"
+   ],
+   "damage_refs": [],
+   "dt_row": null,
+   "spawner": null,
+   "preview": null
+  },
+  {
+   "type": "Flak88Bunker",
+   "bp": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/Bunkers/Flak88Bunker/Ger_BXP_Flak88Bunker",
+   "components": [
+    {
+     "name": "SelectedDecal_GEN_VARIABLE",
+     "class": "DecalComponent"
+    },
+    {
+     "name": "Rounds_GEN_VARIABLE",
+     "class": "StaticMeshComponent",
+     "mesh": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/Bunkers/Flak88Bunker/Mesh/SM_BF_Flak88Bunker_Ammo.SM_BF_Flak88Bunker_Ammo",
+     "materials": []
+    },
+    {
+     "name": "Howitzer_GEN_VARIABLE",
+     "class": "ChildActorComponent"
+    },
+    {
+     "name": "ProgressBarWidget_GEN_VARIABLE",
+     "class": "WidgetComponent"
+    },
+    {
+     "name": "bpSelectionArea_GEN_VARIABLE",
+     "class": "BoxComponent"
+    },
+    {
+     "name": "BuildingMeshComponent",
+     "class": "StaticMeshComponent",
+     "mesh": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/Bunkers/Flak88Bunker/Mesh/SM_BF_Flak88Bunker.SM_BF_Flak88Bunker",
+     "materials": []
+    },
+    {
+     "name": "NavModifier_GEN_VARIABLE",
+     "class": "NavModifierComponent"
+    },
+    {
+     "name": "BehaviourComp_GEN_VARIABLE",
+     "class": "BehaviourComp"
+    },
+    {
+     "name": "RTS_GEN_VARIABLE",
+     "class": "RTSComponent"
+    },
+    {
+     "name": "Health_GEN_VARIABLE",
+     "class": "HealthComponent"
+    },
+    {
+     "name": "TrenchAnchors_GEN_VARIABLE",
+     "class": "FieldTrenchAnchorComponent"
+    },
+    {
+     "name": "WallHoleDamage_GEN_VARIABLE",
+     "class": "WallHoleDamageComponent"
+    },
+    {
+     "name": "Selection_GEN_VARIABLE",
+     "class": "SelectionComponent"
+    }
+   ],
+   "wall_holes": [
+    "WallHoleDamage_GEN_VARIABLE"
+   ],
+   "damage_refs": [
+    "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/Bunkers/Flak88Bunker/Mesh/SM_BF_Flak88Bunker_Damaged"
+   ],
+   "dt_row": null,
+   "spawner": null,
+   "preview": null
+  },
+  {
+   "type": "FlakvierlingBunker",
+   "bp": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/Bunkers/FlakvierlingBunker/Ger_BXP_FlakvierlingBunker",
+   "components": [
+    {
+     "name": "ProgressBarWidget_GEN_VARIABLE",
+     "class": "WidgetComponent"
+    },
+    {
+     "name": "AmmoStack_GEN_VARIABLE",
+     "class": "StaticMeshComponent",
+     "mesh": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/Bunkers/FlakvierlingBunker/Mesh/SM_BF_FlakvierlingBunker_Ammo.SM_BF_FlakvierlingBunker_Ammo",
+     "materials": []
+    },
+    {
+     "name": "Sandbags_GEN_VARIABLE",
+     "class": "StaticMeshComponent",
+     "mesh": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/Bunkers/FlakvierlingBunker/Mesh/SM_BF_FlakvierlingBunker_Sandbags.SM_BF_FlakvierlingBunker_Sandbags",
+     "materials": []
+    },
+    {
+     "name": "Flakvierling_GEN_VARIABLE",
+     "class": "ChildActorComponent"
+    },
+    {
+     "name": "SelectedDecal_GEN_VARIABLE",
+     "class": "DecalComponent"
+    },
+    {
+     "name": "AmmoStack_GEN_VARIABLE",
+     "class": "StaticMeshComponent",
+     "mesh": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/Bunkers/FlakvierlingBunker/Mesh/SM_BF_FlakvierlingBunker_Ammo.SM_BF_FlakvierlingBunker_Ammo",
+     "materials": []
+    },
+    {
+     "name": "bpSelectionArea_GEN_VARIABLE",
+     "class": "BoxComponent"
+    },
+    {
+     "name": "BuildingMeshComponent",
+     "class": "StaticMeshComponent",
+     "mesh": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/Bunkers/FlakvierlingBunker/Mesh/SM_BF_FlakvierlingBunker.SM_BF_FlakvierlingBunker",
+     "materials": []
+    },
+    {
+     "name": "Health_GEN_VARIABLE",
+     "class": "HealthComponent"
+    },
+    {
+     "name": "RTS_GEN_VARIABLE",
+     "class": "RTSComponent"
+    },
+    {
+     "name": "Selection_GEN_VARIABLE",
+     "class": "SelectionComponent"
+    },
+    {
+     "name": "NavModifier_GEN_VARIABLE",
+     "class": "NavModifierComponent"
+    },
+    {
+     "name": "BehaviourComp_GEN_VARIABLE",
+     "class": "BehaviourComp"
+    },
+    {
+     "name": "ShrapnellRounds_GEN_VARIABLE",
+     "class": "ApplyBehaviourAbilityComponent"
+    },
+    {
+     "name": "MGGunnerMount_GEN_VARIABLE",
+     "class": "EmbeddedTurretMountComponent"
+    },
+    {
+     "name": "TrenchAnchors_GEN_VARIABLE",
+     "class": "FieldTrenchAnchorComponent"
+    },
+    {
+     "name": "WallHoleDamage_GEN_VARIABLE",
+     "class": "WallHoleDamageComponent"
+    }
+   ],
+   "wall_holes": [
+    "WallHoleDamage_GEN_VARIABLE"
+   ],
+   "damage_refs": [
+    "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/Bunkers/FlakvierlingBunker/Mesh/SM_BF_FlakvierlingBunker_Damaged",
+    "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/Bunkers/FlakvierlingBunker/Mesh/SM_BF_FlakvierlingBunker_Sandbags_Damaged"
+   ],
+   "dt_row": null,
+   "spawner": null,
+   "preview": null
+  },
+  {
+   "type": "PZ38TTurretBunker",
+   "bp": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/Bunkers/PZ38TTurretBunker/Ger_BXP_PZ38TTurretBunker",
+   "components": [
+    {
+     "name": "BunkerMesh_GEN_VARIABLE",
+     "class": "StaticMeshComponent",
+     "mesh": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/Bunkers/PZ38TTurretBunker/Mesh/SM_BF_PZ38T_TurretBunker.SM_BF_PZ38T_TurretBunker",
+     "materials": []
+    },
+    {
+     "name": "PZ38TTurret_GEN_VARIABLE",
+     "class": "ChildActorComponent"
+    },
+    {
+     "name": "ProgressBarWidget_GEN_VARIABLE",
+     "class": "WidgetComponent"
+    },
+    {
+     "name": "SelectedDecal_GEN_VARIABLE",
+     "class": "DecalComponent"
+    },
+    {
+     "name": "bpSelectionArea_GEN_VARIABLE",
+     "class": "BoxComponent"
+    },
+    {
+     "name": "BuildingMeshComponent",
+     "class": "StaticMeshComponent",
+     "mesh": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/CaptureBunkers/Meshes/SM_CaptureBunker37mm.SM_CaptureBunker37mm",
+     "materials": []
+    },
+    {
+     "name": "NavModifier_GEN_VARIABLE",
+     "class": "NavModifierComponent"
+    },
+    {
+     "name": "BehaviourComp_GEN_VARIABLE",
+     "class": "BehaviourComp"
+    },
+    {
+     "name": "RTS_GEN_VARIABLE",
+     "class": "RTSComponent"
+    },
+    {
+     "name": "Health_GEN_VARIABLE",
+     "class": "HealthComponent"
+    },
+    {
+     "name": "WallHoleDamage_GEN_VARIABLE",
+     "class": "WallHoleDamageComponent"
+    },
+    {
+     "name": "Selection_GEN_VARIABLE",
+     "class": "SelectionComponent"
+    }
+   ],
+   "wall_holes": [
+    "WallHoleDamage_GEN_VARIABLE"
+   ],
+   "damage_refs": [],
+   "dt_row": null,
+   "spawner": null,
+   "preview": null
+  }
+ ]
+}

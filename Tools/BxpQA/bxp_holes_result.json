@@ -1,0 +1,1500 @@
+{
+ "HQRadar": {
+  "bp": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/HQ/HQRadar/Ger_Bxp_HQRadar",
+  "mesh": "SM_Ger_Bxp_HQRadar_BuildingMesh",
+  "saved": true,
+  "debris": "own",
+  "slots": [
+   [
+    "M_GerRadar",
+    "MI_M_GerRadar_WallHoles"
+   ],
+   [
+    "M_Switchboard",
+    "MI_M_Switchboard_WallHoles"
+   ],
+   [
+    "M_PantherII_Sheets",
+    "MI_M_PantherII_Sheets_WallHoles"
+   ],
+   [
+    "M_GerSandBagScaffold_Atlas",
+    "MI_GerPit_GerSandBag_WallHoles"
+   ]
+  ],
+  "aim": [
+   [
+    265,
+    11,
+    256
+   ],
+   [
+    505,
+    10,
+    117
+   ],
+   [
+    71,
+    5,
+    236
+   ],
+   [
+    284,
+    245,
+    154
+   ],
+   [
+    267,
+    -250,
+    144
+   ]
+  ]
+ },
+ "HQPlatform": {
+  "bp": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/HQ/HQFlakDefense/Ger_Bxp_HQPlatform",
+  "mesh": "SM_Ger_Bxp_HQFlakPosition_BuildingMesh",
+  "saved": true,
+  "debris": "own",
+  "slots": [
+   [
+    "M_GerRadar",
+    "MI_M_GerRadar_WallHoles"
+   ],
+   [
+    "M_PantherII_Sheets",
+    "MI_M_PantherII_Sheets_WallHoles"
+   ],
+   [
+    "M_GerSandBagScaffold_Atlas",
+    "MI_GerPit_GerSandBag_WallHoles"
+   ]
+  ],
+  "aim": [
+   [
+    253,
+    0,
+    239
+   ],
+   [
+    473,
+    15,
+    241
+   ],
+   [
+    127,
+    0,
+    239
+   ],
+   [
+    263,
+    204,
+    236
+   ],
+   [
+    265,
+    -195,
+    246
+   ]
+  ]
+ },
+ "HQHarvester": {
+  "bp": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/HQ/HarvesterHub/Ger_Bxp_HQHarvesterHub",
+  "mesh": "SM_Ger_Bxp_HarvesterHub_BuildingMesh",
+  "saved": true,
+  "debris": "own",
+  "slots": [
+   [
+    "M_GerRadar",
+    "MI_M_GerRadar_WallHoles"
+   ],
+   [
+    "M_GerSandBagScaffold_Atlas",
+    "MI_GerPit_GerSandBag_WallHoles"
+   ],
+   [
+    "MM_Ger_PropsAtlas",
+    "MI_MM_Ger_PropsAtlas_WallHoles"
+   ],
+   [
+    "MI_Rusty_Painted_Metal_Sheet_xhtnbhlg_2K",
+    null
+   ]
+  ],
+  "aim": [
+   [
+    203,
+    0,
+    148
+   ],
+   [
+    393,
+    3,
+    169
+   ],
+   [
+    101,
+    0,
+    148
+   ],
+   [
+    224,
+    193,
+    172
+   ],
+   [
+    218,
+    -192,
+    181
+   ]
+  ]
+ },
+ "HQRepairBay": {
+  "bp": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/HQ/RepairHub/Ger_Bxp_HQRepairBay",
+  "mesh": "SM_Ger_Bxp_HQRepairHub",
+  "saved": true,
+  "debris": "own",
+  "slots": [
+   [
+    "M_GerRadar",
+    "MI_M_GerRadar_WallHoles"
+   ],
+   [
+    "M_PantherII_Sheets",
+    "MI_M_PantherII_Sheets_WallHoles"
+   ],
+   [
+    "M_GerSandBagScaffold_Atlas",
+    "MI_GerPit_GerSandBag_WallHoles"
+   ]
+  ],
+  "aim": [
+   [
+    -22,
+    179,
+    145
+   ],
+   [
+    251,
+    -5,
+    129
+   ],
+   [
+    -254,
+    -10,
+    112
+   ],
+   [
+    -39,
+    183,
+    121
+   ],
+   [
+    -11,
+    -189,
+    111
+   ]
+  ]
+ },
+ "HQTower": {
+  "bp": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/HQ/HQTower/Ger_Bxp_HQTower",
+  "mesh": "SM_Ger_Bxp_HQTower_BuildingMesh",
+  "saved": true,
+  "debris": "own",
+  "slots": [
+   [
+    "M_GerRadar",
+    "MI_M_GerRadar_WallHoles"
+   ],
+   [
+    "M_PantherII_Sheets",
+    "MI_M_PantherII_Sheets_WallHoles"
+   ]
+  ],
+  "aim": [
+   [
+    -395,
+    19,
+    303
+   ],
+   [
+    -395,
+    19,
+    303
+   ],
+   [
+    -572,
+    30,
+    338
+   ],
+   [
+    -448,
+    127,
+    303
+   ],
+   [
+    -448,
+    -89,
+    303
+   ]
+  ]
+ },
+ "RefConverter": {
+  "bp": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/Refinery/RadixConvert/Ger_Ref_Converter",
+  "mesh": "SM_GerRefinery_Converter",
+  "saved": true,
+  "debris": "own",
+  "slots": [
+   [
+    "M_PantherII_Sheets",
+    "MI_M_PantherII_Sheets_WallHoles"
+   ],
+   [
+    "M_rusty_pipe_Radixite",
+    "MI_M_rusty_pipe_Radixite_WallHoles"
+   ],
+   [
+    "M_GerSandBagScaffold_Atlas",
+    "MI_GerPit_GerSandBag_WallHoles"
+   ],
+   [
+    "M_SD_RadixiteGlass",
+    null
+   ],
+   [
+    "MI_Crystals1",
+    null
+   ]
+  ],
+  "aim": [
+   [
+    150,
+    0,
+    325
+   ],
+   [
+    245,
+    0,
+    325
+   ],
+   [
+    112,
+    -33,
+    280
+   ],
+   [
+    165,
+    333,
+    330
+   ],
+   [
+    165,
+    -333,
+    330
+   ]
+  ]
+ },
+ "Kaskade": {
+  "bp": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/Refinery/Kaskade/Ger_Bxp_RefineryKaskade",
+  "mesh": "SM_GerRefinery_Kaskade",
+  "saved": true,
+  "debris": "own",
+  "slots": [
+   [
+    "M_PantherII_Sheets",
+    "MI_M_PantherII_Sheets_WallHoles"
+   ],
+   [
+    "M_rusty_pipe_Radixite",
+    "MI_M_rusty_pipe_Radixite_WallHoles"
+   ],
+   [
+    "M_GerSandBagScaffold_Atlas",
+    "MI_GerPit_GerSandBag_WallHoles"
+   ],
+   [
+    "M_SD_RadixiteGlass",
+    null
+   ]
+  ],
+  "aim": [
+   [
+    -1095,
+    99,
+    517
+   ],
+   [
+    -701,
+    87,
+    262
+   ],
+   [
+    -1152,
+    37,
+    520
+   ],
+   [
+    -1099,
+    458,
+    455
+   ],
+   [
+    -1089,
+    -190,
+    517
+   ]
+  ]
+ },
+ "FlakStand": {
+  "bp": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/Refinery/FlakStand/Ger_Bxp_RefineryFlakStand",
+  "mesh": "SM_GerRefinery_FlakStand",
+  "saved": true,
+  "debris": "own",
+  "slots": [
+   [
+    "M_rusty_pipe_Radixite",
+    "MI_M_rusty_pipe_Radixite_WallHoles"
+   ],
+   [
+    "M_GerSandBagScaffold_Atlas",
+    "MI_GerPit_GerSandBag_WallHoles"
+   ],
+   [
+    "M_PantherII_Sheets",
+    "MI_M_PantherII_Sheets_WallHoles"
+   ],
+   [
+    "M_Old_Concrete_2",
+    "MI_M_Old_Concrete_2_WallHoles"
+   ]
+  ],
+  "aim": [
+   [
+    89,
+    -114,
+    622
+   ],
+   [
+    232,
+    -145,
+    499
+   ],
+   [
+    -363,
+    -152,
+    580
+   ],
+   [
+    -33,
+    62,
+    630
+   ],
+   [
+    -48,
+    -421,
+    569
+   ]
+  ]
+ },
+ "BarracksReactor": {
+  "bp": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/Barracks/RadixReactor/Ger_Bxp_BarracksReactorExpansion",
+  "mesh": "SM_GerBarracks_RadixReactor",
+  "saved": true,
+  "debris": "own",
+  "slots": [
+   [
+    "M_MB_ModuleAtlas",
+    "MI_M_MB_ModuleAtlas_WallHoles"
+   ],
+   [
+    "M_PantherII_Sheets",
+    "MI_M_PantherII_Sheets_WallHoles"
+   ],
+   [
+    "M_SD_RadixiteGlass",
+    null
+   ],
+   [
+    "M_MB_PropsAtlas",
+    "MI_M_MB_PropsAtlas_WallHoles"
+   ],
+   [
+    "MI_SD_RadixiteGlow",
+    null
+   ],
+   [
+    "M_GerSandBagScaffold_Atlas",
+    "MI_GerPit_GerSandBag_WallHoles"
+   ]
+  ],
+  "aim": [
+   [
+    -133,
+    672,
+    220
+   ],
+   [
+    110,
+    611,
+    246
+   ],
+   [
+    -235,
+    685,
+    220
+   ],
+   [
+    -97,
+    745,
+    220
+   ],
+   [
+    25,
+    517,
+    217
+   ]
+  ]
+ },
+ "BarracksFuelCell": {
+  "bp": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/Barracks/FuelCell/Ger_Bxp_BarracksFuelExpansion",
+  "mesh": "SM_GerBarracks_FuelCell",
+  "saved": true,
+  "debris": "own",
+  "slots": [
+   [
+    "M_MB_PropsAtlas",
+    "MI_M_MB_PropsAtlas_WallHoles"
+   ],
+   [
+    "MM_GerInfantryWeapon_Emissive",
+    null
+   ],
+   [
+    "M_WeaponRack",
+    "MI_M_WeaponRack_WallHoles"
+   ],
+   [
+    "M_MB_ModuleAtlas",
+    "MI_M_MB_ModuleAtlas_WallHoles"
+   ],
+   [
+    "M_GerSandBagScaffold_Atlas",
+    "MI_GerPit_GerSandBag_WallHoles"
+   ],
+   [
+    "M_MB_Decals",
+    null
+   ]
+  ],
+  "aim": [
+   [
+    -904,
+    36,
+    143
+   ],
+   [
+    -736,
+    24,
+    107
+   ],
+   [
+    -1075,
+    35,
+    137
+   ],
+   [
+    -839,
+    187,
+    149
+   ],
+   [
+    -886,
+    -74,
+    125
+   ]
+  ]
+ },
+ "ForgeReactor": {
+  "bp": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/Forge/RadixReactor/Ger_Bxp_LFactoryRadixiteReactor",
+  "mesh": "SM_GerForge_RadixReactor",
+  "saved": true,
+  "debris": "own",
+  "slots": [
+   [
+    "M_PantherII_Sheets",
+    "MI_M_PantherII_Sheets_WallHoles"
+   ],
+   [
+    "M_MB_ModuleAtlas",
+    "MI_M_MB_ModuleAtlas_WallHoles"
+   ],
+   [
+    "MI_SD_RadixiteGlow",
+    null
+   ],
+   [
+    "M_SD_RadixiteGlass",
+    null
+   ],
+   [
+    "M_MB_PropsAtlas",
+    "MI_M_MB_PropsAtlas_WallHoles"
+   ]
+  ],
+  "aim": [
+   [
+    -537,
+    569,
+    342
+   ],
+   [
+    -472,
+    610,
+    342
+   ],
+   [
+    -681,
+    589,
+    342
+   ],
+   [
+    -515,
+    789,
+    342
+   ],
+   [
+    -532,
+    369,
+    358
+   ]
+  ]
+ },
+ "ForgeFuel": {
+  "bp": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/Forge/RadixFuel/Ger_Bxp_LFactoryFuelExpansion",
+  "mesh": "SM_GerForge_FuelStorage",
+  "saved": true,
+  "debris": "own",
+  "slots": [
+   [
+    "M_MB_ModuleAtlas",
+    "MI_M_MB_ModuleAtlas_WallHoles"
+   ],
+   [
+    "M_MB_PropsAtlas",
+    "MI_M_MB_PropsAtlas_WallHoles"
+   ],
+   [
+    "M_PantherII_Sheets",
+    "MI_M_PantherII_Sheets_WallHoles"
+   ],
+   [
+    "M_SD_RadixiteGlass",
+    null
+   ],
+   [
+    "M_GerSandBagScaffold_Atlas",
+    "MI_GerPit_GerSandBag_WallHoles"
+   ]
+  ],
+  "aim": [
+   [
+    750,
+    695,
+    285
+   ],
+   [
+    908,
+    695,
+    285
+   ],
+   [
+    593,
+    679,
+    285
+   ],
+   [
+    731,
+    878,
+    285
+   ],
+   [
+    672,
+    527,
+    313
+   ]
+  ]
+ },
+ "SchreckFrame": {
+  "bp": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/Forge/SchreckFrame/Ger_Bxp_LFactorySchreckFrame",
+  "mesh": "SM_GerForge_SchreckFrame",
+  "saved": true,
+  "debris": "own",
+  "slots": [
+   [
+    "M_MB_ModuleAtlas",
+    "MI_M_MB_ModuleAtlas_WallHoles"
+   ],
+   [
+    "M_MB_PropsAtlas",
+    "MI_M_MB_PropsAtlas_WallHoles"
+   ],
+   [
+    "M_PantherII_Sheets",
+    "MI_M_PantherII_Sheets_WallHoles"
+   ]
+  ],
+  "aim": [
+   [
+    830,
+    0,
+    584
+   ],
+   [
+    850,
+    0,
+    584
+   ],
+   [
+    420,
+    0,
+    484
+   ],
+   [
+    829,
+    307,
+    446
+   ],
+   [
+    829,
+    -307,
+    446
+   ]
+  ]
+ },
+ "Smelter": {
+  "bp": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/MetalVault/Smelter/Ger_Bxp_MetalVaultSmelter",
+  "mesh": "SM_GerMetalVault_Smelter",
+  "saved": true,
+  "debris": "own",
+  "slots": [
+   [
+    "M_TowerFrame_MetalVault",
+    "MI_M_TowerFrame_MetalVault_WallHoles"
+   ],
+   [
+    "M_PantherII_Sheets",
+    "MI_M_PantherII_Sheets_WallHoles"
+   ],
+   [
+    "M_GerSandBagScaffold_Atlas",
+    "MI_GerPit_GerSandBag_WallHoles"
+   ],
+   [
+    "M_RTS_MetalResource",
+    null
+   ],
+   [
+    "M_SD_Firebrick",
+    "MI_M_SD_Firebrick_WallHoles"
+   ],
+   [
+    "M_SD_SmelterMelt",
+    null
+   ]
+  ],
+  "aim": [
+   [
+    -547,
+    250,
+    532
+   ],
+   [
+    -390,
+    172,
+    495
+   ],
+   [
+    -715,
+    172,
+    495
+   ],
+   [
+    -525,
+    404,
+    532
+   ],
+   [
+    -417,
+    143,
+    495
+   ]
+  ]
+ },
+ "CommObservationPost": {
+  "bp": "/Game/RTS_Survival/Blueprints/GroundVehicles/BaseAndNomadic/ChildBlueprints/GerT2/CommunicationsCenter/BXPs/ObservationPost/Ger_Bxp_CommObservationPost",
+  "mesh": "SM_GerCommCenter_ObservationPost",
+  "saved": true,
+  "debris": "own",
+  "slots": [
+   [
+    "M_MB_ModuleAtlas",
+    "MI_M_MB_ModuleAtlas_WallHoles"
+   ],
+   [
+    "M_GerSandBagScaffold_Atlas",
+    "MI_GerPit_GerSandBag_WallHoles"
+   ],
+   [
+    "M_MB_PropsAtlas",
+    "MI_M_MB_PropsAtlas_WallHoles"
+   ]
+  ],
+  "aim": [
+   [
+    177,
+    -27,
+    261
+   ],
+   [
+    297,
+    -27,
+    258
+   ],
+   [
+    76,
+    0,
+    255
+   ],
+   [
+    152,
+    152,
+    255
+   ],
+   [
+    174,
+    -179,
+    260
+   ]
+  ]
+ },
+ "CommMG42Nests": {
+  "bp": "/Game/RTS_Survival/Blueprints/GroundVehicles/BaseAndNomadic/ChildBlueprints/GerT2/CommunicationsCenter/BXPs/MG42Nests/Ger_Bxp_CommMG42Nests",
+  "mesh": "SM_GerCommCenter_MG42Nests",
+  "saved": true,
+  "debris": "own",
+  "slots": [
+   [
+    "M_GerSandBagScaffold_Atlas",
+    "MI_GerPit_GerSandBag_WallHoles"
+   ],
+   [
+    "M_GerCamoConcretePalet_Atlas",
+    "MI_GerPit_GerCamoConcrete_WallHoles"
+   ],
+   [
+    "M_Ger_AmmoBox",
+    "MI_GerPit_GerAmmoBox_WallHoles"
+   ]
+  ],
+  "aim": [
+   [
+    -640,
+    -225,
+    470
+   ],
+   [
+    275,
+    462,
+    454
+   ],
+   [
+    -803,
+    -175,
+    375
+   ],
+   [
+    -80,
+    633,
+    404
+   ],
+   [
+    -633,
+    -540,
+    454
+   ]
+  ]
+ },
+ "CommRequisitionOffice": {
+  "bp": "/Game/RTS_Survival/Blueprints/GroundVehicles/BaseAndNomadic/ChildBlueprints/GerT2/CommunicationsCenter/BXPs/RequisitionOffice/Ger_Bxp_CommRequisitionOffice",
+  "mesh": "SM_GerCommCenter_RequisitionOffice",
+  "saved": true,
+  "debris": "own",
+  "slots": [
+   [
+    "M_MB_ModuleAtlas",
+    "MI_M_MB_ModuleAtlas_WallHoles"
+   ],
+   [
+    "M_MB_PropsAtlas",
+    "MI_M_MB_PropsAtlas_WallHoles"
+   ]
+  ],
+  "aim": [
+   [
+    -525,
+    675,
+    736
+   ],
+   [
+    -408,
+    726,
+    691
+   ],
+   [
+    -600,
+    675,
+    736
+   ],
+   [
+    -509,
+    820,
+    710
+   ],
+   [
+    -509,
+    590,
+    710
+   ]
+  ]
+ },
+ "CommCipherRoom": {
+  "bp": "/Game/RTS_Survival/Blueprints/GroundVehicles/BaseAndNomadic/ChildBlueprints/GerT2/CommunicationsCenter/BXPs/CipherRoom/Ger_Bxp_CommCipherRoom",
+  "mesh": "SM_GerCommCenter_CipherRoom",
+  "saved": true,
+  "debris": "own",
+  "slots": [
+   [
+    "M_MB_ModuleAtlas",
+    "MI_M_MB_ModuleAtlas_WallHoles"
+   ],
+   [
+    "M_MB_PropsAtlas",
+    "MI_M_MB_PropsAtlas_WallHoles"
+   ]
+  ],
+  "aim": [
+   [
+    42,
+    0,
+    675
+   ],
+   [
+    233,
+    18,
+    689
+   ],
+   [
+    8,
+    0,
+    760
+   ],
+   [
+    3,
+    227,
+    675
+   ],
+   [
+    43,
+    -150,
+    675
+   ]
+  ]
+ },
+ "Flak37": {
+  "bp": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/Childs/37mmFlak/RTS_BP_BXP_37mmFlak",
+  "mesh": "SM_BXP_37mm_BuildingMesh",
+  "saved": true,
+  "debris": "own",
+  "slots": [
+   [
+    "M_GerSandBagScaffold_Atlas",
+    "MI_GerPit_GerSandBag_WallHoles"
+   ],
+   [
+    "M_Ger_AmmoBox",
+    "MI_GerPit_GerAmmoBox_WallHoles"
+   ],
+   [
+    "M_messingShell",
+    null
+   ],
+   [
+    "M_ShellCasing",
+    null
+   ],
+   [
+    "M_Wood_Pine",
+    "MI_M_Wood_Pine_WallHoles"
+   ]
+  ],
+  "aim": [
+   [
+    66,
+    7,
+    2
+   ],
+   [
+    264,
+    -10,
+    57
+   ],
+   [
+    -154,
+    7,
+    3
+   ],
+   [
+    34,
+    207,
+    34
+   ],
+   [
+    32,
+    -183,
+    38
+   ]
+  ]
+ },
+ "Flak88": {
+  "bp": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/Childs/88mmFlak/RTS_BP_BXP_Flak88",
+  "mesh": "SM_Flak88_BuildingMesh",
+  "saved": true,
+  "debris": "own",
+  "slots": [
+   [
+    "M_Flak88_Ammo",
+    "MI_GerPit_Flak88Ammo_WallHoles"
+   ],
+   [
+    "M_Wood_Pine",
+    "MI_M_Wood_Pine_WallHoles"
+   ],
+   [
+    "M_Ger_AmmoBox",
+    "MI_GerPit_GerAmmoBox_WallHoles"
+   ],
+   [
+    "M_GerSandBagScaffold_Atlas",
+    "MI_GerPit_GerSandBag_WallHoles"
+   ]
+  ],
+  "aim": [
+   [
+    -32,
+    29,
+    4
+   ],
+   [
+    342,
+    24,
+    62
+   ],
+   [
+    -334,
+    45,
+    8
+   ],
+   [
+    -24,
+    318,
+    65
+   ],
+   [
+    -23,
+    -277,
+    62
+   ]
+  ]
+ },
+ "LeFH150": {
+  "bp": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/Childs/LeFH105/RTS_BP_BXP_LeFH105mm",
+  "mesh": "SM_Flak88_BuildingMesh",
+  "saved": true,
+  "debris": "own",
+  "slots": [
+   [
+    "M_Flak88_Ammo",
+    "MI_GerPit_Flak88Ammo_WallHoles"
+   ],
+   [
+    "M_Wood_Pine",
+    "MI_M_Wood_Pine_WallHoles"
+   ],
+   [
+    "M_Ger_AmmoBox",
+    "MI_GerPit_GerAmmoBox_WallHoles"
+   ],
+   [
+    "M_GerSandBagScaffold_Atlas",
+    "MI_GerPit_GerSandBag_WallHoles"
+   ]
+  ],
+  "aim": [
+   [
+    -32,
+    29,
+    4
+   ],
+   [
+    342,
+    24,
+    62
+   ],
+   [
+    -334,
+    45,
+    8
+   ],
+   [
+    -24,
+    318,
+    65
+   ],
+   [
+    -23,
+    -277,
+    62
+   ]
+  ]
+ },
+ "SolarLarge": {
+  "bp": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/Childs/Economic/BigSolarEXP/BXP_Solar_Big",
+  "mesh": "SM_GerGamma_SolarTrailer",
+  "saved": true,
+  "debris": "own",
+  "slots": [
+   [
+    "M_Radixite_Solar_Pannel",
+    "MI_M_Radixite_Solar_Pannel_WallHoles"
+   ],
+   [
+    "M_OpelBlitz",
+    "MI_M_OpelBlitz_WallHoles"
+   ],
+   [
+    "T_ATent_D_Mat",
+    "MI_T_ATent_D_Mat_WallHoles"
+   ],
+   [
+    "M_RustedRefinery_Atlas",
+    "MI_M_RustedRefinery_Atlas_WallHoles"
+   ],
+   [
+    "MI_Crystal1",
+    null
+   ],
+   [
+    "M_MB_Decals",
+    null
+   ]
+  ],
+  "aim": [
+   [
+    158,
+    0,
+    147
+   ],
+   [
+    313,
+    0,
+    172
+   ],
+   [
+    37,
+    89,
+    174
+   ],
+   [
+    161,
+    163,
+    162
+   ],
+   [
+    192,
+    -135,
+    185
+   ]
+  ]
+ },
+ "RailPakBunker": {
+  "bp": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerPits/RailPakBunker/Ger_BXP_RailPakBunker",
+  "mesh": "SM_GerRailPakBunker",
+  "saved": true,
+  "debris": "own",
+  "slots": [
+   [
+    "M_GerCamoConcretePalet_Atlas",
+    "MI_GerPit_GerCamoConcrete_WallHoles"
+   ],
+   [
+    "M_Ger_AmmoBox",
+    "MI_GerPit_GerAmmoBox_WallHoles"
+   ],
+   [
+    "M_GerSandBagScaffold_Atlas",
+    "MI_GerPit_GerSandBag_WallHoles"
+   ],
+   [
+    "MI_Bunker_Concrete_Wall_2x2_M_tk3fbcgfw_8K",
+    null
+   ],
+   [
+    "M_RailSlug_Metal",
+    null
+   ],
+   [
+    "M_RailSlug_Glow",
+    null
+   ]
+  ],
+  "aim": [
+   [
+    -81,
+    -8,
+    254
+   ],
+   [
+    395,
+    -16,
+    310
+   ],
+   [
+    -451,
+    37,
+    312
+   ],
+   [
+    -83,
+    417,
+    309
+   ],
+   [
+    -68,
+    -401,
+    312
+   ]
+  ]
+ },
+ "HQLaser": {
+  "bp": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/HQ/HQLaser/Ger_Bxp_HQLaserPlatform",
+  "mesh": "SM_Ger_Bxp_HqLaser_BuildingMesh",
+  "saved": true,
+  "debris": "own",
+  "slots": [
+   [
+    "M_GerRadar",
+    "MI_M_GerRadar_WallHoles"
+   ],
+   [
+    "M_PantherII_Sheets",
+    "MI_M_PantherII_Sheets_WallHoles"
+   ],
+   [
+    "M_GerSandBagScaffold_Atlas",
+    "MI_GerPit_GerSandBag_WallHoles"
+   ],
+   [
+    "M_HQLaser_Coils",
+    null
+   ]
+  ],
+  "aim": [
+   [
+    332,
+    0,
+    311
+   ],
+   [
+    410,
+    0,
+    239
+   ],
+   [
+    97,
+    0,
+    239
+   ],
+   [
+    263,
+    204,
+    236
+   ],
+   [
+    260,
+    -199,
+    236
+   ]
+  ]
+ },
+ "FlakBunker": {
+  "bp": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/Bunkers/FlakBunker/Ger_BXP_FlakBunker",
+  "mesh": "SM_Ger_FlakBunker",
+  "saved": true,
+  "debris": "own",
+  "slots": [
+   [
+    "MI_GerFlakBunker",
+    "MI_GerFlakBunker_WallHoles"
+   ]
+  ],
+  "aim": [
+   [
+    124,
+    -393,
+    380
+   ],
+   [
+    338,
+    -351,
+    403
+   ],
+   [
+    -448,
+    -393,
+    380
+   ],
+   [
+    124,
+    217,
+    529
+   ],
+   [
+    122,
+    -1002,
+    435
+   ]
+  ]
+ },
+ "Flak88Bunker": {
+  "bp": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/Bunkers/Flak88Bunker/Ger_BXP_Flak88Bunker",
+  "mesh": "SM_BF_Flak88Bunker",
+  "saved": true,
+  "debris": "own",
+  "slots": [
+   [
+    "MI_BF_Flak88Bunker_Concrete",
+    "MI_BF_Flak88Bunker_Concrete_WallHoles"
+   ],
+   [
+    "M_BF_Trim",
+    "MI_M_BF_Trim_WallHoles"
+   ],
+   [
+    "M_BF_CamoNet",
+    null
+   ]
+  ],
+  "aim": [
+   [
+    -42,
+    85,
+    340
+   ],
+   [
+    407,
+    65,
+    240
+   ],
+   [
+    -460,
+    36,
+    396
+   ],
+   [
+    16,
+    644,
+    340
+   ],
+   [
+    -18,
+    -555,
+    334
+   ]
+  ]
+ },
+ "FlakvierlingBunker": {
+  "bp": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/Bunkers/FlakvierlingBunker/Ger_BXP_FlakvierlingBunker",
+  "mesh": "SM_BF_FlakvierlingBunker",
+  "saved": true,
+  "debris": "own",
+  "slots": [
+   [
+    "MI_BF_FlakvierlingBunker_Concrete",
+    "MI_BF_FlakvierlingBunker_Concrete_WallHoles"
+   ],
+   [
+    "M_BF_Trim",
+    "MI_M_BF_Trim_WallHoles"
+   ],
+   [
+    "M_BF_CamoNet",
+    null
+   ]
+  ],
+  "aim": [
+   [
+    -42,
+    -12,
+    109
+   ],
+   [
+    195,
+    -30,
+    105
+   ],
+   [
+    -320,
+    40,
+    125
+   ],
+   [
+    -70,
+    230,
+    125
+   ],
+   [
+    30,
+    -260,
+    125
+   ]
+  ]
+ },
+ "PZ38TBunker": {
+  "bp": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/Bunkers/PZ38TTurretBunker/Ger_BXP_PZ38TTurretBunker",
+  "mesh": "SM_CaptureBunker37mm",
+  "saved": true,
+  "debris": "own",
+  "slots": [
+   [
+    "M_PZII_NoAtlas",
+    "MI_M_PZII_NoAtlas_WallHoles"
+   ],
+   [
+    "M_GerCamoConcretePalet_Atlas",
+    "MI_GerPit_GerCamoConcrete_WallHoles"
+   ]
+  ],
+  "aim": [
+   [
+    -61,
+    58,
+    244
+   ],
+   [
+    244,
+    87,
+    260
+   ],
+   [
+    -293,
+    95,
+    194
+   ],
+   [
+    -60,
+    421,
+    224
+   ],
+   [
+    -71,
+    -284,
+    224
+   ]
+  ]
+ },
+ "CaptureBunker37": {
+  "bp": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/CaptureBunkers/Ger_Bxp_CaptureBunker37mm",
+  "mesh": "SM_CaptureBunker37mm",
+  "saved": true,
+  "debris": "own",
+  "slots": [
+   [
+    "M_PZII_NoAtlas",
+    "MI_M_PZII_NoAtlas_WallHoles"
+   ],
+   [
+    "M_GerCamoConcretePalet_Atlas",
+    "MI_GerPit_GerCamoConcrete_WallHoles"
+   ]
+  ],
+  "aim": [
+   [
+    -61,
+    58,
+    244
+   ],
+   [
+    244,
+    87,
+    260
+   ],
+   [
+    -293,
+    95,
+    194
+   ],
+   [
+    -60,
+    421,
+    224
+   ],
+   [
+    -71,
+    -284,
+    224
+   ]
+  ]
+ },
+ "CaptureBunkerTurret": {
+  "bp": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/CaptureBunkers/Ger_Bxp_CaptureBunkerTurret",
+  "mesh": "SM_CaptureBunkerTurret",
+  "saved": true,
+  "debris": "own",
+  "slots": [
+   [
+    "M_GerCamoConcretePalet_Atlas",
+    "MI_GerPit_GerCamoConcrete_WallHoles"
+   ],
+   [
+    "M_PZII_NoAtlas",
+    "MI_M_PZII_NoAtlas_WallHoles"
+   ]
+  ],
+  "aim": [
+   [
+    -83,
+    -58,
+    329
+   ],
+   [
+    258,
+    -41,
+    329
+   ],
+   [
+    -293,
+    -78,
+    259
+   ],
+   [
+    -47,
+    295,
+    329
+   ],
+   [
+    -28,
+    -281,
+    329
+   ]
+  ]
+ }
+}

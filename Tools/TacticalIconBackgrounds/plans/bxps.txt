@@ -1,0 +1,105 @@
+# Placard plan: German building expansions (BXP option pictures), 2026-11-19. Engrave with
+#   python ../placard_portraits.py bxps.txt --out D:/UE_Assets/Icons/TrainingUI/Expansions/Ger
+# (or UnitPortraits/bxp_portraits.py, which crops the captures first). Output name = the key (T_Ger_Bxp_<Short>.png).
+#
+# Mapping (proposal, follows the approved unit scheme: left = class in camo colours, right = role in signal colours):
+#   LEFT  = the option's section in CPPGameState (AsDefense / AsEconomic / AsTech; pits and bunkers = defence):
+#           defence  T_HQ_Icon (fort)                     Panzergrau
+#           economy  T_MetalStorageClass_Icon_V2 (ingots) sand
+#           tech     T_ResearchBuilding (flask)           olive
+#   RIGHT = role: anti-air sky blue, anti-armour oxide red (Pak / 88 / turret = tank destroyer, Schreck/Puppchen = AT
+#           infantry, rail, laser), indirect/explosive plum (artillery, rockets), rapid fire amber (MG), precision cream
+#           (sniper), support teal (range/spotting, repair, energy, storage, parts, cheaper defences, ability cooldown).
+#   stem@colour paints an icon in another palette colour (fort as teal role = cheaper field defences).
+# Lines starting with "#P2 " wait for the phase-2 (backdrop) captures; drop the prefix once their NoIcon exists.
+
+
+# --- Defence: anti-air (sky blue) ---
+# HQPlatform: HQ flak platform, 37mm
+T_Ger_Bxp_HQPlatform=D:/UE_Assets/Icons/TrainingUI/Expansions/Ger/NoIcon/T_Ger_Bxp_HQPlatform.png|T_HQ_Icon|T_AntiAirClass_Icon_V3_NoStar
+# RefFlakStand: Flak 37 over the refinery tanks
+T_Ger_Bxp_RefFlakStand=D:/UE_Assets/Icons/TrainingUI/Expansions/Ger/NoIcon/T_Ger_Bxp_RefFlakStand.png|T_HQ_Icon|T_AntiAirClass_Icon_V3_NoStar
+T_Ger_Bxp_Flak37=D:/UE_Assets/Icons/TrainingUI/Expansions/Ger/NoIcon/T_Ger_Bxp_Flak37.png|T_HQ_Icon|T_AntiAirClass_Icon_V3_NoStar
+#SKIP placeholder mesh (SM_Box_13 ammo box, no gun) T_Ger_Bxp_Flak20=D:/UE_Assets/Icons/TrainingUI/Expansions/Ger/NoIcon/T_Ger_Bxp_Flak20.png|T_HQ_Icon|T_AntiAirClass_Icon_V3_NoStar
+T_Ger_Bxp_PitFlak37=D:/UE_Assets/Icons/TrainingUI/Expansions/Ger/NoIcon/T_Ger_Bxp_PitFlak37.png|T_HQ_Icon|T_AntiAirClass_Icon_V3_NoStar
+# FlakBunker: 88 + 37 flak
+T_Ger_Bxp_FlakBunker=D:/UE_Assets/Icons/TrainingUI/Expansions/Ger/NoIcon/T_Ger_Bxp_FlakBunker.png|T_HQ_Icon|T_AntiAirClass_Icon_V3_NoStar
+T_Ger_Bxp_FlakvierlingBunker=D:/UE_Assets/Icons/TrainingUI/Expansions/Ger/NoIcon/T_Ger_Bxp_FlakvierlingBunker.png|T_HQ_Icon|T_AntiAirClass_Icon_V3_NoStar
+
+# --- Defence: anti-armour (oxide red) ---
+# Flak88: DT text: highly effective against armour (the 88 team weapon also has AA)
+T_Ger_Bxp_Flak88=D:/UE_Assets/Icons/TrainingUI/Expansions/Ger/NoIcon/T_Ger_Bxp_Flak88.png|T_HQ_Icon|T_TankDestroyerClass_Icon
+T_Ger_Bxp_PitFlak88=D:/UE_Assets/Icons/TrainingUI/Expansions/Ger/NoIcon/T_Ger_Bxp_PitFlak88.png|T_HQ_Icon|T_TankDestroyerClass_Icon
+T_Ger_Bxp_Flak88Bunker=D:/UE_Assets/Icons/TrainingUI/Expansions/Ger/NoIcon/T_Ger_Bxp_Flak88Bunker.png|T_HQ_Icon|T_TankDestroyerClass_Icon
+T_Ger_Bxp_Pak38=D:/UE_Assets/Icons/TrainingUI/Expansions/Ger/NoIcon/T_Ger_Bxp_Pak38.png|T_HQ_Icon|T_TankDestroyerClass_Icon
+T_Ger_Bxp_PitPak40=D:/UE_Assets/Icons/TrainingUI/Expansions/Ger/NoIcon/T_Ger_Bxp_PitPak40.png|T_HQ_Icon|T_TankDestroyerClass_Icon
+# HQTower: Pz IV turret on a tower
+T_Ger_Bxp_HQTower=D:/UE_Assets/Icons/TrainingUI/Expansions/Ger/NoIcon/T_Ger_Bxp_HQTower.png|T_HQ_Icon|T_TankDestroyerClass_Icon
+# PZ38TTurretBunker: 38(t) turret
+#SKIP unfinished Blueprint T_Ger_Bxp_PZ38TTurretBunker=D:/UE_Assets/Icons/TrainingUI/Expansions/Ger/NoIcon/T_Ger_Bxp_PZ38TTurretBunker.png|T_HQ_Icon|T_TankDestroyerClass_Icon
+# PitPuppchen: rocket launcher crew
+T_Ger_Bxp_PitPuppchen=D:/UE_Assets/Icons/TrainingUI/Expansions/Ger/NoIcon/T_Ger_Bxp_PitPuppchen.png|T_HQ_Icon|T_ATInfantryClass_Icon_V2
+T_Ger_Bxp_PitPanzerschreck=D:/UE_Assets/Icons/TrainingUI/Expansions/Ger/NoIcon/T_Ger_Bxp_PitPanzerschreck.png|T_HQ_Icon|T_ATInfantryClass_Icon_V2
+# ForgeSchreckFrame: Panzerschreck team on the frame
+T_Ger_Bxp_ForgeSchreckFrame=D:/UE_Assets/Icons/TrainingUI/Expansions/Ger/NoIcon/T_Ger_Bxp_ForgeSchreckFrame.png|T_HQ_Icon|T_ATInfantryClass_Icon_V2
+T_Ger_Bxp_RailPakBunker=D:/UE_Assets/Icons/TrainingUI/Expansions/Ger/NoIcon/T_Ger_Bxp_RailPakBunker.png|T_HQ_Icon|T_RailgunClass_Icon_V2
+T_Ger_Bxp_HQLaserPlatform=D:/UE_Assets/Icons/TrainingUI/Expansions/Ger/NoIcon/T_Ger_Bxp_HQLaserPlatform.png|T_HQ_Icon|T_LaserClass_Icon
+
+# --- Defence: indirect / explosive (plum) ---
+T_Ger_Bxp_LeFH150=D:/UE_Assets/Icons/TrainingUI/Expansions/Ger/NoIcon/T_Ger_Bxp_LeFH150.png|T_HQ_Icon|T_ArtilleryClass_Icon_V3
+T_Ger_Bxp_PitLeFH18=D:/UE_Assets/Icons/TrainingUI/Expansions/Ger/NoIcon/T_Ger_Bxp_PitLeFH18.png|T_HQ_Icon|T_ArtilleryClass_Icon_V3
+T_Ger_Bxp_PitSFH18=D:/UE_Assets/Icons/TrainingUI/Expansions/Ger/NoIcon/T_Ger_Bxp_PitSFH18.png|T_HQ_Icon|T_ArtilleryClass_Icon_V3
+T_Ger_Bxp_PitMortar=D:/UE_Assets/Icons/TrainingUI/Expansions/Ger/NoIcon/T_Ger_Bxp_PitMortar.png|T_HQ_Icon|T_ArtilleryClass_Icon_V3
+T_Ger_Bxp_PitCapturedB4=D:/UE_Assets/Icons/TrainingUI/Expansions/Ger/NoIcon/T_Ger_Bxp_PitCapturedB4.png|T_HQ_Icon|T_ArtilleryClass_Icon_V3
+
+# --- Defence: rapid fire (amber) / precision (cream) ---
+T_Ger_Bxp_CommMG42Nests=D:/UE_Assets/Icons/TrainingUI/Expansions/Ger/NoIcon/T_Ger_Bxp_CommMG42Nests.png|T_HQ_Icon|T_MGClass_Icon_V2
+T_Ger_Bxp_PitTwinMG42=D:/UE_Assets/Icons/TrainingUI/Expansions/Ger/NoIcon/T_Ger_Bxp_PitTwinMG42.png|T_HQ_Icon|T_MGClass_Icon_V2
+# BarracksSniperLoft: Kar98k sniper
+T_Ger_Bxp_BarracksSniperLoft=D:/UE_Assets/Icons/TrainingUI/Expansions/Ger/NoIcon/T_Ger_Bxp_BarracksSniperLoft.png|T_HQ_Icon|T_SniperClass_Icon_V2
+
+# --- Economy (support teal) ---
+# HQHarvesterHub: harvester / scavenger research platform
+T_Ger_Bxp_HQHarvesterHub=D:/UE_Assets/Icons/TrainingUI/Expansions/Ger/NoIcon/T_Ger_Bxp_HQHarvesterHub.png|T_MetalStorageClass_Icon_V2|T_ResearchBuilding@teal
+# HQRepairBay: auto-repair
+T_Ger_Bxp_HQRepairBay=D:/UE_Assets/Icons/TrainingUI/Expansions/Ger/NoIcon/T_Ger_Bxp_HQRepairBay.png|T_MetalStorageClass_Icon_V2|T_RepairAuraClass_V2
+# RefConverter: radixite -> vehicle parts
+T_Ger_Bxp_RefConverter=D:/UE_Assets/Icons/TrainingUI/Expansions/Ger/NoIcon/T_Ger_Bxp_RefConverter.png|T_MetalStorageClass_Icon_V2|T_EngineerClass_Icon_V2
+# MetalVaultSmelter: metal -> vehicle parts
+T_Ger_Bxp_MetalVaultSmelter=D:/UE_Assets/Icons/TrainingUI/Expansions/Ger/NoIcon/T_Ger_Bxp_MetalVaultSmelter.png|T_MetalStorageClass_Icon_V2|T_EngineerClass_Icon_V2
+# RefKaskade: +750 radixite storage
+T_Ger_Bxp_RefKaskade=D:/UE_Assets/Icons/TrainingUI/Expansions/Ger/NoIcon/T_Ger_Bxp_RefKaskade.png|T_MetalStorageClass_Icon_V2|T_RadixiteStorageClass_Icon_V2
+# ForgeRadixReactor: energy
+T_Ger_Bxp_ForgeRadixReactor=D:/UE_Assets/Icons/TrainingUI/Expansions/Ger/NoIcon/T_Ger_Bxp_ForgeRadixReactor.png|T_MetalStorageClass_Icon_V2|T_EnergyBuilidngClass_Icon_V2
+# ForgeFuelStorage: energy
+T_Ger_Bxp_ForgeFuelStorage=D:/UE_Assets/Icons/TrainingUI/Expansions/Ger/NoIcon/T_Ger_Bxp_ForgeFuelStorage.png|T_MetalStorageClass_Icon_V2|T_EnergyBuilidngClass_Icon_V2
+# SolarLarge: solar trailer, energy
+T_Ger_Bxp_SolarLarge=D:/UE_Assets/Icons/TrainingUI/Expansions/Ger/NoIcon/T_Ger_Bxp_SolarLarge.png|T_MetalStorageClass_Icon_V2|T_Solar_Icon_V2@teal
+# CommRequisitionOffice: field defences cost x0.75
+T_Ger_Bxp_CommRequisitionOffice=D:/UE_Assets/Icons/TrainingUI/Expansions/Ger/NoIcon/T_Ger_Bxp_CommRequisitionOffice.png|T_MetalStorageClass_Icon_V2|T_HQ_Icon@teal
+
+# --- Tech ---
+# HQRadar: range for nearby units
+T_Ger_Bxp_HQRadar=D:/UE_Assets/Icons/TrainingUI/Expansions/Ger/NoIcon/T_Ger_Bxp_HQRadar.png|T_ResearchBuilding|T_RangeProviderClass_ICon_V2
+# CommObservationPost: spotting
+T_Ger_Bxp_CommObservationPost=D:/UE_Assets/Icons/TrainingUI/Expansions/Ger/NoIcon/T_Ger_Bxp_CommObservationPost.png|T_ResearchBuilding|T_RangeProviderClass_ICon_V2
+# MechDepotRadioVan: depot sees further
+T_Ger_Bxp_MechDepotRadioVan=D:/UE_Assets/Icons/TrainingUI/Expansions/Ger/NoIcon/T_Ger_Bxp_MechDepotRadioVan.png|T_ResearchBuilding|T_RangeProviderClass_ICon_V2
+# CommCipherRoom: global ability cooldown x0.8
+T_Ger_Bxp_CommCipherRoom=D:/UE_Assets/Icons/TrainingUI/Expansions/Ger/NoIcon/T_Ger_Bxp_CommCipherRoom.png|T_ResearchBuilding|T_RocketAbiltyClass_ICon_V3@teal
+# BarracksRadixReactor: energy supply 8
+T_Ger_Bxp_BarracksRadixReactor=D:/UE_Assets/Icons/TrainingUI/Expansions/Ger/NoIcon/T_Ger_Bxp_BarracksRadixReactor.png|T_ResearchBuilding|T_EnergyBuilidngClass_Icon_V2
+# BarracksFuelCell: energy supply 5
+T_Ger_Bxp_BarracksFuelCell=D:/UE_Assets/Icons/TrainingUI/Expansions/Ger/NoIcon/T_Ger_Bxp_BarracksFuelCell.png|T_ResearchBuilding|T_EnergyBuilidngClass_Icon_V2
+# MechDepotWurfrahmenShop: Panzerwerfers reload faster (plum = rockets)
+T_Ger_Bxp_MechDepotWurfrahmenShop=D:/UE_Assets/Icons/TrainingUI/Expansions/Ger/NoIcon/T_Ger_Bxp_MechDepotWurfrahmenShop.png|T_ResearchBuilding|T_RocketWeaponClass_Icon_V2
+
+# --- Follow-up 2026-11-19 ---
+# CaptureBunker37mm: map-placed capturable bunker, 37mm Flak (anti-armour per coordinator)
+T_Ger_Bxp_CaptureBunker37mm=D:/UE_Assets/Icons/TrainingUI/Expansions/Ger/NoIcon/T_Ger_Bxp_CaptureBunker37mm.png|T_HQ_Icon|T_TankDestroyerClass_Icon
+# CaptureBunkerTurret: map-placed capturable bunker with the Jaguar 35mm autocannon turret -> rapid fire
+T_Ger_Bxp_CaptureBunkerTurret=D:/UE_Assets/Icons/TrainingUI/Expansions/Ger/NoIcon/T_Ger_Bxp_CaptureBunkerTurret.png|T_HQ_Icon|T_AutoCannon_Class_V2
+# MarderStugFactory: builds Marders and StuGs (tank hunters) -> tank destroyer, oxide red; picture = medium factory portrait
+T_Ger_Bxp_MarderStugFactory=D:/UE_Assets/Icons/TrainingUI/Expansions/Ger/NoIcon/T_Ger_Bxp_MarderStugFactory.png|T_ResearchBuilding|T_TankDestroyerClass_Icon
+# FieldTrench: dragged field trench (cover for infantry) -> garrison/cover icon, support teal
+T_Ger_Bxp_FieldTrench=D:/UE_Assets/Icons/TrainingUI/Expansions/Ger/NoIcon/T_Ger_Bxp_FieldTrench.png|T_HQ_Icon|T_CargoGarrisionClass_Icon@teal

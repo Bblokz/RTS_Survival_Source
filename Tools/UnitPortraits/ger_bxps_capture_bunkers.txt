@@ -1,0 +1,3 @@
+# Capturable map bunkers (2026-11-19 follow-up), idle only.
+T_Ger_Bxp_CaptureBunker37mm=/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/CaptureBunkers/Ger_Bxp_CaptureBunker37mm.Ger_Bxp_CaptureBunker37mm_C
+T_Ger_Bxp_CaptureBunkerTurret=/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/CaptureBunkers/Ger_Bxp_CaptureBunkerTurret.Ger_Bxp_CaptureBunkerTurret_C

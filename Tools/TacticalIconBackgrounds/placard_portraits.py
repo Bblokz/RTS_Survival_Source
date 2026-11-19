@@ -6,7 +6,8 @@ Plan file, one line per in-game texture:
   <UE texture path>=<clean portrait png>|<left icon stem or ->|<right icon stem or ->
   /Game/RTS_Survival/Textures/GameUI/UnitIcons/LightTanks/T_Ger_LightTank_PanzerII_F=D:/UE_Assets/Icons/TrainingUI/GerTanks/Light/NoIcon/T_Ger_LightTank_PanzerII_F.png|T_LightTankClass_Icon_V2|T_AutoCannon_Class_V2
 The portrait may be written inpaint:<iconed png> when no clean version exists; the neon glyphs in the bottom band are
-then painted out first. Icon stems are Set08_FlatStencil file names (without .png) listed in placard_colours.GROUPS.
+then painted out first. Icon stems are Set08_FlatStencil file names (without .png) listed in placard_colours.GROUPS; stem@<colour> paints
+the icon in another PALETTE colour (plans/bxps.txt).
 
 Usage:
   python placard_portraits.py <plan file> [<plan file> ...] [--out D:/UE_Assets/Icons/TrainingUI/Placard] [--sheet x.png]
@@ -26,7 +27,7 @@ sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE.parent / "UnitPortraits"))
 import enamel_handmade as eh  # noqa: E402
 import icon_backgrounds as ib  # noqa: E402
-from placard_colours import recommended_colour  # noqa: E402
+from placard_colours import PALETTE, recommended_colour  # noqa: E402
 
 DEFAULT_OUT = Path("D:/UE_Assets/Icons/TrainingUI/Placard")
 UNIT_ICONS_ROOT = "/Game/RTS_Survival/Textures/GameUI/UnitIcons/"
@@ -68,9 +69,13 @@ def load_portrait(spec):
     return Image.fromarray(cv2.inpaint(iconed, mask, INPAINT_RADIUS, cv2.INPAINT_TELEA)).convert("RGBA")
 
 
-def badge(icon_stem, texture, side):
+def badge(icon_spec, texture, side):
+    """icon_spec is an icon stem, or stem@<palette colour> to paint that icon in another colour of the palette (the
+    building expansions use one icon in two meanings, e.g. the fort as defence class and as the field-defence role)."""
+    icon_stem, _, colour_name = icon_spec.partition("@")
+    colour = PALETTE[colour_name] if colour_name else recommended_colour(icon_stem)
     seed = zlib.crc32(f"{texture}|{side}".encode()) % 100000
-    plate = eh.instrument_placard(ib.ICON_SET / f"{icon_stem}.png", recommended_colour(icon_stem), seed)
+    plate = eh.instrument_placard(ib.ICON_SET / f"{icon_stem}.png", colour, seed)
     return plate.resize((ib.BADGE_SIZE, ib.BADGE_SIZE), Image.LANCZOS)
 
 

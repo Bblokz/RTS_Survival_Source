@@ -227,6 +227,13 @@ protected:
 	virtual void UnitDies(const ERTSDeathType DeathType) override;
 
 	/**
+	 * @brief Runs the Blueprint health handler, then keeps the building mesh and its slot materials when the expansion
+	 * has procedural wall holes: older health graphs still swap to _At66/_At50/_At33 meshes or damaged materials on the
+	 * notify levels (and play their explosions there); a swap would wipe the holes, so mesh and materials are put back.
+	 */
+	virtual void OnHealthChanged(const EHealthLevel PercentageLeft, const bool bIsHealing) override;
+
+	/**
 	 * @brief Destroy the bxp and spawn actors around the location.
 	 * @param SpawnParams Defines what actors to spawn and where.
 	 * @param CollapseFX Optional FX to play.
