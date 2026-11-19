@@ -8,6 +8,8 @@
 #include "Components/Button.h"
 #include "Components/MeshComponent.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "GameFramework/Character.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "Components/SceneCaptureComponent2D.h"
 #include "Engine/SceneCapture2D.h"
 #include "Engine/TextureRenderTarget2D.h"
@@ -21,12 +23,14 @@
 #include "Misc/Paths.h"
 #include "NavigationSystem.h"
 #include "RTS_Survival/RTSCollisionTraceChannels.h"
+#include "RTS_Survival/Enemy/EnemyAISettings/EnemyAISettings.h"
 #include "RTS_Survival/Enemy/EnemyController/EnemyController.h"
 #include "RTS_Survival/Enemy/EnemyController/EnemyDirectControlComponent/EnemyDirectControlComponent.h"
 #include "RTS_Survival/Enemy/StrategicAI/Component/EnemyStrategicAIComponent.h"
 #include "RTS_Survival/Enemy/TrainingAndUnitCreation/EnemyAITechLevel/EnemyAITechLevel.h"
 #include "RTS_Survival/Enemy/TrainingAndUnitCreation/EnemyTrainingHelpers/EnemyTrainingHelpers.h"
 #include "RTS_Survival/Game/Players/RTSPlayers.h"
+#include "RTS_Survival/GlobalAbilitySystem/GlobalAbilities/ReconFlight/GlobalAbilityVisionBubble.h"
 #include "RTS_Survival/GameUI/GameDifficultyPicker/W_GameDifficultyPicker.h"
 #include "RTS_Survival/Interfaces/Commands.h"
 #include "RTS_Survival/Player/CPPController.h"
@@ -36,6 +40,8 @@
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/Units/Enums/Enum_UnitType.h"
+#include "RTS_Survival/Units/SquadController.h"
+#include "RTS_Survival/Units/Squads/SquadUnit/SquadUnit.h"
 #include "RTS_Survival/Utils/RTS_Statics/SubSystems/EnemyControllerSubsystem/EnemyControllerSubsystem.h"
 #include "RTS_Survival/Utils/UnitSpawning/RTSUnitOwnerSpawning.h"
 
@@ -100,6 +106,40 @@ namespace EnemyBuildingTrainerTestPrivate
 	const TCHAR* const TankSwitch = TEXT("EnemyBuildingTrainerTestTank=");
 	ESquadSubtype TestSquad = ESquadSubtype::Squad_Rus_Mosin;
 	ETankSubtype TestTank = ETankSubtype::Tank_BT7;
+	// -EnemyBuildingTrainerTestSpawnQA: frames and measurements of how a trained unit appears at its building.
+	const TCHAR* const SpawnQASwitch = TEXT("EnemyBuildingTrainerTestSpawnQA");
+	// The "pre" frame is taken once the active job is this far along.
+	constexpr float SpawnQAPreProgress = 0.97f;
+	struct FSpawnQAStage
+	{
+		const TCHAR* Tag;
+		float SecondsAfterSpawn;
+	};
+	constexpr FSpawnQAStage SpawnQAStages[] = {
+		{TEXT("b_spawn"), 0.f}, {TEXT("c_1s"), 1.f}, {TEXT("d_3s"), 3.f}, {TEXT("e_8s"), 8.f}, {TEXT("f_20s"), 20.f}
+	};
+	// Bodies are sampled every tick this long after the spawn for teleports and drops.
+	constexpr float SpawnQASampleSeconds = 2.5f;
+	// A body that moved this much further in one tick than its speed explains was teleported.
+	constexpr float SpawnQAMaxBodyJumpCm = 80.f;
+	// The fog control: a human vision bubble this wide over the first building's exit, for the whole run.
+	constexpr float SpawnQAFogControlRadiusCm = 2500.f;
+	constexpr float SpawnQAFogControlSeconds = 900.f;
+	// From this stage on the fog has had its ticks to show the control building's units.
+	constexpr int32 SpawnQAFogControlFirstCheckedStage = 1;
+	// Ignoring the first moments, while a unit may settle onto the ground.
+	constexpr float SpawnQAAirborneIgnoreSeconds = 0.25f;
+	constexpr float SpawnQAMaxAirborneCm = 35.f;
+	// At the last stage no body of the unit may stand this close to its exit (where the next unit appears).
+	constexpr float SpawnQAMinBodyExitDistanceCm = 250.f;
+	constexpr int32 SpawnQAStageCount = UE_ARRAY_COUNT(SpawnQAStages);
+	// Exit view: looks back at the exit and the building's front from outside, 30 degrees off the exit axis.
+	constexpr float SpawnQAViewYawOffset = 30.f;
+	constexpr float SpawnQAViewPitch = -38.f;
+	constexpr float SpawnQAViewTargetTowardBuildingMlt = 0.3f;
+	constexpr float SpawnQAViewDistanceRadiusMlt = 1.5f;
+	constexpr float SpawnQAViewMinDistanceCm = 2200.f;
+	constexpr float SpawnQAViewMaxDistanceCm = 6500.f;
 	constexpr int32 CaptureWidth = 1280;
 	constexpr int32 CaptureHeight = 720;
 
@@ -182,7 +222,7 @@ void UEnemyBuildingTrainerTestSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 	ReadCommandLine();
 	IPlatformFile& PlatformFile = FPlatformFileManager::Get().GetPlatformFile();
 	PlatformFile.CreateDirectoryTree(*M_OutputDirectory);
-	if (bM_Capture)
+	if (bM_Capture || bM_SpawnQA)
 	{
 		// One-shot captures of freshly spawned buildings otherwise render before their textures stream in.
 		if (IConsoleVariable* TextureStreaming = IConsoleManager::Get().FindConsoleVariable(TEXT("r.TextureStreaming")))
@@ -273,6 +313,7 @@ void UEnemyBuildingTrainerTestSubsystem::ReadCommandLine()
 	}
 	bM_AddMissingTrainers = FParse::Param(CommandLine, AddMissingSwitch);
 	bM_SpawnerAudit = FParse::Param(CommandLine, SpawnerAuditSwitch);
+	bM_SpawnQA = FParse::Param(CommandLine, SpawnQASwitch);
 	FString SubtypeName;
 	if (FParse::Value(CommandLine, SquadSwitch, SubtypeName))
 	{
@@ -613,6 +654,30 @@ void UEnemyBuildingTrainerTestSubsystem::QueueFirstJobs()
 			Case.Failures.Add(TEXT("not_active_right_after_queue"));
 		}
 	}
+	if (bM_SpawnQA)
+	{
+		for (int32 CaseIndex = 0; CaseIndex < M_Cases.Num(); ++CaseIndex)
+		{
+			const UEnemyBuildingTrainerComponent* const Trainer = M_Cases[CaseIndex].Trainer.Get();
+			if (not IsValid(Trainer))
+			{
+				continue;
+			}
+			FActorSpawnParameters BubbleParameters;
+			BubbleParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+			AGlobalAbilityVisionBubble* const Bubble = GetWorld()->SpawnActor<AGlobalAbilityVisionBubble>(
+				Trainer->GetExitTransform().GetLocation(), FRotator::ZeroRotator, BubbleParameters);
+			if (IsValid(Bubble))
+			{
+				Bubble->StartVision(SpawnQAFogControlRadiusCm, SpawnQAFogControlSeconds,
+				                    static_cast<uint8>(RTSPlayers::HumanPlayer));
+				M_FogControlCaseIndex = CaseIndex;
+				Log(FString::Printf(TEXT("RTS_EBT spawnqa fog control: human vision %.0f cm over %s's exit"),
+				                    SpawnQAFogControlRadiusCm, *M_Cases[CaseIndex].Label));
+			}
+			break;
+		}
+	}
 	// A second unit at the first building: it must start right after the first, with the activity left on.
 	for (FEnemyBuildingTrainerTestCase& Case : M_Cases)
 	{
@@ -627,7 +692,10 @@ void UEnemyBuildingTrainerTestSubsystem::QueueFirstJobs()
 		{
 			Case.Failures.Add(TEXT("second_job_not_queued"));
 		}
-		break;
+		if (not bM_SpawnQA)
+		{
+			break;
+		}
 	}
 }
 
@@ -759,6 +827,11 @@ void UEnemyBuildingTrainerTestSubsystem::TickJobChecks(FEnemyBuildingTrainerTest
 				Job.bActivityOffWhileTraining = true;
 			}
 			const float Progress = IsValid(Trainer) ? Trainer->GetActiveTrainingProgress() : 0.f;
+			if (bM_SpawnQA && not Job.bQAPreCaptured && Progress >= SpawnQAPreProgress)
+			{
+				CaptureExitView(Case, FString::Printf(TEXT("job%d_a_pre"), JobIndex));
+				Job.bQAPreCaptured = true;
+			}
 			if (bM_Capture && JobIndex == 0 && Job.CapturesTaken == 0 && Progress >= 0.3f)
 			{
 				CaptureCase(Case, TEXT("1_training30"));
@@ -781,7 +854,8 @@ void UEnemyBuildingTrainerTestSubsystem::TickJobChecks(FEnemyBuildingTrainerTest
 		if (bIsTank && IsValid(Unit))
 		{
 			Job.MaxMovedCm = FMath::Max(Job.MaxMovedCm, FVector::Dist2D(Unit->GetActorLocation(), Job.SpawnLocation));
-			if (not Job.bMoveOrdered && Job.RegisteredAt >= 0.f)
+			// Spawn QA watches what the unit does on its own: no test move order.
+			if (not bM_SpawnQA && not Job.bMoveOrdered && Job.RegisteredAt >= 0.f)
 			{
 				if (ICommands* const Commands = Cast<ICommands>(Unit))
 				{
@@ -792,6 +866,10 @@ void UEnemyBuildingTrainerTestSubsystem::TickJobChecks(FEnemyBuildingTrainerTest
 				}
 				Job.bMoveOrdered = true;
 			}
+		}
+		if (bM_SpawnQA)
+		{
+			TickSpawnQA(Case, JobIndex);
 		}
 	}
 }
@@ -820,7 +898,9 @@ bool UEnemyBuildingTrainerTestSubsystem::GetAreAllJobsDone() const
 			const bool bWaitsForRegistration = Job.RegisteredAt < 0.f && Now - Job.FinishedAt < RegistrationTimeoutSeconds;
 			const bool bWaitsForExit = bIsTank && Job.MaxMovedCm < ExitClearMinMovedCm
 				&& Now - Job.FinishedAt < ExitClearWindowSeconds;
-			if (bWaitsForRegistration || bWaitsForExit)
+			const bool bWaitsForSpawnQA = bM_SpawnQA && Job.QAStagesDone < SpawnQAStageCount
+				&& Now - Job.FinishedAt < SpawnQAStages[SpawnQAStageCount - 1].SecondsAfterSpawn + 5.f;
+			if (bWaitsForRegistration || bWaitsForExit || bWaitsForSpawnQA)
 			{
 				return false;
 			}
@@ -937,7 +1017,7 @@ void UEnemyBuildingTrainerTestSubsystem::TickSettle()
 				Case.Failures.Add(JobTag + TEXT("_not_in_direct_control_pool"));
 			}
 			const bool bIsTank = Job.Option.UnitType == EAllUnitType::UNType_Tank;
-			if (bIsTank && Job.MaxMovedCm < ExitClearMinMovedCm)
+			if (bIsTank && Job.MaxMovedCm < ExitClearMinMovedCm && not bM_SpawnQA)
 			{
 				Case.Failures.Add(FString::Printf(TEXT("%s_stuck_at_exit_moved_%.0fcm"), *JobTag, Job.MaxMovedCm));
 			}
@@ -971,6 +1051,12 @@ void UEnemyBuildingTrainerTestSubsystem::TickSettle()
 			}
 		}
 		break;
+	}
+	if (bM_SpawnQA)
+	{
+		// The QA run is about the units' appearance; the think and cancel phases are covered by the plain run.
+		Finish();
+		return;
 	}
 	StartRealThink();
 }
@@ -1429,6 +1515,440 @@ void UEnemyBuildingTrainerTestSubsystem::CaptureCase(const FEnemyBuildingTrainer
 		return;
 	}
 	const FString Path = FPaths::Combine(M_OutputDirectory, Case.Label + TEXT("_") + Suffix + TEXT(".png"));
+	FImageUtils::SaveImageByExtension(*Path, Image);
+	Log(FString::Printf(TEXT("RTS_EBT capture %s"), *Path));
+}
+
+void UEnemyBuildingTrainerTestSubsystem::TickSpawnQA(FEnemyBuildingTrainerTestCase& Case, const int32 JobIndex)
+{
+	using namespace EnemyBuildingTrainerTestPrivate;
+	FEnemyBuildingTrainerTestJob& Job = Case.Jobs[JobIndex];
+	if (Job.FinishedAt < 0.f || Job.QAStagesDone >= SpawnQAStageCount)
+	{
+		return;
+	}
+	const float Now = GetGameSeconds();
+	const float SinceSpawn = Now - Job.FinishedAt;
+	if (SinceSpawn <= SpawnQASampleSeconds)
+	{
+		const float SampleDelta = Job.QALastSampleSeconds >= 0.f ? Now - Job.QALastSampleSeconds : 0.f;
+		Job.QALastSampleSeconds = Now;
+		TArray<AActor*> Bodies;
+		CollectUnitBodies(Job.Unit.Get(), Bodies);
+		for (AActor* const Body : Bodies)
+		{
+			// The squad unit optimizer moves soldiers out of the player's view in 0.5 s ticks (250 cm steps at walking
+			// speed); per-frame movement here, as SquadMarchTestScenario does, so a step is a real teleport.
+			if (const ACharacter* const Character = Cast<ACharacter>(Body))
+			{
+				if (UCharacterMovementComponent* const Movement = Character->GetCharacterMovement())
+				{
+					Movement->SetComponentTickInterval(0.f);
+				}
+			}
+			const FVector Location = Body->GetActorLocation();
+			const float Speed = Body->GetVelocity().Size();
+			FEnemyBuildingTrainerQABodySample* const Last = Job.QABodySamples.FindByPredicate(
+				[Body](const FEnemyBuildingTrainerQABodySample& Sample) { return Sample.Body.Get() == Body; });
+			if (Last != nullptr)
+			{
+				// Movement its speed explains (either end of the tick) is walking or driving, the rest a teleport.
+				const float Explained = FMath::Max(Last->Speed, Speed) * SampleDelta;
+				const float Jump = FVector::Dist(Last->Location, Location) - Explained;
+				if (Jump > SpawnQAMaxBodyJumpCm)
+				{
+					const ACharacter* const Character = Cast<ACharacter>(Body);
+					const USkeletalMeshComponent* const BodyMesh = IsValid(Character) ? Character->GetMesh() : nullptr;
+					Log(FString::Printf(
+						TEXT("RTS_EBT spawnqa jump %s %s t=%.3f dt=%.3f from=%s to=%s jump=%.0f speed=%.0f..%.0f hidden=%d rendered=%d"),
+						*Case.Label, *GetNameSafe(Body), SinceSpawn, SampleDelta, *Last->Location.ToCompactString(),
+						*Location.ToCompactString(), Jump, Last->Speed, Speed, Body->IsHidden() ? 1 : 0,
+						IsValid(BodyMesh) && BodyMesh->WasRecentlyRendered(0.5f) ? 1 : 0));
+				}
+				Job.QAMaxBodyJumpCm = FMath::Max(Job.QAMaxBodyJumpCm, Jump);
+				Last->Location = Location;
+				Last->Speed = Speed;
+			}
+			else
+			{
+				Job.QABodySamples.Add({Body, Location, Speed});
+			}
+			const UPrimitiveComponent* const BodyRoot = Cast<UPrimitiveComponent>(Body->GetRootComponent());
+			float GroundZ = Location.Z;
+			if (SinceSpawn >= SpawnQAAirborneIgnoreSeconds && IsValid(BodyRoot) && TryGetGroundZ(Location, GroundZ))
+			{
+				Job.QAMaxAirborneCm = FMath::Max(Job.QAMaxAirborneCm, BodyRoot->Bounds.GetBox().Min.Z - GroundZ);
+			}
+		}
+	}
+	const FSpawnQAStage& Stage = SpawnQAStages[Job.QAStagesDone];
+	if (GetGameSeconds() - Job.FinishedAt < Stage.SecondsAfterSpawn)
+	{
+		return;
+	}
+	SpawnQAStage(Case, JobIndex, Stage.Tag);
+	++Job.QAStagesDone;
+}
+
+void UEnemyBuildingTrainerTestSubsystem::CollectUnitBodies(AActor* Unit, TArray<AActor*>& OutBodies)
+{
+	if (not IsValid(Unit))
+	{
+		return;
+	}
+	if (ASquadController* const SquadController = Cast<ASquadController>(Unit))
+	{
+		for (ASquadUnit* const SquadUnit : SquadController->GetSquadUnitsChecked())
+		{
+			if (IsValid(SquadUnit))
+			{
+				OutBodies.Add(SquadUnit);
+			}
+		}
+		return;
+	}
+	OutBodies.Add(Unit);
+}
+
+void UEnemyBuildingTrainerTestSubsystem::SpawnQAStage(FEnemyBuildingTrainerTestCase& Case, const int32 JobIndex,
+                                                      const TCHAR* StageTag)
+{
+	using namespace EnemyBuildingTrainerTestPrivate;
+	FEnemyBuildingTrainerTestJob& Job = Case.Jobs[JobIndex];
+	const FString Suffix = FString::Printf(TEXT("job%d_%s"), JobIndex, StageTag);
+	AActor* const Unit = Job.Unit.Get();
+	AActor* const Building = Case.Building.Get();
+	const UEnemyBuildingTrainerComponent* const Trainer = Case.Trainer.Get();
+	TArray<AActor*> Bodies;
+	CollectUnitBodies(Unit, Bodies);
+	// Measured before the capture, which un-hides fogged units for the frame.
+	int32 HiddenByFog = 0;
+	for (const AActor* const Body : Bodies)
+	{
+		HiddenByFog += Body->IsHidden() ? 1 : 0;
+	}
+	CaptureExitView(Case, Suffix);
+	if (Bodies.IsEmpty() || not IsValid(Building) || not IsValid(Trainer))
+	{
+		Log(FString::Printf(TEXT("RTS_EBT spawnqa %s %s no_unit_bodies"), *Case.Label, *Suffix));
+		return;
+	}
+
+	const FTransform Exit = Trainer->GetExitTransform();
+	const float ExitYaw = Exit.Rotator().Yaw;
+	TInlineComponentArray<UPrimitiveComponent*> BuildingPrimitives(Building);
+	const FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(EnemyBuildingTrainerSpawnQA), false);
+	FVector Centroid = FVector::ZeroVector;
+	float MinGroundOffset = TNumericLimits<float>::Max();
+	float MaxGroundOffset = TNumericLimits<float>::Lowest();
+	float MinBuildingClearance = TNumericLimits<float>::Max();
+	float MaxYawOffset = 0.f;
+	int32 InsideBuilding = 0;
+	for (AActor* const Body : Bodies)
+	{
+		const FVector BodyLocation = Body->GetActorLocation();
+		Centroid += BodyLocation;
+		MaxYawOffset = FMath::Max(MaxYawOffset,
+		                          FMath::Abs(FMath::FindDeltaAngleDegrees(ExitYaw, Body->GetActorRotation().Yaw)));
+		UPrimitiveComponent* const BodyRoot = Cast<UPrimitiveComponent>(Body->GetRootComponent());
+		if (not IsValid(BodyRoot))
+		{
+			continue;
+		}
+		float GroundZ = BodyLocation.Z;
+		if (TryGetGroundZ(BodyLocation, GroundZ))
+		{
+			const float GroundOffset = BodyRoot->Bounds.GetBox().Min.Z - GroundZ;
+			MinGroundOffset = FMath::Min(MinGroundOffset, GroundOffset);
+			MaxGroundOffset = FMath::Max(MaxGroundOffset, GroundOffset);
+		}
+		const ECollisionChannel BodyChannel = BodyRoot->GetCollisionObjectType();
+		bool bIsInside = false;
+		for (UPrimitiveComponent* const Primitive : BuildingPrimitives)
+		{
+			if (not IsValid(Primitive) || not Primitive->IsCollisionEnabled()
+				|| Primitive->GetCollisionResponseToChannel(BodyChannel) != ECR_Block)
+			{
+				continue;
+			}
+			FVector ClosestPoint;
+			const float Distance = Primitive->GetDistanceToCollision(BodyLocation, ClosestPoint);
+			if (Distance >= 0.f)
+			{
+				MinBuildingClearance = FMath::Min(MinBuildingClearance, Distance);
+			}
+			if (not bIsInside && Primitive->ComponentOverlapComponent(BodyRoot, BodyRoot->GetComponentLocation(),
+			                                                         BodyRoot->GetComponentQuat(), QueryParams))
+			{
+				bIsInside = true;
+			}
+		}
+		InsideBuilding += bIsInside ? 1 : 0;
+	}
+	Centroid /= Bodies.Num();
+	if (Job.QAStagesDone == 0)
+	{
+		Job.QASpawnCentroid = Centroid;
+	}
+	const float MovedCm = FVector::Dist2D(Centroid, Job.QASpawnCentroid);
+	Job.MaxMovedCm = FMath::Max(Job.MaxMovedCm, MovedCm);
+
+	// Stacking: bodies of this unit that overlap the previous unit of the same building, and the closest pair.
+	int32 OverlapsPrevious = 0;
+	float NearestPreviousCm = -1.f;
+	if (Case.Jobs.IsValidIndex(JobIndex - 1))
+	{
+		TArray<AActor*> PreviousBodies;
+		CollectUnitBodies(Case.Jobs[JobIndex - 1].Unit.Get(), PreviousBodies);
+		NearestPreviousCm = PreviousBodies.IsEmpty() ? -1.f : TNumericLimits<float>::Max();
+		for (AActor* const Body : Bodies)
+		{
+			UPrimitiveComponent* const BodyRoot = Cast<UPrimitiveComponent>(Body->GetRootComponent());
+			for (AActor* const PreviousBody : PreviousBodies)
+			{
+				NearestPreviousCm = FMath::Min(NearestPreviousCm, FVector::Dist2D(Body->GetActorLocation(),
+				                                                                  PreviousBody->GetActorLocation()));
+				UPrimitiveComponent* const PreviousRoot = Cast<UPrimitiveComponent>(PreviousBody->GetRootComponent());
+				if (IsValid(BodyRoot) && IsValid(PreviousRoot)
+					&& PreviousRoot->ComponentOverlapComponent(BodyRoot, BodyRoot->GetComponentLocation(),
+					                                           BodyRoot->GetComponentQuat(), QueryParams))
+				{
+					++OverlapsPrevious;
+				}
+			}
+		}
+	}
+
+	// Stacking on any other trained unit of the test, at any building.
+	int32 OverlapsAny = 0;
+	float NearestAnyCm = -1.f;
+	for (const FEnemyBuildingTrainerTestCase& OtherCase : M_Cases)
+	{
+		for (const FEnemyBuildingTrainerTestJob& OtherJob : OtherCase.Jobs)
+		{
+			if (OtherJob.Unit.Get() == Unit || not OtherJob.Unit.IsValid())
+			{
+				continue;
+			}
+			TArray<AActor*> OtherBodies;
+			CollectUnitBodies(OtherJob.Unit.Get(), OtherBodies);
+			for (AActor* const Body : Bodies)
+			{
+				UPrimitiveComponent* const BodyRoot = Cast<UPrimitiveComponent>(Body->GetRootComponent());
+				for (AActor* const OtherBody : OtherBodies)
+				{
+					const float Distance = FVector::Dist2D(Body->GetActorLocation(), OtherBody->GetActorLocation());
+					NearestAnyCm = NearestAnyCm < 0.f ? Distance : FMath::Min(NearestAnyCm, Distance);
+					UPrimitiveComponent* const OtherRoot = Cast<UPrimitiveComponent>(OtherBody->GetRootComponent());
+					if (IsValid(BodyRoot) && IsValid(OtherRoot)
+						&& OtherRoot->ComponentOverlapComponent(BodyRoot, BodyRoot->GetComponentLocation(),
+						                                        BodyRoot->GetComponentQuat(), QueryParams))
+					{
+						++OverlapsAny;
+						// Which soldiers, where, and the cover each holds (cover state, point id).
+						const ASquadUnit* const Soldier = Cast<ASquadUnit>(Body);
+						const ASquadUnit* const OtherSoldier = Cast<ASquadUnit>(OtherBody);
+						Log(FString::Printf(
+							TEXT("RTS_EBT spawnqa overlap %s %s at %s cover=%d/%lld with %s (%s) at %s cover=%d/%lld"),
+							*Case.Label, *GetNameSafe(Body), *Body->GetActorLocation().ToCompactString(),
+							IsValid(Soldier) ? static_cast<int32>(Soldier->GetCoverRuntimeState().State) : -1,
+							IsValid(Soldier) ? Soldier->GetCoverRuntimeState().AssignedCoverPoint.PointId : -1ll,
+							*GetNameSafe(OtherBody), *OtherCase.Label, *OtherBody->GetActorLocation().ToCompactString(),
+							IsValid(OtherSoldier) ? static_cast<int32>(OtherSoldier->GetCoverRuntimeState().State) : -1,
+							IsValid(OtherSoldier) ? OtherSoldier->GetCoverRuntimeState().AssignedCoverPoint.PointId : -1ll));
+					}
+				}
+			}
+		}
+	}
+	// In the strip straight out of its own exit (where the next unit comes out).
+	const FVector ExitForward2D = Exit.GetRotation().GetForwardVector().GetSafeNormal2D();
+	const FVector ToCentroid = FVector(Centroid.X - Exit.GetLocation().X, Centroid.Y - Exit.GetLocation().Y, 0.f);
+	const float LaneHalfWidth = Trainer->TrainerKind == EEnemyBuildingTrainerKind::Vehicles
+		                            ? EnemyAISettings::UnitTraining::StandSpotVehicleExitLaneHalfWidthCm
+		                            : EnemyAISettings::UnitTraining::StandSpotInfantryExitLaneHalfWidthCm;
+	const float Along = FVector::DotProduct(ToCentroid, ExitForward2D);
+	const bool bInExitLane = Along >= 0.f && Along <= EnemyAISettings::UnitTraining::StandSpotExitLaneLengthCm
+		&& FMath::Abs(FVector::DotProduct(ToCentroid, FVector::CrossProduct(FVector::UpVector, ExitForward2D)))
+		<= LaneHalfWidth;
+	// Bodies standing in any trainer's exit lane (soldiers spread out of their squad, into cover).
+	int32 BodiesInExitLanes = 0;
+	for (const FEnemyBuildingTrainerTestCase& LaneCase : M_Cases)
+	{
+		const UEnemyBuildingTrainerComponent* const LaneTrainer = LaneCase.Trainer.Get();
+		if (not IsValid(LaneTrainer))
+		{
+			continue;
+		}
+		const FTransform LaneExit = LaneTrainer->GetExitTransform();
+		const FVector LaneForward = LaneExit.GetRotation().GetForwardVector().GetSafeNormal2D();
+		const FVector LaneRight = FVector::CrossProduct(FVector::UpVector, LaneForward);
+		const float LaneWidth = LaneTrainer->TrainerKind == EEnemyBuildingTrainerKind::Vehicles
+			                        ? EnemyAISettings::UnitTraining::StandSpotVehicleExitLaneHalfWidthCm
+			                        : EnemyAISettings::UnitTraining::StandSpotInfantryExitLaneHalfWidthCm;
+		for (const AActor* const Body : Bodies)
+		{
+			const FVector Offset = Body->GetActorLocation() - LaneExit.GetLocation();
+			const float BodyAlong = FVector::DotProduct(FVector(Offset.X, Offset.Y, 0.f), LaneForward);
+			if (BodyAlong >= 0.f && BodyAlong <= EnemyAISettings::UnitTraining::StandSpotExitLaneLengthCm
+				&& FMath::Abs(FVector::DotProduct(FVector(Offset.X, Offset.Y, 0.f), LaneRight)) <= LaneWidth)
+			{
+				++BodiesInExitLanes;
+			}
+		}
+	}
+	float NearestBodyToExitCm = TNumericLimits<float>::Max();
+	for (const AActor* const Body : Bodies)
+	{
+		NearestBodyToExitCm = FMath::Min(NearestBodyToExitCm,
+		                                 FVector::Dist2D(Body->GetActorLocation(), Exit.GetLocation()));
+	}
+	const bool bIsLastStage = Job.QAStagesDone == SpawnQAStageCount - 1;
+	const FString JobTag = FString::Printf(TEXT("job%d"), JobIndex);
+	const bool bIsFogControl = M_Cases.IsValidIndex(M_FogControlCaseIndex) && &M_Cases[M_FogControlCaseIndex] == &Case;
+	if (bIsFogControl)
+	{
+		// The human player sees this exit: hidden-until-seen must show its units once the fog has ticked.
+		if (Job.QAStagesDone >= SpawnQAFogControlFirstCheckedStage && HiddenByFog > 0
+			&& not Case.Failures.Contains(JobTag + TEXT("_hidden_although_in_vision")))
+		{
+			Case.Failures.Add(JobTag + TEXT("_hidden_although_in_vision"));
+		}
+	}
+	else if (HiddenByFog < Bodies.Num() && not Case.Failures.Contains(JobTag + TEXT("_seen_through_fog")))
+	{
+		Case.Failures.Add(JobTag + TEXT("_seen_through_fog"));
+	}
+	if (bIsLastStage)
+	{
+		if (Job.QAMaxBodyJumpCm > SpawnQAMaxBodyJumpCm)
+		{
+			Case.Failures.Add(FString::Printf(TEXT("%s_teleported_%.0fcm_after_spawn"), *JobTag, Job.QAMaxBodyJumpCm));
+		}
+		if (Job.QAMaxAirborneCm > SpawnQAMaxAirborneCm)
+		{
+			Case.Failures.Add(FString::Printf(TEXT("%s_dropped_from_%.0fcm"), *JobTag, Job.QAMaxAirborneCm));
+		}
+		if (OverlapsAny > 0)
+		{
+			Case.Failures.Add(FString::Printf(TEXT("%s_overlaps_%d_bodies_of_other_units"), *JobTag, OverlapsAny));
+		}
+		// Per body: a squad split into cover on both sides of a door has its centre in front of it, blocking nothing.
+		if (NearestBodyToExitCm < SpawnQAMinBodyExitDistanceCm)
+		{
+			Case.Failures.Add(FString::Printf(TEXT("%s_body_%.0fcm_from_exit"), *JobTag, NearestBodyToExitCm));
+		}
+		if (BodiesInExitLanes > 0)
+		{
+			Case.Failures.Add(FString::Printf(TEXT("%s_%d_bodies_in_an_exit_lane"), *JobTag, BodiesInExitLanes));
+		}
+	}
+
+	// Where the exit sits: in front of the building (positive) and how far from the building's collision.
+	FVector BuildingOrigin;
+	FVector BuildingExtent;
+	Building->GetActorBounds(true, BuildingOrigin, BuildingExtent);
+	const FVector ExitForward = Exit.GetRotation().GetForwardVector().GetSafeNormal2D();
+	const float ExitFacesOut = FVector::DotProduct(ExitForward,
+	                                               (Exit.GetLocation() - Building->GetActorLocation()).GetSafeNormal2D());
+	ICommands* const Commands = Cast<ICommands>(Unit);
+	const FString ActiveCommand = Commands != nullptr
+		                              ? StaticEnum<EAbilityID>()->GetNameStringByValue(
+			                              static_cast<int64>(Commands->GetActiveCommandID()))
+		                              : FString(TEXT("none"));
+	Log(FString::Printf(
+		TEXT("RTS_EBT spawnqa %s %s %s t=%.2f bodies=%d fog_hidden=%d ground_dz=%.0f..%.0f inside_building=%d ")
+		TEXT("clear_min=%.0f overlap_prev=%d near_prev=%.0f overlap_any=%d near_any=%.0f in_exit_lane=%d bodies_in_lanes=%d nearest_body_to_exit=%.0f yaw_off=%.0f ")
+		TEXT("moved=%.0f exit_dist=%.0f exit_faces_out=%.2f max_jump=%.0f max_air=%.0f fog_control=%d command=%s"),
+		*Case.Label, *Suffix, *Job.Option.GetDisplayName(), GetGameSeconds() - Job.FinishedAt, Bodies.Num(),
+		HiddenByFog, MinGroundOffset == TNumericLimits<float>::Max() ? -1.f : MinGroundOffset,
+		MaxGroundOffset == TNumericLimits<float>::Lowest() ? -1.f : MaxGroundOffset, InsideBuilding,
+		MinBuildingClearance == TNumericLimits<float>::Max() ? -1.f : MinBuildingClearance, OverlapsPrevious,
+		NearestPreviousCm, OverlapsAny, NearestAnyCm, bInExitLane ? 1 : 0, BodiesInExitLanes, NearestBodyToExitCm, MaxYawOffset, MovedCm,
+		FVector::Dist2D(Centroid, Exit.GetLocation()), ExitFacesOut, Job.QAMaxBodyJumpCm, Job.QAMaxAirborneCm,
+		bIsFogControl ? 1 : 0, *ActiveCommand));
+}
+
+void UEnemyBuildingTrainerTestSubsystem::CaptureExitView(const FEnemyBuildingTrainerTestCase& Case,
+                                                         const FString& Suffix)
+{
+	using namespace EnemyBuildingTrainerTestPrivate;
+	AActor* const Building = Case.Building.Get();
+	const UEnemyBuildingTrainerComponent* const Trainer = Case.Trainer.Get();
+	if (not IsValid(Building) || not IsValid(Trainer) || not EnsureCaptureActor())
+	{
+		return;
+	}
+	FBox VisibleBox(ForceInit);
+	TInlineComponentArray<UMeshComponent*> Meshes(Building);
+	for (const UMeshComponent* Mesh : Meshes)
+	{
+		if (IsValid(Mesh) && Mesh->IsVisible() && not Mesh->bHiddenInGame
+			&& Mesh->Bounds.GetBox().GetExtent().GetMax() <= MaxFramedComponentExtentCm)
+		{
+			VisibleBox += Mesh->Bounds.GetBox();
+		}
+	}
+	if (not VisibleBox.IsValid)
+	{
+		VisibleBox = FBox::BuildAABB(Building->GetActorLocation(), FVector(1000.f));
+	}
+	const float Radius = FMath::Max(FMath::Max(VisibleBox.GetExtent().X, VisibleBox.GetExtent().Y), 800.f);
+	const FTransform Exit = Trainer->GetExitTransform();
+	const FVector ExitForward = Exit.GetRotation().GetForwardVector().GetSafeNormal2D();
+	FVector Target = Exit.GetLocation() - ExitForward * Radius * SpawnQAViewTargetTowardBuildingMlt;
+	float GroundZ = Target.Z;
+	if (TryGetGroundZ(Target, GroundZ))
+	{
+		Target.Z = GroundZ + 150.f;
+	}
+	const FVector CameraDirection = ExitForward.RotateAngleAxis(SpawnQAViewYawOffset, FVector::UpVector);
+	const FRotator LookRotation(SpawnQAViewPitch, (-CameraDirection).Rotation().Yaw, 0.f);
+	const float Distance = FMath::Clamp(Radius * SpawnQAViewDistanceRadiusMlt, SpawnQAViewMinDistanceCm,
+	                                    SpawnQAViewMaxDistanceCm);
+	const FVector ViewLocation = Target - LookRotation.Vector() * Distance;
+
+	// The fog of war hides the AI's building and units; show them for this frame only.
+	TArray<AActor*> Shown;
+	TArray<AActor*> Bodies;
+	for (const FEnemyBuildingTrainerTestJob& Job : Case.Jobs)
+	{
+		CollectUnitBodies(Job.Unit.Get(), Bodies);
+	}
+	Bodies.Add(Building);
+	for (AActor* const Body : Bodies)
+	{
+		if (Body->IsHidden())
+		{
+			Body->SetActorHiddenInGame(false);
+			if (Body != Building)
+			{
+				Shown.Add(Body);
+			}
+		}
+		TInlineComponentArray<USkeletalMeshComponent*> SkeletalMeshes(Body);
+		for (USkeletalMeshComponent* const SkeletalMesh : SkeletalMeshes)
+		{
+			if (IsValid(SkeletalMesh) && SkeletalMesh->IsVisible())
+			{
+				SkeletalMesh->TickAnimation(0.f, false);
+				SkeletalMesh->RefreshBoneTransforms();
+			}
+		}
+	}
+	M_CaptureActor->SetActorLocationAndRotation(ViewLocation, LookRotation);
+	M_CaptureActor->GetCaptureComponent2D()->CaptureScene();
+	for (AActor* const Body : Shown)
+	{
+		Body->SetActorHiddenInGame(true);
+	}
+	FImage Image;
+	if (not FImageUtils::GetRenderTargetImage(M_CaptureTarget, Image))
+	{
+		Log(FString::Printf(TEXT("RTS_EBT capture %s %s failed"), *Case.Label, *Suffix));
+		return;
+	}
+	const FString Path = FPaths::Combine(M_OutputDirectory, TEXT("SpawnQA_") + Case.Label + TEXT("_") + Suffix + TEXT(".png"));
 	FImageUtils::SaveImageByExtension(*Path, Image);
 	Log(FString::Printf(TEXT("RTS_EBT capture %s"), *Path));
 }

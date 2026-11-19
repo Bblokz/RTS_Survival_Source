@@ -57,6 +57,13 @@
 #include "RTS_Survival/Player/ConstructionPreview/StaticMeshPreview/StaticPreviewMesh.h"
 #include "RTS_Survival/Weapons/InfantryWeapon/InfantryWeaponMaster.h"
 
+namespace SquadControllerSpawnStatics
+{
+	// A spawn grid point lies on the navmesh and a unit's location is its capsule centre: lift it by its half height
+	// plus this margin so it stands on the ground instead of dropping onto it.
+	constexpr float SpawnLiftMarginCm = 10.f;
+}
+
 namespace SquadControllerParachuteStatics
 {
 	// Reach of the trace that finds the ground under a unit hidden in the air.
@@ -942,7 +949,12 @@ void ASquadController::OnRTSUnitSpawned(const bool bSetDisabled, const float Tim
 		if (GetIsValidSquadUnit(eachSqUnit))
 		{
 			// Uses the grid points and attempts to project them to obtain valid points.
-			FVector SpawnLocation = FindIdealSpawnLocation() + (0, 0, 150);
+			// (This used to add "(0, 0, 150)": the comma operator made that +150 on X, Y and Z, so every soldier
+			// jumped 2.1 m diagonally and dropped 60 cm when it was placed.)
+			const UCapsuleComponent* const Capsule = eachSqUnit->GetCapsuleComponent();
+			const float LiftCm = (IsValid(Capsule) ? Capsule->GetScaledCapsuleHalfHeight() : 90.f)
+				+ SquadControllerSpawnStatics::SpawnLiftMarginCm;
+			const FVector SpawnLocation = FindIdealSpawnLocation() + FVector(0.f, 0.f, LiftCm);
 
 			eachSqUnit->OnSquadSpawned(bSetDisabled, TimeNotSelectable, SpawnLocation);
 		}

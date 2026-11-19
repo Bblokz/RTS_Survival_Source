@@ -25,8 +25,14 @@ and shows that it is working while it trains, like the cranes on the player's bu
    - `OnTrainingStarted` fires, and `OnTrainingActiveChanged(true)` fires once per busy stretch.
    - When the time is up, the async spawner creates the unit at the exit for the building's owner.
    - `UEnemyStrategicAIComponent::OnBuildingTrainerUnitSpawned` runs the same path as every trained unit:
-     `RegisterAsBlackboardIdle`, which puts the unit in the controller's direct-control pool, then a move to a base
-     defense position.
+     `RegisterAsBlackboardIdle`, which puts the unit in the controller's direct-control pool.
+   - Then it walks to a stand spot near its exit (see Fixes, 3) and waits there 45-60 s
+     (`StandSpotWaitSeconds` + seeded `StandSpotWaitJitterSeconds`). Log: `AI_TRAIN stand_spot_wait`.
+   - `Training_ReleaseStandSpotWaiters` (every strategic think, 6 s) then sends it to a random base defense position
+     (`AI_TRAIN stand_spot_release`). It keeps waiting while it is not idle (walking, fighting) or while the AI has no
+     defense position. A unit the AI picked from the idle pool for a mission meanwhile is left to that mission
+     (`AI_TRAIN stand_spot_picked`).
+   - No stand spot found: straight to a defense position, as before (`AI_TRAIN defense_position`).
 5. Building destroyed, packed up or removed mid-training:
    - The queue is dropped and `OnTrainingCancelled` fires per unit.
    - Units still waiting refund their points. The unit in training is lost.
@@ -112,6 +118,7 @@ second unit. It checks:
 | `-Capture` | PNG frames per building: `0_idle`, `1_training30`, `2_training70`, `3_after`, `4_rest` (33 s after: crane cycle finished) |
 | `-Exposure <bias>` | exposure bias for the captures |
 | `-AddMissing` | adds a runtime trainer to Blueprints without one (core check only) |
+| `-SpawnQA` | two units per building and no test move orders; exit-view frames `SpawnQA_<Building>_job<N>_<stage>.png` just before the spawn and 0 / 1 / 3 / 8 / 20 s after, plus one `RTS_EBT spawnqa` line per frame (ground offset, building overlap, stacking, exit lanes, fog, facing, movement, active command). A human vision bubble over the first building's exit is the fog control: its units must show, all others stay hidden. It fails on a teleport or drop in the first 2.5 s, a unit seen through the fog (or a control unit that is not shown), overlapping units at +20 s, or a body in any exit lane or within 2.5 m of its exit at +20 s. It skips the think and cancel phases |
 | `-SpawnerAudit` | no buildings: spawns every squad and tank of every tech level through the async spawner and checks each reports the ordered type and subtype (`NO_SPAWNER_ROW`, `NO_SPAWN`, `SUBTYPE_MISMATCH`) |
 | `-Squad <ESquadSubtype>` / `-Tank <ETankSubtype>` | trains that unit instead of `Squad_Rus_Mosin` / `Tank_BT7`. Every spawned unit must report the ordered type and subtype on its RTS component, which catches wrong spawner rows and copied Blueprints. |
 
@@ -163,3 +170,116 @@ The first `-SpawnerAudit` passed 39 of 48 AI-trainable units. After the fixes, 4
     (`SurvivalWaveSettings`), so the row stays until a real Ghosts squad exists.
 - `Rus_Squad_MosinPTRS` is the Okhotnik squad: it declares `Squad_Rus_Okhotnik`.
 
+## Spawn QA (2026-11-19)
+
+The first `-SpawnQA` run is in `Saved/EnemyBuildingTrainer/spawn_qa1`, with the contact sheets `SpawnQA_Infantry.png` and
+`SpawnQA_Vehicles.png`.
+
+What is fine:
+- every exit faces away from its building;
+- no unit appears inside building collision;
+- units stand on the ground (2-8 cm) and tanks face out of the exit.
+
+What was not fine (the first three fixed the same day, see below):
+- **Squads jump and drop:** about 1 s after they appear, every soldier snaps about 2.1 m along world +X+Y and drops
+  from 1.5 m.
+  - Cause: `SquadController.cpp` `FindIdealSpawnLocation() + (0, 0, 150)`. The comma operator makes this `+ 150` on
+    X, Y and Z.
+  - The async spawner's 1 s `TimeNotSelectable` delays the teleport.
+  - Player squads share this code.
+- **Squads then walk back to the spawn point and end facing the building.**
+- **Units stay at the exit when the AI has no base defense position** (the test map has none):
+  - the second squad ends inside the first (3-5 of 6 soldiers overlapping at 8 s);
+  - the second tank is pushed 9.7 m aside by `MoveClearOfVehiclesWhenSpawned`.
+- **Trained units are visible through the fog of war for about 4 s.** `UFowComp` starts participating 4 s after the
+  unit starts (`TimeRemainingStartAsyncLoading + 2`), a delay meant for the player trainer's hidden pre-spawn.
+- **Debug draw in non-Shipping builds:** a green 1 m sphere with "trained : X" at every trained unit. The ungated
+  `DebugTrainedUnit` draws it.
+- **Tanks: the first rendered frame is grey and has no tracks**, fine by +1 s. The AI spawns the unit and shows it in
+  the same frame; the player trainer has it ticking hidden first.
+- **Barracks:** the squad formation reaches into the sandbag piles beside the door, which don't block pawns.
+
+### Fixes (user: "1,2,3", 2026-11-19)
+
+1. **Squad spawn placement** (shared by every squad the async spawner or a trainer places):
+   - `SquadController.cpp` lifts each grid point by the soldier's capsule half height + 10 cm, instead of the comma
+     `(0, 0, 150)`.
+   - `ASquadUnit::OnSquadUnitSpawned_SetEnabled` places a soldier that already stands within 6 m of its spot in the
+     same frame it shows. Only its selection waits for `TimeNotSelectable`.
+   - A soldier far away (the player trainer's pre-spawn at the spawner) still moves when the delay ends, as before.
+   - The parachute paths cancel the pending placement as before. The at-once placement only changes where in its
+     2.5 m grid a soldier stands before the drop takes over.
+2. **Fog:**
+   - `UFowComp::StartFowNowHiddenUntilSeen` joins the fog now, the owner hidden until the next fog tick (0.1 s) shows
+     it.
+   - Called before `StartFow`, the next start goes that way. Without a fog manager it does nothing.
+   - The strategic AI calls it for every building-trained unit and its soldiers: at spawn, and again once a squad is
+     loaded.
+3. **Stand spots** (`EnemyTrainedUnitStandSpots`):
+   - Every building-trained unit is sent to a stand spot first (user, 2026-11-19: "wait near their building and after
+     some time go to a defensive position"). Before that, only units without a base defense position used one.
+   - **Where spots are tried:** rings around the exit, nearest first, the ground in front of the exit before the
+     building's sides, up to 50 m and 120 degrees off the exit axis.
+   - **What a spot must pass:**
+     - its whole footprint on the unit's own navmesh (tanks use their agent's);
+     - a straight navmesh line from the exit, when any spot has one;
+     - outside every trainer's exit lane: 18 m long, 3 m half-width for infantry and 5 m for vehicles;
+     - clear of the side's soldiers and tanks, and of the spots other units were sent to, by both radii + 1 m.
+   - **Facing:** the unit faces away from the building.
+   - **Footprint radius:** squads `max(250, 130 * sqrt(members))`; other units their colliding local bounds, clamped
+     to 250-800 cm.
+   - **Reservations:** a spot stays reserved for 60 s, then for as long as its unit stands on it.
+   - **Log:** `AI_TRAIN stand_spot`.
+   - **Then the defense position:** after the wait (see Flow, 4).
+   - **Cover keep-out:** every trainer registers its exit with `URTSCoverFinderWorldSubsystem::AddCoverKeepOutZone`
+     (refreshed by the 1 s owner check, removed at EndPlay).
+     - The zone is the exit lane plus 3 m behind the exit toward the door
+       (`EnemyAISettings::UnitTraining::ExitCoverKeepOutBehindCm`).
+     - That player's soldiers take no cover in it while they look for cover without a target (idle). Before this,
+       idle squads auto-covered at the sandbags flanking the barracks door, 2 m from where the next squad appears.
+     - Combat and stress-retreat cover still use every point, so defenders under fire keep the door's sandbags.
+
+After the fixes (final run `spawn_qa6`, Development build; sheets `SpawnQA_Infantry_after.png` /
+`SpawnQA_Vehicles_after.png`; the plain run `integration_final` passes):
+- **Squads** appear on the ground with no jump or drop.
+- **Fog:** units stay hidden through the fog, and the control building's units show.
+- **Where units go:** squads walk to spots 8.4 m off the exit and tanks drive to spots 10 m off it. Second units take
+  the other side of the lane.
+- **Nothing in the way:** no body stands in an exit lane, and the nearest soldier to an exit is 3.2 m away
+  (2.06 m before the cover keep-out).
+- **One overlap (open):** in `spawn_qa6` two soldiers stood on the same spot at +20 s. `spawn_qa7` (which passes)
+  logged why: two soldiers at exactly (11200, -22200), each holding a different cover point id (state 4).
+  - So the cover finder has two cover points at the same location, and each can be reserved.
+  - It is not the stand-spot search and not a keep-out fallback. It was not fixed.
+
+Real survival match after the fixes (`survival_watch2`: SM_Desert_01, `-SovietBaseWatch=480`, nothing forced):
+- 10 units trained. All 10 took the defense-position branch (`AI_TRAIN defense_position`) and none used a stand spot.
+- The defense positions were 51 m to 448 m from the unit's building, often at another base.
+- So in matches the stand spots only matter while the AI has no defense position. A match always gave one here.
+
+Things to know:
+- **Idle Soviet squads then spread into cover** within `M_EnemyAutomaticCoverSearchRadius` (25 m, by design), so
+  soldiers end up along the building's sandbags and walls. The exit keep-out zones keep that cover off the door's
+  flanks. The QA checks every body, not the squad's centre.
+- **The optimizer's 0.5 s ticks:** `URTSSquadUnitOptimizer` moves soldiers outside the player's view in 0.5 s
+  movement ticks, about 250 cm steps at walking speed. The QA forces per-frame movement while it samples, as
+  `SquadMarchTestScenario` does; otherwise those steps read as teleports.
+- **Still open (not asked for):**
+  - the green `DebugTrainedUnit` sphere;
+  - the grey, trackless first tank frame;
+  - the barracks sandbags.
+
+
+## Wait at the stand spot, then defend (user, 2026-11-19)
+
+Every building-trained unit now waits at its stand spot for 45-60 s, then goes to a base defense position (see Flow, 4).
+Checked in a real match (`survival_watch3`: SM_Desert_01, `-SovietBaseWatch=480`, Development build, nothing forced):
+
+- 4 units were trained (Mosin squad, T-26, BT-7, T-70). All 4 went to a stand spot 8-11 m from their exit
+  (`AI_TRAIN stand_spot_wait`), although the AI had defense positions the whole match.
+- The Mosin squad and the T-26 left after 54-56 s for defense positions 28 m and 80 m from their exits
+  (`stand_spot_release`). The release runs on the 6 s strategic think, so a unit leaves up to 6 s after its time.
+- The BT-7 and T-70 were taken out of the idle pool by something else just before or at their release
+  (`stand_spot_picked`), and were left to that order. The decision tree does not log, so which mission took them
+  was not checked.
+- Not checked: how the units looked while they waited (no captures), and the Shipping build.

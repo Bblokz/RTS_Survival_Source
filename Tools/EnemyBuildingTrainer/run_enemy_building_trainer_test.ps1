@@ -11,6 +11,8 @@ param(
 	[switch]$AddMissing,
 	# Spawns every unit the AI can train and checks each comes out as itself (no buildings, no training).
 	[switch]$SpawnerAudit,
+	# Two units per building, exit-view frames around each unit's appearance and spawnqa measurements.
+	[switch]$SpawnQA,
 	[string]$Exposure = '',
 	[string]$At = '',
 	# ESquadSubtype / ETankSubtype names the buildings train instead of Squad_Rus_Mosin / Tank_BT7.
@@ -38,6 +40,7 @@ if ($Buildings -ne '') { $Arguments += "-EnemyBuildingTrainerTestBuildings=$Buil
 if ($Capture) { $Arguments += '-EnemyBuildingTrainerTestCapture' }
 if ($AddMissing) { $Arguments += '-EnemyBuildingTrainerTestAddMissing' }
 if ($SpawnerAudit) { $Arguments += '-EnemyBuildingTrainerTestSpawnerAudit' }
+if ($SpawnQA) { $Arguments += '-EnemyBuildingTrainerTestSpawnQA' }
 if ($Exposure -ne '') { $Arguments += "-EnemyBuildingTrainerTestExposure=$Exposure" }
 if ($At -ne '') { $Arguments += "-EnemyBuildingTrainerTestAt=$At" }
 if ($Squad -ne '') { $Arguments += "-EnemyBuildingTrainerTestSquad=$Squad" }
@@ -49,7 +52,7 @@ $Process.WaitForExit()
 
 $Result = $null
 if (Test-Path $Log) {
-	Select-String -Path $Log -Pattern 'RTS_EBT (job|case|routed|real_think|cancel|capture|audit|.*WARNING)' |
+	Select-String -Path $Log -Pattern 'RTS_EBT (job|case|routed|real_think|cancel|audit|spawnqa|.*WARNING)' |
 		ForEach-Object { $_.Line.Substring($_.Line.IndexOf('RTS_EBT')) }
 	$Result = Select-String -Path $Log -Pattern 'RTS_EBT RESULT (PASS|FAIL)' | Select-Object -Last 1
 }

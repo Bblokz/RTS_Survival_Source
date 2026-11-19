@@ -8,6 +8,7 @@
 #include "RTS_Survival/Enemy/StrategicAI/StrategicAIBlackboard.h"
 #include "RTS_Survival/GameUI/TrainingUI/TrainingOptions/TrainingOptions.h"
 #include "RTS_Survival/Enemy/TrainingAndUnitCreation/StrategicTrainingState/StrategicTrainingState.h"
+#include "RTS_Survival/Enemy/TrainingAndUnitCreation/EnemyBuildingTrainer/EnemyTrainedUnitStandSpots.h"
 #include "RTS_Survival/GlobalAbilitySystem/GlobalAbilityType/EGlobalAbilityType.h"
 #include "RTS_Survival/Utils/RTSMapTests/RTSMapTests.h"
 #include "EnemyStrategicAIComponent.generated.h"
@@ -25,6 +26,14 @@ class ASquadController;
 class UEnemyBuildingTrainerComponent;
 
 DECLARE_DELEGATE(FAIThinkStepDelegate);
+class ICommands;
+
+/** Where a unit a building trained came out; read when the unit gets its first orders (a squad once loaded). */
+struct FEnemyBuildingTrainedUnitExit
+{
+	FTransform ExitTransform = FTransform::Identity;
+	FVector BuildingCenter = FVector::ZeroVector;
+};
 
 USTRUCT()
 struct FAIThinkingTimerData
@@ -212,11 +221,15 @@ public:
 	/** Points of a unit a building trainer dropped before it trained go back to the AI. */
 	void RefundTrainingPoints(const int32 TrainingPoints);
 	/**
-	 * @brief A building trainer of this AI's player finished a unit: it joins this controller's direct-control pool
-	 * (blackboard idle) and moves to a base defense position, like every trained unit.
+	 * @brief A building trainer of this AI's player finished a unit: it joins the fog hidden until seen, joins this
+	 * controller's direct-control pool (blackboard idle) and moves to a base defense position, like every trained
+	 * unit; without a defense position it moves to a stand spot near the exit that blocks no unit of this side.
+	 * @param Trainer The building's trainer for its exit; null when the building is gone (the unit then waits
+	 * around TrainingLocation).
 	 */
 	void OnBuildingTrainerUnitSpawned(const FTrainingOption& TrainingOption, AActor* SpawnedActor,
-	                                  const FVector& TrainingLocation);
+	                                  const FVector& TrainingLocation,
+	                                  const UEnemyBuildingTrainerComponent* Trainer = nullptr);
 
 #if RTS_WITH_MAP_TESTS
 	// Routes the units through the building trainers like a paid batch (no points are spent); returns how many
@@ -332,6 +345,24 @@ private:
 	TArray<FEnemyStrategicAITrainingSpawnBatch> M_ActiveTrainingSpawnBatches;
 	// Standing buildings of this AI's player with a UEnemyBuildingTrainerComponent; refreshed every training think.
 	TArray<TWeakObjectPtr<UEnemyBuildingTrainerComponent>> M_BuildingTrainers;
+	// Building-trained units that have not had their first orders yet (squads wait until they are loaded).
+	TMap<TWeakObjectPtr<AActor>, FEnemyBuildingTrainedUnitExit> M_BuildingTrainedUnitExits;
+	// Stand spots building-trained units were sent to; one stays taken while its unit walks there or stands on it.
+	TArray<FEnemyStandSpotReservation> M_StandSpotReservations;
+	/** Sends a building-trained unit to a stand spot near its exit (see EnemyTrainedUnitStandSpots); false if none. */
+	bool Training_MoveToStandSpot(AActor* Unit, ICommands& Commands, const FEnemyBuildingTrainedUnitExit& Exit);
+	// Building-trained units waiting at their stand spot before they go to a base defense position.
+	TArray<FEnemyStandSpotWait> M_StandSpotWaits;
+	/** Sends every waiting unit whose time is up, and that is still idle in the AI's pool, to a defense position. */
+	void Training_ReleaseStandSpotWaiters();
+	/** Moves the unit to a random base defense position; false if the AI has none. */
+	bool MoveUnitToRandomDefensePosition(AActor* Unit, ICommands& Commands, const TCHAR* LogTag,
+	                                     const FVector& LogFromLocation);
+	/** The faction's units and reserved spots around an exit, without the unit itself (or its own soldiers). */
+	void Training_GatherStandSpotOccupied(const AActor* Unit, const FVector& ExitLocation,
+	                                      TArray<FEnemyStandSpotOccupied>& OutOccupied);
+	/** The unit and its soldiers join the fog now, hidden until the human player can see them. */
+	static void Training_StartFogNowHiddenUntilSeen(AActor* Unit);
 #if RTS_WITH_MAP_TESTS
 	bool bM_MapTest_IsTrainingThinkSuspended = false;
 	bool bM_MapTest_IsForcingTrainingThink = false;

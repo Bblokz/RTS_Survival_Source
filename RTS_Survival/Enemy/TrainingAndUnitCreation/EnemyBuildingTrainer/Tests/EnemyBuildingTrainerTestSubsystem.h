@@ -39,6 +39,14 @@ struct FEnemyBuildingTrainerAuditEntry
 	TWeakObjectPtr<AActor> Unit;
 };
 
+/** Where a body of a trained unit was at the last spawn QA sample, and how fast it moved. */
+struct FEnemyBuildingTrainerQABodySample
+{
+	TWeakObjectPtr<AActor> Body;
+	FVector Location = FVector::ZeroVector;
+	float Speed = 0.f;
+};
+
 /** One unit a test building trained (or dropped), as the trainer's events reported it. */
 struct FEnemyBuildingTrainerTestJob
 {
@@ -57,6 +65,16 @@ struct FEnemyBuildingTrainerTestJob
 	// The building's activity was on at every sample while this unit trained.
 	bool bActivityOffWhileTraining = false;
 	int32 CapturesTaken = 0;
+	// Spawn QA (-EnemyBuildingTrainerTestSpawnQA): exit-view frames and measurements around the unit's appearance.
+	bool bQAPreCaptured = false;
+	int32 QAStagesDone = 0;
+	FVector QASpawnCentroid = FVector::ZeroVector;
+	// Sampled every tick for the first seconds: the largest move of any body beyond what its own speed explains (a
+	// teleport, whatever the frame time) and how far above the ground any body got (a drop).
+	float QAMaxBodyJumpCm = 0.f;
+	float QAMaxAirborneCm = 0.f;
+	float QALastSampleSeconds = -1.f;
+	TArray<FEnemyBuildingTrainerQABodySample> QABodySamples;
 };
 
 /** One Soviet building the test spawns for player 2 and trains at. */
@@ -88,7 +106,11 @@ struct FEnemyBuildingTrainerTestCase
  * Switches: -EnemyBuildingTrainerTestBuildings=Barracks,Factory (labels below or class paths; default all),
  * -EnemyBuildingTrainerTestAddMissing (adds a runtime trainer to buildings whose Blueprint has none),
  * -EnemyBuildingTrainerTestCapture (PNG frames idle / 30 % / 70 % / after / rest per building),
- * -EnemyBuildingTrainerTestExposure=<bias>, -EnemyBuildingTrainerTestAt=X,Y, -EnemyBuildingTrainerTestDir=<dir>.
+ * -EnemyBuildingTrainerTestExposure=<bias>, -EnemyBuildingTrainerTestAt=X,Y, -EnemyBuildingTrainerTestDir=<dir>,
+ * -EnemyBuildingTrainerTestSpawnQA (two units per building, no test move orders; exit-view frames just before the
+ * spawn and 0 / 1 / 3 / 8 / 20 s after, with ground offset, building overlap, stacking, fog, facing and movement
+ * logged per frame as RTS_EBT spawnqa; fails on a teleport or drop after the spawn, a unit seen through the fog, units
+ * overlapping at +20 s, or a unit still at or in front of its exit at +20 s).
  * Log lines start with RTS_EBT; the last one is RTS_EBT RESULT PASS|FAIL.
  */
 UCLASS()
@@ -125,6 +147,9 @@ private:
 	TArray<FString> M_RequestedLabels;
 	TArray<FEnemyBuildingTrainerTestCase> M_Cases;
 	bool bM_SpawnerAudit = false;
+	bool bM_SpawnQA = false;
+	// Spawn QA fog control: a human vision bubble over this case's exit; its units must show, the others stay hidden.
+	int32 M_FogControlCaseIndex = INDEX_NONE;
 	TArray<FEnemyBuildingTrainerAuditEntry> M_AuditEntries;
 	TArray<FString> M_GlobalFailures;
 	TArray<FString> M_Lines;
@@ -168,6 +193,10 @@ private:
 	void StartSpawnerAudit();
 	void TickSpawnerAudit();
 	void CaptureCase(const FEnemyBuildingTrainerTestCase& Case, const FString& Suffix);
+	void TickSpawnQA(FEnemyBuildingTrainerTestCase& Case, const int32 JobIndex);
+	void SpawnQAStage(FEnemyBuildingTrainerTestCase& Case, const int32 JobIndex, const TCHAR* StageTag);
+	void CaptureExitView(const FEnemyBuildingTrainerTestCase& Case, const FString& Suffix);
+	static void CollectUnitBodies(AActor* Unit, TArray<AActor*>& OutBodies);
 	bool EnsureCaptureActor();
 	bool GetAreAllJobsDone() const;
 	int32 GetTotalJobCount() const;

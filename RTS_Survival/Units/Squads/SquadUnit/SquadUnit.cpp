@@ -53,6 +53,13 @@
 #include "RTS_Survival/Scavenging/ScavengeObject/ScavengableObject.h"
 #include "RTS_Survival/Utils/UnitGroundRecovery/RTSUnitGroundRecovery.h"
 
+namespace SquadUnitSpawnPlacement
+{
+	// A soldier this close to its spawn spot when it shows is placed at once; moving it later, while it can be seen,
+	// reads as a jump.
+	constexpr float PlaceAtOnceDistanceCm = 600.f;
+}
+
 namespace SquadUnitGroundRecovery
 {
 	// A soldier that keeps falling through the world after this many recoveries dies instead.
@@ -4988,11 +4995,27 @@ void ASquadUnit::OnSquadUnitSpawned_SetEnabled(const float TimeNotSelectable, co
 		OnSquadUnitSpawned_TeleportAndSetSelectable(SquadUnitLocation);
 		return;
 	}
+	// Already standing by its spot (a unit spawned where it appears, like the AI's building-trained squads): place it
+	// in the frame it shows and only delay the selection. One elsewhere still moves when the delay ends.
+	const bool bPlaceAtOnce = FVector::Dist2D(GetActorLocation(), SquadUnitLocation)
+		<= SquadUnitSpawnPlacement::PlaceAtOnceDistanceCm;
+	if (bPlaceAtOnce)
+	{
+		SetActorLocation(SquadUnitLocation);
+	}
 	TWeakObjectPtr<ASquadUnit> WeakThis(this);
-	auto TeleportAfterDelay = [WeakThis, SquadUnitLocation]()
+	auto TeleportAfterDelay = [WeakThis, SquadUnitLocation, bPlaceAtOnce]()
 	{
 		if (not WeakThis.IsValid())
 		{
+			return;
+		}
+		if (bPlaceAtOnce)
+		{
+			if (IsValid(WeakThis->SelectionComponent))
+			{
+				WeakThis->SelectionComponent->SetCanBeSelected(true);
+			}
 			return;
 		}
 		WeakThis->OnSquadUnitSpawned_TeleportAndSetSelectable(SquadUnitLocation);

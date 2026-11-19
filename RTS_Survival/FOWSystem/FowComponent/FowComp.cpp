@@ -37,6 +37,12 @@ void UFowComp::StartFow(const EFowBehaviour FowComponentBehaviour, const bool bS
 	M_FowBehaviour = FowComponentBehaviour;
 	bM_HasStartedFow = true;
 
+	if (bM_StartNowHiddenRequested)
+	{
+		bM_StartNowHiddenRequested = false;
+		StartFowNowHiddenUntilSeen();
+		return;
+	}
 	if (bStartImmediately)
 	{
 		OnFowStartParticipation();
@@ -47,6 +53,37 @@ void UFowComp::StartFow(const EFowBehaviour FowComponentBehaviour, const bool bS
 	// a bit before we start participating in the FOW system.
 	constexpr float TimeTillActivateFow = DeveloperSettings::GamePlay::Training::TimeRemainingStartAsyncLoading + 2.0f;
 	StartFowParticipationInSeconds(TimeTillActivateFow);
+}
+
+void UFowComp::StartFowNowHiddenUntilSeen()
+{
+	if (not bM_HasStartedFow)
+	{
+		bM_StartNowHiddenRequested = true;
+		return;
+	}
+	if (not GetIsValidFowManager() || M_FowManager->GetIsFowParticipant(this))
+	{
+		// No fog to show the owner again, or the fog already decides what is seen.
+		return;
+	}
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(M_FowParticpationHandle);
+	}
+	AActor* const FowOwner = GetOwner();
+	if (M_FowBehaviour != EFowBehaviour::Fow_Active && IsValid(FowOwner) && not FowOwner->IsHidden())
+	{
+		// Hidden by the fog from the first frame, the way OnFowVisibilityUpdated hides it: the next fog update shows
+		// it if the human player can see it.
+		bM_OwnerHiddenByFog = true;
+		if (FowOwner->GetActorEnableCollision())
+		{
+			FowOwner->Tags.AddUnique(DeveloperSettings::GamePlay::FoW::TagUnitHiddenByFog);
+		}
+		FowOwner->SetActorHiddenInGame(true);
+	}
+	OnFowStartParticipation();
 }
 
 void UFowComp::OnFowVisibilityUpdated(const float Visibility)

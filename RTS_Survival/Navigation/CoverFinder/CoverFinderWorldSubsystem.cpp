@@ -1479,6 +1479,49 @@ FRTSCombatCoverSettings URTSCoverFinderWorldSubsystem::BuildCombatCoverSettings(
 	return CombatSettings;
 }
 
+int32 URTSCoverFinderWorldSubsystem::AddCoverKeepOutZone(const FRTSCoverKeepOutZone& Zone)
+{
+	FRTSCoverKeepOutZone& Added = M_CoverKeepOutZones.Add_GetRef(Zone);
+	Added.ZoneId = M_NextCoverKeepOutZoneId++;
+	return Added.ZoneId;
+}
+
+bool URTSCoverFinderWorldSubsystem::UpdateCoverKeepOutZone(const FRTSCoverKeepOutZone& Zone)
+{
+	FRTSCoverKeepOutZone* const Existing = M_CoverKeepOutZones.FindByPredicate(
+		[&Zone](const FRTSCoverKeepOutZone& Candidate) { return Candidate.ZoneId == Zone.ZoneId; });
+	if (Existing == nullptr)
+	{
+		return false;
+	}
+	*Existing = Zone;
+	return true;
+}
+
+void URTSCoverFinderWorldSubsystem::RemoveCoverKeepOutZone(const int32 ZoneId)
+{
+	M_CoverKeepOutZones.RemoveAll([ZoneId](const FRTSCoverKeepOutZone& Zone) { return Zone.ZoneId == ZoneId; });
+}
+
+bool URTSCoverFinderWorldSubsystem::GetIsInCoverKeepOutZone(const FVector& Location, const int32 OwningPlayer) const
+{
+	for (const FRTSCoverKeepOutZone& Zone : M_CoverKeepOutZones)
+	{
+		if (Zone.OwningPlayer != OwningPlayer)
+		{
+			continue;
+		}
+		const FVector2D Offset = FVector2D(Location.X, Location.Y) - Zone.Start;
+		const float Along = FVector2D::DotProduct(Offset, Zone.Forward);
+		const float Across = FMath::Abs(FVector2D::CrossProduct(Zone.Forward, Offset));
+		if (Along >= -Zone.BehindLength && Along <= Zone.AheadLength && Across <= Zone.HalfWidth)
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
 bool URTSCoverFinderWorldSubsystem::GetIsCoverPointAvailableToUnit(
 	const FRTSCoverPoint& CoverPoint,
 	const ASquadUnit& SquadUnit) const
@@ -1788,8 +1831,15 @@ TArray<FRTSCoverPoint> URTSCoverFinderWorldSubsystem::GatherBestTacticalCoverCan
 	M_TacticalPerformanceSnapshot.CandidateChecksLastFrame += BestCandidates.Num();
 	const bool bLimitTargetDistance = IsValid(TargetActor) && MaximumDistanceToTarget > 0.0f;
 	const float MaximumDistanceToTargetSquared = FMath::Square(MaximumDistanceToTarget);
+	// Keep-out zones only hold for cover taken without a target: under fire a soldier still uses every cover.
+	const bool bApplyKeepOutZones = not IsValid(TargetActor) && not M_CoverKeepOutZones.IsEmpty();
+	const int32 OwningPlayer = SquadUnit.GetOwningPlayer();
 	BestCandidates.RemoveAll([&](const FRTSCoverPoint& CoverPoint)
 	{
+		if (bApplyKeepOutZones && GetIsInCoverKeepOutZone(CoverPoint.Location, OwningPlayer))
+		{
+			return true;
+		}
 		if (bLimitTargetDistance &&
 			FVector::DistSquared(CoverPoint.Location, TargetLocation) > MaximumDistanceToTargetSquared)
 		{

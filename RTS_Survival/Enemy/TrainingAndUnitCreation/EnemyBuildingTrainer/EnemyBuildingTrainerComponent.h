@@ -221,6 +221,10 @@ private:
 	FTimerHandle M_ActiveJobTimer;
 	FTimerHandle M_SpawnWatchdogTimer;
 	FTimerHandle M_OwnerCheckTimer;
+	// This building's exit in the cover finder: its player's soldiers take no cover where its units appear.
+	int32 M_CoverKeepOutZoneId = 0;
+	void UpdateCoverKeepOutZone();
+	void RemoveCoverKeepOutZone();
 	FTimerHandle M_FinishCycleTimer;
 
 	void StartNextJob();

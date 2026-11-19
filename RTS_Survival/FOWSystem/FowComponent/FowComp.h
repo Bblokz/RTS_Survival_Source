@@ -63,6 +63,15 @@ public:
     UFUNCTION(BlueprintCallable, NotBlueprintable)
     void StartFow(const EFowBehaviour FowComponentBehaviour, const bool bStartImmediately = false);
 
+	/**
+	 * @brief Joins the fog now instead of after the start delay; a passive owner is hidden until the fog shows it.
+	 * For units that appear in the open the moment they spawn, like the AI's building-trained units: the start delay
+	 * covers the player trainer's hidden pre-spawn, and such a unit would stay visible through the fog until it ran
+	 * out. Called before StartFow, the next StartFow starts this way.
+	 * @note Does nothing without a fog manager (maps without fog), so it never hides a unit for good.
+	 */
+	void StartFowNowHiddenUntilSeen();
+
     /**
      * @brief Called when the Fog of War visibility is updated for this component.
      *
@@ -164,6 +173,9 @@ private:
 
 	// Set once StartFow picked a behaviour; before that an owner change has nothing to switch.
 	bool bM_HasStartedFow = false;
+
+	// StartFowNowHiddenUntilSeen came before StartFow: that start joins at once, hidden until seen.
+	bool bM_StartNowHiddenRequested = false;
 
 	// True while the fog hides the owner and the owner was not hidden already when the fog came; decides whether
 	// the owner carries TagUnitHiddenByFog (only while its collision is on). Passive behaviours only.

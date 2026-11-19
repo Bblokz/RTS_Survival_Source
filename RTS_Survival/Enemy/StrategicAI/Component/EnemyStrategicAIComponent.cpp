@@ -25,8 +25,15 @@
 #include "RTS_Survival/Player/AsyncRTSAssetsSpawner/RTSAsyncSpawner.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/Units/SquadController.h"
+#include "NavigationData.h"
+#include "RTS_Survival/Units/Squads/SquadUnit/SquadUnit.h"
+#include "RTS_Survival/Units/Tanks/TankMaster.h"
+#include "RTS_Survival/FOWSystem/FowComponent/FowComp.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
+
+// Where building-trained units are sent once spawned (AI_TRAIN defense_position).
+DEFINE_LOG_CATEGORY_STATIC(LogEnemyTrainedUnitOrders, Log, All);
 
 namespace EnemyStrategicAIMineLocationConstants
 {
@@ -1100,9 +1107,182 @@ void UEnemyStrategicAIComponent::RefundTrainingPoints(const int32 TrainingPoints
 void UEnemyStrategicAIComponent::OnBuildingTrainerUnitSpawned(
 	const FTrainingOption& TrainingOption,
 	AActor* SpawnedActor,
-	const FVector& TrainingLocation)
+	const FVector& TrainingLocation,
+	const UEnemyBuildingTrainerComponent* Trainer)
 {
+	if (IsValid(SpawnedActor))
+	{
+		FEnemyBuildingTrainedUnitExit Exit;
+		Exit.ExitTransform = FTransform(TrainingLocation);
+		Exit.BuildingCenter = TrainingLocation;
+		if (IsValid(Trainer) && IsValid(Trainer->GetOwner()))
+		{
+			Exit.ExitTransform = Trainer->GetExitTransform();
+			Exit.BuildingCenter = Trainer->GetOwner()->GetActorLocation();
+		}
+		for (auto It = M_BuildingTrainedUnitExits.CreateIterator(); It; ++It)
+		{
+			if (not It.Key().IsValid())
+			{
+				It.RemoveCurrent();
+			}
+		}
+		M_BuildingTrainedUnitExits.Add(SpawnedActor, Exit);
+		// Spawned in the open at the building: without this it shows through the fog until the fog's start delay
+		// for the player trainer's hidden pre-spawn runs out.
+		Training_StartFogNowHiddenUntilSeen(SpawnedActor);
+	}
 	OnBlackboardUnitSpawned(TrainingOption, SpawnedActor, INDEX_NONE, TrainingLocation);
+}
+
+void UEnemyStrategicAIComponent::Training_StartFogNowHiddenUntilSeen(AActor* Unit)
+{
+	if (not IsValid(Unit))
+	{
+		return;
+	}
+	TArray<AActor*> Actors = {Unit};
+	if (ASquadController* const SquadController = Cast<ASquadController>(Unit))
+	{
+		for (ASquadUnit* const SquadUnit : SquadController->GetSquadUnitsChecked())
+		{
+			Actors.Add(SquadUnit);
+		}
+	}
+	for (AActor* const Actor : Actors)
+	{
+		if (not IsValid(Actor))
+		{
+			continue;
+		}
+		if (UFowComp* const FowComponent = Actor->FindComponentByClass<UFowComp>())
+		{
+			FowComponent->StartFowNowHiddenUntilSeen();
+		}
+	}
+}
+
+bool UEnemyStrategicAIComponent::Training_MoveToStandSpot(AActor* Unit, ICommands& Commands,
+                                                          const FEnemyBuildingTrainedUnitExit& Exit)
+{
+	using namespace EnemyAISettings::UnitTraining;
+	UWorld* const World = GetWorld();
+	if (not IsValid(World) || not IsValid(Unit))
+	{
+		return false;
+	}
+	FEnemyStandSpotQuery Query;
+	Query.ExitLocation = Exit.ExitTransform.GetLocation();
+	const FVector ExitForward = Exit.ExitTransform.GetRotation().GetForwardVector().GetSafeNormal2D();
+	Query.ExitForward = ExitForward.IsNearlyZero() ? FVector::ForwardVector : ExitForward;
+	Query.BuildingCenter = Exit.BuildingCenter;
+	Query.UnitRadius = EnemyTrainedUnitStandSpots::GetUnitFootprintRadius(Unit);
+	Query.NavData = EnemyTrainedUnitStandSpots::GetNavDataForUnit(World, Unit);
+	Query.UnitNameForLog = Unit->GetName();
+	// Every exit of this AI's buildings stays free for the units still to come out (read here, not from
+	// M_BuildingTrainers, which only the training think refreshes).
+	TArray<const UEnemyBuildingTrainerComponent*> Trainers;
+	if (EnsureIsValidUnitManager())
+	{
+		for (const ABuildingExpansion* const Bxp : M_GameUnitManager->GetPlayerBxps(
+			     static_cast<uint8>(GetControlledPlayer())))
+		{
+			if (IsValid(Bxp))
+			{
+				Trainers.Add(Bxp->FindComponentByClass<UEnemyBuildingTrainerComponent>());
+			}
+		}
+	}
+	for (const UEnemyBuildingTrainerComponent* const Trainer : Trainers)
+	{
+		if (not IsValid(Trainer))
+		{
+			continue;
+		}
+		const FTransform TrainerExit = Trainer->GetExitTransform();
+		FEnemyStandSpotKeepClearLane& Lane = Query.KeepClearLanes.AddDefaulted_GetRef();
+		Lane.Start = TrainerExit.GetLocation();
+		Lane.Forward = TrainerExit.GetRotation().GetForwardVector().GetSafeNormal2D();
+		Lane.Length = StandSpotExitLaneLengthCm;
+		Lane.HalfWidth = Trainer->TrainerKind == EEnemyBuildingTrainerKind::Vehicles
+			                 ? StandSpotVehicleExitLaneHalfWidthCm
+			                 : StandSpotInfantryExitLaneHalfWidthCm;
+	}
+	Training_GatherStandSpotOccupied(Unit, Query.ExitLocation, Query.Occupied);
+	FEnemyStandSpot Spot;
+	if (not EnemyTrainedUnitStandSpots::FindStandSpot(World, Query, Spot))
+	{
+		return false;
+	}
+	FEnemyStandSpotReservation& Reservation = M_StandSpotReservations.AddDefaulted_GetRef();
+	Reservation.Unit = Unit;
+	Reservation.Location = Spot.Location;
+	Reservation.Radius = Query.UnitRadius;
+	Reservation.ReservedAtSeconds = World->GetTimeSeconds();
+	constexpr bool bSetUnitToIdle = false;
+	Commands.MoveToLocation(Spot.Location, bSetUnitToIdle, FRotator(0.f, Spot.Yaw, 0.f), true);
+	return true;
+}
+
+void UEnemyStrategicAIComponent::Training_GatherStandSpotOccupied(const AActor* Unit, const FVector& ExitLocation,
+                                                                  TArray<FEnemyStandSpotOccupied>& OutOccupied)
+{
+	using namespace EnemyAISettings::UnitTraining;
+	const UWorld* const World = GetWorld();
+	const float Now = IsValid(World) ? World->GetTimeSeconds() : 0.f;
+	// A reservation lasts while its unit may still be walking there, or for as long as it stands on the spot.
+	M_StandSpotReservations.RemoveAll([Unit, Now](const FEnemyStandSpotReservation& Reservation)
+	{
+		const AActor* const ReservedUnit = Reservation.Unit.Get();
+		if (not IsValid(ReservedUnit) || ReservedUnit == Unit)
+		{
+			return true;
+		}
+		const bool bMayStillBeWalking = Now - Reservation.ReservedAtSeconds < StandSpotReservationWalkSeconds;
+		const bool bStandsOnIt = FVector::Dist2D(ReservedUnit->GetActorLocation(), Reservation.Location)
+			<= Reservation.Radius * 2.f;
+		return not bMayStillBeWalking && not bStandsOnIt;
+	});
+	const float MaxDistanceSquared = FMath::Square(StandSpotOccupiedGatherRadiusCm);
+	for (const FEnemyStandSpotReservation& Reservation : M_StandSpotReservations)
+	{
+		if (FVector::DistSquared2D(Reservation.Location, ExitLocation) <= MaxDistanceSquared)
+		{
+			OutOccupied.Add({Reservation.Location, Reservation.Radius});
+		}
+	}
+	if (not EnsureIsValidUnitManager())
+	{
+		return;
+	}
+	const uint8 ControlledPlayer = static_cast<uint8>(GetControlledPlayer());
+	TArray<const AActor*> OwnSoldiers;
+	if (const ASquadController* const OwnSquad = Cast<ASquadController>(Unit))
+	{
+		for (ASquadUnit* const SquadUnit : const_cast<ASquadController*>(OwnSquad)->GetSquadUnitsChecked())
+		{
+			OwnSoldiers.Add(SquadUnit);
+		}
+	}
+	const float SoldierRadius = EnemyTrainedUnitStandSpots::GetSoldierFootprintRadius();
+	for (const ASquadUnit* const Soldier : M_GameUnitManager->GetSquadUnitsOfPlayerView(ControlledPlayer))
+	{
+		if (not IsValid(Soldier) || OwnSoldiers.Contains(Soldier)
+			|| FVector::DistSquared2D(Soldier->GetActorLocation(), ExitLocation) > MaxDistanceSquared)
+		{
+			continue;
+		}
+		OutOccupied.Add({Soldier->GetActorLocation(), SoldierRadius});
+	}
+	for (const ATankMaster* const Tank : M_GameUnitManager->GetTanksOfPlayerView(ControlledPlayer))
+	{
+		if (not IsValid(Tank) || Tank == Unit
+			|| FVector::DistSquared2D(Tank->GetActorLocation(), ExitLocation) > MaxDistanceSquared)
+		{
+			continue;
+		}
+		OutOccupied.Add({Tank->GetActorLocation(), EnemyTrainedUnitStandSpots::GetUnitFootprintRadius(Tank)});
+	}
 }
 
 #if RTS_WITH_MAP_TESTS
@@ -1386,6 +1566,17 @@ void UEnemyStrategicAIComponent::RegisterDroppedUnitWithBlackboard(AActor* Dropp
 
 void UEnemyStrategicAIComponent::IssueOrdersToSpawnedBlackboardUnit(AActor* SpawnedActor)
 {
+	// Building-trained: read (and drop) where it came out.
+	bool bIsBuildingTrained = false;
+	FEnemyBuildingTrainedUnitExit BuildingExit;
+	if (const FEnemyBuildingTrainedUnitExit* const FoundExit = M_BuildingTrainedUnitExits.Find(SpawnedActor))
+	{
+		bIsBuildingTrained = true;
+		BuildingExit = *FoundExit;
+		M_BuildingTrainedUnitExits.Remove(SpawnedActor);
+		// Again once loaded: a squad's soldiers may not have existed when it spawned.
+		Training_StartFogNowHiddenUntilSeen(SpawnedActor);
+	}
 	ICommands* Commands = Cast<ICommands>(SpawnedActor);
 	if (Commands == nullptr)
 	{
@@ -1398,18 +1589,96 @@ void UEnemyStrategicAIComponent::IssueOrdersToSpawnedBlackboardUnit(AActor* Spaw
 		return;
 	}
 
-	FDefensePositions DefensePosition;
-	if (not TryGetRandomBlackboardDefensePosition(DefensePosition))
+	if (bIsBuildingTrained)
 	{
-		return;
+		// First wait by the building, clear of its exit, then go on to a defense position
+		// (Training_ReleaseStandSpotWaiters). Left at the exit it would block the next unit.
+		if (Training_MoveToStandSpot(SpawnedActor, *Commands, BuildingExit))
+		{
+			using namespace EnemyAISettings::UnitTraining;
+			const UWorld* const World = GetWorld();
+			const float Now = IsValid(World) ? World->GetTimeSeconds() : 0.f;
+			FEnemyStandSpotWait& Wait = M_StandSpotWaits.AddDefaulted_GetRef();
+			Wait.Unit = SpawnedActor;
+			Wait.ReleaseAtSeconds = Now + StandSpotWaitSeconds
+				+ static_cast<float>(GetSeededIndex(StandSpotWaitJitterSeconds + 1));
+			UE_LOG(LogEnemyTrainedUnitOrders, Log, TEXT("AI_TRAIN stand_spot_wait %s t=%.1f release_at=%.1f"),
+			       *SpawnedActor->GetName(), Now, Wait.ReleaseAtSeconds);
+			return;
+		}
 	}
+	MoveUnitToRandomDefensePosition(SpawnedActor, *Commands,
+	                                bIsBuildingTrained ? TEXT("defense_position") : nullptr,
+	                                BuildingExit.ExitTransform.GetLocation());
+}
 
+bool UEnemyStrategicAIComponent::MoveUnitToRandomDefensePosition(AActor* Unit, ICommands& Commands,
+                                                                 const TCHAR* LogTag, const FVector& LogFromLocation)
+{
+	FDefensePositions DefensePosition;
+	if (not IsValid(Unit) || not TryGetRandomBlackboardDefensePosition(DefensePosition))
+	{
+		return false;
+	}
+	if (LogTag != nullptr)
+	{
+		UE_LOG(LogEnemyTrainedUnitOrders, Log, TEXT("AI_TRAIN %s %s to %s (%.0f cm from its exit)"),
+		       LogTag, *Unit->GetName(), *DefensePosition.Location.ToCompactString(),
+		       FVector::Dist2D(DefensePosition.Location, LogFromLocation));
+	}
 	constexpr bool bQueueOrder = false;
-	Commands->MoveToLocation(
+	Commands.MoveToLocation(
 		DefensePosition.Location,
 		bQueueOrder,
 		FRotator(0.f, DefensePosition.YawRotation, 0.f),
 		true);
+	return true;
+}
+
+void UEnemyStrategicAIComponent::Training_ReleaseStandSpotWaiters()
+{
+	if (M_StandSpotWaits.IsEmpty())
+	{
+		return;
+	}
+	const UWorld* const World = GetWorld();
+	if (not IsValid(World))
+	{
+		return;
+	}
+	const float Now = World->GetTimeSeconds();
+	for (int32 Index = M_StandSpotWaits.Num() - 1; Index >= 0; --Index)
+	{
+		const FEnemyStandSpotWait Wait = M_StandSpotWaits[Index];
+		AActor* const Unit = Wait.Unit.Get();
+		ICommands* const Commands = Cast<ICommands>(Unit);
+		if (not IsValid(Unit) || Commands == nullptr)
+		{
+			M_StandSpotWaits.RemoveAtSwap(Index);
+			continue;
+		}
+		if (Now < Wait.ReleaseAtSeconds)
+		{
+			continue;
+		}
+		// Picked from the idle pool for a mission meanwhile: that mission's orders win.
+		if (not M_Blackboard.IdleDirectControlUnits.Contains(Unit))
+		{
+			UE_LOG(LogEnemyTrainedUnitOrders, Log, TEXT("AI_TRAIN stand_spot_picked %s t=%.1f"),
+			       *Unit->GetName(), Now);
+			M_StandSpotWaits.RemoveAtSwap(Index);
+			continue;
+		}
+		// Still walking or busy (e.g. fighting): try again next think. Same without a defense position.
+		if (not Commands->GetIsUnitIdle())
+		{
+			continue;
+		}
+		if (MoveUnitToRandomDefensePosition(Unit, *Commands, TEXT("stand_spot_release"), Unit->GetActorLocation()))
+		{
+			M_StandSpotWaits.RemoveAtSwap(Index);
+		}
+	}
 }
 
 bool UEnemyStrategicAIComponent::TryGetRandomBlackboardDefensePosition(FDefensePositions& OutDefensePosition) const
@@ -1721,6 +1990,7 @@ void UEnemyStrategicAIComponent::StrategicAiThinkingLoop()
 	TRACE_CPUPROFILER_EVENT_SCOPE("StrategicAI_ThinkingLoop")
 	const float Now = GetWorld()->GetTimeSeconds();
 	ClearInvalidIdleUnitsFromBlackboard();
+	Training_ReleaseStandSpotWaiters();
 	for (auto EachThinkTimer : M_AIThinkTimers)
 	{
 		if (not EachThinkTimer || not EachThinkTimer->ThinkStepDelegate.IsBound())

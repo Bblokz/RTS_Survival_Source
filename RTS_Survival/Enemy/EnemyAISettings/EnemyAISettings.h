@@ -56,6 +56,25 @@ namespace EnemyAISettings
 		inline constexpr float BuildingTrainingBaseSeconds = 20.f;
 		inline constexpr float BuildingTrainingSecondsPerPoint = 1.5f;
 		inline constexpr float BuildingTrainingMaxSeconds = 120.f;
+
+		// A building-trained unit first walks to a stand spot near its exit and waits there this long, plus a seeded
+		// 0..StandSpotWaitJitterSeconds, before it goes on to a base defense position. It keeps waiting while it is
+		// busy or the AI has no defense position; one the AI picks for a mission meanwhile goes with that mission.
+		inline constexpr float StandSpotWaitSeconds = 45.f;
+		inline constexpr int32 StandSpotWaitJitterSeconds = 15;
+
+		// Stand spots (EnemyTrainedUnitStandSpots) lie out of every trainer's exit lane (this long and half wide) and clear of the
+		// side's units and of the spots others were sent to.
+		inline constexpr float StandSpotExitLaneLengthCm = 1800.f;
+		inline constexpr float StandSpotVehicleExitLaneHalfWidthCm = 500.f;
+		inline constexpr float StandSpotInfantryExitLaneHalfWidthCm = 300.f;
+		// The side's soldiers also take no cover in that lane, nor this far behind the exit toward its building (the
+		// door's flanks, where a squad appears): URTSCoverFinderWorldSubsystem keep-out zones.
+		inline constexpr float ExitCoverKeepOutBehindCm = 300.f;
+		// A stand spot stays reserved this long for its unit to walk there, and after that while it stands on it.
+		inline constexpr float StandSpotReservationWalkSeconds = 60.f;
+		// Units and reservations further than this from the exit cannot touch a stand spot.
+		inline constexpr float StandSpotOccupiedGatherRadiusCm = 7000.f;
 	}
 
 	namespace TrainingPressure

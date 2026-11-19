@@ -16,6 +16,7 @@
 #include "RTS_Survival/Enemy/EnemyController/EnemyController.h"
 #include "RTS_Survival/Enemy/StrategicAI/Component/EnemyStrategicAIComponent.h"
 #include "RTS_Survival/Game/Players/RTSPlayers.h"
+#include "RTS_Survival/Navigation/CoverFinder/CoverFinderWorldSubsystem.h"
 #include "RTS_Survival/Player/AsyncRTSAssetsSpawner/RTSAsyncSpawner.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
@@ -54,6 +55,7 @@ void UEnemyBuildingTrainerComponent::BeginPlay()
 	}
 	World->GetTimerManager().SetTimer(M_OwnerCheckTimer, this, &UEnemyBuildingTrainerComponent::OnOwnerCheck,
 	                                  EnemyBuildingTrainerPrivate::OwnerCheckIntervalSeconds, true);
+	UpdateCoverKeepOutZone();
 }
 
 void UEnemyBuildingTrainerComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -64,6 +66,7 @@ void UEnemyBuildingTrainerComponent::EndPlay(const EEndPlayReason::Type EndPlayR
 		World->GetTimerManager().ClearTimer(M_OwnerCheckTimer);
 		World->GetTimerManager().ClearTimer(M_FinishCycleTimer);
 	}
+	RemoveCoverKeepOutZone();
 	Super::EndPlay(EndPlayReason);
 }
 
@@ -277,7 +280,7 @@ void UEnemyBuildingTrainerComponent::OnActiveJobSpawned(const int32 JobID, const
 	}
 	if (IsValid(StrategicAI) && IsValid(SpawnedActor))
 	{
-		StrategicAI->OnBuildingTrainerUnitSpawned(Option, SpawnedActor, ExitLocation);
+		StrategicAI->OnBuildingTrainerUnitSpawned(Option, SpawnedActor, ExitLocation, this);
 	}
 	if (bIsActiveJob)
 	{
@@ -361,6 +364,8 @@ void UEnemyBuildingTrainerComponent::CancelAllTraining()
 
 void UEnemyBuildingTrainerComponent::OnOwnerCheck()
 {
+	// Follows a building that moved or changed owner.
+	UpdateCoverKeepOutZone();
 	if (GetIsTraining())
 	{
 		if (not GetCanTrainNow())
@@ -370,6 +375,49 @@ void UEnemyBuildingTrainerComponent::OnOwnerCheck()
 		return;
 	}
 	ApplyActivityToComponents(false, false, false);
+}
+
+void UEnemyBuildingTrainerComponent::UpdateCoverKeepOutZone()
+{
+	using namespace EnemyAISettings::UnitTraining;
+	UWorld* const World = GetWorld();
+	URTSCoverFinderWorldSubsystem* const CoverFinder = IsValid(World)
+		                                                   ? World->GetSubsystem<URTSCoverFinderWorldSubsystem>()
+		                                                   : nullptr;
+	if (not IsValid(CoverFinder) || not IsValid(GetOwner()))
+	{
+		return;
+	}
+	const FTransform Exit = GetExitTransform();
+	const FVector Forward = Exit.GetRotation().GetForwardVector().GetSafeNormal2D();
+	FRTSCoverKeepOutZone Zone;
+	Zone.ZoneId = M_CoverKeepOutZoneId;
+	Zone.OwningPlayer = FRTSPlayers::GetOwningPlayerOfActor(GetOwner());
+	Zone.Start = FVector2D(Exit.GetLocation().X, Exit.GetLocation().Y);
+	Zone.Forward = Forward.IsNearlyZero() ? FVector2D(1.f, 0.f) : FVector2D(Forward.X, Forward.Y);
+	Zone.BehindLength = ExitCoverKeepOutBehindCm;
+	Zone.AheadLength = StandSpotExitLaneLengthCm;
+	Zone.HalfWidth = TrainerKind == EEnemyBuildingTrainerKind::Vehicles
+		                 ? StandSpotVehicleExitLaneHalfWidthCm
+		                 : StandSpotInfantryExitLaneHalfWidthCm;
+	if (M_CoverKeepOutZoneId != 0 && CoverFinder->UpdateCoverKeepOutZone(Zone))
+	{
+		return;
+	}
+	M_CoverKeepOutZoneId = CoverFinder->AddCoverKeepOutZone(Zone);
+}
+
+void UEnemyBuildingTrainerComponent::RemoveCoverKeepOutZone()
+{
+	UWorld* const World = GetWorld();
+	URTSCoverFinderWorldSubsystem* const CoverFinder = IsValid(World)
+		                                                   ? World->GetSubsystem<URTSCoverFinderWorldSubsystem>()
+		                                                   : nullptr;
+	if (IsValid(CoverFinder) && M_CoverKeepOutZoneId != 0)
+	{
+		CoverFinder->RemoveCoverKeepOutZone(M_CoverKeepOutZoneId);
+	}
+	M_CoverKeepOutZoneId = 0;
 }
 
 FTransform UEnemyBuildingTrainerComponent::GetExitTransform() const
