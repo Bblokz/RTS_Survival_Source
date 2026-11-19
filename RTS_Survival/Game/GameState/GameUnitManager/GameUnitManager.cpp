@@ -1270,6 +1270,11 @@ TArray<ATankMaster*> UGameUnitManager::GetPlayerTanks(const uint8 Player) const
 	return GetUnitsOfPlayer(Player).TankMasters;
 }
 
+const TArray<ABuildingExpansion*>& UGameUnitManager::GetPlayerBxps(const uint8 Player) const
+{
+	return GetUnitsOfPlayer(Player).Bxps;
+}
+
 #if RTS_WITH_SHIPPING_MAP_TESTS || RTS_WITH_MAP_TESTS
 TArray<AAircraftMaster*> UGameUnitManager::ShippingTest_GetAircraftOfPlayer(const uint8 Player) const
 {

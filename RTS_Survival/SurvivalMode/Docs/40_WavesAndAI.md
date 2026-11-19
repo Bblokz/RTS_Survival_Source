@@ -307,7 +307,8 @@ global-ability think step (shared cooldowns with the Artillery/AirRaid/Airborne 
 Cross-agent notes:
 - **Soviet-base agent:** the strategic AI's own tech still comes from building expansions: `BTX_RusBarracks` →
   BasicInfantry, `BTX_RusFactory` / `BTX_RusCoolingTowers` → LightTanks, `BTX_RusResearchCenter` → Tier2; bases need
-  enemy trainer components (`InitTrainerAsEnemyTrainerComponent`) or the AI trains nothing. Base buildings are what
+  standing trainer buildings with a `UEnemyBuildingTrainerComponent` (`Source/Docs/EnemyAI/EnemyBuildingTraining.md`) or the
+  AI trains nothing. Base buildings are what
   `FindEnemyBase_TimerRequest` clusters into DefendBase points.
 - **Mission-UI agent:** see §12.
 

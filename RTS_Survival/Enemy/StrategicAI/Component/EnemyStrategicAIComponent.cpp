@@ -13,7 +13,9 @@
 #include "RTS_Survival/Enemy/StrategicAI/BlackboardQueries/BlackboardQueryHelpers.h"
 #include "RTS_Survival/Enemy/StrategicAI/StochasticDecisionTree/StochasticDecisionTree.h"
 #include "RTS_Survival/Enemy/StrategicAI/StochasticDecisionTree/StochasticHelpers/StochasticHelpers.h"
+#include "RTS_Survival/Enemy/TrainingAndUnitCreation/EnemyBuildingTrainer/EnemyBuildingTrainerComponent.h"
 #include "RTS_Survival/Enemy/TrainingAndUnitCreation/EnemyTrainingHelpers/EnemyTrainingHelpers.h"
+#include "RTS_Survival/Buildings/BuildingExpansion/BuildingExpansion.h"
 #include "RTS_Survival/GlobalAbilitySystem/GlobalAbilities/GlobalAbility.h"
 #include "RTS_Survival/GlobalAbilitySystem/GlobalAbilitiesManager/GlobalAbilitiesManager.h"
 #include "RTS_Survival/Game/RTSGameInstance/RTSGameInstance.h"
@@ -609,6 +611,16 @@ void UEnemyStrategicAIComponent::Training_ThinkStep()
 	}
 #endif
 
+#if RTS_WITH_MAP_TESTS
+	if (bM_MapTest_IsTrainingThinkSuspended && not bM_MapTest_IsForcingTrainingThink)
+	{
+		return;
+	}
+#endif
+
+	// Units train at buildings: know which ones stand before picking anything they would have to train.
+	Training_RefreshBuildingTrainers();
+
 	// Reserved batches are handled first so saved pressure cannot be replaced by cheaper random picks.
 	// “Do I currently have at least ReservedTrainingBatch.TrainingPointCost training points?”
 	if (Training_HandleReservedTrainingBatchIfAny())
@@ -678,6 +690,13 @@ bool UEnemyStrategicAIComponent::Training_HandleReservedTrainingBatchIfAny()
 	}
 
 	const FEnemyStrategicAITrainingBatch& ReservedTrainingBatch = M_TrainingReservation.ReservedTrainingBatch;
+	// The building that would train part of the reservation is gone: drop it so the saved points go to what the AI
+	// can still train, instead of blocking every later pick.
+	if (not Training_GetCanTrainBatch(ReservedTrainingBatch))
+	{
+		M_TrainingReservation.Reset();
+		return false;
+	}
 	// “Do I currently have at least ReservedTrainingBatch.TrainingPointCost training points?”
 	if (not Training_TrySpendTrainingPoints(ReservedTrainingBatch.TrainingPointCost))
 	{
@@ -703,6 +722,33 @@ void UEnemyStrategicAIComponent::Training_CollectAvailableTrainingOptions(
 	Training_AddUnlockedTrainingOptions(EnemyLevelTraining.AdvancedInfantryOptions, OutTankSubtypes, OutSquadSubtypes);
 	Training_AddUnlockedTrainingOptions(EnemyLevelTraining.Tier3Options, OutTankSubtypes, OutSquadSubtypes);
 	Training_AddUnlockedTrainingOptions(EnemyLevelTraining.ExperimentalOptions, OutTankSubtypes, OutSquadSubtypes);
+
+	// A unit the async spawner has no class for would keep its building busy for the whole training time and then be
+	// dropped (seen in a survival match with Squad_Rus_HazmatBazooka): never pick it.
+	if (const ARTSAsyncSpawner* const AsyncSpawner = FRTS_Statics::GetAsyncSpawner(this))
+	{
+		OutTankSubtypes.RemoveAll([AsyncSpawner](const ETankSubtype TankSubtype)
+		{
+			return not AsyncSpawner->GetHasClassForTrainingOption(
+				FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(TankSubtype)));
+		});
+		OutSquadSubtypes.RemoveAll([AsyncSpawner](const ESquadSubtype SquadSubtype)
+		{
+			return not AsyncSpawner->GetHasClassForTrainingOption(
+				FTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(SquadSubtype)));
+		});
+	}
+
+	// Unlocked is not producible: without a standing barracks/tent (squads) or vehicle building (tanks) the AI must
+	// not spend pressure or points on that kind of unit.
+	if (not Training_GetCanTrainUnitType(EAllUnitType::UNType_Squad))
+	{
+		OutSquadSubtypes.Empty();
+	}
+	if (not Training_GetCanTrainUnitType(EAllUnitType::UNType_Tank))
+	{
+		OutTankSubtypes.Empty();
+	}
 }
 
 void UEnemyStrategicAIComponent::Training_AddUnlockedTrainingOptions(
@@ -881,27 +927,218 @@ void UEnemyStrategicAIComponent::CreateTrainingBatch(
 	const TArray<ETankSubtype>& TankSubtypes,
 	const TArray<ESquadSubtype>& SquadSubtypes)
 {
-	TArray<FTrainingOption> TrainingOptionsToSpawn;
-	CreateTrainingOptionsToSpawn(TankSubtypes, SquadSubtypes, TrainingOptionsToSpawn);
-	if (TrainingOptionsToSpawn.IsEmpty())
+	TArray<FTrainingOption> TrainingOptions;
+	CreateTrainingOptionsToSpawn(TankSubtypes, SquadSubtypes, TrainingOptions);
+	if (TrainingOptions.IsEmpty())
 	{
 		return;
 	}
 
-	FTransform SpawnTransform;
-	if (not GetValidTrainingSpawnTransform(SpawnTransform))
+	TArray<FTrainingOption> OptionsWithoutBuilding;
+	Training_QueueOptionsAtBuildingTrainers(TrainingOptions, OptionsWithoutBuilding);
+	if (OptionsWithoutBuilding.IsEmpty())
 	{
 		return;
 	}
 
+	// Legacy levels: an enemy UTrainerComponent on the blackboard still spawns its units right there.
+	FTransform LegacyTrainerTransform;
 	FVector ProjectedSpawnLocation = FVector::ZeroVector;
-	if (not TryProjectTrainingLocationToNavmesh(SpawnTransform.GetLocation(), ProjectedSpawnLocation))
+	if (GetValidTrainerComponentLocationFromBlackboard(LegacyTrainerTransform)
+		&& TryProjectTrainingLocationToNavmesh(LegacyTrainerTransform.GetLocation(), ProjectedSpawnLocation))
 	{
+		StartTrainingSpawnBatchTimer(OptionsWithoutBuilding, ProjectedSpawnLocation);
 		return;
 	}
 
-	StartTrainingSpawnBatchTimer(TrainingOptionsToSpawn, ProjectedSpawnLocation);
+	// No building can train these units (it fell between the pick and now): the AI gets the points back.
+	int32 RefundedPoints = 0;
+	for (const FTrainingOption& Option : OptionsWithoutBuilding)
+	{
+		RefundedPoints += Training_GetTrainingOptionCost(Option);
+	}
+	RefundTrainingPoints(RefundedPoints);
+	if constexpr (DeveloperSettings::Debugging::GEnemyController_StrategicAI_Compile_DebugSymbols &&
+		EnemyAISettings::Debugging::TrainingPressureDebugging)
+	{
+		RTSFunctionLibrary::PrintString(FString::Printf(
+			TEXT("Enemy strategic AI: %d unit(s) had no standing building to train them; %d points refunded."),
+			OptionsWithoutBuilding.Num(), RefundedPoints), FColor::Orange);
+	}
 }
+
+void UEnemyStrategicAIComponent::Training_RefreshBuildingTrainers()
+{
+	M_BuildingTrainers.Reset();
+	if (not EnsureIsValidUnitManager())
+	{
+		return;
+	}
+	const uint8 ControlledPlayer = static_cast<uint8>(GetControlledPlayer());
+	for (ABuildingExpansion* const Bxp : M_GameUnitManager->GetPlayerBxps(ControlledPlayer))
+	{
+		if (not IsValid(Bxp))
+		{
+			continue;
+		}
+		UEnemyBuildingTrainerComponent* const Trainer = Bxp->FindComponentByClass<UEnemyBuildingTrainerComponent>();
+		if (IsValid(Trainer))
+		{
+			M_BuildingTrainers.Add(Trainer);
+		}
+	}
+}
+
+bool UEnemyStrategicAIComponent::Training_GetHasLegacyEnemyTrainer() const
+{
+	for (const TWeakObjectPtr<UTrainerComponent>& LegacyTrainer : M_Blackboard.TrainerComponents)
+	{
+		if (LegacyTrainer.IsValid())
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
+bool UEnemyStrategicAIComponent::Training_GetCanTrainUnitType(const EAllUnitType UnitType) const
+{
+	if (Training_GetHasLegacyEnemyTrainer())
+	{
+		return true;
+	}
+	const FTrainingOption ProbeOption(UnitType, 0);
+	for (const TWeakObjectPtr<UEnemyBuildingTrainerComponent>& Trainer : M_BuildingTrainers)
+	{
+		if (Trainer.IsValid() && Trainer->GetCanTrainOption(ProbeOption))
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
+bool UEnemyStrategicAIComponent::Training_GetCanTrainBatch(const FEnemyStrategicAITrainingBatch& TrainingBatch) const
+{
+	if (not TrainingBatch.TankSubtypes.IsEmpty() && not Training_GetCanTrainUnitType(EAllUnitType::UNType_Tank))
+	{
+		return false;
+	}
+	if (not TrainingBatch.SquadSubtypes.IsEmpty() && not Training_GetCanTrainUnitType(EAllUnitType::UNType_Squad))
+	{
+		return false;
+	}
+	return true;
+}
+
+UEnemyBuildingTrainerComponent* UEnemyStrategicAIComponent::Training_PickBuildingTrainer(
+	const FTrainingOption& TrainingOption) const
+{
+	UEnemyBuildingTrainerComponent* BestTrainer = nullptr;
+	float BestQueuedSeconds = TNumericLimits<float>::Max();
+	for (const TWeakObjectPtr<UEnemyBuildingTrainerComponent>& WeakTrainer : M_BuildingTrainers)
+	{
+		UEnemyBuildingTrainerComponent* const Trainer = WeakTrainer.Get();
+		if (not IsValid(Trainer) || not Trainer->GetCanTrainOption(TrainingOption))
+		{
+			continue;
+		}
+		const float QueuedSeconds = Trainer->GetQueuedSecondsRemaining();
+		if (QueuedSeconds < BestQueuedSeconds)
+		{
+			BestQueuedSeconds = QueuedSeconds;
+			BestTrainer = Trainer;
+		}
+	}
+	return BestTrainer;
+}
+
+int32 UEnemyStrategicAIComponent::Training_GetTrainingOptionCost(const FTrainingOption& TrainingOption) const
+{
+	if (TrainingOption.UnitType == EAllUnitType::UNType_Squad)
+	{
+		return EnemyTrainingHelpers::GetSquadTrainingPointCost(static_cast<ESquadSubtype>(TrainingOption.SubtypeValue));
+	}
+	if (TrainingOption.UnitType == EAllUnitType::UNType_Tank)
+	{
+		return EnemyTrainingHelpers::GetTankTrainingPointsCost(static_cast<ETankSubtype>(TrainingOption.SubtypeValue));
+	}
+	return 0;
+}
+
+int32 UEnemyStrategicAIComponent::Training_QueueOptionsAtBuildingTrainers(
+	const TArray<FTrainingOption>& TrainingOptions,
+	TArray<FTrainingOption>& OutOptionsWithoutBuilding)
+{
+	int32 QueuedCount = 0;
+	for (const FTrainingOption& Option : TrainingOptions)
+	{
+		// Picked one by one, so a batch of several units spreads over the buildings that can train them.
+		UEnemyBuildingTrainerComponent* const Trainer = Training_PickBuildingTrainer(Option);
+		if (IsValid(Trainer) && Trainer->EnqueueTraining(Option, Training_GetTrainingOptionCost(Option), this))
+		{
+			++QueuedCount;
+			continue;
+		}
+		OutOptionsWithoutBuilding.Add(Option);
+	}
+	return QueuedCount;
+}
+
+void UEnemyStrategicAIComponent::RefundTrainingPoints(const int32 TrainingPoints)
+{
+	if (TrainingPoints <= 0)
+	{
+		return;
+	}
+	M_TrainingState.TrainingPoints += TrainingPoints;
+#if RTS_WITH_MAP_TESTS
+	M_MapTest_RefundedTrainingPoints += TrainingPoints;
+#endif
+}
+
+void UEnemyStrategicAIComponent::OnBuildingTrainerUnitSpawned(
+	const FTrainingOption& TrainingOption,
+	AActor* SpawnedActor,
+	const FVector& TrainingLocation)
+{
+	OnBlackboardUnitSpawned(TrainingOption, SpawnedActor, INDEX_NONE, TrainingLocation);
+}
+
+#if RTS_WITH_MAP_TESTS
+int32 UEnemyStrategicAIComponent::MapTest_QueueTrainingAtBuildings(
+	const TArray<ETankSubtype>& TankSubtypes,
+	const TArray<ESquadSubtype>& SquadSubtypes)
+{
+	Training_RefreshBuildingTrainers();
+	TArray<FTrainingOption> TrainingOptions;
+	CreateTrainingOptionsToSpawn(TankSubtypes, SquadSubtypes, TrainingOptions);
+	TArray<FTrainingOption> OptionsWithoutBuilding;
+	return Training_QueueOptionsAtBuildingTrainers(TrainingOptions, OptionsWithoutBuilding);
+}
+
+TArray<UEnemyBuildingTrainerComponent*> UEnemyStrategicAIComponent::MapTest_GetBuildingTrainers()
+{
+	Training_RefreshBuildingTrainers();
+	TArray<UEnemyBuildingTrainerComponent*> Trainers;
+	for (const TWeakObjectPtr<UEnemyBuildingTrainerComponent>& Trainer : M_BuildingTrainers)
+	{
+		if (Trainer.IsValid())
+		{
+			Trainers.Add(Trainer.Get());
+		}
+	}
+	return Trainers;
+}
+
+void UEnemyStrategicAIComponent::MapTest_CollectAvailableTrainingOptions(
+	TArray<ETankSubtype>& OutTankSubtypes,
+	TArray<ESquadSubtype>& OutSquadSubtypes)
+{
+	Training_RefreshBuildingTrainers();
+	Training_CollectAvailableTrainingOptions(OutTankSubtypes, OutSquadSubtypes);
+}
+#endif
 
 void UEnemyStrategicAIComponent::CreateTrainingOptionsToSpawn(
 	const TArray<ETankSubtype>& TankSubtypes,
@@ -1208,36 +1445,6 @@ void UEnemyStrategicAIComponent::DebugTrainedUnit(
 		TrainedUnitDebugText);
 }
 
-bool UEnemyStrategicAIComponent::GetValidTrainingSpawnTransform(FTransform& OutTransform)
-{
-	if (not GetValidTrainerComponentLocationFromBlackboard(OutTransform))
-	{
-		if constexpr (DeveloperSettings::Debugging::GEnemyController_StrategicAI_Compile_DebugSymbols &&
-			EnemyAISettings::Debugging::TrainingPressureDebugging)
-		{
-			RTSFunctionLibrary::PrintString(
-				"Enemy strategic AI cannot create training batch because it cannot get valid spawn "
-				"transform from trainer component on blackboard.", FColor::Red);
-		}
-		if (not GetRandomEnemyBaseClusterSpawnTransform(OutTransform))
-		{
-			if constexpr (DeveloperSettings::Debugging::GEnemyController_StrategicAI_Compile_DebugSymbols &&
-				EnemyAISettings::Debugging::TrainingPressureDebugging)
-			{
-				RTSFunctionLibrary::PrintString(
-					"Enemy strategic AI cannot create training batch because it cannot get valid spawn "
-					"transform from random enemy base cluster either.", FColor::Red);
-			}
-			RTSFunctionLibrary::ReportError(
-				"Enemy strategic AI could not get a valid training spawn transform from a trainer or enemy base.");
-
-			return false;
-		}
-		return true;
-	}
-	return true;
-}
-
 bool UEnemyStrategicAIComponent::GetValidTrainerComponentLocationFromBlackboard(FTransform& OutSpawnTransform) const
 {
 	OutSpawnTransform = FTransform::Identity;
@@ -1255,19 +1462,6 @@ bool UEnemyStrategicAIComponent::GetValidTrainerComponentLocationFromBlackboard(
 	}
 	return false;
 }
-
-bool UEnemyStrategicAIComponent::GetRandomEnemyBaseClusterSpawnTransform(FTransform& OutSpawnTransform) const
-{
-	if (M_Blackboard.EnemyBasePoints.IsEmpty())
-	{
-		return false;
-	}
-	const FEnemyBasePointCoreBuildings RandomBasePoint = M_Blackboard.EnemyBasePoints[FMath::RandRange(
-		0, M_Blackboard.EnemyBasePoints.Num() - 1)];
-	OutSpawnTransform.SetLocation(RandomBasePoint.BaseLocation);
-	return true;
-}
-
 
 void UEnemyStrategicAIComponent::TrainingPressure_ThinkStep()
 {

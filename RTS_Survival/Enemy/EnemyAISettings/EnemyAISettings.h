@@ -49,6 +49,13 @@ namespace EnemyAISettings
 	{
 		// Delay between enemy strategic AI training spawns so a batch does not appear at once.
 		inline float TrainingBatchSpawnInterval = 1.f;
+
+		// Time a Soviet building (UEnemyBuildingTrainerComponent) takes for one unit the strategic AI paid for:
+		// base + seconds per training point, capped. Mosin (3) 25 s, T-70 (12) 38 s, T-34/76 (20) 50 s,
+		// KV-1 (28) 62 s, IS-2 (55) 103 s. Each building trains one unit at a time.
+		inline constexpr float BuildingTrainingBaseSeconds = 20.f;
+		inline constexpr float BuildingTrainingSecondsPerPoint = 1.5f;
+		inline constexpr float BuildingTrainingMaxSeconds = 120.f;
 	}
 
 	namespace TrainingPressure

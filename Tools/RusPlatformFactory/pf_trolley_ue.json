@@ -1,0 +1,45 @@
+{
+  "skeletal_mesh": "SK_RusPlatformFactory_Trolley",
+  "fbx": "D:/Blender/BlenderProjects/BlenderTanks/CustomMapItems/SovietsStuff/RusPlatformFactory/Model/SK_RusPlatformFactory_Trolley_Animated.FBX",
+  "take": "AN_RusPF_TrolleyWork",
+  "loop_seconds": 30.0,
+  "tris": 3600,
+  "ue_folder": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/RusBuildings/PlatformFactory/AITraining",
+  "materials": {
+    "MI_CraneMaterial_04": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/RusBuildings/PlatformFactory/Materials/MI_CraneMaterial_04",
+    "M_ZoneIndustry_Atlas2": "/Game/RTS_Survival/Meshes/Industrial/Zone/Textures/Atlas/M_ZoneIndustry_Atlas2",
+    "MI_T34Soviet": "/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Rus_Medium/T34/Meshes/MI_T34Soviet"
+  },
+  "hull": {
+    "mesh": "/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Rus_Medium/T34/Meshes/SM_T34_Hull",
+    "material": "/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Rus_Medium/T34/Meshes/MI_T34Soviet",
+    "location_ue_cm": [
+      338.5,
+      100.0,
+      22.28
+    ],
+    "yaw_ue_deg": 0.0
+  },
+  "seat_ue_cm": [
+    384.5,
+    100.0,
+    176.28
+  ],
+  "seat_blend_m": [
+    3.845,
+    -1.0,
+    1.7628400000000002
+  ],
+  "hull_top_blend_m": 1.9683900000000003,
+  "rack_blend_m": [
+    3.845,
+    6.6,
+    0.55
+  ],
+  "hook_x_blend_m": 3.845,
+  "timeline_s": {
+    "pick": 3.75,
+    "seat": 17.0,
+    "reset": 29.5
+  }
+}

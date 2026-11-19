@@ -244,6 +244,9 @@ public:
 	 */
 	TArray<ATankMaster*> GetPlayerTanks(const uint8 Player) const;
 
+	/** @return The building expansions registered for exactly this player (the enemy AI finds its trainers here). */
+	const TArray<ABuildingExpansion*>& GetPlayerBxps(const uint8 Player) const;
+
 #if RTS_WITH_SHIPPING_MAP_TESTS || RTS_WITH_MAP_TESTS
 	TArray<AAircraftMaster*> ShippingTest_GetAircraftOfPlayer(uint8 Player) const;
 	TArray<ABuildingExpansion*> MapTest_GetBxpsOfPlayer(uint8 Player) const;
