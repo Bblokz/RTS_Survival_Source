@@ -176,6 +176,11 @@ enum class EBuildingExpansionType : uint8
 	BTX_RusTripleCrownBunker UMETA(DisplayName = "Rus Triple Crown Ice Cannon Bunker"),
 	// HQ socket expansion: the Panzer V III laser turret on a camo-painted HQ platform with radixite coil stacks.
 	BTX_GerHQLaser UMETA(DisplayName = "Ger HQ Laser Platform Expansion"),
+	// Breakthrough doctrine concrete bunkers, field defenses of the HQ beside the rail Pak bunker: an 8.8 cm Flak in a
+	// concrete Flakstand, a Flakvierling in an open concrete emplacement and a Pz 38(t) turret on a concrete pillbox.
+	BTX_GerFlak88Bunker UMETA(DisplayName = "Ger Flak 88 Bunker"),
+	BTX_GerFlakvierlingBunker UMETA(DisplayName = "Ger Flakvierling Bunker"),
+	BTX_GerPZ38TBunker UMETA(DisplayName = "Ger Pz 38(t) Turret Bunker"),
 };
 
 static FString Global_GetBxpTypeEnumAsString(EBuildingExpansionType BxpType)
@@ -312,6 +317,12 @@ static FString Global_GetBxpTypeEnumAsString(EBuildingExpansionType BxpType)
 		return FString("BTX_GerBarracksSniperLoft");
 	case EBuildingExpansionType::BTX_GerHQLaser:
 		return FString("BTX_GerHQLaser");
+	case EBuildingExpansionType::BTX_GerFlak88Bunker:
+		return FString("BTX_GerFlak88Bunker");
+	case EBuildingExpansionType::BTX_GerFlakvierlingBunker:
+		return FString("BTX_GerFlakvierlingBunker");
+	case EBuildingExpansionType::BTX_GerPZ38TBunker:
+		return FString("BTX_GerPZ38TBunker");
 	case EBuildingExpansionType::BTX_GerHQRadar:
 		return FString("BTX_GerHQRadar");
 	case EBuildingExpansionType::BTX_GerHQPlatform:
@@ -385,6 +396,9 @@ static FString Global_GetBxpDisplayString(const EBuildingExpansionType BxpType)
 	case EBuildingExpansionType::BTX_GerPuppchenPit: return TEXT("Puppchen Pit");
 	case EBuildingExpansionType::BTX_GerPanzerschreckPit: return TEXT("Panzerschreck Foxhole");
 	case EBuildingExpansionType::BTX_GerRailPakBunker: return TEXT("Rail Pak Bunker");
+	case EBuildingExpansionType::BTX_GerFlak88Bunker: return TEXT("Flak 88 Bunker");
+	case EBuildingExpansionType::BTX_GerFlakvierlingBunker: return TEXT("Flakvierling Bunker");
+	case EBuildingExpansionType::BTX_GerPZ38TBunker: return TEXT("Pz 38(t) Turret Bunker");
 	case EBuildingExpansionType::BTX_GerFlak88Pit: return TEXT("Flak 88 Emplacement");
 	case EBuildingExpansionType::BTX_GerMortarPit: return TEXT("Mortar Pit");
 	case EBuildingExpansionType::BTX_Rus120MortarPit: return TEXT("120mm Mortar Pit");
@@ -478,6 +492,9 @@ static bool Global_GetIsFieldDefenseBxpType(const EBuildingExpansionType BxpType
 	case EBuildingExpansionType::BTX_GerSFH18Pit:
 	case EBuildingExpansionType::BTX_GerFlak88Pit:
 	case EBuildingExpansionType::BTX_GerRailPakBunker:
+	case EBuildingExpansionType::BTX_GerFlak88Bunker:
+	case EBuildingExpansionType::BTX_GerFlakvierlingBunker:
+	case EBuildingExpansionType::BTX_GerPZ38TBunker:
 	case EBuildingExpansionType::BTX_GerFieldTrench:
 		return true;
 	default:

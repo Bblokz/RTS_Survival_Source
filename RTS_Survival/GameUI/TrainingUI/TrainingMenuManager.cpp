@@ -3001,6 +3001,7 @@ void UTrainingMenuManager::InitAllGameFieldDefenseTrainingOptions()
 	using DeveloperSettings::GameBalance::TrainingTime::GerPuppchenPitBuildTime;
 	using DeveloperSettings::GameBalance::TrainingTime::GerPanzerschreckPitBuildTime;
 	using DeveloperSettings::GameBalance::TrainingTime::GerRailPakBunkerBuildTime;
+	using DeveloperSettings::GameBalance::TrainingTime::GerConcreteBunkerBuildTime;
 	using DeveloperSettings::GameBalance::TrainingTime::GerTwinMG42PitBuildTime;
 
 	auto AddFieldDefenseTrainingOption = [this](const EBuildingExpansionType BxpType, URTSRequirement* Requirement,
@@ -3037,6 +3038,17 @@ void UTrainingMenuManager::InitAllGameFieldDefenseTrainingOptions()
 		EBuildingExpansionType::BTX_GerRailPakBunker,
 		FRTS_RequirementHelpers::CreateUnitRequirement(GetTransientPackage(), RequiredTierTwoBuilding),
 		GerRailPakBunkerBuildTime);
+	// The breakthrough doctrine's other concrete bunkers, beside the rail Pak bunker in its HQ layout.
+	for (const EBuildingExpansionType ConcreteBunker : {
+		     EBuildingExpansionType::BTX_GerFlak88Bunker, EBuildingExpansionType::BTX_GerFlakvierlingBunker,
+		     EBuildingExpansionType::BTX_GerPZ38TBunker
+	     })
+	{
+		AddFieldDefenseTrainingOption(
+			ConcreteBunker,
+			FRTS_RequirementHelpers::CreateUnitRequirement(GetTransientPackage(), RequiredTierTwoBuilding),
+			GerConcreteBunkerBuildTime);
+	}
 	// Never queued: the trench digs itself, so its training time is unused.
 	AddFieldDefenseTrainingOption(EBuildingExpansionType::BTX_GerFieldTrench, nullptr);
 }

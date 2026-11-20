@@ -128,6 +128,10 @@ namespace BxpConstructionRules
 		{EBuildingExpansionType::BTX_GerTwinMG42Pit, WithFootprint(FreeConstructionRules, 900.f, 900.f)},
 		// The concrete block is 10.8 m across at its foot; the props and the rear ladder stand just outside it.
 		{EBuildingExpansionType::BTX_GerRailPakBunker, WithFootprint(FreeConstructionRules, 1250.f, 1250.f)},
+		// Footprints from the bunker meshes' bounds (Flakstand 14.7 x 17.3 m, Flakvierling 9.5 x 9.2 m, 38(t) 7.0 x 7.0 m).
+		{EBuildingExpansionType::BTX_GerFlak88Bunker, WithFootprint(FreeConstructionRules, 1500.f, 1750.f)},
+		{EBuildingExpansionType::BTX_GerFlakvierlingBunker, WithFootprint(FreeConstructionRules, 960.f, 940.f)},
+		{EBuildingExpansionType::BTX_GerPZ38TBunker, WithFootprint(FreeConstructionRules, 720.f, 720.f)},
 		// The square bag walls are 9.5 m across; the ammo niche bulges 1.2 m out of the left wall.
 		{EBuildingExpansionType::BTX_GerFlak88Pit, WithFootprint(FreeConstructionRules, 1200.f, 1200.f)},
 		// Compact square mortar pits whose walls are approximately 9 m across.

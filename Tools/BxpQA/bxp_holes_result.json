@@ -1370,44 +1370,48 @@
  },
  "PZ38TBunker": {
   "bp": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/Bunkers/PZ38TTurretBunker/Ger_BXP_PZ38TTurretBunker",
-  "mesh": "SM_CaptureBunker37mm",
+  "mesh": "SM_BF_PZ38T_TurretBunker",
   "saved": true,
   "debris": "own",
   "slots": [
    [
-    "M_PZII_NoAtlas",
-    "MI_M_PZII_NoAtlas_WallHoles"
+    "M_BF_PZ38T_Bunker_Concrete",
+    "MI_M_BF_PZ38T_Bunker_Concrete_WallHoles"
    ],
    [
-    "M_GerCamoConcretePalet_Atlas",
-    "MI_GerPit_GerCamoConcrete_WallHoles"
+    "M_BF_PZ38T_Bunker_WornSteel",
+    "MI_M_BF_PZ38T_Bunker_WornSteel_WallHoles"
+   ],
+   [
+    "M_BF_PZ38T_Bunker_RustDark",
+    "MI_M_BF_PZ38T_Bunker_RustDark_WallHoles"
    ]
   ],
   "aim": [
    [
-    -61,
-    58,
-    244
+    21,
+    -36,
+    143
    ],
    [
-    244,
-    87,
-    260
+    266,
+    -1,
+    168
    ],
    [
-    -293,
-    95,
-    194
+    -266,
+    1,
+    168
    ],
    [
-    -60,
-    421,
-    224
+    1,
+    266,
+    168
    ],
    [
-    -71,
-    -284,
-    224
+    -1,
+    -266,
+    168
    ]
   ]
  },

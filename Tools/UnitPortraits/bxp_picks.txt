@@ -26,8 +26,7 @@ BTX_GerCapturedB4Pit=PitCapturedB4|D:/UE5Projects/RTS_Survival/Saved/UnitPortrai
 HQLaserPlatform=HQLaserPlatform|D:/UE5Projects/RTS_Survival/Saved/UnitPortraits/bxps_p1|FrontRight|notes=not wired to its own type yet
 Flak88Bunker=Flak88Bunker|D:/UE5Projects/RTS_Survival/Saved/UnitPortraits/bxps_p1|FrontRight|notes=not wired to its own type yet
 FlakvierlingBunker=FlakvierlingBunker|D:/UE5Projects/RTS_Survival/Saved/UnitPortraits/bxps_p1|FrontRight|notes=not wired to its own type yet
-# SKIPPED: unfinished Blueprint (BuildingMeshComponent shows the placeholder SM_CaptureBunker37mm, the 38(t) turret stands off to the side)
-# PZ38TTurretBunker=PZ38TTurretBunker|D:/UE5Projects/RTS_Survival/Saved/UnitPortraits/bxps_p1|FrontRight|notes=not wired to its own type yet
+BTX_GerPZ38TBunker=PZ38TTurretBunker|D:/UE5Projects/RTS_Survival/Saved/UnitPortraits/bxps_pz38t|FrontRight|box=772,852,1080|zoom=1|dy=0.12|notes=recaptured 2026-11-20 after the mesh fix (round pillbox, 38(t) turret in the roof ring); logged bounds far too large, cropped by hand
 BTX_GerHQTower=HQTower|D:/UE5Projects/RTS_Survival/Saved/UnitPortraits/bxps_p1|Front|notes=bare; the phase-2 backdrop capture (bxps_p2) was compared and not clearly better. AtBuildingOrigin but a free-standing tower; pictured without the HQ
 BTX_GerBarracksRadixReactor=BarracksRadixReactor|D:/UE5Projects/RTS_Survival/Saved/UnitPortraits/bxps_p1|FrontRight|notes=bare; the phase-2 backdrop capture (bxps_p2) was compared and not clearly better. AtBuildingOrigin, stands on the ground beside the tent; pictured without the barracks
 BTX_GerBarrackFuelCell=BarracksFuelCell|D:/UE5Projects/RTS_Survival/Saved/UnitPortraits/bxps_p1|FrontRight|notes=bare; the phase-2 backdrop capture (bxps_p2) was compared and not clearly better. AtBuildingOrigin, ground piece behind the barracks; pictured without it (the barracks would hide it from these views)

@@ -4,6 +4,7 @@ import unreal
 
 COMM = "/Game/RTS_Survival/Blueprints/GroundVehicles/BaseAndNomadic/ChildBlueprints/GerT2/CommunicationsCenter/BXPs/"
 HQ = "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/HQ/"
+BUNKERS = "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/Bunkers/"
 ENTRIES = [
     (unreal.BuildingExpansionType.BTX_GER_COMM_REQUISITION_OFFICE,
      COMM + "RequisitionOffice/Ger_Bxp_CommRequisitionOffice",
@@ -14,6 +15,15 @@ ENTRIES = [
     (unreal.BuildingExpansionType.BTX_GER_HQ_LASER,
      HQ + "HQLaser/Ger_Bxp_HQLaserPlatform",
      HQ + "HQLaser/Prev_Cons/SM_Ger_Bxp_HqLaser_PreviewMesh"),
+    # Breakthrough concrete bunkers: field defenses previewed with their own building mesh, like the rail Pak bunker.
+    (unreal.BuildingExpansionType.BTX_GER_FLAK88_BUNKER,
+     BUNKERS + "Flak88Bunker/Ger_BXP_Flak88Bunker", BUNKERS + "Flak88Bunker/Mesh/SM_BF_Flak88Bunker"),
+    (unreal.BuildingExpansionType.BTX_GER_FLAKVIERLING_BUNKER,
+     BUNKERS + "FlakvierlingBunker/Ger_BXP_FlakvierlingBunker",
+     BUNKERS + "FlakvierlingBunker/Mesh/SM_BF_FlakvierlingBunker"),
+    (unreal.BuildingExpansionType.BTX_GER_PZ38T_BUNKER,
+     BUNKERS + "PZ38TTurretBunker/Ger_BXP_PZ38TTurretBunker",
+     BUNKERS + "PZ38TTurretBunker/Mesh/SM_BF_PZ38T_TurretBunker"),
 ]
 
 spawner = unreal.load_asset("/Game/RTS_Survival/Blueprints/Player/RTS_BP_RTSAsyncSpawner")

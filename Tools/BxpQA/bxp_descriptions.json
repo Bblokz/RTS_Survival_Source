@@ -313,5 +313,26 @@
     "description": "The Panzer V/III turret on an HQ platform, firing its <Text_Weapon>Strahlkanone 39</> beam. The height gives it <Text_Accent>double range</> (+100%). Draws <Text_Accent>15 energy</>.",
     "facts": "Ger_Bxp_HQLaserPlatform BP: child turret Ger_Turret_PZV_III (Panzer V/III, weapon enum Strahlkanone39 'Strahlkanone 39 50MM PZ V/III'); BP adds BP_Beh_Weapon_HQDoubleRange like the Flak Platform. BxpData: 450 Rad + 150 Metal (user pick 2026-11-20), energy -15, health T1BxpHealth*1.5, build 30 s (BxpDataHelpers.h HQ Laser block).",
     "offered_by": "HQ (Defense) Source/RTS_Survival/Game/GameState/CPPGameState.cpp:9596"
+  },
+  "BTX_GerFlak88Bunker": {
+    "name": "Flak 88 Bunker",
+    "tooltip": "Heavy flak in concrete",
+    "description": "The Flak 88 pit's <Text_Weapon>8.8 cm Flak</> and crew in a concrete Flakstand. <Text_Accent>Strong against tanks at long range</>, with twice a heavy bunker's health.",
+    "facts": "Ger_BXP_Flak88Bunker: turret RTS_BP_EmbTurret_GerPit_Flak88 (the Flak 88 pit's crewed gun). BxpData gun-pit table: 900 Rad + 450 Metal, HealthMlt 2.0 x BxpHeavyBunkerHealth, build GerConcreteBunkerBuildTime (= rail Pak 40 s). Breakthrough HQ Barriers slot, needs Communication Center.",
+    "offered_by": "Breakthrough HQ field defense (TrainingMenuManager + DA_TrainingLayout Barriers)"
+  },
+  "BTX_GerFlakvierlingBunker": {
+    "name": "Flakvierling Bunker",
+    "tooltip": "Quad 2 cm flak",
+    "description": "A <Text_Weapon>2 cm Flakvierling</> in an open concrete emplacement: four rapid-firing barrels. <Text_Accent>1.6x</> a heavy bunker's health.",
+    "facts": "Ger_BXP_FlakvierlingBunker: turret RTS_BP_EmbTurret_BF_Flakvierling (weapon Flak4_20mm). 600 Rad + 300 Metal, HealthMlt 1.6, 40 s. Breakthrough HQ Barriers slot, needs Communication Center.",
+    "offered_by": "Breakthrough HQ field defense"
+  },
+  "BTX_GerPZ38TBunker": {
+    "name": "Pz 38(t) Turret Bunker",
+    "tooltip": "Turret pillbox",
+    "description": "A Pz 38(t) turret with its <Text_Weapon>3.7 cm KwK 38(t)</> on a round concrete pillbox. Cheap anti-tank cover with <Text_Accent>1.5x</> a heavy bunker's health.",
+    "facts": "Ger_BXP_PZ38TTurretBunker: turret Ger_Turret_PZ38T (KwK38_T_37MM); building mesh fixed 2026-11-20 to SM_BF_PZ38T_TurretBunker (was the capture bunker placeholder). 500 Rad + 250 Metal, HealthMlt 1.5, 40 s.",
+    "offered_by": "Breakthrough HQ field defense"
   }
 }

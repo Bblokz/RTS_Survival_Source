@@ -36,7 +36,7 @@ T_Ger_Bxp_PitPak40=D:/UE_Assets/Icons/TrainingUI/Expansions/Ger/NoIcon/T_Ger_Bxp
 # HQTower: Pz IV turret on a tower
 T_Ger_Bxp_HQTower=D:/UE_Assets/Icons/TrainingUI/Expansions/Ger/NoIcon/T_Ger_Bxp_HQTower.png|T_HQ_Icon|T_TankDestroyerClass_Icon
 # PZ38TTurretBunker: 38(t) turret
-#SKIP unfinished Blueprint T_Ger_Bxp_PZ38TTurretBunker=D:/UE_Assets/Icons/TrainingUI/Expansions/Ger/NoIcon/T_Ger_Bxp_PZ38TTurretBunker.png|T_HQ_Icon|T_TankDestroyerClass_Icon
+T_Ger_Bxp_PZ38TTurretBunker=D:/UE_Assets/Icons/TrainingUI/Expansions/Ger/NoIcon/T_Ger_Bxp_PZ38TTurretBunker.png|T_HQ_Icon|T_TankDestroyerClass_Icon
 # PitPuppchen: rocket launcher crew
 T_Ger_Bxp_PitPuppchen=D:/UE_Assets/Icons/TrainingUI/Expansions/Ger/NoIcon/T_Ger_Bxp_PitPuppchen.png|T_HQ_Icon|T_ATInfantryClass_Icon_V2
 T_Ger_Bxp_PitPanzerschreck=D:/UE_Assets/Icons/TrainingUI/Expansions/Ger/NoIcon/T_Ger_Bxp_PitPanzerschreck.png|T_HQ_Icon|T_ATInfantryClass_Icon_V2

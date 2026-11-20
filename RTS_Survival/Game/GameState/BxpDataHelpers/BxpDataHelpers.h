@@ -133,6 +133,19 @@ namespace BxpHelpers
 					EBuildingExpansionType::BTX_GerRailPakBunker, GerRailPakBunker_Radixite, GerRailPakBunker_Metal,
 					1.8f, GerRailPakBunkerBuildTime
 				},
+				// The breakthrough doctrine's other concrete bunkers; the Flak 88 Flakstand is the heaviest.
+				{
+					EBuildingExpansionType::BTX_GerFlak88Bunker, GerFlak88Bunker_Radixite, GerFlak88Bunker_Metal,
+					2.0f, GerConcreteBunkerBuildTime
+				},
+				{
+					EBuildingExpansionType::BTX_GerFlakvierlingBunker, GerFlakvierlingBunker_Radixite,
+					GerFlakvierlingBunker_Metal, 1.6f, GerConcreteBunkerBuildTime
+				},
+				{
+					EBuildingExpansionType::BTX_GerPZ38TBunker, GerPZ38TBunker_Radixite, GerPZ38TBunker_Metal,
+					1.5f, GerConcreteBunkerBuildTime
+				},
 				// A heavy gun behind thick, high bag walls: tougher than the open gun pits.
 				{EBuildingExpansionType::BTX_GerFlak88Pit, GerFlak88Pit_Radixite, GerFlak88Pit_Metal, 1.3f},
 				// The mortar is protected by a compact square sandbag wall, but remains a light emplacement.

@@ -43,6 +43,6 @@ BTX_GerTwinMG42Pit /Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/Ge
 BTX_GerCapturedB4Pit /Game/RTS_Survival/Blueprints/Squads/TeamWeapons/Soviet/B4_203MM/Pit/Ger_BXP_CapturedB4Pit
 # Modelled + in UE but not wired to their own type (second priority)
 BTX_GerHQLaser /Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/HQ/HQLaser/Ger_Bxp_HQLaserPlatform
-Flak88Bunker /Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/Bunkers/Flak88Bunker/Ger_BXP_Flak88Bunker
-FlakvierlingBunker /Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/Bunkers/FlakvierlingBunker/Ger_BXP_FlakvierlingBunker
-PZ38TTurretBunker /Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/Bunkers/PZ38TTurretBunker/Ger_BXP_PZ38TTurretBunker
+BTX_GerFlak88Bunker /Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/Bunkers/Flak88Bunker/Ger_BXP_Flak88Bunker
+BTX_GerFlakvierlingBunker /Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/Bunkers/FlakvierlingBunker/Ger_BXP_FlakvierlingBunker
+BTX_GerPZ38TBunker /Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/Bunkers/PZ38TTurretBunker/Ger_BXP_PZ38TTurretBunker

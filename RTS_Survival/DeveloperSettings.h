@@ -307,6 +307,8 @@ namespace DeveloperSettings
 			inline constexpr int32 GerBarracksSniperLoftBuildTime = RoundToNearestMultipleOf(20.f * GameTimeMlt, 2);
 			// A poured concrete pillbox takes longer than a sandbag pit.
 			inline constexpr int32 GerRailPakBunkerBuildTime = RoundToNearestMultipleOf(40.f * GameTimeMlt, 2);
+			// The other breakthrough concrete bunkers pour as long as the rail Pak bunker.
+			inline constexpr int32 GerConcreteBunkerBuildTime = GerRailPakBunkerBuildTime;
 		}
 
 
@@ -1032,6 +1034,13 @@ namespace DeveloperSettings
 				inline constexpr int32 GerBarracksSniperLoft_Metal = 160;
 				inline constexpr int32 GerRailPakBunker_Radixite = 850;
 				inline constexpr int32 GerRailPakBunker_Metal = 420;
+				// Breakthrough concrete bunkers (user pick 2026-11-20), priced around the rail Pak bunker.
+				inline constexpr int32 GerFlak88Bunker_Radixite = 900;
+				inline constexpr int32 GerFlak88Bunker_Metal = 450;
+				inline constexpr int32 GerFlakvierlingBunker_Radixite = 600;
+				inline constexpr int32 GerFlakvierlingBunker_Metal = 300;
+				inline constexpr int32 GerPZ38TBunker_Radixite = 500;
+				inline constexpr int32 GerPZ38TBunker_Metal = 250;
 				inline constexpr int32 GerFlak88Pit_Radixite = 560;
 				inline constexpr int32 GerFlak88Pit_Metal = 360;
 				inline constexpr int32 GerMortarPit_Radixite = 340;
