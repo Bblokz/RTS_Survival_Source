@@ -1500,5 +1500,60 @@
     329
    ]
   ]
+ },
+ "Pak38": {
+  "bp": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/Childs/Pak38/RTS_BP_BXP_Pak38",
+  "mesh": "SM_PakBunker_BuildingMesh",
+  "saved": true,
+  "debris": "own",
+  "slots": [
+   [
+    "M_messingShell",
+    null
+   ],
+   [
+    "M_ShellCasing",
+    null
+   ],
+   [
+    "M_PakBunker",
+    "MI_M_PakBunker_WallHoles"
+   ],
+   [
+    "M_GerSandBagScaffold_Atlas",
+    "MI_GerPit_GerSandBag_WallHoles"
+   ],
+   [
+    "Stair_Metal_M",
+    null
+   ]
+  ],
+  "aim": [
+   [
+    217,
+    63,
+    179
+   ],
+   [
+    272,
+    -28,
+    71
+   ],
+   [
+    -282,
+    -89,
+    166
+   ],
+   [
+    -6,
+    308,
+    71
+   ],
+   [
+    59,
+    -248,
+    76
+   ]
+  ]
  }
 }

@@ -67,6 +67,8 @@ JOBS = {
     "LeFH150": BXP + "Childs/LeFH105/RTS_BP_BXP_LeFH105mm",
     "SolarLarge": BXP + "Childs/Economic/BigSolarEXP/BXP_Solar_Big",
     "RailPakBunker": BXP + "GerPits/RailPakBunker/Ger_BXP_RailPakBunker",
+    # Not offered yet; holes so the bunker is ready when it is (user ask 2026-11-20).
+    "Pak38": BXP + "Childs/Pak38/RTS_BP_BXP_Pak38",
     # Second priority: in Unreal but not offered to the player yet.
     "HQLaser": GERBXPS + "/HQ/HQLaser/Ger_Bxp_HQLaserPlatform",
     "FlakBunker": GERBXPS + "/Bunkers/FlakBunker/Ger_BXP_FlakBunker",

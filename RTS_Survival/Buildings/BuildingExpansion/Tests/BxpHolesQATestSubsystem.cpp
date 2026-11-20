@@ -81,6 +81,7 @@ namespace BxpHolesQATestPrivate
 			Bxp + TEXT("Childs/37mmFlak/RTS_BP_BXP_37mmFlak"),
 			Bxp + TEXT("Childs/88mmFlak/RTS_BP_BXP_Flak88"),
 			Bxp + TEXT("Childs/LeFH105/RTS_BP_BXP_LeFH105mm"),
+			Bxp + TEXT("Childs/Pak38/RTS_BP_BXP_Pak38"),
 			Bxp + TEXT("Childs/Economic/BigSolarEXP/BXP_Solar_Big"),
 			Bxp + TEXT("GerPits/RailPakBunker/Ger_BXP_RailPakBunker"),
 			Bxp + TEXT("GerBxps/MechDepot/RadioVan/Ger_Bxp_MechDepotRadioVan"),
