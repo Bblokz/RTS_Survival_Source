@@ -40,6 +40,7 @@ namespace BxpConstructionRules
 		{EBuildingExpansionType::BTX_GerHQHarvester, WithFootprint(SocketConstructionRules, 500.f, 500.f)},
 		{EBuildingExpansionType::BTX_GerHQRepairBay, WithFootprint(FreeConstructionRules, 700.f, 350.f)},
 		{EBuildingExpansionType::BTX_GerHQTower, WithFootprint(OriginConstructionRules, 200.f, 200.f)},
+		{EBuildingExpansionType::BTX_GerHQLaser, WithFootprint(SocketConstructionRules, 500.f, 500.f)},
 
 		// Refinery Expansions.
 		{EBuildingExpansionType::BTX_RefConverter, WithFootprint(SocketConstructionRules, 800.f, 400.f)},

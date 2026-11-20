@@ -306,5 +306,12 @@
     "description": "A concrete bunker with a Jaguar turret and its <Text_Weapon>35mm autocannon</> on 5-round clips. Once captured it <Text_Accent>fights for you</>.",
     "facts": "BP Ger_Bxp_CaptureBunkerTurret: child turret Ger_Turret_Jaguar35mm, weapon Kwk32_35MM (35 mm, MagCapacity 5, reload 5 s, burst fire; Source/RTS_Survival/Game/GameState/CPPGameState.cpp:3688-3701). Map placed as BP_CaptureBunker_Turret (child of BP_CaptureActor). BxpData: health T2BxpHealth*4 = 3520, T1 vision, cost 700 R / 300 M (Source/RTS_Survival/Game/GameState/BxpDataHelpers/BxpDataHelpers.h:68-84). Weapon enum display string says 'Kwk32 30MM' but calibre is 35.",
     "offered_by": "not offered: map-placed capture point (BP_CaptureBunker_Turret; SurvivalStartContentSettings.cpp:274)"
+  },
+  "BTX_GerHQLaser": {
+    "name": "Laser Platform",
+    "tooltip": "Laser turret",
+    "description": "The Panzer V/III turret on an HQ platform, firing its <Text_Weapon>Strahlkanone 39</> beam. The height gives it <Text_Accent>double range</> (+100%). Draws <Text_Accent>15 energy</>.",
+    "facts": "Ger_Bxp_HQLaserPlatform BP: child turret Ger_Turret_PZV_III (Panzer V/III, weapon enum Strahlkanone39 'Strahlkanone 39 50MM PZ V/III'); BP adds BP_Beh_Weapon_HQDoubleRange like the Flak Platform. BxpData: 450 Rad + 150 Metal (user pick 2026-11-20), energy -15, health T1BxpHealth*1.5, build 30 s (BxpDataHelpers.h HQ Laser block).",
+    "offered_by": "HQ (Defense) Source/RTS_Survival/Game/GameState/CPPGameState.cpp:9596"
   }
 }

@@ -930,6 +930,8 @@ namespace DeveloperSettings
 				inline constexpr int32 GerHQPlatform_Metal = 75;
 				inline constexpr int32 GerHQTower_Radixite = 200;
 				inline constexpr int32 GerHQTower_Metal = 75;
+				inline constexpr int32 GerHQLaser_Radixite = 450;
+				inline constexpr int32 GerHQLaser_Metal = 150;
 				inline constexpr int32 GerHQRepairBay_Radixite = 300;
 				inline constexpr int32 GerHQRepairBay_Metal = 150;
 				inline constexpr int32 GerLFactoryRadixiteReactor_Radixite = 300;

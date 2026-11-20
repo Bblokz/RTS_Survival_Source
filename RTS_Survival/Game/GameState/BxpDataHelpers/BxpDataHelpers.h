@@ -488,6 +488,27 @@ namespace BxpHelpers
 			BxpData.Abilities = ArmedBxpAbilities;
 			InPlayerDataMap.Add(EBuildingExpansionType::BTX_GerHQTower, BxpData);
 
+			// ----------------------- GER HQ Laser Platform Socket Expansion -----------------------
+			// The Panzer V III laser turret on an HQ socket: about three Flak Platforms in cost and power draw.
+			BxpData.ConstructionTime = RoundToNearestMultipleOfFive(30);
+			BxpData.Health = RoundToNearestMultipleOfFive(T1BxpHealth * 1.5);
+			BxpData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIBasicBuildingArmorResistances(
+				BxpData.Health);
+			BxpData.VisionRadius = T1BxpVisionRadius;
+			BxpData.Cost = FUnitCost({
+				{
+					ERTSResourceType::Resource_Radixite,
+					GerHQLaser_Radixite
+				},
+				{
+					ERTSResourceType::Resource_Metal,
+					GerHQLaser_Metal
+				},
+			});
+			BxpData.EnergySupply = -15;
+			BxpData.Abilities = ArmedBxpAbilities;
+			InPlayerDataMap.Add(EBuildingExpansionType::BTX_GerHQLaser, BxpData);
+
 			// ----------------------- GER HQ Repair Bay Free Expansion -----------------------
 			BxpData.ConstructionTime = RoundToNearestMultipleOfFive(25);
 			BxpData.Health = RoundToNearestMultipleOfFive(T1BxpHealth * 3);

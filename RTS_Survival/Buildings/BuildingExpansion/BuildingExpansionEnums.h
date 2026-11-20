@@ -174,6 +174,8 @@ enum class EBuildingExpansionType : uint8
 	// deck covers the front half circle (the loft's net poles block the back); built at the building origin.
 	BTX_GerBarracksSniperLoft UMETA(DisplayName = "Ger Barracks Sniper Loft"),
 	BTX_RusTripleCrownBunker UMETA(DisplayName = "Rus Triple Crown Ice Cannon Bunker"),
+	// HQ socket expansion: the Panzer V III laser turret on a camo-painted HQ platform with radixite coil stacks.
+	BTX_GerHQLaser UMETA(DisplayName = "Ger HQ Laser Platform Expansion"),
 };
 
 static FString Global_GetBxpTypeEnumAsString(EBuildingExpansionType BxpType)
@@ -308,6 +310,8 @@ static FString Global_GetBxpTypeEnumAsString(EBuildingExpansionType BxpType)
 		return FString("BTX_GerMechDepotWurfrahmenShop");
 	case EBuildingExpansionType::BTX_GerBarracksSniperLoft:
 		return FString("BTX_GerBarracksSniperLoft");
+	case EBuildingExpansionType::BTX_GerHQLaser:
+		return FString("BTX_GerHQLaser");
 	case EBuildingExpansionType::BTX_GerHQRadar:
 		return FString("BTX_GerHQRadar");
 	case EBuildingExpansionType::BTX_GerHQPlatform:
@@ -339,6 +343,7 @@ static FString Global_GetBxpDisplayString(const EBuildingExpansionType BxpType)
 	case EBuildingExpansionType::BTX_GerHQHarvester: return TEXT("HQ Harvester Hub");
 	case EBuildingExpansionType::BTX_GerHQRepairBay: return TEXT("HQ Repair Bay");
 	case EBuildingExpansionType::BTX_GerHQTower: return TEXT("HQ GuardTower");
+	case EBuildingExpansionType::BTX_GerHQLaser: return TEXT("HQ Laser Platform");
 
 	case EBuildingExpansionType::BTX_GerBarracksRadixReactor: return TEXT("Barracks Radix Reactor");
 	case EBuildingExpansionType::BTX_GerBarrackFuelCell: return TEXT("Barracks Fuel Cell");

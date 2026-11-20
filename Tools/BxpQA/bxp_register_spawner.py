@@ -3,6 +3,7 @@ Only adds missing keys; existing entries are left as they are."""
 import unreal
 
 COMM = "/Game/RTS_Survival/Blueprints/GroundVehicles/BaseAndNomadic/ChildBlueprints/GerT2/CommunicationsCenter/BXPs/"
+HQ = "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/HQ/"
 ENTRIES = [
     (unreal.BuildingExpansionType.BTX_GER_COMM_REQUISITION_OFFICE,
      COMM + "RequisitionOffice/Ger_Bxp_CommRequisitionOffice",
@@ -10,6 +11,9 @@ ENTRIES = [
     (unreal.BuildingExpansionType.BTX_GER_COMM_CIPHER_ROOM,
      COMM + "CipherRoom/Ger_Bxp_CommCipherRoom",
      COMM + "CipherRoom/SM_GerCommCenter_CipherRoom_PreviewMesh"),
+    (unreal.BuildingExpansionType.BTX_GER_HQ_LASER,
+     HQ + "HQLaser/Ger_Bxp_HQLaserPlatform",
+     HQ + "HQLaser/Prev_Cons/SM_Ger_Bxp_HqLaser_PreviewMesh"),
 ]
 
 spawner = unreal.load_asset("/Game/RTS_Survival/Blueprints/Player/RTS_BP_RTSAsyncSpawner")
@@ -21,7 +25,7 @@ for bxp_type, bp_path, preview_path in ENTRIES:
     name = bp_path.split("/")[-1]
     if bxp_type not in classes:
         classes[bxp_type] = unreal.load_class(None, bp_path + "." + name + "_C")
-    if bxp_type not in previews:
+    if previews.get(bxp_type) is None:
         previews[bxp_type] = unreal.load_asset(preview_path)
 spawner.modify()
 cdo.set_editor_property("BuildingExpansionMap", classes)

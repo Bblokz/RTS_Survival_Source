@@ -9593,6 +9593,7 @@ void ACPPGameState::InitAllGameNomadicData()
 		AsEconomic(EBuildingExpansionType::BTX_GerHQHarvester),
 		AsEconomic(EBuildingExpansionType::BTX_GerHQRepairBay),
 		AsDefense(EBuildingExpansionType::BTX_GerHQTower),
+		AsDefense(EBuildingExpansionType::BTX_GerHQLaser),
 	});
 
 	NomadicData.MaxAmountBuildingExpansions = 5;
