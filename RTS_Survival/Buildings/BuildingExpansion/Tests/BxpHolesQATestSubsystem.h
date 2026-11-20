@@ -6,6 +6,7 @@
 #include "BxpHolesQATestSubsystem.generated.h"
 
 class ABuildingExpansion;
+class ACameraActor;
 class UMaterialInterface;
 class UWallHoleDamageComponent;
 class UStaticMesh;
@@ -26,7 +27,8 @@ enum class EBxpHolesQATestStage : uint8
  * Each class is spawned on its own near the anchor, gets debug shell hits at its aim points (holes must be cut), is then
  * damaged through AActor::TakeDamage past every health notify level (the legacy Blueprint swaps must not change the
  * building mesh, and the hole materials must stay), and is finally killed (its death must run without errors).
- * Optional -BxpQAAnchorX= / -BxpQAAnchorY= and -BxpQAOnly=<substring>. Log lines RTS_BXPQA_TEST; not in shipping.
+ * Optional -BxpQAAnchorX= / -BxpQAAnchorY= and -BxpQAOnly=<substring>. With -BxpQAShots every expansion is also
+ * photographed from two sides after its holes are cut (Saved/BxpQA/shots). Log lines RTS_BXPQA_TEST; not in shipping.
  */
 UCLASS()
 class RTS_SURVIVAL_API UBxpHolesQATestSubsystem : public UTickableWorldSubsystem
@@ -58,6 +60,12 @@ private:
 	UPROPERTY()
 	TArray<TWeakObjectPtr<UMaterialInterface>> M_MaterialsAfterHoles;
 
+	UPROPERTY()
+	TObjectPtr<ACameraActor> M_ShotCamera;
+
+	bool bM_TakeShots = false;
+	int32 M_ShotsRequested = 0;
+
 	void TickWaitingForStart();
 	void TickSpawningNext();
 	void TickWaitingForSettle();
@@ -69,6 +77,13 @@ private:
 	void DamagePastNotifyLevels(ABuildingExpansion& Bxp);
 	void CheckMeshAndMaterialsKept(ABuildingExpansion& Bxp, const FString& Moment);
 	FString GetCurrentName() const;
+
+	/**
+	 * @brief With -BxpQAShots: frames the expansion from one side per window and requests a UI-free screenshot.
+	 * @return true once every view has been shot (always true without -BxpQAShots).
+	 */
+	bool TickShotsAndGetIsDone(const ABuildingExpansion& Bxp, float SecondsSinceDamage);
+	void AimShotCamera(const ABuildingExpansion& Bxp, int32 ViewIndex);
 
 	void Check(bool bCondition, const FString& Description, const FString& Details = FString());
 	void EnterStage(EBxpHolesQATestStage NewStage);

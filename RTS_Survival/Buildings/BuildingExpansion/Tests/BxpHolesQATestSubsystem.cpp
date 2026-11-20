@@ -3,7 +3,11 @@
 #include "RTS_Survival/Utils/RTSMapTests/RTSMapTests.h"
 
 #if RTS_WITH_MAP_TESTS
+#include "Camera/CameraActor.h"
+#include "Camera/CameraComponent.h"
 #include "Camera/PlayerCameraManager.h"
+#include "Kismet/KismetMathLibrary.h"
+#include "UnrealClient.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/DamageEvents.h"
 #include "Engine/StaticMesh.h"
@@ -31,6 +35,12 @@ namespace BxpHolesQATestPrivate
 	constexpr float SettleSeconds = 1.5f;
 	constexpr float AfterDamageSeconds = 1.0f;
 	constexpr float AfterDeathSeconds = 3.0f;
+	// -BxpQAShots: two views (front-left, back-right), each held this long before its screenshot is requested.
+	constexpr int32 ShotViewCount = 2;
+	constexpr float ShotSecondsPerView = 0.6f;
+	constexpr float ShotYawsDeg[ShotViewCount] = {35.f, 215.f};
+	constexpr float ShotPitchDeg = 28.f;
+	constexpr float ShotDistancePerBoundsRadius = 1.7f;
 	constexpr float TestHitCalibreMm = 75.f;
 	constexpr float TestHitStandOff = 400.f;
 	constexpr float TestHitReach = 800.f;
@@ -178,6 +188,20 @@ void UBxpHolesQATestSubsystem::TickWaitingForStart()
 		return;
 	}
 	M_ClassPaths = GetClassPaths();
+	bM_TakeShots = FParse::Param(FCommandLine::Get(), TEXT("BxpQAShots"));
+	if (bM_TakeShots)
+	{
+		M_ShotCamera = GetWorld()->SpawnActor<ACameraActor>();
+		if (IsValid(M_ShotCamera) && IsValid(M_ShotCamera->GetCameraComponent()))
+		{
+			// Instant eye adaptation: the first shot otherwise catches the exposure still adapting to the new view.
+			FPostProcessSettings& Settings = M_ShotCamera->GetCameraComponent()->PostProcessSettings;
+			Settings.bOverride_AutoExposureSpeedUp = true;
+			Settings.bOverride_AutoExposureSpeedDown = true;
+			Settings.AutoExposureSpeedUp = 100.f;
+			Settings.AutoExposureSpeedDown = 100.f;
+		}
+	}
 	UE_LOG(LogRTSBxpHolesQA, Display, TEXT("RTS_BXPQA_TEST START classes=%d anchor=%s"), M_ClassPaths.Num(),
 	       *M_Anchor.ToCompactString());
 	EnterStage(EBxpHolesQATestStage::SpawningNext);
@@ -244,6 +268,11 @@ void UBxpHolesQATestSubsystem::TickWaitingAfterDamage()
 		EnterStage(EBxpHolesQATestStage::SpawningNext);
 		return;
 	}
+	if (not TickShotsAndGetIsDone(*BxpActor, GetStageElapsed() - AfterDamageSeconds))
+	{
+		return;
+	}
+	M_ShotsRequested = 0;
 	CheckMeshAndMaterialsKept(*BxpActor, TEXT("after_damage"));
 	UGameplayStatics::ApplyDamage(BxpActor, 1000000.f, nullptr, nullptr, UDamageType::StaticClass());
 	EnterStage(EBxpHolesQATestStage::WaitingAfterDeath);
@@ -476,6 +505,62 @@ bool UBxpHolesQATestSubsystem::FindAnchor(FVector& OutAnchor) const
 		return false;
 	}
 	return GlobalAbilityHelpers::TryFindGroundLocation(this, GroundHit.Location, OutAnchor);
+}
+
+bool UBxpHolesQATestSubsystem::TickShotsAndGetIsDone(const ABuildingExpansion& Bxp, const float SecondsSinceDamage)
+{
+	using namespace BxpHolesQATestPrivate;
+	if (not bM_TakeShots || not IsValid(M_ShotCamera))
+	{
+		return true;
+	}
+	if (M_ShotsRequested >= ShotViewCount)
+	{
+		// One extra window so the last requested screenshot is written before the expansion is killed.
+		return SecondsSinceDamage >= (ShotViewCount + 1) * ShotSecondsPerView;
+	}
+	// The game's own camera takes the view back; it is handed to the shot camera again every frame.
+	AimShotCamera(Bxp, M_ShotsRequested);
+	const float SecondsInView = SecondsSinceDamage - M_ShotsRequested * ShotSecondsPerView;
+	if (SecondsInView < ShotSecondsPerView * 0.8f)
+	{
+		return false;
+	}
+	const FString FileName = FPaths::ProjectSavedDir() / TEXT("BxpQA") / TEXT("shots") / FString::Printf(
+		TEXT("%02d_%s_%d.png"), M_ClassIndex, *GetCurrentName(), M_ShotsRequested);
+	FScreenshotRequest::RequestScreenshot(FileName, false, false);
+	++M_ShotsRequested;
+	return false;
+}
+
+void UBxpHolesQATestSubsystem::AimShotCamera(const ABuildingExpansion& Bxp, const int32 ViewIndex)
+{
+	using namespace BxpHolesQATestPrivate;
+	APlayerController* Controller = GetWorld()->GetFirstPlayerController();
+	if (not IsValid(Controller) || not IsValid(M_ShotCamera))
+	{
+		return;
+	}
+	// Framed on the holed building mesh: some expansions carry far-reaching helper components that inflate actor bounds.
+	FVector Origin;
+	FVector Extent;
+	const UWallHoleDamageComponent* Holes = Bxp.FindComponentByClass<UWallHoleDamageComponent>();
+	const UStaticMeshComponent* WallMesh = IsValid(Holes) ? Holes->GetWallMeshComponent() : nullptr;
+	if (IsValid(WallMesh))
+	{
+		Origin = WallMesh->Bounds.Origin;
+		Extent = WallMesh->Bounds.BoxExtent;
+	}
+	else
+	{
+		Bxp.GetActorBounds(true, Origin, Extent);
+	}
+	const float Distance = FMath::Max(Extent.Size(), 300.f) * ShotDistancePerBoundsRadius;
+	const FVector FromTarget = FRotator(ShotPitchDeg, ShotYawsDeg[ViewIndex], 0.f).Vector() * Distance;
+	const FVector CameraLocation = Origin + FromTarget;
+	M_ShotCamera->SetActorLocationAndRotation(CameraLocation,
+	                                          UKismetMathLibrary::FindLookAtRotation(CameraLocation, Origin));
+	Controller->SetViewTarget(M_ShotCamera);
 }
 
 void UBxpHolesQATestSubsystem::Finish()
