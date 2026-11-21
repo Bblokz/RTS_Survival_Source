@@ -907,3 +907,11 @@ the explosion pack's `NS_Ground_*` (fiery) and the smoke pillar (thin wisps) wer
   the wall (they rise over the parapet; smoke from the stacks) and rows of housing blocks further back; in front
   (`ural_front`): about 300 flattened shell craters in scorched earth (`MI_Intro_Ground_Crater`) and dead trees in
   groves. The 6.3 road and camera corridor stay clear.
+- *Review fixes:* the gatehouse lamps moved above the iron band (round lenses at 27 m read as windows); the 6.3
+  camera starts 22 m from the platoon (from 90 m the soldiers were 30 px tall) and pulls back and up as the leaves
+  close; the 2.4 card sits on 2.4c (cues end with their shot); the Svarog scorch rings and fire cards drop under the
+  table for 2.4b (`move_level_actors`, Sequencer restores them: their edges read as spare arrowheads from table height).
+- *Not from this pass:* 6.1 / 6.2 render with a grey checkerboard ground: `M_RTS_Landscape_OreMountains` (changed
+  2026-11-17 in the Ore Mountains work) needs 66 SRVs in the Nanite base pass where 64 are allowed, so the render
+  process falls back to the default material. 3.4b's white-out came out shorter in this render (the fireball's rise
+  now shows); no 3.4b input changed.

@@ -171,6 +171,19 @@ def thrusts_2_4c():
     return actors
 
 
+def hide_strikes():
+    """move_level_actors specs that drop the Svarog scorch rings, fire cards and light pools under the table for a
+    shot (Sequencer puts them back afterwards). They are clock-driven and invisible from above, but from a few cm over
+    the paper their edges read as red triangles."""
+    moves = []
+    for index, strike in enumerate(sets.SVAROG_STRIKES):
+        x, y = sets.map_local(*strike)
+        for suffix in ("", "_FireA", "_FireB", "_FireLight"):
+            moves.append({"level": "Intro_Bunker", "label": "Ring_Svarog_%d%s" % (index, suffix),
+                          "keys": [(0.0, world(x, y, TOP - 60.0), (0, 0, 0), 0.01)]})
+    return moves
+
+
 def camera_point(lat, lon, back=0.0, side=0.0, up=0.0):
     x, y = sets.map_local(lat, lon)
     return world(x - back, y + side, TOP + up)

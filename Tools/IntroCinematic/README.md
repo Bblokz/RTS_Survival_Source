@@ -67,7 +67,7 @@ Launch the throwaway editor (never the shared one):
 3. Send a request with `intro_cmd.py` that calls, in this order: `intro_build.import_vo()`, `build_transcripts()`,
    `intro_materials.import_textures()`, `intro_materials.build_all(seed uvs)`, `intro_materials.build_notice_material()`,
    `intro_import.import_all()` (Blender kits from `Saved/IntroCinematic/import/`), `intro_sets.build_bunker()`,
-   `intro_sets2.build_all()`, `intro_sets2.build_ural()`, `intro_shots.build_film(intro_manifest.shots(), cues)`,
+   `intro_sets2.build_all()`, `intro_sets2.build_ural()`, `intro_purple.build_gas_material()` (5.1 gas), `intro_shots.build_film(intro_manifest.shots(), cues)`,
    `intro_sound.add_sounds(...)`, `intro_build.setup_map()`, `intro_build.build_render_preset(...)`.
    (`build_request.py` is the request used during the build; its STEPS list selects the parts.)
 4. `bash render.sh MRQ_Final` (or `MRQ_Preview`, 5 fps), `python section_sheets.py <frames> <fps>`,

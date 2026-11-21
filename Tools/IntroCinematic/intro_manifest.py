@@ -290,14 +290,16 @@ def shots():
                  (1.0, warmap.world(-72.0, warmap.YEAR_1944 + warmap.YEAR_STEP + 3.0, TOP + 40.0), (-80, 0, 0))],
          "actors": warmap.date_arrow(), "mpc": dict(warmap.map_mpc(), **warmap.DATE_PENCIL)},
         {"id": "2.4b", "levels": ["Intro_Bunker"], "min": 2.9, "fov": 38, "handheld": 0.12,
-         "cam": [(0.0, warmap.camera_point(52.6, 21.6, back=15.0, up=5.5), (-17, 8, 0)),
-                 (1.0, warmap.camera_point(52.6, 18.2, back=15.0, up=5.0), (-17, 4, 0))],
+         "cam": [(0.0, warmap.camera_point(52.6, 23.8, back=15.0, up=5.5), (-17, 8, 0)),
+                 (1.0, warmap.camera_point(52.6, 20.4, back=15.0, up=5.0), (-17, 4, 0))],
          "actors": warmap.thrusts_2_4b(), "mpc": warmap.map_mpc(),
-         "cues": [card("1944 - 1945", "THE RED ARMY MOVES WEST", 0.25, 5.6)]},
+         # the Svarog strikes' scorch rings and fire cards (1946) read as spare arrowheads this close: under the table
+         "move_level_actors": warmap.hide_strikes()},
         {"id": "2.4c", "levels": ["Intro_Bunker"], "min": 3.6, "fov": 55, "move": "ease",
          "cam": [(0.0, warmap.camera_point(50.8, 17.5, back=50.0, up=58.0), (-52, 0, 0)),
                  (1.0, warmap.camera_point(50.8, 14.0, back=56.0, up=64.0), (-50, -3, 0))],
-         "actors": warmap.thrusts_2_4c(), "mpc": warmap.map_mpc()},
+         "actors": warmap.thrusts_2_4c(), "mpc": warmap.map_mpc(),
+         "cues": [card("1944 - 1945", "THE RED ARMY MOVES WEST", 0.2, 3.3)]},
         # ---- Section 3: January 1945, Berlin ----------------------------------------------------------------------
         {"id": "3.1", "handheld": 0.12, "levels": [OLD], "vo": ["3_1"], "pre": 0.6, "post": 0.6, "fov": 50,
          "cam": [(0.0, (-34700, -9300, 640), {"at": (RUS_PAD[0], RUS_PAD[1], 1700)}),
@@ -455,9 +457,11 @@ def shots():
          "mpc": {"Rings62": clock(1.0), "Rings36": [(0.0, 60.0)],
                  "Darken": [(0.0, 0.0), (0.2, 0.0), (0.22, 0.4), (0.26, 0.0), (0.5, 0.0), (0.52, 0.4), (0.56, 0.0)]}},
         {"id": "6.3", "levels": ["Intro_Ural"], "vo": ["6_3"], "pre": 2.2, "min": 12.5, "fov": 50,
-         "cam": [(0.0, at("Intro_Ural", -9800, -1500, 190), {"at": at("Intro_Ural", -900, 0, 1300)}),
-                 (0.66, at("Intro_Ural", -8300, -1000, 260), {"at": at("Intro_Ural", -900, 0, 1500)}),
-                 (1.0, at("Intro_Ural", -8900, -1300, 1500), {"at": at("Intro_Ural", -900, 0, 1900)})],
+         # close enough that the marching platoon reads (the column passes beside the camera), then back and up to
+         # show the wall's height as the leaves close
+         "cam": [(0.0, at("Intro_Ural", -4300, -1450, 170), {"at": at("Intro_Ural", -600, -150, 520)}),
+                 (0.6, at("Intro_Ural", -3900, -1350, 230), {"at": at("Intro_Ural", -500, -100, 700)}),
+                 (1.0, at("Intro_Ural", -7600, -1500, 1300), {"at": at("Intro_Ural", -800, 0, 1900)})],
          # The column and a marching platoon go in; the leaves close only once the last of them is through
          # (they used to close on the last T-34).
          "actors": ural_column(12.5) + ural_platoon(12.5) + [

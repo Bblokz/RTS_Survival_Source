@@ -297,8 +297,9 @@ def build_gateframe():
         mb.box((-6.38, y - 0.25, 30.1), (-5.9, y + 0.25, 35.9), R_IRON, skip='+x', v=('abs', 30.0))
     for y in (-4.4, 4.4):
         mb.box((-7.12, y - 3.0, 44.9), (-5.88, y + 3.0, 46.2), R_PARA, v=('abs', 41.6))
+    # lamps under the gallery, above the iron band (at 27 m on the blind concrete their round lenses read as windows)
     for y in (-6.0, -2.0, 2.0, 6.0):
-        floodlight(mb, (-5.4, y, 27.0), (-1, 0, 0), 1.1)
+        floodlight(mb, (-5.5, y, 38.7), (-1, 0, 0), 1.1)
     ob = mb.build()
     for nm, sy in (('SOCKET_Hinge_L', 1), ('SOCKET_Hinge_R', -1)):
         e = bpy.data.objects.new(nm, None)
