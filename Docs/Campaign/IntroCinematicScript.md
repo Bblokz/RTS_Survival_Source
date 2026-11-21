@@ -198,6 +198,9 @@ Assets:
 | 2.1 | Dusk, a forest launch site. A German V2 lifts off its launch table. The camera tilts with it into the clouds. | "In October of 1944, a month after we successfully launched our first V2 rocket against ze British," | In October of 1944, a month after we successfully launched our first V2 rocket against the British, | none |
 | 2.2 | Night, a drafting room. A torch beam crosses a V2 cutaway blueprint. A gloved hand photographs it, flash by flash. Only the coat sleeve and a red-star cap badge show in the torch spill. | "Soviet spies managed to capture our blueprints" | Soviet spies managed to capture our blueprints | Card: `OCTOBER 1944` / `HEERESVERSUCHSANSTALT PEENEMÜNDE`. The blueprint prop carries `GEHEIME KOMMANDOSACHE`. Stamp: `CONFIRMED`. |
 | 2.3 | A Soviet hangar. Under work lights, a V2 painted Soviet green sits on a transport cradle, with workers on scaffolds. | "und created their own rocket program." | and created their own rocket program. | none |
+| 2.4a | Map table, archive grade (added 2026-11-21). Top-down on the date line at the table edge: a red pencil arrow runs from the 1944 tick to the 1945 tick. | none (music) | none | none |
+| 2.4b | Low over Poland on the map: scale-model T-34s and an IS-2 on wargame bases, with a green V2 on its stand, are pushed west behind a red arrow that grows ahead of them. Slight handheld. | none | none | Card: `1944 - 1945` / `THE RED ARMY MOVES WEST` |
+| 2.4c | Wide over Europe: two thrusts sweep west from the Soviet border, north along the coast past Hamburg to the Netherlands, south over Vienna and Bavaria to Alsace, each with its tanks and V2. Berlin is left alone (it stands until 3.3). | none | none | none |
 
 Assets:
 - V2 launch: **Have** `/Game/RTS_Survival/Cinematics/V2Scene/BP_Scene_V2`.
@@ -267,7 +270,7 @@ narrator believes it was, a weapon for genocide.
 
 | # | Visual | Spoken | Subtitle | On screen |
 |---|---|---|---|---|
-| 5.1 | Night. High clouds lit purple from inside. A single unmarked canister falls through the frame (no aircraft shown). | "Ze western powers could not accept defeat und in zheir dying breath zhey unleashed something else," | The western powers could not accept defeat and in their dying breath they unleashed something else, | Card: `AUGUST 1945` / `LOCATION UNKNOWN` |
+| 5.1 | Night. High clouds lit purple from inside. Many blunt purple canisters (no fins, no nose cone: never a bomb shape) with glowing violet windows tumble down through the cloud at different depths (no aircraft shown). One after another they burst in the air: the caps blow off, the half shells peel apart, the glowing ampoules are bared and the purple aerosol balloons out and becomes cloud. No markings. | "Ze western powers could not accept defeat und in zheir dying breath zhey unleashed something else," | The western powers could not accept defeat and in their dying breath they unleashed something else, | Card: `AUGUST 1945` / `LOCATION UNKNOWN` |
 | 5.2 | Dawn in a 1945 trench line: helmets, a field telephone, a crate of rations. Fine purple dust settles over everything. | "not a bomb but a silent weapon of some biological material." | not a bomb but a silent weapon of some biological material. | none |
 | 5.3 | Time-lapse in the same trench. The purple mould grows and rounds off the trench corners. Veins wrap the crates and a helmet. Bodies lie under it. | "Whatever ze hell it was, it worked too well. Millions died from direct contact with it." | Whatever the hell it was, it worked too well. Millions died from direct contact with it. | none |
 | 5.4 | Map table. A purple stain bleeds out from several points across Eurasia at once, so no single start point reads as a farming region. Cut away **before** it reaches the Urals: never show where it stops. | "As far as we know it was some kind of bio weapon for genocide." | As far as we know it was some kind of bio-weapon for genocide. | Red pencil label on the map: `THE PURPLE DEATH` |
@@ -299,8 +302,8 @@ Assets:
 | 6.1 | A Soviet tank column drives through dead, blackened forest in falling ash. Artillery flashes beyond the ridge. Wrecked vehicles lie at the roadside. | "Things escalated quickly after zhis" | Things escalated quickly after this | Card: `1946 - 1947` / `OPERATION SVAROG` |
 | 6.2 | From a hilltop: several nuclear flashes far apart, on different horizons. They are scattered, **not** in a line. The column halts and the crews watch. | "und we think ze Soviets nuked most parts of Eurasia as part of a larger war zhey fought against ze western coalition." | and we think the Soviets nuked most parts of Eurasia as part of a larger war they fought against the western coalition. | none |
 | 6.2b | Map table or a high wide shot: burn rings and craters across Soviet-held Europe, behind the Soviet front line (the strikes fall on their own side). Ruined towns in the archive grade. | "Most of Europe today is destroyed due to ze Soviets using ze weapons on zheir own captured territories." | Most of Europe today is destroyed due to the Soviets using the weapons on their own captured territories. | none |
-| 6.3 | The column drives east toward a vast wall of iron and concrete across a mountain pass. Huge iron gates part, the column enters, and the gates close. Dust settles. | "After zhis zhey moved far eastward und hid behind ze Ural Shield." | After this they moved far eastward and hid behind the Ural Shield. | Card: `THE URAL SHIELD` |
-| 6.4 | Pull back high and wide: the wall runs north and south out of sight, over mountains, to both horizons. Or the same on the map table: one line drawn down the length of Russia. | "Ze Ural Shield is a massive wall of iron und concrete, spanning from ze northern to ze southern Russian border." | The Ural Shield is a massive wall of iron and concrete, spanning from the northern to the southern Russian border. | none |
+| 6.3 | The column drives east toward a vast wall of iron and concrete. The lower concrete is blind (no windows or embrasures). Huge iron gates part, four T-34s and a marching rifle platoon (three files, rifles shouldered, in step) go in, and the gates close only after the last tank and the last rank are through. | "After zhis zhey moved far eastward und hid behind ze Ural Shield." | After this they moved far eastward and hid behind the Ural Shield. | Card: `THE URAL SHIELD` |
+| 6.4 | Pull back high and wide: the wall runs north and south out of sight to both horizons. Behind it (east) Soviet industry (stacks with smoke, cooling towers, works halls) and housing blocks; in front of it (west) a no man's land of shell craters and dead trees. | "Ze Ural Shield is a massive wall of iron und concrete, spanning from ze northern to ze southern Russian border." | The Ural Shield is a massive wall of iron and concrete, spanning from the northern to the southern Russian border. | none |
 
 Assets:
 - Dead forest and ridge: **Have?** `/Game/RTS_Survival/Maps/GerMissions/Ger_2ndOreMountains`.
@@ -881,3 +884,26 @@ kits have no intact houses: "standing" Berlin is the bomb-damaged city of Januar
 sublevel opened on its own, `intro_sets.standalone`), so building them never loads the mission maps. Leftovers: the
 white holds about 2.4 s over the cut (3.4a white plus the nuke's own flash), so the fireball's first rise is not seen;
 the explosion pack's `NS_Ground_*` (fiery) and the smoke pillar (thin wisps) were tried as collapse dust and dropped.
+
+**2026-11-21 owner pass: 2.4 map scene, canisters, Ural Shield.**
+- *2.4 (new, between 2.3 and 3.1, 9.1 s, music only):* 1944 to 1945 on the map table, told like a wartime briefing
+  (`intro_warmap.py`). 2.4a: a red pencil arrow runs along the date line from the 1944 tick to the 1945 tick and
+  `1945` is written in red pencil (MPC `Pencil` reveals `MI_Intro_Pencil1945`; the map's own pencil label is out of
+  view). 2.4b: low over Poland, scale-model T-34s and an IS-2 on wargame bases and a green V2 on its stand are pushed
+  west behind a growing red arrow; card `1944 - 1945` / `THE RED ARMY MOVES WEST`. 2.4c: wide over Europe, both thrusts
+  (north along the coast to the Netherlands, south over Vienna to Alsace) sweep west; Berlin is left alone because it
+  stands until 3.3. The ring clocks, `Stain` and `Pencil` are keyed to 0 (nothing burnt in 1944). The `Observe` music
+  runs 8.9 s longer so it still ends at the Berlin flash.
+- *5.1:* the falling canister read as a bomb before the line "not a bomb". Now nine blunt purple canisters (Blender
+  `build_pdcan_*`: two half shells with glowing windows, nose and tail caps, a core of six glowing ampoules; no fins)
+  tumble through the cloud and burst one after another: caps blow off, the shells peel apart, and the aerosol
+  (`M_Intro_PDGas`, soft-limbed noise spheres that thin out as they grow) balloons out until it is cloud.
+  `intro_canisters.py` composes each part's opening motion onto its canister's transform.
+- *6.3:* the lower concrete of the wall kit is blind (hoods, gun ports and tower casemates below the iron band
+  removed from `blender/build_kit.py`). The leaves closed on the last T-34; now the column (four T-34s at 19 km/h,
+  10 m apart) and a 18-man rifle platoon marching at the game's march speed (190 cm/s, rifles on `GunSocket`) are
+  through the gate before the leaves start to close at 0.80.
+- *6.4:* behind the wall (`intro_sets2.ural_hinterland`): works with stacks, cooling towers, a refinery and halls near
+  the wall (they rise over the parapet; smoke from the stacks) and rows of housing blocks further back; in front
+  (`ural_front`): about 300 flattened shell craters in scorched earth (`MI_Intro_Ground_Crater`) and dead trees in
+  groves. The 6.3 road and camera corridor stay clear.

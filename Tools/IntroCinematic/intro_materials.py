@@ -350,6 +350,9 @@ def build_simple():
     instance("MI_Intro_DarkWood", material, vectors={"Tint": (0.10, 0.065, 0.04, 1.0)}, scalars={"Roughness": 0.7})
     instance("MI_Intro_Concrete", material, vectors={"Tint": (0.30, 0.29, 0.27, 1.0)}, scalars={"Roughness": 0.95})
     instance("MI_Intro_Flame", material, vectors={"Tint": (1.0, 0.55, 0.18, 1.0)}, scalars={"Glow": 40.0})
+    # the Purple Death canister's windows and ampoules (5.1)
+    instance("MI_Intro_PDGlow", material, vectors={"Tint": (0.42, 0.08, 0.75, 1.0)}, scalars={"Glow": 3.5, "Roughness": 0.2})
+    instance("MI_Intro_PDGlowCore", material, vectors={"Tint": (0.34, 0.05, 0.62, 1.0)}, scalars={"Glow": 1.1, "Roughness": 0.2})
 
 
 def build_text_material():
@@ -684,6 +687,8 @@ return float4(lerp(Near.rgb, Near2.rgb, 0.5) * macro * Tint.rgb, 1.0);
     mel.connect_material_property(rough, "", unreal.MaterialProperty.MP_ROUGHNESS)
     _finish(material)
     instance("MI_Intro_Ground_Ural", material, vectors={"Tint": (1.7, 1.55, 1.4, 1.0)})
+    # the shell craters in front of the Ural Shield (6.4): scorched, darker than the plain
+    instance("MI_Intro_Ground_Crater", material, vectors={"Tint": (0.22, 0.19, 0.16, 1.0)})
     # Berlin (3.3 / 3.4): the same soil, greyer and darker: ash and brick dust over the streets.
     instance("MI_Intro_Ground_Berlin", material, vectors={"Tint": (0.95, 0.9, 0.84, 1.0)})
 
@@ -780,6 +785,8 @@ def extras():
     text = unreal.load_asset(MAT_DIR + "/M_Intro_TextPlane")
     paper = unreal.load_asset(MAT_DIR + "/M_Intro_PaperTex")
     flat = unreal.load_asset(MAT_DIR + "/M_Intro_Flat")
+    instance("MI_Intro_Pencil1945", text, textures={"Texture": unreal.load_asset(T + "T_Intro_Pencil1945")},
+             scalars={"UsePencil": 1.0})
     instance("MI_Intro_PencilPurpleDeath", text, textures={"Texture": unreal.load_asset(T + "T_Intro_PencilPurpleDeath")},
              scalars={"UsePencil": 1.0})
     instance("MI_Intro_DateLine", paper, textures={"Texture": unreal.load_asset(T + "T_Intro_DateStrip")})

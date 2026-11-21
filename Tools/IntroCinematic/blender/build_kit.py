@@ -139,7 +139,6 @@ def buttress(mb, yc, uoff):
                       (xf + c, yc + hw, z), (xb, yc + hw, z)])
     specs = [(R_TALL, A0), (R_TALL, None), (R_TALL, A0), (R_TALL, None), (R_TALL, A0), (R_GEN, None)]
     mb.loft(rings, specs, closed=False, uoff=uoff)
-    hood(mb, (-6.05, yc, 7.6), (-1, 0, 0), 3.0, 2.6, 0.9, 1.0, margin=0.4, mz=0.5, depth=0.6)     # gun port in the buttress foot
 
 
 def pilaster(mb, yc, uoff):
@@ -150,14 +149,14 @@ def pilaster(mb, yc, uoff):
     mb.loft(rings, [(R_TALL, A0), (R_GEN, None)], closed=False, uoff=uoff)
 
 
-def wall_details(mb, ys_butt, ys_hood, ys_pier, ys_merlon, ys_cupola, hero=True):
+def wall_details(mb, ys_butt, ys_pier, ys_merlon, ys_cupola, hero=True):
+    # The concrete below the iron band (z < 30 m) is blind: no casemate hoods or gun ports (owner, 2026-11-21:
+    # rows of dark embrasures read as windows).
     for i, y in enumerate(ys_butt):
         buttress(mb, y, 0.137 * (i + 1))
         pilaster(mb, y, 0.211 * (i + 1))
         if hero:
             floodlight(mb, (-3.5, y, 38.7), (-1, 0, 0))
-    for y in ys_hood:
-        hood(mb, (-3.65, y, 20.5), (-1, 0, 0), 3.4, 2.7, 1.25, 1.0)
     for y in ys_pier:
         mb.box((-3.55, y - 0.6, 37.3), (-2.0, y + 0.6, 38.7), R_GEN, skip='+x', v=('abs', 36.0))   # gallery pier
         mb.box((-4.38, y - 0.25, 30.1), (-3.9, y + 0.25, 35.9), R_IRON, skip='+x', v=('abs', 30.0))  # band rib
@@ -178,7 +177,7 @@ def wall_details(mb, ys_butt, ys_hood, ys_pier, ys_merlon, ys_cupola, hero=True)
 def build_segment():
     mb = MB('SM_UralShield_Segment')
     wall_run(mb, -C.HALF, C.HALF)
-    wall_details(mb, [-22.5, -7.5, 7.5, 22.5], [-27, -18, -12, -3, 3, 12, 18, 27],
+    wall_details(mb, [-22.5, -7.5, 7.5, 22.5],
                  [-27.5 + 5 * k for k in range(12)], [-25, -5, 5, 25], [-15, 15])
     return mb.build()
 
@@ -200,9 +199,6 @@ def build_far():
         rings = [[(3.9, yc + 1.6, z), (xf, yc + 1.6, z), (xf, yc - 1.6, z), (3.9, yc - 1.6, z)]
                  for z, xf in [(0.0, 6.9), (26.5, 6.9), (30.2, 4.2)]]
         mb.loft(rings, [(R_TALL, A0), (R_GEN, None)], closed=False, uoff=0.211 * (i + 1))
-    for y in [-27, -18, -12, -3, 3, 12, 18, 27]:
-        mb.box((-4.9, y - 1.7, 20.5), (-3.0, y + 1.7, 23.2), R_TALL, skip='+x', v=A0,
-               regions={'-x': R_HOOD, '+z': R_GEN, '-z': R_GEN})
     for y in [-25, -5, 5, 25]:
         mb.box((-5.0, y - 3.0, 45.0), (-4.0, y + 3.0, 46.2), R_PARA, skip='-z', v=('abs', 41.6))   # flush: underside never visible
     for y in [-15, 15]:
@@ -235,8 +231,6 @@ def tower(mb, sy):
     specs = [s for _, s in st][:-1]
     mb.loft(rings, specs, closed=True, uoff=0.31 if sy > 0 else 0.63)
 
-    def xw_at(z):
-        return -11.4 + 3.4 * (z - 3.6) / 26.4
     cy = 13.5
     # roof: parapet top, inner wall, deck
     top_o = ring(53.8, -8.8, 7.0, 19.2, 7.0, 1.2)
@@ -262,11 +256,8 @@ def tower(mb, sy):
     slit(mb, (-3.9, sy * 13.1, 54.5), (-1, 0, 0), 2.4, 0.35, embed=0.6)
     mb.box((-1.5, sy * 13.1 - 0.5, 56.9), (0.35, sy * 13.1 + 0.5, 58.9), R_TRIM, skip='-z')
     floodlight(mb, (-0.2, sy * 13.1, 58.6), (-1, 0, 0), 0.9)
-    # a single column of casemates on the west face (no paired openings)
-    hood(mb, (xw_at(9.0) + 0.1, sy * cy, 7.5), (-1, 0, 0), 5.0, 3.0, 1.2, 1.8)
-    hood(mb, (xw_at(21.0) + 0.1, sy * cy, 19.5), (-1, 0, 0), 5.0, 3.0, 1.2, 1.8)
+    # casemates only on the iron-era top storey: the concrete below the band stays blind
     hood(mb, (-7.8, sy * cy, 43.8), (-1, 0, 0), 6.0, 2.4, 0.8, 0.5, region=R_GEN, v=('abs', 42.0), mz=0.5, depth=0.6)
-    hood(mb, (6.9, sy * cy, 19.5), (1, 0, 0), 5.0, 3.0, 1.2, 1.6)
     hood(mb, (6.0, sy * cy, 43.8), (1, 0, 0), 6.0, 2.4, 0.8, 0.5, region=R_GEN, v=('abs', 42.0), mz=0.5, depth=0.6)
     # iron storey: one long vision slit per face
     slit(mb, (-8.8, sy * 13.1, 51.2), (-1, 0, 0), 7.5, 0.7)
@@ -284,7 +275,7 @@ def build_gateframe():
     for sy in (1, -1):
         ya, yb = sorted((sy * 17.5, sy * C.HALF))
         wall_run(mb, ya, yb)
-        wall_details(mb, [sy * 22.5], [sy * 27], [sy * 22.5, sy * 27.5], [sy * 25], [])
+        wall_details(mb, [sy * 22.5], [sy * 22.5, sy * 27.5], [sy * 25], [])
         tower(mb, sy)
         # door stop frame behind the leaf
         ya, yb = sorted((sy * 7.6, sy * 8.3))
@@ -302,7 +293,6 @@ def build_gateframe():
     specs = hspec + ws[i30:] + [(R_TALL, ('off', 12.0))] + isp
     mb.profile(pts, specs, -8.5, 8.5, uoff=0.45)
     for y in (-4.9, 0.0, 4.9):
-        hood(mb, (-5.4, y, 19.6), (-1, 0, 0), 3.4, 2.7, 1.1, 0.6)
         mb.box((-5.55, y - 0.6, 37.3), (-4.0, y + 0.6, 38.7), R_GEN, skip='+x', v=('abs', 36.0))
         mb.box((-6.38, y - 0.25, 30.1), (-5.9, y + 0.25, 35.9), R_IRON, skip='+x', v=('abs', 30.0))
     for y in (-4.4, 4.4):

@@ -176,12 +176,23 @@ def _make_instance(spec):
 _T34 = "/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Rus_Medium/T34/Meshes/"
 _T34_TURRET = "/Game/RTS_Survival/Blueprints/Turrets/Russian/Medium/T34Turrets/"
 _PANTHER = "/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Heavy/PantherG/Meshes/"
+_IS2 = "/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Rus_Heavy/"
+_IS2_TURRET = "/Game/RTS_Survival/Blueprints/Turrets/Russian/Heavy/IS-2/Meshes/"
 TANK_KITS = {
     "Rus_Vehicle_T3476_Soviet": [
         ("skel", _T34 + "SK_T34_Tracks", (0.0, 0.0, 0.0), None),
         ("mesh", _T34 + "SM_T34_Hull", (0.0, -2.0, 3.0), _T34 + "MI_T34Soviet"),
         ("mesh", _T34_TURRET + "Meshes/SM_T34_76_TurretBaseMesh", (46.0, -1.0, 157.0), _T34 + "MI_T34Soviet"),
         ("skel", _T34_TURRET + "T34_76/Meshes/SK_34_76WeaponSystem", (46.0, -1.0, 157.0), _T34 + "MI_T34Soviet"),
+    ],
+    # IS-2 (Rus_Vehicle_IS-2_Soviet): hull, add-on panels and turret at scale 1.1 in the Blueprint (5th element);
+    # the turret sits on the hull's Turret socket (64.7, -11.1, 162.5) x 1.1 + the hull offset.
+    "Rus_Vehicle_IS-2_Soviet": [
+        ("skel", _IS2 + "KV1/Meshes/SK_KV_1_Tracks", (0.0, 0.0, 0.0), None),
+        ("mesh", _IS2 + "IS-1And-2/Meshes/SM_IS_1_Hull", (-8.9, 0.3, -4.7), _IS2 + "IS-1And-2/Materials/MI_IS_1_SovietCamo", 1.1),
+        ("mesh", _IS2 + "IS-1And-2/IS2_Forge/SM_IS2_Soviet_Armor_R_05_AddOnPanels", (-8.9, 0.3, -4.7), None, 1.1),
+        ("mesh", _IS2_TURRET + "SM_IS-2_BaseMesh", (62.3, -11.9, 174.0), None, 1.1),
+        ("skel", _IS2_TURRET + "SK_IS-2_Turret", (62.3, -11.9, 174.0), None, 1.1),
     ],
     "Ger_Vehicle_PantherG": [
         ("skel", _PANTHER + "PantherG_Tracks", (0.0, 0.0, 0.0), None),
@@ -248,12 +259,18 @@ def add_tank(sequence, spec, seconds):
         spec["snap"] = None
     drive = TANK_DRIVE.get(spec["asset"]) if spec.get("drive") else None
     bindings = []
-    for index, (kind, asset, offset, materials) in enumerate(TANK_KITS[spec["asset"]]):
+    # kit_scale: a scale model of the tank (the map-table miniatures of 2.4): offsets and parts shrink together.
+    kit_scale = float(spec.get("kit_scale", 1.0))
+    for index, entry in enumerate(TANK_KITS[spec["asset"]]):
+        kind, asset, offset, materials = entry[:4]
+        part_scale = (entry[4] if len(entry) > 4 else 1.0) * kit_scale
         part = dict(spec)
         # Some "SM_" turret and gun assets are skeletal meshes: trust the asset, not the name.
         kind = "skel" if isinstance(unreal.load_asset(asset), unreal.SkeletalMesh) else "mesh"
-        part.update({"kind": kind, "asset": asset, "mats": materials, "local_offset": offset,
+        part.update({"kind": kind, "asset": asset, "mats": materials, "local_offset": tuple(o * kit_scale for o in offset),
                      "label": "%s_part%d" % (spec.get("label", "Tank"), index)})
+        if part_scale != 1.0:
+            part["_scale"] = (part_scale, part_scale, part_scale)
         if drive and index == 0:
             part["anim"] = drive[0]
             part["play_rate"] = float(spec["drive"])
@@ -324,6 +341,14 @@ def add_actor(sequence, spec, seconds):
     return binding
 
 
+def attach(sequence, child, parent, socket, seconds):
+    track = child.add_track(unreal.MovieScene3DAttachTrack)
+    section = track.add_section()
+    section.set_range(0, b.frames(seconds))
+    section.set_constraint_binding_id(sequence.get_binding_id(parent))
+    section.set_editor_property("attach_socket_name", socket)
+
+
 def add_mpc(sequence, keys, seconds, archive):
     """Material Parameter Collection keys. keys: {name: [(fraction, value or callable(seconds))]}.
     Every shot states every scalar, so nothing leaks from the shot before."""
@@ -391,8 +416,19 @@ def build_shot(sequence, shot, seconds):
         keys = _handheld(keys, seconds, float(shot["handheld"]), shot["id"])
         style = "ease"
     b.add_camera(sequence, keys, seconds, focal_length=focal_for_fov(shot.get("fov", 60.0)), linear=style == "linear")
-    for spec in shot.get("actors", []):
-        add_actor(sequence, spec, seconds)
+    actors = shot.get("actors", [])
+    if callable(actors):            # actors that depend on the shot's final length (5.1 canisters)
+        actors = actors(seconds)
+    by_label = {}
+    for spec in actors:
+        binding = add_actor(sequence, spec, seconds)
+        if spec.get("label") and not isinstance(binding, list):
+            by_label[spec["label"]] = binding
+    for spec in actors:
+        # "attach": (parent label, socket): the actor rides a socket of another actor of the shot (a rifle in a
+        # marching soldier's hand); its keys are then relative to that socket.
+        if spec.get("attach") and by_label.get(spec["label"]) and by_label.get(spec["attach"][0]):
+            attach(sequence, by_label[spec["label"]], by_label[spec["attach"][0]], spec["attach"][1], seconds)
     for move in shot.get("move_level_actors", []):
         move_level_actor(sequence, move, seconds)
 

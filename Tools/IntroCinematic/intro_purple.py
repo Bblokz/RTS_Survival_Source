@@ -179,3 +179,46 @@ def build_instances(meshes):
                           scalars={"Mode": mode, "Seed": index * 0.37, "StageLo": lo, "StageHi": hi})
         out[name] = M + prefix
     return out
+
+
+# Shot 5.1 (2026-11-21): the aerosol that pours out of the opened canisters. A sphere with a soft limb and billowing
+# noise (camera-independent, so no billboard keys are needed); it thins out as it grows (ObjectRadius against
+# RefRadius), so a puff keyed from small to large reads as gas spreading into cloud.
+GAS_CODE = mats.VNOISE + """
+float3 p = (WorldPos - ObjPos) / max(Radius, 1.0);
+float limb = saturate(dot(normalize(Normal), normalize(CamVec)));
+float t = Time * Drift + Seed;
+float d = 0.0; float amp = 0.5;
+float2 q1 = p.xy * 2.4 + float2(t, Seed * 1.7); float2 q2 = p.yz * 2.4 + float2(Seed * 0.9, -t);
+for (int i = 0; i < 5; i++) { d += amp * (vnoise(q1) * 0.5 + vnoise(q2) * 0.5); q1 = q1 * 2.03 + 7.0; q2 = q2 * 2.03 + 3.0; amp *= 0.5; }
+float body = smoothstep(0.05, 0.75, limb);
+float thin = saturate(pow(RefRadius / max(Radius, 1.0), 0.7));
+// billows with gaps between them, dense and lit at their cores, dark and torn at their edges
+float alpha = saturate(body * smoothstep(0.40, 0.74, d + limb * 0.14)) * Density * thin;
+float3 col = lerp(float3(0.025, 0.006, 0.04), float3(0.48, 0.09, 0.80), saturate(d * 2.2 - 0.85));
+col *= Glow * (0.35 + 1.1 * limb * limb * d);
+return float4(col, alpha);
+"""
+
+
+def build_gas_material():
+    material = mats._new_material("M_Intro_PDGas", blend=unreal.BlendMode.BLEND_TRANSLUCENT,
+                                  shading=unreal.MaterialShadingModel.MSM_UNLIT)
+    inputs = [
+        ("WorldPos", mel.create_material_expression(material, unreal.MaterialExpressionWorldPosition, -900, -400), ""),
+        ("ObjPos", mel.create_material_expression(material, unreal.MaterialExpressionObjectPositionWS, -900, -320), ""),
+        ("Radius", mel.create_material_expression(material, unreal.MaterialExpressionObjectRadius, -900, -240), ""),
+        ("CamVec", mel.create_material_expression(material, unreal.MaterialExpressionCameraVectorWS, -900, -160), ""),
+        ("Normal", mel.create_material_expression(material, unreal.MaterialExpressionVertexNormalWS, -900, -80), ""),
+        ("Time", mel.create_material_expression(material, unreal.MaterialExpressionTime, -900, 0), ""),
+        ("Seed", mats._scalar(material, "Seed", 0.0, 100), ""),
+        ("Drift", mats._scalar(material, "Drift", 0.12, 200), ""),
+        ("Density", mats._scalar(material, "Density", 0.75, 300), ""),
+        ("Glow", mats._scalar(material, "Glow", 1.35, 400), ""),
+        ("RefRadius", mats._scalar(material, "RefRadius", 420.0, 500), "")]
+    custom = mats._custom(material, GAS_CODE, inputs)
+    mel.connect_material_property(mats._mask(material, custom, "rgb"), "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+    mel.connect_material_property(mats._mask(material, custom, "a"), "", unreal.MaterialProperty.MP_OPACITY)
+    mats._finish(material)
+    for index in range(4):
+        mats.instance("MI_Intro_PDGas_%d" % index, material, scalars={"Seed": 3.1 + index * 7.3})

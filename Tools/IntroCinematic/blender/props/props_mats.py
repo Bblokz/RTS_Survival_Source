@@ -370,6 +370,29 @@ def m_can_steel(name):
     return g.finish(c, r, m, h, bump=0.0004)
 
 
+# ---- Purple Death canister (2026-11-21): near-black violet casing, purple bands, glowing ampoules
+@_reg
+def m_pdcan_paint(name):
+    g = G(name)
+    c, r, m, h = worn(g, (0.040, 0.028, 0.050), s=10.0, paint_rough=0.5, chip=0.65, rust=0.7, scratch=0.9, dirt=0.8,
+                      var=0.12)
+    return g.finish(c, r, m, h, bump=0.0006)
+
+
+@_reg
+def m_pdcan_band(name):
+    g = G(name)
+    c, r, m, h = worn(g, (0.26, 0.045, 0.36), s=14.0, paint_rough=0.45, chip=0.6, rust=0.5, scratch=0.8, dirt=0.7,
+                      var=0.15)
+    return g.finish(c, r, m, h, bump=0.0005)
+
+
+@_reg
+def m_pdcan_glow(name):
+    g = G(name)
+    return g.finish((0.55, 0.14, 0.85), 0.15, 0.0, emit=3.0)
+
+
 # ---- pins
 @_reg
 def m_pin_head(name):

@@ -175,6 +175,8 @@ def _prop_rule(mesh, slot):
     prop = mesh.replace("SM_Intro_", "").replace("_Curled", "")
     if prop == "OilLamp" and slot == "Flame":
         return mats.MAT_DIR + "/MI_Intro_Flame"
+    if prop.startswith("PDCan") and slot == "Glow":
+        return mats.MAT_DIR + "/MI_Intro_PDGlow"
     if prop == "PaperTag" and slot == "String":
         return "T_Intro_PaperTag_String"
     if prop == "Banner" and slot == "Pole":

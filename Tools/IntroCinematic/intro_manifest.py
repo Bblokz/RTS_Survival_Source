@@ -20,8 +20,12 @@ importlib.reload(sets)
 
 import intro_sets2 as sets2
 import intro_berlin as berlin
+import intro_canisters as canisters
+import intro_warmap as warmap
 
 importlib.reload(berlin)
+importlib.reload(canisters)
+importlib.reload(warmap)
 
 O = sets.ORIGINS
 M = sets.M
@@ -163,6 +167,47 @@ def road_column(tail_start, travel, count, spacing, lateral, drive):
     return specs
 
 
+# Shot 6.3 at the Ural gate (12.5 s): the leaves (hinges at x -500, y +-795, 8.1 m long) swing out over x -1310..-500.
+# They are open from 0.16 to 0.80 of the shot; a leaf crosses the tank lane (|y| < 160) only below ~37 degrees.
+URAL_GATE = ((0.0, 0.0), (0.16, 1.0), (0.80, 1.0), (0.95, 0.0), (1.0, 0.0))
+URAL_TANK_SPEED = 540.0         # cm/s (about 19 km/h); the old column ran in at 38 km/h
+URAL_TANK_GAP = 1000.0
+URAL_TANK_LEAD = -2300.0        # lead tank centre at the start: its bow is clear of the leaves while they swing open
+URAL_MARCH = 190.0              # cm/s: the march cycle's natural speed in the game (USquadUnitAnimInstance)
+RIFLE = "/Game/RTS_Survival/Blueprints/Squads/InfantryWeapons/Russian/Mosin/SM_InfWeapon_Mosin"
+MARCH = "/Game/RTS_Survival/Blueprints/Squads/SquadUnits/Anims/Movement/March/AN_Infantry_March_RifleShoulder"
+
+
+def ural_column(seconds):
+    """Four T-34s in a tight column; the last one's hull is inside the gate (rear past x -380) before the leaves close."""
+    travel = URAL_TANK_SPEED * seconds
+    return [{"kind": "class", "asset": T34, "label": "T34_%d" % index, "drive": 1.0, "snap": 0.0, "trace_from": 600.0,
+             "contact": True,
+             "keys": [(0.0, at("Intro_Ural", URAL_TANK_LEAD - index * URAL_TANK_GAP, 0, 0), (0, 0, 0)),
+                      (1.0, at("Intro_Ural", URAL_TANK_LEAD - index * URAL_TANK_GAP + travel, 0, 0), (0, 0, 0))]}
+            for index in range(4)]
+
+
+def ural_platoon(seconds):
+    """A platoon in three files beside the column on the camera side, rifles shouldered, marching in step; the last
+    rank is through the gate (x > -380) when the leaves start to close at 0.80."""
+    close = URAL_GATE[2][0] * seconds
+    last_start = -360.0 - URAL_MARCH * close
+    specs = []
+    for rank in range(6):
+        for file_, y in enumerate((-560.0, -440.0, -320.0)):
+            x0 = last_start + (5 - rank) * 130.0 + (file_ % 2) * 8.0
+            label = "Marcher_%d_%d" % (rank, file_)
+            specs.append({"kind": "skel", "asset": SOLDIER_RUS, "label": label, "anim": MARCH,
+                          # the infantry mesh faces its +Y: yaw -90 marches it along +X
+                          "keys": [(0.0, at("Intro_Ural", x0, y, 0), (0, -90, 0)),
+                                   (1.0, at("Intro_Ural", x0 + URAL_MARCH * seconds, y, 0), (0, -90, 0))]})
+            # the rifle in the right hand (the game's weapon offset on GunSocket)
+            specs.append({"kind": "mesh", "asset": RIFLE, "label": label + "_Rifle", "attach": (label, "GunSocket"),
+                          "keys": [(0.0, (-16.2, 5.25, 1.79), (-5.0, -180.0, 2.0))]})
+    return specs
+
+
 US_SITES = ("LosAlamos", "OakRidge", "Hanford")
 
 
@@ -237,6 +282,22 @@ def shots():
                   stamp("CONFIRMED", (0.66, 0.60), -8.0, 0, 0.3, 2.6)]},
         {"id": "2.3", "levels": [OLD], "vo": ["2_3"], "pre": 0.7, "post": 1.3, "fov": 60,
          "cam": [(0.0, (-2541, HANGAR_Y - 2700, 360), (3, 90, 0)), (1.0, (-2541, HANGAR_Y - 1500, 330), (4, 90, 0))]},
+        # ---- 2.4: 1944 to 1945 on the map table (owner, 2026-11-21): the date line advances a year and the Red
+        # Army with its own V2s rolls west from the Soviet border into western Europe, wartime-briefing style:
+        # red pencil arrows and scale-model pieces pushed across the map, cut like an archive newsreel. No voice.
+        {"id": "2.4a", "levels": ["Intro_Bunker"], "min": 2.6, "fov": 45, "handheld": 0.08,
+         "cam": [(0.0, warmap.world(-72.0, warmap.YEAR_1944 + 3.0, TOP + 44.0), (-80, 0, 0)),
+                 (1.0, warmap.world(-72.0, warmap.YEAR_1944 + warmap.YEAR_STEP + 3.0, TOP + 40.0), (-80, 0, 0))],
+         "actors": warmap.date_arrow(), "mpc": dict(warmap.map_mpc(), **warmap.DATE_PENCIL)},
+        {"id": "2.4b", "levels": ["Intro_Bunker"], "min": 2.9, "fov": 38, "handheld": 0.12,
+         "cam": [(0.0, warmap.camera_point(52.6, 21.6, back=15.0, up=5.5), (-17, 8, 0)),
+                 (1.0, warmap.camera_point(52.6, 18.2, back=15.0, up=5.0), (-17, 4, 0))],
+         "actors": warmap.thrusts_2_4b(), "mpc": warmap.map_mpc(),
+         "cues": [card("1944 - 1945", "THE RED ARMY MOVES WEST", 0.25, 5.6)]},
+        {"id": "2.4c", "levels": ["Intro_Bunker"], "min": 3.6, "fov": 55, "move": "ease",
+         "cam": [(0.0, warmap.camera_point(50.8, 17.5, back=50.0, up=58.0), (-52, 0, 0)),
+                 (1.0, warmap.camera_point(50.8, 14.0, back=56.0, up=64.0), (-50, -3, 0))],
+         "actors": warmap.thrusts_2_4c(), "mpc": warmap.map_mpc()},
         # ---- Section 3: January 1945, Berlin ----------------------------------------------------------------------
         {"id": "3.1", "handheld": 0.12, "levels": [OLD], "vo": ["3_1"], "pre": 0.6, "post": 0.6, "fov": 50,
          "cam": [(0.0, (-34700, -9300, 640), {"at": (RUS_PAD[0], RUS_PAD[1], 1700)}),
@@ -324,12 +385,9 @@ def shots():
         # ---- Section 5: August 1945, the Purple Death --------------------------------------------------------------
         {"id": "5.1", "levels": ["Intro_Clouds"], "vo": ["5_1"], "pre": 0.8, "post": 0.8, "fov": 55,
          "cam": [(0.0, at("Intro_Clouds", 0, 0, 0), (5, -3, 0)), (1.0, at("Intro_Clouds", 120, 30, -60), (-9, 4, 0))],
-         "actors": [
-             {"kind": "mesh", "asset": "SM_Intro_Canister", "fallback": True, "label": "Canister", "mats": None,
-              "keys": [(0.0, at("Intro_Clouds", 560, -210, 330), (-52, 20, 0)), (1.0, at("Intro_Clouds", 500, 150, -250), (-70, 60, 150))]},
-             # A cold key on the canister's flank, so the steel reads against the cloud.
-             {"kind": "point", "label": "CanisterKey", "intensity": 22.0, "color": (0.75, 0.8, 1.0, 1.0), "radius": 900.0,
-              "keys": [(0.0, at("Intro_Clouds", 330, -330, 400), (0, 0, 0), 1.0), (1.0, at("Intro_Clouds", 300, 20, -150), (0, 0, 0), 1.0)]}],
+         # Many blunt purple canisters (no fins: "not a bomb") tumble down through the cloud and burst one after
+         # another; the aerosol balloons out of each into purple cloud (intro_canisters).
+         "actors": lambda seconds: canisters.canister_actors(lambda *a: at(*a), seconds),
          "cues": [card("AUGUST 1945", "LOCATION UNKNOWN", 0.5, 5.4)]},
         {"id": "5.2", "handheld": 0.12, "levels": ["Intro_Trench"], "vo": ["5_2"], "pre": 0.8, "post": 1.0, "fov": 48,
          "cam": [(0.0, at("Intro_Trench", 14, 470, 132), (-9, -90, 0)), (1.0, at("Intro_Trench", 8, 330, 122), (-11, -91, 0))],
@@ -400,28 +458,22 @@ def shots():
          "cam": [(0.0, at("Intro_Ural", -9800, -1500, 190), {"at": at("Intro_Ural", -900, 0, 1300)}),
                  (0.66, at("Intro_Ural", -8300, -1000, 260), {"at": at("Intro_Ural", -900, 0, 1500)}),
                  (1.0, at("Intro_Ural", -8900, -1300, 1500), {"at": at("Intro_Ural", -900, 0, 1900)})],
-         "actors": [
-             {"kind": "class", "asset": T34, "label": "T34_%d" % index, "drive": 2.0, "snap": 0.0, "trace_from": 600.0,
-              "contact": True,
-              "keys": [(0.0, at("Intro_Ural", -7600 - index * 1200, 0, 0), (0, 0, 0)),
-                       (0.62, at("Intro_Ural", 700 - index * 1200, 0, 0), (0, 0, 0)),
-                       (1.0, at("Intro_Ural", 4200 - index * 1200, 0, 0), (0, 0, 0))]} for index in range(4)] + [
+         # The column and a marching platoon go in; the leaves close only once the last of them is through
+         # (they used to close on the last T-34).
+         "actors": ural_column(12.5) + ural_platoon(12.5) + [
              # The iron leaves hang on their hinge pivots (kit README): closed at yaw 0, they swing outward (-X).
-             {"kind": "mesh", "asset": "SM_UralShield_GateLeaf_L", "label": "Leaf_L",
-              "keys": [(0.0, at("Intro_Ural", -500, -795, -40), (0, 0, 0)), (0.10, at("Intro_Ural", -500, -795, -40), (0, 0, 0)),
-                       (0.30, at("Intro_Ural", -500, -795, -40), (0, 85, 0)), (0.72, at("Intro_Ural", -500, -795, -40), (0, 85, 0)),
-                       (0.92, at("Intro_Ural", -500, -795, -40), (0, 0, 0)), (1.0, at("Intro_Ural", -500, -795, -40), (0, 0, 0))]},
-             {"kind": "mesh", "asset": "SM_UralShield_GateLeaf_R", "label": "Leaf_R",
-              "keys": [(0.0, at("Intro_Ural", -500, 795, -40), (0, 0, 0)), (0.10, at("Intro_Ural", -500, 795, -40), (0, 0, 0)),
-                       (0.30, at("Intro_Ural", -500, 795, -40), (0, -85, 0)), (0.72, at("Intro_Ural", -500, 795, -40), (0, -85, 0)),
-                       (0.92, at("Intro_Ural", -500, 795, -40), (0, 0, 0)), (1.0, at("Intro_Ural", -500, 795, -40), (0, 0, 0))]}],
+             {"kind": "mesh", "asset": "SM_UralShield_GateLeaf_" + side, "label": "Leaf_" + side,
+              "keys": [(f, at("Intro_Ural", -500, 795 * sign, -40), (0, -85 * sign * open_, 0)) for f, open_ in URAL_GATE]}
+             for side, sign in (("L", -1), ("R", 1))],
          "cues": [{"type": "Card", "at": 0.8, "dur": 5.0, "l1": "THE URAL SHIELD", "l2": ""}]},
         {"id": "6.4", "mpc": {"Sand": [(0.0, 0.22), (1.0, 0.4)]}, "levels": ["Intro_Ural"], "vo": ["6_4"], "pre": 0.6, "post": 1.2, "fov": 50,
          "cam": [(0.0, at("Intro_Ural", -26000, -52000, 9000), {"at": at("Intro_Ural", 0, 60000, 2500)}),
                  (1.0, at("Intro_Ural", -47000, -84000, 27000), {"at": at("Intro_Ural", 0, 80000, 2500)})],
          "actors": [
              {"kind": "mesh", "asset": "SM_UralShield_GateLeaf_L", "label": "Leaf_L", "keys": [(0.0, at("Intro_Ural", -500, -795, -40), (0, 0, 0))]},
-             {"kind": "mesh", "asset": "SM_UralShield_GateLeaf_R", "label": "Leaf_R", "keys": [(0.0, at("Intro_Ural", -500, 795, -40), (0, 0, 0))]}]},
+             {"kind": "mesh", "asset": "SM_UralShield_GateLeaf_R", "label": "Leaf_R", "keys": [(0.0, at("Intro_Ural", -500, 795, -40), (0, 0, 0))]}] +
+             # the hinterland's works smoke behind the wall (intro_sets2.ural_hinterland)
+             sets2.ural_smoke(at)},
         # ---- Section 7: 1948-1975, the Directorate -----------------------------------------------------------------
         {"id": "7.1", "levels": ["Intro_Hall"], "vo": ["7_1"], "pre": 0.8, "post": 0.8, "fov": 55,
          "cam": [(0.0, at("Intro_Hall", -1750, -260, 190), {"at": at("Intro_Hall", 1440, 0, 900)}),

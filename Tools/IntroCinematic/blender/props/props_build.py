@@ -146,6 +146,110 @@ def build_canister():
                 pivot='centre of mass (volume centroid), long axis X, lifting lug up (+Z), valve cap at +X')
 
 
+# ====================================================================================== 2b Purple Death canister
+# Shot 5.1 (2026-11-21): the old canister read as a bomb (fins, nose). This one is a blunt drum, no fins: a sleeve of
+# two half shells with glowing purple windows, a purple nose cap and a flat tail cap, around a cage of glowing
+# ampoules. All parts share one origin (the canister centre, long axis X) so the shot animates them apart from one
+# closed pose: caps blow off, shells part and tumble, the ampoules spill the purple gas.
+PD_R = 0.26          # sleeve outer radius
+PD_T = 0.022         # sleeve wall
+PD_X = 0.62          # sleeve half length
+
+
+def arc_shell(b, r_out, r_in, a0, a1, x0, x1, n):
+    """Closed curved slab: radii r_out..r_in, angles a0..a1 (degrees, 0 = +Y, 90 = +Z) about X, from x0 to x1."""
+    def ring(r, x):
+        return [b._v((x, r * math.cos(math.radians(a0 + (a1 - a0) * i / n)),
+                      r * math.sin(math.radians(a0 + (a1 - a0) * i / n))), None) for i in range(n + 1)]
+    oa, ob, ia, ib = ring(r_out, x0), ring(r_out, x1), ring(r_in, x0), ring(r_in, x1)
+    faces = []
+    for i in range(n):
+        faces.append(b.bm.faces.new((oa[i], oa[i + 1], ob[i + 1], ob[i])))
+        faces.append(b.bm.faces.new((ia[i + 1], ia[i], ib[i], ib[i + 1])))
+        faces.append(b.bm.faces.new((oa[i + 1], oa[i], ia[i], ia[i + 1])))
+        faces.append(b.bm.faces.new((ob[i], ob[i + 1], ib[i + 1], ib[i])))
+    faces.append(b.bm.faces.new((oa[0], ob[0], ib[0], ia[0])))
+    faces.append(b.bm.faces.new((ob[n], oa[n], ia[n], ib[n])))
+    return faces
+
+
+def build_pdcan_shell():
+    """One half of the sleeve (the +Y half); the other half is the same mesh rolled 180 degrees about X."""
+    b = Builder(41)
+    R, T, X = PD_R, PD_T, PD_X
+    b.add(arc_shell(b, R, R - T, -90, 90, -X, X, 24), 'pdcan_paint', smooth=40)
+    for x0, x1 in ((-X, -X + 0.05), (-0.03, 0.03), (X - 0.05, X)):            # steel bands (ends and middle)
+        b.add(arc_shell(b, R + 0.013, R - 0.006, -90, 90, x0, x1, 24), 'can_steel', smooth=40)
+    for x0, x1 in ((-X + 0.07, -X + 0.15), (X - 0.15, X - 0.07)):             # purple paint bands
+        b.add(arc_shell(b, R + 0.004, R - 0.006, -90, 90, x0, x1, 24), 'pdcan_band', smooth=40)
+    for a in (-55.0, 0.0, 55.0):                                              # glowing windows in steel rails
+        for x0, x1 in ((-X + 0.18, -0.06), (0.06, X - 0.18)):
+            b.add(arc_shell(b, R + 0.003, R - 0.008, a - 4.0, a + 4.0, x0, x1, 3), 'pdcan_glow', smooth=60)
+            for e0, e1 in ((a - 6.5, a - 4.0), (a + 4.0, a + 6.5)):
+                b.add(arc_shell(b, R + 0.011, R - 0.006, e0, e1, x0 - 0.02, x1 + 0.02, 2), 'can_steel', smooth=40)
+    for e0, e1 in ((-90.0, -87.0), (87.0, 90.0)):                             # seam flanges along the split
+        b.add(arc_shell(b, R + 0.016, R - 0.004, e0, e1, -X, X, 1), 'can_steel', smooth=40)
+    return dict(sets=[dict(b=b, tex='PDCanShell', size=2048, uv='smart', ao_exclude=('pdcan_glow',),
+                           slots={'pdcan_paint': 'Steel', 'can_steel': 'Steel', 'pdcan_band': 'Steel',
+                                  'pdcan_glow': 'Glow'})],
+                slots=['Steel', 'Glow'], kinds={'Glow': 'emit'}, max_tris=3000, view=(0.9, -1.3, 0.55),
+                pivot='canister centre, long axis X, this half on +Y')
+
+
+def _pdcan_cap(prof, seed):
+    b = Builder(seed)
+    faces = b.add(b.lathe(prof, 32), 'pdcan_band', smooth=38)
+
+    def steel(f):
+        z = abs(f.calc_center_median().z)
+        return PD_X - 0.012 < z < PD_X + 0.05
+    remat(b, faces, 'can_steel', steel)
+    b.transform(Matrix.Rotation(PI / 2, 4, 'Y'))          # lathe axis Z -> X
+    return b
+
+
+def build_pdcan_nose():
+    R, X = PD_R, PD_X
+    prof = [(0, X - 0.01), (R - 0.03, X - 0.01), (R + 0.013, X), (R + 0.013, X + 0.045), (R - 0.004, X + 0.055)]
+    for t in (15, 30, 45, 60, 75):
+        prof.append(((R - 0.004) * math.cos(math.radians(t)), X + 0.055 + 0.15 * math.sin(math.radians(t))))
+    prof += [(0.055, X + 0.21), (0.055, X + 0.245), (0.035, X + 0.26), (0, X + 0.26)]
+    b = _pdcan_cap(prof, 43)
+    return dict(sets=[dict(b=b, tex='PDCanNose', size=1024, uv='smart',
+                           slots={'pdcan_band': 'Steel', 'can_steel': 'Steel'})],
+                slots=['Steel'], max_tris=1500, view=(0.9, -1.3, 0.55), pivot='canister centre (the cap sits at +X)')
+
+
+def build_pdcan_tail():
+    R, X = PD_R, PD_X
+    prof = [(0, -X + 0.01), (R - 0.03, -X + 0.01), (R + 0.013, -X), (R + 0.013, -X - 0.045), (R - 0.02, -X - 0.06),
+            (R - 0.02, -X - 0.09), (0.11, -X - 0.09), (0.11, -X - 0.13), (0.06, -X - 0.15), (0, -X - 0.15)]
+    b = _pdcan_cap(prof, 44)
+    return dict(sets=[dict(b=b, tex='PDCanTail', size=1024, uv='smart',
+                           slots={'pdcan_band': 'Steel', 'can_steel': 'Steel'})],
+                slots=['Steel'], max_tris=1500, view=(0.9, -1.3, 0.55), pivot='canister centre (the cap sits at -X)')
+
+
+def build_pdcan_core():
+    """Steel spine, two spacer discs and six glass ampoules of the glowing agent."""
+    b = Builder(45)
+    rot = Matrix.Rotation(PI / 2, 4, 'Y')
+    b.add(b.cyl((-PD_X + 0.02, 0, 0), (PD_X - 0.02, 0, 0), 0.03, 10), 'can_steel', smooth=40)
+    for x in (-0.42, 0.42):
+        b.add(b.cyl((x - 0.012, 0, 0), (x + 0.012, 0, 0), 0.215, 24), 'can_steel', smooth=40)
+    amp = [(0, -0.54)] + [(0.068 * math.sin(math.radians(t)), -0.47 - 0.07 * math.cos(math.radians(t))) for t in (30, 60, 90)]
+    amp += [(0.068, 0.47)] + [(0.068 * math.cos(math.radians(t)), 0.47 + 0.07 * math.sin(math.radians(t))) for t in (30, 60)]
+    amp += [(0.02, 0.555), (0.02, 0.585), (0, 0.585)]
+    for k in range(6):
+        a = 2 * PI * k / 6 + PI / 6
+        m = Matrix.Translation((0, 0.145 * math.cos(a), 0.145 * math.sin(a))) @ rot
+        b.add(b.lathe(amp, 12, m=m), 'pdcan_glow', smooth=60)
+    return dict(sets=[dict(b=b, tex='PDCanCore', size=1024, uv='smart', ao_exclude=('pdcan_glow',),
+                           slots={'can_steel': 'Steel', 'pdcan_glow': 'Glow'})],
+                slots=['Steel', 'Glow'], kinds={'Glow': 'emit'}, max_tris=3000, view=(0.9, -1.3, 0.55),
+                pivot='canister centre, long axis X')
+
+
 # ====================================================================================== 3 / 4 pins
 def build_mappin():
     b = Builder(33)
@@ -672,7 +776,8 @@ def gen_weave_detail():
 PROPS = dict(OilLamp=build_oillamp, Canister=build_canister, MapPin=build_mappin, StarPin=build_starpin,
              PaperTag=build_papertag, PaperTag_Curled=build_papertag_curled, BurnRing=build_burnring,
              Banner=build_banner, PictureFrame=build_frame, MapTable=build_maptable,
-             AmmoSpread=build_ammospread)
+             AmmoSpread=build_ammospread, PDCanShell=build_pdcan_shell, PDCanNose=build_pdcan_nose,
+             PDCanTail=build_pdcan_tail, PDCanCore=build_pdcan_core)
 GENERATED = set()
 
 

@@ -77,6 +77,8 @@ def main():
     # Red pencil label on the map (shot 5.4).
     text_image("THE PURPLE DEATH", ITALIC, 150, RED_PENCIL, (2048, 256), angle=3.0, jitter=4.0).filter(
         ImageFilter.GaussianBlur(0.8)).save(OUT + "/T_Intro_PencilPurpleDeath.png")
+    # Red pencil year written under the 1945 tick of the date line (shot 2.4a, 2026-11-21).
+    pencil_1945()
     # Hand-drawn date line along the table edge (shots 1.2 and 9.2): a ruled line with year ticks, 1944 to 1976.
     line = Image.new("RGBA", (4096, 256), (0, 0, 0, 0))
     draw = ImageDraw.Draw(line)
@@ -150,6 +152,11 @@ def blueprint():
     stains = Image.effect_noise((w // 8, h // 8), 60).resize((w, h), Image.BICUBIC).filter(ImageFilter.GaussianBlur(20))
     image = Image.composite(image, Image.new("RGBA", (w, h), (16, 36, 76, 255)), stains.point(lambda v: 255 if v > 96 else 190))
     image.filter(ImageFilter.GaussianBlur(0.7)).save(OUT + "/T_Intro_Blueprint.png")
+
+
+def pencil_1945():
+    text_image("1945", ITALIC, 170, RED_PENCIL, (512, 256), angle=-4.0, jitter=3.0).filter(
+        ImageFilter.GaussianBlur(0.8)).save(OUT + "/T_Intro_Pencil1945.png")
 
 
 def date_strip():

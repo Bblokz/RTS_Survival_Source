@@ -292,6 +292,99 @@ def build_ural_greybox():
     scout.set_levels_visible([])
 
 
+# Behind the Ural Shield (+X, east): the Soviet hinterland, owner 2026-11-21. Tall works (stacks, cooling towers,
+# refinery) stand near the wall where they rise over its 45 m parapet in 6.4; housing blocks lie further back, where
+# the climbing camera sees over the wall. In front (-X, west): a cratered no man's land of dead trees. Both are
+# seeded plans (the shots read them too: smoke on the stacks). Clear: the 6.3 road and camera (|y| < 2600 near the gate).
+_IZ = "/Game/RTS_Survival/Meshes/Industrial/Zone/Meshes/"
+_RUSB = "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/RusBuildings/"
+# (mesh, stack top as (x, y, z) in the mesh's own frame or None, scale range)
+URAL_WORKS = (
+    (_IZ + "MegaFactoryPipeVerticals/Atlassed_SM_Mega_factory_01", (-194.0, 318.0, 13300.0), (1.0, 1.25)),
+    (_IZ + "MegaFactoryPipeVerticals/Atlassed_SM_Mega_factory_04", (59.0, 3.0, 8600.0), (1.0, 1.2)),
+    (_IZ + "MegaFactoryPipeVerticals/Atlassed_SM_Mega_factory_02", None, (1.0, 1.3)),
+    (_IZ + "Cooling_tower/Atlassed_SM_Cooling_tower_01", (0.0, 0.0, 4900.0), (1.1, 1.5)),
+    ("/Game/RTS_Survival/Meshes/Buildings/Industrial/SM_IndustrialRefinery", None, (1.0, 1.2)),
+    (_IZ + "Warehouses/Atlassed_SM_Warehouse_01", None, (1.0, 1.0)),
+    (_RUSB + "FactoryMeshes/SM_Rus_WarFactory", None, (1.6, 2.0)),
+    (_RUSB + "CoolingTowersMeshes/SM_Rus_IndustrialCooling", None, (1.8, 2.4)),
+)
+URAL_HOUSING = (
+    ("/Game/ApocalypticCity/StaticMeshs/Classic_house_01_sm", (0.9, 1.1)),
+    ("/Game/SM_CityHouse_Grey_1", (1.3, 1.6)),
+    ("/Game/SM_CityHouse_Yellow_1", (1.3, 1.6)),
+    ("/Game/SM_CityHouse_Blue_1", (1.3, 1.6)),
+)
+URAL_TREES = tuple("/Game/RTS_Survival/Meshes/Nature/Trees/DeadTrees/SM_RTS_DeadTree_%s" % n for n in ("1", "2", "04", "05", "06"))
+URAL_STUMP = "/Game/RTS_Survival/Meshes/Nature/Trees/DeadTrees/SM_RTS_DeadTree_Stump"
+URAL_CRATER = "/Game/RTS_Survival/Meshes/ground/Craters/SM_Crater_1_TerrainNode_001"
+
+
+def ural_hinterland():
+    """[(mesh, x, y, yaw, scale, stack top world point or None)] behind the wall, set-local cm."""
+    import math
+    rng = random.Random(1946)
+    plan = []
+    y = -36000.0
+    while y < 420000.0:
+        mesh, stack, (lo, hi) = URAL_WORKS[rng.randrange(len(URAL_WORKS))]
+        x = rng.uniform(9000.0, 26000.0) + max(0.0, y) * 0.04
+        yaw = rng.choice((0.0, 90.0, 180.0, 270.0)) + rng.uniform(-4.0, 4.0)
+        scale = rng.uniform(lo, hi)
+        top = None
+        if stack:
+            c, s_ = math.cos(math.radians(yaw)), math.sin(math.radians(yaw))
+            top = (x + (stack[0] * c - stack[1] * s_) * scale, y + (stack[0] * s_ + stack[1] * c) * scale, stack[2] * scale)
+        plan.append((mesh, x, y, yaw, scale, top))
+        y += rng.uniform(5500.0, 11000.0) * (1.0 + max(0.0, y) / 300000.0)
+    # housing: rows of blocks along streets parallel to the wall, further back
+    for row in range(6):
+        x_row = 34000.0 + row * 7000.0
+        y = -30000.0 + rng.uniform(0.0, 3000.0)
+        while y < 300000.0:
+            mesh, (lo, hi) = URAL_HOUSING[rng.randrange(len(URAL_HOUSING))]
+            plan.append((mesh, x_row + rng.uniform(-600.0, 600.0), y, rng.choice((0.0, 180.0)), rng.uniform(lo, hi), None))
+            y += rng.uniform(3400.0, 6200.0) * (1.0 + max(0.0, y) / 200000.0)
+    return plan
+
+
+def ural_front():
+    """[(kind, mesh, x, y, yaw, scale)] in front of the wall: craters (flattened, bowl floor on the ground) and dead
+    trees in groves and alone; nothing on the 6.3 road / camera corridor."""
+    rng = random.Random(1947)
+    plan = []
+
+    def clear(x, y):
+        return x > -16000.0 and abs(y) < 2600.0
+
+    for _ in range(360):
+        x, y = -rng.uniform(1600.0, 70000.0), rng.uniform(-70000.0, 320000.0)
+        if clear(x, y):
+            continue
+        plan.append(("crater", URAL_CRATER, x, y, rng.uniform(0.0, 360.0), rng.uniform(1.3, 3.4)))
+    groves = [(-rng.uniform(3000.0, 60000.0), rng.uniform(-60000.0, 300000.0)) for _ in range(34)]
+    for gx, gy in groves:
+        for _ in range(rng.randrange(4, 12)):
+            x, y = gx + rng.gauss(0.0, 2200.0), gy + rng.gauss(0.0, 3200.0)
+            if x > -1500.0 or clear(x, y):
+                continue
+            mesh = URAL_STUMP if rng.random() < 0.25 else URAL_TREES[rng.randrange(len(URAL_TREES))]
+            plan.append(("tree", mesh, x, y, rng.uniform(0.0, 360.0), rng.uniform(1.8, 2.8)))
+    for _ in range(140):
+        x, y = -rng.uniform(1800.0, 60000.0), rng.uniform(-60000.0, 300000.0)
+        if clear(x, y):
+            continue
+        plan.append(("tree", URAL_TREES[rng.randrange(len(URAL_TREES))], x, y, rng.uniform(0.0, 360.0), rng.uniform(1.8, 3.0)))
+    return plan
+
+
+def ural_smoke(at):
+    """Shot spawnables: smoke from the hinterland's stacks (NS_SmokePillar1 rendered in 3.3)."""
+    return [{"kind": "niagara", "asset": "NS_SmokePillar1", "label": "UralStack_%d" % index,
+             "keys": [(0.0, at("Intro_Ural", *top), (0, 0, 0), 6.0)]}
+            for index, top in enumerate(t for *_, t in ural_hinterland() if t is not None) if index < 24]
+
+
 def build_ural():
     """The Ural Shield (6.3 / 6.4) from the modelled kit, on its own plain: gate frame at the set origin, hero
     segments beside it, cheap far pieces (stretched along the wall with distance) to about 40 km each way, hills
@@ -327,6 +420,17 @@ def build_ural():
         height = radius * rng.uniform(0.16, 0.34)
         s.mesh("Ural_Hill_%02d" % index, SPHERE, (x, y, -height * 0.35), scale=(radius / 50.0, radius * rng.uniform(1.0, 2.2) / 50.0, height / 50.0),
                materials=dirt, shadow=False)
+    for index, (mesh, x, y, yaw, scale, _top) in enumerate(ural_hinterland()):
+        s.mesh("Ural_Works_%03d" % index, mesh, (x, y, 0), rotation=(0, yaw, 0), scale=(scale,) * 3, shadow=x < 40000.0)
+    for index, (kind, mesh, x, y, yaw, scale) in enumerate(ural_front()):
+        if kind == "crater":
+            # flattened so its bowl floor sits on the ground (the ground box would cover a sunken bowl): a low rim
+            # (the mesh's own landscape-style material drew pale discs: scorched earth instead)
+            s.mesh("Ural_Crater_%03d" % index, mesh, (x, y, 310.0 * scale * 0.45), rotation=(0, yaw, 0),
+                   scale=(scale, scale, scale * 0.45), shadow=False, materials=M + "MI_Intro_Ground_Crater")
+        else:
+            s.mesh("Ural_DeadTree_%03d" % index, mesh, (x, y, -10.0), rotation=(0, yaw, 0), scale=(scale,) * 3,
+                   shadow=x > -20000.0)
     sun(s, "Ural_Sun", -24, 18, 3.6, (1.0, 0.9, 0.78, 1.0))
     sky_light(s, "Ural_Sky", 0.9, (0.62, 0.66, 0.76, 1.0))
     s.mesh("Ural_SkyDome", SPHERE, (0, 0, 0), scale=(150000.0,) * 3, materials=M + "MI_Intro_Sky_Ash", shadow=False)

@@ -37,6 +37,8 @@ Brief: `Source/Docs/Campaign/IntroCinematicScript.md` (script + build ledger at 
 | `game_run.sh` | headless plain `-game` playthrough with auto-quit and UI screenshots |
 | `contact_sheet.py` | contact sheet from rendered frames |
 | `intro_berlin.py` | Berlin strike (3.3 / 3.4): city plan of the Berlin kits, both Skyline levels, the 3.4b nuke, collapses and camera |
+| `intro_warmap.py` | 2.4 map scene: red arrows that grow along routes, scale-model tank / V2 pieces on bases, the date line arrow |
+| `intro_canisters.py` | 5.1: the Purple Death canisters (parts animated apart from one origin) and the gas puffs (`M_Intro_PDGas`) |
 | `intro_fire.py` | fire on the map strikes: flame cards, light pool, burning pins (run off the ring clocks) |
 | `intro_purple.py` | `M_Intro_PurpleDeath` on the trench mould and veins (growth revealed by MPC `Mould`) |
 | `blender/sets/build_veins.py` | branching vein networks over the trench (`SM_Intro_Mould_Veins`, U = metres from root) |
@@ -122,3 +124,12 @@ More rules learned:
   rebuild 3.3 / 3.4a / 3.4b (the falling shells are spawnables of 3.4b from the same plan).
 - Re-adding sounds without a full build: remove the master's "Music" and "Effects" audio tracks, then
   `intro_sound.add_sounds(timeline shots, cues)` (it adds new tracks every call).
+- A shot's `"actors"` may be a function of the shot's final length (`lambda seconds: [...]`, 5.1 canisters).
+- `"attach": (parent label, socket)` rides another actor of the same shot (a Mosin on a marcher's `GunSocket`);
+  its keys are then relative to that socket. `"kit_scale"` on a tank class makes a scale model (2.4 miniatures):
+  offsets and parts shrink together. The IS-2 kit is in `TANK_KITS` (parts at the Blueprint's 1.1 scale).
+- Infantry skeletal meshes face their +Y: yaw -90 walks them along +X. The march cycle's natural speed is
+  190 cm/s (`USquadUnitAnimInstance::MarchMontageNaturalSpeed`); key the soldiers at that speed.
+- The Ural gate (6.3) closes only after the last tank's rear (x > -380) and the last rank are through; check
+  `URAL_GATE`, `URAL_TANK_*` and `ural_platoon` together when the shot length changes.
+- `S_Medium_Engine_Rus` does not export to wav (the offline mix never had it); use exportable waves for new cues.
