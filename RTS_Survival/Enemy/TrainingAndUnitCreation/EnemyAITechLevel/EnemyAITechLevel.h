@@ -74,9 +74,10 @@ struct FEnemyLevelTraining
 	// With how many points does the AI start for training? Note that 10 = one light tank.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 TrainingPointsStart = 10;
-	// Scales how much the AI can train; 10 points is one light tank.
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	int32 TrainingPointsPerMinute = 3;
+	// Scales how much the AI can train; 10 points is one light tank. Fractions carry over between minutes,
+	// so 1.5 with a 3-point Mosin squad trains one squad every 2 minutes.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0.0"))
+	float TrainingPointsPerMinute = 3.f;
 
 	TArray<EBuildingExpansionType> GetUniqueBuildingTypesForTechLevels() const;
 

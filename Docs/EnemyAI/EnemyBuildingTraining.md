@@ -15,8 +15,24 @@ and shows that it is working while it trains, like the cranes on the player's bu
    - a `SetupRusSquads` row was added to `RTS_BP_RTSAsyncSpawner`;
    - `Rus_Squad_HazmatBazooka`'s construction script set its own subtype to `Squad_Rus_HazmatEngineers`, a copy
      leftover, and now sets `Squad_Rus_HazmatBazooka`.
+   A mission can keep the AI to a few units with `RestrictTrainingToSquads` / `RestrictTrainingToTanks` on the enemy
+   controller's `M_EnemyAIMissionSettings` (struct `FEnemyAIMissionSettings`). With both lists empty the AI trains
+   anything its buildings unlock. Otherwise it only picks units from the lists, still only those its buildings unlock,
+   and an empty list next to a filled one means none of that kind. A pressure that no listed unit fits no longer skips
+   the think step: the listed units answer it. `Ger_IntroMission` uses `Squad_Rus_Mosin` only (2026-11-21), so its
+   two barracks train Mosin squads.
+
+   A placed enemy controller needs a decision tree (`M_StochasticDecisionTree`) for any of this: training pressure
+   comes from the tree's actions, and without one the think loop reports an uninitialised variable every 6 s and
+   nothing is trained. Survival copies `DA_SurvivalWaveSettings`' tree in at runtime; a mission map gets its own
+   saved copy with `AEnemyController::CopyStrategicDecisionTreeFrom` (Blueprint-callable, run from editor python, see
+   `Source/Tools/IntroMission/intro_ai_mosin_setup.py`). With `bAllowDirectControlStochasticDecisionTree` off, the
+   tree only feeds training pressure and sends no attacks. The AI earns `TrainingPointsPerMinute` (a float, default 3: one
+   Mosin squad a minute; fractions carry over) on top of `TrainingPointsStart` (default 10). Ger_IntroMission uses 1.5
+   points a minute from 0 start points, so it trains one Mosin squad (3 points) every 2 minutes.
 3. `CreateTrainingBatch` hands every paid unit to the least busy standing building of its kind
-   (`GetQueuedSecondsRemaining`). A unit no building can take gets its points back.
+   (`GetQueuedSecondsRemaining`). Equally busy buildings (within 0.1 s) take turns: the one that took a unit longest
+   ago (`GetLastEnqueuedWorldSeconds`) goes first. A unit no building can take gets its points back.
    - Legacy path: a level whose enemy `UTrainerComponent`s are on the blackboard (`InitTrainerAsEnemyTrainerComponent`)
      still spawns at that trainer at once. No Soviet building uses that path.
    - The old base-cluster fallback is gone. It projected the base point with a 2 cm extent and in practice trained

@@ -79,6 +79,14 @@ public:
 	 * across maps (survival). Call after BeginPlay; think timers keep running.
 	 */
 	void OverrideStrategicDecisionTree(const UStochasticDecisionTree* Template);
+
+	/**
+	 * @brief Editor setup for mission maps: gives this placed controller its own copy of an authored tree (for example
+	 * DA_SurvivalWaveSettings' tree). Without a tree no training pressure builds, so the AI never trains.
+	 * @param Template Tree to copy, with its instanced sub-actions; saved with the map.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Strategic AI|Brain")
+	void CopyStrategicDecisionTreeFrom(const UStochasticDecisionTree* Template);
 	UGlobalAbilitiesManager* GetGlobalAbilitiesManager();
 
 	// This is used to evaluate whether the AI can use its decision tree to manually control units that are 'idle' on the blackboard

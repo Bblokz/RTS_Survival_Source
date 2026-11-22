@@ -448,6 +448,16 @@ private:
 		const FEnemyTrainingOptionsForTechLevel& TrainingOptions,
 		TArray<ETankSubtype>& OutTankSubtypes,
 		TArray<ESquadSubtype>& OutSquadSubtypes) const;
+
+	/**
+	 * @brief A mission can keep the AI to a few units (FEnemyAIMissionSettings::RestrictTrainingTo*), such as Mosin
+	 * squads only in an early mission; drops every unlocked option outside those lists.
+	 * @param InOutTankSubtypes Unlocked tank options, filtered in place.
+	 * @param InOutSquadSubtypes Unlocked squad options, filtered in place.
+	 */
+	void Training_ApplyMissionTrainingRestriction(
+		TArray<ETankSubtype>& InOutTankSubtypes,
+		TArray<ESquadSubtype>& InOutSquadSubtypes) const;
 	/**
 	 * @brief Narrows unlocked options to what can satisfy the broad pressure buckets before random batch selection.
 	 * @param Selection Focus and specialty picked from accumulated training pressure.
@@ -494,7 +504,7 @@ private:
 	bool Training_GetHasLegacyEnemyTrainer() const;
 	// Every unit of the batch has a building that can train it.
 	bool Training_GetCanTrainBatch(const FEnemyStrategicAITrainingBatch& TrainingBatch) const;
-	// The least busy standing building that trains this option; null when none can.
+	// The least busy standing building that trains this option (equally busy ones take turns); null when none can.
 	UEnemyBuildingTrainerComponent* Training_PickBuildingTrainer(const FTrainingOption& TrainingOption) const;
 	int32 Training_GetTrainingOptionCost(const FTrainingOption& TrainingOption) const;
 	/**

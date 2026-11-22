@@ -185,6 +185,8 @@ public:
 	bool GetCanTrainNow() const;
 	// Seconds until the whole queue is through; used to pick the least busy building.
 	float GetQueuedSecondsRemaining() const;
+	// World time this building last took a unit; -1 when it never did. Breaks ties so equally free buildings take turns.
+	float GetLastEnqueuedWorldSeconds() const { return M_LastEnqueuedWorldSeconds; }
 	static float GetTrainingSecondsForCost(const int32 TrainingPointCost);
 
 	/**
@@ -217,6 +219,7 @@ private:
 	TArray<FEnemyBuildingTrainingJob> M_Queue;
 
 	int32 M_NextJobID = 1;
+	float M_LastEnqueuedWorldSeconds = -1.f;
 	bool bM_IsActivityOn = false;
 	FTimerHandle M_ActiveJobTimer;
 	FTimerHandle M_SpawnWatchdogTimer;

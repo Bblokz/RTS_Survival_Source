@@ -162,6 +162,8 @@ bool UEnemyBuildingTrainerComponent::EnqueueTraining(const FTrainingOption& Opti
 	Job.DurationSeconds = GetTrainingSecondsForCost(TrainingPointCost) * FMath::Max(0.05f, TrainingTimeMlt);
 	Job.JobID = M_NextJobID++;
 	Job.RequestingStrategicAI = RequestingStrategicAI;
+	const UWorld* World = GetWorld();
+	M_LastEnqueuedWorldSeconds = IsValid(World) ? World->GetTimeSeconds() : 0.f;
 	Broadcast(EEnemyBuildingTrainingEvent::Queued, Option, nullptr, Job.DurationSeconds);
 	if (M_Queue.Num() == 1)
 	{

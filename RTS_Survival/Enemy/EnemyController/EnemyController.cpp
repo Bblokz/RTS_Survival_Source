@@ -1232,6 +1232,24 @@ bool AEnemyController::GetIsValidEnemyGlobalAbilitiesManager() const
 	return false;
 }
 
+void AEnemyController::CopyStrategicDecisionTreeFrom(const UStochasticDecisionTree* Template)
+{
+	if (not IsValid(Template))
+	{
+		RTSFunctionLibrary::ReportError("CopyStrategicDecisionTreeFrom called without a template tree.");
+		return;
+	}
+	Modify();
+	UStochasticDecisionTree* NewTree = DuplicateObject<UStochasticDecisionTree>(Template, this);
+	if (not IsValid(NewTree))
+	{
+		RTSFunctionLibrary::ReportError("Failed to copy the strategic decision tree template.");
+		return;
+	}
+	M_StochasticDecisionTree = NewTree;
+	MarkPackageDirty();
+}
+
 void AEnemyController::OverrideStrategicDecisionTree(const UStochasticDecisionTree* Template)
 {
 	if (not IsValid(Template))

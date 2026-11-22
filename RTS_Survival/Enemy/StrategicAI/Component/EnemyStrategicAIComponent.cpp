@@ -666,7 +666,14 @@ void UEnemyStrategicAIComponent::Training_ThinkStep()
 		FilteredSquadSubtypes);
 	if (FilteredTankSubtypes.IsEmpty() && FilteredSquadSubtypes.IsEmpty())
 	{
-		return;
+		// A mission that keeps the AI to a few units (Mosins only) would otherwise skip every pressure those few do
+		// not fit and barely train: the mission's own list answers any pressure.
+		if (not M_Blackboard.StrategicAIMissionSettings.GetHasTrainingRestriction())
+		{
+			return;
+		}
+		FilteredTankSubtypes = AvailableTankSubtypes;
+		FilteredSquadSubtypes = AvailableSquadSubtypes;
 	}
 
 	// Pick exact units last so availability, pressure, and cost all describe the same batch.
@@ -746,6 +753,8 @@ void UEnemyStrategicAIComponent::Training_CollectAvailableTrainingOptions(
 		});
 	}
 
+	Training_ApplyMissionTrainingRestriction(OutTankSubtypes, OutSquadSubtypes);
+
 	// Unlocked is not producible: without a standing barracks/tent (squads) or vehicle building (tanks) the AI must
 	// not spend pressure or points on that kind of unit.
 	if (not Training_GetCanTrainUnitType(EAllUnitType::UNType_Squad))
@@ -756,6 +765,26 @@ void UEnemyStrategicAIComponent::Training_CollectAvailableTrainingOptions(
 	{
 		OutTankSubtypes.Empty();
 	}
+}
+
+void UEnemyStrategicAIComponent::Training_ApplyMissionTrainingRestriction(
+	TArray<ETankSubtype>& InOutTankSubtypes,
+	TArray<ESquadSubtype>& InOutSquadSubtypes) const
+{
+	const FEnemyAIMissionSettings& MissionSettings = M_Blackboard.StrategicAIMissionSettings;
+	if (not MissionSettings.GetHasTrainingRestriction())
+	{
+		return;
+	}
+
+	InOutTankSubtypes.RemoveAll([&MissionSettings](const ETankSubtype TankSubtype)
+	{
+		return not MissionSettings.RestrictTrainingToTanks.Contains(TankSubtype);
+	});
+	InOutSquadSubtypes.RemoveAll([&MissionSettings](const ESquadSubtype SquadSubtype)
+	{
+		return not MissionSettings.RestrictTrainingToSquads.Contains(SquadSubtype);
+	});
 }
 
 void UEnemyStrategicAIComponent::Training_AddUnlockedTrainingOptions(
@@ -1041,6 +1070,9 @@ bool UEnemyStrategicAIComponent::Training_GetCanTrainBatch(const FEnemyStrategic
 UEnemyBuildingTrainerComponent* UEnemyStrategicAIComponent::Training_PickBuildingTrainer(
 	const FTrainingOption& TrainingOption) const
 {
+	// Queues this close count as equally busy; the building that took a unit longest ago goes first, so idle
+	// buildings of the same kind take turns instead of the first one in the list training everything.
+	constexpr float EqualQueueToleranceSeconds = 0.1f;
 	UEnemyBuildingTrainerComponent* BestTrainer = nullptr;
 	float BestQueuedSeconds = TNumericLimits<float>::Max();
 	for (const TWeakObjectPtr<UEnemyBuildingTrainerComponent>& WeakTrainer : M_BuildingTrainers)
@@ -1051,7 +1083,12 @@ UEnemyBuildingTrainerComponent* UEnemyStrategicAIComponent::Training_PickBuildin
 			continue;
 		}
 		const float QueuedSeconds = Trainer->GetQueuedSecondsRemaining();
-		if (QueuedSeconds < BestQueuedSeconds)
+		const bool bIsLessBusy = QueuedSeconds < BestQueuedSeconds - EqualQueueToleranceSeconds;
+		const bool bIsEquallyBusy = not bIsLessBusy
+			&& FMath::IsNearlyEqual(QueuedSeconds, BestQueuedSeconds, EqualQueueToleranceSeconds);
+		const bool bHasWaitedLonger = BestTrainer != nullptr
+			&& Trainer->GetLastEnqueuedWorldSeconds() < BestTrainer->GetLastEnqueuedWorldSeconds();
+		if (bIsLessBusy || (bIsEquallyBusy && bHasWaitedLonger))
 		{
 			BestQueuedSeconds = QueuedSeconds;
 			BestTrainer = Trainer;
