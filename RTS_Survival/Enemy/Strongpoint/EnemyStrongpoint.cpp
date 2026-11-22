@@ -3,12 +3,14 @@
 #include "EnemyStrongpoint.h"
 
 #include "EngineUtils.h"
+#include "Animation/AnimMontage.h"
 #include "Engine/Texture2D.h"
 #include "RTS_Survival/Enemy/EnemyController/EnemyController.h"
 #include "RTS_Survival/Enemy/EnemyController/EnemyBaseTrenchComponent/EnemyBaseTrenchComponent.h"
 #include "RTS_Survival/Enemy/EnemyController/EnemyDirectControlComponent/EnemyDirectControlComponent.h"
 #include "RTS_Survival/Enemy/EnemyWaves/WaveSpawner/EnemyWaveSpawner.h"
 #include "RTS_Survival/Enemy/MissionPlacement/EnemyPlacementShapesComponent.h"
+#include "RTS_Survival/Enemy/Strongpoint/WorkCircuit/EnemyWorkCircuitRunner.h"
 #include "RTS_Survival/Interfaces/Commands.h"
 #include "RTS_Survival/Player/AsyncRTSAssetsSpawner/RTSAsyncSpawner.h"
 #include "RTS_Survival/Units/SquadController.h"
@@ -39,6 +41,9 @@ namespace EnemyStrongpointConstants
 	constexpr float TrenchArcThickness = 16.f;
 	constexpr float ReinforcementDashSize = 220.f;
 	constexpr float TrenchBrightness = 0.7f;
+	constexpr float WorkPointRadius = 90.f;
+	constexpr float WorkCircuitDashSize = 120.f;
+	constexpr float WorkCircuitBrightness = 0.8f;
 }
 
 namespace
@@ -50,6 +55,11 @@ namespace
 
 	bool GetIsSquadPost(const FEnemyStrongpointPost& StrongpointPost)
 	{
+		// Only squads walk work circuits, so such a post is a squad post even before a mission picks its units.
+		if (StrongpointPost.WorkCircuit.bEnabled)
+		{
+			return true;
+		}
 		return not StrongpointPost.UnitOptions.IsEmpty()
 			&& StrongpointPost.UnitOptions[0].Kind == EEnemyPlacementUnitKind::Squad;
 	}
@@ -90,6 +100,7 @@ void AEnemyStrongpoint::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	{
 		World->GetTimerManager().ClearTimer(M_WatchTimerHandle);
 	}
+	StopWorkCircuits();
 	RemoveMinimapIcon();
 	Super::EndPlay(EndPlayReason);
 }
@@ -186,7 +197,7 @@ void AEnemyStrongpoint::SpawnPostsForDifficulty(const ERTSGameDifficulty Difficu
 	TArray<int32> MannedPosts;
 	for (int32 PostIndex = 0; PostIndex < Posts.Num(); ++PostIndex)
 	{
-		if (EnemyPlacement::GetIsDifficultyIncluded(Difficulty, Posts[PostIndex].FromDifficulty))
+		if (GetIsPostManned(PostIndex, Difficulty))
 		{
 			MannedPosts.Add(PostIndex);
 		}
@@ -204,10 +215,67 @@ void AEnemyStrongpoint::SpawnPostsForDifficulty(const ERTSGameDifficulty Difficu
 	bM_IsIssuingSpawns = false;
 }
 
+bool AEnemyStrongpoint::GetIsPostManned(const int32 PostIndex, const ERTSGameDifficulty Difficulty) const
+{
+	if (not bM_HasPostUnitOverrides)
+	{
+		return EnemyPlacement::GetIsDifficultyIncluded(Difficulty, Posts[PostIndex].FromDifficulty);
+	}
+	// The mission's list is already the one for this difficulty.
+	const FEnemyStrongpointPostUnits* Override = FindPostUnitOverride(Posts[PostIndex].PostId);
+	return Override != nullptr && not Override->UnitOptions.IsEmpty();
+}
+
+TArray<FEnemyPlacementUnit> AEnemyStrongpoint::GetPostUnitOptions(const int32 PostIndex) const
+{
+	if (not bM_HasPostUnitOverrides)
+	{
+		return Posts[PostIndex].UnitOptions;
+	}
+	const FEnemyStrongpointPostUnits* Override = FindPostUnitOverride(Posts[PostIndex].PostId);
+	return Override != nullptr ? Override->UnitOptions : TArray<FEnemyPlacementUnit>();
+}
+
+const FEnemyStrongpointPostUnits* AEnemyStrongpoint::FindPostUnitOverride(const FName PostId) const
+{
+	if (PostId.IsNone())
+	{
+		return nullptr;
+	}
+	return M_PostUnitOverrides.FindByPredicate([PostId](const FEnemyStrongpointPostUnits& Override)
+	{
+		return Override.PostId == PostId;
+	});
+}
+
+void AEnemyStrongpoint::SetPostUnitOverrides(const TArray<FEnemyStrongpointPostUnits>& Overrides)
+{
+	if (bM_HasStartedSpawning)
+	{
+		RTSFunctionLibrary::ReportError("Strongpoint " + GetName() + ": SetPostUnitOverrides came after the garrison "
+			"started spawning; turn Timing.bSpawnOnBeginPlay off and call SpawnGarrison after it.");
+		return;
+	}
+	M_PostUnitOverrides = Overrides;
+	bM_HasPostUnitOverrides = true;
+	for (const FEnemyStrongpointPostUnits& Override : Overrides)
+	{
+		const bool bHasPost = Posts.ContainsByPredicate([&Override](const FEnemyStrongpointPost& StrongpointPost)
+		{
+			return StrongpointPost.PostId == Override.PostId;
+		});
+		if (not bHasPost)
+		{
+			RTSFunctionLibrary::ReportError("Strongpoint " + GetName() + " has no post with PostId " +
+				Override.PostId.ToString() + "; its units are not spawned.");
+		}
+	}
+}
+
 bool AEnemyStrongpoint::SpawnPostDefender(const int32 PostIndex)
 {
 	const FEnemyStrongpointPost& StrongpointPost = Posts[PostIndex];
-	const TArray<FTrainingOption> Options = EnemyPlacement::ToTrainingOptions(StrongpointPost.UnitOptions);
+	const TArray<FTrainingOption> Options = EnemyPlacement::ToTrainingOptions(GetPostUnitOptions(PostIndex));
 	ARTSAsyncSpawner* AsyncSpawner = FRTS_Statics::GetAsyncSpawner(this);
 	if (Options.IsEmpty() || not IsValid(AsyncSpawner))
 	{
@@ -265,6 +333,7 @@ void AEnemyStrongpoint::HandleDefenderSpawned(const int32 PostIndex, AActor* Spa
 		{
 			ScheduleDigIn(SpawnedUnit);
 		}
+		StartWorkCircuit(PostIndex, SpawnedUnit);
 	}
 	if (M_PendingSpawns == 0 && not bM_IsIssuingSpawns)
 	{
@@ -293,6 +362,64 @@ void AEnemyStrongpoint::ScheduleDigIn(AActor* Defender)
 		UE_LOG(LogTemp, Verbose, TEXT("Strongpoint defender %s dig-in: %d"), *WeakDefender->GetName(),
 		       static_cast<int32>(Error));
 	}), FMath::Max(Timing.DigInDelay, KINDA_SMALL_NUMBER), false);
+}
+
+void AEnemyStrongpoint::StartWorkCircuit(const int32 PostIndex, AActor* Defender)
+{
+	const FEnemyStrongpointWorkCircuit& Circuit = Posts[PostIndex].WorkCircuit;
+	if (not Circuit.bEnabled || Circuit.Points.IsEmpty() || bM_IsEngaged)
+	{
+		return;
+	}
+	ASquadController* Squad = Cast<ASquadController>(Defender);
+	if (not IsValid(Squad))
+	{
+		RTSFunctionLibrary::ReportError("Strongpoint " + GetName() + ": post " + FString::FromInt(PostIndex) +
+			" has a work circuit but its defender is not a squad.");
+		return;
+	}
+	TArray<FVector> WorldPoints;
+	for (const FVector& Point : Circuit.Points)
+	{
+		WorldPoints.Add(EnemyPlacement::ProjectToNavigationIfPossible(
+			GetWorld(), GetActorTransform().TransformPosition(Point)));
+	}
+	UEnemyWorkCircuitRunner* WorkCircuit = NewObject<UEnemyWorkCircuitRunner>(this);
+	M_WorkCircuits.Add(WorkCircuit);
+	WorkCircuit->StartCircuit(Squad, WorldPoints, Circuit.WorkSeconds, Circuit.MaxWalkSeconds,
+	                          Circuit.WorkMontage.LoadSynchronous());
+}
+
+int32 AEnemyStrongpoint::GetRunningWorkCircuitCount() const
+{
+	int32 Running = 0;
+	for (const UEnemyWorkCircuitRunner* WorkCircuit : M_WorkCircuits)
+	{
+		Running += IsValid(WorkCircuit) && WorkCircuit->GetIsRunning() ? 1 : 0;
+	}
+	return Running;
+}
+
+int32 AEnemyStrongpoint::GetWorkingCircuitCount() const
+{
+	int32 Working = 0;
+	for (const UEnemyWorkCircuitRunner* WorkCircuit : M_WorkCircuits)
+	{
+		Working += IsValid(WorkCircuit) && WorkCircuit->GetPhase() == EEnemyWorkCircuitPhase::Working ? 1 : 0;
+	}
+	return Working;
+}
+
+void AEnemyStrongpoint::StopWorkCircuits()
+{
+	for (UEnemyWorkCircuitRunner* WorkCircuit : M_WorkCircuits)
+	{
+		if (IsValid(WorkCircuit))
+		{
+			WorkCircuit->StopCircuit();
+		}
+	}
+	M_WorkCircuits.Empty();
 }
 
 void AEnemyStrongpoint::FinishSpawningGarrison()
@@ -338,6 +465,8 @@ void AEnemyStrongpoint::ReleaseGarrisonToEnemyAI()
 		return;
 	}
 	bM_IsReleased = true;
+	// The enemy AI moves released units itself; a work circuit would fight its orders.
+	StopWorkCircuits();
 	TArray<AActor*> ReleasedUnits;
 	for (FEnemyStrongpointDefender& Defender : M_Defenders)
 	{
@@ -418,6 +547,7 @@ void AEnemyStrongpoint::WatchGarrison()
 		ClearStrongpoint();
 		return;
 	}
+	CheckGarrisonEngaged();
 	const float LossFraction = GetLossFraction(AliveDefenders);
 	if (not Reinforcements.Spawners.IsEmpty() && LossFraction >= Reinforcements.LossFraction)
 	{
@@ -427,6 +557,32 @@ void AEnemyStrongpoint::WatchGarrison()
 	{
 		ReleaseGarrisonToEnemyAI();
 	}
+}
+
+void AEnemyStrongpoint::CheckGarrisonEngaged()
+{
+	if (bM_IsEngaged)
+	{
+		return;
+	}
+	const TArray<AActor*> AliveDefenders = GetAliveDefenders();
+	bool bIsEngagedNow = AliveDefenders.Num() < M_Defenders.Num();
+	for (AActor* Defender : AliveDefenders)
+	{
+		if (bIsEngagedNow)
+		{
+			break;
+		}
+		const ICommands* Commands = Cast<ICommands>(Defender);
+		bIsEngagedNow = Commands != nullptr && Commands->GetIsUnitInCombat();
+	}
+	if (not bIsEngagedNow)
+	{
+		return;
+	}
+	bM_IsEngaged = true;
+	StopWorkCircuits();
+	OnGarrisonEngaged.Broadcast(this);
 }
 
 float AEnemyStrongpoint::GetLossFraction(const int32 AliveDefenders) const
@@ -449,6 +605,7 @@ void AEnemyStrongpoint::ClearStrongpoint()
 	{
 		World->GetTimerManager().ClearTimer(M_WatchTimerHandle);
 	}
+	StopWorkCircuits();
 	RemoveMinimapIcon();
 	OnStrongpointCleared.Broadcast(this);
 }
@@ -497,7 +654,11 @@ FString AEnemyStrongpoint::GetConfigurationProblem() const
 	}
 	if (GetHasUnsetPost())
 	{
-		return TEXT("post with no unit picked");
+		return bUnitsSetByMission ? TEXT("post with no PostId") : TEXT("post with no unit picked");
+	}
+	if (bUnitsSetByMission && Timing.bSpawnOnBeginPlay)
+	{
+		return TEXT("units set by mission but spawns on BeginPlay");
 	}
 	return GetReinforcementProblem();
 }
@@ -506,6 +667,14 @@ bool AEnemyStrongpoint::GetHasUnsetPost() const
 {
 	for (const FEnemyStrongpointPost& StrongpointPost : Posts)
 	{
+		if (bUnitsSetByMission)
+		{
+			if (StrongpointPost.PostId.IsNone())
+			{
+				return true;
+			}
+			continue;
+		}
 		if (not EnemyPlacement::GetAreUnitsSet(StrongpointPost.UnitOptions))
 		{
 			return true;
@@ -577,6 +746,7 @@ void AEnemyStrongpoint::AddPostShapes(FEnemyPlacementShapes& OutSummary, FEnemyP
 			OutDetail.AddFlatBox(GetPostWorldLocation(StrongpointPost), DigInPitHalfExtent, Yaw, Color, false);
 		}
 		OutlineRadius = FMath::Max(OutlineRadius, FVector::Dist2D(Centre, Location) + OutlineMargin);
+		AddWorkCircuitShapes(StrongpointPost, OutDetail);
 	}
 	// The closed ring is the strongpoint's shape language: it holds an area instead of moving through it.
 	for (int32 Segment = 0; Segment < OutlineSegments; ++Segment)
@@ -587,6 +757,30 @@ void AEnemyStrongpoint::AddPostShapes(FEnemyPlacementShapes& OutSummary, FEnemyP
 		                               LiftPostPoint(Centre + FRotator(0.f, EndYaw, 0.f).Vector() * OutlineRadius),
 		                               Color, OutlineDashSize);
 	}
+}
+
+void AEnemyStrongpoint::AddWorkCircuitShapes(const FEnemyStrongpointPost& StrongpointPost,
+                                             FEnemyPlacementShapes& OutDetail) const
+{
+	using namespace EnemyStrongpointConstants;
+	const FEnemyStrongpointWorkCircuit& Circuit = StrongpointPost.WorkCircuit;
+	if (not Circuit.bEnabled || Circuit.Points.IsEmpty())
+	{
+		return;
+	}
+	const FColor CircuitColor = EnemyPlacementColors::GetDimmed(GetPlacementColor(), WorkCircuitBrightness);
+	FVector Previous = LiftPostPoint(GetPostWorldLocation(StrongpointPost));
+	for (const FVector& Point : Circuit.Points)
+	{
+		const FVector WorldPoint = LiftPostPoint(GetActorTransform().TransformPosition(Point));
+		OutDetail.Spheres.Emplace(WorkPointRadius, WorldPoint, FLinearColor(CircuitColor),
+		                          FDebugRenderSceneProxy::EDrawType::WireMesh);
+		OutDetail.DashedLines.Emplace(Previous, WorldPoint, CircuitColor, WorkCircuitDashSize);
+		Previous = WorldPoint;
+	}
+	// Closes the loop: the squad starts again at the first point.
+	OutDetail.DashedLines.Emplace(Previous, LiftPostPoint(GetActorTransform().TransformPosition(Circuit.Points[0])),
+	                              CircuitColor, WorkCircuitDashSize);
 }
 
 void AEnemyStrongpoint::AddTrenchShapes(FEnemyPlacementShapes& OutDetail) const

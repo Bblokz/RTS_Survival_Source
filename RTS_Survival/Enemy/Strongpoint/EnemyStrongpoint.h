@@ -13,17 +13,70 @@
 class AEnemyController;
 class AEnemyStrongpoint;
 class AEnemyWaveSpawner;
+class UAnimMontage;
+class UEnemyWorkCircuitRunner;
 class UTexture2D;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnEnemyStrongpointUnits, AEnemyStrongpoint*, Strongpoint,
                                              const TArray<AActor*>&, Units);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnEnemyStrongpointEvent, AEnemyStrongpoint*, Strongpoint);
 
+/**
+ * Squads only: instead of standing on its post the defender walks between these points and works at each one
+ * (a looping work montage), until the garrison meets its first fight; then it stays where it is and fights.
+ */
+USTRUCT(BlueprintType)
+struct FEnemyStrongpointWorkCircuit
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Work Circuit")
+	bool bEnabled = false;
+
+	// Relative to the strongpoint, visited in order and then from the first again.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Work Circuit",
+		meta = (MakeEditWidget = "true", EditCondition = "bEnabled", EditConditionHides))
+	TArray<FVector> Points;
+
+	// Seconds the squad works at each point.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Work Circuit",
+		meta = (ClampMin = "1.0", EditCondition = "bEnabled", EditConditionHides))
+	float WorkSeconds = 25.f;
+
+	// A squad that has not reached its point after this many seconds works where it stands.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Work Circuit",
+		meta = (ClampMin = "5.0", EditCondition = "bEnabled", EditConditionHides))
+	float MaxWalkSeconds = 60.f;
+
+	// Looped on every soldier of the squad while it works; must be on the infantry skeleton.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Work Circuit",
+		meta = (EditCondition = "bEnabled", EditConditionHides))
+	TSoftObjectPtr<UAnimMontage> WorkMontage;
+};
+
+/** The units a mission puts on one named post (see AEnemyStrongpoint::SetPostUnitOverrides). */
+USTRUCT(BlueprintType)
+struct FEnemyStrongpointPostUnits
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Post")
+	FName PostId = NAME_None;
+
+	// The defender is one of these, picked at random; empty leaves the post unmanned.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Post")
+	TArray<FEnemyPlacementUnit> UnitOptions;
+};
+
 /** One defender of the strongpoint: where it stands, which way it faces and what it is. */
 USTRUCT(BlueprintType)
 struct FEnemyStrongpointPost
 {
 	GENERATED_BODY()
+
+	// Name a mission uses to put units on this post (SetPostUnitOverrides); optional otherwise.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Post")
+	FName PostId = NAME_None;
 
 	// Relative to the strongpoint; drag the widget to move the defender and rotate it to turn it.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Post", meta = (MakeEditWidget = "true"))
@@ -45,6 +98,9 @@ struct FEnemyStrongpointPost
 	// off, it stays on the post.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Post")
 	bool bTakeNearbyCover = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Post")
+	FEnemyStrongpointWorkCircuit WorkCircuit;
 };
 
 USTRUCT(BlueprintType)
@@ -189,6 +245,26 @@ public:
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Strongpoint")
 	void CallReinforcements();
 
+	/**
+	 * @brief Lets a mission pick the units per named post (e.g. from a per-difficulty data asset); call before the
+	 * garrison spawns. Posts are then matched by PostId, FromDifficulty is ignored and unlisted posts stay unmanned.
+	 * @param Overrides Units per PostId.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Strongpoint")
+	void SetPostUnitOverrides(const TArray<FEnemyStrongpointPostUnits>& Overrides);
+
+	/** @brief Ends every work circuit now; the workers stay where they are. */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Strongpoint")
+	void StopWorkCircuits();
+
+	// True once any defender was in combat.
+	UFUNCTION(BlueprintPure, NotBlueprintable, Category = "Strongpoint")
+	bool GetIsEngaged() const { return bM_IsEngaged; }
+
+	// Work circuits still running; Working counts only squads at a point, playing their work montage.
+	int32 GetRunningWorkCircuitCount() const;
+	int32 GetWorkingCircuitCount() const;
+
 	UFUNCTION(BlueprintPure, NotBlueprintable, Category = "Strongpoint")
 	FName GetStrongpointId() const { return StrongpointId; }
 
@@ -222,6 +298,10 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "Strongpoint")
 	FOnEnemyStrongpointEvent OnStrongpointCleared;
 
+	// The first defender came into combat; work circuits have just stopped.
+	UPROPERTY(BlueprintAssignable, Category = "Strongpoint")
+	FOnEnemyStrongpointEvent OnGarrisonEngaged;
+
 	virtual FColor GetPlacementColor() const override;
 	virtual FString GetConfigurationProblem() const override;
 
@@ -241,6 +321,11 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Strongpoint|Posts")
 	TArray<FEnemyStrongpointPost> Posts;
+
+	// On: a mission sets the units per PostId (SetPostUnitOverrides) before the garrison spawns, so the posts need a
+	// PostId but no units of their own. Turn bSpawnOnBeginPlay off as well.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Strongpoint|Posts")
+	bool bUnitsSetByMission = false;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Strongpoint|Timing")
 	FEnemyStrongpointTiming Timing;
@@ -274,6 +359,13 @@ private:
 	UPROPERTY()
 	TArray<FEnemyStrongpointDefender> M_Defenders;
 
+	// Set by SetPostUnitOverrides; used instead of the posts' own units and difficulties when bM_HasPostUnitOverrides.
+	UPROPERTY()
+	TArray<FEnemyStrongpointPostUnits> M_PostUnitOverrides;
+
+	UPROPERTY()
+	TArray<TObjectPtr<UEnemyWorkCircuitRunner>> M_WorkCircuits;
+
 	FTimerHandle M_WatchTimerHandle;
 	FName M_MinimapIconId = NAME_None;
 	int32 M_PendingSpawns = 0;
@@ -287,19 +379,26 @@ private:
 	bool bM_IsCleared = false;
 	// AddFortifiedBase appends a base each call, so the strongpoint adds its own once.
 	bool bM_HasAddedTrenchBase = false;
+	bool bM_HasPostUnitOverrides = false;
+	bool bM_IsEngaged = false;
 
 	// ----- Spawning -----
 	bool GetIsValidEnemyController() const;
 	void AddTrenchBaseOnce();
 	void SpawnPostsForDifficulty(const ERTSGameDifficulty Difficulty);
+	bool GetIsPostManned(const int32 PostIndex, const ERTSGameDifficulty Difficulty) const;
+	TArray<FEnemyPlacementUnit> GetPostUnitOptions(const int32 PostIndex) const;
+	const FEnemyStrongpointPostUnits* FindPostUnitOverride(const FName PostId) const;
 	bool SpawnPostDefender(const int32 PostIndex);
 	void HandleDefenderSpawned(const int32 PostIndex, AActor* SpawnedUnit);
 	void ScheduleDigIn(AActor* Defender);
+	void StartWorkCircuit(const int32 PostIndex, AActor* Defender);
 	void FinishSpawningGarrison();
 
 	// ----- Watching losses -----
 	void StartWatchingGarrison();
 	void WatchGarrison();
+	void CheckGarrisonEngaged();
 	float GetLossFraction(const int32 AliveDefenders) const;
 	void ClearStrongpoint();
 	TArray<AActor*> GetAliveDefenders() const;
@@ -312,6 +411,7 @@ private:
 	bool GetHasUnsetPost() const;
 	FString GetReinforcementProblem() const;
 	void AddPostShapes(FEnemyPlacementShapes& OutSummary, FEnemyPlacementShapes& OutDetail) const;
+	void AddWorkCircuitShapes(const FEnemyStrongpointPost& StrongpointPost, FEnemyPlacementShapes& OutDetail) const;
 	void AddTrenchShapes(FEnemyPlacementShapes& OutDetail) const;
 	void AddReinforcementLinkShapes(FEnemyPlacementShapes& OutSummary) const;
 	float GetTrenchArcDegrees() const;
