@@ -10454,6 +10454,31 @@ void ACPPGameState::InitAllGameSquadData()
 	SquadData.StressTolerance = DeveloperSettings::GameBalance::InfantrySettings::StressTolerance::Elite;
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Ger_EliteScavengers, SquadData);
 
+	// Burrowers (Berlin cellar miners, Docs/Campaign/BerlinBurrowers.md): the Scavenger body and stats; they repair
+	// but do not scavenge (the Scavengers stay the harvesters). Their own abilities (tunnel move, listening post,
+	// clearing cave-ins) are still open with the owner and fill the free slots later.
+	TArray<FUnitAbilityEntry> BurrowerAbilities = FAbilityHelpers::ConvertAbilityIdsToEntries({
+		EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdPatrol, EAbilityID::IdRetreat,
+		EAbilityID::IdSwitchWeapon, EAbilityID::IdNoAbility, EAbilityID::IdRepair, EAbilityID::IdNoAbility,
+		EAbilityID::IdAttackGround,
+		EAbilityID::IdPickupItem, EAbilityID::IdEnterCargo, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
+		EAbilityID::IdNoAbility,
+	});
+	SquadData.MaxHealth = BasicInfantryHealth;
+	SquadData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIBasicInfantryResistances(SquadData.MaxHealth);
+	SquadData.MaxWalkSpeedCms = BasicInfantrySpeed;
+	SquadData.MaxAcceleration = BasicInfantryAcceleration;
+	SquadData.VisionRadius = InfantryVisionRadius;
+	SquadData.Cost = FUnitCost({
+		{ERTSResourceType::Resource_Radixite, Burrowers_Radixite}
+	});
+	SquadData.Abilities = BurrowerAbilities;
+	SquadData.ExperienceWorth = BaseInfantryExp;
+	SquadData.ExperienceLevels = GetTier1InfantryExpLevels();
+	SquadData.ExperienceMultiplier = 1.0;
+	SquadData.StressTolerance = DeveloperSettings::GameBalance::InfantrySettings::StressTolerance::Untrained;
+	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Ger_Burrowers, SquadData);
+
 	// Red Spine: three light mech walkers on the infantry skeleton, heavy infantry armour, MP46s, normal pace.
 	SquadData.MaxHealth = RedSpineWalkerHealth;
 	SquadData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIHeavyInfantryArmorResistances(

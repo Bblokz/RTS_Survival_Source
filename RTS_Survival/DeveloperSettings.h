@@ -590,6 +590,9 @@ namespace DeveloperSettings
 				// Scavengers (250) and the armoured Panzer Grenadiers (675 + 200); well below the Rail Troopers.
 				inline constexpr int32 EliteScavengers_Radixite = 450;
 				inline constexpr int32 EliteScavengers_Metal = 125;
+				// Burrowers: given free on contact in the Berlin mission, never trained. The value only matters
+				// where a squad's worth is read (refunds, score); set a little above the Scavengers.
+				inline constexpr int32 Burrowers_Radixite = 300;
 				// Red Spine: 3 light mech walkers (Etasphere01) with MP46s. Priced like the elite squads it matches
 				// in total health (Iron Storm 700 + 300, Panzer Grenadiers 675 + 200), below the heavier walkers.
 				inline constexpr int32 RedSpine_Radixite = 650;

@@ -568,6 +568,10 @@ enum class ESquadSubtype: uint8
 	// GA_GerEliteScavengersParadrop. Appended to preserve the numeric subtype IDs stored in training options.
 	Squad_Ger_EliteScavengers UMETA(DisplayName = "Ger Elite Scavengers (STG 44s and Panzerfausts)"),
 	Squad_Rus_ArmoredMosin UMETA(DisplayName = "Rus Armored Mosin Squad"),
+	// Berlin mission, BONUS "The cellar people": Burrower miners from the Friedrichshain brewery cellars. One squad is
+	// given to the player on contact; not trainable. Scavenger body as SK_BurrowerKumpel (cap lamps). Appended to
+	// preserve the numeric subtype IDs stored in training options.
+	Squad_Ger_Burrowers UMETA(DisplayName = "Ger Burrowers (Berlin cellar miners)"),
 };
 
 
@@ -722,6 +726,8 @@ static FString Global_GetSquadDisplayName(const ESquadSubtype SquadSubType)
 		return "Rail Troopers";
 	case ESquadSubtype::Squad_Ger_EliteScavengers:
 		return "Elite Scavengers";
+	case ESquadSubtype::Squad_Ger_Burrowers:
+		return "Burrowers";
 	case ESquadSubtype::Squad_Ger_RedSpine:
 		return "Red Spine Walkers";
 	case ESquadSubtype::Squad_Ger_FelsKrieger:
