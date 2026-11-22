@@ -53,7 +53,8 @@ TUNE = {
     'window_inset_cm': 4.0,
     'window_offset_cm': 2.0,
 }
-EXIT_LOCATION = (1040.0, -100.0, 0.0)
+# Porch foot of the Zeltpodest (ue_largetent_podest.py, 2026-11-22); was (1040, -100) in front of the +X gable door.
+EXIT_LOCATION = (1720.0, -100.0, 0.0)
 DOOR_X = 697.0  # between the recessed seam panel (x 694) and the gable wall (x 700)
 DOOR_Y = -100.0
 PIPE_XY = (-330.0, 110.0)

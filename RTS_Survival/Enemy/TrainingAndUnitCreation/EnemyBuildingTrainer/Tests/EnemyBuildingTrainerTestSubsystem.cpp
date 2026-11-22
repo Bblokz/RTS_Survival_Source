@@ -26,6 +26,7 @@
 #include "RTS_Survival/Enemy/EnemyAISettings/EnemyAISettings.h"
 #include "RTS_Survival/Enemy/EnemyController/EnemyController.h"
 #include "RTS_Survival/Enemy/EnemyController/EnemyDirectControlComponent/EnemyDirectControlComponent.h"
+#include "RTS_Survival/Enemy/TrainingAndUnitCreation/EnemyBuildingTrainer/SquadDisplay/EnemyTrainingSquadDisplayComponent.h"
 #include "RTS_Survival/Enemy/StrategicAI/Component/EnemyStrategicAIComponent.h"
 #include "RTS_Survival/Enemy/TrainingAndUnitCreation/EnemyAITechLevel/EnemyAITechLevel.h"
 #include "RTS_Survival/Enemy/TrainingAndUnitCreation/EnemyTrainingHelpers/EnemyTrainingHelpers.h"
@@ -42,6 +43,9 @@
 #include "RTS_Survival/Units/Enums/Enum_UnitType.h"
 #include "RTS_Survival/Units/SquadController.h"
 #include "RTS_Survival/Units/Squads/SquadUnit/SquadUnit.h"
+#include "RTS_Survival/Units/Squads/SquadControllerHpComp/SquadWeaponIcons/SquadWeaponIconSettings/SquadWeaponIconSettings.h"
+#include "RTS_Survival/Weapons/WeaponData/WeaponData.h"
+#include "RTS_Survival/Weapons/WeaponData/WeaponSystems.h"
 #include "RTS_Survival/Utils/RTS_Statics/SubSystems/EnemyControllerSubsystem/EnemyControllerSubsystem.h"
 #include "RTS_Survival/Utils/UnitSpawning/RTSUnitOwnerSpawning.h"
 
@@ -105,6 +109,12 @@ namespace EnemyBuildingTrainerTestPrivate
 	const TCHAR* const SquadSwitch = TEXT("EnemyBuildingTrainerTestSquad=");
 	const TCHAR* const TankSwitch = TEXT("EnemyBuildingTrainerTestTank=");
 	ESquadSubtype TestSquad = ESquadSubtype::Squad_Rus_Mosin;
+	// -EnemyBuildingTrainerTestDisplaySquads=A,B,C: every infantry building trains these squads in order (the first
+	// through the AI routing, the rest queued straight on the trainer) and a frame + squad-display line is taken at
+	// half of each squad's training.
+	const TCHAR* const DisplaySquadsSwitch = TEXT("EnemyBuildingTrainerTestDisplaySquads=");
+	TArray<ESquadSubtype> DisplaySquads;
+	constexpr float DisplayCaptureProgress = 0.5f;
 	ETankSubtype TestTank = ETankSubtype::Tank_BT7;
 	// -EnemyBuildingTrainerTestSpawnQA: frames and measurements of how a trained unit appears at its building.
 	const TCHAR* const SpawnQASwitch = TEXT("EnemyBuildingTrainerTestSpawnQA");
@@ -337,6 +347,26 @@ void UEnemyBuildingTrainerTestSubsystem::ReadCommandLine()
 		else
 		{
 			TestTank = static_cast<ETankSubtype>(Value);
+		}
+	}
+	FString DisplaySquadsText;
+	if (FParse::Value(CommandLine, DisplaySquadsSwitch, DisplaySquadsText, false))
+	{
+		TArray<FString> Names;
+		DisplaySquadsText.ParseIntoArray(Names, TEXT(","), true);
+		for (const FString& Name : Names)
+		{
+			const int64 Value = StaticEnum<ESquadSubtype>()->GetValueByNameString(Name);
+			if (Value == INDEX_NONE)
+			{
+				M_GlobalFailures.Add(TEXT("unknown_display_squad_") + Name);
+				continue;
+			}
+			DisplaySquads.Add(static_cast<ESquadSubtype>(Value));
+		}
+		if (not DisplaySquads.IsEmpty())
+		{
+			TestSquad = DisplaySquads[0];
 		}
 	}
 	bM_Capture = FParse::Param(CommandLine, CaptureSwitch);
@@ -653,6 +683,18 @@ void UEnemyBuildingTrainerTestSubsystem::QueueFirstJobs()
 		{
 			Case.Failures.Add(TEXT("not_active_right_after_queue"));
 		}
+		if (Case.ExpectedKind != EEnemyBuildingTrainerKind::Infantry)
+		{
+			continue;
+		}
+		for (int32 Index = 1; Index < DisplaySquads.Num(); ++Index)
+		{
+			const FTrainingOption Option(EAllUnitType::UNType_Squad, static_cast<uint8>(DisplaySquads[Index]));
+			if (not Trainer->EnqueueTraining(Option, GetOptionCost(Option), M_StrategicAI.Get()))
+			{
+				Case.Failures.Add(TEXT("display_enqueue_failed_") + Option.GetTrainingName());
+			}
+		}
 	}
 	if (bM_SpawnQA)
 	{
@@ -791,7 +833,8 @@ void UEnemyBuildingTrainerTestSubsystem::TickTrain()
 		}
 	}
 	const float Elapsed = GetGameSeconds() - M_StepStartGameSeconds;
-	if (Elapsed > 2.f * LongestJob + TrainTimeoutSlackSeconds + ExitClearWindowSeconds)
+	const float QueuedJobs = FMath::Max(2, DisplaySquads.Num() + 1);
+	if (Elapsed > QueuedJobs * LongestJob + TrainTimeoutSlackSeconds + ExitClearWindowSeconds)
 	{
 		M_GlobalFailures.Add(TEXT("training_phase_timeout"));
 		SetStep(EEnemyBuildingTrainerTestStep::Settle);
@@ -831,6 +874,30 @@ void UEnemyBuildingTrainerTestSubsystem::TickJobChecks(FEnemyBuildingTrainerTest
 			{
 				CaptureExitView(Case, FString::Printf(TEXT("job%d_a_pre"), JobIndex));
 				Job.bQAPreCaptured = true;
+			}
+			if (not DisplaySquads.IsEmpty())
+			{
+				if (Job.CapturesTaken == 0 && Progress >= DisplayCaptureProgress)
+				{
+					const UEnemyTrainingSquadDisplayComponent* const Display = IsValid(Case.Building.Get())
+						? Case.Building->FindComponentByClass<UEnemyTrainingSquadDisplayComponent>()
+						: nullptr;
+					Log(FString::Printf(TEXT("RTS_EBT display case=%s job=%d trains=%s %s"), *Case.Label, JobIndex,
+					                    *Job.Option.GetTrainingName(),
+					                    IsValid(Display) ? *Display->MapTest_DescribeShownState() : TEXT("no_display")));
+					if (IsValid(Display) && not Display->GetIsShowingSquad())
+					{
+						Case.Failures.Add(FString::Printf(TEXT("display_not_showing_job%d"), JobIndex));
+					}
+					if (bM_Capture)
+					{
+						CaptureCase(Case, FString::Printf(TEXT("sq%d_%s"), JobIndex, *Job.Option.GetTrainingName()));
+						// From the exit, looking back over the porch where the squad display stands.
+						CaptureExitView(Case, FString::Printf(TEXT("sq%d_exitview"), JobIndex));
+					}
+					Job.CapturesTaken = 1;
+				}
+				continue;
 			}
 			if (bM_Capture && JobIndex == 0 && Job.CapturesTaken == 0 && Progress >= 0.3f)
 			{
@@ -1036,9 +1103,13 @@ void UEnemyBuildingTrainerTestSubsystem::TickSettle()
 		}
 		if (bM_SecondJobQueued)
 		{
-			if (Case.Jobs.Num() != 2)
+			// Display runs queue their extra squads on every infantry building, the first one included.
+			const int32 ExpectedJobs = 2 + (Case.ExpectedKind == EEnemyBuildingTrainerKind::Infantry
+				                                ? FMath::Max(0, DisplaySquads.Num() - 1)
+				                                : 0);
+			if (Case.Jobs.Num() != ExpectedJobs)
 			{
-				Case.Failures.Add(FString::Printf(TEXT("expected_2_jobs_got_%d"), Case.Jobs.Num()));
+				Case.Failures.Add(FString::Printf(TEXT("expected_%d_jobs_got_%d"), ExpectedJobs, Case.Jobs.Num()));
 			}
 			else if (FMath::Abs(Case.Jobs[1].StartedAt - Case.Jobs[0].FinishedAt) > 1.f)
 			{
@@ -1359,6 +1430,29 @@ void UEnemyBuildingTrainerTestSubsystem::TickSpawnerAudit()
 				const bool bMatches = RTSComponent->GetUnitType() == Entry.Option.UnitType
 					&& RTSComponent->GetUnitSubType() == Entry.Option.SubtypeValue;
 				Result = bMatches ? TEXT("OK") : TEXT("SUBTYPE_MISMATCH");
+			}
+			if (ASquadController* const Squad = Cast<ASquadController>(Unit))
+			{
+				// The squad healthbar's icon rule: the highest valued weapon of any member.
+				EWeaponName BestWeapon = EWeaponName::DEFAULT_WEAPON;
+				int32 BestValue = -1;
+				for (ASquadUnit* const Member : Squad->GetSquadUnitsChecked())
+				{
+					UWeaponState* const State = IsValid(Member) ? Member->GetWeaponState() : nullptr;
+					if (State == nullptr)
+					{
+						continue;
+					}
+					const EWeaponName Weapon = State->GetRawWeaponData().WeaponName;
+					if (Global_GetWeaponValue(Weapon) > BestValue)
+					{
+						BestValue = Global_GetWeaponValue(Weapon);
+						BestWeapon = Weapon;
+					}
+				}
+				Log(FString::Printf(TEXT("RTS_EBT audit_icon %s members=%d icon=%s"), *OptionName,
+				                    Squad->GetSquadUnitsCount(),
+				                    *UEnum::GetValueAsString(Global_GetWeaponIconForWeapon(BestWeapon))));
 			}
 		}
 		if (Result == TEXT("OK"))

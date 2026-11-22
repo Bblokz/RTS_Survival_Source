@@ -18,6 +18,8 @@ param(
 	# ESquadSubtype / ETankSubtype names the buildings train instead of Squad_Rus_Mosin / Tank_BT7.
 	[string]$Squad = '',
 	[string]$Tank = '',
+	# Comma list of ESquadSubtype names every infantry building trains in order; logs and frames each squad display.
+	[string]$DisplaySquads = '',
 	[string]$Configuration = 'DebugGame',
 	[string]$OutputDirectory = ''
 )
@@ -45,6 +47,7 @@ if ($Exposure -ne '') { $Arguments += "-EnemyBuildingTrainerTestExposure=$Exposu
 if ($At -ne '') { $Arguments += "-EnemyBuildingTrainerTestAt=$At" }
 if ($Squad -ne '') { $Arguments += "-EnemyBuildingTrainerTestSquad=$Squad" }
 if ($Tank -ne '') { $Arguments += "-EnemyBuildingTrainerTestTank=$Tank" }
+if ($DisplaySquads -ne '') { $Arguments += "-EnemyBuildingTrainerTestDisplaySquads=$DisplaySquads" }
 
 Write-Output "== enemy building trainer test -> $OutputDirectory"
 $Process = Start-Process -FilePath $Exe -ArgumentList $Arguments -PassThru -WindowStyle Hidden
@@ -52,7 +55,7 @@ $Process.WaitForExit()
 
 $Result = $null
 if (Test-Path $Log) {
-	Select-String -Path $Log -Pattern 'RTS_EBT (job|case|routed|real_think|cancel|audit|spawnqa|.*WARNING)' |
+	Select-String -Path $Log -Pattern 'RTS_EBT (job|case|routed|real_think|cancel|audit|spawnqa|display|.*WARNING)' |
 		ForEach-Object { $_.Line.Substring($_.Line.IndexOf('RTS_EBT')) }
 	$Result = Select-String -Path $Log -Pattern 'RTS_EBT RESULT (PASS|FAIL)' | Select-Object -Last 1
 }

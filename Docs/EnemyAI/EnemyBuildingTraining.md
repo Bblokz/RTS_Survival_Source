@@ -102,7 +102,7 @@ Activity comes from component tags, with no Blueprint graph needed:
 | Blueprint | Kind | Activity |
 |---|---|---|
 | `Rus_Building_Barracks` (+ `_Concrete` child) | Infantry | window, door and gable glow, door bulb and doorstep light, chimney smoke (now off when idle); `_Concrete` also has a 9-man drill squad and sergeant on the Appellplatz. Script: `_AssetSource/BarracksTraining/ue_build_barracks_training.py` |
-| `Rus_Building_LargeTent` (+ `_Soviet` child, inherits) | Infantry | lit door seams and windows, door lamp and light pool, stove-pipe smoke. Script: `Source/Tools/EnemyBuildingTrainer/LargeTent/ue_largetent_ai_training.py` |
+| `Rus_Building_LargeTent` (+ `_Soviet` child, inherits) | Infantry | lit door seams and windows, door lamp and light pool, stove-pipe smoke. Script: `Source/Tools/EnemyBuildingTrainer/LargeTent/ue_largetent_ai_training.py`. Since 2026-11-22 the Zeltpodest: a plank deck with a muster porch at the exit gable, where the squad display (below) shows which squad trains. Script: `ue_largetent_podest.py`; exit moved to the porch foot (1720, -100) |
 | `Rus_Building_Factory` (A2 crane) | Vehicles | A2 crane loop only while training (frame 0 = doors closed, jib parked), gate work light, roof weld light, sparks. Script: `Source/Tools/RusFactoryA2/ue_rusfactory_a2_trainer.py` |
 | `AssemblyYard/Rus_Building_AssemblyYard` | Vehicles | four cranes in step only while training, six floodlights, a T-34 hull in the bay while training; exit 7 m past the ramp foot |
 | `Rus_Building_PlatformFactory` | Vehicles | floods, weld light, sparks; trolley on the fixed beam (user pick B, 2026-11-19) |
@@ -111,6 +111,37 @@ Activity comes from component tags, with no Blueprint graph needed:
 - Tech unlocks are unchanged: an assembly yard or platform factory unlocks no tier by itself. With only one of them
   and no factory or cooling towers, the AI has no light tanks. It trains Tier 2 tanks there once a research center
   stands.
+
+## Squad display: which squad trains (user pick "C Zeltpodest", 2026-11-22)
+
+`UEnemyTrainingSquadDisplayComponent` (`EnemyBuildingTrainer/SquadDisplay/`) sits next to the trainer. It listens to
+`OnTrainingEventNative`. On `Started` it reads the squad's look from its Blueprints and dresses tagged components;
+on `ActivityOff`, or when `Finished`/`Cancelled` leaves the queue empty, it hides them again. To read the look:
+- it resolves the squad class through the async spawner (`GetTrainingOptionClass`), the same lookup used for the spawn,
+  so director overrides show;
+- it reads `SquadUnitClasses` from the controller's CDO by reflection (the property is protected), then async-loads
+  the member classes;
+- per member, it takes the `ACharacter` mesh, its materials and scale. From the unit Blueprint's SCS it takes the
+  weapon child actor (the first static mesh of that `AInfantryWeaponMaster`, with its socket and relative transform)
+  and every shown static mesh on the body. These are the same templates `UnitVariantAbilityCards` reads.
+- looks are cached per squad class. A squad without a spawner row or members shows `FallbackSquad` (Mosin).
+
+| Tag | Component | What happens |
+|---|---|---|
+| `AITrainingSquadFigure` | skeletal mesh (name order) | takes member *i*'s body, materials and kit; plays one of `FigureIdleAnimations` from a random time. Extra figures stay hidden |
+| `AITrainingRackSlot` | scene component | gets member *i*'s weapon, stood upright on its longest axis |
+| `AITrainingSquadBoardIcon` | primitive | MID `IconTexture` = the squad's healthbar weapon icon (`USquadWeaponIconSettings` brush texture), `IconVisible` 1/0 |
+
+The board icon comes from the component's `SquadWeaponIcons` map (ESquadSubtype -> ESquadWeaponIcon). The map was
+filled from the spawner audit's `RTS_EBT audit_icon` lines, which use the healthbar's rule (the highest-valued weapon
+of any member). Squads whose healthbar shows `None` get an icon picked by their main weapon: HazmatBazooka
+PanzerShrek, Dyakonov GrenadeRifle, ROKS3_PPSH AshmakerSmall, LargePTRS PTRS, KorovinAssault PPSH. Rifle squads,
+engineers and crews show `FallbackIconTexture` (the SKS icon). `M_RusTentPodest_BoardIcon` thickens the line-art
+icons with a 49-tap alpha dilation (`IconThickness`).
+
+Everything is attached to the building actor, so the fog of war (actor hidden) hides it with the building. The tent's
+`Podest_FootprintBounds` box blocks nothing (query only, every channel ignored). It exists so that survival bases,
+which size a building by its colliding parts, keep the porch free (user: "both tents, everywhere", 2026-11-22).
 
 ## Test
 
@@ -135,7 +166,8 @@ second unit. It checks:
 | `-Exposure <bias>` | exposure bias for the captures |
 | `-AddMissing` | adds a runtime trainer to Blueprints without one (core check only) |
 | `-SpawnQA` | two units per building and no test move orders; exit-view frames `SpawnQA_<Building>_job<N>_<stage>.png` just before the spawn and 0 / 1 / 3 / 8 / 20 s after, plus one `RTS_EBT spawnqa` line per frame (ground offset, building overlap, stacking, exit lanes, fog, facing, movement, active command). A human vision bubble over the first building's exit is the fog control: its units must show, all others stay hidden. It fails on a teleport or drop in the first 2.5 s, a unit seen through the fog (or a control unit that is not shown), overlapping units at +20 s, or a body in any exit lane or within 2.5 m of its exit at +20 s. It skips the think and cancel phases |
-| `-SpawnerAudit` | no buildings: spawns every squad and tank of every tech level through the async spawner and checks each reports the ordered type and subtype (`NO_SPAWNER_ROW`, `NO_SPAWN`, `SUBTYPE_MISMATCH`) |
+| `-SpawnerAudit` | no buildings: spawns every squad and tank of every tech level through the async spawner and checks each reports the ordered type and subtype (`NO_SPAWNER_ROW`, `NO_SPAWN`, `SUBTYPE_MISMATCH`); per squad it also logs `audit_icon` (member count and healthbar weapon icon) |
+| `-DisplaySquads A,B,C` | every infantry building trains these squads in order. The first goes through the AI routing, the rest are queued on the trainer. At half of each training it logs `RTS_EBT display ... figures= bodies= kit= rack= icon=` and, with `-Capture`, writes `sq<N>_<option>` and `sq<N>_exitview` frames. It fails when a building with a squad display is not showing |
 | `-Squad <ESquadSubtype>` / `-Tank <ETankSubtype>` | trains that unit instead of `Squad_Rus_Mosin` / `Tank_BT7`. Every spawned unit must report the ordered type and subtype on its RTS component, which catches wrong spawner rows and copied Blueprints. |
 
 Captures turn off texture streaming and occlusion queries, and refresh skeletal poses before each shot. Before these
