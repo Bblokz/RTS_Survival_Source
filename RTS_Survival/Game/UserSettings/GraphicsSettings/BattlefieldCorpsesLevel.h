@@ -5,7 +5,8 @@
 #include "BattlefieldCorpsesLevel.generated.h"
 
 /**
- * @brief How many crew corpses stay on the battlefield at once; the oldest makes way for a new one.
+ * @brief How many crew corpses stay on the battlefield at once; the oldest makes way for a new one. Each corpse also
+ * goes after URTSRagdollSettings::CorpseLifetimeSeconds.
  * The count is handed to URTSCorpseSubsystem through the console variable rts.Corpses.
  */
 UENUM(BlueprintType)

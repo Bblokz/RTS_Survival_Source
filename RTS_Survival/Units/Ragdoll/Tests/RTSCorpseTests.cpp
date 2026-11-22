@@ -2,7 +2,8 @@
 
 // QA for battlefield corpses: a frozen crew body leaves a corpse and returns to the pool at once, Off keeps the old
 // sinking, the cap removes the oldest corpse first and reuses its slot, a lowered setting trims and gives the memory
-// back, and the chosen pose lies like the body did. Runs under -nullrhi in the hand-ticked ragdoll test world.
+// back, corpses expire after CorpseLifetimeSeconds, and the chosen pose lies like the body did. Runs under -nullrhi in
+// the hand-ticked ragdoll test world.
 #if WITH_DEV_AUTOMATION_TESTS
 
 #include "Engine/StaticMesh.h"
@@ -36,6 +37,10 @@ namespace RTSCorpseTestsPrivate
 	constexpr int32 TrimCapAfter = 2;
 	// The trim runs on a one second timer.
 	constexpr float TrimWaitSeconds = 1.2f;
+	constexpr float ShortLifetimeSeconds = 3.f;
+	// Ticks before the second corpse is laid down; both corpses expire on different trim checks.
+	constexpr float SecondCorpseDelaySeconds = 2.f;
+	constexpr int32 LifetimeTestCap = 10;
 	constexpr float AxisMatchDot = 0.99f;
 	const float TestYawsDegrees[] = {0.f, 75.f, 200.f};
 
@@ -55,6 +60,16 @@ namespace RTSCorpseTestsPrivate
 				CVar->Set(Cap, ECVF_SetByCode);
 			}
 		}
+	};
+
+	/** Shortens CorpseLifetimeSeconds for one test and puts the project's value back afterwards. */
+	struct FScopedCorpseLifetime
+	{
+		URTSRagdollSettings* Settings = GetMutableDefault<URTSRagdollSettings>();
+		float Previous = Settings->CorpseLifetimeSeconds;
+
+		explicit FScopedCorpseLifetime(const float Seconds) { Settings->CorpseLifetimeSeconds = Seconds; }
+		~FScopedCorpseLifetime() { Settings->CorpseLifetimeSeconds = Previous; }
 	};
 
 	FRTSCrewBodyRequest MakeCookOff()
@@ -282,6 +297,43 @@ bool FRTSCorpseTrimTest::RunTest(const FString& Parameters)
 	Cap.Set(0);
 	TestFalse(TEXT("Off refuses new corpses"), Corpses->TryAddCorpse(
 		          MakeCorpse(FVector(0.f, 0.f, PelvisHeightCm), FQuat::Identity)));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRTSCorpseLifetimeTest,
+	"RTS.Ragdoll.Corpses.ExpireAfterLifetime",
+	RTSCorpseTestsPrivate::TestFlags)
+
+bool FRTSCorpseLifetimeTest::RunTest(const FString& Parameters)
+{
+	using namespace RTSCorpseTestsPrivate;
+	const FScopedCorpseCap Cap(LifetimeTestCap);
+	const FScopedCorpseLifetime Lifetime(ShortLifetimeSeconds);
+	const FRagdollTestWorld TestWorld;
+	URTSCorpseSubsystem* Corpses = GetCorpses(TestWorld);
+	if (not TestNotNull(TEXT("Corpse subsystem exists"), Corpses))
+	{
+		return false;
+	}
+	Corpses->TryAddCorpse(MakeCorpse(FVector(0.f, 0.f, PelvisHeightCm), FQuat::Identity));
+	TestWorld.TickFor(SecondCorpseDelaySeconds);
+	Corpses->TryAddCorpse(MakeCorpse(FVector(CorpseSpacingCm, 0.f, PelvisHeightCm), FQuat::Identity));
+	TestEqual(TEXT("Both corpses lie while young"), Corpses->GetCorpseCount(), 2);
+
+	TestWorld.TickFor(ShortLifetimeSeconds - SecondCorpseDelaySeconds + TrimWaitSeconds);
+	TestEqual(TEXT("The first corpse is removed after its lifetime"), Corpses->GetCorpseCount(), 1);
+	const URTSCorpsePoseLibrary* Library = nullptr;
+	int32 Pose = INDEX_NONE;
+	FTransform Remaining;
+	Corpses->GetCorpse(0, Library, Pose, Remaining);
+	TestTrue(TEXT("The younger corpse is the one kept"),
+	         FMath::IsNearlyEqual(Remaining.GetLocation().X, CorpseSpacingCm, GroundToleranceCm));
+
+	TestWorld.TickFor(SecondCorpseDelaySeconds + TrimWaitSeconds);
+	TestEqual(TEXT("The second corpse is removed after its lifetime"), Corpses->GetCorpseCount(), 0);
+	TestEqual(TEXT("A clear field gives the instances back"), Corpses->GetInstanceCount(), 0);
+	TestTrue(TEXT("A new corpse is still accepted"), Corpses->TryAddCorpse(
+		         MakeCorpse(FVector(0.f, 0.f, PelvisHeightCm), FQuat::Identity)));
 	return true;
 }
 

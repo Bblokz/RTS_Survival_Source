@@ -48,7 +48,7 @@ void URTSCorpseSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 {
 	Super::OnWorldBeginPlay(InWorld);
 	LoadLibraries();
-	InWorld.GetTimerManager().SetTimer(M_TrimTimer, this, &URTSCorpseSubsystem::TrimToCap,
+	InWorld.GetTimerManager().SetTimer(M_TrimTimer, this, &URTSCorpseSubsystem::TrimCorpses,
 	                                   RTSCorpseSubsystemStatics::TrimCheckSeconds, true);
 }
 
@@ -157,7 +157,7 @@ bool URTSCorpseSubsystem::TryAddCorpse(const FRTSCorpseRequest& Request)
 		InstanceIndex = Batch.FreeInstances.Pop(EAllowShrinking::No);
 		Batch.Component->UpdateInstanceTransform(InstanceIndex, CorpseTransform, true, true, true);
 	}
-	M_Corpses.Add({BatchIndex, InstanceIndex});
+	M_Corpses.Add({BatchIndex, InstanceIndex, GetWorld()->GetTimeSeconds()});
 	if (GetInstanceCount() > Cap * RTSCorpseSubsystemStatics::MaxInstancesPerCorpse)
 	{
 		CompactBatches();
@@ -431,6 +431,37 @@ void URTSCorpseSubsystem::RemoveOldestCorpse()
 		                                         true, true);
 		Batch.FreeInstances.Add(Oldest.InstanceIndex);
 	}
+}
+
+void URTSCorpseSubsystem::TrimCorpses()
+{
+	RemoveExpiredCorpses();
+	TrimToCap();
+}
+
+void URTSCorpseSubsystem::RemoveExpiredCorpses()
+{
+	const float LifetimeSeconds = GetDefault<URTSRagdollSettings>()->CorpseLifetimeSeconds;
+	const UWorld* World = GetWorld();
+	if (LifetimeSeconds <= 0.f || M_Corpses.IsEmpty() || not IsValid(World))
+	{
+		return;
+	}
+	// Corpses are oldest first, so the expired ones are all at the front.
+	const double OldestKeptTimeSeconds = World->GetTimeSeconds() - LifetimeSeconds;
+	bool bRemovedAny = false;
+	while (not M_Corpses.IsEmpty() && M_Corpses[0].AddedTimeSeconds <= OldestKeptTimeSeconds)
+	{
+		RemoveOldestCorpse();
+		bRemovedAny = true;
+	}
+	// Removed corpses leave hidden instances for the next ones to reuse; once the field is clear, give them back.
+	if (bRemovedAny && M_Corpses.IsEmpty())
+	{
+		CompactBatches();
+	}
+	UE_CLOG(bRemovedAny, LogRTSCorpses, Verbose, TEXT("RTS_CORPSE expired corpses=%d instances=%d"),
+	        M_Corpses.Num(), GetInstanceCount());
 }
 
 void URTSCorpseSubsystem::TrimToCap()

@@ -108,6 +108,11 @@ public:
 	UPROPERTY(Config, EditAnywhere, Category="Corpses", meta=(ContentDir))
 	FDirectoryPath CorpsePoseFolder;
 
+	// How long a corpse stays before it is removed, checked once a second; 0 keeps it until the Battlefield Corpses
+	// cap makes way for a newer one.
+	UPROPERTY(Config, EditAnywhere, Category="Corpses", meta=(ClampMin="0", Units="Seconds"))
+	float CorpseLifetimeSeconds = 30.f;
+
 	// A corpse follows the ground's slope up to this angle; steeper ground would stand it up unnaturally.
 	UPROPERTY(Config, EditAnywhere, Category="Corpses", meta=(ClampMin="0", ClampMax="90"))
 	float MaxCorpseTiltDegrees = 30.f;
