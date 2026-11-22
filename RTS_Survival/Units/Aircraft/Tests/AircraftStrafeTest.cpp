@@ -39,6 +39,9 @@
 #include "Misc/PackageName.h"
 #include "RTS_Survival/Physics/RTSSurfaceSubtypes.h"
 #include "RTS_Survival/Weapons/WeaponData/MultiProjectileWeapon/UWeaponStateMultiProjectile.h"
+#include "RTS_Survival/Units/SquadController.h"
+#include "RTS_Survival/Units/Squads/SquadUnit/SquadUnit.h"
+#include "RTS_Survival/Utils/UnitSpawning/RTSUnitOwnerSpawning.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogRTSAircraftStrafeTest, Log, All);
 
@@ -84,6 +87,15 @@ namespace AircraftStrafeTestPrivate
 	constexpr uint8 StrafeTargetOwner = 2;
 	// Distances along the approach from the strafe target (the run is about 30 m long).
 	constexpr float StrafeTargetDistancesCm[] = {600.f, 1700.f};
+	// -AircraftStrafeTargets=Infantry: basic enemy rifle squads on the same spots, for the near-miss damage.
+	const TCHAR* const StrafeInfantryTargetClassPath = TEXT("/Game/RTS_Survival/Blueprints/Squads/Rus/Rus_Squad_Mosin.Rus_Squad_Mosin_C");
+
+	bool GetIsInfantryTargetRequested()
+	{
+		FString Targets;
+		return FParse::Value(FCommandLine::Get(), TEXT("AircraftStrafeTargets="), Targets)
+			&& Targets.Equals(TEXT("Infantry"), ESearchCase::IgnoreCase);
+	}
 
 	// Strafe gun acceptance (the legacy guns are only measured, for the comparison).
 	constexpr int32 MinMeasuredShots = 100;
@@ -168,6 +180,7 @@ void UAircraftTestSubsystem::TickAircraftStrafe()
 {
 	using namespace AircraftStrafeTestPrivate;
 	const bool bAnyFired = TrackStrafeAircraft();
+	RecordStrafeTargetSoldiers();
 	const float Now = GetNow();
 	const float Waited = Now - M_PhaseStartSeconds;
 	// The showcase gives way (camera and all) as soon as the real strafe fires.
@@ -334,6 +347,11 @@ void UAircraftTestSubsystem::PlaceStrafeTargets(const FVector& ApproachingAircra
 		{
 			continue;
 		}
+		if (GetIsInfantryTargetRequested())
+		{
+			SpawnStrafeTargetSquad(FTransform(Broadside, Ground));
+			continue;
+		}
 		AActor* Target = SpawnUnitForPlayer(StrafeTargetClassPath, FTransform(Broadside, Ground), StrafeTargetOwner);
 		const UHealthComponent* Health = IsValid(Target) ? Target->FindComponentByClass<UHealthComponent>() : nullptr;
 		if (not IsValid(Health))
@@ -347,6 +365,53 @@ void UAircraftTestSubsystem::PlaceStrafeTargets(const FVector& ApproachingAircra
 		       TEXT("RTS_AIRCRAFT_TEST STRAFE_TARGET %s at=%s health=%.0f footprint_cm=%.0fx%.0f"),
 		       *Target->GetName(), *Ground.ToCompactString(), Health->GetCurrentHealth(),
 		       LocalBounds.GetSize().X, LocalBounds.GetSize().Y);
+	}
+}
+
+void UAircraftTestSubsystem::SpawnStrafeTargetSquad(const FTransform& Transform)
+{
+	using namespace AircraftStrafeTestPrivate;
+	UClass* SquadClass = LoadClass<AActor>(nullptr, StrafeInfantryTargetClassPath);
+	AActor* Squad = IsValid(SquadClass)
+		                ? FRTSUnitOwnerSpawning::SpawnUnitForPlayer(*GetWorld(), SquadClass, Transform, StrafeTargetOwner)
+		                : nullptr;
+	Check(IsValid(Squad), TEXT("strafe_infantry_target_spawned"), StrafeInfantryTargetClassPath);
+	M_StrafeTargetSquads.Add(Squad);
+}
+
+void UAircraftTestSubsystem::RecordStrafeTargetSoldiers()
+{
+	using namespace AircraftStrafeTestPrivate;
+	if (bM_StrafeSoldiersRecorded || M_StrafeTargetSquads.IsEmpty())
+	{
+		return;
+	}
+	TArray<ASquadUnit*> Soldiers;
+	for (const TWeakObjectPtr<AActor>& WeakSquad : M_StrafeTargetSquads)
+	{
+		ASquadController* Squad = Cast<ASquadController>(WeakSquad.Get());
+		if (IsValid(Squad))
+		{
+			Soldiers.Append(Squad->GetSquadUnitsChecked());
+		}
+	}
+	if (Soldiers.IsEmpty())
+	{
+		return;
+	}
+	bM_StrafeSoldiersRecorded = true;
+	for (ASquadUnit* Soldier : Soldiers)
+	{
+		const UHealthComponent* Health = IsValid(Soldier) ? Soldier->FindComponentByClass<UHealthComponent>() : nullptr;
+		if (not IsValid(Health))
+		{
+			continue;
+		}
+		FRTSUnitOwnerSpawning::MatchSoldierToSquadOwner(Soldier, StrafeTargetOwner);
+		M_StrafeTargets.Add(Soldier);
+		M_StrafeTargetStartHealth.Add(Health->GetCurrentHealth());
+		UE_LOG(LogRTSAircraftStrafeTest, Display, TEXT("RTS_AIRCRAFT_TEST STRAFE_TARGET %s at=%s health=%.0f"),
+		       *Soldier->GetName(), *Soldier->GetActorLocation().ToCompactString(), Health->GetCurrentHealth());
 	}
 }
 
@@ -430,6 +495,33 @@ void UAircraftTestSubsystem::FinishAircraftStrafeQA()
 	// Measured, not judged: the MG 15 (12 mm) mostly bounces off a BTR-152, in the old and the new guns alike.
 	UE_LOG(LogRTSAircraftStrafeTest, Display, TEXT("RTS_AIRCRAFT_TEST STRAFE_NOTE target_damage=%.0f destroyed=%d"),
 	       TargetDamage, TargetsDestroyed);
+	UE_LOG(LogRTSAircraftStrafeTest, Display,
+	       TEXT("RTS_AIRCRAFT_TEST STRAFE_AREA_DAMAGE infantry=%d near_miss_hits=%d near_miss_kills=%d cannon_splashes=%d"),
+	       GetIsInfantryTargetRequested() ? 1 : 0, FAircraftStrafeShotRecorder::GetNearMissHitCount(),
+	       FAircraftStrafeShotRecorder::GetNearMissKillCount(), FAircraftStrafeShotRecorder::GetCannonSplashCount());
+	if (bIsStrafeCannonUnderTest)
+	{
+		// Every MK 108 round that lands splashes; its spurts stay visual, so there are no near misses.
+		Check(FAircraftStrafeShotRecorder::GetCannonSplashCount() > 0
+		      && FAircraftStrafeShotRecorder::GetNearMissHitCount() == 0, TEXT("strafe_cannon_splashes"),
+		      FString::Printf(TEXT("cannon_splashes=%d near_miss_hits=%d"),
+		                      FAircraftStrafeShotRecorder::GetCannonSplashCount(),
+		                      FAircraftStrafeShotRecorder::GetNearMissHitCount()));
+	}
+	else
+	{
+		Check(FAircraftStrafeShotRecorder::GetCannonSplashCount() == 0, TEXT("strafe_mg_no_cannon_splash"),
+		      FString::Printf(TEXT("cannon_splashes=%d"), FAircraftStrafeShotRecorder::GetCannonSplashCount()));
+	}
+	if (GetIsInfantryTargetRequested())
+	{
+		Check(M_StrafeTargets.Num() > 0, TEXT("strafe_infantry_soldiers_recorded"),
+		      FString::Printf(TEXT("soldiers=%d"), M_StrafeTargets.Num()));
+		// The strafe runs over both squads: their soldiers must take area damage, not only the odd direct hit.
+		Check(TargetDamage > 0.f, TEXT("strafe_infantry_takes_damage"),
+		      FString::Printf(TEXT("damage=%.0f killed=%d near_miss_hits=%d"), TargetDamage, TargetsDestroyed,
+		                      FAircraftStrafeShotRecorder::GetNearMissHitCount()));
+	}
 	// Unit_Spark only spawns when a round hits a unit, which a run need not have; the three ground emitters must.
 	Check(EmittersWithoutSpawns >= 0 && EmittersWithoutSpawns <= (UnitImpactsDrawn > 0 ? 0 : 1),
 	      TEXT("strafe_gun_every_impact_emitter_spawned"),

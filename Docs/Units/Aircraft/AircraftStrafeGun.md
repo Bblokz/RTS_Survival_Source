@@ -59,6 +59,45 @@ Damage per round, rate of fire, ammo and armour penetration are the weapon's own
 footprint under the beaten zone instead of the end-of-range cone, so damage dealt changes; the strafe test logs it in
 both modes.
 
+## Area damage (2026-11-22)
+
+Direct hits alone left infantry standing in the middle of a churned band: a soldier's footprint is about 1 m², so a
+round had a 1-2 % chance to land on him. The band itself now does the damage.
+
+- **Near misses (machine guns, no explosive filler):** every impact drawn on the ground, the round and each of its 3
+  extra spurts, hits the **nearest** enemy soldier (`ASquadUnit`) within 90 cm x (calibre / 7.92)^0.6 for one round's
+  damage (MG 15: 12, with the weapon's flux). Nearest only, so one spurt never hurts a packed squad at once.
+  - The soldiers come from the volley's existing unit search (no new queries); positions are read when the tracer arrives.
+  - Skipped: dead soldiers, soldiers seated in cargo (attached to a building or vehicle, which takes the hits),
+    soldiers with collision off (not deployed yet), and soldiers more than 3 m above or below the impact. Not hidden
+    ones: fog of war hides enemy soldiers that the strafe can still hit.
+  - Every multi-socket aircraft MG is a strafe gun, so this holds for any MG ground attack, also enemy aircraft on
+    the player's infantry. Cover and trenches give no reduction yet.
+  - A round that hit a unit directly does no near-miss damage (it draws no spurts either).
+  - Without the strafe impact system the spurts are not drawn, so only the round itself counts.
+  - Vehicles never take near-miss damage: the armour check stays on direct hits.
+- **Cannon splash (explosive filler, so the MK 108):** every round that lands deals rear-armour area damage
+  (`FRTS_AOE::DealDamageVsRearArmorInRadiusAsync`, hostiles of the owner, destructibles too) around its impact:
+  radius 90 cm x (calibre / 7.92)^0.6 (2 m for 30 mm), half the round's damage at the centre (MK 108: 40), falloff
+  from the shrapnel particles, measured to each victim's nearest collision (`EAoeFalloffDistance::ClosestCollision`:
+  to the actor origin, about 1 m above the ground for a soldier, a shell at his feet did a quarter of its damage),
+  full damage up to the shrapnel pen (15 mm) and none from 1.5x it. A directly hit unit
+  is left out, as it took the round. The cannon's spurts stay visual: no near misses. The weapon data's own
+  `ShrapnelRange` (60 cm) and `ShrapnelDamage` (12.5) were too small to read as a 30 mm mine shell, so they are not used.
+- Tuning: `AircraftStrafeGunSettings` in `WeaponStateAircraftStrafeGun.h` (`NearMiss*`, `CannonSplash*`).
+
+Results 2026-11-22, `-AircraftStrafeTargets=Infantry` (two Mosin squads, 12 soldiers of 160 HP = 1,920 HP), one
+30 s strafe window each:
+
+| | Rounds landed | Area hits | Damage | Soldiers killed |
+| --- | --- | --- | --- | --- |
+| 2x Bf 110 (MG 15) | 411 (3,428 impacts drawn) | 88 near misses | 1,050 | 2 |
+| 2x Ho 229 (MK 108) | 50 | 48 splashes | 1,024 | 3 |
+
+Before, two Bf 110s did 0-49 damage to two BTRs in the same window, and an infantry estimate was a few hits per
+soldier per pass. The Ho 229's first run measured to the actor origin: 53 damage from 42 splashes.
+- Legacy guns and air-to-air fire are unchanged.
+
 ## Strafe impact VFX
 
 `UAircraftStrafeImpactBatcher` lives on `ASmallArmsProjectileManager`. It uses the same pattern as the trace impact
@@ -131,7 +170,8 @@ stone impact sound, so every projectile that lands plays a Minengeschoss crack-p
 `UAircraftWeapon::SetupMultiProjectileWeapon` turns every weapon that `UWeaponStateAircraftStrafeGun::GetIsStrafeCannon`
 lists into a strafe gun instead, with the same sockets, VFX, burst settings and weapon data. So the cannon gets the
 beaten zone, the impacts timed to its tracers, the dirt spurts and the pocks (both scale with calibre), and the steep
-strafe dives. Damage stays direct hits only: the projectile MK 108 did no splash either (shell splash starts at 45 mm).
+strafe dives. Since 2026-11-22 every round that lands also splashes (see [Area damage](#area-damage-2026-11-22)); the
+projectile MK 108 did none (projectile shell splash starts at 45 mm).
 `-AircraftStrafeLegacyGuns` brings the projectiles back. Strafe guns of 28 mm and up use the HeavyCannon sound set:
 version A "Hammer" from `build_30mm_versions.py`, 600 rpm a cannon, with an impact churn of heavy HE bursts at about
 13 a second. It plays 3.5 dB above the MG set.
@@ -195,6 +235,11 @@ Strafe gun checks:
 - every impact emitter spawned
 - the batcher drew at least one ground impact per round
 - bullet pocks were placed
+
+Area damage checks (`STRAFE_AREA_DAMAGE` line: near-miss hits and kills, cannon splashes):
+- MG strafe: no cannon splash; Ho 229 run: splashes and no near misses.
+- `-AircraftStrafeTargets=Infantry` puts two enemy Mosin squads (`Rus_Squad_Mosin`) on the target spots instead of
+  the BTRs; their soldiers must take damage (`strafe_infantry_takes_damage`).
 
 Two values are only logged as `STRAFE_NOTE`, because neither works as a pass/fail check:
 - **Off-nose share:** it counts beaten-zone spread and hunting-phase rounds, while the gun cone itself holds by

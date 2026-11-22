@@ -34,6 +34,9 @@ namespace AircraftStrafeShotRecorderPrivate
 		float LastImpactTime = -1.f;
 		int32 GroundProbes = 0;
 		int32 GroundProbeHits = 0;
+		int32 NearMissHits = 0;
+		int32 NearMissKills = 0;
+		int32 CannonSplashes = 0;
 		TArray<FString> CsvLines;
 	};
 
@@ -174,6 +177,44 @@ void FAircraftStrafeShotRecorder::RecordGroundProbe(const bool bFoundGround)
 	State.GroundProbeHits += bFoundGround ? 1 : 0;
 }
 
+void FAircraftStrafeShotRecorder::RecordNearMissHit(const bool bKilled)
+{
+	using namespace AircraftStrafeShotRecorderPrivate;
+	FRecorderState& State = GetState();
+	if (not State.bIsEnabled)
+	{
+		return;
+	}
+	++State.NearMissHits;
+	State.NearMissKills += bKilled ? 1 : 0;
+}
+
+void FAircraftStrafeShotRecorder::RecordCannonSplash()
+{
+	using namespace AircraftStrafeShotRecorderPrivate;
+	FRecorderState& State = GetState();
+	if (not State.bIsEnabled)
+	{
+		return;
+	}
+	++State.CannonSplashes;
+}
+
+int32 FAircraftStrafeShotRecorder::GetNearMissHitCount()
+{
+	return AircraftStrafeShotRecorderPrivate::GetState().NearMissHits;
+}
+
+int32 FAircraftStrafeShotRecorder::GetNearMissKillCount()
+{
+	return AircraftStrafeShotRecorderPrivate::GetState().NearMissKills;
+}
+
+int32 FAircraftStrafeShotRecorder::GetCannonSplashCount()
+{
+	return AircraftStrafeShotRecorderPrivate::GetState().CannonSplashes;
+}
+
 int32 FAircraftStrafeShotRecorder::GetShotCount()
 {
 	return AircraftStrafeShotRecorderPrivate::GetState().ShotCount;
@@ -218,14 +259,15 @@ FString FAircraftStrafeShotRecorder::DescribeMetrics()
 	return FString::Printf(
 		TEXT("label=%s shots=%d impacts=%d ground_hit_share=%.2f air_impacts=%d nose_angle_mean=%.1f nose_angle_max=%.1f "
 			"off_nose_share=%.2f impact_lead_abs_mean_s=%.3f slant_mean_cm=%.0f cross_track_miss_mean_cm=%.0f "
-			"along_track_miss_mean_cm=%.0f along_track_sigma_cm=%.0f impacts_per_s=%.1f ground_probes=%d probe_hits=%d"),
+			"along_track_miss_mean_cm=%.0f along_track_sigma_cm=%.0f impacts_per_s=%.1f ground_probes=%d probe_hits=%d "
+			"near_miss_hits=%d near_miss_kills=%d cannon_splashes=%d"),
 		*State.Label, State.ShotCount, State.ImpactCount, GetGroundHitShare(),
 		State.ImpactCount - State.GroundOrUnitHits,
 		State.ShotCount > 0 ? State.SumNoseAngleDeg / State.ShotCount : 0.0, State.MaxNoseAngleDeg,
 		GetShareOfShotsOutsideNoseCone(), GetMeanAbsImpactLeadSeconds(),
 		State.ImpactCount > 0 ? State.SumSlantDistanceCm / State.ImpactCount : 0.0,
 		GetMeanCrossTrackMissCm(), MeanAlong, AlongSigma, State.ImpactCount / FiringSeconds, State.GroundProbes,
-		State.GroundProbeHits);
+		State.GroundProbeHits, State.NearMissHits, State.NearMissKills, State.CannonSplashes);
 }
 
 void FAircraftStrafeShotRecorder::WriteCsv()

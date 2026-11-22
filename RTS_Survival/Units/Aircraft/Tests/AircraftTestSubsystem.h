@@ -283,6 +283,9 @@ private:
 	TArray<TWeakObjectPtr<AActor>> M_StrafeTargets;
 	TArray<float> M_StrafeTargetStartHealth;
 	bool bM_StrafeTargetsPlaced = false;
+	// -AircraftStrafeTargets=Infantry: enemy squads instead; their soldiers join M_StrafeTargets once they exist.
+	TArray<TWeakObjectPtr<AActor>> M_StrafeTargetSquads;
+	bool bM_StrafeSoldiersRecorded = false;
 	// Load during the QA window: the most strafe impact particles alive at once, and the frame times.
 	int32 M_StrafePeakLiveParticles = 0;
 	// VFX showcase while the aircraft fly in: synthetic strafe bands drawn straight into the impact batcher.
@@ -439,6 +442,9 @@ private:
 	void TickStrafeImpactShowcase(const float SecondsSincePhaseStart, const float DeltaSeconds);
 	// Puts enemy armoured cars on the strafe line, broadside, between the target and 30 m past it.
 	void PlaceStrafeTargets(const FVector& ApproachingAircraftLocation);
+	void SpawnStrafeTargetSquad(const FTransform& Transform);
+	// Squads spawn their soldiers after BeginPlay: records each soldier and its health as a target once they are there.
+	void RecordStrafeTargetSoldiers();
 	// Total health the strafe targets lost (destroyed ones count their whole start health).
 	float GetStrafeTargetDamage(int32& OutDestroyed) const;
 

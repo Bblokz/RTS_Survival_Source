@@ -45,6 +45,14 @@ public:
 	// A strafe gun volley probed the ground under its aim point; a miss puts the volley on the aim plane instead.
 	static void RecordGroundProbe(const bool bFoundGround);
 
+	// A machine gun impact (a round or a spurt) hurt the nearest enemy soldier; bKilled when it killed him.
+	static void RecordNearMissHit(const bool bKilled);
+	// A strafe cannon round with explosive filler splashed.
+	static void RecordCannonSplash();
+	static int32 GetNearMissHitCount();
+	static int32 GetNearMissKillCount();
+	static int32 GetCannonSplashCount();
+
 	// One line with every metric, for the RTS_AIRCRAFT_TEST log.
 	static FString DescribeMetrics();
 

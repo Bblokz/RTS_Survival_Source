@@ -13,7 +13,11 @@
 #include "RTS_Survival/Physics/FRTS_PhysicsHelper.h"
 #include "RTS_Survival/Physics/RTSSurfaceSubtypes.h"
 #include "RTS_Survival/Units/Aircraft/AircraftMaster/AAircraftMaster.h"
+#include "RTS_Survival/Units/Squads/SquadUnit/SquadUnit.h"
+#include "RTS_Survival/Utils/AOE/FRTS_AOE.h"
 #include "RTS_Survival/Utils/CollisionSetup/RTSPlayerCollision.h"
+#include "RTS_Survival/Utils/HFunctionLibary.h"
+#include "RTS_Survival/Weapons/WeaponData/FRTSWeaponHelpers/FRTSWeaponHelpers.h"
 #include "RTS_Survival/Weapons/AircraftWeapon/AircraftStrafeGun/AircraftStrafeShotRecorder.h"
 #include "RTS_Survival/Weapons/SmallArmsProjectileManager/SmallArmsProjectileManager.h"
 #include "RTS_Survival/Weapons/WeaponData/WeaponOwner/WeaponOwner.h"
@@ -290,9 +294,11 @@ void UWeaponStateAircraftStrafeGun::ResolveVolley(const FStrafeVolley& Volley, c
 	const TArray<FStrafeUnitCandidate> Candidates = Ground != nullptr
 		                                                ? FindUnitsUnderVolley(Volley, *Ground)
 		                                                : TArray<FStrafeUnitCandidate>();
+	const TSharedPtr<const FNearMissSoldiers> NearMissSoldiers = CollectNearMissSoldiers(Candidates);
 	for (const FStrafeRoundPlan& RoundPlan : Volley.Rounds)
 	{
 		FStrafeRoundInFlight Round;
+		Round.NearMissSoldiers = NearMissSoldiers;
 		Round.LaunchLocation = RoundPlan.LaunchLocation;
 		Round.AimCentre = Volley.Aim.AimCentre;
 		Round.FlightForward2D = Volley.Aim.FlightForward2D;
@@ -531,8 +537,163 @@ void UWeaponStateAircraftStrafeGun::ApplyRoundImpact(const FStrafeRoundInFlight&
 	else
 	{
 		DrawGroundImpact(Round);
+		ApplyNearMissDamage(Round);
+	}
+	if (GetUsesCannonSplash())
+	{
+		ApplyCannonSplash(Round);
 	}
 	PlayRoundImpactSound(Round);
+}
+
+float UWeaponStateAircraftStrafeGun::GetRadiusForWeaponCalibre(const float RadiusAtReferenceCalibreCm) const
+{
+	using namespace AircraftStrafeGunSettings;
+	// Guards the division and the power against a calibre left at zero in the weapon data.
+	constexpr float MinCalibreMm = 1.f;
+	const float CalibreRatio = FMath::Max(WeaponData.WeaponCalibre, MinCalibreMm) / ImpactReferenceCalibreMm;
+	return RadiusAtReferenceCalibreCm * FMath::Pow(CalibreRatio, ImpactCalibreScaleExponent);
+}
+
+TSharedPtr<const UWeaponStateAircraftStrafeGun::FNearMissSoldiers> UWeaponStateAircraftStrafeGun::CollectNearMissSoldiers(
+	const TArray<FStrafeUnitCandidate>& Candidates) const
+{
+	if (GetUsesCannonSplash())
+	{
+		return nullptr;
+	}
+	TSharedPtr<FNearMissSoldiers> Soldiers;
+	for (const FStrafeUnitCandidate& Candidate : Candidates)
+	{
+		ASquadUnit* Soldier = Cast<ASquadUnit>(Candidate.Actor.Get());
+		if (not IsValid(Soldier))
+		{
+			continue;
+		}
+		if (not Soldiers.IsValid())
+		{
+			Soldiers = MakeShared<FNearMissSoldiers>();
+		}
+		Soldiers->Add(Soldier);
+	}
+	return Soldiers;
+}
+
+void UWeaponStateAircraftStrafeGun::ApplyNearMissDamage(const FStrafeRoundInFlight& Round)
+{
+	if (not Round.NearMissSoldiers.IsValid())
+	{
+		return;
+	}
+	// Held for the whole round: a kill callback must not free the list while it is read.
+	const TSharedPtr<const FNearMissSoldiers> Soldiers = Round.NearMissSoldiers;
+	const float RadiusCm = GetRadiusForWeaponCalibre(AircraftStrafeGunSettings::NearMissRadiusAtReferenceCalibreCm);
+	ApplyNearMissAtImpact(Round.ImpactLocation, *Soldiers, RadiusCm);
+	// Without the strafe impact system the extra spurts are not drawn, so they hurt no one either.
+	if (GetReadyStrafeImpactBatcher() == nullptr)
+	{
+		return;
+	}
+	for (const FVector& ExtraSpurt : Round.ExtraSpurts)
+	{
+		ApplyNearMissAtImpact(ExtraSpurt, *Soldiers, RadiusCm);
+	}
+}
+
+void UWeaponStateAircraftStrafeGun::ApplyNearMissAtImpact(
+	const FVector& ImpactLocation,
+	const FNearMissSoldiers& Soldiers,
+	const float RadiusCm)
+{
+	ASquadUnit* Soldier = FindNearestSoldierInReach(ImpactLocation, Soldiers, RadiusCm);
+	if (Soldier == nullptr)
+	{
+		return;
+	}
+	const bool bDidSoldierDie = FluxDamageHitActor_DidActorDie(Soldier, WeaponData.BaseDamage);
+#if RTS_WITH_MAP_TESTS
+	FAircraftStrafeShotRecorder::RecordNearMissHit(bDidSoldierDie);
+#endif
+	if (bDidSoldierDie)
+	{
+		OnActorKilled(Soldier);
+	}
+}
+
+ASquadUnit* UWeaponStateAircraftStrafeGun::FindNearestSoldierInReach(
+	const FVector& ImpactLocation,
+	const FNearMissSoldiers& Soldiers,
+	const float RadiusCm)
+{
+	ASquadUnit* NearestSoldier = nullptr;
+	float NearestDistanceSquared = FMath::Square(RadiusCm);
+	for (const TWeakObjectPtr<ASquadUnit>& WeakSoldier : Soldiers)
+	{
+		ASquadUnit* Soldier = WeakSoldier.Get();
+		// Dead, seated in cargo (a building or a vehicle takes the hits) or not deployed yet: out of the strafe's reach.
+		// Not IsHidden(): fog of war hides enemy soldiers that the strafe can still hit.
+		if (not RTSFunctionLibrary::RTSIsValid(Soldier) || IsValid(Soldier->GetAttachParentActor())
+			|| not Soldier->GetActorEnableCollision())
+		{
+			continue;
+		}
+		const FVector SoldierLocation = Soldier->GetActorLocation();
+		if (FMath::Abs(SoldierLocation.Z - ImpactLocation.Z) > AircraftStrafeGunSettings::NearMissMaxHeightDifferenceCm)
+		{
+			continue;
+		}
+		const float DistanceSquared = FVector::DistSquared2D(SoldierLocation, ImpactLocation);
+		if (DistanceSquared > NearestDistanceSquared)
+		{
+			continue;
+		}
+		NearestDistanceSquared = DistanceSquared;
+		NearestSoldier = Soldier;
+	}
+	return NearestSoldier;
+}
+
+void UWeaponStateAircraftStrafeGun::ApplyCannonSplash(const FStrafeRoundInFlight& Round) const
+{
+	using namespace AircraftStrafeGunSettings;
+	if (not IsValid(MeshComponent) || not IsValid(MeshComponent->GetOwner()))
+	{
+		return;
+	}
+	TArray<TWeakObjectPtr<AActor>> ActorsToIgnore;
+	for (const FHitResult& UnitHit : Round.UnitHits)
+	{
+		// The directly hit unit (and the part of it that was hit, like a turret) already took the round.
+		for (AActor* HitActor = UnitHit.GetActor(); IsValid(HitActor); HitActor = HitActor->GetAttachParentActor())
+		{
+			ActorsToIgnore.Add(HitActor);
+		}
+	}
+	const float DamageFallOff = FRTSWeaponHelpers::GetAoEFalloffExponentFromShrapnelParticles(
+		WeaponData.ShrapnelParticles,
+		DeveloperSettings::GameBalance::Weapons::ImpactAOE::AOEMaxParticlesScaleDamageFallOffExponent,
+		DeveloperSettings::GameBalance::Weapons::ImpactAOE::AOEMinParticlesScaleDamageFallOffExponent);
+#if RTS_WITH_MAP_TESTS
+	FAircraftStrafeShotRecorder::RecordCannonSplash();
+#endif
+	FRTS_AOE::DealDamageVsRearArmorInRadiusAsync(
+		MeshComponent->GetOwner(),
+		Round.ImpactLocation,
+		GetRadiusForWeaponCalibre(CannonSplashRadiusAtReferenceCalibreCm),
+		WeaponData.BaseDamage * CannonSplashDamageShareOfRound,
+		DamageFallOff,
+		WeaponData.ShrapnelPen,
+		CannonSplashArmorPenFallOff,
+		WeaponData.ShrapnelPen * CannonSplashMaxArmorPenMlt,
+		WeaponData.DamageType,
+		FAoeInstigator::HostilesOf(OwningPlayer),
+		EShieldDamageSource::Shrapnel,
+		ActorsToIgnore,
+		EVehicleModuleSplashPolicy::DamageExternalModules,
+		WeaponData.ShellType,
+		// The impact is on the ground and a soldier's origin about a metre above it: measured to the origin, a shell
+		// at his feet would do a quarter of its damage.
+		EAoeFalloffDistance::ClosestCollision);
 }
 
 void UWeaponStateAircraftStrafeGun::ApplyQueuedRoundThroughTracePath(

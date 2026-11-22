@@ -8,6 +8,7 @@
 #include "WeaponStateAircraftStrafeGun.generated.h"
 
 class ALandscapeProxy;
+class ASquadUnit;
 class UAircraftGunAudioPlayer;
 
 namespace AircraftStrafeGunSettings
@@ -37,6 +38,24 @@ namespace AircraftStrafeGunSettings
 	// Spread of those spurts around their round, as a share of the zone's spread.
 	constexpr float ExtraSpurtSpreadShareOfZone = 0.45f;
 
+	// Impact radii below are set for this calibre; larger calibres scale with (calibre / reference)^exponent, as the
+	// strafe impact VFX and the bullet pocks do.
+	constexpr float ImpactReferenceCalibreMm = 7.92f;
+	constexpr float ImpactCalibreScaleExponent = 0.6f;
+	// Near misses (machine guns, no explosive filler): every impact drawn on the ground, a round or one of its extra
+	// spurts, hits the nearest enemy soldier within this radius for one round's damage. The band of spurts stands for
+	// the real rate of fire, so what the player sees landing next to a soldier hurts him.
+	constexpr float NearMissRadiusAtReferenceCalibreCm = 90.f;
+	// A soldier this far above or below an impact (on a roof, on a bridge) is not hit by it.
+	constexpr float NearMissMaxHeightDifferenceCm = 300.f;
+	// Strafe cannons with explosive filler splash on every round that lands instead (the spurts stay visual): radius
+	// at the reference calibre, and the damage at the centre as a share of the round's damage.
+	constexpr float CannonSplashRadiusAtReferenceCalibreCm = 90.f;
+	constexpr float CannonSplashDamageShareOfRound = 0.5f;
+	// The splash hurts vehicles through their rear armour: full damage up to the shrapnel pen, none from this multiple.
+	constexpr float CannonSplashMaxArmorPenMlt = 1.5f;
+	constexpr float CannonSplashArmorPenFallOff = 1.f;
+
 	// One probe per volley finds the ground under the aim point; it starts this far above and ends this far below.
 	constexpr float GroundProbeAboveCm = 3000.f;
 	constexpr float GroundProbeBelowCm = 4000.f;
@@ -63,7 +82,8 @@ namespace AircraftStrafeGunSettings
  * UAircraftWeapon::SetupMultiTraceWeapon, so no Blueprint changes). Each volley leaves along the nose into a
  * ground-plane beaten zone that walks with the aircraft: one ground probe and one unit search per volley instead of a
  * trace per round, extra visual spurts between the rounds, all drawn by UAircraftStrafeImpactBatcher when the tracers
- * arrive. Air-to-air fire and the -AircraftStrafeLegacyGuns switch keep the regular multi-trace behaviour.
+ * arrive. Machine gun impacts near enemy soldiers hurt them (near misses); cannons with explosive filler splash instead.
+ * Air-to-air fire and the -AircraftStrafeLegacyGuns switch keep the regular multi-trace behaviour.
  */
 UCLASS()
 class RTS_SURVIVAL_API UWeaponStateAircraftStrafeGun : public UWeaponStateMultiTrace
@@ -145,11 +165,16 @@ private:
 		FBox LocalBounds;
 	};
 
+	// Enemy soldiers under a volley, shared by its rounds for the near-miss check.
+	using FNearMissSoldiers = TArray<TWeakObjectPtr<ASquadUnit>>;
+
 	// A resolved round whose tracer is still in the air; impact (and damage, for a unit hit) waits for its arrival.
 	struct FStrafeRoundInFlight
 	{
 		// Only for a round that hit a unit: the hit that the regular trace damage path resolves.
 		TArray<FHitResult> UnitHits;
+		// Null for cannons with explosive filler and for volleys with no enemy soldier near them.
+		TSharedPtr<const FNearMissSoldiers> NearMissSoldiers;
 		FVector LaunchLocation = FVector::ZeroVector;
 		FVector ImpactLocation = FVector::ZeroVector;
 		FVector ImpactNormal = FVector::UpVector;
@@ -213,6 +238,36 @@ private:
 	// Runs the regular trace path (armour, damage, impact) for a queued round without a second tracer.
 	void ApplyQueuedRoundThroughTracePath(FTraceDatum& TraceDatum, const FStrafeRoundInFlight& Round);
 	void DrawGroundImpact(const FStrafeRoundInFlight& Round);
+
+	// Weapons with explosive filler (the MK 108) splash on every round; the others hurt soldiers with near misses.
+	bool GetUsesCannonSplash() const { return WeaponData.TNTExplosiveGrams > 0.f; }
+	float GetRadiusForWeaponCalibre(float RadiusAtReferenceCalibreCm) const;
+	TSharedPtr<const FNearMissSoldiers> CollectNearMissSoldiers(const TArray<FStrafeUnitCandidate>& Candidates) const;
+	// A ground round and, when they are drawn, its extra spurts each hit the nearest soldier in reach.
+	void ApplyNearMissDamage(const FStrafeRoundInFlight& Round);
+
+	/**
+	 * @brief One drawn impact hurts at most one soldier, through the regular damage and kill path so kill credit and
+	 * veterancy work as for a direct hit.
+	 * @param ImpactLocation Where the round or spurt lands.
+	 * @param Soldiers The enemy soldiers under the volley.
+	 * @param RadiusCm Reach of the impact on the ground.
+	 */
+	void ApplyNearMissAtImpact(const FVector& ImpactLocation, const FNearMissSoldiers& Soldiers, float RadiusCm);
+
+	/**
+	 * @brief Finds the soldier a near miss hurts: the closest one still alive and in view, so one spurt never hurts a
+	 * whole squad standing close together.
+	 * @param ImpactLocation Where the round or spurt lands.
+	 * @param Soldiers The enemy soldiers under the volley.
+	 * @param RadiusCm Reach of the impact on the ground.
+	 * @return Null when no soldier is in reach.
+	 */
+	static ASquadUnit* FindNearestSoldierInReach(const FVector& ImpactLocation, const FNearMissSoldiers& Soldiers,
+	                                             float RadiusCm);
+
+	// Explosive filler: area damage around the round's impact, leaving out the unit it hit directly.
+	void ApplyCannonSplash(const FStrafeRoundInFlight& Round) const;
 	void PlayRoundImpactSound(const FStrafeRoundInFlight& Round);
 	void PlayThrottledImpactSound(const FVector& Location);
 	UAircraftGunAudioPlayer* GetOrCreateGunAudio();
