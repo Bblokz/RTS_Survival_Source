@@ -88,6 +88,27 @@ closest position in range.
 - When it ends, or is skipped, the view goes back to the player's camera.
 - If no aircraft comes near within `MaxWaitSeconds`, or anything is missing, there is no cinematic and the train goes.
 
+- Skipping: hold Space. The prompt (`UW_HoldToSkip`) gets Space from a Slate input preprocessor (2026-11-23), so the
+  skip does not depend on keyboard focus (before, it only heard Space while it had focus, so a mouse click or another
+  widget taking focus could silence it; not observed in a test, the owner asked to make sure it is skippable). Alt-tab
+  while holding cancels the hold.
+
+**Base reinforcements (`BaseReinforcements`, `FSovietCounterattackBaseReinforcementSettings`, user 2026-11-23).** Once
+the arrival cinematic is over (finished, skipped, timed out, or never played), `Arrival_OnOver` fires
+`BP_OnArrivalCinematicOver(bWasShown, bWasSkipped)` and, `DelayAfterCinematicSeconds` (1.5 s) later,
+`DropBaseReinforcements` (also BlueprintCallable; runs once):
+- the announcer line `VoiceLine` = `IntroMission_BaseHeavyReinforcements` (8.4 s, ElevenLabs take 1 of 3,
+  whisper-checked, AnnouncerFilter + radio bookends): "Kommandant, HQ provides us with more heavy tanks to help defend
+  our base; they will be dropped inside your base." Set on the DA by `set_base_reinforcements_line.py`.
+- `UPlayerAirDropSubsystem::DeliverPlayerUnitsByAir` at the player HQ + `LandingOffsetFromHQ` (-1200,0: the open
+  concrete west of the HQ, away from the attack; `FallbackLandingPoint` (250,300) without an HQ), ground traced and
+  projected onto the navmesh, with `CargoPlaneAbility` (`GA_GerPzIIIFlak41Drop`: Ju 390B, one aircraft per vehicle, 1000 apart).
+  Every German tank drop template uses the same aircraft and hang offset (-250), so heavy and light tanks share it.
+  Vehicles spawn from the training option = the regular (non-variant) unit.
+  - Breakthrough Doctrine (any non-Strike faction): 2 x `Tank_TigerH1`, 3 x `Tank_PzII_Luchs`.
+  - Strike Division: 2 x `Tank_PantherD`, 2 x `Tank_PzIII_AA`.
+- a reinforcements ping on the minimap at the landing point for `MiniMapPingSeconds` (8 s).
+
 Test: `Source/Tools/IntroMission/counterattack/counterattack_presentation_test.py`, env `PRESENT_MODE`:
 - `cut` (default): the chain cut to this mission, vehicles only, four Pz IV F1 dig in on the positions (held markers,
   counter, reward), natural end of the cinematic.

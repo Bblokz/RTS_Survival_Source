@@ -1,6 +1,10 @@
 # Ore Mountains mission (design draft, working title)
 
-Status: concept only, nothing built. Started 2026-11-13. This is the **second mission** of the campaign.
+Status: flow designed (26 owner picks on 2026-11-22, written up 2026-11-23 in "Mission structure"); mission scripting
+not started. Built: the map (`Ger_2ndOreMountains`, 570 x 570 m, see [OreMountainsMap.md](OreMountainsMap.md)), the
+clue and intercept triggers, the briefing voice lines and the `ASurrenderingCargoTruck` C++ (not play-tested). No
+mission Blueprints, convoy route or Soviet sites in the map yet. Started 2026-11-13. This is the **second mission** of
+the campaign.
 Lore reference: `Source/DesignTexts/Lore.txt`. Related: [BerlinMission.md](BerlinMission.md) (the mission that follows).
 Every item marked **(open)** is undecided.
 
@@ -15,7 +19,7 @@ Every item marked **(open)** is undecided.
 - **Spec generators:** `MapDesigner/OreMountains/generators/` (`gen_ore.py` to `gen_ore5.py`, each version built from the
   previous one by `make_gen2.py` to `make_gen5.py`). The spec polygons have about 90 vertices each, so change the layout in
   the latest generator (`gen_ore5.py <out.json>`), not the JSON by hand.
-- **Sketch facts (v5):** map 850 x 850 m (units cm, +X north, +Y east), Czech border and ridge on the **south** edge,
+- **Sketch facts (v5; the built map is 570 x 570 m):** map 850 x 850 m (units cm, +X north, +Y east), Czech border and ridge on the **south** edge,
   convoy road 868 m. The tool features it relies on (slope passability per unit class, curved graded ramps) are described
   in `MapDesigner/AGENTS.md`.
 
@@ -57,7 +61,8 @@ A4 line), which is a natural convoy route west.
 - The ridge faces a long valley, so convoys are visible at a distance and can be ambushed from the high ground.
 - **Map size: 1.67 times the linear size of Ger_MarderStugMission, and square** (confirmed as linear, not area).
   Ger_MarderStugMission is 510 x 510 m, so the map is about **850 x 850 m** (about 0.72 km², roughly 2.8 times the area
-  of Ger_MarderStugMission).
+  of Ger_MarderStugMission). **The built map is 570 x 570 m** (850 m was too large, 2026-11-13); the sketch numbers
+  in this doc (ranges, distances) are from the 850 m sketch and need retuning.
 - **The mission sits along the Czech border.** One edge of the map is the border, with the ridge along it; the valley
   and the convoy road run beside it. **(open)** which edge (the ridge and border side is the south or south-east in the
   real geography, with the corridor running along it toward the north-west) and what the border edge looks like in-game.
@@ -92,7 +97,8 @@ intro mission teaches (one harvester gathers Radixite and metal there), so this 
 - **The rich heaps sit out near the Soviet sites and in the north foothills**, each with a capture station. Only they
   keep paying after the easy heap is gone, which pushes the player out at the right time.
 - The sketch has 2 near and 3 far metal spots, and the built map already has spoil-heap terrain (RockDesert paint, scree
-  and stones). **(open)** which heaps get a station, and the amounts.
+  and stones). **Decided 2026-11-22:** 1 easy heap (no capture) + **2 capture stations**, one in the north foothills and
+  one near Base B. **(open)** the amounts.
 
 **Extra touches:**
 - **Show the heap emptying:** if the heap mesh can step down as it empties (`ResourceStorageLevel` suggests stages), the
@@ -111,16 +117,18 @@ intro mission teaches (one harvester gathers Radixite and metal there), so this 
   - The drop-off registers with the game state at `BeginPlay` and uses player controller 0. Confirm that harvesters
     really skip an inactive drop-off, and that the drop-off counts as the player's.
   - Only player squads call the capture today. Retaking by the Soviets means either AI capture or destroying the station
-    through its optional HealthComponent (and switching the drop-off off again). **(open)** which one.
+    through its optional HealthComponent (and switching the drop-off off again). **Decided 2026-11-22: the Soviets
+    retake a station by destroying it**; the player repairs or recaptures it.
   - Whether a heap should be harvestable before its station is captured (long hauls to the base) or blocked until then.
 
 ## The player's base
 
 - The player **starts with a base on the ridge**, built into the old mine tunnels.
 - **The base can be expanded.** It starts with an **expanded HQ, a Gamma Facility, a refinery and a barracks.**
-- **Starting force:** will be implemented later in mission scripting, not in the design doc. **(open)**
-- **(open)** how much of the rest of the base-building kit is available this early, and how the existing base-building
-  tutorial (the intro mission) affects this.
+- **Starting force (decided 2026-11-22): by faction**, as in the intro mission: Strike Division and Breakthrough get
+  different starting sets (for example Pz II/III against Pz IV). It drives out of the adits after the briefing.
+  **(open)** the exact units per faction.
+- **Base-building kit (decided 2026-11-22): everything** is available from the start; the player chooses the build.
 
 ## The enemy
 
@@ -130,18 +138,19 @@ intro mission teaches (one harvester gathers Radixite and metal there), so this 
   and driving **west** along the valley road below the ridge. Road only, no rail line.
 - **Escort:** the first convoys are **lightly escorted** (a car or two). Later ones add **armoured cars** and then a few
   **tanks**. The **last one is a heavy convoy with a real escort**. Escort size **scales with difficulty**.
-- **Success:** destroy **enough of them, for example 4 of 6**. Trucks that **escape fill a "Soviet supply delivered"
-  meter, and if it fills the mission fails.** That gives a clear loss condition without a hard timer. **(open)** exact
-  threshold per difficulty.
-- **Bases as a lever:** destroying a base **thins the escorts or removes a convoy source**. The bases are **optional**, but
-  they make the mission easier.
+- **Success (replaced 2026-11-22):** there is no convoy count to reach and no "supply delivered" fail meter. **An
+  escaped convoy never loses the mission**; its cargo makes the Soviets stronger by type (see "Mission structure").
+  The win is Base B destroyed and the Berlin cases recovered.
+- **Bases (replaced 2026-11-22):** Base A is a loot-only bonus with no effect on the convoys; Base B is the road
+  overwatch and radio command post (see "Soviet bases").
 
 ### What the convoys carry
 
 - Most are **ordinary supply: fuel, ammo and parts**. This is what the western outposts need.
 - **One special convoy carries sealed cases that connect to the Forge survey: sample canisters and documents marked for
   Berlin.** Wiping it out and **recovering the cargo is the Berlin hook**, and it is a good **climax** for the mission.
-  **(open)** which convoy is the special one (it could be the heavy last convoy), and how the cargo is recovered.
+  **Decided 2026-11-22: convoy 5, disguised as an ordinary convoy, with an armoured case truck** (see "Mission
+  structure" for recovery and what happens if it escapes).
 - The convoy is **not the first time the player sees the Berlin crates.** An early clue comes from the radio outpost (see
   "Radio outpost with the Berlin crates" below), so the special convoy pays off something the player already knows about.
 
@@ -153,22 +162,23 @@ those trucks, and the base grows from the raids.
 - **Kill the escort and the trucks stop and surrender.** A truck that surrenders is no longer a Soviet unit.
 - **A captured truck drives itself to the mine adit** (the "mine adit drop-off" by the Gamma Facility in the sketch) and
   **pays out its cargo when it arrives**: fuel, vehicle parts or Radixite, by the convoy's cargo type. The player cannot
-  steer it. It pays **only on arrival**, so it can still be lost on the way (Soviet response forces, the battery barrage).
+  steer it. It pays **only on arrival**. **Decided 2026-11-22: nothing chases a captured truck**; the capture is the
+  risky part and the trip is safe (a battery barrage that happens to land on it can still kill it).
 - **The choice on every convoy: a fast kill or slower, riskier loot.**
   - **Destroy:** each dead truck already drops a scavengeable cargo cache (existing convoy behaviour,
     `FConvoyCargoSettings::CacheClass`: about 5 minutes before it is gone, about 12 s for a squad to scavenge). Fast and
     safe, but the player gets a share and has to send squads into the kill zone to pick it up.
   - **Capture:** the full cargo, but the player has to kill the escort **without** killing the trucks, then cover the
     trucks while they drive up to the adit.
-- A captured truck counts as **stopped** for the convoy objective and does **not** fill the "Soviet supply delivered"
-  meter.
+- A captured truck counts as **stopped**: its cargo does not reach the Soviets (see "Escaped cargo" in "Mission
+  structure").
 - **The power fantasy grows from the raids.** Keep the starting resources low so that captured cargo is what pays for
   the base expansion and the tanks.
 
 **Implementation requirement: a new derived class for cargo trucks that can surrender.**
 
 - We want a **new C++ class derived from the class the convoy trucks use today** (convoy trucks are `ATankMaster`
-  children, spawned from `FConvoyTruckSpec::TruckClass`). Working name `ASurrenderingCargoTruck` **(open)**.
+  children, spawned from `FConvoyTruckSpec::TruckClass`). Built as `ASurrenderingCargoTruck`.
 - **Only trucks of this class can surrender.** The Ore Mountains convoy definitions point their `TruckClass` at Blueprint
   children of this class.
 - **No other cargo truck in the game gets this feature.** The intro mission's fuel convoy (`DA_Convoy_IntroFuel`), other
@@ -200,10 +210,11 @@ those trucks, and the base grows from the raids.
     `BP_OnScuttleCountdownStarted`, `BP_OnScuttled`, `BP_OnSurrendered`.
   - Still to do: the Blueprint child (it does not inherit `RTS_BP_TrackedTankMaster`, so copy its AI controller and
     setup), the Ore convoy definitions, and the drop-off marker at the adit.
-- **(open)** what exactly triggers the surrender (all escorts of that convoy dead, or no living escort within a set
-  distance of the truck), whether a damaged truck can still surrender, whether the Soviets try to destroy or retake a
-  captured truck, what shows the surrender (white flag, voice line, minimap icon change), the payout per truck, and the
-  truck's route up the main ramp to the adit.
+- The trigger, the damaged-truck rule and the countdown are settled by the code above; nothing chases a captured truck
+  (2026-11-22). **(open)** what shows the surrender (white flag, voice line, minimap icon change), the payout per truck,
+  the truck's route up the main ramp to the adit, and fuel: convoys can carry `Fuel`, `VehicleParts` and `Ammo`
+  (`EConvoyCargoType`), but the captured-truck payout only knows Radixite, metal and vehicle parts, so a captured fuel
+  or ammo truck needs a mapping (for example fuel to Radixite).
 
 ### Convoy line-up (first three decided 2026-11-16)
 
@@ -211,17 +222,25 @@ Each convoy is a different problem, not the same ambush with a bigger escort.
 
 1. **Light fuel run: a guided first ambush.** A few fuel trucks and a light escort (a car or two). The mission guides the
    player through it: where to set the ambush, and that killing the escort makes the trucks surrender. This is where
-   capture versus destroy is taught.
+   capture versus destroy is taught. **Taught by (2026-11-22):** an ambush hint marker below the ridge; when the escort
+   dies a "Capturing trucks" field-manual takeover explains the countdown, the 20 m squad rule and the 60 % rule; the
+   Advisor coaches.
 2. **The weighbridge convoy: a set-piece window.** This convoy **stops at the weighbridge checkpoint** for an inspection,
-   which gives the player a fixed time and place to strike. The checkpoint guards and towers join the fight. **(open)**
-   how long it stops, and what happens if the player strikes early or late. Note: the weighbridge, booth and towers are
-   still placeholders on the map, and the checkpoint has no collision yet.
+   which gives the player a fixed time and place to strike. The checkpoint guards and towers join the fight.
+   **Decided 2026-11-22: a 60 s stop.** Strike early and the convoy floors it forward; miss the window and it drives on.
+   Note: the weighbridge, booth and towers are still placeholders on the map, and the checkpoint has no collision yet.
 3. **The ammo convoy that splits: two targets, pick one.** Part of the column (the **ammo trucks**) turns off toward the
    **artillery battery** in the north-east, while the rest drives on west. The player chooses: stop the ammo trucks and
-   deny the barrage, or stop the supply trucks and protect the meter. **(open)** whether the battery still gets other
-   ammo trucks on their own route as well, and whether captured ammo trucks pay out something the player can use.
+   deny the barrage, or stop the supply trucks so their cargo does not strengthen the bases. **(open)** whether the
+   battery still gets other ammo trucks on their own route as well, and whether captured ammo trucks pay out something
+   the player can use.
+4. **The hunter convoy (decided 2026-11-22):** its trucks carry infantry that dismount at the ambush zone and climb
+   toward the ridge to hit the base.
+5. **The case convoy (decided 2026-11-22):** looks like an ordinary convoy but carries the **armoured case truck** with
+   the Berlin cases (see "Mission structure").
+6. **The heavy convoy (decided 2026-11-22):** a heavy column that reinforces Base B; it leads into the finale.
 
-Convoys 4 to 6 are **(open)**. The last one is still the heavy convoy (see "Escort" above).
+Convoys 1 to 3 start from mission stages; convoys 4 to 6 run on a timer (see "Mission structure").
 
 ### Radio outpost with the Berlin crates (decided 2026-11-16)
 
@@ -231,8 +250,9 @@ Berlin hook: the player finds the crates before the special convoy, so the clima
 - **Guards: only a few infantry.** A few **Mosin squads** (`Squad_Rus_Mosin`) and **one bazooka hazmat squad**
   (`Squad_Rus_HazmatBazooka`), **and that is it**: no vehicles, no guns, no bunkers. It is meant as a small, early side
   target, not a third base.
-- **(open)** where it sits on the map, what the player gets from the crates (a manifest, a voice line, a takeover), and
-  whether the radio does anything in play (for example warning the convoys while it stands).
+- **Decided 2026-11-22:** it sits in the **north foothills near the Forge survey post**. Taking it plays a **manifest
+  takeover** that marks convoy 5 as the case convoy and adds the "Recover the cases" major objective. **(open)** the
+  exact spot, and whether the radio does anything in play while it stands.
 - Check before building: the survival-mode base docs say `Squad_Rus_HazmatBazooka` is **not** in that mode's base spawner
   map. Confirm that the placement actor used here (for example `AEnemyStrongpoint`) can spawn it.
 
@@ -244,7 +264,14 @@ Berlin hook: the player finds the crates before the special convoy, so the clima
   of infantry squads and two light tanks. It is close to the start, so it can be hit early.
 - **Base B, on the foothills across the valley from the player's ridge:** it overlooks the road and is **better defended**,
   with AT guns and some infantry on the high ground. It forces a **flanking approach** and uses the elevation tiers.
-- **(open)** whether each base thins escorts or removes a convoy source, and the exact defences.
+- **Decided 2026-11-22:**
+  - **Base A is a bonus, loot only.** Destroying it gives resources and has no effect on the convoys. The convoy
+    route must not use it as its owning building (`bHasOwningBuilding` off), or destroying it would stop the convoys.
+  - **Base B is a major objective and the finale.** Before that it is the **road overwatch** (its AT guns cover the road
+    below the knoll, so ambushes near it are costly) and the **radio command post** (while it stands, convoys get
+    warnings and speed up through ambush zones; its radio mast is the tell). It receives the escaped-cargo effects and
+    convoy 6.
+- **(open)** the exact defences.
 
 ### Soviet artillery battery (top right)
 
@@ -255,20 +282,21 @@ weapon pits the game already has** (for example the Rus pits: 53-K, BS-3, 120 mm
 - **Supplied state:** whenever an ammo truck **arrives**, the battery gets **increased range** and **starts barraging the
   player**. Unsupplied, it has its normal (shorter) range and does not reach the player's base.
 - **Counterplay:** the player can intercept the ammo trucks to deny the barrage, or destroy the battery itself.
-- **(open)** the ammo truck route (where they start, whether they use the valley road for part of the way, how many, how
-  often), how long the supplied state lasts after a truck arrives, the barrage's target selection (the base, the player's
-  units, or both), and what each pit type contributes. Range numbers need tuning against the pits' real ranges.
-- **(open)** whether the battery counts as one of the "two small bases" or is a third site, and how it is defended.
-- **(open)** whether ammo trucks count toward the "Soviet supply delivered" meter.
+- **Decided 2026-11-22: a timed supplied state.** Each arriving ammo truck gives about **3 min supplied**: the range
+  reaches the ridge and the battery barrages player units and buildings in range. Unsupplied it cannot reach. It is a
+  **third site with a light guard**; destroying it is a bonus. Escaped ammo cargo keeps it supplied longer.
+- **(open)** the ammo truck route (where they start, how many, how often) and what each pit type contributes. Range
+  numbers need tuning against the pits' real ranges on the 570 m map.
 
 ### Landmarks and set dressing
 
 Added 2026-11-13, so the map is not all nature. Each has a lore job.
 
 - **Weighbridge / checkpoint on the valley road.** The convoys pass through it. It is a natural ambush spot with a clear
-  sight line (from the ridge). **(open)** how it is staffed, and whether convoys stop at it.
-- **Broken viaduct or overpass from the old A4 line.** Gives the road some history. **(open)** where it crosses the road,
-  and whether its collapse blocks or only narrows the road.
+  sight line (from the ridge). Convoy 2 stops at it for 60 s (decided 2026-11-22). **(open)** how it is staffed.
+- **Broken viaduct or overpass from the old A4 line.** Gives the road some history. Built in the map with a 10 m road
+  gap. **Decided 2026-11-22: a natural chokepoint only**: convoys slow to single file there, which makes it the prime
+  ambush spot; no extra mechanic.
 - **Small Forge survey post** near the Radixite field: sampling stakes with flags, a cryo canister rack and a generator.
   It matches the Forge survey station in Berlin and **foreshadows it**, so the Berlin mission feels earned when the
   special convoy's cargo turns up. **(open)** whether it has a guard, and whether it is a target or only dressing.
@@ -295,9 +323,11 @@ base. A unit kept at a tower reveals a wide area of fog and warns earlier of eac
   panel and lookouts face south. Main mesh about 9.4k triangles with collision and `cargo_*` / `entrance_01` sockets for
   the garrison (`UCargo`). Not in Unreal yet. **Owner approved model v1 as built (2026-11-18, "Yes, keep it"),
   including the 90-degree turn and the added detail (fallen ridge beam, north wall breach, rubble, drum, track and tub).**
-- **(open)** which summits (foothill tops are 4-10 m; the Base B knoll is taken), how many towers, garrison
-  (`AGarrisonableBuilding`) or capture zone (`ACaptureActor`), reveal radius, how much earlier the warning comes and how it
-  shows the cargo, and whether the Soviets contest a held tower.
+- **Decided 2026-11-22: 2 towers, captured like a capture point** (`ACaptureActor`); once taken they stay the
+  player's with no garrison needed. (This conflicts with alert tier 2, "retake squads at captured towers"; see
+  "Mission structure".)
+- **(open)** which summits (foothill tops are 4-10 m; the Base B knoll is taken), reveal radius, and how much earlier the
+  warning comes and how it shows the cargo.
 
 ## Environment: what happened here
 
@@ -464,40 +494,218 @@ Only the **sand mounds** are built so far; the vehicle actors and the gameplay h
 - **Sand colour (decided 2026-11-18):** close to the ground colour, a paler tint only up the mound (vertex R from
   0.15 m, full at 1.25 m; `FreshTint` 1.32/1.18/0.98). A clearly paler sand was tried and dropped: the user prefers
   the version that "better blends with the landscape".
-- **(open)** where on the map they go, collision/nav of the mound, and whether the mound stays after the vehicle
-  drives out (under the hull the sand is a flat plateau, not a hollow).
+- **Placement (decided 2026-11-22): all 5, one per region.** StuG III near the ridge (early, easy), Pz IV carrier in
+  the north foothills, 251 mortar by the viaduct, Flak-Luchs near the radio outpost, Wespe near the battery (late,
+  guarded).
+- **(open)** the exact spots, collision/nav of the mound, and whether the mound stays after the vehicle drives out
+  (under the hull the sand is a flat plateau, not a hollow).
 
-## Mission structure
+## Mission structure (flow picked 2026-11-22)
 
-**(open)** not yet designed beyond the beats above. Likely: hold the ridge, ambush the first lightly escorted convoys,
-discover and hit the bases, then escalate to the heavy last convoy and the special cargo.
+The owner picked 26 decisions on 2026-11-22 (six options each). They are written up here on 2026-11-23. Anything
+marked *proposal* was not picked by the owner and still needs a yes.
+
+### Win and lose
+
+- **Major objectives:** **destroy Base B** and **recover the Berlin cases**.
+- **Bonus objectives:** destroy Base A (loot only), destroy the artillery battery, and take the radio outpost.
+- **An escaped convoy never loses the mission.** It makes the rest harder: its cargo strengthens the Soviets (see
+  "Escaped cargo" below).
+- **Lose:** the HQ is destroyed (*proposal*: the usual `UDontLoseHQMission`).
+
+### Flow
+
+1. **Opening.** Location intro (Erzgebirge + date), then a camera tour of the valley (weighbridge, road, knoll,
+   battery), then briefing lines 01 to 03 (recorded: `OreMountains_Briefing_01_Weighbridge`, `_02_DiggingIn`,
+   `_03_SpecialConvoy` in `.../AAAGerMissions/OreMountains/Briefing`). Then the faction's start force drives out of
+   the adits. The full building kit is available.
+2. **Convoy 1, the guided fuel run (scripted start).** An ambush hint marker below the ridge. When the escort dies, the
+   "Capturing trucks" field-manual takeover explains the 12 s countdown, the 20 m squad rule and the 60 % health rule,
+   and the Advisor coaches. Captured trucks drive to the adit and nothing chases them.
+3. **Convoy 2, the weighbridge (scripted start).** The convoy stops about 60 s at the checkpoint, and the guards and
+   towers join the fight. Strike early and it floors it forward; miss the window and it drives on.
+   - **Light counterattack after convoy 2 is stopped:** infantry in trucks plus light armour hit the ridge. The first
+     real pressure on the base. It also comes when convoy 2 escapes (owner pick 2026-11-23), one unit stronger.
+4. **Convoy 3, the ammo split (scripted start).** The ammo trucks turn off toward the battery and the rest drive west.
+   Each ammo truck that reaches the battery supplies it for about 3 min.
+5. **Convoys 4 to 6 (timer).** Each starts about 4 min after the previous one has finished, with a tower or Advisor
+   warning first.
+   - **Convoy 4, hunters:** infantry dismount at the ambush zone and climb toward the ridge.
+   - **Convoy 5, the cases:** an ordinary-looking convoy (the radio outpost manifest or a held tower marks it as "sealed
+     cargo") with an **armoured case truck** that is very hard to destroy; the intended way is to kill the escort and
+     capture it.
+     - **Captured:** it drives to the adit; the cases are recovered on arrival.
+     - **Destroyed anyway:** the cases survive in a **sealed cache** at the wreck, which a squad must scavenge (slower,
+       under fire).
+     - **Escaped:** the cases are **stored at Base B** and recovered when Base B falls (*proposal*: as a sealed cache
+       there to scavenge).
+     - **Heavy counterattack after convoy 5:** medium and heavy armour with hazmat engineers in support (losing the cases
+       makes the Soviets lash out).
+   - **Convoy 6, heavy:** a heavy column that reinforces Base B.
+6. **Finale: storm Base B.** It is stronger for every convoy that escaped.
+7. **Ending:** once Base B is destroyed and the cases have reached the adit, an Advisor line ties the cases to the Forge
+   survey at the Berlin crater (the Berlin hook), then the end debrief.
+
+### Running through the mission
+
+- **Escaped cargo, by type:** fuel = more vehicles at the bases; ammo = the battery stays supplied longer or hits
+  harder; concrete = new bunkers or AT pits at a base. The effects land at Base B. Tower intel shows the cargo type in
+  advance, which is what makes capture-or-destroy and the towers matter. Note: `EConvoyCargoType` has `Fuel`,
+  `VehicleParts` and `Ammo`, no concrete.
+- **Alert tiers:** each stopped convoy raises the alert. Tier 1 sends patrols into the foothills, tier 2 sends retake
+  squads to captured stations and towers, and tier 3 raids the ridge. **Conflict to settle:** the towers were picked to
+  stay the player's once taken, and stations are retaken by destroying them. So tier 2 either attacks the stations only,
+  or the towers need AI capture (C++).
+- **Base B:** the road overwatch and the radio command post (see "Soviet bases").
+- **Battery:** the timed supplied state (see "Soviet artillery battery").
+- **Radio outpost** (north foothills): the manifest takeover marks convoy 5 and adds "Recover the cases".
+- **Lookout towers:** 2 capture-zone towers. **Spoil heaps:** 1 easy heap and 2 capture stations. **Buried armour:** all 5,
+  one per region. **Viaduct:** a chokepoint only.
+
+### Missions[] stage plan (*proposal*, 2026-11-23)
+
+This follows the owner's mission Blueprint rules:
+- One `UMissionBase` Blueprint (or a Blueprint child of a C++ mission class) per stage.
+- A flat `Missions[]` array, with each stage started by its own trigger, usually "Mission Class Completed" on an
+  earlier stage.
+- The flow lives in the event graph, and waits use `ScheduleSingleCallback`.
+
+See [BerlinMissionScripting.md](BerlinMissionScripting.md) for the framework. Folder:
+`/Game/RTS_Survival/Blueprints/Missions/GerCampaign/OreMountains/`, names `Mission_Ore_<Stage>`. Every started stage
+shows a plate. A convoy stage **completes whether the convoy is stopped or escapes** (the plate says which), so the next
+stage always starts.
+
+| # | Stage | Parent class | Plate | Trigger | Completes when | On start / on complete |
+|---|---|---|---|---|---|---|
+| 0 | `Opening` | `UMissionBase` | Major: "Survey the valley" | none (begin play) | the graph completes it after briefing line 03 | **Start:** location intro; camera tour; briefing 01-03 chained with `ScheduleSingleCallback`. **Complete:** the faction start force drives out of the adits. |
+| 1 | `KeepHQ` | `UDontLoseHQMission` | Major: "Keep the HQ alive" | class completed: Opening | never; **fails = defeat** | |
+| 2 | `Convoy1_FuelRun` | `UMissionBase` | Major: "Ambush the fuel convoy" | class completed: Opening | the convoy has finished (`OnConvoyFinished` of the route) | **Start:** hint marker; Advisor line; start convoy 1 on the route. **First scuttle countdown:** "Capturing trucks" field manual. |
+| 3 | `Convoy2_Weighbridge` | `UMissionBase` | Major: "Strike at the weighbridge" | class completed: Convoy1_FuelRun | the convoy has finished | **Start:** start convoy 2; it stops 60 s at the weighbridge. |
+| 4 | `LightCounterattack` | `USovietCounterattackMission` | Major: "Hold the ridge" | class completed: Convoy2_Weighbridge | the attack is beaten | Infantry in trucks + light armour (own settings asset). |
+| 5 | `Convoy3_AmmoSplit` | `UMissionBase` | Major: "Stop the ammo convoy" | class completed: Convoy2_Weighbridge | the convoy has finished (both parts) | **Start:** start convoy 3; its ammo trucks branch to the battery. |
+| 6 | `Convoy4_Hunters` | `UMissionBase` | Major: "Raid the convoys" | class completed: Convoy3_AmmoSplit | the convoy has finished | **Start:** `ScheduleSingleCallback(240)`, warning, start convoy 4. |
+| 7 | `Convoy5_Cases` | `UMissionBase` | Major: "Raid the convoys" | class completed: Convoy4_Hunters | the convoy has finished | **Start:** 240 s, warning ("sealed cargo" if the outpost or a tower has marked it), start convoy 5. **Complete:** note where the cases are (adit, sealed cache, Base B). |
+| 8 | `HeavyCounterattack` | `USovietCounterattackMission` | Major: "Hold the ridge" | class completed: Convoy5_Cases | the attack is beaten | Medium + heavy armour, hazmat engineers. |
+| 9 | `Convoy6_Heavy` | `UMissionBase` | Major: "Stop the heavy column" | class completed: Convoy5_Cases | the convoy has finished | **Start:** 240 s, warning, start convoy 6 toward Base B. |
+| 10 | `RadioOutpost` | `UKillActorsMission` (outpost guards) | Bonus: "Take the radio outpost" | class completed: Opening | the guards are dead | **Complete:** manifest takeover; convoy 5 is marked. |
+| 11 | `RecoverCases` | `UMissionBase` | Major: "Recover the Berlin cases" | class completed: RadioOutpost (owner pick 2026-11-23: also started with convoy 5 if the outpost is not taken by then) | the cases reach the adit, or their sealed cache is scavenged | A stage has one trigger, so the second path needs a second trigger entry or a start call from `Convoy5_Cases`'s graph. |
+| 12 | `DestroyBaseB` | `UKillActorsMission` (Base B targets) | Major: "Destroy Base B" | class completed: Opening | every target is dead | If the cases escaped, Base B falling drops their sealed cache. |
+| 13 | `BaseA` | `UKillActorsMission` (Base A targets) | Bonus: "Raid the convoy yard" | class completed: Opening | every target is dead | **Complete:** loot. The route's owning building stays unset. |
+| 14 | `Battery` | `UKillActorsMission` (the pits) | Bonus: "Silence the battery" | class completed: Convoy3_AmmoSplit | every pit is dead | |
+| 15 | `Ending` | `UMissionBase` | none | class completed: DestroyBaseB | the graph ends it | **Start:** if `GetHasMissionClassCompleted(RecoverCases)` is true, play the Advisor Berlin line now; otherwise wait for `BP_OnOtherMissionEnded(RecoverCases)` first. Then victory and debrief. |
+
+### Mission Blueprints built (2026-11-23)
+
+All 16 stages exist and are wired into `Ger_2ndOreMountains`' `BP_MissionManager` (`Missions[0..15]`, map saved; backup
+`Saved/OreMountains/stages/backup/Ger_2ndOreMountains_2026-11-23_pre_stages.umap`). Every stage compiles. **No stage
+has run in a game** (the owner tests). Where the build differs from the table above:
+
+- **Shared pieces:** `Mission_Ore_Base` (parent of the `UMissionBase` stages) holds `PlayAdvisorLine`,
+  `StartConvoyRoute(RouteId)` and `TrackTaggedTargets(Tag, Prefix)`; `BPML_OreMission` holds the macro
+  `SwitchConvoyEnd` (Outcome -> Stopped / Escaped).
+- **Kill stages track tags, not placed lists** (the sites are not in the map yet): `RadioOutpost` tracks actors tagged
+  `ORE_RadioOutpost`, `DestroyBaseB` `ORE_BaseB_Target`, `BaseA` `ORE_BaseA_Target`, `Battery` `ORE_Battery_Pit`.
+  Each tracks on the minimap and, when the last one dies: line, wait, complete. With no tagged actor the plate stays up.
+- **Bonus triggers:** `BaseA` and `Battery` start when a player unit comes within 90 m of the site (`near`), so their
+  plates appear when found; `RadioOutpost` starts after `Opening` until its spot is picked.
+- **Convoy stages** start the route whose `RouteId` is `ORE_Convoy1` .. `ORE_Convoy6` (one `AEnemyConvoyRoute` per
+  convoy, each with its own definition and `Timing.bStartOnBeginPlay` off). **None is placed yet.** Convoys 4-6 wait
+  `GapSeconds` (240) before their convoy; convoy 5 plays `SealedCargoLine` when `RadioOutpost` completed, otherwise
+  `UnmarkedLine`.
+- **Counterattacks:** `DA_Ore_LightCounterattack` / `DA_Ore_HeavyCounterattack` (copies of `DA_Berlin_ResponseForce`:
+  no train, no air drops, no dig-in intro, no cinematic). Road group from the convoy yard (2010, 22500) down the valley
+  road to the ridge; light = BT-7/T-26/T-70/BA + Mosin/Okhotnik/Maxim, 2 waves; heavy = T-34/KV-1/SU-85/IS-2 + hazmat
+  engineers, hazmat bazookas, PTRS, 4 waves. Wave sizes are starter values.
+- **Opening:** "Erzgebirge / 1976 / Ore Mountains, the Czech border" (date is a placeholder), a four-shot tour
+  (weighbridge, knoll, battery, our adit), briefing 01-03 with 11 / 22 / 12 s waits, then the start force at
+  (-21000, 6400) west of the adit drop-off: 2x `SpawnPlayerLightMediumTank_PZIII_J_Or_PZIV_F1`, 1x
+  `SpawnPlayerGerMediumTankDestroyer_StugIII_OrMarder`, 1x `SpawnPlayerGerArmoredCar250_251Mortar` (these pick by
+  faction). **The start base (HQ, Gamma Facility, refinery, barracks) is not placed and nothing spawns it.**
+- **Slots that wait for content:** `Convoy1.ShowCaptureFieldManual` (the takeover widget is not built; it prints a
+  note), `RecoverCases.WatchCases` (waits for the case truck C++), the manifest takeover, every Advisor line except the
+  briefing (empty `SoundBase` variables play nothing).
+- **Second start for RecoverCases (open Q4):** `UMissionClassCompletedMissionTrigger::AlsoWatchMissionClasses` (new,
+  2026-11-23) lets one trigger watch several classes; RecoverCases will watch `RadioOutpost` OR `Convoy4_Hunters`
+  (= the moment the convoy 5 stage begins) once the editor DLL with it is loaded.
+- **Tools:** `Source/Tools/OreMountainsMission/` (`build_ore_stages.py` rebuilds every stage, `tidy_ore_functions.py`,
+  `make_counterattack_settings.py`, `run_wire_ore_stages.py` + `wire_ore_stages.py`). Event graphs are hand laid out
+  (rows left to right, each scheduled callback right after its Schedule node); functions are tidied (no reroute knots).
+
+### What has to be built (2026-11-23 check)
+
+**In the map** (none placed yet):
+- the player's start base on the ridge;
+- the convoy route, including the ammo branch to the battery;
+- Base A, Base B, the battery pits, the radio outpost, the weighbridge guards and the weighbridge collision;
+- the ambush hint marker;
+- the 2 lookout towers (the model is not in Unreal yet);
+- the 2 spoil-heap stations;
+- the 5 buried-armour vehicle actors (only the sand meshes exist).
+
+The map already holds an actor tagged `CapturedTruckDropOff`; check that it sits at the main adit on the navmesh.
+
+**Assets:**
+- the Blueprint child of `ASurrenderingCargoTruck`;
+- the armoured case truck;
+- the six Ore convoy definitions;
+- the two counterattack settings assets;
+- the start force per faction;
+- the "Capturing trucks" field manual and the manifest takeover.
+
+**C++ not found in the code** (searched by name; unverified):
+- a timed convoy stop at a point (convoys only halt behind their escorts today);
+- infantry dismounting from convoy trucks;
+- Base B's radio speeding convoys up;
+- escaped-cargo effects by type (and a concrete cargo type);
+- alert tiers;
+- the battery's supplied state (range up plus the barrage);
+- the case truck's sealed cache and "stored at Base B";
+- a payout mapping for captured fuel and ammo trucks;
+- AI capture of towers (only if tier 2 retakes towers).
+
+**Voice lines:**
+- Recorded: briefing 01-03.
+- Still needed, Advisor: convoy 1 coaching, the convoy warnings, the two counterattack warnings, the manifest, the
+  cases recovered, and the Berlin ending line.
+- Still needed, other: tower and station capture lines.
 
 ## Dependencies
 
-- Ore Mountains terrain: ridge, foothills and open valley, with several elevation tiers. **(open)**
-- A large Radixite field and metal deposits placed in the map. **(open)**
-- Wismut-style mine and processing site assets for the Soviet bases and the player's tunnel base. **(open)**
-- Soviet truck convoy units and the convoy movement/spawn logic along a road. **(open)** check what exists.
+The full build list is in "What has to be built" under "Mission structure"; this list is the older summary.
+
+- Ore Mountains terrain: ridge, foothills and open valley, with several elevation tiers. Built (570 m map).
+- A large Radixite field and metal deposits placed in the map. Placed; amounts still to tune.
+- Wismut-style mine and processing site assets for the Soviet bases and the player's tunnel base. Adit portals and
+  rockworks are built; the Soviet sites are still placeholders.
+- Soviet truck convoy units and the convoy movement/spawn logic along a road: `AEnemyConvoyRoute` + `AConvoy` exist
+  (escort tiers per difficulty, mission or timer start, outcome counts and events).
 - The artillery battery: the existing Rus weapon pits, ammo trucks, and a "supplied" state that raises range and starts
-  the barrage when a truck arrives. **(open)** check whether the pits' ammo/range can be driven by mission scripting.
-- Escort scaling per difficulty and a "supply delivered" meter with a fail threshold. **(open)** check what exists.
+  the barrage when a truck arrives. The supplied state is not in code.
 - Starting base buildings: HQ (expanded), Gamma Facility, refinery and barracks, placed on the ridge. The Gamma Facility
   is an existing building (`Nomadic_GerGammaFacility`).
 - Mission scripting for the starting force (later).
 
 ## Open questions
 
-1. Which edge is the Czech border, and whether there are side valleys.
-2. Exact convoy success threshold per difficulty, and which convoy carries the special cargo.
-3. Exactly how each base affects the convoys, and the exact defences.
-4. Resource field sizes and positions (tuning later).
-5. How much of the rest of the base-building kit is available this early.
-6. The artillery battery: ammo truck route and frequency, how long the supplied state lasts, what the barrage targets,
-   whether it is a third site, and how it is defended.
-7. Truck surrender: the exact trigger, how it is shown, the payout per truck, and whether the Soviets go after captured
-   trucks.
-8. Convoys 4 to 6 (beyond "the last one is heavy").
-9. The radio outpost: location, and what the Berlin crates give the player.
-10. Whether the survey post keeps its cryo rack as unexplained dressing or drops it.
-11. Spoil heaps: which heaps get a capture station, amounts, how the Soviets retake a station, and whether a heap can be
-    harvested before its station is captured.
+All ten were answered by the owner on 2026-11-23 (six-option dialog); these answers win over older text above.
+
+1. **Alert tier 2 = stations only.** Tier 2 squads go after the 2 spoil-heap stations and try to destroy them. Towers
+   stay the player's; no AI capture code.
+2. **New `EConvoyCargoType::Concrete`.** Escaped concrete trucks switch on pre-placed hidden defences at Base B; a
+   captured concrete truck pays metal.
+3. **Captured payout mapping, 2.5x:** fuel to Radixite, ammo to metal, vehicle parts to vehicle parts, concrete to
+   metal. A surrender shows a white flag on the truck, one short Advisor line (once), and the minimap icon turns to
+   the player's colour.
+4. **"Recover the cases" also starts with convoy 5:** if the radio outpost has not been taken when convoy 5 starts, the
+   objective appears then (with an Advisor line), only without the early "sealed cargo" mark.
+5. **The light counterattack comes after convoy 2 either way;** if convoy 2 escaped it is one unit stronger.
+6. **Numbers: starter values that the owner tunes** after play-testing, all in data assets or Blueprint defaults (for
+   example 240 s convoy gaps, alert tiers at 1 / 3 / 5 stopped convoys, battery reach to the ridge when supplied).
+7. **Spots: proposed, then picked.** A top-down render with 2-3 numbered candidates per item (following the region
+   picks); the owner picks in one dialog round.
+8. **No cryo rack** at the survey post: stakes, flags, generator and sample cases only. Berlin stays the first cryo look.
+9. **Far heaps can be harvested any time** (long hauls home); the station only shortens the trip. No lock.
+10. **Czech border = the south edge,** shown by a row of old boundary stones and a broken border post (dressing); no
+    side valleys.
+
+Nothing is open beyond the tuning numbers and the spot picks.

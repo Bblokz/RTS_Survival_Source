@@ -152,6 +152,7 @@ void AConvoy::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	}
 	RemoveAllMinimapIcons();
 	OnConvoyEventNative.Clear();
+	OnBehaviourEventNative.Clear();
 	Super::EndPlay(EndPlayReason);
 }
 
@@ -185,6 +186,15 @@ void AConvoy::Broadcast(const EConvoyEventType Type, const FConvoyMember* Member
 	Event.Location = Member != nullptr and Location.IsZero() ? Member->Location : Location;
 	Event.Detail = Detail;
 	Event.WorldSeconds = GetNow();
+	// The fate of a truck is decided where these two events are sent; the cargo outcome counts them.
+	if (Member != nullptr and Type == EConvoyEventType::TruckDestroyed)
+	{
+		MarkTruckFate(Member->MemberId, EConvoyTruckFate::Destroyed);
+	}
+	if (Member != nullptr and Type == EConvoyEventType::TruckCaptured)
+	{
+		MarkTruckFate(Member->MemberId, EConvoyTruckFate::Captured);
+	}
 	UE_LOG(LogConvoy, Log, TEXT("CONVOY %d t=%.2f %s member=%d %s"), M_ConvoyId, Event.WorldSeconds,
 	       *ConvoyNames::GetEventName(Type), Event.MemberId, *Detail);
 	OnConvoyEventNative.Broadcast(Event);
@@ -213,7 +223,8 @@ FVector AConvoy::GetColumnCentre() const
 	int32 Count = 0;
 	for (const FConvoyMember& Member : M_Members)
 	{
-		if (Member.Role == EConvoyUnitRole::Truck and Member.GetIsAlive())
+		// Branch trucks drive elsewhere; the centre (escort leash, ambush zones) is the column's.
+		if (Member.GetIsColumnTruck())
 		{
 			Sum += Member.Location;
 			++Count;
@@ -257,6 +268,7 @@ void AConvoy::GetMemberSnapshots(TArray<FConvoyMemberSnapshot>& OutSnapshots) co
 		Snapshot.WantedSpeed = Member.WantedSpeed;
 		Snapshot.bIsStuck = Member.bIsStuck;
 		Snapshot.bHasPartialPath = Member.bHasPartialPath;
+		Snapshot.CargoType = Member.CargoType;
 	}
 }
 
