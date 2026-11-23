@@ -7,6 +7,7 @@
 #include "RTS_Survival/Enemy/Convoy/Convoy.h"
 #include "RTS_Survival/Enemy/Convoy/ConvoyDefinition.h"
 #include "RTS_Survival/Enemy/Convoy/ConvoyRoute.h"
+#include "RTS_Survival/Enemy/EnemyController/EnemyController.h"
 #include "RTS_Survival/Enemy/MissionPlacement/EnemyPlacementShapesComponent.h"
 #include "RTS_Survival/Enemy/MissionPlacement/EnemyPlacementTypes.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
@@ -92,6 +93,8 @@ void AEnemyConvoyRoute::StartRoute()
 	bM_IsRunning = true;
 	bM_HasLaunchedLastConvoy = false;
 	bM_HasBuiltRoute = false;
+	bM_HasTriedBranchRoute = false;
+	M_BuiltBranchRoute.Points.Reset();
 	M_ConvoysThisRun = 0;
 	WaitForEnemyAI(Timing.FirstConvoyDelay);
 }
@@ -137,6 +140,10 @@ AEnemyConvoyRoute* AEnemyConvoyRoute::FindEnemyConvoyRoute(const UObject* WorldC
 void AEnemyConvoyRoute::OnEnemyAIReady(AEnemyController* EnemyController, const ERTSGameDifficulty Difficulty)
 {
 	M_Difficulty = Difficulty;
+	if (IsValid(EnemyController))
+	{
+		M_EnemyController = EnemyController;
+	}
 	LaunchConvoy();
 }
 
@@ -154,6 +161,8 @@ void AEnemyConvoyRoute::LaunchConvoy()
 		return;
 	}
 	const int32 ConvoyIndex = M_ConvoysThisRun;
+	// Behaviour filters and events use the index over every run, so mission-started convoys are 0, 1, 2...
+	const int32 RouteConvoyIndex = M_StartedConvoyCount;
 	const FConvoyStartParams Params = BuildStartParams(ConvoyIndex);
 	AConvoy* Convoy = AConvoy::StartConvoy(this, Definition, Route, Params);
 	if (not IsValid(Convoy))
@@ -162,9 +171,11 @@ void AEnemyConvoyRoute::LaunchConvoy()
 		MarkLastConvoyLaunched();
 		return;
 	}
+	// Same frame as the start: the convoy's first tick comes later, so the plan is in place before it drives.
+	Convoy->SetBehaviourPlan(BuildBehaviourPlan(RouteConvoyIndex, Route));
 	M_StartedConvoyCount++;
 	M_ConvoysThisRun++;
-	TrackStartedConvoy(Convoy, Params.GuardTierIndex);
+	TrackStartedConvoy(Convoy, Params.GuardTierIndex, RouteConvoyIndex);
 	OnConvoyStarted.Broadcast(this, Convoy);
 	if (not GetHasMoreConvoysToStart())
 	{
@@ -254,13 +265,16 @@ FConvoyStartParams AEnemyConvoyRoute::BuildStartParams(const int32 ConvoyIndex) 
 	return Params;
 }
 
-void AEnemyConvoyRoute::TrackStartedConvoy(AConvoy* Convoy, const int32 GuardTierIndex)
+void AEnemyConvoyRoute::TrackStartedConvoy(AConvoy* Convoy, const int32 GuardTierIndex, const int32 ConvoyIndex)
 {
 	FEnemyConvoyRouteConvoyTally& Tally = M_Convoys.AddDefaulted_GetRef();
 	Tally.Convoy = Convoy;
 	Tally.ConvoyId = Convoy->GetConvoyId();
+	Tally.ConvoyIndex = ConvoyIndex;
 	Tally.TruckCount = Definition->GetTruckColumn(GuardTierIndex).Num();
 	Tally.EventHandle = Convoy->OnConvoyEventNative.AddUObject(this, &AEnemyConvoyRoute::HandleConvoyEvent);
+	Tally.BehaviourHandle = Convoy->OnBehaviourEventNative.AddUObject(this,
+	                                                                  &AEnemyConvoyRoute::HandleConvoyBehaviourEvent);
 	Convoy->OnConvoyFinished.AddDynamic(this, &AEnemyConvoyRoute::HandleConvoyFinished);
 }
 
@@ -362,9 +376,12 @@ void AEnemyConvoyRoute::HandleConvoyFinished(AConvoy* Convoy, const EConvoyOutco
 	}
 	const FEnemyConvoyRouteConvoyTally Tally = M_Convoys[TallyIndex];
 	M_Convoys.RemoveAt(TallyIndex);
-	Convoy->OnConvoyEventNative.Remove(Tally.EventHandle);
-	Convoy->OnConvoyFinished.RemoveDynamic(this, &AEnemyConvoyRoute::HandleConvoyFinished);
-	CountFinishedConvoy(Tally, Outcome);
+	UnbindConvoy(Tally);
+	FConvoyCargoOutcome CargoOutcome = Convoy->GetCargoOutcome();
+	CargoOutcome.ConvoyIndex = Tally.ConvoyIndex;
+	// Counted before the broadcasts, so listeners read the route totals with this convoy in them.
+	CountFinishedConvoy(Tally, Outcome, CargoOutcome.EscapedTrucks);
+	OnConvoyCargoOutcome.Broadcast(this, Convoy, CargoOutcome);
 	OnConvoyFinished.Broadcast(this, Convoy, Outcome);
 	if (bM_IsRunning && not bM_HasLaunchedLastConvoy && Timing.bWaitForPreviousConvoy)
 	{
@@ -381,13 +398,14 @@ FEnemyConvoyRouteConvoyTally* AEnemyConvoyRoute::FindTally(const int32 ConvoyId)
 	});
 }
 
-void AEnemyConvoyRoute::CountFinishedConvoy(const FEnemyConvoyRouteConvoyTally& Tally, const EConvoyOutcome Outcome)
+void AEnemyConvoyRoute::CountFinishedConvoy(const FEnemyConvoyRouteConvoyTally& Tally, const EConvoyOutcome Outcome,
+                                            const int32 EscapedTruckCount)
 {
+	// The convoy counts the trucks it removed at the exit itself: captured and branch-delivered trucks are not in it.
+	M_EscapedTruckCount += FMath::Max(EscapedTruckCount, 0);
 	if (Outcome == EConvoyOutcome::Escaped)
 	{
 		M_EscapedConvoyCount++;
-		// Captured trucks left the convoy before it reached the exit.
-		M_EscapedTruckCount += FMath::Max(Tally.TruckCount - Tally.DestroyedTruckCount - Tally.CapturedTruckCount, 0);
 		return;
 	}
 	if (Outcome == EConvoyOutcome::TrucksDestroyed)
@@ -401,17 +419,23 @@ void AEnemyConvoyRoute::CountFinishedConvoy(const FEnemyConvoyRouteConvoyTally& 
 	}
 }
 
+void AEnemyConvoyRoute::UnbindConvoy(const FEnemyConvoyRouteConvoyTally& Tally)
+{
+	AConvoy* Convoy = Tally.Convoy.Get();
+	if (not IsValid(Convoy))
+	{
+		return;
+	}
+	Convoy->OnConvoyEventNative.Remove(Tally.EventHandle);
+	Convoy->OnBehaviourEventNative.Remove(Tally.BehaviourHandle);
+	Convoy->OnConvoyFinished.RemoveDynamic(this, &AEnemyConvoyRoute::HandleConvoyFinished);
+}
+
 void AEnemyConvoyRoute::UnbindAllConvoys()
 {
 	for (const FEnemyConvoyRouteConvoyTally& Tally : M_Convoys)
 	{
-		AConvoy* Convoy = Tally.Convoy.Get();
-		if (not IsValid(Convoy))
-		{
-			continue;
-		}
-		Convoy->OnConvoyEventNative.Remove(Tally.EventHandle);
-		Convoy->OnConvoyFinished.RemoveDynamic(this, &AEnemyConvoyRoute::HandleConvoyFinished);
+		UnbindConvoy(Tally);
 	}
 	M_Convoys.Empty();
 }
@@ -494,6 +518,7 @@ void AEnemyConvoyRoute::BuildEditorShapes(FEnemyPlacementShapes& OutSummary, FEn
 	const TArray<FVector> WorldRoutePoints = GetWorldPoints(RoutePoints);
 	AddRoutePointShapes(WorldRoutePoints, OutSummary, OutDetail);
 	AddPreviewShapes(OutDetail);
+	AddBehaviourShapes(OutSummary, OutDetail);
 }
 
 void AEnemyConvoyRoute::AddRoutePointShapes(const TArray<FVector>& WorldRoutePoints, FEnemyPlacementShapes& OutSummary,

@@ -262,6 +262,7 @@ void AConvoy::UpdateTrucksLost(const double Now)
 	}
 	if (not bAnyAlive)
 	{
-		FinishConvoy(GetOutcomeWithoutTrucks(), false);
+		// Escaped also when every truck delivered on the branch; a stopped column keeps its destroyed/stopped outcome.
+		FinishConvoy(GetFinalOutcomeWithoutTrucks(), false);
 	}
 }

@@ -54,6 +54,7 @@ void AConvoy::BuildMembersFromDefinition()
 	for (const FConvoyTruckSpec& Truck : TruckColumn)
 	{
 		AddMember(EConvoyUnitRole::Truck, EConvoyStation::Lead, Truck.TrainingOption.GetDisplayName());
+		M_Members.Last().CargoType = Truck.bOverrideCargoType ? Truck.CargoTypeOverride : M_Definition->Cargo.CargoType;
 	}
 	const FConvoyGuardTier* Tier = M_Definition->GetGuardTier(M_Params.GuardTierIndex);
 	if (Tier == nullptr)
@@ -79,6 +80,7 @@ void AConvoy::AddMember(const EConvoyUnitRole MemberRole, const EConvoyStation S
 	Member.Role = MemberRole;
 	Member.Station = Station;
 	Member.UnitName = UnitName;
+	Member.CargoType = M_Definition->Cargo.CargoType;
 }
 
 float AConvoy::GetTruckColumnLength() const
@@ -86,7 +88,8 @@ float AConvoy::GetTruckColumnLength() const
 	int32 TruckCount = 0;
 	for (const FConvoyMember& Member : M_Members)
 	{
-		const bool bCounts = Member.Role == EConvoyUnitRole::Truck
+		// Branch trucks left the column; they no longer stretch it.
+		const bool bCounts = Member.Role == EConvoyUnitRole::Truck and not Member.GetIsOnBranch()
 			and (Member.State == EConvoyMemberState::Spawning or Member.GetIsAlive());
 		TruckCount += bCounts ? 1 : 0;
 	}
@@ -101,7 +104,7 @@ void AConvoy::AssignSlots()
 	for (FConvoyMember& Member : M_Members)
 	{
 		const bool bActive = Member.State == EConvoyMemberState::Spawning or Member.GetIsAlive();
-		if (Member.Role == EConvoyUnitRole::Truck and bActive)
+		if (Member.Role == EConvoyUnitRole::Truck and bActive and not Member.GetIsOnBranch())
 		{
 			Trucks.Add(&Member);
 		}
