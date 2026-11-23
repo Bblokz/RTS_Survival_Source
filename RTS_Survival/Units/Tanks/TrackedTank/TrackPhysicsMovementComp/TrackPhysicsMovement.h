@@ -175,6 +175,12 @@ public:
 	 */
 	void SetDriveStrength(float DriveStrength);
 
+	/**
+	 * @brief Holds a dug-in vehicle still: its chassis is kinematic then, so the physics step must not drive or brace it.
+	 * @param bIsAnchored Whether the vehicle is anchored in place.
+	 */
+	void SetIsAnchored(bool bIsAnchored);
+
 protected:
 	// Called when the game starts
 	virtual void BeginPlay() override;
@@ -308,6 +314,8 @@ private:
 	TAtomic<float> M_TrackForceMultiplier;
 	TAtomic<float> M_ModuleAccelerationMultiplier{1.f};
 	TAtomic<float> M_DriveStrength{1.f};
+	// Set while dug in; the async step then leaves the kinematic chassis alone.
+	TAtomic<bool> bM_IsAnchored{false};
 	TAtomic<float> M_CurrentSteeringInDeg{0.0f};
 	TAtomic<ETrackPhysicsMovementState> M_MovementState{ETrackPhysicsMovementState::Inactive};
 

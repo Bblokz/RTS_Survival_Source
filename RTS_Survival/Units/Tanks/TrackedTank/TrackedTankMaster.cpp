@@ -261,6 +261,8 @@ void ATrackedTankMaster::UnitDies(const ERTSDeathType DeathType)
 	{
 		M_DigInComponent->OnOwningUnitDeath();
 	}
+	// The death and wreck flows expect a simulating chassis, as before the dig-in.
+	SetChassisAnchored(false);
 	Super::UnitDies(DeathType);
 }
 
@@ -318,7 +320,41 @@ EAlliedVehiclePassage ATrackedTankMaster::GetAlliedVehiclePassage() const
 bool ATrackedTankMaster::GetCanBePushedAside() const
 {
 	// The dig-in component is optional; vehicles without one can always drive off.
-	return not IsValid(M_DigInComponent) || not M_DigInComponent->GetIsDiggingInOrDugIn();
+	return not GetIsAnchoredInPlace();
+}
+
+bool ATrackedTankMaster::GetIsAnchoredInPlace() const
+{
+	// The dig-in component is optional; vehicles without one are never anchored.
+	return IsValid(M_DigInComponent) && M_DigInComponent->GetIsDiggingInOrDugIn();
+}
+
+void ATrackedTankMaster::SetChassisAnchored(const bool bAnchor)
+{
+	if (bAnchor == bM_IsChassisAnchored || not IsValid(ChassisMesh))
+	{
+		return;
+	}
+	// A chassis that does not simulate (hidden at spawn, carried by an aircraft) is left as it is.
+	if (bAnchor && not ChassisMesh->IsSimulatingPhysics())
+	{
+		return;
+	}
+	bM_IsChassisAnchored = bAnchor;
+	if (GetIsValidTrackPhysicsMovement())
+	{
+		TrackPhysicsMovement->SetIsAnchored(bAnchor);
+	}
+	if (bAnchor)
+	{
+		ChassisMesh->SetPhysicsLinearVelocity(FVector::ZeroVector);
+		ChassisMesh->SetPhysicsAngularVelocityInDegrees(FVector::ZeroVector);
+		ChassisMesh->SetSimulatePhysics(false);
+		return;
+	}
+	ChassisMesh->SetSimulatePhysics(true);
+	ChassisMesh->SetPhysicsLinearVelocity(FVector::ZeroVector);
+	ChassisMesh->SetPhysicsAngularVelocityInDegrees(FVector::ZeroVector);
 }
 
 void ATrackedTankMaster::SetupHullBlocker()
@@ -1233,6 +1269,8 @@ void ATrackedTankMaster::TerminateCancelFireRockets()
 
 void ATrackedTankMaster::OnStartDigIn()
 {
+	// From the first spade on the hull stays put; nothing may shove it out of its position.
+	SetChassisAnchored(true);
 	if (not SwapAbility(EAbilityID::IdDigIn, EAbilityID::IdBreakCover))
 	{
 		RTSFunctionLibrary::ReportError("Failed to swap dig in ability"
@@ -1277,6 +1315,7 @@ void ATrackedTankMaster::OnDigInCompleted()
 
 void ATrackedTankMaster::OnBreakCoverCompleted()
 {
+	SetChassisAnchored(false);
 	if (not GetIsValidRTSComponent())
 	{
 		return;
