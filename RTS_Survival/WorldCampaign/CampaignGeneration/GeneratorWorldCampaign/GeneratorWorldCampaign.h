@@ -209,6 +209,15 @@ struct FWorldCampaignPlacementState
 	 */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World Campaign|Generation")
 	TMap<FGuid, EMapMission> MissionsByAnchorKey;
+
+	/**
+	 * @note Used in: ConnectionsCreated pre-seed and MissionsPlaced spacing checks.
+	 * @note Why: Marks which MissionsByAnchorKey entries are pinned story missions written before seeded placement.
+	 * @note Technical: Written together with the pinned entries; pinned missions only enforce min mission spacing.
+	 * @note Notes: Empty when pinned places are off, which keeps placement identical to the pre-pin generator.
+	 */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World Campaign|Generation")
+	TSet<FGuid> PinnedMissionAnchorKeys;
 };
 
 struct FEmptyAnchorDistance
@@ -556,6 +565,26 @@ public:
 	 */
 	bool GetIsGenerationFinished() const;
 
+	/** True when the anchor stands for a configured pinned place (story mission, HQ or wall). */
+	bool GetIsPinnedAnchorKey(const FGuid& AnchorKey) const;
+
+	/** Pin id of a pinned anchor, NAME_None for seeded anchors. */
+	FName GetPinIdForAnchorKey(const FGuid& AnchorKey) const;
+
+	/**
+	 * @brief Finds the anchor of a pinned place, also after a campaign was restored from a save.
+	 * @param PinId Configured pin id.
+	 * @param OutAnchorKey Anchor key of the pin; invalid when the pin is not part of the current campaign.
+	 * @return true when the pin resolved to an anchor.
+	 */
+	bool TryGetAnchorKeyForPinId(FName PinId, FGuid& OutAnchorKey) const;
+
+	/** True for anchors holding a pinned story mission; seeded side missions return false. */
+	bool GetIsStoryMissionAnchorKey(const FGuid& AnchorKey) const;
+
+	/** Pins resolved for the current campaign; empty when pinned places are off or none are configured. */
+	const FWorldCampaignResolvedPins& GetResolvedPinnedPlaces() const { return M_ResolvedPins; }
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "01 - World Campaign|Debugging",
 		meta = (AllowPrivateAccess = "true", DisplayPriority = 2,
 			ToolTip =
@@ -791,6 +820,97 @@ private:
 	                                      bool (AGeneratorWorldCampaign::*StepFunction)(
 		                                      FCampaignGenerationStepTransaction&));
 	bool ExecuteGenerateAnchorPoints(FCampaignGenerationStepTransaction& OutTransaction);
+
+	/**
+	 * @brief Resolves configured pinned places to anchors before the grid spawns, so generated anchors keep their
+	 * minimum distance to pins and pins exist even when anchor generation is disabled.
+	 * @param OutTransaction Receives spawned pinned anchors so undo and erase remove them like generated anchors.
+	 */
+	void ResolvePinnedPlacesForGeneration(FCampaignGenerationStepTransaction& OutTransaction);
+
+	/**
+	 * @brief Uses the hand-placed anchor carrying the pin id, else a pinned anchor left by an earlier attempt,
+	 * else spawns one; then re-keys it from the pin id and records the pin.
+	 * @param PinnedPlace Usable pin config.
+	 * @param SortedAnchors Anchors in deterministic order, gathered before any pin was spawned.
+	 * @param OutTransaction Receives a spawned anchor for rollback.
+	 */
+	void ResolveSinglePinnedPlace(const FWorldCampaignPinnedPlace& PinnedPlace,
+	                              const TArray<TObjectPtr<AAnchorPoint>>& SortedAnchors,
+	                              FCampaignGenerationStepTransaction& OutTransaction);
+
+	/** Reads UWorldCampaignMapContentSettings (game thread only) and drops unusable pins with a warning. */
+	TArray<FWorldCampaignPinnedPlace> GetUsablePinnedPlacesFromSettings() const;
+
+	/**
+	 * @brief Finds the anchor that already stands for a pin, in deterministic order.
+	 * @param SortedAnchors Anchors in deterministic order.
+	 * @param PinId Pin to look for.
+	 * @param bWantGeneratedAnchor true to find a pinned anchor left by an earlier spawn, false for hand-placed ones.
+	 * @return First matching anchor, or nullptr.
+	 */
+	AAnchorPoint* FindExistingAnchorForPin(const TArray<TObjectPtr<AAnchorPoint>>& SortedAnchors, FName PinId,
+	                                       bool bWantGeneratedAnchor) const;
+
+	/**
+	 * @brief Spawns the anchor of a pin that has no hand-placed anchor, keyed and tagged like generated anchors.
+	 * @param PinnedPlace Pin config providing the world location.
+	 * @param PinnedAnchorKey Key derived from the pin id.
+	 * @param OutTransaction Receives the spawned anchor for rollback.
+	 * @return Spawned anchor, or nullptr when the world or spawn failed.
+	 */
+	AAnchorPoint* SpawnPinnedAnchor(const FWorldCampaignPinnedPlace& PinnedPlace, const FGuid& PinnedAnchorKey,
+	                                FCampaignGenerationStepTransaction& OutTransaction);
+
+	/**
+	 * Writes pinned missions into M_PlacementState. Called after every setup wipe (connections re-run, macro undo,
+	 * async setup backtrack) and by the parity reset; it never spawns actors.
+	 */
+	void ApplyPinnedMissionPreSeedToPlacementState();
+
+	/**
+	 * Manual editor steps only (promotion not deferred): spawns pinned mission objects that are not shown yet.
+	 * Deferred and async runs promote them during realization instead.
+	 */
+	void PromotePinnedMissionsForManualSteps();
+
+	/** Cached anchor of a pinned single-anchor role, or nullptr when the role is not pinned. */
+	AAnchorPoint* FindCachedAnchorForPinnedRole(EWorldPinnedPlaceRole Role) const;
+
+	/**
+	 * @brief Candidate source for a single-anchor role: only the pin when pinned, otherwise every non-pin anchor.
+	 * @param CandidateSource Source the unpinned rules would use.
+	 * @param Role Role being placed.
+	 * @return Restricted source; CandidateSource unchanged when there are no pins.
+	 */
+	TArray<TObjectPtr<AAnchorPoint>> RestrictCandidateSourceForPinnedRole(
+		const TArray<TObjectPtr<AAnchorPoint>>& CandidateSource, EWorldPinnedPlaceRole Role) const;
+
+	/** Moves chosen pinned anchors to the front so duplicate-key repair keeps their pin-derived keys. */
+	void PrioritizePinnedAnchorsForKeyRepair(TArray<TObjectPtr<AAnchorPoint>>& InOutSortedAnchors) const;
+
+	/**
+	 * @brief Rebuilds pin lookups after restore by re-deriving each pin key from its pin id.
+	 * @param AnchorsByKey Restored anchors.
+	 */
+	void RestorePinnedPlacesFromSave(const TMap<FGuid, TObjectPtr<AAnchorPoint>>& AnchorsByKey);
+
+	/**
+	 * @brief Parity check that both solvers kept every pin on its anchor.
+	 * @param SynchronousResult Result from the game-thread placement path.
+	 * @param AsyncResult Result from the snapshot solver.
+	 * @param OutFailureReason First pin mismatch.
+	 * @return true when every pin matches in both results.
+	 */
+	bool ComparePinnedPlacementParity(const FWorldCampaignPlacementResult& SynchronousResult,
+	                                  const FWorldCampaignPlacementResult& AsyncResult,
+	                                  FString& OutFailureReason) const;
+
+	/**
+	 * Logs missions only reachable through the enemy HQ that the swap will not fix: pinned missions, and every
+	 * mission when the enemy HQ itself is pinned.
+	 */
+	void ReportPinnedMissionsBlockedByEnemyHQ() const;
 
 	/**
 	 * @brief Validates settings and collects boundary data before generated-anchor spawning begins.
@@ -1769,6 +1889,14 @@ private:
 	bool bM_DeferWorldObjectPromotionDuringBacktracking = false;
 
 	ECampaignGenerationStep M_BacktrackedFailedStepAttemptToPreserve = ECampaignGenerationStep::NotStarted;
+
+	// Pins resolved in the anchor step (or rebuilt from config on restore). Constant across placement retries and
+	// copied into the async snapshot, so it is plain data and not reflected.
+	FWorldCampaignResolvedPins M_ResolvedPins;
+
+	// Live anchors chosen for pins; duplicate-key repair keeps their keys when a copy-pasted anchor shares them.
+	UPROPERTY()
+	TArray<TWeakObjectPtr<AAnchorPoint>> M_ResolvedPinnedAnchorActors;
 
 	int32 M_AsyncPlacementGenerationRequestId = 0;
 	int32 M_AsyncPlacementFutureRequestId = 0;

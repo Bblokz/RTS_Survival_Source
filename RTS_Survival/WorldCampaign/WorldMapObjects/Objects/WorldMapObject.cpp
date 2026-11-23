@@ -32,6 +32,23 @@ void AWorldMapObject::InitializeForAnchor(AAnchorPoint* AnchorPoint)
 	M_AnchorKey = AnchorPoint->GetAnchorKey();
 }
 
+void AWorldMapObject::SetIsClearedByPlayer()
+{
+	if (bM_IsClearedByPlayer)
+	{
+		return;
+	}
+
+	bM_IsClearedByPlayer = true;
+	// Cleared objects must not catch clicks or hover outlines any more, whatever they look like.
+	SetActorEnableCollision(false);
+	if (bM_HideWhenClearedByPlayer)
+	{
+		SetActorHiddenInGame(true);
+	}
+	BP_OnClearedByPlayer();
+}
+
 FString AWorldMapObject::GetObjectDebugName() const
 {
 	return GetName();

@@ -31,6 +31,14 @@ public:
 
 	TMap<FTrainingOption, bool> GetProfileUnitsSpawned() const { return M_IsProfileUnitSpawned; }
 
+	/**
+	 * @brief The deck this mission plays with: the world-map deck for a campaign operation that has one, else the
+	 * cards of the PlayerProfile save. Other mission systems that read selected cards use this so both agree.
+	 * @param WorldContextObject Any object in the mission world.
+	 * @return The selected cards; empty when neither source exists.
+	 */
+	static TArray<FCardSaveData> GetSelectedCardsForMission(const UObject* WorldContextObject);
+
 protected:
 	// Called when the game starts
 	virtual void BeginPlay() override;

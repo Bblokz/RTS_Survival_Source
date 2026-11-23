@@ -99,6 +99,7 @@ namespace CampaignMapTest
 		FString BuildSeedPlacementReport(
 			const int32 Seed,
 			const FWorldCampaignPlacementState& State,
+			const FWorldCampaignResolvedPins& PinnedPlaces,
 			const bool bSuccess,
 			const FString& FailureReason,
 			uint32& OutFingerprint)
@@ -192,6 +193,29 @@ namespace CampaignMapTest
 					                          *LocationString(Key),
 					                          *MissionName(State.MissionsByAnchorKey.FindChecked(Key))));
 				}
+			}
+
+			// Pin lines only when pins exist, so fingerprints of pin-free runs match the pre-pin baselines.
+			if (PinnedPlaces.HasAnyPins())
+			{
+				Lines.Add(FString::Printf(TEXT("PINS %d"), PinnedPlaces.GetPins().Num()));
+				TArray<FString> PinLines;
+				for (const FWorldCampaignResolvedPin& Pin : PinnedPlaces.GetPins())
+				{
+					const UEnum* RoleEnum = StaticEnum<EWorldPinnedPlaceRole>();
+					const FString RoleName = RoleEnum
+						                         ? RoleEnum->GetNameStringByValue(static_cast<int64>(Pin.Role))
+						                         : FString::FromInt(static_cast<int32>(Pin.Role));
+					PinLines.Add(FString::Printf(TEXT("PIN id=%s role=%s mission=%s key=%s loc=%s"),
+					                             *Pin.PinId.ToString(),
+					                             *RoleName,
+					                             *MissionName(Pin.Mission),
+					                             *KeyString(Pin.AnchorKey),
+					                             *LocationString(Pin.AnchorKey)));
+				}
+
+				PinLines.Sort();
+				Lines.Append(PinLines);
 			}
 
 			// Every anchor (including pruned-through empty routing anchors that survived) for a full graph diff.
@@ -322,7 +346,8 @@ namespace CampaignMapTest
 			const FWorldCampaignPlacementState& State = Generator->GetPlacementState();
 
 			uint32 Fingerprint = 0;
-			const FString SeedReport = BuildSeedPlacementReport(Seed, State, bSuccess, FailureReason, Fingerprint);
+			const FString SeedReport = BuildSeedPlacementReport(Seed, State, Generator->GetResolvedPinnedPlaces(),
+			                                                    bSuccess, FailureReason, Fingerprint);
 
 			const FString SeedFilePath = RunDirectory / FString::Printf(TEXT("Seed_%06d.log"), Seed);
 			if (not FFileHelper::SaveStringToFile(SeedReport, *SeedFilePath))

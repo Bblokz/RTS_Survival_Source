@@ -85,3 +85,20 @@ Current enemy turn flow:
 4. End the enemy turn, advance the current turn, update the turn counter UI, save campaign state, and start the next player turn.
 
 As more campaign systems are added, keep turn-long effects and one-mission-equals-one-turn logic in WorldCampaign state/manager code. UI should display the state; it should not be the authority for whether a campaign item was completed, attacked, revealed, or timed out.
+
+## Update 2026-11-23: turn flow and campaign progress
+
+The turn flow described above changed on 2026-11-23. Details: `Docs/Campaign/WorldMapCampaignDesign.md`, section 10.
+
+- A new campaign starts on the player turn 1. The enemy turn no longer runs on every load of the map: it runs
+  only after an operation the player returned from, won or lost.
+- `UWorldCampaignProgressManager` (on the world player controller) owns `FWorldCampaignProgressState`, which is
+  saved as `FWorldCampaignState::Progress`: missions won, cleared anchors, map resources, bought tech, buildings,
+  enemy alert and freeze, commander map state and the pending operation. Add campaign progress there.
+- Launching an operation records it as pending and saves before the level opens. The mission reports a result to
+  `URTSGameInstance`; the world map applies it on load (`WorldSetupComplete_ResolveReturningOperation`).
+- The enemy turn is played by `UWorldEnemyTurnDirector`, which calls back when all enemy movement has ended.
+- Divisions are enemy-only pieces. The player has none.
+- Pinned places, countries and build nodes are config (`UWorldCampaignMapContentSettings`), not level actors.
+- Never run the world map headless without `-RTSWorldCampaignSaveSlot=<name>`: it would overwrite the real campaign
+  save.

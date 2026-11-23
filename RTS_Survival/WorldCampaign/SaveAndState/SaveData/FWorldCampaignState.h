@@ -10,6 +10,7 @@
 #include "RTS_Survival/WorldCampaign/CampaignGeneration/Enums/Enum_MapPlayerItem.h"
 #include "RTS_Survival/WorldCampaign/CampaignGeneration/Enums/GenerationStep/Enum_CampaignGenerationStep.h"
 #include "RTS_Survival/WorldCampaign/CampaignGeneration/Enums/NeutralObjectType/Enum_MapNeutralObjectType.h"
+#include "RTS_Survival/WorldCampaign/CampaignProgress/WorldCampaignProgressState.h"
 #include "RTS_Survival/WorldCampaign/PlayerProfile/FPlayerProfileSaveData.h"
 #include "RTS_Survival/WorldCampaign/StrengthTypes/WorldStrengthTypes.h"
 #include "RTS_Survival/Units/Enums/Enum_UnitType.h"
@@ -172,6 +173,10 @@ struct RTS_SURVIVAL_API FWorldCampaignState
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame)
 	TArray<FWorldDivisionSaveData> WorldDivisions;
+
+	/** What was won, bought and built, and what the enemy is up to; owned at runtime by UWorldCampaignProgressManager. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame)
+	FWorldCampaignProgressState Progress;
 
 	bool GetIsValidForRestore() const;
 };

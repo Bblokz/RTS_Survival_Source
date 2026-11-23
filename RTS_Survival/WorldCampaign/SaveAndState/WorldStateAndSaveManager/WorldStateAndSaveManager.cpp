@@ -7,6 +7,7 @@
 #include "HAL/PlatformFileManager.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/WorldCampaign/CampaignGeneration/GeneratorWorldCampaign/GeneratorWorldCampaign.h"
+#include "RTS_Survival/WorldCampaign/CampaignProgress/WorldCampaignProgressManager.h"
 #include "RTS_Survival/WorldCampaign/WorldPlayer/Controller/WorldPlayerController.h"
 
 namespace
@@ -15,6 +16,38 @@ namespace
 	const FString SaveGameExtension = TEXT(".sav");
 	const FString BackupDirectoryName = TEXT("backup");
 	constexpr int32 WorldCampaignUserIndex = 0;
+
+	// Empty = use the real slot. Set by tests so they never overwrite the real campaign.
+	FString WorldCampaignSaveSlotNameOverride;
+}
+
+bool UWorldStateAndSaveManager::GetDoesCampaignSaveExist()
+{
+	return UGameplayStatics::DoesSaveGameExist(GetCampaignSaveSlotName(), WorldCampaignUserIndex);
+}
+
+void UWorldStateAndSaveManager::SetCampaignSaveSlotNameOverride(const FString& SlotName)
+{
+	WorldCampaignSaveSlotNameOverride = SlotName;
+}
+
+FString UWorldStateAndSaveManager::GetCampaignSaveSlotName()
+{
+#if !UE_BUILD_SHIPPING
+	// -RTSWorldCampaignSaveSlot=Name: headless checks of the world map write to their own slot.
+	static bool bHasReadCommandLineSlot = false;
+	if (not bHasReadCommandLineSlot)
+	{
+		bHasReadCommandLineSlot = true;
+		FString CommandLineSlotName;
+		if (FParse::Value(FCommandLine::Get(), TEXT("-RTSWorldCampaignSaveSlot="), CommandLineSlotName)
+			&& WorldCampaignSaveSlotNameOverride.IsEmpty())
+		{
+			WorldCampaignSaveSlotNameOverride = CommandLineSlotName;
+		}
+	}
+#endif
+	return WorldCampaignSaveSlotNameOverride.IsEmpty() ? WorldCampaignSaveSlotName : WorldCampaignSaveSlotNameOverride;
 }
 
 UWorldStateAndSaveManager::UWorldStateAndSaveManager()
@@ -26,7 +59,9 @@ void UWorldStateAndSaveManager::CacheCurrentWorldState(const AGeneratorWorldCamp
 {
 	const int32 CachedCurrentTurn = M_WorldCampaignState.CurrentTurn;
 	const int32 CachedEnemyObjectProceduralMapIndex = M_WorldCampaignState.EnemyObjectProceduralMapIndex;
+	const FWorldCampaignProgressState CachedProgress = M_WorldCampaignState.Progress;
 	M_WorldCampaignState = WorldGenerator.BuildWorldCampaignStateFromCurrentGeneration();
+	M_WorldCampaignState.Progress = CachedProgress;
 	M_WorldCampaignState.CurrentTurn = CachedCurrentTurn;
 	M_WorldCampaignState.EnemyObjectProceduralMapIndex = CachedEnemyObjectProceduralMapIndex;
 }
@@ -68,7 +103,7 @@ bool UWorldStateAndSaveManager::SaveCampaignState()
 bool UWorldStateAndSaveManager::LoadCampaignState(FWorldCampaignState& OutWorldCampaignState,
                                                   FPlayerProfileSaveData& OutPlayerProfileSaveData)
 {
-	USaveGame* LoadedSaveGame = UGameplayStatics::LoadGameFromSlot(WorldCampaignSaveSlotName, WorldCampaignUserIndex);
+	USaveGame* LoadedSaveGame = UGameplayStatics::LoadGameFromSlot(GetCampaignSaveSlotName(), WorldCampaignUserIndex);
 	USaveWorldCampaign* LoadedCampaignSave = Cast<USaveWorldCampaign>(LoadedSaveGame);
 	if (not IsValid(LoadedCampaignSave))
 	{
@@ -139,7 +174,18 @@ int32 UWorldStateAndSaveManager::AdvanceEnemyObjectProceduralMapIndex(const int3
 
 FWorldCampaignState UWorldStateAndSaveManager::AggregateWorldCampaignState() const
 {
-	return M_WorldCampaignState;
+	FWorldCampaignState WorldCampaignState = M_WorldCampaignState;
+	// The progress manager owns the live progress; the cached copy is only what was last loaded.
+	const AActor* OwningActor = GetOwner();
+	const UWorldCampaignProgressManager* ProgressManager = IsValid(OwningActor)
+		                                                       ? OwningActor->FindComponentByClass<
+			                                                       UWorldCampaignProgressManager>()
+		                                                       : nullptr;
+	if (IsValid(ProgressManager))
+	{
+		WorldCampaignState.Progress = ProgressManager->GetProgressState();
+	}
+	return WorldCampaignState;
 }
 
 FPlayerProfileSaveData UWorldStateAndSaveManager::AggregatePlayerSaveState() const
@@ -156,7 +202,7 @@ bool UWorldStateAndSaveManager::SaveMainCampaignSlot(const FWorldCampaignState& 
 		return false;
 	}
 
-	const bool bDidSave = UGameplayStatics::SaveGameToSlot(SavePayload, WorldCampaignSaveSlotName,
+	const bool bDidSave = UGameplayStatics::SaveGameToSlot(SavePayload, GetCampaignSaveSlotName(),
 	                                                     WorldCampaignUserIndex);
 	if (not bDidSave)
 	{
@@ -212,13 +258,13 @@ USaveWorldCampaign* UWorldStateAndSaveManager::CreateSavePayload(
 
 FString UWorldStateAndSaveManager::GetMainSaveFilePath() const
 {
-	return FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("SaveGames"), WorldCampaignSaveSlotName + SaveGameExtension);
+	return FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("SaveGames"), GetCampaignSaveSlotName() + SaveGameExtension);
 }
 
 FString UWorldStateAndSaveManager::GetBackupSaveFilePath() const
 {
 	return FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("SaveGames"), BackupDirectoryName,
-	                       WorldCampaignSaveSlotName + SaveGameExtension);
+	                       GetCampaignSaveSlotName() + SaveGameExtension);
 }
 
 bool UWorldStateAndSaveManager::EnsureBackupDirectoryExists() const

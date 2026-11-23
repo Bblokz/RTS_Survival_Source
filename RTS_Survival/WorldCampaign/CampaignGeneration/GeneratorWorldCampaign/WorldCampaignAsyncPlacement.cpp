@@ -506,6 +506,7 @@ namespace
 			State.SeedUsed = Snapshot->SeedUsed;
 			UpdateProgress(TEXT("Building derived graph caches"), ECampaignGenerationStep::ConnectionsCreated);
 			InitializeDerivedDataFromSnapshot();
+			ApplyPinnedMissionPreSeed();
 
 			UpdateProgress(TEXT("Running placement backtracking"), ECampaignGenerationStep::PlayerHQPlaced);
 			if (not ExecutePlacementBacktracking())
@@ -1728,18 +1729,123 @@ namespace
 			return NeutralType != nullptr && *NeutralType == RequiredNeutralType;
 		}
 
+		/**
+		 * Mirrors AGeneratorWorldCampaign::ApplyPinnedMissionPreSeedToPlacementState: pinned story missions occupy
+		 * their anchors before any seeded step runs, so every transaction snapshot taken afterwards keeps them.
+		 */
+		void ApplyPinnedMissionPreSeed()
+		{
+			if (not Snapshot->PinnedPlaces.HasAnyPins())
+			{
+				return;
+			}
+
+			WorldCampaignPinnedPlaces::ApplyPinnedMissionPreSeed(
+				Snapshot->PinnedPlaces,
+				[this](const FGuid& AnchorKey)
+				{
+					return IsAnchorCached(AnchorKey);
+				},
+				State.MissionsByAnchorKey);
+		}
+
+		bool GetIsPinnedMissionAnchorKey(const FGuid& AnchorKey) const
+		{
+			return Snapshot->PinnedPlaces.GetIsPinnedMissionAnchorKey(AnchorKey);
+		}
+
+		/**
+		 * Unpinned single-anchor roles must not take an anchor reserved by any pin; pinned roles use only their pin.
+		 * Without pins the source is returned unchanged so results match the pre-pin solver.
+		 */
+		TArray<int32> RestrictCandidateSourceForRole(const TArray<int32>& CandidateSource,
+		                                             const EWorldPinnedPlaceRole Role) const
+		{
+			if (not Snapshot->PinnedPlaces.HasAnyPins())
+			{
+				return CandidateSource;
+			}
+
+			const FGuid RolePinKey = Snapshot->PinnedPlaces.GetAnchorKeyForRole(Role);
+			const TArray<int32>& SourceToFilter = RolePinKey.IsValid() ? AnchorIndicesInSnapshotOrder : CandidateSource;
+			TArray<FGuid> SourceKeys;
+			SourceKeys.Reserve(SourceToFilter.Num());
+			for (const int32 AnchorIndex : SourceToFilter)
+			{
+				SourceKeys.Add(GetAnchorKey(AnchorIndex));
+			}
+
+			const TArray<int32> KeptPositions = WorldCampaignPinnedPlaces::SelectCandidatePositionsForRole(
+				SourceKeys, RolePinKey, Snapshot->PinnedPlaces.GetPinnedAnchorKeys());
+			TArray<int32> RestrictedSource;
+			RestrictedSource.Reserve(KeptPositions.Num());
+			for (const int32 Position : KeptPositions)
+			{
+				RestrictedSource.Add(SourceToFilter[Position]);
+			}
+
+			return RestrictedSource;
+		}
+
+		/**
+		 * A pinned HQ skips the degree and neighbourhood rules: the story places it, not the topology.
+		 * Mirrors AGeneratorWorldCampaign::TryFinalizePlayerHQPlacement for the pinned anchor.
+		 */
+		bool TryPlacePinnedPlayerHQ(const FGuid& PinnedAnchorKey)
+		{
+			const int32 PinnedAnchorIndex = FindAnchorIndexByKey(PinnedAnchorKey);
+			if (not IsAnchorCached(PinnedAnchorIndex))
+			{
+				AddDebugEvent(ECampaignGenerationStep::PlayerHQPlaced,
+				              TEXT("Player HQ failed: pinned anchor is not in the graph."));
+				return false;
+			}
+
+			State.PlayerHQAnchorKey = PinnedAnchorKey;
+			State.PlayerHQAnchorIndex = PinnedAnchorIndex;
+			BuildHopDistanceCache(PinnedAnchorIndex, DerivedData.PlayerHQHopDistancesByAnchorKey);
+			BuildChokepointScores(true, PinnedAnchorKey);
+			return true;
+		}
+
+		bool TryPlacePinnedEnemyHQ(const FGuid& PinnedAnchorKey)
+		{
+			const int32 PinnedAnchorIndex = FindAnchorIndexByKey(PinnedAnchorKey);
+			if (not IsAnchorCached(PinnedAnchorIndex) || PinnedAnchorKey == State.PlayerHQAnchorKey)
+			{
+				AddDebugEvent(ECampaignGenerationStep::EnemyHQPlaced,
+				              TEXT("Enemy HQ failed: pinned anchor is not in the graph or holds the player HQ."));
+				return false;
+			}
+
+			State.EnemyHQAnchorKey = PinnedAnchorKey;
+			State.EnemyHQAnchorIndex = PinnedAnchorIndex;
+			BuildHopDistanceCache(PinnedAnchorIndex, DerivedData.EnemyHQHopDistancesByAnchorKey);
+			return true;
+		}
+
 		TArray<int32> GetPlayerHQCandidateSource() const
 		{
-			return Snapshot->PlayerHQPlacementRules.AnchorCandidateIndices.Num() > 0
-				       ? Snapshot->PlayerHQPlacementRules.AnchorCandidateIndices
-				       : AnchorIndicesInSnapshotOrder;
+			return RestrictCandidateSourceForRole(
+				Snapshot->PlayerHQPlacementRules.AnchorCandidateIndices.Num() > 0
+					? Snapshot->PlayerHQPlacementRules.AnchorCandidateIndices
+					: AnchorIndicesInSnapshotOrder,
+				EWorldPinnedPlaceRole::PlayerHQ);
 		}
 
 		TArray<int32> GetEnemyHQCandidateSource() const
 		{
-			return Snapshot->EnemyHQPlacementRules.AnchorCandidateIndices.Num() > 0
-				       ? Snapshot->EnemyHQPlacementRules.AnchorCandidateIndices
-				       : AnchorIndicesInSnapshotOrder;
+			return RestrictCandidateSourceForRole(
+				Snapshot->EnemyHQPlacementRules.AnchorCandidateIndices.Num() > 0
+					? Snapshot->EnemyHQPlacementRules.AnchorCandidateIndices
+					: AnchorIndicesInSnapshotOrder,
+				EWorldPinnedPlaceRole::EnemyHQ);
+		}
+
+		TArray<int32> GetEnemyWallCandidateSource() const
+		{
+			return RestrictCandidateSourceForRole(Snapshot->EnemyWallPlacementRules.AnchorCandidateIndices,
+			                                      EWorldPinnedPlaceRole::EnemyWall);
 		}
 
 		bool BuildHQAnchorCandidates(const TArray<int32>& CandidateSource, const int32 MinDegree,
@@ -1800,6 +1906,13 @@ namespace
 			{
 				AddDebugEvent(ECampaignGenerationStep::PlayerHQPlaced, TEXT("Player HQ failed: no anchors."));
 				return false;
+			}
+
+			const FGuid PinnedPlayerHQAnchorKey =
+				Snapshot->PinnedPlaces.GetAnchorKeyForRole(EWorldPinnedPlaceRole::PlayerHQ);
+			if (PinnedPlayerHQAnchorKey.IsValid())
+			{
+				return TryPlacePinnedPlayerHQ(PinnedPlayerHQAnchorKey);
 			}
 
 			constexpr int32 MaxAnchorDegreeUnlimited = TNumericLimits<int32>::Max();
@@ -1885,6 +1998,12 @@ namespace
 			{
 				AddDebugEvent(ECampaignGenerationStep::EnemyHQPlaced, TEXT("Enemy HQ failed: prerequisites missing."));
 				return false;
+			}
+
+			const FGuid PinnedEnemyHQAnchorKey = Snapshot->PinnedPlaces.GetAnchorKeyForRole(EWorldPinnedPlaceRole::EnemyHQ);
+			if (PinnedEnemyHQAnchorKey.IsValid())
+			{
+				return TryPlacePinnedEnemyHQ(PinnedEnemyHQAnchorKey);
 			}
 
 			constexpr int32 MinAnchorDegreeFloor = 0;
@@ -1975,8 +2094,10 @@ namespace
 		bool ExecutePlaceEnemyWall()
 		{
 			RecordPlacementAttempt();
-			if (not IsAnchorCached(State.EnemyHQAnchorIndex) || Snapshot->EnemyWallPlacementRules.AnchorCandidateIndices.
-			                                                            Num() == 0)
+			const bool bHasPinnedEnemyWall =
+				Snapshot->PinnedPlaces.GetAnchorKeyForRole(EWorldPinnedPlaceRole::EnemyWall).IsValid();
+			if (not IsAnchorCached(State.EnemyHQAnchorIndex)
+				|| (not bHasPinnedEnemyWall && Snapshot->EnemyWallPlacementRules.AnchorCandidateIndices.Num() == 0))
 			{
 				AddDebugEvent(ECampaignGenerationStep::EnemyWallPlaced,
 				              TEXT("Enemy wall failed: prerequisites missing."));
@@ -2000,11 +2121,10 @@ namespace
 		                                          FWorldCampaignKeyPlacementCandidate& OutCandidate) const
 		{
 			TArray<FWorldCampaignKeyPlacementCandidate> Candidates;
-			for (int32 SourceIndex = 0;
-			     SourceIndex < Snapshot->EnemyWallPlacementRules.AnchorCandidateIndices.Num();
-			     SourceIndex++)
+			const TArray<int32> WallCandidateSource = GetEnemyWallCandidateSource();
+			for (int32 SourceIndex = 0; SourceIndex < WallCandidateSource.Num(); SourceIndex++)
 			{
-				const int32 CandidateIndex = Snapshot->EnemyWallPlacementRules.AnchorCandidateIndices[SourceIndex];
+				const int32 CandidateIndex = WallCandidateSource[SourceIndex];
 				const FGuid CandidateKey = GetAnchorKey(CandidateIndex);
 				if (not IsAnchorCached(CandidateIndex) || IsAnchorOccupied(CandidateKey))
 				{
@@ -2649,6 +2769,7 @@ namespace
 				PlacementPlan.Add(MissionType);
 			}
 
+			WorldCampaignPinnedPlaces::RemovePinnedMissionsFromPlan(Snapshot->PinnedPlaces, PlacementPlan);
 			return PlacementPlan;
 		}
 
@@ -3080,16 +3201,19 @@ namespace
 
 			const int32 MissionAnchorIndex = FindAnchorIndexByKey(MissionAnchorKey);
 			const int32 HopDistance = GetHopDistance(MissionAnchorIndex, CandidateIndex);
-			if (HopDistance == INDEX_NONE)
+			const int32 MaxSpacingClamped = FMath::Max(EffectiveRules.MinMissionSpacingHops,
+			                                           EffectiveRules.MaxMissionSpacingHops);
+			// Pinned story missions only enforce min spacing; see WorldCampaignPinnedPlaces::PassesMissionHopSpacingBand.
+			if (not WorldCampaignPinnedPlaces::PassesMissionHopSpacingBand(
+				HopDistance, EffectiveRules.MinMissionSpacingHops, MaxSpacingClamped,
+				GetIsPinnedMissionAnchorKey(MissionAnchorKey)))
 			{
 				return false;
 			}
 
-			const int32 MaxSpacingClamped = FMath::Max(EffectiveRules.MinMissionSpacingHops,
-			                                           EffectiveRules.MaxMissionSpacingHops);
-			if (HopDistance < EffectiveRules.MinMissionSpacingHops || HopDistance > MaxSpacingClamped)
+			if (HopDistance == INDEX_NONE)
 			{
-				return false;
+				return true;
 			}
 
 			InOutNearestMissionHopDistance = FMath::Min(
@@ -3108,7 +3232,9 @@ namespace
 
 			const int32 MissionAnchorIndex = FindAnchorIndexByKey(MissionAnchorKey);
 			const float XYDistance = GetXYDistance(CandidateIndex, MissionAnchorIndex);
-			if (XYDistance < EffectiveRules.MinMissionSpacingXY || XYDistance > EffectiveRules.MaxMissionSpacingXY)
+			if (not WorldCampaignPinnedPlaces::PassesMissionXYSpacingBand(
+				XYDistance, EffectiveRules.MinMissionSpacingXY, EffectiveRules.MaxMissionSpacingXY,
+				GetIsPinnedMissionAnchorKey(MissionAnchorKey)))
 			{
 				return false;
 			}

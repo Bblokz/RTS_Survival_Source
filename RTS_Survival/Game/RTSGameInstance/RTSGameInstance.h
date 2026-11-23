@@ -67,6 +67,8 @@ public:
 	bool GetHasPlayerFaction() const;
 	bool GetIsPlayerFactionChosenByPlayer() const { return bM_IsPlayerFactionChosenByPlayer; }
 	ERTSCommander GetPlayerCommander() const ;
+	// False until the commander screen (or PIE settings, a test, or a loaded campaign) set one; no error is reported.
+	bool GetHasPlayerCommander() const;
 	// Picked in the faction selection menu; FRTS_TeamColor writes it to the player's vehicles.
 	void SetPlayerTeamColor(const FLinearColor& TeamColor) { M_PlayerTeamColor = TeamColor; }
 	FLinearColor GetPlayerTeamColor() const { return M_PlayerTeamColor; }
@@ -82,6 +84,41 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "World Campaign|Mission Context")
 	void ResetWorldMissionContext();
+
+	/**
+	 * @brief Whether the running mission is a turn of the world campaign (the world map launched it).
+	 * @return false for survival, hangar playtests, PIE and maps opened directly.
+	 */
+	UFUNCTION(BlueprintPure, Category = "World Campaign|Mission Context")
+	bool GetIsCampaignOperation() const { return M_WorldMissionContext.GetIsCampaignOperation(); }
+
+	/**
+	 * @brief Records how the running campaign operation ended, for the world map to read when it loads again.
+	 * @param Outcome Victory or Defeat.
+	 * @return false when no campaign operation is running; nothing is recorded then.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "World Campaign|Mission Result")
+	bool ReportWorldMissionResult(EWorldMissionOutcome Outcome);
+
+	UFUNCTION(BlueprintPure, Category = "World Campaign|Mission Result")
+	FWorldMissionResult GetWorldMissionResult() const { return M_WorldMissionResult; }
+
+	/** Called by the world map right before it opens an operation level. */
+	void SetWorldMissionOperationLevel(const TSoftObjectPtr<UWorld>& OperationLevel);
+
+	/** Hands the stored result to the world map once and clears it, together with the mission context. */
+	FWorldMissionResult ConsumeWorldMissionResult();
+
+	/**
+	 * @brief Makes the next world map load restore the saved campaign instead of generating a new one.
+	 * Called before an operation level opens, and by a "continue campaign" menu entry.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "World Campaign")
+	void RequestLoadSavedCampaign();
+
+	/** Level that holds the campaign world map, from the map content settings. */
+	UFUNCTION(BlueprintPure, Category = "World Campaign")
+	static TSoftObjectPtr<UWorld> GetWorldCampaignMap();
 
 	// Set before opening the faction selection map; when on, the player picks unit variants after the faction.
 	UFUNCTION(BlueprintCallable, Category = "Pre-Game Setup")
@@ -118,6 +155,13 @@ private:
 		const TMap<ERTSAudioType, TSoftObjectPtr<USoundClass>>& SoundClassesByType);
 
     void BeginLoadingScreen(const FString& MapName);
+
+	/**
+	 * @brief Ends a campaign operation that was left without returning to the world map (escape menu, main menu):
+	 * its context and result are dropped as soon as a level loads that is neither its own nor the world map.
+	 * @param MapName Level about to load, as PreLoadMap reports it.
+	 */
+	void DropCampaignOperationWhenLeavingItsLevel(const FString& MapName);
     void EndLoadingScreen(UWorld* LoadedWorld);
 
     void StopLoadingScreen();
@@ -140,6 +184,9 @@ private:
 
 	UPROPERTY()
 	FWorldMissionContext M_WorldMissionContext;
+
+	UPROPERTY()
+	FWorldMissionResult M_WorldMissionResult;
 
 	// Keeps the selected setup flow and destination alive across pre-game map transitions.
 	UPROPERTY()

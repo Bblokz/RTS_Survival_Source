@@ -15,6 +15,8 @@
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/WorldCampaign/CampaignGeneration/Debugging/WorldCampaignDebugger.h"
 #include "RTS_Survival/WorldCampaign/DeveloperSettings/WorldCampaignSettings.h"
+#include "RTS_Survival/WorldCampaign/DeveloperSettings/WorldCampaignMapContentSettings.h"
+#include "RTS_Survival/WorldCampaign/CampaignGeneration/PinnedPlaces/WorldCampaignPinnedPlaces.h"
 #include "RTS_Survival/WorldCampaign/CampaignGeneration/GenerationHelpers/WorldCampaignGenerationHelper.h"
 #include "RTS_Survival/WorldCampaign/CampaignGeneration/GenerationHelpers/WorldCampaignPruningHelper.h"
 #include "RTS_Survival/WorldCampaign/StrengthTypes/WorldFortificationModificationsComponent.h"
@@ -65,6 +67,9 @@ namespace
 	constexpr int32 PlayerHQForcePlacementSeedOffset = 4021;
 	constexpr int32 EnemyHQForcePlacementSeedOffset = 4027;
 	const FName GeneratedAnchorTag(TEXT("WC_GeneratedAnchor"));
+	// Added next to GeneratedAnchorTag on spawned pinned anchors: erase/undo/restore treat them as generated, while
+	// pruning keeps them because their keys are pinned.
+	const FName PinnedAnchorTag(TEXT("WC_PinnedAnchor"));
 	const TCHAR* const RepairedAnchorKeyPrefix = TEXT("WorldCampaign.RepairedAnchorKey");
 	constexpr uint64 Mix64Increment = 0x9E3779B97F4A7C15ull;
 	constexpr uint64 Mix64MultiplierA = 0xBF58476D1CE4E5B9ull;
@@ -2978,29 +2983,32 @@ namespace
 				continue;
 			}
 
+			// Pinned story missions only enforce min spacing; see WorldCampaignPinnedPlaces::PassesMissionHopSpacingBand.
+			const bool bIsPinnedMission = WorkingPlacementState.PinnedMissionAnchorKeys.Contains(MissionAnchorKey);
 			if (EffectiveRules.bUseMissionSpacingHops)
 			{
 				const int32 HopDistance = CampaignGenerationHelper::HopsFromHQ(CandidateAnchor, MissionAnchor);
-				if (HopDistance == INDEX_NONE)
-				{
-					return false;
-				}
-
 				const int32 MaxSpacingClamped = FMath::Max(EffectiveRules.MinMissionSpacingHops,
 				                                           EffectiveRules.MaxMissionSpacingHops);
-				if (HopDistance < EffectiveRules.MinMissionSpacingHops || HopDistance > MaxSpacingClamped)
+				if (not WorldCampaignPinnedPlaces::PassesMissionHopSpacingBand(
+					HopDistance, EffectiveRules.MinMissionSpacingHops, MaxSpacingClamped, bIsPinnedMission))
 				{
 					return false;
 				}
 
-				OutNearestMissionHopDistance =
-					FMath::Min(OutNearestMissionHopDistance, static_cast<float>(HopDistance));
+				if (HopDistance != INDEX_NONE)
+				{
+					OutNearestMissionHopDistance =
+						FMath::Min(OutNearestMissionHopDistance, static_cast<float>(HopDistance));
+				}
 			}
 
 			if (EffectiveRules.bUseMissionSpacingXY)
 			{
 				const float XYDistance = CampaignGenerationHelper::XYDistanceFromHQ(CandidateAnchor, MissionAnchor);
-				if (XYDistance < EffectiveRules.MinMissionSpacingXY || XYDistance > EffectiveRules.MaxMissionSpacingXY)
+				if (not WorldCampaignPinnedPlaces::PassesMissionXYSpacingBand(
+					XYDistance, EffectiveRules.MinMissionSpacingXY, EffectiveRules.MaxMissionSpacingXY,
+					bIsPinnedMission))
 				{
 					return false;
 				}
@@ -5392,6 +5400,7 @@ void AGeneratorWorldCampaign::RestoreWorldStateFromSave(const FWorldCampaignStat
 	RestoreSavedConnections(WorldCampaignState, AnchorsByKey);
 	RestoreSavedMapItems(WorldCampaignState, AnchorsByKey);
 	ApplyRestoredPlacementState(WorldCampaignState, AnchorsByKey, RestoredAnchors);
+	RestorePinnedPlacesFromSave(AnchorsByKey);
 }
 
 void AGeneratorWorldCampaign::PruneUnusedAnchorsAndRepairConnectivity()
@@ -5429,6 +5438,13 @@ void AGeneratorWorldCampaign::EnsureMissionObjectsAreReachableBeforeEnemyHQ()
 		return;
 	}
 
+	// A pinned enemy HQ never moves; a pinned mission is never swapped (the finder skips it). Both only log.
+	if (M_ResolvedPins.GetIsPinnedAnchorKey(M_PlacementState.EnemyHQAnchorKey))
+	{
+		ReportPinnedMissionsBlockedByEnemyHQ();
+		return;
+	}
+
 	const int32 MaxMissionHQSwaps = M_PlacementState.MissionsByAnchorKey.Num();
 	for (int32 SwapIndex = 0; SwapIndex < MaxMissionHQSwaps; SwapIndex++)
 	{
@@ -5436,6 +5452,7 @@ void AGeneratorWorldCampaign::EnsureMissionObjectsAreReachableBeforeEnemyHQ()
 		EMapMission MissionType = EMapMission::None;
 		if (not TryFindMissionObjectReachableOnlyThroughEnemyHQ(MissionAnchorKey, MissionType))
 		{
+			ReportPinnedMissionsBlockedByEnemyHQ();
 			return;
 		}
 
@@ -5454,6 +5471,8 @@ void AGeneratorWorldCampaign::EnsureMissionObjectsAreReachableBeforeEnemyHQ()
 		RTSFunctionLibrary::ReportError(
 			TEXT("Enemy HQ mission reachability correction still has blocked missions after the swap budget."));
 	}
+
+	ReportPinnedMissionsBlockedByEnemyHQ();
 }
 
 bool AGeneratorWorldCampaign::GenerateAndValidatePrunedWorldForSeed(const int32 Seed, FString& OutFailureReason)
@@ -5846,6 +5865,417 @@ void AGeneratorWorldCampaign::ApplyRestoredPlacementState(const FWorldCampaignSt
 	M_GenerationStep = WorldCampaignState.GenerationStep;
 }
 
+namespace
+{
+	bool GetDoesPlacementResultHoldPinnedPlace(const FWorldCampaignPlacementResult& Result,
+	                                           const FWorldCampaignResolvedPin& Pin)
+	{
+		switch (Pin.Role)
+		{
+		case EWorldPinnedPlaceRole::PlayerHQ:
+			return Result.PlayerHQAnchorKey == Pin.AnchorKey;
+		case EWorldPinnedPlaceRole::EnemyHQ:
+			return Result.EnemyHQAnchorKey == Pin.AnchorKey;
+		case EWorldPinnedPlaceRole::EnemyWall:
+			return Result.EnemyItemsByAnchorKey.FindRef(Pin.AnchorKey) == EMapEnemyItem::EnemyWall;
+		case EWorldPinnedPlaceRole::Mission:
+			return Result.MissionsByAnchorKey.FindRef(Pin.AnchorKey) == Pin.Mission;
+		default:
+			return true;
+		}
+	}
+}
+
+bool AGeneratorWorldCampaign::GetIsPinnedAnchorKey(const FGuid& AnchorKey) const
+{
+	return M_ResolvedPins.GetIsPinnedAnchorKey(AnchorKey);
+}
+
+FName AGeneratorWorldCampaign::GetPinIdForAnchorKey(const FGuid& AnchorKey) const
+{
+	return M_ResolvedPins.GetPinIdForAnchorKey(AnchorKey);
+}
+
+bool AGeneratorWorldCampaign::TryGetAnchorKeyForPinId(const FName PinId, FGuid& OutAnchorKey) const
+{
+	return M_ResolvedPins.TryGetAnchorKeyForPinId(PinId, OutAnchorKey);
+}
+
+bool AGeneratorWorldCampaign::GetIsStoryMissionAnchorKey(const FGuid& AnchorKey) const
+{
+	return M_ResolvedPins.GetIsPinnedMissionAnchorKey(AnchorKey);
+}
+
+TArray<FWorldCampaignPinnedPlace> AGeneratorWorldCampaign::GetUsablePinnedPlacesFromSettings() const
+{
+	const UWorldCampaignMapContentSettings* MapContentSettings = UWorldCampaignMapContentSettings::Get();
+	if (not IsValid(MapContentSettings))
+	{
+		return TArray<FWorldCampaignPinnedPlace>();
+	}
+
+	TArray<FString> Warnings;
+	TArray<FWorldCampaignPinnedPlace> UsablePlaces = WorldCampaignPinnedPlaces::BuildUsablePinnedPlaces(
+		MapContentSettings->bUsePinnedPlaces,
+		MapContentSettings->PinnedPlaces,
+		Warnings);
+	for (const FString& Warning : Warnings)
+	{
+		UE_LOG(LogRTS, Warning, TEXT("World campaign: %s"), *Warning);
+	}
+
+	return UsablePlaces;
+}
+
+void AGeneratorWorldCampaign::ResolvePinnedPlacesForGeneration(FCampaignGenerationStepTransaction& OutTransaction)
+{
+	M_ResolvedPins.Reset();
+	M_ResolvedPinnedAnchorActors.Reset();
+	const TArray<FWorldCampaignPinnedPlace> UsablePlaces = GetUsablePinnedPlacesFromSettings();
+	if (UsablePlaces.Num() == 0)
+	{
+		return;
+	}
+
+	TArray<TObjectPtr<AAnchorPoint>> SortedAnchors;
+	GatherSortedExistingAnchors(SortedAnchors);
+	for (const FWorldCampaignPinnedPlace& PinnedPlace : UsablePlaces)
+	{
+		ResolveSinglePinnedPlace(PinnedPlace, SortedAnchors, OutTransaction);
+	}
+}
+
+void AGeneratorWorldCampaign::ResolveSinglePinnedPlace(const FWorldCampaignPinnedPlace& PinnedPlace,
+                                                       const TArray<TObjectPtr<AAnchorPoint>>& SortedAnchors,
+                                                       FCampaignGenerationStepTransaction& OutTransaction)
+{
+	const FGuid PinnedAnchorKey = WorldCampaignPinnedPlaces::BuildPinnedAnchorKey(PinnedPlace.PinId);
+	constexpr bool bFindHandPlacedAnchor = false;
+	constexpr bool bFindGeneratedAnchor = true;
+	AAnchorPoint* PinnedAnchor = FindExistingAnchorForPin(SortedAnchors, PinnedPlace.PinId, bFindHandPlacedAnchor);
+	if (not IsValid(PinnedAnchor))
+	{
+		// Reuse a pinned anchor that survived an earlier failed attempt instead of stacking a second one.
+		PinnedAnchor = FindExistingAnchorForPin(SortedAnchors, PinnedPlace.PinId, bFindGeneratedAnchor);
+	}
+
+	if (not IsValid(PinnedAnchor))
+	{
+		PinnedAnchor = SpawnPinnedAnchor(PinnedPlace, PinnedAnchorKey, OutTransaction);
+	}
+
+	if (not IsValid(PinnedAnchor))
+	{
+		RTSFunctionLibrary::ReportError(FString::Printf(
+			TEXT("World campaign: could not resolve an anchor for pinned place %s."),
+			*PinnedPlace.PinId.ToString()));
+		return;
+	}
+
+	/*
+	 * Hand-placed pinned anchors are re-keyed from the pin id too: saves store only anchor keys, so the
+	 * derived key is how restore and the pin lookups find the place again.
+	 */
+	PinnedAnchor->SetAnchorKey(PinnedAnchorKey, true);
+	PinnedAnchor->SetPinId(PinnedPlace.PinId);
+
+	FWorldCampaignResolvedPin ResolvedPin;
+	ResolvedPin.PinId = PinnedPlace.PinId;
+	ResolvedPin.Role = PinnedPlace.Role;
+	ResolvedPin.Mission = PinnedPlace.Mission;
+	ResolvedPin.AnchorKey = PinnedAnchorKey;
+	M_ResolvedPins.AddPin(ResolvedPin);
+	M_ResolvedPinnedAnchorActors.Add(PinnedAnchor);
+}
+
+AAnchorPoint* AGeneratorWorldCampaign::FindExistingAnchorForPin(const TArray<TObjectPtr<AAnchorPoint>>& SortedAnchors,
+                                                                const FName PinId,
+                                                                const bool bWantGeneratedAnchor) const
+{
+	AAnchorPoint* FoundAnchor = nullptr;
+	int32 MatchCount = 0;
+	for (const TObjectPtr<AAnchorPoint>& AnchorPoint : SortedAnchors)
+	{
+		if (not IsValid(AnchorPoint) || AnchorPoint->GetPinId() != PinId)
+		{
+			continue;
+		}
+
+		if (AnchorPoint->Tags.Contains(GeneratedAnchorTag) != bWantGeneratedAnchor)
+		{
+			continue;
+		}
+
+		MatchCount++;
+		if (FoundAnchor == nullptr)
+		{
+			FoundAnchor = AnchorPoint.Get();
+		}
+	}
+
+	if (MatchCount > 1)
+	{
+		UE_LOG(LogRTS, Warning,
+		       TEXT("World campaign: %d anchors carry pin id %s; using %s, the others stay seeded anchors."),
+		       MatchCount,
+		       *PinId.ToString(),
+		       *FoundAnchor->GetName());
+	}
+
+	return FoundAnchor;
+}
+
+AAnchorPoint* AGeneratorWorldCampaign::SpawnPinnedAnchor(const FWorldCampaignPinnedPlace& PinnedPlace,
+                                                         const FGuid& PinnedAnchorKey,
+                                                         FCampaignGenerationStepTransaction& OutTransaction)
+{
+	UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		return nullptr;
+	}
+
+	TSubclassOf<AAnchorPoint> AnchorClass = M_AnchorPointGenerationSettings.M_GeneratedAnchorPointClass;
+	if (not AnchorClass)
+	{
+		AnchorClass = AAnchorPoint::StaticClass();
+	}
+
+	const FTransform SpawnTransform(FRotator::ZeroRotator, PinnedPlace.WorldLocation);
+	AAnchorPoint* SpawnedAnchor = World->SpawnActorDeferred<AAnchorPoint>(
+		AnchorClass, SpawnTransform, nullptr,
+		nullptr,
+		ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+	if (not IsValid(SpawnedAnchor))
+	{
+		return nullptr;
+	}
+
+	SpawnedAnchor->SetAnchorKey(PinnedAnchorKey, true);
+	SpawnedAnchor->SetPinId(PinnedPlace.PinId);
+	SpawnedAnchor->FinishSpawning(SpawnTransform);
+	SpawnedAnchor->Tags.AddUnique(GeneratedAnchorTag);
+	SpawnedAnchor->Tags.AddUnique(PinnedAnchorTag);
+	OutTransaction.SpawnedActors.Add(SpawnedAnchor);
+	return SpawnedAnchor;
+}
+
+void AGeneratorWorldCampaign::PromotePinnedMissionsForManualSteps()
+{
+	if (not M_ResolvedPins.HasAnyPins() || GetShouldDeferWorldObjectPromotion())
+	{
+		return;
+	}
+
+	/*
+	 * Promoted objects are owned by their anchor (M_PromotedWorldObject), so connection re-runs, undo and erase
+	 * clear them through the anchors even though no transaction records them.
+	 */
+	const TMap<FGuid, TObjectPtr<AAnchorPoint>> AnchorLookup = BuildAnchorLookup(M_PlacementState.CachedAnchors);
+	for (const FWorldCampaignResolvedPin& Pin : M_ResolvedPins.GetPins())
+	{
+		AAnchorPoint* PinnedAnchor = FindAnchorByKey(AnchorLookup, Pin.AnchorKey);
+		if (not M_PlacementState.PinnedMissionAnchorKeys.Contains(Pin.AnchorKey) || not IsValid(PinnedAnchor))
+		{
+			continue;
+		}
+
+		if (PinnedAnchor->GetHasPromotedWorldObject())
+		{
+			continue;
+		}
+
+		PinnedAnchor->OnMissionPromotion(Pin.Mission, ECampaignGenerationStep::MissionsPlaced);
+	}
+}
+
+void AGeneratorWorldCampaign::ApplyPinnedMissionPreSeedToPlacementState()
+{
+	M_PlacementState.PinnedMissionAnchorKeys.Reset();
+	if (not M_ResolvedPins.HasAnyPins())
+	{
+		return;
+	}
+
+	const TMap<FGuid, TObjectPtr<AAnchorPoint>> AnchorLookup = BuildAnchorLookup(M_PlacementState.CachedAnchors);
+	WorldCampaignPinnedPlaces::ApplyPinnedMissionPreSeed(
+		M_ResolvedPins,
+		[&AnchorLookup](const FGuid& AnchorKey)
+		{
+			return IsValid(FindAnchorByKey(AnchorLookup, AnchorKey));
+		},
+		M_PlacementState.MissionsByAnchorKey);
+
+	for (const FGuid& PinnedMissionAnchorKey : M_ResolvedPins.GetPinnedMissionAnchorKeys())
+	{
+		if (M_PlacementState.MissionsByAnchorKey.Contains(PinnedMissionAnchorKey))
+		{
+			M_PlacementState.PinnedMissionAnchorKeys.Add(PinnedMissionAnchorKey);
+		}
+	}
+}
+
+AAnchorPoint* AGeneratorWorldCampaign::FindCachedAnchorForPinnedRole(const EWorldPinnedPlaceRole PinnedRole) const
+{
+	const FGuid PinnedAnchorKey = M_ResolvedPins.GetAnchorKeyForRole(PinnedRole);
+	if (not PinnedAnchorKey.IsValid())
+	{
+		return nullptr;
+	}
+
+	return FindAnchorByKey(BuildAnchorLookup(M_PlacementState.CachedAnchors), PinnedAnchorKey);
+}
+
+TArray<TObjectPtr<AAnchorPoint>> AGeneratorWorldCampaign::RestrictCandidateSourceForPinnedRole(
+	const TArray<TObjectPtr<AAnchorPoint>>& CandidateSource,
+	const EWorldPinnedPlaceRole PinnedRole) const
+{
+	if (not M_ResolvedPins.HasAnyPins())
+	{
+		return CandidateSource;
+	}
+
+	// Mirrors FWorldCampaignPlacementBacktrackingSolver::RestrictCandidateSourceForRole in the async solver.
+	const FGuid RolePinKey = M_ResolvedPins.GetAnchorKeyForRole(PinnedRole);
+	const TArray<TObjectPtr<AAnchorPoint>>& SourceToFilter = RolePinKey.IsValid()
+		                                                         ? M_PlacementState.CachedAnchors
+		                                                         : CandidateSource;
+	TArray<FGuid> SourceKeys;
+	SourceKeys.Reserve(SourceToFilter.Num());
+	for (const TObjectPtr<AAnchorPoint>& AnchorPoint : SourceToFilter)
+	{
+		SourceKeys.Add(IsValid(AnchorPoint) ? AnchorPoint->GetAnchorKey() : FGuid());
+	}
+
+	const TArray<int32> KeptPositions = WorldCampaignPinnedPlaces::SelectCandidatePositionsForRole(
+		SourceKeys, RolePinKey, M_ResolvedPins.GetPinnedAnchorKeys());
+	TArray<TObjectPtr<AAnchorPoint>> RestrictedSource;
+	RestrictedSource.Reserve(KeptPositions.Num());
+	for (const int32 Position : KeptPositions)
+	{
+		RestrictedSource.Add(SourceToFilter[Position]);
+	}
+
+	return RestrictedSource;
+}
+
+void AGeneratorWorldCampaign::PrioritizePinnedAnchorsForKeyRepair(
+	TArray<TObjectPtr<AAnchorPoint>>& InOutSortedAnchors) const
+{
+	if (M_ResolvedPinnedAnchorActors.Num() == 0)
+	{
+		return;
+	}
+
+	TArray<TObjectPtr<AAnchorPoint>> PinnedAnchorsFirst;
+	TArray<TObjectPtr<AAnchorPoint>> OtherAnchors;
+	PinnedAnchorsFirst.Reserve(InOutSortedAnchors.Num());
+	OtherAnchors.Reserve(InOutSortedAnchors.Num());
+	for (const TObjectPtr<AAnchorPoint>& AnchorPoint : InOutSortedAnchors)
+	{
+		const bool bIsResolvedPinnedAnchor = M_ResolvedPinnedAnchorActors.Contains(
+			TWeakObjectPtr<AAnchorPoint>(AnchorPoint.Get()));
+		if (bIsResolvedPinnedAnchor)
+		{
+			PinnedAnchorsFirst.Add(AnchorPoint);
+			continue;
+		}
+
+		OtherAnchors.Add(AnchorPoint);
+	}
+
+	PinnedAnchorsFirst.Append(OtherAnchors);
+	InOutSortedAnchors = MoveTemp(PinnedAnchorsFirst);
+}
+
+void AGeneratorWorldCampaign::RestorePinnedPlacesFromSave(const TMap<FGuid, TObjectPtr<AAnchorPoint>>& AnchorsByKey)
+{
+	M_ResolvedPins.Reset();
+	M_ResolvedPinnedAnchorActors.Reset();
+	M_PlacementState.PinnedMissionAnchorKeys.Reset();
+	for (const FWorldCampaignPinnedPlace& PinnedPlace : GetUsablePinnedPlacesFromSettings())
+	{
+		const FGuid PinnedAnchorKey = WorldCampaignPinnedPlaces::BuildPinnedAnchorKey(PinnedPlace.PinId);
+		TObjectPtr<AAnchorPoint> const* RestoredAnchor = AnchorsByKey.Find(PinnedAnchorKey);
+		if (RestoredAnchor == nullptr || not IsValid(RestoredAnchor->Get()))
+		{
+			// Saves made before this pin existed, or a pin whose anchor was not saved.
+			continue;
+		}
+
+		RestoredAnchor->Get()->SetPinId(PinnedPlace.PinId);
+		RestoredAnchor->Get()->Tags.AddUnique(PinnedAnchorTag);
+		FWorldCampaignResolvedPin ResolvedPin;
+		ResolvedPin.PinId = PinnedPlace.PinId;
+		ResolvedPin.Role = PinnedPlace.Role;
+		ResolvedPin.Mission = PinnedPlace.Mission;
+		ResolvedPin.AnchorKey = PinnedAnchorKey;
+		M_ResolvedPins.AddPin(ResolvedPin);
+		M_ResolvedPinnedAnchorActors.Add(RestoredAnchor->Get());
+		if (M_ResolvedPins.GetIsPinnedMissionAnchorKey(PinnedAnchorKey)
+			&& M_PlacementState.MissionsByAnchorKey.Contains(PinnedAnchorKey))
+		{
+			M_PlacementState.PinnedMissionAnchorKeys.Add(PinnedAnchorKey);
+		}
+	}
+}
+
+bool AGeneratorWorldCampaign::ComparePinnedPlacementParity(const FWorldCampaignPlacementResult& SynchronousResult,
+                                                           const FWorldCampaignPlacementResult& AsyncResult,
+                                                           FString& OutFailureReason) const
+{
+	for (const FWorldCampaignResolvedPin& Pin : M_ResolvedPins.GetPins())
+	{
+		const bool bSynchronousHoldsPin = GetDoesPlacementResultHoldPinnedPlace(SynchronousResult, Pin);
+		const bool bAsyncHoldsPin = GetDoesPlacementResultHoldPinnedPlace(AsyncResult, Pin);
+		if (bSynchronousHoldsPin && bAsyncHoldsPin)
+		{
+			continue;
+		}
+
+		OutFailureReason = FString::Printf(
+			TEXT("pinned place %s is not on its anchor %s (sync=%d async=%d)."),
+			*Pin.PinId.ToString(),
+			*Pin.AnchorKey.ToString(),
+			bSynchronousHoldsPin ? 1 : 0,
+			bAsyncHoldsPin ? 1 : 0);
+		return false;
+	}
+
+	return true;
+}
+
+void AGeneratorWorldCampaign::ReportPinnedMissionsBlockedByEnemyHQ() const
+{
+	if (not M_ResolvedPins.HasAnyPins())
+	{
+		return;
+	}
+
+	TSet<FGuid> ReachableAnchorKeysWithoutEnemyHQ;
+	if (not BuildReachableAnchorKeysWithoutEnemyHQ(ReachableAnchorKeysWithoutEnemyHQ))
+	{
+		return;
+	}
+
+	const bool bIsEnemyHQPinned = M_ResolvedPins.GetIsPinnedAnchorKey(M_PlacementState.EnemyHQAnchorKey);
+	TArray<FGuid> SortedMissionAnchorKeys;
+	BuildSortedMissionAnchorKeys(M_PlacementState.MissionsByAnchorKey, SortedMissionAnchorKeys);
+	for (const FGuid& MissionAnchorKey : SortedMissionAnchorKeys)
+	{
+		const bool bIsSwapExempt = bIsEnemyHQPinned || M_ResolvedPins.GetIsPinnedMissionAnchorKey(MissionAnchorKey);
+		if (not bIsSwapExempt || ReachableAnchorKeysWithoutEnemyHQ.Contains(MissionAnchorKey))
+		{
+			continue;
+		}
+
+		UE_LOG(LogRTS, Warning,
+		       TEXT("World campaign: mission at anchor %s (pin %s) is only reachable through the enemy HQ; pinned places are never swapped."),
+		       *MissionAnchorKey.ToString(),
+		       *M_ResolvedPins.GetPinIdForAnchorKey(MissionAnchorKey).ToString());
+	}
+}
+
 
 #if WITH_EDITOR
 
@@ -6102,6 +6532,8 @@ void AGeneratorWorldCampaign::ResetGenerationRuntimeState()
 	M_MissionMicroPlacedCount = 0;
 	M_BacktrackedFailedStepAttemptToPreserve = ECampaignGenerationStep::NotStarted;
 	M_GenerationStep = ECampaignGenerationStep::NotStarted;
+	M_ResolvedPins.Reset();
+	M_ResolvedPinnedAnchorActors.Reset();
 }
 
 void AGeneratorWorldCampaign::ClearAllAnchorWorldState()
@@ -6546,6 +6978,12 @@ bool AGeneratorWorldCampaign::ExecuteStepWithMicroTransactions(ECampaignGenerati
 
 bool AGeneratorWorldCampaign::ExecuteGenerateAnchorPoints(FCampaignGenerationStepTransaction& OutTransaction)
 {
+	/*
+	 * Pins first: they must exist even with generation disabled, and spawning them before the grid lets
+	 * GatherSortedExistingAnchors keep the generated minimum distance to them. No random stream is touched.
+	 */
+	ResolvePinnedPlacesForGeneration(OutTransaction);
+
 	if (not M_AnchorPointGenerationSettings.bM_EnableGeneratedAnchorPoints)
 	{
 		RTSFunctionLibrary::DisplayNotification(TEXT("Anchor generation disabled; skipping."));
@@ -6697,6 +7135,8 @@ bool AGeneratorWorldCampaign::ExecuteCreateConnections(FCampaignGenerationStepTr
 	GenerateConnectionsForAnchors(AnchorPoints, RandomStream, DesiredConnections);
 	CacheGeneratedState(AnchorPoints);
 	OutTransaction.SpawnedConnections = M_GeneratedConnections;
+	// PrepareAnchorsForConnectionGeneration wiped the placement state; every setup re-run lands here.
+	ApplyPinnedMissionPreSeedToPlacementState();
 	return true;
 }
 
@@ -6734,7 +7174,8 @@ bool AGeneratorWorldCampaign::PrepareAnchorsForConnectionGeneration(TArray<TObje
 void AGeneratorWorldCampaign::NormalizeAnchorKeysForConnectionGeneration(
 	TArray<TObjectPtr<AAnchorPoint>>& InOutAnchorPoints) const
 {
-	const FAnchorKeyRepairSource RepairSource = BuildAnchorKeyRepairSource(InOutAnchorPoints);
+	FAnchorKeyRepairSource RepairSource = BuildAnchorKeyRepairSource(InOutAnchorPoints);
+	PrioritizePinnedAnchorsForKeyRepair(RepairSource.SortedAnchors);
 	FAnchorKeyRepairPlan RepairPlan = BuildAnchorKeyRepairPlan(RepairSource);
 	ApplyAnchorKeyRepairPlan(RepairPlan);
 	LogAnchorKeyRepairPlan(RepairPlan);
@@ -6821,10 +7262,19 @@ bool AGeneratorWorldCampaign::ExecutePlaceHQ(FCampaignGenerationStepTransaction&
 		return false;
 	}
 
+	if (M_ResolvedPins.GetAnchorKeyForRole(EWorldPinnedPlaceRole::PlayerHQ).IsValid())
+	{
+		// The story places the HQ: skip degree/neighbourhood rules and never fall back to another anchor.
+		return TryFinalizePlayerHQPlacement(FindCachedAnchorForPinnedRole(EWorldPinnedPlaceRole::PlayerHQ),
+		                                    OutTransaction);
+	}
+
 	constexpr int32 MaxAnchorDegreeUnlimited = TNumericLimits<int32>::Max();
-	const TArray<TObjectPtr<AAnchorPoint>>& CandidateSource = M_PlayerHQPlacementRules.AnchorCandidates.Num() > 0
-		                                                          ? M_PlayerHQPlacementRules.AnchorCandidates
-		                                                          : M_PlacementState.CachedAnchors;
+	const TArray<TObjectPtr<AAnchorPoint>> CandidateSource = RestrictCandidateSourceForPinnedRole(
+		M_PlayerHQPlacementRules.AnchorCandidates.Num() > 0
+			? M_PlayerHQPlacementRules.AnchorCandidates
+			: M_PlacementState.CachedAnchors,
+		EWorldPinnedPlaceRole::PlayerHQ);
 
 	const int32 AttemptIndex = GetStepAttemptIndex(ECampaignGenerationStep::PlayerHQPlaced);
 	TArray<TObjectPtr<AAnchorPoint>> Candidates;
@@ -6974,11 +7424,25 @@ bool AGeneratorWorldCampaign::ExecutePlaceEnemyHQ(FCampaignGenerationStepTransac
 		return false;
 	}
 
+	if (M_ResolvedPins.GetAnchorKeyForRole(EWorldPinnedPlaceRole::EnemyHQ).IsValid())
+	{
+		AAnchorPoint* PinnedEnemyHQAnchor = FindCachedAnchorForPinnedRole(EWorldPinnedPlaceRole::EnemyHQ);
+		if (PinnedEnemyHQAnchor == M_PlacementState.PlayerHQAnchor.Get())
+		{
+			RTSFunctionLibrary::ReportError(TEXT("Enemy HQ placement failed: pinned anchor holds the player HQ."));
+			return false;
+		}
+
+		return TryFinalizeEnemyHQPlacement(PinnedEnemyHQAnchor, OutTransaction);
+	}
+
 	constexpr int32 MinAnchorDegreeFloor = 0;
 	constexpr int32 MaxAnchorDegreeUnlimited = TNumericLimits<int32>::Max();
-	const TArray<TObjectPtr<AAnchorPoint>>& CandidateSource = M_EnemyHQPlacementRules.AnchorCandidates.Num() > 0
-		                                                          ? M_EnemyHQPlacementRules.AnchorCandidates
-		                                                          : M_PlacementState.CachedAnchors;
+	const TArray<TObjectPtr<AAnchorPoint>> CandidateSource = RestrictCandidateSourceForPinnedRole(
+		M_EnemyHQPlacementRules.AnchorCandidates.Num() > 0
+			? M_EnemyHQPlacementRules.AnchorCandidates
+			: M_PlacementState.CachedAnchors,
+		EWorldPinnedPlaceRole::EnemyHQ);
 
 	TArray<TObjectPtr<AAnchorPoint>> Candidates;
 	bool bShouldForcePlacement = false;
@@ -7117,15 +7581,24 @@ bool AGeneratorWorldCampaign::ExecutePlaceEnemyWall(FCampaignGenerationStepTrans
 		return false;
 	}
 
-	if (M_EnemyWallPlacementRules.AnchorCandidates.Num() == 0)
+	const bool bHasPinnedEnemyWall = M_ResolvedPins.GetAnchorKeyForRole(EWorldPinnedPlaceRole::EnemyWall).IsValid();
+	if (not bHasPinnedEnemyWall && M_EnemyWallPlacementRules.AnchorCandidates.Num() == 0)
 	{
 		RTSFunctionLibrary::ReportError(TEXT("Enemy wall placement failed: no anchor candidates provided."));
 		return false;
 	}
 
+	// With pins the candidate list is the pinned wall alone, or the configured list without pinned anchors.
+	FEnemyWallPlacementRules EffectiveWallPlacementRules = M_EnemyWallPlacementRules;
+	if (M_ResolvedPins.HasAnyPins())
+	{
+		EffectiveWallPlacementRules.AnchorCandidates = RestrictCandidateSourceForPinnedRole(
+			M_EnemyWallPlacementRules.AnchorCandidates, EWorldPinnedPlaceRole::EnemyWall);
+	}
+
 	const int32 AttemptIndex = GetStepAttemptIndex(ECampaignGenerationStep::EnemyWallPlaced);
 	FPlacementCandidate SelectedCandidate;
-	if (not TrySelectEnemyWallPlacementCandidate(*this, M_EnemyWallPlacementRules, M_PlacementState, M_DerivedData,
+	if (not TrySelectEnemyWallPlacementCandidate(*this, EffectiveWallPlacementRules, M_PlacementState, M_DerivedData,
 	                                             AttemptIndex, SelectedCandidate))
 	{
 		RTSFunctionLibrary::ReportError(TEXT("Enemy wall placement failed: no valid anchor candidates found."));
@@ -7231,6 +7704,8 @@ TArray<EMapMission> AGeneratorWorldCampaign::BuildMissionPlacementPlanFiltered()
 		PlacementPlan.Add(MissionType);
 	}
 
+	// Pinned story missions are pre-seeded after connections and are never placed by the seeded solver.
+	WorldCampaignPinnedPlaces::RemovePinnedMissionsFromPlan(M_ResolvedPins, PlacementPlan);
 	return PlacementPlan;
 }
 
@@ -7664,6 +8139,7 @@ bool AGeneratorWorldCampaign::ExecutePlaceMissions(FCampaignGenerationStepTransa
 {
 	// NOTE: If this step spawns actors, add them to OutTransaction.SpawnedActors for rollback.
 	(void)OutTransaction;
+	PromotePinnedMissionsForManualSteps();
 	const TArray<EMapMission> MissionPlacementPlan = BuildMissionPlacementPlanFiltered();
 	const int32 RequiredMissions = MissionPlacementPlan.Num();
 	if (RequiredMissions <= NoRequiredItems)
@@ -7826,6 +8302,7 @@ void AGeneratorWorldCampaign::CopyPlacementSnapshotSettings(FWorldCampaignPlacem
 	OutSnapshot.NeutralItemPlacementRules = M_NeutralItemPlacementRules;
 	OutSnapshot.ExcludedMissionsFromMapPlacement = M_ExcludedMissionsFromMapPlacement;
 	OutSnapshot.PlacementFailurePolicy = M_PlacementFailurePolicy;
+	OutSnapshot.PinnedPlaces = M_ResolvedPins;
 
 	OutSnapshot.PlayerHQPlacementRules.MinAnchorDegreeForHQ = M_PlayerHQPlacementRules.MinAnchorDegreeForHQ;
 	OutSnapshot.PlayerHQPlacementRules.MinAnchorsWithinHops = M_PlayerHQPlacementRules.MinAnchorsWithinHops;
@@ -8443,6 +8920,8 @@ void AGeneratorWorldCampaign::ResetPlacementStateForParityRun(
 	M_PlacementState.EnemyItemsByAnchorKey.Reset();
 	M_PlacementState.NeutralItemsByAnchorKey.Reset();
 	M_PlacementState.MissionsByAnchorKey.Reset();
+	// The reset above wipes the pinned missions written after connections; the sync baseline must start with them.
+	ApplyPinnedMissionPreSeedToPlacementState();
 	M_DerivedData = SetupDerivedData;
 	M_DerivedData.PlayerHQHopDistancesByAnchorKey.Reset();
 	M_DerivedData.EnemyHQHopDistancesByAnchorKey.Reset();
@@ -8584,6 +9063,11 @@ bool AGeneratorWorldCampaign::ComparePlacementParityResults(
 
 	if (not GetParityMapMatches(SynchronousResult.MissionsByAnchorKey, AsyncResult.MissionsByAnchorKey,
 	                            TEXT("mission placements"), BuildParityKeyString, OutFailureReason))
+	{
+		return false;
+	}
+
+	if (not ComparePinnedPlacementParity(SynchronousResult, AsyncResult, OutFailureReason))
 	{
 		return false;
 	}
@@ -9484,6 +9968,8 @@ TSet<FGuid> AGeneratorWorldCampaign::BuildGameplayAnchorKeysForPruning() const
 		GameplayAnchorKeys.Add(AnchorPoint->GetAnchorKey());
 	}
 
+	// Pinned anchors are story places: keep them (and connected to the HQ) even if their object failed to spawn.
+	GameplayAnchorKeys.Append(M_ResolvedPins.GetPinnedAnchorKeys());
 	return GameplayAnchorKeys;
 }
 
@@ -9634,7 +10120,8 @@ bool AGeneratorWorldCampaign::TryFindMissionObjectReachableOnlyThroughEnemyHQ(
 	{
 		if (not MissionAnchorKey.IsValid()
 			|| MissionAnchorKey == M_PlacementState.EnemyHQAnchorKey
-			|| ReachableAnchorKeysWithoutEnemyHQ.Contains(MissionAnchorKey))
+			|| ReachableAnchorKeysWithoutEnemyHQ.Contains(MissionAnchorKey)
+			|| M_ResolvedPins.GetIsPinnedMissionAnchorKey(MissionAnchorKey))
 		{
 			continue;
 		}
@@ -9661,6 +10148,11 @@ bool AGeneratorWorldCampaign::TrySwapEnemyHQWithMissionObject(
 	if (not MissionAnchorKey.IsValid()
 		|| MissionAnchorKey == OldEnemyHQAnchorKey
 		|| MissionType == EMapMission::None)
+	{
+		return false;
+	}
+
+	if (M_ResolvedPins.GetIsPinnedAnchorKey(MissionAnchorKey) || M_ResolvedPins.GetIsPinnedAnchorKey(OldEnemyHQAnchorKey))
 	{
 		return false;
 	}
@@ -9700,7 +10192,7 @@ bool AGeneratorWorldCampaign::GetPrunedCachedAnchorsHaveOnlyGameplay(FString& Ou
 		}
 
 		const FGuid AnchorKey = AnchorPoint->GetAnchorKey();
-		if (AnchorPoint->GetHasPromotedWorldObject())
+		if (AnchorPoint->GetHasPromotedWorldObject() || M_ResolvedPins.GetIsPinnedAnchorKey(AnchorKey))
 		{
 			continue;
 		}

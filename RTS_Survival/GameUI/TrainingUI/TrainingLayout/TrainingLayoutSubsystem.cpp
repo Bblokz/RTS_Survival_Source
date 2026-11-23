@@ -9,6 +9,7 @@
 #include "RTS_Survival/CardSystem/PlayerProfile/PlayerProfileLoader/FRTS_Profile.h"
 #include "RTS_Survival/CardSystem/PlayerProfile/SavePlayerProfile/USavePlayerProfile.h"
 #include "RTS_Survival/GameUI/TrainingUI/TrainingOptions/TrainingOptionLibrary/TrainingOptionLibrary.h"
+#include "RTS_Survival/Player/StartGameProfileManager/PlayerProfileLoader.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 #include "Slate/SlateBrushAsset.h"
@@ -142,7 +143,9 @@ void UTrainingLayoutSubsystem::LoadCardUnlocksIfNeeded()
 		return;
 	}
 
-	for (const FCardSaveData& SelectedCard : PlayerProfile->M_SelectedCards)
+	// In a campaign operation the cards come from the campaign deck; everywhere else this is the profile's cards.
+	const TArray<FCardSaveData> SelectedCards = UPlayerProfileLoader::GetSelectedCardsForMission(this);
+	for (const FCardSaveData& SelectedCard : SelectedCards)
 	{
 		if (not TrainingLayoutCards::GetIsTrainingCardType(SelectedCard.CardType))
 		{

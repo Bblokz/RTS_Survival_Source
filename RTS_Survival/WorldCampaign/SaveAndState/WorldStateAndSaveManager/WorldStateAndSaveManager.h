@@ -50,6 +50,21 @@ public:
 	int32 AdvanceEnemyObjectProceduralMapIndex(int32 MapCount);
 
 	const FWorldCampaignState& GetCachedWorldCampaignState() const { return M_WorldCampaignState; }
+
+	/**
+	 * @brief Whether a campaign save exists on disk, so menus and the world map can offer or take the load path.
+	 * @return true when the main campaign slot exists.
+	 */
+	UFUNCTION(BlueprintPure, Category = "World Campaign|Save")
+	static bool GetDoesCampaignSaveExist();
+
+	/**
+	 * @brief Points every later save and load at another slot; tests use it so they never touch the real campaign.
+	 * @param SlotName Slot to use, or an empty string to go back to the real campaign slot.
+	 */
+	static void SetCampaignSaveSlotNameOverride(const FString& SlotName);
+
+	static FString GetCampaignSaveSlotName();
 	const FPlayerProfileSaveData& GetCachedPlayerProfileSaveData() const { return M_PlayerProfileSaveData; }
 
 private:

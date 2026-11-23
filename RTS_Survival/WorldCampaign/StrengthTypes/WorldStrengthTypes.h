@@ -30,6 +30,8 @@ enum class EWorldFieldDivisions : uint8
 	SovietMediumArmorDivision,
 	SovietHeavyArmorDivision,
 	SovietInfantryDivision,
+	/** Cheap enemy reaction piece; on arrival it is consumed and fortifies its target. */
+	SovietSupplyConvoy,
 };
 
 UENUM(BlueprintType)

@@ -8498,9 +8498,17 @@ void ACPPController::SetupGlobalAbilityManager(UMainGameUI* MainMenuWidget, cons
 	);
 #else
 	// Without a mission manager (skirmish, survival) the whole kit is available at its normal costs.
-	M_PlayerGlobabilitiesManager->SetPlayerMissionSettings(IsValid(MissionManager)
-		                                                       ? MissionManager->GetPlayerGlobalAbilitySettings()
-		                                                       : FMissionPlayerGlobalAbilitySettings());
+	FMissionPlayerGlobalAbilitySettings PlayerAbilitySettings = IsValid(MissionManager)
+		                                                            ? MissionManager->GetPlayerGlobalAbilitySettings()
+		                                                            : FMissionPlayerGlobalAbilitySettings();
+	const FWorldMissionContext WorldMissionContext = GameInstance->GetWorldMissionContext();
+	if (WorldMissionContext.GetIsCampaignOperation())
+	{
+		// In the campaign the player's rank caps the tier; the mission's own cap can only lower it further.
+		PlayerAbilitySettings.MaxAllowedTier = FMath::Min(PlayerAbilitySettings.MaxAllowedTier,
+		                                                  WorldMissionContext.CampaignGlobalAbilityTierCap);
+	}
+	M_PlayerGlobabilitiesManager->SetPlayerMissionSettings(PlayerAbilitySettings);
 
 	M_PlayerGlobabilitiesManager->InitGlobalAbilitiesManager(
 		1,

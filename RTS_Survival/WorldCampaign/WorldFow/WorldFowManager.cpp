@@ -11,6 +11,7 @@
 #include "RTS_Survival/DeveloperSettings.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/WorldCampaign/CampaignGeneration/GeneratorWorldCampaign/GeneratorWorldCampaign.h"
+#include "RTS_Survival/WorldCampaign/CampaignProgress/WorldCampaignProgressManager.h"
 #include "RTS_Survival/WorldCampaign/WorldFow/WorldFowCloud.h"
 #include "RTS_Survival/WorldCampaign/WorldFow/WorldMapFowComponent.h"
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/AnchorPoint/AnchorPoint.h"
@@ -19,6 +20,7 @@
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/Objects/WorldEnemyObject/WorldEnemyObject.h"
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/Objects/WorldMissionObject/WorldMissionObject.h"
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/Objects/WorldNeutralObject/WorldNeutralObject.h"
+#include "RTS_Survival/WorldCampaign/WorldPlayer/Controller/WorldPlayerController.h"
 
 namespace WorldFowDebugConstants
 {
@@ -54,12 +56,90 @@ void AWorldFowManager::InitializeWorldFow(
 	M_WorldPlayerController = WorldPlayerController;
 	M_WorldGenerator = WorldGenerator;
 
+	BindToCampaignProgress();
 	CacheCloudActor();
 	UpdateFowFromCurrentWorldState();
 }
 
+void AWorldFowManager::RefreshWorldFow()
+{
+	UpdateFowFromCurrentWorldState();
+}
+
+void AWorldFowManager::SetRevealSource(const FWorldFowRevealSource& RevealSource)
+{
+	if (RevealSource.SourceId.IsNone())
+	{
+		RTSFunctionLibrary::ReportError(TEXT("AWorldFowManager::SetRevealSource called with a reveal source without id."));
+		return;
+	}
+
+	M_RevealSourcesById.Add(RevealSource.SourceId, RevealSource);
+}
+
+void AWorldFowManager::SetRevealSources(const TArray<FWorldFowRevealSource>& RevealSources)
+{
+	M_RevealSourcesById.Reset();
+	for (const FWorldFowRevealSource& RevealSource : RevealSources)
+	{
+		SetRevealSource(RevealSource);
+	}
+}
+
+void AWorldFowManager::RemoveRevealSource(const FName SourceId)
+{
+	M_RevealSourcesById.Remove(SourceId);
+}
+
+TArray<FWorldFowRevealSource> AWorldFowManager::GetRevealSources() const
+{
+	TArray<FWorldFowRevealSource> RevealSources;
+	M_RevealSourcesById.GenerateValueArray(RevealSources);
+	return RevealSources;
+}
+
+void AWorldFowManager::BindToCampaignProgress()
+{
+	UnbindFromCampaignProgress();
+	if (not M_WorldPlayerController.IsValid())
+	{
+		return;
+	}
+
+	M_WorldCampaignProgressManager = M_WorldPlayerController->FindComponentByClass<UWorldCampaignProgressManager>();
+	bM_HasCampaignProgress = true;
+	if (not GetIsValidWorldCampaignProgressManager())
+	{
+		bM_HasCampaignProgress = false;
+		return;
+	}
+
+	M_AnchorClearedHandle = M_WorldCampaignProgressManager->OnAnchorCleared.AddUObject(
+		this, &AWorldFowManager::OnAnchorCleared);
+}
+
+void AWorldFowManager::UnbindFromCampaignProgress()
+{
+	if (M_WorldCampaignProgressManager.IsValid() && M_AnchorClearedHandle.IsValid())
+	{
+		M_WorldCampaignProgressManager->OnAnchorCleared.Remove(M_AnchorClearedHandle);
+	}
+
+	M_AnchorClearedHandle.Reset();
+	bM_HasCampaignProgress = false;
+}
+
+void AWorldFowManager::OnAnchorCleared(const FGuid& /*AnchorKey*/)
+{
+	// A cleared anchor becomes Visible and floods onward, so the whole reveal pass has to run again.
+	RefreshWorldFow();
+}
+
 void AWorldFowManager::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	UnbindFromCampaignProgress();
+	M_RevealSourcesById.Empty();
+	M_WorldCampaignProgressManager.Reset();
 	M_WorldPlayerController.Reset();
 	M_WorldGenerator.Reset();
 	M_WorldFowCloud.Reset();
@@ -78,6 +158,7 @@ void AWorldFowManager::UpdateFowFromCurrentWorldState()
 	}
 
 	InitializeMissingCampaignActorStates();
+	ApplyPersistentRevealsToAnchors();
 	ApplyRevealRulesFromVisibleAnchors();
 	ApplyWorldObjectStates();
 	ApplyConnectionStates();
@@ -88,6 +169,92 @@ void AWorldFowManager::UpdateFowFromCurrentWorldState()
 
 	RebuildMaskTexture();
 	PushMaskToCloudMaterial();
+}
+
+void AWorldFowManager::ApplyPersistentRevealsToAnchors()
+{
+	const FWorldCampaignPlacementState& PlacementState = M_WorldGenerator->GetPlacementState();
+	for (const TObjectPtr<AAnchorPoint>& AnchorPoint : PlacementState.CachedAnchors)
+	{
+		if (not IsValid(AnchorPoint) || GetAnchorState(AnchorPoint) == EWorldMapFowState::Visible)
+		{
+			continue;
+		}
+
+		if (GetIsAnchorCleared(AnchorPoint) || GetIsAnchorInsideRevealSource(AnchorPoint))
+		{
+			SetAnchorState(AnchorPoint, EWorldMapFowState::Visible);
+		}
+	}
+}
+
+bool AWorldFowManager::GetIsAnchorCleared(const AAnchorPoint* AnchorPoint) const
+{
+	if (not bM_HasCampaignProgress || not IsValid(AnchorPoint) || not GetIsValidWorldCampaignProgressManager())
+	{
+		return false;
+	}
+
+	return M_WorldCampaignProgressManager->GetIsAnchorCleared(AnchorPoint->GetAnchorKey());
+}
+
+bool AWorldFowManager::GetIsAnchorInsideRevealSource(const AAnchorPoint* AnchorPoint) const
+{
+	if (not IsValid(AnchorPoint))
+	{
+		return false;
+	}
+
+	const FVector AnchorLocation = AnchorPoint->GetActorLocation();
+	for (const TPair<FName, FWorldFowRevealSource>& RevealSourceById : M_RevealSourcesById)
+	{
+		const FWorldFowRevealSource& RevealSource = RevealSourceById.Value;
+		if (RevealSource.RevealRadius <= 0.f)
+		{
+			continue;
+		}
+
+		if (FVector::DistSquared2D(AnchorLocation, RevealSource.WorldLocation) <= FMath::Square(RevealSource.RevealRadius))
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
+void AWorldFowManager::StampRevealSourcesToMask()
+{
+	for (const TPair<FName, FWorldFowRevealSource>& RevealSourceById : M_RevealSourcesById)
+	{
+		const FWorldFowRevealSource& RevealSource = RevealSourceById.Value;
+		if (RevealSource.RevealRadius <= 0.f)
+		{
+			continue;
+		}
+
+		StampCircle(
+			RevealSource.WorldLocation,
+			RevealSource.RevealRadius,
+			RevealSource.RevealFalloff,
+			WorldFowMaskConstants::VisibleChannelIndex
+		);
+	}
+}
+
+bool AWorldFowManager::GetIsValidWorldCampaignProgressManager() const
+{
+	if (M_WorldCampaignProgressManager.IsValid())
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+		this,
+		TEXT("M_WorldCampaignProgressManager"),
+		TEXT("GetIsValidWorldCampaignProgressManager"),
+		this
+	);
+	return false;
 }
 
 void AWorldFowManager::Debug_RevealAll()
@@ -624,6 +791,7 @@ void AWorldFowManager::RebuildMaskTexture()
 	StampAnchorsToMask();
 	StampConnectionsToMask();
 	StampWorldObjectsToMask();
+	StampRevealSourcesToMask();
 }
 
 void AWorldFowManager::StampAnchorsToMask()

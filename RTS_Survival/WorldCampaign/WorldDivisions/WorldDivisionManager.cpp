@@ -6,11 +6,14 @@
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/WorldCampaign/CampaignGeneration/GeneratorWorldCampaign/GeneratorWorldCampaign.h"
 #include "RTS_Survival/WorldCampaign/DeveloperSettings/WorldCampaignSettings.h"
+#include "RTS_Survival/WorldCampaign/EnemyTurn/WorldEnemyTurnSettings.h"
 #include "RTS_Survival/WorldCampaign/SaveAndState/WorldStateAndSaveManager/WorldStateAndSaveManager.h"
 #include "RTS_Survival/WorldCampaign/StrengthTypes/WorldStrengthEstimationComponent.h"
 #include "RTS_Survival/WorldCampaign/WorldData/WorldDataComponent.h"
+#include "RTS_Survival/WorldCampaign/WorldDivisions/WorldConvoyDivision.h"
 #include "RTS_Survival/WorldCampaign/WorldDivisions/WorldDivisionBase.h"
 #include "RTS_Survival/WorldCampaign/WorldDivisions/WorldDivisionMovementComponent.h"
+#include "RTS_Survival/WorldCampaign/WorldDivisions/WorldDivisionOwners.h"
 #include "RTS_Survival/WorldCampaign/WorldDivisions/WorldSquadDivision.h"
 #include "RTS_Survival/WorldCampaign/WorldDivisions/WorldTankDivision.h"
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/AnchorPoint/AnchorPoint.h"
@@ -24,8 +27,8 @@
 
 namespace
 {
-	constexpr int32 PlayerOwner = 1;
-	constexpr int32 EnemyOwner = 2;
+	constexpr int32 PlayerOwner = WorldDivisionOwners::PlayerOwner;
+	constexpr int32 EnemyOwner = WorldDivisionOwners::EnemyOwner;
 
 	bool GetIsWithinXYRadius(const FVector& SourceLocation,
 	                         const FVector& TargetLocation,
@@ -100,29 +103,18 @@ namespace
 	int32 GetDivisionInfluenceSign(const AWorldDivisionBase& WorldDivision, const AWorldMapObject& TargetObject)
 	{
 		/*
-		 * Positive field-division strength means "harder" in the existing strength UI. Player divisions therefore add
-		 * positive strength to friendly map objects, but negative strength to enemy missions they are suppressing.
+		 * Positive field-division strength means "harder" in the existing strength UI. Only the enemy has divisions
+		 * and convoys: they make enemy items and missions in range harder and do nothing to player or neutral items.
+		 * Cleared targets are no longer fought over, so they get nothing either.
 		 */
-		const int32 DivisionOwner = WorldDivision.GetOwningPlayer();
-		const bool bIsMissionObject =TargetObject.IsA(AWorldMissionObject::StaticClass()); 
-		const bool bIsEnemyObject = TargetObject.IsA(AWorldEnemyObject::StaticClass());
-		const bool bIsPlayerObject = TargetObject.IsA(AWorldPlayerObject::StaticClass());
+		if (WorldDivision.GetOwningPlayer() != EnemyOwner || TargetObject.GetIsClearedByPlayer())
+		{
+			return 0;
+		}
 
-		if (bIsMissionObject || bIsEnemyObject)
-		{
-			if (DivisionOwner == PlayerOwner)
-			{
-				// Player division suppresses difficulty in mission / enemy base siege.
-				return -1;
-			}
-			// Enemy division makes mission / enemy base siege harder.
-			return 1;
-		}
-		if (bIsPlayerObject)
-		{
-			return DivisionOwner == EnemyOwner ? 1 : -1;
-		}
-		return 0;
+		const bool bIsMissionObject = TargetObject.IsA(AWorldMissionObject::StaticClass());
+		const bool bIsEnemyObject = TargetObject.IsA(AWorldEnemyObject::StaticClass());
+		return bIsMissionObject || bIsEnemyObject ? 1 : 0;
 	}
 
 	FText BuildFallbackDivisionReasonText(const EWorldFieldDivisions DivisionType)
@@ -175,12 +167,169 @@ void UWorldDivisionManager::RestoreSavedCampaignDivisions(AWorldPlayerController
 
 void UWorldDivisionManager::MovePlayerDivisions(const ERTSGameDifficulty GameDifficulty)
 {
-	MoveDivisionsForOwner(PlayerOwner, EWorldTurnType::Player, GameDifficulty);
+	MoveDivisionsForOwner(PlayerOwner, EWorldTurnType::Player, GameDifficulty, true, FSimpleDelegate());
 }
 
 void UWorldDivisionManager::MoveEnemyDivisions(const ERTSGameDifficulty GameDifficulty)
 {
-	MoveDivisionsForOwner(EnemyOwner, EWorldTurnType::Enemy, GameDifficulty);
+	MoveDivisionsForOwner(EnemyOwner, EWorldTurnType::Enemy, GameDifficulty, true, FSimpleDelegate());
+}
+
+void UWorldDivisionManager::MoveEnemyDivisionsThenNotify(const ERTSGameDifficulty GameDifficulty,
+                                                         const FSimpleDelegate& OnMovementFinished)
+{
+	MoveDivisionsForOwner(EnemyOwner, EWorldTurnType::Enemy, GameDifficulty, false, OnMovementFinished);
+}
+
+AWorldDivisionBase* UWorldDivisionManager::SpawnEnemyReactionPiece(const EWorldFieldDivisions PieceType,
+                                                                   const FVector& SpawnLocation,
+                                                                   const FGuid& DivisionKey,
+                                                                   const ERTSGameDifficulty GameDifficulty)
+{
+	if (PieceType == EWorldFieldDivisions::None || not GetIsValidWorldGenerator())
+	{
+		return nullptr;
+	}
+
+	FTransform SpawnTransform = FTransform::Identity;
+	SpawnTransform.SetLocation(SpawnLocation);
+	AWorldDivisionBase* WorldDivision = SpawnDivision(PieceType, SpawnTransform);
+	if (not IsValid(WorldDivision))
+	{
+		return nullptr;
+	}
+
+	// The C++ tank and squad fallback classes have no scene root: such a piece would sit at the origin and never move.
+	if (not IsValid(WorldDivision->GetRootComponent()))
+	{
+		RTSFunctionLibrary::ReportError(
+			TEXT("Enemy reaction piece class has no root component; configure a Blueprint for this type in ")
+			TEXT("UWorldCampaignSettings::WorldDivisionClassByType. The piece was not spawned."));
+		WorldDivision->Destroy();
+		return nullptr;
+	}
+
+	InitializeDivisionFromWorldData(*WorldDivision, DivisionKey, PieceType, EnemyOwner, GameDifficulty);
+	ApplyReactionPieceRoster(*WorldDivision, UWorldEnemyTurnSettings::FindPieceSetup(PieceType));
+	RegisterDivision(WorldDivision);
+	return WorldDivision;
+}
+
+AWorldDivisionBase* UWorldDivisionManager::FindDivisionByKey(const FGuid& DivisionKey) const
+{
+	if (not DivisionKey.IsValid())
+	{
+		return nullptr;
+	}
+
+	for (const TObjectPtr<AWorldDivisionBase>& WorldDivision : M_WorldDivisions)
+	{
+		if (IsValid(WorldDivision) && WorldDivision->GetDivisionKey() == DivisionKey)
+		{
+			return WorldDivision.Get();
+		}
+	}
+	return nullptr;
+}
+
+bool UWorldDivisionManager::RemoveDivisionByKey(const FGuid& DivisionKey)
+{
+	AWorldDivisionBase* WorldDivision = FindDivisionByKey(DivisionKey);
+	if (not IsValid(WorldDivision))
+	{
+		return false;
+	}
+
+	/*
+	 * Unregister first so callbacks fired by StopTurnMovement (which may end a movement pass and run its waiting
+	 * callers) already see the map without this piece.
+	 */
+	const FVector LastLocation = WorldDivision->GetActorLocation();
+	WorldDivision->OnDivisionStrengthChanged().RemoveAll(this);
+	M_WorldDivisions.Remove(WorldDivision);
+	M_DivisionKeysMovingThisPass.Remove(DivisionKey);
+	WorldDivision->StopTurnMovement();
+	if (UWorldDivisionMovementComponent* MovementComponent = WorldDivision->GetWorldDivisionMovementComponent())
+	{
+		MovementComponent->OnMovementFinished().RemoveAll(this);
+	}
+	WorldDivision->Destroy();
+
+	RefreshDivisionInfluence(M_CurrentGameDifficulty);
+	CacheDivisionSaveState();
+	M_OnDivisionRemoved.Broadcast(DivisionKey, LastLocation);
+	TryFinishMovementPassIfIdle();
+	return true;
+}
+
+int32 UWorldDivisionManager::ApplyDamageToEnemyDivisionsInRadius(const FVector& Center,
+                                                                 const float Radius,
+                                                                 const int32 DamageEntryCount)
+{
+	if (DamageEntryCount <= 0 || Radius <= 0.f)
+	{
+		return 0;
+	}
+
+	// Damage can remove a piece and change M_WorldDivisions, so iterate a weak snapshot.
+	TArray<TWeakObjectPtr<AWorldDivisionBase>> DivisionsInRadius;
+	for (const TObjectPtr<AWorldDivisionBase>& WorldDivision : M_WorldDivisions)
+	{
+		if (IsValid(WorldDivision)
+			&& WorldDivision->GetOwningPlayer() == EnemyOwner
+			&& GetIsWithinXYRadius(Center, WorldDivision->GetActorLocation(), Radius))
+		{
+			DivisionsInRadius.Add(WorldDivision.Get());
+		}
+	}
+
+	int32 HitCount = 0;
+	for (const TWeakObjectPtr<AWorldDivisionBase>& WeakDivision : DivisionsInRadius)
+	{
+		AWorldDivisionBase* WorldDivision = WeakDivision.Get();
+		if (not IsValid(WorldDivision))
+		{
+			continue;
+		}
+
+		WorldDivision->ApplyWorldDivisionDamage(DamageEntryCount);
+		HitCount++;
+	}
+	return HitCount;
+}
+
+TArray<FWorldStrengthContribution> UWorldDivisionManager::BuildOperationStrengthContributionsForDivision(
+	const FGuid& DivisionKey) const
+{
+	TArray<FWorldStrengthContribution> StrengthContributions;
+	const AWorldDivisionBase* TargetDivision = FindDivisionByKey(DivisionKey);
+	if (not IsValid(TargetDivision))
+	{
+		return StrengthContributions;
+	}
+
+	if (TargetDivision->GetCurrentStrengthPercentage() != 0)
+	{
+		StrengthContributions.Add(TargetDivision->BuildOwnStrengthContribution());
+	}
+
+	for (const TObjectPtr<AWorldDivisionBase>& SupportingDivision : M_WorldDivisions)
+	{
+		if (not IsValid(SupportingDivision)
+			|| SupportingDivision.Get() == TargetDivision
+			|| SupportingDivision->GetOwningPlayer() != EnemyOwner
+			|| SupportingDivision->GetCurrentStrengthPercentage() == 0
+			|| not GetIsWithinXYRadius(
+				SupportingDivision->GetActorLocation(),
+				TargetDivision->GetActorLocation(),
+				SupportingDivision->GetInfluenceAreaRadius()))
+		{
+			continue;
+		}
+
+		StrengthContributions.Add(SupportingDivision->BuildOwnStrengthContribution());
+	}
+	return StrengthContributions;
 }
 
 void UWorldDivisionManager::RefreshDivisionInfluence(const ERTSGameDifficulty GameDifficulty)
@@ -335,6 +484,7 @@ void UWorldDivisionManager::DestroyRegisteredDivisions()
 	}
 
 	M_WorldDivisions.Reset();
+	M_DivisionKeysMovingThisPass.Reset();
 }
 
 void UWorldDivisionManager::SpawnInitialDivisions(const ERTSGameDifficulty GameDifficulty)
@@ -463,6 +613,11 @@ TSubclassOf<AWorldDivisionBase> UWorldDivisionManager::ResolveDivisionClass(
 		return AWorldSquadDivision::StaticClass();
 	}
 
+	if (DivisionType == EWorldFieldDivisions::SovietSupplyConvoy)
+	{
+		return AWorldConvoyDivision::StaticClass();
+	}
+
 	return nullptr;
 }
 
@@ -487,26 +642,72 @@ void UWorldDivisionManager::InitializeDivisionFromWorldData(AWorldDivisionBase& 
 		OwningPlayer,
 		StrengthReason.StrengthPercent,
 		StrengthReasonText);
+
+	/*
+	 * Without a WorldData entry a piece would have zero strength and be skipped by influence. The enemy turn settings
+	 * hold a fallback per type; it is applied on every spawn and restore so saved damage ratios stay consistent.
+	 */
+	const FWorldEnemyReactionPieceSetup* PieceSetup = UWorldEnemyTurnSettings::FindPieceSetup(DivisionType);
+	if (WorldDivision.GetMaxStrengthPercentage() <= 0 && PieceSetup != nullptr
+		&& PieceSetup->FallbackMaxStrengthPercentage > 0)
+	{
+		WorldDivision.SetMaxStrengthPercentage(PieceSetup->FallbackMaxStrengthPercentage);
+		WorldDivision.SetCurrentStrengthPercentage(PieceSetup->FallbackMaxStrengthPercentage);
+	}
 }
 
-void UWorldDivisionManager::MoveDivisionsForOwner(const int32 OwningPlayer,
-                                                  const EWorldTurnType TurnType,
-                                                  const ERTSGameDifficulty GameDifficulty)
+void UWorldDivisionManager::ApplyReactionPieceRoster(AWorldDivisionBase& WorldDivision,
+                                                     const FWorldEnemyReactionPieceSetup* PieceSetup) const
 {
-	if (not GetIsValidWorldGenerator())
+	if (PieceSetup == nullptr)
 	{
 		return;
 	}
 
-	M_ActiveMovingTurn = TurnType;
-	M_ActiveMovementDifficulty = GameDifficulty;
-	M_ActiveTurnMovementCount = 0;
+	if (AWorldTankDivision* TankDivision = Cast<AWorldTankDivision>(&WorldDivision))
+	{
+		if (PieceSetup->TankSubtypes.Num() > 0)
+		{
+			TankDivision->SetTankSubtypes(PieceSetup->TankSubtypes);
+		}
+		return;
+	}
+
+	AWorldSquadDivision* SquadDivision = Cast<AWorldSquadDivision>(&WorldDivision);
+	if (IsValid(SquadDivision) && PieceSetup->SquadSubtypes.Num() > 0)
+	{
+		SquadDivision->SetSquadSubtypes(PieceSetup->SquadSubtypes);
+	}
+}
+
+void UWorldDivisionManager::MoveDivisionsForOwner(const int32 OwningPlayer,
+                                                  const EWorldTurnType TurnType,
+                                                  const ERTSGameDifficulty GameDifficulty,
+                                                  const bool bSaveWhenFinished,
+                                                  const FSimpleDelegate& OnMovementFinished)
+{
+	if (not GetIsValidWorldGenerator())
+	{
+		OnMovementFinished.ExecuteIfBound();
+		return;
+	}
 
 	/*
 	 * Movement is allowed only for the active owner, but completion is asynchronous because the movement component
-	 * interpolates visually. The manager counts started movements and performs save/influence work after all callbacks.
+	 * interpolates visually. Movers are tracked by key across passes: a pass started while an earlier pass still
+	 * moves joins it instead of resetting it, and every waiting caller runs once the last mover reported back.
 	 */
-	for (const TObjectPtr<AWorldDivisionBase>& WorldDivision : M_WorldDivisions)
+	M_ActiveMovingTurn = TurnType;
+	M_ActiveMovementDifficulty = GameDifficulty;
+	bM_ShouldSaveWhenMovementFinished = bM_ShouldSaveWhenMovementFinished || bSaveWhenFinished;
+	if (OnMovementFinished.IsBound())
+	{
+		M_MovementFinishedCallbacks.Add(OnMovementFinished);
+	}
+
+	bM_IsStartingMovementPass = true;
+	const TArray<TObjectPtr<AWorldDivisionBase>> DivisionsSnapshot = M_WorldDivisions;
+	for (const TObjectPtr<AWorldDivisionBase>& WorldDivision : DivisionsSnapshot)
 	{
 		if (not IsValid(WorldDivision)
 			|| WorldDivision->GetOwningPlayer() != OwningPlayer
@@ -515,27 +716,73 @@ void UWorldDivisionManager::MoveDivisionsForOwner(const int32 OwningPlayer,
 			continue;
 		}
 
-		UWorldDivisionMovementComponent* MovementComponent =
-			WorldDivision->GetWorldDivisionMovementComponent();
-		if (not IsValid(MovementComponent))
-		{
-			continue;
-		}
-
-		MovementComponent->OnMovementFinished().RemoveAll(this);
-		MovementComponent->OnMovementFinished().AddUObject(
-			this,
-			&UWorldDivisionManager::OnDivisionMovementFinished);
-		if (WorldDivision->MoveForTurnDistance())
-		{
-			M_ActiveTurnMovementCount++;
-		}
+		(void)TryStartTurnMovement(*WorldDivision);
 	}
 
-	if (M_ActiveTurnMovementCount == 0)
+	bM_IsStartingMovementPass = false;
+	TryFinishMovementPassIfIdle();
+}
+
+bool UWorldDivisionManager::TryStartTurnMovement(AWorldDivisionBase& WorldDivision)
+{
+	// A division still playing an earlier pass keeps that pass's binding and key.
+	if (WorldDivision.GetIsMoving())
 	{
-		FinishActiveTurnMovement();
+		return false;
 	}
+
+	UWorldDivisionMovementComponent* MovementComponent = WorldDivision.GetWorldDivisionMovementComponent();
+	if (not IsValid(MovementComponent))
+	{
+		return false;
+	}
+
+	const FGuid DivisionKey = WorldDivision.GetDivisionKey();
+	MovementComponent->OnMovementFinished().RemoveAll(this);
+	MovementComponent->OnMovementFinished().AddUObject(this, &UWorldDivisionManager::OnDivisionMovementFinished);
+	M_DivisionKeysMovingThisPass.Add(DivisionKey);
+	if (WorldDivision.MoveForTurnDistance())
+	{
+		return true;
+	}
+
+	MovementComponent->OnMovementFinished().RemoveAll(this);
+	M_DivisionKeysMovingThisPass.Remove(DivisionKey);
+	return false;
+}
+
+void UWorldDivisionManager::PruneStaleMovingDivisionKeys()
+{
+	TArray<FGuid> StaleDivisionKeys;
+	for (const FGuid& DivisionKey : M_DivisionKeysMovingThisPass)
+	{
+		const AWorldDivisionBase* WorldDivision = FindDivisionByKey(DivisionKey);
+		if (not IsValid(WorldDivision) || not WorldDivision->GetIsMoving())
+		{
+			StaleDivisionKeys.Add(DivisionKey);
+		}
+	}
+
+	for (const FGuid& StaleDivisionKey : StaleDivisionKeys)
+	{
+		M_DivisionKeysMovingThisPass.Remove(StaleDivisionKey);
+	}
+}
+
+void UWorldDivisionManager::TryFinishMovementPassIfIdle()
+{
+	if (bM_IsStartingMovementPass || M_ActiveMovingTurn == EWorldTurnType::None)
+	{
+		return;
+	}
+
+	PruneStaleMovingDivisionKeys();
+	if (M_DivisionKeysMovingThisPass.Num() > 0)
+	{
+		return;
+	}
+
+	FinishActiveTurnMovement();
 }
 
 void UWorldDivisionManager::OnDivisionMovementFinished(AWorldDivisionBase* WorldDivision)
@@ -547,15 +794,11 @@ void UWorldDivisionManager::OnDivisionMovementFinished(AWorldDivisionBase* World
 		{
 			MovementComponent->OnMovementFinished().RemoveAll(this);
 		}
+
+		M_DivisionKeysMovingThisPass.Remove(WorldDivision->GetDivisionKey());
 	}
 
-	M_ActiveTurnMovementCount = FMath::Max(0, M_ActiveTurnMovementCount - 1);
-	if (M_ActiveTurnMovementCount > 0)
-	{
-		return;
-	}
-
-	FinishActiveTurnMovement();
+	TryFinishMovementPassIfIdle();
 }
 
 void UWorldDivisionManager::OnDivisionStrengthChanged(AWorldDivisionBase* WorldDivision)
@@ -565,8 +808,16 @@ void UWorldDivisionManager::OnDivisionStrengthChanged(AWorldDivisionBase* WorldD
 		return;
 	}
 
-	RefreshDivisionInfluence(M_CurrentGameDifficulty);
-	CacheDivisionSaveState();
+	// A piece that lost its last tank, squad or truck leaves the map; removal refreshes influence and the cache.
+	if (WorldDivision->GetRemainingEntryCount() == 0)
+	{
+		(void)RemoveDivisionByKey(WorldDivision->GetDivisionKey());
+	}
+	else
+	{
+		RefreshDivisionInfluence(M_CurrentGameDifficulty);
+		CacheDivisionSaveState();
+	}
 
 	if (GetIsValidWorldPlayerController())
 	{
@@ -583,12 +834,13 @@ void UWorldDivisionManager::FinishActiveTurnMovement()
 {
 	/*
 	 * This is the one post-movement choke point for both sides: recalc strength from final positions, cache division
-	 * state into the world save payload, then commit the campaign save.
+	 * state into the world save payload, commit the campaign save when a pass asked for it, then run the callers that
+	 * waited. State is reset before the callers run so they can start the next pass right away.
 	 */
 	RefreshDivisionInfluence(M_ActiveMovementDifficulty);
 	CacheDivisionSaveState();
 
-	if (GetIsValidWorldPlayerController())
+	if (bM_ShouldSaveWhenMovementFinished && GetIsValidWorldPlayerController())
 	{
 		UWorldStateAndSaveManager* WorldStateAndSaveManager =
 			M_WorldPlayerController->GetWorldStateAndSaveManager();
@@ -599,7 +851,14 @@ void UWorldDivisionManager::FinishActiveTurnMovement()
 	}
 
 	M_ActiveMovingTurn = EWorldTurnType::None;
-	M_ActiveTurnMovementCount = 0;
+	bM_ShouldSaveWhenMovementFinished = false;
+	M_DivisionKeysMovingThisPass.Reset();
+	const TArray<FSimpleDelegate> WaitingCallbacks = MoveTemp(M_MovementFinishedCallbacks);
+	M_MovementFinishedCallbacks.Reset();
+	for (const FSimpleDelegate& WaitingCallback : WaitingCallbacks)
+	{
+		WaitingCallback.ExecuteIfBound();
+	}
 }
 
 bool UWorldDivisionManager::GetIsValidWorldPlayerController() const

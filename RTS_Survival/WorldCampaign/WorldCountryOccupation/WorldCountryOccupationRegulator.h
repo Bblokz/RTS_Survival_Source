@@ -5,15 +5,46 @@
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
 #include "RTS_Survival/WorldCampaign/CampaignGeneration/Enums/Enum_MapItemType.h"
+#include "RTS_Survival/WorldCampaign/WorldCountryOccupation/WorldCountryLiberationRules.h"
 #include "UObject/ObjectKey.h"
 #include "WorldCountryOccupationRegulator.generated.h"
 
 class AAnchorPoint;
 class AGeneratorWorldCampaign;
 class AStaticMeshActor;
+class AWorldPlayerController;
+class UMaterialInstanceDynamic;
 class UMaterialInterface;
 class UStaticMeshComponent;
+class UWorldCampaignProgressManager;
 struct FWorldCampaignPlacementState;
+
+/** A country's liberation value changed; build nodes and UI listen to this. */
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnWorldCountryLiberationChanged, FName, CountryId, float, Liberation);
+
+/**
+ * @brief Runtime liberation state of one country. Rebuilt from the generated anchors and the saved cleared anchor
+ * keys, so nothing here is saved.
+ */
+USTRUCT()
+struct FWorldCountryLiberationData
+{
+	GENERATED_BODY()
+
+	FName CountryId = NAME_None;
+
+	/** Index into the regulator's runtime country list. */
+	int32 CountryIndex = INDEX_NONE;
+
+	FWorldCountryTargetTally TargetTally;
+
+	// -1 until the first evaluation so the first real value is always broadcast.
+	float Liberation = -1.f;
+
+	/** One dynamic instance per country, parented to the Soviet material; created on first use. */
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInstanceDynamic> LiberationMaterial = nullptr;
+};
 
 /**
  * @brief Designer-authored country visuals used to connect generated anchors to world-map regions.
@@ -33,7 +64,9 @@ struct FWorldCountryOccupationActorPair
 };
 
 /**
- * @brief Added to the world generator actor to cache country ownership and update country materials.
+ * @brief Added to the world generator actor to map anchors to countries, derive each country's liberation value from
+ * the cleared anchors and blend the country material from the Soviet look toward the Resistance look.
+ * Call InitializeCampaignProgress once with the world player controller so cleared anchors update the countries.
  *
  * @note The component is found by AGeneratorWorldCampaign::PostInitializeComponents.
  */
@@ -60,6 +93,39 @@ public:
 	 * @param MapItemType New high-level item type at the supplied anchor.
 	 */
 	void UpdateCountryOccupationForAnchor(AAnchorPoint* AnchorPoint, EMapItemType MapItemType);
+
+	/**
+	 * @brief Reads cleared anchors from the controller's progress manager and re-evaluates a country whenever one of
+	 * its anchors is cleared. Safe to call before or after InitializeCountryOccupation, and more than once.
+	 * @param WorldPlayerController Controller that owns the UWorldCampaignProgressManager.
+	 */
+	void InitializeCampaignProgress(AWorldPlayerController* WorldPlayerController);
+
+	/**
+	 * @brief Liberation of a country: cleared targets over all targets, story missions weighted.
+	 * @return 0..1; 1 for a country without targets; 0 for an unknown id.
+	 */
+	UFUNCTION(BlueprintPure, Category = "World Campaign|Country Occupation")
+	float GetCountryLiberation(FName CountryId) const;
+
+	/** @return Country of the anchor, or NAME_None when the anchor lies outside every configured country. */
+	UFUNCTION(BlueprintPure, Category = "World Campaign|Country Occupation")
+	FName GetCountryIdForAnchorKey(const FGuid& AnchorKey) const;
+
+	UFUNCTION(BlueprintPure, Category = "World Campaign|Country Occupation")
+	TArray<FName> GetCountryIds() const;
+
+	UFUNCTION(BlueprintPure, Category = "World Campaign|Country Occupation")
+	int32 GetClearedTargetCount(FName CountryId) const;
+
+	UFUNCTION(BlueprintPure, Category = "World Campaign|Country Occupation")
+	int32 GetTargetCount(FName CountryId) const;
+
+	UPROPERTY(BlueprintAssignable, Category = "World Campaign|Country Occupation")
+	FOnWorldCountryLiberationChanged OnCountryLiberationChanged;
+
+protected:
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 private:
 	/**
@@ -214,7 +280,7 @@ private:
 	/**
 	 * @brief Guards configured country index lookups before array access.
 	 * @param CountryIndex Configured country index to test.
-	 * @return true when the index can be used with M_CountryMeshActorPairs.
+	 * @return true when the index can be used with M_RuntimeCountryMeshActors.
 	 */
 	bool GetIsCountryIndexValid(int32 CountryIndex) const;
 
@@ -256,7 +322,133 @@ private:
 	 */
 	bool GetIsValidNeutralMaterial() const;
 
-	/** Designer-provided country actors and paired border actors placed on the campaign map. */
+	bool GetIsValidWorldCampaignProgressManager() const;
+
+	/** Native OnAnchorCleared handler: re-evaluates only the country that holds the anchor. */
+	void OnAnchorCleared(const FGuid& AnchorKey);
+
+	void UnbindFromCampaignProgress();
+
+	/**
+	 * @brief Creates one liberation entry per valid country with its stable id.
+	 */
+	void InitializeCountryLiberationData();
+
+	/**
+	 * @brief Stable id: the Countries config entry whose CountryMeshActorName matches the actor, else the actor FName.
+	 * @param CountryIndex Configured country index.
+	 * @return Country id, or NAME_None when the country actor is invalid.
+	 */
+	FName ResolveCountryId(int32 CountryIndex) const;
+
+	void RecomputeAllCountryLiberation();
+
+	/**
+	 * @brief Recounts one country's targets, updates its liberation value and look, and broadcasts a change.
+	 * @param LiberationDataIndex Index into M_CountryLiberationData.
+	 */
+	void RecomputeCountryLiberation(int32 LiberationDataIndex);
+
+	/**
+	 * @brief Classifies one anchor: missions and enemy items are targets, and so is any anchor the player cleared,
+	 * so a cleared target still counts after its object was hidden or removed.
+	 * @param AnchorPoint Anchor mapped to the country.
+	 * @param ProgressManager Source of cleared anchors, or nullptr before InitializeCampaignProgress.
+	 * @return Target flags for the liberation tally.
+	 */
+	FWorldCountryAnchorTargetInput BuildAnchorTargetInput(const AAnchorPoint* AnchorPoint,
+	                                                      const UWorldCampaignProgressManager* ProgressManager) const;
+
+	/** Reads the blendable parameters of the Soviet and Resistance instances once. */
+	void CacheLiberationLookParameters();
+
+	/**
+	 * @brief Reads the configured parameter names from a material; parameters the material lacks are skipped.
+	 * @param Material Material instance to read.
+	 * @param OutParameterSet Receives the values found.
+	 */
+	void ReadMaterialParameterSet(const UMaterialInterface* Material,
+	                              FWorldCountryMaterialParameterSet& OutParameterSet) const;
+
+	/**
+	 * @brief Neutral material without targets, the blended dynamic instance otherwise, and the old whole-material
+	 * swap as fallback when no dynamic instance can be made.
+	 * @param LiberationData Country to update.
+	 */
+	void ApplyCountryLiberationLook(FWorldCountryLiberationData& LiberationData);
+
+	/**
+	 * @brief Pushes the liberation blend into the country's dynamic instance.
+	 * @param LiberationData Country to update; receives its dynamic instance on first use.
+	 * @return false when the blend cannot be shown (no parameters read or no instance could be made).
+	 */
+	bool TryApplyBlendedLiberationLook(FWorldCountryLiberationData& LiberationData);
+
+	/**
+	 * @brief Creates the country's dynamic instance once and makes sure the mesh uses it.
+	 * @param LiberationData Country that owns the instance.
+	 * @return The instance, or nullptr when the mesh or Soviet material is missing.
+	 */
+	UMaterialInstanceDynamic* GetOrCreateLiberationMaterial(FWorldCountryLiberationData& LiberationData);
+
+	const FWorldCountryLiberationData* FindLiberationDataByCountryId(FName CountryId) const;
+
+	/** Outcome of testing an anchor against a country's real shape. */
+	enum class EWorldCountryShapeTestResult : uint8
+	{
+		Inside,
+		Outside,
+		/** No triangle data and no query collision: only the bounds rule can decide for this country. */
+		Untestable
+	};
+
+	/**
+	 * @brief Tests the anchor's XY against the country's flattened mesh triangles; without triangle data a downward
+	 * trace is used when the mesh has query collision.
+	 * @param CountryIndex Runtime country index (triangle cache).
+	 * @param CountryMesh Country fill mesh.
+	 * @param AnchorPoint Anchor to classify.
+	 * @return Inside, Outside, or Untestable when neither test can run.
+	 */
+	EWorldCountryShapeTestResult TestCountryShapeForAnchor(int32 CountryIndex, UStaticMeshComponent* CountryMesh,
+	                                                       const AAnchorPoint* AnchorPoint) const;
+
+	/**
+	 * @brief Country list from the Countries config, matched to level actors by FName; empty config falls back to
+	 * the valid entries of M_CountryMeshActorPairs.
+	 * @return false when the config has no countries.
+	 */
+	bool InitializeRuntimeCountryEntries_FromConfig();
+	void InitializeRuntimeCountryEntries_FromActorPairs();
+
+	/**
+	 * @brief Adds one country actor to the runtime list; a second entry for the same actor is refused.
+	 * @param CountryMeshActor Country fill mesh actor in the level.
+	 * @param CountryId Stable id of the country.
+	 */
+	void AddRuntimeCountry(AStaticMeshActor* CountryMeshActor, FName CountryId);
+
+	/**
+	 * @brief Reads LOD0 render triangles of the country mesh once and flattens them to world XY. Needs CPU-side mesh
+	 * data: always there in the editor, in a cooked build only with bAllowCPUAccess on the mesh.
+	 * @param CountryMesh Country fill mesh.
+	 * @param OutTriangles Receives the triangles; left empty when the data cannot be read.
+	 */
+	void BuildCountryTriangles(const UStaticMeshComponent* CountryMesh,
+	                           TArray<FWorldCountryTriangle2D>& OutTriangles) const;
+
+	/**
+	 * @brief Keeps the candidate with the smaller XY bounds area, so tighter countries win overlaps.
+	 * @param CandidateCountryIndex Country that contains the anchor.
+	 * @param InOutBestCountryIndex Best country so far; INDEX_NONE when none was found yet.
+	 */
+	void KeepSmallerBoundsCountry(int32 CandidateCountryIndex, int32& InOutBestCountryIndex) const;
+
+	/**
+	 * Designer-provided country actors and paired border actors placed on the campaign map.
+	 * Fallback only: the country list comes from UWorldCampaignMapContentSettings::Countries when that is set.
+	 * Empty entries are skipped silently.
+	 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Country Occupation",
 		meta = (AllowPrivateAccess = "true", DisplayName = "Country Mesh Actor Pairs"))
 	TArray<FWorldCountryOccupationActorPair> M_CountryMeshActorPairs;
@@ -292,4 +484,56 @@ private:
 
 	/** Valid configured country indices; invalid actor pairs are omitted once during initialization. */
 	TArray<int32> M_TraceableCountryIndices;
+
+	/** Vector parameters of M_StripeMaterial blended from the Soviet values to the Resistance values. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Country Occupation|Liberation Look",
+		meta = (AllowPrivateAccess = "true", DisplayName = "Blended Vector Parameters"))
+	TArray<FName> M_LiberationVectorParameterNames = {
+		TEXT("BaseColor"), TEXT("BaseColorB"), TEXT("StripeColor"), TEXT("WideStripeColor")
+	};
+
+	/** Scalar parameters of M_StripeMaterial blended from the Soviet values to the Resistance values. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Country Occupation|Liberation Look",
+		meta = (AllowPrivateAccess = "true", DisplayName = "Blended Scalar Parameters"))
+	TArray<FName> M_LiberationScalarParameterNames = {
+		TEXT("StripeIntensity"), TEXT("StripeSpacing"), TEXT("StripeSpeedWorld"), TEXT("StripeWidth01")
+	};
+
+	/** Off = anchors are matched by bounding box only, as before the shape test existed. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Country Occupation",
+		meta = (AllowPrivateAccess = "true", DisplayName = "Use Shape Containment Test"))
+	bool bM_UseShapeContainmentTest = true;
+
+	// Generator whose placement state and story-mission pins classify the anchors.
+	UPROPERTY()
+	TWeakObjectPtr<AGeneratorWorldCampaign> M_WorldGenerator;
+
+	UPROPERTY()
+	TWeakObjectPtr<UWorldCampaignProgressManager> M_WorldCampaignProgressManager;
+
+	FDelegateHandle M_AnchorClearedHandle;
+
+	// Set by InitializeCampaignProgress; before that a missing progress manager is expected and not an error.
+	bool bM_IsCampaignProgressBound = false;
+
+	// Set when all three materials are valid; mappings and liberation are built either way.
+	bool bM_CanApplyCountryLook = false;
+
+	UPROPERTY(Transient)
+	TArray<FWorldCountryLiberationData> M_CountryLiberationData;
+
+	TMap<FName, int32> M_LiberationDataIndexByCountryId;
+	TMap<int32, int32> M_LiberationDataIndexByCountryIndex;
+
+	FWorldCountryMaterialParameterSet M_OccupiedLookParameters;
+	FWorldCountryMaterialParameterSet M_LiberatedLookParameters;
+
+	// Runtime country list; every "CountryIndex" in this class indexes these three parallel arrays.
+	UPROPERTY(Transient)
+	TArray<TWeakObjectPtr<AStaticMeshActor>> M_RuntimeCountryMeshActors;
+
+	TArray<FName> M_RuntimeCountryIds;
+
+	// World-XY triangles of each country mesh; empty when the mesh data could not be read (bounds/trace fallback).
+	TArray<TArray<FWorldCountryTriangle2D>> M_CountryTrianglesByIndex;
 };

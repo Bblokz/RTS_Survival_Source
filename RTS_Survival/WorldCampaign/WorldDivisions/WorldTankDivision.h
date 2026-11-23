@@ -30,6 +30,7 @@ public:
 	 */
 	void SetTankSubtypes(const TArray<ETankSubtype>& TankSubtypes);
 	const TArray<ETankSubtype>& GetTankSubtypes() const { return M_TankSubtypes; }
+	virtual int32 GetRemainingEntryCount() const override { return M_TankSubtypes.Num(); }
 
 protected:
 	/**

@@ -83,6 +83,60 @@ namespace
 			*StepName);
 		RTSFunctionLibrary::PrintString(Message, FColor::Red);
 	}
+
+	/**
+	 * Story missions added for pinned places may not have Blueprint content yet. Use the configured mission class
+	 * with the lowest enum value so promotion stays deterministic; the mission object keeps its real type.
+	 */
+	TSubclassOf<AWorldMissionObject> FindFallbackMissionClass(const UWorldCampaignSettings& WorldCampaignSettings,
+	                                                          EMapMission& OutFallbackMissionType)
+	{
+		OutFallbackMissionType = EMapMission::None;
+		TSubclassOf<AWorldMissionObject> FallbackClass = nullptr;
+		for (const TPair<EMapMission, TSubclassOf<AWorldMissionObject>>& MissionClassPair :
+		     WorldCampaignSettings.MissionObjectClassByType)
+		{
+			if (not IsValid(MissionClassPair.Value.Get()))
+			{
+				continue;
+			}
+
+			const bool bIsLowerType = static_cast<uint8>(MissionClassPair.Key) < static_cast<uint8>(
+				OutFallbackMissionType);
+			if (FallbackClass.Get() != nullptr && not bIsLowerType)
+			{
+				continue;
+			}
+
+			FallbackClass = MissionClassPair.Value;
+			OutFallbackMissionType = MissionClassPair.Key;
+		}
+
+		return FallbackClass;
+	}
+
+	void LogMissionClassFallbackOnce(const EMapMission MissionType, const EMapMission FallbackMissionType)
+	{
+		// Game-thread only; keeps the log readable when many anchors promote the same unconfigured mission.
+		static TSet<EMapMission> LoggedMissionTypes;
+		if (LoggedMissionTypes.Contains(MissionType))
+		{
+			return;
+		}
+
+		LoggedMissionTypes.Add(MissionType);
+		const UEnum* MissionEnum = StaticEnum<EMapMission>();
+		const FString MissionName = MissionEnum
+			                            ? MissionEnum->GetNameStringByValue(static_cast<int64>(MissionType))
+			                            : TEXT("UnknownMission");
+		const FString FallbackName = MissionEnum
+			                             ? MissionEnum->GetNameStringByValue(static_cast<int64>(FallbackMissionType))
+			                             : TEXT("UnknownMission");
+		UE_LOG(LogTemp, Warning,
+		       TEXT("WorldCampaign: no MissionObjectClassByType entry for %s; using the %s mission class instead."),
+		       *MissionName,
+		       *FallbackName);
+	}
 }
 
 AAnchorPoint::AAnchorPoint()
@@ -381,7 +435,23 @@ AWorldMapObject* AAnchorPoint::OnMissionPromotion(EMapMission MissionType, ECamp
 		                                                       ? WorldCampaignSettings->MissionObjectClassByType.Find(
 			                                                       MissionType)
 		                                                       : nullptr;
-	if (not MissionClass || not IsValid(MissionClass->Get()))
+	TSubclassOf<AWorldMissionObject> MissionClassToSpawn;
+	if (MissionClass)
+	{
+		MissionClassToSpawn = *MissionClass;
+	}
+
+	if (not IsValid(MissionClassToSpawn.Get()) && WorldCampaignSettings)
+	{
+		EMapMission FallbackMissionType = EMapMission::None;
+		MissionClassToSpawn = FindFallbackMissionClass(*WorldCampaignSettings, FallbackMissionType);
+		if (IsValid(MissionClassToSpawn.Get()))
+		{
+			LogMissionClassFallbackOnce(MissionType, FallbackMissionType);
+		}
+	}
+
+	if (not IsValid(MissionClassToSpawn.Get()))
 	{
 		const UEnum* MissionEnum = StaticEnum<EMapMission>();
 		const FString EnumName = MissionEnum
@@ -403,7 +473,7 @@ AWorldMapObject* AAnchorPoint::OnMissionPromotion(EMapMission MissionType, ECamp
 	FActorSpawnParameters SpawnParameters;
 	SpawnParameters.Owner = this;
 	SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-	AWorldMissionObject* SpawnedObject = World->SpawnActor<AWorldMissionObject>(*MissionClass, GetActorTransform(),
+	AWorldMissionObject* SpawnedObject = World->SpawnActor<AWorldMissionObject>(MissionClassToSpawn, GetActorTransform(),
 	                                                                            SpawnParameters);
 	if (not IsValid(SpawnedObject))
 	{

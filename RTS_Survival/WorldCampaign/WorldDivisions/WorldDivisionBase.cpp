@@ -2611,6 +2611,33 @@ void AWorldDivisionBase::SetStrengthReasonText(const FText& StrengthReasonText)
 	M_StrengthReasonText = StrengthReasonText;
 }
 
+int32 AWorldDivisionBase::GetRemainingEntryCount() const
+{
+	return INDEX_NONE;
+}
+
+FWorldStrengthContribution AWorldDivisionBase::BuildOwnStrengthContribution() const
+{
+	FWorldStrengthContribution StrengthContribution;
+	StrengthContribution.StrengthType = EWorldStrengthTypes::FieldDivisions;
+	StrengthContribution.StrengthReason = M_StrengthReasonText;
+	StrengthContribution.StrengthPercentage = M_CurrentStrengthPercentage;
+	StrengthContribution.FieldDivision = M_DivisionType;
+	StrengthContribution.SourceKey = M_DivisionKey;
+	StrengthContribution.OwningPlayer = M_OwningPlayer;
+	return StrengthContribution;
+}
+
+void AWorldDivisionBase::StopTurnMovement()
+{
+	if (not GetIsValidMovementComponent())
+	{
+		return;
+	}
+
+	M_MovementComponent->StopMovement();
+}
+
 bool AWorldDivisionBase::GetIsMoving() const
 {
 	if (not IsValid(M_MovementComponent))

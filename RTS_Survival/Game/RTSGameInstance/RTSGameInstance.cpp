@@ -7,6 +7,8 @@
 #include "RTS_Survival/GlobalAbilitySystem/RTSCommanders/RTSCommander.h"
 #include "RTS_Survival/Music/RTSMusicManager/RTSMusicManager.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
+#include "Misc/PackageName.h"
+#include "RTS_Survival/WorldCampaign/DeveloperSettings/WorldCampaignMapContentSettings.h"
 #include "Sound/SoundClass.h"
 #include "Sound/SoundMix.h"
 
@@ -116,6 +118,11 @@ void URTSGameInstance::SetCampaignGenerationSettings(const FCampaignGenerationSe
 {
 	M_CampaignGenerationSettings = Settings;
 	M_CampaignGenerationSettings.bAreSettingsLoaded = true;
+	if (Settings.bNeedsToGenerateCampaign)
+	{
+		// A new campaign must not inherit the result of an operation from the campaign before it.
+		M_WorldMissionResult = FWorldMissionResult();
+	}
 }
 
 FCampaignGenerationSettings URTSGameInstance::GetCampaignGenerationSettings() const
@@ -163,6 +170,11 @@ bool URTSGameInstance::GetHasPlayerFaction() const
 	return M_PlayerFaction != ERTSFaction::NotInitialised;
 }
 
+bool URTSGameInstance::GetHasPlayerCommander() const
+{
+	return M_PlayerCommander != ERTSCommander::NoCommander;
+}
+
 ERTSCommander URTSGameInstance::GetPlayerCommander() const
 {
 	if (M_PlayerCommander == ERTSCommander::NoCommander )
@@ -182,6 +194,38 @@ void URTSGameInstance::SetWorldMissionContext(const FWorldMissionContext& WorldM
 void URTSGameInstance::ResetWorldMissionContext()
 {
 	M_WorldMissionContext = FWorldMissionContext();
+}
+
+bool URTSGameInstance::ReportWorldMissionResult(const EWorldMissionOutcome Outcome)
+{
+	if (not M_WorldMissionContext.GetIsCampaignOperation() || Outcome == EWorldMissionOutcome::None)
+	{
+		return false;
+	}
+
+	M_WorldMissionResult.Outcome = Outcome;
+	M_WorldMissionResult.SourceAnchorKey = M_WorldMissionContext.SourceAnchorKey;
+	M_WorldMissionResult.SourceDivisionKey = M_WorldMissionContext.SourceDivisionKey;
+	return true;
+}
+
+FWorldMissionResult URTSGameInstance::ConsumeWorldMissionResult()
+{
+	const FWorldMissionResult ConsumedResult = M_WorldMissionResult;
+	M_WorldMissionResult = FWorldMissionResult();
+	ResetWorldMissionContext();
+	return ConsumedResult;
+}
+
+void URTSGameInstance::RequestLoadSavedCampaign()
+{
+	M_CampaignGenerationSettings.bNeedsToGenerateCampaign = false;
+	M_CampaignGenerationSettings.bAreSettingsLoaded = true;
+}
+
+TSoftObjectPtr<UWorld> URTSGameInstance::GetWorldCampaignMap()
+{
+	return TSoftObjectPtr<UWorld>(UWorldCampaignMapContentSettings::Get()->WorldCampaignMap);
 }
 
 void URTSGameInstance::Shutdown()
@@ -285,6 +329,34 @@ void URTSGameInstance::EnsureSoundMixHasAudioClasses(
 
 void URTSGameInstance::BeginLoadingScreen(const FString& MapName)
 {
+	DropCampaignOperationWhenLeavingItsLevel(MapName);
+}
+
+void URTSGameInstance::DropCampaignOperationWhenLeavingItsLevel(const FString& MapName)
+{
+	if (not M_WorldMissionContext.GetIsCampaignOperation())
+	{
+		return;
+	}
+
+	const FString LoadingLevelShortName = FPackageName::GetShortName(UWorld::RemovePIEPrefix(MapName));
+	const FString WorldCampaignMapShortName = FPackageName::GetShortName(
+		UWorldCampaignMapContentSettings::Get()->WorldCampaignMap.GetLongPackageName());
+	const bool bIsOperationLevel = LoadingLevelShortName.Equals(M_WorldMissionContext.OperationLevelShortName,
+	                                                            ESearchCase::IgnoreCase);
+	const bool bIsWorldCampaignMap = LoadingLevelShortName.Equals(WorldCampaignMapShortName, ESearchCase::IgnoreCase);
+	if (bIsOperationLevel || bIsWorldCampaignMap)
+	{
+		return;
+	}
+
+	M_WorldMissionResult = FWorldMissionResult();
+	ResetWorldMissionContext();
+}
+
+void URTSGameInstance::SetWorldMissionOperationLevel(const TSoftObjectPtr<UWorld>& OperationLevel)
+{
+	M_WorldMissionContext.OperationLevelShortName = FPackageName::GetShortName(OperationLevel.GetLongPackageName());
 }
 
 void URTSGameInstance::EndLoadingScreen(UWorld* LoadedWorld)
