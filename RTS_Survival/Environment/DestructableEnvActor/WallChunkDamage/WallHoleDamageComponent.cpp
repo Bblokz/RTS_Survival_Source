@@ -204,6 +204,12 @@ void UWallHoleDamageComponent::BeginPlay_BindOwnerDeath()
 {
 	if (not CollapseSettings.bCollapseIntoChunksOnDeath)
 	{
+		// The owner's death broadcasts before its Blueprint death runs (ADestructableEnvActor::OnUnitDies).
+		if (ADestructableEnvActor* const DestructibleOwner = Cast<ADestructableEnvActor>(GetOwner()))
+		{
+			M_OwnerDiedHandle = DestructibleOwner->OnDestructableEnvActorDied.AddUObject(
+				this, &UWallHoleDamageComponent::OnDestructibleOwnerDied_KeepOwnDeath);
+		}
 		return;
 	}
 	if (ADestructableEnvActor* const DestructibleOwner = Cast<ADestructableEnvActor>(GetOwner()))
@@ -882,6 +888,11 @@ bool UWallHoleDamageComponent::GetIsOwnerInTransition() const
 void UWallHoleDamageComponent::OnDestructibleOwnerDied()
 {
 	CollapseIntoPieces(true);
+}
+
+void UWallHoleDamageComponent::OnDestructibleOwnerDied_KeepOwnDeath()
+{
+	RestoreIntactMaterials();
 }
 
 void UWallHoleDamageComponent::OnBuildingOwnerDied()

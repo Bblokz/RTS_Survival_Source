@@ -1008,9 +1008,50 @@ the crossing, not die outright), crushable and damageable by all vehicles, light
   middle one (`FENCE_FROM_DISK=1` tests the saved Blueprint without the in-memory setup). Run `fence2` (2026-11-18,
   ALL PASSED): all six breached, crossed straight (|dx| <= 25 cm), fence damaged; before: all vehicle
   paths through the row, infantry round; after: the gap open for everyone. Shell hits: a 75 mm test hit cuts a hole;
-  a 20 mm hit cuts none (its 17 cm hole is under `MinHoleRadius`, as in slot mode) but takes health.
+  a 20 mm test hit 40 cm in front cut none (test geometry, see below); on the face it cuts a hole.
 - **Saved and checked (2026-11-18):** Blueprint saved after the Development rebuild; run `fence3_disk`
   (`FENCE_FROM_DISK=1 BREACH_EXE=UnrealEditor.exe`, the saved asset on the Development editor): ALL PASSED.
+
+### All destructible fences (2026-11-18)
+
+Owner's follow-up: "there are more fences in the game; find them and implement this the same way: procedural damage +
+damage when driven into". `Tools/WallChunks/Breach/fence_breach_setup.py` now configures every destructible fence from
+one table (wall line, thickness, field materials per slot, settings):
+
+| Blueprint | Who breaks it | Field material(s) | Line (mesh space) |
+|---|---|---|---|
+| `Industrial/BP_Industrial_Dest_FenceWire` | any vehicle, any side | `MI_SM_RTS_Fence_Wire_1_Fence_WallHolesField` | x -8, y -7..358 |
+| `Airport/BP_Airport_Dest_FenceWire` | any vehicle, any side | `Airport/Holes/MI_Fence_02_M_Inst_WallHolesField` | y 0, x -3..373 |
+| `Military/ConcreteWall/BP_Dest_Military_ConcreteFence_1` / `_2` (X x3) | medium + heavy, any side | `MI_SM_Scorch_MilitaryWalls1_ScorchAtlas_WallHolesField` + `MI_M_Barbed_1_WallHolesField` (barbed wire slot) | y 0, x -326..326, 92 cm |
+| `BP_Dest_PostApo_ConcreteFence` / `Long` (Y x3) | medium + heavy, any side | `MI_SM_Scorch_Fence_Concrete_ScorchAtlas_WallHolesField` | x 0, y -170..170, 20 cm |
+| `BP_Dest_PostApo_ConcreteFenceCorner` | medium + heavy, any side | `..._Corner_ScorchAtlas_WallHolesField` | L: x 0 y -170..0, y 0 x 0..175 |
+| `BP_Dest_PostApo_ConcreteFenceGate` | medium + heavy, any side | `MI_SM_Container_FenceGate_ContainerBlue_WallHolesField` | x -5, y -3..338, 10 cm |
+
+- **New mode** `FWallTankBreachSettings::bAnySideBreaks` (concrete): medium and heavy vehicles of every player, whoever
+  owns the fence; nav area `UNavArea_BreachableAnySideMediumHeavy` (filter opens it for medium/heavy of a known side,
+  entering cost 300; plain ground for planners), the same classes the old `BlockCharLight` area and MediumOrHeavy crush
+  allowed. Concrete keeps the Rus wall break (V 0.45, rubble decal, `Collapse_Cue`), the gate a lighter metal one.
+- **Airport fence** had no holes: the authoring command adds a `WallHoleDamage` (`AddHoles=StaticMesh Debris=...
+  OwnDeath=1`, the Industrial fence's chain-link debris). `OwnDeath`: the BP keeps its destroyed-mesh swap;
+  `UWallHoleDamageComponent` now restores the intact materials when an owner that keeps its own death dies
+  (`OnDestructibleOwnerDied_KeepOwnDeath`, before the BP death runs), so the swapped mesh never shows the hole material.
+- **Health** (set by the BPs at BeginPlay): wire 125, Military 250 / 166, PostApo and gate 150. A Pz IV takes ~74 % of a
+  Military panel (65 HP left); PostApo panels and the gate go whole and die into their own death.
+- **Not changed:** `Obstacles/Industrial/BP_Industrial_WireFence_VehiclePartsSquare` (indestructible obstacle, not a
+  destructible actor), `BP_Prx_Airfield_Fences` (procedural proxy), the spline fences and walls
+  (`BP_DestSpline_*`, incl. the farm fence: instanced segments with their own per-segment crush, no hole component),
+  the marketplace sample BPs, barbed wire and hedgehogs (barricades).
+- **Authoring** `NoSave=1`: compile in memory only (tests); the test passes it unless `FENCE_FROM_DISK=1`.
+- **Test** `fence_breach_test.py`, run `fences3` (2026-11-18, in memory): ALL PASSED, 11 lanes: Luchs through both wire
+  fences, enemy Pz IV through the airport fence (dies into `SM_RTS_Fence_WireBlack_Destroyed_*` with `Fence_02_M_Inst`),
+  Pz IV / Tiger through Military 1/2, PostApo, gate and a corner flanked by long fences, enemy Tiger through PostApo Long;
+  Luchs into Military 1 and PostApo: no breach, no damage, drives round. Paths per agent before/after; 20 mm and 75 mm
+  test hits cut holes in a wire and a concrete fence. Test pitfalls: a debug hit is a splash point (a 17 cm hole must sit
+  on the face; 40 cm in front cuts nothing), and a short row (8.5 m) is rightly driven round (entering cost 300).
+- The earlier note on the 20 mm miss (`MinHoleRadius`) was wrong: it was that splash-distance test geometry.
+- **Saved** 2026-11-18 20:35: all 8 Blueprints saved by `run_fence_breach_setup.sh` after a Development rebuild
+  (the airport fence got its `WallHoleDamage` component). Run `fences_disk` (`FENCE_FROM_DISK=1`, Development
+  `UnrealEditor.exe`, the saved Blueprints): ALL PASSED, same 11 lanes and both test hits.
 
 ### Adversarial reviews after completion (2026-11-16)
 

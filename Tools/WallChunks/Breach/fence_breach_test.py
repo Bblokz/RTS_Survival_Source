@@ -1,53 +1,64 @@
-"""Throwaway-editor test of the wire fence breaches (any vehicle, any side; never the shared editor or a mission map).
+"""Throwaway-editor test of the fence breaches (never the shared editor or a mission map).
 Launch: BREACH_SCRIPT=fence_breach_test.py sh run_breach_test.sh <run> [timeout_s]
-The setup (fence_breach_setup.configure_fence) runs first in this editor, so the test also works while another editor
-holds the Blueprint (its save then fails, the compiled class in memory is what PIE uses).
-Each lane is a row of 5 chained BP_Industrial_Dest_FenceWire (yaw 90: the row runs along world X, ~18 m); the vehicle
-starts 24 m in front (+Y) of the middle fence and is ordered 24 m behind (-Y):
-  Luchs / Pz IV / Tiger of player 1 and a Luchs of player 2 -> breach the middle fence, cross, fence loses health.
-Before: every vehicle plans through the row, infantry go round. After: the gap is open for everyone.
-A separate fence takes 20 mm and 75 mm test hits plus 100 damage: holes, health down, still standing.
+FENCE_FROM_DISK=1 tests the Blueprints as saved; otherwise fence_breach_setup.configure_fence() runs first in this
+editor (its saves may fail while another editor holds the files; the compiled classes in memory are what PIE uses).
+Each lane is a row of chained copies of one fence (rotated so its wall line runs along world X at y ~ 0, at least
+~10 m long); the vehicle starts 24 m in front (+Y) of the middle piece and is ordered 24 m behind (-Y).
+  wire fences (any vehicle, any side): Luchs, enemy Pz IV -> breach, cross, fence damaged
+  concrete fences (any side, medium/heavy): Pz IV / Tiger (one enemy-owned) -> breach; Luchs -> no breach, goes round
+Paths before (per agent, own unit as querier) and after; shell test hits on a wire and a concrete fence.
 Results: Saved/WallChunks/Breach/<run>/result.json + PNGs.
 """
 import json
+import math
 import os
 import unreal
 
 RUN = os.environ.get('BREACH_RUN', 'fence')
 ROOT = f'D:/UE5Projects/RTS_Survival/Saved/WallChunks/Breach/{RUN}/'
-FENCE = ('/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/Industrial/'
-         'BP_Industrial_Dest_FenceWire.BP_Industrial_Dest_FenceWire_C')
+FROM_DISK = os.environ.get('FENCE_FROM_DISK') == '1'
+ENV = '/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/'
+CW = ENV + 'Military/ConcreteWall/'
 V = '/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/'
 VEHICLES = {
     'PzIV_G': V + 'Ger_Medium/PanzerIV/Ger_Vehicle_PanzerIV_G.Ger_Vehicle_PanzerIV_G_C',
     'TigerH1': V + 'Ger_Heavy/Tiger/Ger_Vehicle_TigerH1.Ger_Vehicle_TigerH1_C',
     'Luchs': V + 'Ger_Light/PanzerII_Luchs/Ger_Vehicle_PanzerII_Luchs.Ger_Vehicle_PanzerII_Luchs_C',
-    'Puma': V + 'Ger_ArmoredCar/Puma/Ger_ArmoredCar_Puma.Ger_ArmoredCar_Puma_C',
-    'Kettenkrad': V + 'Ger_ArmoredCar/Kettenkrad/Ger_ArmoredCar_Kettenkrad.Ger_ArmoredCar_Kettenkrad_C',
 }
-# FENCE_FROM_DISK=1: test the saved Blueprint as it is (no in-memory setup first).
-FROM_DISK = os.environ.get('FENCE_FROM_DISK') == '1'
-# key: (lane x, vehicle, owner). The enemy lane is far from the others: player tanks shoot enemy test tanks.
+# fence: (Blueprint path, line axis in actor space, line offset across it, span min, span max, kind)
+FENCES = {
+    'industrial': (ENV + 'Industrial/BP_Industrial_Dest_FenceWire', 'Y', -8.0, -174.6, 190.5, 'wire'),
+    'airport': (ENV + 'Airport/BP_Airport_Dest_FenceWire', 'X', 0.0, -182.3, 193.7, 'wire'),
+    'military1': (CW + 'BP_Dest_Military_ConcreteFence_1', 'X', -4.0, -326.0, 326.0, 'concrete'),
+    'military2': (CW + 'BP_Dest_Military_ConcreteFence_2', 'X', -4.0, -978.0, 978.0, 'concrete'),
+    'postapo': (CW + 'BP_Dest_PostApo_ConcreteFence', 'Y', 0.0, -170.0, 170.0, 'concrete'),
+    'postapo_long': (CW + 'BP_Dest_PostApo_ConcreteFenceLong', 'Y', 0.0, -510.0, 510.0, 'concrete'),
+    'gate': (CW + 'BP_Dest_PostApo_ConcreteFenceGate', 'Y', -5.0, -3.0, 338.0, 'concrete'),
+    'corner': (CW + 'BP_Dest_PostApo_ConcreteFenceCorner', 'Y', 0.0, -170.0, 0.0, 'concrete'),
+}
+# key: (lane x, fence, vehicle, owner, expected). Enemy lanes far from the player lanes (they shoot each other).
 LANES = {
-    'luchs': (0, 'Luchs', 1),
-    'pziv': (4000, 'PzIV_G', 1),
-    'tiger': (8000, 'TigerH1', 1),
-    'puma': (16000, 'Puma', 1),
-    'kettenkrad': (20000, 'Kettenkrad', 1),
-    'enemy_luchs': (-16000, 'Luchs', 2),
+    'industrial_luchs': (0, 'industrial', 'Luchs', 1, 'breach'),
+    'airport_luchs': (2600, 'airport', 'Luchs', 1, 'breach'),
+    'military1_pziv': (5200, 'military1', 'PzIV_G', 1, 'breach'),
+    'military2_tiger': (7800, 'military2', 'TigerH1', 1, 'breach'),
+    'military1_luchs': (10400, 'military1', 'Luchs', 1, 'blocked'),
+    'postapo_pziv': (13000, 'postapo', 'PzIV_G', 1, 'breach'),
+    'postapo_luchs': (15600, 'postapo', 'Luchs', 1, 'blocked'),
+    'gate_pziv': (18200, 'gate', 'PzIV_G', 1, 'breach'),
+    'corner_tiger': (20800, 'corner', 'TigerH1', 1, 'breach'),
+    'airport_enemy_pziv': (-16000, 'airport', 'PzIV_G', 2, 'breach'),
+    'postapo_long_enemy_tiger': (-19000, 'postapo_long', 'TigerH1', 2, 'breach'),
 }
-SHOT_X = 12000
-FENCE_WIDTH = 364.4
-FENCES_PER_ROW = 5
-# The chain-link line sits at actor-local (x=-8, y=-174..190); yawed 90 that is world (x-190..x+174, y-8).
-LINE_DX, LINE_DY = -8.0, -8.0
+SHOTS = {'industrial': -8000, 'postapo': -10600}
+MIN_ROW = 1000.0
 START_Y = 2400.0
-MOVE_SECONDS = 70.0
+MOVE_SECONDS = 80.0
 FILTERS = {a: f'/Game/RTS_Survival/Blueprints/Nav/Filters/RTS_NavFilter_{n}.RTS_NavFilter_{n}_C'
            for a, n in (('Character', 'Characters'), ('LightTank', 'LightTanks'), ('MediumTank', 'MediumTanks'),
                         ('HeavyTank', 'HeavyTanks'))}
 S = {'phase': 'wait_load', 't': 0.0, 'mark': 0.0, 'log': [], 'walls': {}, 'rows': {}, 'tanks': {}, 'result': {},
-     'track': {}, 'pics': []}
+     'track': {}, 'pics': [], 'shot_fences': {}}
 
 
 def log(message):
@@ -97,58 +108,110 @@ def set_owner(actor, player):
     return comp is not None
 
 
-def row_fence_x(lane_x, index):
-    return lane_x + (index - FENCES_PER_ROW // 2) * FENCE_WIDTH
+def fence_class(fence):
+    path = FENCES[fence][0]
+    return unreal.load_class(None, f'{path}.{path.rsplit("/", 1)[1]}_C')
+
+
+def placement(fence):
+    """(yaw, world x of the span centre relative to the actor, world y of the line, span width)."""
+    _, axis, offset, lo, hi, _ = FENCES[fence]
+    if axis == 'Y':
+        # Yaw 90: actor (x, y) -> world (-y, x).
+        return 90.0, -(lo + hi) / 2.0, offset, hi - lo
+    return 0.0, (lo + hi) / 2.0, offset, hi - lo
+
+
+# A corner piece alone is a 1.7 m leg: tanks rightly drive round it. Flanked by straight fences it closes the row.
+FLANKS = {'corner': 'postapo_long'}
+
+
+def row_count(fence):
+    width = placement(fence)[3]
+    count = max(1, math.ceil(MIN_ROW / width))
+    return count if count % 2 == 1 else count + 1
+
+
+def row_pieces(lane_x, fence):
+    """[(fence, actor x, actor y, yaw)] with the middle piece's span centred on lane_x."""
+    flank = FLANKS.get(fence)
+    if flank:
+        width = placement(fence)[3]
+        flank_width = placement(flank)[3]
+        centres = [(flank, lane_x - (width + flank_width) / 2.0), (fence, lane_x),
+                   (flank, lane_x + (width + flank_width) / 2.0)]
+    else:
+        width = placement(fence)[3]
+        count = row_count(fence)
+        centres = [(fence, lane_x + (i - count // 2) * width) for i in range(count)]
+    out = []
+    for piece, centre in centres:
+        yaw, centre_dx, line_y, _ = placement(piece)
+        out.append((piece, centre - centre_dx, -line_y, yaw))
+    return out
+
+
+def row_positions(lane_x, fence):
+    pieces = row_pieces(lane_x, fence)
+    return [(px, py) for _, px, py, _ in pieces], pieces[0][3]
 
 
 def configure():
     namespace = {'__name__': 'fence_breach_library'}
     exec(open('D:/UE5Projects/RTS_Survival/Source/Tools/WallChunks/Breach/fence_breach_setup.py').read(), namespace)
-    namespace['configure_fence']()
-    cdo = unreal.get_default_object(unreal.load_class(None, FENCE))
-    breach = cdo.get_component_by_class(unreal.WallTankBreachComponent) if hasattr(cdo, 'get_component_by_class') \
-        else None
-    log(f'configured; cdo breach component {breach is not None}')
+    namespace['configure_fence'](save=False)
+    log('configured in memory')
 
 
 def place_all():
     world = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_editor_world()
     log(f'editor map {world.get_path_name()}')
     actors = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
-    cls = unreal.load_class(None, FENCE)
-    for key, (x, vehicle, owner) in LANES.items():
-        for i in range(FENCES_PER_ROW):
-            fx = row_fence_x(x, i)
-            actors.spawn_actor_from_class(cls, unreal.Vector(fx, 0, ground_z(world, fx, 0)), unreal.Rotator(0, 0, 90))
-        tx = x + LINE_DX
+    for key, (x, fence, vehicle, owner, _) in LANES.items():
+        positions = row_pieces(x, fence)
+        for piece, px, py, yaw in positions:
+            actors.spawn_actor_from_class(fence_class(piece), unreal.Vector(px, py, ground_z(world, px, py)),
+                                          unreal.Rotator(0, 0, yaw))
         tank = actors.spawn_actor_from_class(unreal.load_class(None, VEHICLES[vehicle]),
-                                             unreal.Vector(tx, START_Y, ground_z(world, tx, START_Y) + 50),
+                                             unreal.Vector(x, START_Y, ground_z(world, x, START_Y) + 50),
                                              unreal.Rotator(0, 0, -90))
-        log(f'{key}: placed row and {vehicle} owner {owner} set {set_owner(tank, owner)}')
-    actors.spawn_actor_from_class(cls, unreal.Vector(SHOT_X, 0, ground_z(world, SHOT_X, 0)), unreal.Rotator(0, 0, 90))
+        log(f'{key}: placed {len(positions)} x {fence} and {vehicle} owner {owner} set {set_owner(tank, owner)}')
+    for fence, x in SHOTS.items():
+        pieces = row_pieces(x, fence)
+        _, px, py, _ = pieces[len(pieces) // 2]
+        actors.spawn_actor_from_class(fence_class(fence), unreal.Vector(px, py, ground_z(world, px, py)),
+                                      unreal.Rotator(0, 0, placement(fence)[0]))
     actors.spawn_actor_from_class(unreal.CameraActor, unreal.Vector(0, 12000, 2000))
     actors.spawn_actor_from_class(unreal.SceneCapture2D, unreal.Vector(0, 12100, 2000))
 
 
 def find_runtime(world):
-    for actor in unreal.GameplayStatics.get_all_actors_of_class(world, unreal.Actor):
-        name = actor.get_class().get_name()
+    expected = {}
+    for key, (x, fence, _, _, _) in LANES.items():
+        positions, _ = row_positions(x, fence)
+        for i, (px, py) in enumerate(positions):
+            expected[(round(px), round(py))] = (key, i, len(positions))
+    shot_at = {}
+    for f, x in SHOTS.items():
+        pieces = row_pieces(x, f)
+        shot_at[(round(pieces[len(pieces) // 2][1]), round(pieces[len(pieces) // 2][2]))] = f
+    for actor in unreal.GameplayStatics.get_all_actors_of_class(world, unreal.DestructableEnvActor):
         loc = actor.get_actor_location()
-        if name == 'BP_Industrial_Dest_FenceWire_C' and abs(loc.y) < 50:
-            if abs(loc.x - SHOT_X) < 50:
-                S['shot_fence'] = actor
-            for key, (x, _, _) in LANES.items():
-                for i in range(FENCES_PER_ROW):
-                    if abs(loc.x - row_fence_x(x, i)) < 50:
-                        S['rows'].setdefault(key, {})[i] = actor
-                        if i == FENCES_PER_ROW // 2:
-                            S['walls'][key] = actor
-        if name.startswith('BP_FogOfWar_Manager'):
+        for (px, py), (key, i, count) in expected.items():
+            if abs(loc.x - px) < 30 and abs(loc.y - py) < 30:
+                S['rows'].setdefault(key, {})[i] = actor
+                if i == count // 2:
+                    S['walls'][key] = actor
+        for (px, py), fence in shot_at.items():
+            if abs(loc.x - px) < 30 and abs(loc.y - py) < 30:
+                S['shot_fences'][fence] = actor
+    for actor in unreal.GameplayStatics.get_all_actors_of_class(world, unreal.Actor):
+        if actor.get_class().get_name().startswith('BP_FogOfWar_Manager'):
             for comp in actor.get_components_by_class(unreal.PostProcessComponent):
                 comp.set_editor_property('enabled', False)
     for tank in unreal.GameplayStatics.get_all_actors_of_class(world, unreal.TankMaster):
         loc = tank.get_actor_location()
-        for key, (x, _, _) in LANES.items():
+        for key, (x, _, _, _, _) in LANES.items():
             if abs(loc.x - x) < 300 and abs(loc.y - START_Y) < 500:
                 S['tanks'][key] = tank
     capture = unreal.GameplayStatics.get_all_actors_of_class(world, unreal.SceneCapture2D)[0]
@@ -162,8 +225,8 @@ def find_runtime(world):
     comp.set_editor_property('fov_angle', 70.0)
     capture.root_component.set_mobility(unreal.ComponentMobility.MOVABLE)
     S['capture'] = capture
-    log(f'runtime walls {sorted(S["walls"])} rows {[len(r) for r in S["rows"].values()]} tanks {sorted(S["tanks"])} '
-        f'shot fence {"shot_fence" in S}')
+    log(f'runtime walls {len(S["walls"])}/{len(LANES)} tanks {len(S["tanks"])}/{len(LANES)} '
+        f'shot fences {sorted(S["shot_fences"])}')
 
 
 def wall_mesh(wall):
@@ -176,29 +239,15 @@ def actor_state(wall):
     holes = wall.get_component_by_class(unreal.WallHoleDamageComponent)
     mesh = wall_mesh(wall)
     health = wall.get_editor_property('health')
-    return dict(holes=holes.get_hole_count(), breaches=holes.get_breach_count(),
-                removed=round(holes.get_removed_face_share(), 3), health=round(health), alive=bool(health > 0.0),
-                mesh=mesh.static_mesh.get_name() if mesh.static_mesh else None,
-                visible=bool(mesh.is_visible()),
+    breach = wall.get_component_by_class(unreal.WallTankBreachComponent)
+    settings = breach.get_editor_property('settings') if breach else None
+    return dict(holes=holes.get_hole_count() if holes else None, breaches=holes.get_breach_count() if holes else None,
+                removed=round(holes.get_removed_face_share(), 3) if holes else None, health=round(health),
+                alive=bool(health > 0.0), mesh=mesh.static_mesh.get_name() if mesh.static_mesh else None,
                 material=mesh.get_material(0).get_name() if mesh.get_material(0) else None,
-                breach_comp=wall.get_component_by_class(unreal.WallTankBreachComponent) is not None,
-                any_vehicle=_any_vehicle(wall), field=_field(wall))
-
-
-def _any_vehicle(wall):
-    comp = wall.get_component_by_class(unreal.WallTankBreachComponent)
-    try:
-        return bool(comp.get_editor_property('settings').get_editor_property('any_vehicle_breaks')) if comp else None
-    except Exception as error:  # noqa: BLE001
-        return repr(error)[:60]
-
-
-def _field(wall):
-    holes = wall.get_component_by_class(unreal.WallHoleDamageComponent)
-    try:
-        return bool(holes.get_is_field_mode())
-    except Exception:  # noqa: BLE001
-        return None
+                breach_comp=breach is not None,
+                any_vehicle=bool(settings.get_editor_property('any_vehicle_breaks')) if settings else None,
+                any_side=bool(settings.get_editor_property('any_side_breaks')) if settings else None)
 
 
 def wall_state(key):
@@ -207,7 +256,8 @@ def wall_state(key):
 
 def neighbours_state(key):
     row = S['rows'].get(key, {})
-    return {i: actor_state(a).get('breaches', 'gone') for i, a in sorted(row.items()) if i != FENCES_PER_ROW // 2}
+    mid = len(row) // 2
+    return {i: actor_state(a).get('breaches', 'gone') for i, a in sorted(row.items()) if i != mid}
 
 
 def navmeshes(world):
@@ -237,22 +287,19 @@ def path(world, a, b, nav_data, filter_class):
 
 
 def across_paths(world, key):
-    x = LANES[key][0] + LINE_DX
+    x = LANES[key][0]
     z = S['ground'][key] + 20
     a, b = unreal.Vector(x, 900, z), unreal.Vector(x, -900, z)
-    queriers = {'PlayerHeavy': ('HeavyTank', S['tanks'].get('tiger')),
-                'PlayerMedium': ('MediumTank', S['tanks'].get('pziv')),
-                'PlayerLight': ('LightTank', S['tanks'].get('luchs')),
-                'EnemyLight': ('LightTank', S['tanks'].get('enemy_luchs')),
+    queriers = {'PlayerHeavy': ('HeavyTank', S['tanks'].get('military2_tiger')),
+                'PlayerMedium': ('MediumTank', S['tanks'].get('military1_pziv')),
+                'PlayerLight': ('LightTank', S['tanks'].get('industrial_luchs')),
+                'EnemyMedium': ('MediumTank', S['tanks'].get('airport_enemy_pziv')),
                 'Character': ('Character', None)}
-    out = {}
-    # A planner without a unit (convoy routes, strategic AI): fences are plain ground, as before.
-    out['Planner'] = path(world, a, b, S['nav']['LightTank'], unreal.RTSClosedBreachableWallsQueryFilter)
+    out = {'Planner': path(world, a, b, S['nav']['LightTank'], unreal.RTSClosedBreachableWallsQueryFilter)}
     for label, (agent, unit) in queriers.items():
         context = unit.get_controller() if unit is not None and alive(unit) else None
         out[label] = path(world, a, b, context if context is not None else S['nav'][agent],
                           unreal.load_class(None, FILTERS[agent]))
-        out[label]['querier'] = 'unit' if context is not None else 'navdata'
     return out
 
 
@@ -266,7 +313,7 @@ def aim_and_shoot(name, eye, look):
 
 
 def lane_view(x, z, side=1.0):
-    return unreal.Vector(x + 900, side * 1300, z + 650), unreal.Vector(x, 0, z + 200)
+    return unreal.Vector(x + 1000, side * 1400, z + 750), unreal.Vector(x, 0, z + 200)
 
 
 def queue_picture(name, at, eye, look):
@@ -282,7 +329,7 @@ def take_due_pictures():
 
 def sample():
     for key, tank in S['tanks'].items():
-        x = LANES[key][0] + LINE_DX
+        x = LANES[key][0]
         track = S['track'].setdefault(key, dict(max_side_near=0.0, cross_side=None, last=None, breach_at=None,
                                                 states=[], min_speed_near=None))
         if alive(tank):
@@ -297,12 +344,11 @@ def sample():
                 track['cross_side'] = round(loc.x - x)
                 track['cross_time'] = round(S['t'] - S['order_time'], 1)
         state = wall_state(key)
-        if state.get('breaches', 0) > 0 and track['breach_at'] is None:
+        if (state.get('breaches') or 0) > 0 and track['breach_at'] is None:
             track['breach_at'] = round(S['t'] - S['order_time'], 2)
             log(f'{key}: first breach {json.dumps(state)} tank at {track["last"]}')
             eye, look = lane_view(LANES[key][0], S['ground'][key])
             queue_picture(f'{key}_push', S['t'] + 0.2, eye, look)
-            queue_picture(f'{key}_fallen', S['t'] + 1.0, eye, look)
             queue_picture(f'{key}_after', S['t'] + 6.0, eye, look)
             queue_picture(f'{key}_after_back', S['t'] + 6.2, lane_view(LANES[key][0], S['ground'][key], -1.0)[0],
                           look)
@@ -313,19 +359,69 @@ def sample():
 
 
 def shot_test():
-    fence = S.get('shot_fence')
-    holes = fence.get_component_by_class(unreal.WallHoleDamageComponent)
-    z = ground_z(game_world(), SHOT_X, 1500)
-    removed = holes.debug_fire_test_hit(unreal.Vector(SHOT_X - 80, 30, z + 150), unreal.Vector(0, -1, 0), 20)
-    removed += holes.debug_fire_test_hit(unreal.Vector(SHOT_X + 60, 30, z + 320), unreal.Vector(0, -1, 0), 75)
-    unreal.GameplayStatics.apply_damage(fence, 100.0, None, None, unreal.DamageType)
-    state = actor_state(fence)
-    # 20 mm cuts a 17 cm hole, under MinHoleRadius (also in slot mode): health only. 75 mm cuts a hole.
-    ok = bool(state.get('holes', 0) >= 1 and state.get('alive') and state.get('health', 500) <= 25)
-    S['result']['shot'] = dict(removed=removed, state=state, passed=ok)
-    log(f'shot test {json.dumps(S["result"]["shot"], default=str)}')
-    eye, look = lane_view(SHOT_X, z)
-    queue_picture('shot_fence', S['t'] + 0.5, eye, look)
+    out = {}
+    for fence, x in SHOTS.items():
+        actor = S['shot_fences'].get(fence)
+        if actor is None:
+            out[fence] = dict(passed=False, error='missing')
+            continue
+        holes = actor.get_component_by_class(unreal.WallHoleDamageComponent)
+        loc = actor.get_actor_location()
+        z = ground_z(game_world(), x, 1500)
+        origin, extent = actor.get_actor_bounds(True)
+        mid_z = origin.z
+        before = actor_state(actor)
+        # Wall line on world y = 0, hits at mid height. A debug hit is a splash point: the 20 mm one (17 cm hole) must
+        # sit on the face (5 cm), the 75 mm one reaches 40 cm.
+        removed_20 = holes.debug_fire_test_hit(unreal.Vector(x - 90, 5, mid_z), unreal.Vector(0, -1, 0), 20)
+        removed = holes.debug_fire_test_hit(unreal.Vector(x + 70, 40, mid_z), unreal.Vector(0, -1, 0), 75)
+        unreal.GameplayStatics.apply_damage(actor, 60.0, None, None, unreal.DamageType)
+        state = actor_state(actor)
+        ok = bool(removed_20 > 0 and removed > 0 and state.get('holes', 0) >= 2 and state.get('alive')
+                  and state.get('health') < before.get('health'))
+        out[fence] = dict(removed_20=removed_20, removed_75=removed, before=before, state=state, passed=ok,
+                          actor_z=round(loc.z), mid_z=round(mid_z), extent=str(extent))
+        log(f'shot test {fence} {json.dumps(out[fence], default=str)}')
+        eye, look = lane_view(x, z)
+        queue_picture(f'shot_{fence}', S['t'] + 0.6, eye, look)
+    S['result']['shots'] = out
+
+
+def verdict(key, world):
+    x, fence, vehicle, owner, expected = LANES[key]
+    kind = FENCES[fence][5]
+    track = S['track'].get(key, {})
+    state = wall_state(key)
+    crossed = track.get('cross_side') is not None
+    before = S['result']['paths_before'][key]
+    after = across_paths(world, key)
+    S['result'].setdefault('paths_after', {})[key] = after
+    health0 = S['result']['setup'][key].get('health') or 0
+    breached = (state.get('breaches') or 0) > 0 or track.get('breach_at') is not None
+    damaged = bool(state.get('gone') or not state.get('alive') or (state.get('health') or 0) < health0)
+    if kind == 'wire':
+        nav_ok = all(before[q].get('through') for q in ('PlayerHeavy', 'PlayerMedium', 'PlayerLight', 'EnemyMedium'))
+    else:
+        nav_ok = bool(before['PlayerHeavy'].get('through') and before['PlayerMedium'].get('through')
+                      and before['EnemyMedium'].get('through') and not before['PlayerLight'].get('through'))
+    nav_ok = nav_ok and not before['Character'].get('through') and bool(before['Planner'].get('through'))
+    material_ok = state.get('alive') or state.get('gone') or not str(state.get('material')).startswith('MID_')
+    if expected == 'breach':
+        ok = bool(breached and damaged and crossed and abs(track['cross_side']) < 300 and nav_ok
+                  and after['Character'].get('through') and material_ok)
+    elif expected == 'breach_only':
+        ok = bool(breached and damaged and material_ok)
+    else:
+        ok = bool(not breached and not damaged and (not crossed or abs(track['cross_side']) > 300))
+    out = dict(fence=fence, vehicle=vehicle, owner=owner, expected=expected, passed=ok, breached=breached,
+               damaged=damaged, crossed=crossed, cross_dx=track.get('cross_side'), cross_time=track.get('cross_time'),
+               breach_at=track.get('breach_at'), min_speed_near=track.get('min_speed_near'), nav_ok=nav_ok,
+               material_ok=material_ok, health0=health0, end_state=state, neighbours=neighbours_state(key),
+               states=track.get('states'))
+    log(f'{key} verdict {json.dumps({k: v for k, v in out.items() if k != "states"})}')
+    log(f'{key} paths before {json.dumps(before)}')
+    log(f'{key} paths after {json.dumps(after)}')
+    return out
 
 
 def tick(delta):
@@ -345,7 +441,7 @@ def step():
         if phase == 'wait_load' and S['t'] > 15.0:
             S['phase'] = 'placing'
             if FROM_DISK:
-                log('testing the Blueprint as saved on disk')
+                log('testing the Blueprints as saved on disk')
             else:
                 configure()
             place_all()
@@ -378,12 +474,10 @@ def step():
             S['result']['paths_before'] = {k: across_paths(world, k) for k in LANES}
             for key in LANES:
                 log(f'{key} setup {json.dumps(S["result"]["setup"][key])}')
-                log(f'{key} paths before {json.dumps(S["result"]["paths_before"][key])}')
             shot_test()
             S['order_time'] = S['t']
             for key, tank in S['tanks'].items():
-                x = LANES[key][0] + LINE_DX
-                target = unreal.Vector(x, -START_Y, S['ground'][key] + 20)
+                target = unreal.Vector(LANES[key][0], -START_Y, S['ground'][key] + 20)
                 try:
                     result = tank.move_to_location(target, True, unreal.Rotator(0, 0, -90), False)
                 except Exception as error:  # noqa: BLE001
@@ -404,42 +498,22 @@ def step():
             world = game_world()
             if S['t'] - S['mark'] < 4.0 or S['pics'] or (nav_building(world) and S['t'] - S['mark'] < 30.0):
                 return
-            out = {}
-            for key, (x, vehicle, owner) in LANES.items():
-                track = S['track'].get(key, {})
-                state = wall_state(key)
-                crossed = track.get('cross_side') is not None
-                before = S['result']['paths_before'][key]
-                after = across_paths(world, key)
-                S['result'].setdefault('paths_after', {})[key] = after
-                breached = state.get('breaches', 0) > 0 or (track.get('breach_at') is not None)
-                damaged = bool(state.get('gone') or not state.get('alive') or state.get('health', 500) < 500)
-                vehicles_through = all(before[q].get('through') for q in ('PlayerHeavy', 'PlayerMedium',
-                                                                          'PlayerLight', 'EnemyLight'))
-                infantry_round = not before['Character'].get('through')
-                ok = bool(breached and damaged and crossed and abs(track['cross_side']) < 300 and vehicles_through
-                          and infantry_round and after['Character'].get('through')
-                          and before['Planner'].get('through'))
-                out[key] = dict(vehicle=vehicle, owner=owner, passed=ok, breached=breached, damaged=damaged,
-                                crossed=crossed, cross_dx=track.get('cross_side'), cross_time=track.get('cross_time'),
-                                breach_at=track.get('breach_at'), max_side_near=round(track.get('max_side_near', 0)),
-                                min_speed_near=track.get('min_speed_near'), vehicles_through=vehicles_through,
-                                infantry_round=infantry_round, last=track.get('last'), end_state=state,
-                                neighbours=neighbours_state(key), states=track.get('states'))
-                log(f'{key} verdict {json.dumps({k: v for k, v in out[key].items() if k != "states"})}')
-                log(f'{key} paths after {json.dumps(after)}')
+            out = {key: verdict(key, world) for key in LANES}
             S['result']['lanes'] = out
-            shot = S['result'].get('shot', {})
-            shot['end_state'] = actor_state(S.get('shot_fence'))
+            shots = S['result'].get('shots', {})
+            for fence, row in shots.items():
+                row['end_state'] = actor_state(S['shot_fences'].get(fence))
             lanes_ok = all(r['passed'] for r in out.values())
-            S['result']['all_passed'] = bool(lanes_ok and shot.get('passed'))
-            log(f'lanes_ok {lanes_ok} shot_ok {shot.get("passed")} shot_end {json.dumps(shot["end_state"])}')
+            shots_ok = all(r.get('passed') for r in shots.values())
+            S['result']['all_passed'] = bool(lanes_ok and shots_ok)
+            log(f'failed lanes {[k for k, r in out.items() if not r["passed"]]}')
+            log(f'lanes_ok {lanes_ok} shots_ok {shots_ok}')
             log(f'ALL PASSED {S["result"]["all_passed"]}')
             finish()
     except Exception as error:  # noqa: BLE001
         log(f'ERROR {phase}: {error!r}')
         finish()
-    if S['t'] > 420.0 and S['phase'] != 'done':
+    if S['t'] > 480.0 and S['phase'] != 'done':
         log('timeout')
         finish()
 

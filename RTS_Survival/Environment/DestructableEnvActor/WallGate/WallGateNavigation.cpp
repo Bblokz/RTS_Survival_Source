@@ -84,6 +84,15 @@ UNavArea_BreachableAnyVehicle::UNavArea_BreachableAnyVehicle(const FObjectInitia
 	FixedAreaEnteringCost = WallGateNavigationConstants::AnyVehicleFenceEnteringCost;
 }
 
+UNavArea_BreachableAnySideMediumHeavy::UNavArea_BreachableAnySideMediumHeavy(
+	const FObjectInitializer& ObjectInitializer)
+	: Super(ObjectInitializer)
+{
+	DrawColor = WallGateNavigationConstants::BreachableWallColour;
+	DefaultCost = 1.f;
+	FixedAreaEnteringCost = WallGateNavigationConstants::BreachableWallEnteringCost;
+}
+
 UNavArea_WallGatePlayerSide::UNavArea_WallGatePlayerSide(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
 {
@@ -199,6 +208,17 @@ void URTSWallGateNavQueryFilter::ExcludeBreachableWalls(const ANavigationData& N
 	else
 	{
 		ExcludeArea(NavData, UNavArea_BreachableAnyVehicle::StaticClass(), Filter);
+	}
+	// Concrete fences: medium and heavy vehicles of every side drive through; light vehicles and infantry go round.
+	if (bHasKnownSide && GetIsQuerierMediumOrHeavyTank(Querier))
+	{
+		OpenBreachableArea(NavData, UNavArea_BreachableAnySideMediumHeavy::StaticClass(), Filter,
+		                   WallGateNavigationConstants::BreachableWallTankCost,
+		                   WallGateNavigationConstants::BreachableWallEnteringCost);
+	}
+	else
+	{
+		ExcludeArea(NavData, UNavArea_BreachableAnySideMediumHeavy::StaticClass(), Filter);
 	}
 }
 

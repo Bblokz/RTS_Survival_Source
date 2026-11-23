@@ -254,6 +254,19 @@ public:
 	void Editor_SetFieldMode(const TArray<UMaterialInterface*>& InDamagedMaterials, const TArray<FVector2D>& PathPoints,
 	                         float Thickness);
 	void Editor_SetDamagedMaterials(const TArray<UMaterialInterface*>& InDamagedMaterials);
+	// Authoring of a hole component added to a Blueprint that had none (the airport wire fence).
+	void Editor_SetUp(const FName InWallMeshComponentName, const TArray<UStaticMesh*>& InDebrisMeshes,
+	                  const bool bInCollapseIntoChunksOnDeath)
+	{
+		Modify();
+		WallMeshComponentName = InWallMeshComponentName;
+		DebrisMeshes.Reset();
+		for (UStaticMesh* const Mesh : InDebrisMeshes)
+		{
+			DebrisMeshes.Add(Mesh);
+		}
+		CollapseSettings.bCollapseIntoChunksOnDeath = bInCollapseIntoChunksOnDeath;
+	}
 #endif
 
 	/** @return The breach at this index; null when out of range. */
@@ -439,6 +452,9 @@ private:
 	void SwapToDamagedMaterials();
 	void RestoreIntactMaterials();
 	void OnDestructibleOwnerDied();
+	// Owners that keep their own death (mesh swaps, geometry collections): the hole materials come off first, so a
+	// destroyed mesh swapped in never shows the masked hole material.
+	void OnDestructibleOwnerDied_KeepOwnDeath();
 	void OnBuildingOwnerDied();
 	// True while a building expansion shows its construction, placement or packing look.
 	bool GetIsOwnerInTransition() const;

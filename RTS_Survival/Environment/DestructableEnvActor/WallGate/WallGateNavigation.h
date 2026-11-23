@@ -138,6 +138,20 @@ public:
 };
 
 /**
+ * @brief A breachable obstacle without sides that only medium and heavy vehicles break (concrete fences): medium and
+ * heavy vehicles of every player plan through it; light vehicles and infantry go round. Plain ground for unfiltered
+ * queries and planners, as the fences' old BlockCharLight area was.
+ */
+UCLASS(Config=Engine)
+class RTS_SURVIVAL_API UNavArea_BreachableAnySideMediumHeavy : public UNavArea
+{
+	GENERATED_BODY()
+
+public:
+	UNavArea_BreachableAnySideMediumHeavy(const FObjectInitializer& ObjectInitializer);
+};
+
+/**
  * @brief Parent of the RTS_NavFilter_* Blueprints so each unit plans only through closed wall gates of its own player
  * and its allies; built per querier (AI controller -> pawn -> URTSComponent owning player), the doorway areas of every
  * other player are excluded. Relations are read when the filter is built (each new path request); a path planned

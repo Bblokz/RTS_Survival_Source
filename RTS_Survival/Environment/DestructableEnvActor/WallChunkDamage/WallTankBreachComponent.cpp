@@ -178,9 +178,9 @@ void UWallTankBreachComponent::OnWallCollisionSetUp(UPrimitiveComponent* const W
 	// Only the human player's tanks breach: AI-side units never raise overlap events on the wall (their response is
 	// left as the wall had it, unless that was an overlap).
 	WallMesh->SetCollisionResponseToChannel(COLLISION_OBJ_PLAYER, ECR_Overlap);
-	if (Settings.bAnyVehicleBreaks)
+	if (Settings.bAnyVehicleBreaks || Settings.bAnySideBreaks)
 	{
-		// Wire fences: the AI's vehicles flatten them too.
+		// Fences: the AI's vehicles break them too.
 		WallMesh->SetCollisionResponseToChannel(COLLISION_OBJ_ENEMY, ECR_Overlap);
 	}
 	else if (WallMesh->GetCollisionResponseToChannel(COLLISION_OBJ_ENEMY) == ECR_Overlap)
@@ -265,6 +265,11 @@ bool UWallTankBreachComponent::GetIsBreachingTank(const AActor* const Actor) con
 		// Wire fences: any vehicle of any side, whoever owns the fence.
 		return AgentType == ERTSNavAgents::LightTank || AgentType == ERTSNavAgents::MediumTank
 			|| AgentType == ERTSNavAgents::HeavyTank;
+	}
+	if (Settings.bAnySideBreaks)
+	{
+		// Concrete fences: medium and heavy vehicles of any side, whoever owns the fence.
+		return AgentType == ERTSNavAgents::MediumTank || AgentType == ERTSNavAgents::HeavyTank;
 	}
 	const bool bIsAllowedClass = AgentType == ERTSNavAgents::HeavyTank
 		|| (AgentType == ERTSNavAgents::MediumTank && not Settings.bHeavyTanksOnly);
@@ -1548,6 +1553,10 @@ TSubclassOf<UNavArea> UWallTankBreachComponent::GetWallNavArea()
 	if (Settings.bAnyVehicleBreaks)
 	{
 		return UNavArea_BreachableAnyVehicle::StaticClass();
+	}
+	if (Settings.bAnySideBreaks)
+	{
+		return UNavArea_BreachableAnySideMediumHeavy::StaticClass();
 	}
 	if (Settings.bHeavyTanksOnly)
 	{

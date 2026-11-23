@@ -16,6 +16,7 @@
 #include "Engine/Blueprint.h"
 #include "Engine/InheritableComponentHandler.h"
 #include "Engine/SCS_Node.h"
+#include "Engine/StaticMesh.h"
 #include "Engine/SimpleConstructionScript.h"
 #include "HAL/IConsoleManager.h"
 #include "Kismet2/BlueprintEditorUtils.h"
@@ -260,6 +261,7 @@ namespace WallTankBreachAuthoring
 			Settings.NavBlockHalfDepth = FCString::Atof(*NavHalfDepth);
 		}
 		Settings.bAnyVehicleBreaks = GetArg(Line, TEXT("AnyVehicle")) == TEXT("1");
+		Settings.bAnySideBreaks = GetArg(Line, TEXT("AnySide")) == TEXT("1");
 		if (GetArg(Line, TEXT("NoDecal")) == TEXT("1"))
 		{
 			Settings.bSpawnRubbleDecal = false;
@@ -291,6 +293,34 @@ namespace WallTankBreachAuthoring
 		return Settings;
 	}
 
+	/** @return The Blueprint's own hole component, added (named WallHoleDamage) when it has none. */
+	UWallHoleDamageComponent* AddHoleComponent(UBlueprint& Blueprint, const FString& Line)
+	{
+		USimpleConstructionScript* const Construction = Blueprint.SimpleConstructionScript;
+		USCS_Node* const Node = Construction->CreateNode(UWallHoleDamageComponent::StaticClass(), TEXT("WallHoleDamage"));
+		Construction->AddNode(Node);
+		UWallHoleDamageComponent* const Holes = Cast<UWallHoleDamageComponent>(Node->ComponentTemplate);
+		if (Holes == nullptr)
+		{
+			return nullptr;
+		}
+		TArray<UStaticMesh*> Debris;
+		TArray<FString> DebrisPaths;
+		GetArg(Line, TEXT("Debris")).ParseIntoArray(DebrisPaths, TEXT("|"));
+		for (const FString& Path : DebrisPaths)
+		{
+			if (UStaticMesh* const Mesh = LoadByPath<UStaticMesh>(Path))
+			{
+				Debris.Add(Mesh);
+			}
+		}
+		const bool bOwnDeath = GetArg(Line, TEXT("OwnDeath")) == TEXT("1");
+		Holes->Editor_SetUp(FName(*GetArg(Line, TEXT("AddHoles"))), Debris, not bOwnDeath);
+		UE_LOG(LogWallBreachAuthoring, Display, TEXT("RTS_WALL_BREACH_SETUP %s added WallHoleDamage on %s debris=%d own_death=%d"),
+		       *Blueprint.GetName(), *GetArg(Line, TEXT("AddHoles")), Debris.Num(), bOwnDeath ? 1 : 0);
+		return Holes;
+	}
+
 	void ConfigureRusWall(const TArray<FString>& Args)
 	{
 		const FString Line = FString::Join(Args, TEXT(" "));
@@ -304,8 +334,13 @@ namespace WallTankBreachAuthoring
 		Blueprint->Modify();
 		bool bHolesInherited = false;
 		USCS_Node* const HolesNode = FindNodeOfClass(*Blueprint, UWallHoleDamageComponent::StaticClass(), bHolesInherited);
-		UWallHoleDamageComponent* const Holes = Cast<UWallHoleDamageComponent>(
+		UWallHoleDamageComponent* Holes = Cast<UWallHoleDamageComponent>(
 			GetEditableTemplate(*Blueprint, HolesNode, bHolesInherited));
+		if (Holes == nullptr && not GetArg(Line, TEXT("AddHoles")).IsEmpty())
+		{
+			Holes = AddHoleComponent(*Blueprint, Line);
+			bHolesInherited = false;
+		}
 		if (Holes == nullptr)
 		{
 			UE_LOG(LogWallBreachAuthoring, Error, TEXT("RTS_WALL_BREACH_SETUP FAIL %s has no WallHoleDamage"), *BlueprintPath);
@@ -344,10 +379,12 @@ namespace WallTankBreachAuthoring
 		FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(Blueprint);
 		FKismetEditorUtilities::CompileBlueprint(Blueprint);
 		const bool bCompiled = Blueprint->Status != BS_Error;
-		const bool bSaved = bCompiled && SaveAsset(*Blueprint);
+		// NoSave=1: tests compile the Blueprint in memory only (an editor on an older DLL must not load it from disk).
+		const bool bSkipSave = GetArg(Line, TEXT("NoSave")) == TEXT("1");
+		const bool bSaved = bCompiled && not bSkipSave && SaveAsset(*Blueprint);
 		UE_LOG(LogWallBreachAuthoring, Display,
 		       TEXT("RTS_WALL_BREACH_SETUP %s %s inherited=%d materials=%d nav_blockers=%d"),
-		       bSaved ? TEXT("SAVED") : TEXT("FAIL"), *BlueprintPath, bHolesInherited ? 1 : 0, Materials.Num(),
+		       bSaved ? TEXT("SAVED") : (bSkipSave && bCompiled ? TEXT("COMPILED") : TEXT("FAIL")), *BlueprintPath, bHolesInherited ? 1 : 0, Materials.Num(),
 		       NavBlockers);
 	}
 
@@ -355,7 +392,8 @@ namespace WallTankBreachAuthoring
 		TEXT("RTS.WallBreach.ConfigureRusWall"),
 		TEXT("Field holes + tank breaches on a wall BP. Args: Blueprint= Materials=a|b [Path=x,y;x,y] [Thickness=] "
 			"[NavArea=] [NavBlocker=] [Dust=] [Sound=] [Attenuation=] [Concurrency=] [HeavyOnly=1] [Unowned=1] "
-			"[KillOnFall=1] [NavHalfDepth=] [SideMargin=] [VSlope=] [MeshNoNav=<mesh component name>] [AnyVehicle=1] "
+			"[KillOnFall=1] [NavHalfDepth=] [SideMargin=] [VSlope=] [MeshNoNav=<mesh component name>] [AnyVehicle=1] [AnySide=1] "
+			"[AddHoles=<mesh component> Debris=a|b OwnDeath=1] "
 			"[NoDecal=1] [LightShare=] [MediumShare=] [HeavyShare=] [StubHeight=] [EdgeBand=] [DustScale=] "
 			"[HealthScale=] [TopDelay=] [TopDuration=] [RubblePieces=]"),
 		FConsoleCommandWithArgsDelegate::CreateStatic(&ConfigureRusWall));

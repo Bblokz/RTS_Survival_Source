@@ -485,6 +485,12 @@ void ADestructableEnvActor::SetupComponentCollisions(TArray<UMeshComponent*> Mes
 	}
 	for (const auto EachResourceGeometryComponent : GeometryComponents)
 	{
+		if (not IsValid(EachResourceGeometryComponent))
+		{
+			// An empty entry is a component the Blueprint no longer has (the military concrete fences lost their
+			// geometry collection with the fence-breach rework but still pass the array pin): nothing to set up.
+			continue;
+		}
 		FRTS_CollisionSetup::SetupDestructibleEnvActorGeometryComponentCollision(EachResourceGeometryComponent);
 	}
 }

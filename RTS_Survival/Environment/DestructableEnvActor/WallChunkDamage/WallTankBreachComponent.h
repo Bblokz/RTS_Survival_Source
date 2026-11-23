@@ -38,6 +38,11 @@ struct FWallTankBreachSettings
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category="Breach")
 	bool bAnyVehicleBreaks = false;
 
+	// Medium and heavy vehicles of every player break this obstacle, whoever owns it (concrete fences); light vehicles
+	// and infantry go round. Nav uses UNavArea_BreachableAnySideMediumHeavy. bAnyVehicleBreaks wins when both are set.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category="Breach")
+	bool bAnySideBreaks = false;
+
 	// A wall without an owner (no RTS component, the Berlin ruins) counts as not the human player's: his tanks break it.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category="Breach")
 	bool bBreachUnownedWall = false;
