@@ -115,6 +115,12 @@ def shorten(da):
         block.set_editor_property('max_units_first_wave', FIRST)
         block.set_editor_property('units_added_per_wave', ADDED)
         da.set_editor_property(field, block)
+    # 2026-11-22: the dig-in intro (takeover + tour) and the first-wave cinematic have their own test
+    # (counterattack_presentation_test.py); off here so this test's timings stay as they were.
+    for field in ('dig_in_intro', 'arrival_cinematic'):
+        block = da.get_editor_property(field)
+        block.set_editor_property('enabled', False)
+        da.set_editor_property(field, block)
 
 
 def classify(loc, da):

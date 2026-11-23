@@ -90,6 +90,35 @@ class defaults written by `Source/Tools/IntroMission/setup_secure_line_mission.p
      the new opt-in `FStrafeAircraftSettings::bRepeatRunsOverTarget` (`AAircraftMaster::OnAttackMoveCompleted`) keeps
      every run over the target until the 150 s are up.
 
+5. **Okhotnik intel (2026-11-22, user request):** `IntelSquadDelaySeconds` (8 s) after the strike takes off, the
+   squad info takeover of the first living enemy `Squad_Rus_Okhotnik` opens (row `Okhotnik` of
+   `DT_SquadInfoTakeovers`, the user's text, written by `Tools/InfoTakeover/author_squad_info_takeovers.py`). If none
+   has landed yet, the mission looks again every second for a minute. Portrait `T_Rus_Squad_Okhotnik`: the
+   `BP_Solo_Rus_PTRS` side view (Right_idle) from `Tools/UnitPortraits` (lists `rus_squad_info_takeover*.txt`),
+   rendered 2026-11-22 once the GPU had room. A render with other editors open crashed them earlier the same day.
+6. **Ju 87 reserve (2026-11-22, user request):** the strike now flies **4** Ju 87s. `GrantedAbilityDelaySeconds`
+   (60 s) after it takes off, the player is granted `GA_Ju87Strafing` through `GrantMissionGlobalAbility`: 4
+   aircraft that keep attacking the targeted area, 2 charges, a 180 s cooldown and no cost. Then
+   `IntroMission_Ju87Reserve` plays on the announcer portrait.
+   - The map's mission manager has `bHideGlobalAbilitiesForPlayer` on, so the panel is hidden until this grant. It
+     shows only the Ju 87 reserve and collapses again after the second use.
+   - Values: `Tools/IntroMission/setup_ju87_reserve.py`. `apply_mission()` writes the Blueprint class defaults, and
+     `apply_map()` sets the hide flag and the same values on the map's mission instance.
+   - Test: `ju87_reserve_headless_test.py` (through `rear_editor_server`). Run of 2026-11-22 (Development), 14/14:
+     - panel hidden at the start; 4 Ju 87s; the Okhotnik takeover at 8.0 s game time, game paused;
+     - the reserve was granted at 60.0 s with 2 charges, 180 s cooldown, no cost and 4 aircraft;
+     - use 1 left 1 charge (8 player aircraft in the air); a second use was blocked during the cooldown, which lasted
+       179.9 s; use 2 removed the ability and collapsed the panel.
+   - `IntroMission_StukaSupport` was re-recorded on 2026-11-22 to say "four Ju-87" (user request). eleven_v4 kept
+     saying "Dammit" in 12 new takes, so the dry take is a splice: the approved take A_9's "Verdammt!" (0-1.17 s,
+     30 ms fade) plus new take `EL_IntroMission_StukaSupport_Four` from 0.88 s, loudness matched. It went through the
+     same AnnouncerFilter chain, overwrote the BlenderTanks source, was reimported (11.09 s) and has a new subtitle
+     row.
+   - `IntroMission_Ju87Reserve`: ElevenLabs takes through the AnnouncerFilter voice changer, take 2 of 3 picked by
+     the user on 2026-11-22. The takes are in `VoiceLines/VoiceChanger/Output/Audition_Ju87Reserve`. The source is
+     BlenderTanks `Announcer/AAAGerMissions/IntroMission/IntroMission_Ju87Reserve.wav`, with its `.script.txt` and
+     `.timing.json`. It is set on the class defaults and the map instance; the test re-run with it was 14/14.
+
 Audition takes are in BlenderTanks `Announcer/AAAGerMissions/IntroMission/Audition_RampAssault/`, takes A/B/C for
 each line. The user picked take A of both (2026-11-16); B and C were deleted.
 

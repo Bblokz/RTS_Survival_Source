@@ -2,8 +2,20 @@
 
 #include "SovietCounterattackMission.h"
 
+#include "Camera/CameraActor.h"
+#include "Components/WidgetComponent.h"
+#include "Kismet/GameplayStatics.h"
+#include "RTS_Survival/Player/PlayerResourceManager/PlayerResourceManager.h"
+#include "RTS_Survival/RTSComponents/AbilityComponents/DigInComponent/DigInComponent.h"
+#include "Camera/CameraComponent.h"
 #include "Engine/World.h"
+#include "EngineUtils.h"
+#include "LevelSequence.h"
+#include "LevelSequenceActor.h"
+#include "LevelSequencePlayer.h"
 #include "TimerManager.h"
+#include "RTS_Survival/Game/Players/RTSPlayers.h"
+#include "RTS_Survival/Units/Aircraft/AircraftMaster/AAircraftMaster.h"
 #include "RTS_Survival/Enemy/AirDrop/EnemyAirDrop.h"
 #include "RTS_Survival/Enemy/EnemyController/EnemyController.h"
 #include "RTS_Survival/FOWSystem/FowManager/FowManager.h"
@@ -31,6 +43,38 @@ namespace SovietCounterattackConstants
 	constexpr float SpawnZLift = 50.f;
 	// Seconds an air drop actor of a finished batch lives on (it is still inside its own broadcast).
 	constexpr float FinishedAirDropLifeSpan = 1.f;
+	// ID of the dig-in camera tour (handed back in OnCameraTourFinishedNative).
+	constexpr int32 DigInTourId = 7301;
+	// How often the intro checks whether the tour's first shot is on screen (to start the voice line).
+	constexpr float IntroVoiceLinePollSeconds = 0.2f;
+	// How often the dig-in positions are checked for dug-in player vehicles.
+	constexpr float PositionPollSeconds = 0.5f;
+	// Drop shot, after the filmed unit is on the ground: the camera turns to it.
+	constexpr float ArrivalUnitLookLift = 150.f;
+	// Dig-in markers: the ground under a marker point is traced this far above and below it.
+	constexpr float MarkerTraceHalfHeight = 3000.f;
+	// Arrival cinematic: how often the filmed aircraft is checked while waiting, and the closing-speed smoothing.
+	constexpr float ArrivalPollSeconds = 0.1f;
+	constexpr float ArrivalClosingSpeedBlend = 0.35f;
+	// Below this closing speed (cm/s) the aircraft is not on its way in; within this 2D distance it is at the pad.
+	constexpr float ArrivalMinClosingSpeed = 50.f;
+	constexpr float ArrivalAtPadDistance = 1500.f;
+	// Drop shot: the camera looks between the pad and the aircraft; the aircraft offset counts up to this length.
+	constexpr float ArrivalMaxLookOffset = 5000.f;
+	constexpr float ArrivalLookAtInterpSpeed = 2.5f;
+	constexpr float ArrivalLookAtLift = 200.f;
+	constexpr float ArrivalTrainLookLift = 150.f;
+	// The sequence actor and camera outlive the session by this much (it ends inside the player's broadcast).
+	constexpr float ArrivalActorLifeSpan = 0.5f;
+	// Fog stays lifted a little longer than the cinematic.
+	constexpr float ArrivalRevealExtraSeconds = 3.f;
+
+	const FName MarkerSetTextEventName(TEXT("SetText"));
+
+	struct FMarkerSetTextParams
+	{
+		FText NewText;
+	};
 }
 
 namespace
@@ -97,6 +141,17 @@ void USovietCounterattackMission::OnCleanUpMission()
 
 void USovietCounterattackMission::ClearRuntime(const bool bDestroyPendingActors)
 {
+	Arrival_Clear(false);
+	Intro_UnbindTakeover();
+	Intro_RemoveMarkers();
+	if (M_IntroStage != EIntroStage::NotStarted)
+	{
+		M_IntroStage = EIntroStage::Done;
+	}
+	if (UWorld* const World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(M_IntroVoiceLineTimer);
+	}
 	if (UWorld* const World = GetWorld())
 	{
 		FTimerManager& Timers = World->GetTimerManager();
@@ -200,10 +255,33 @@ void USovietCounterattackMission::Start_Preparation()
 	M_WaveCount = FMath::Max(0, Difficulty->WaveCount);
 	M_SecondsBetweenWaves = FMath::Max(1, Difficulty->SecondsBetweenWaves);
 	M_SpawnedWaveCount = 0;
-	const int32 PrepareSeconds = FMath::Max(0, Difficulty->SecondsUntilSovietsArrive);
-	const int32 SurviveSeconds = M_WaveCount * M_SecondsBetweenWaves;
+	M_PrepareSeconds = FMath::Max(0, Difficulty->SecondsUntilSovietsArrive);
+	bM_PrepareCountdownStarted = false;
+	bM_FirstPositionLinePlayed = false;
+	bM_AllPositionsRewardPaid = false;
 
 	SetObjective(Settings->PrepareObjectiveTitle, Settings->PrepareObjectiveDescription);
+
+	if (Settings->DigInIntro.bEnabled)
+	{
+		// The countdown starts when the intro (takeover, markers, tour) is over.
+		Intro_Start();
+		Positions_RefreshObjective();
+		return;
+	}
+	Start_PrepareCountdown();
+}
+
+void USovietCounterattackMission::Start_PrepareCountdown()
+{
+	UWorld* const World = GetWorld();
+	if (bM_PrepareCountdownStarted || M_Phase != EPhase::Preparing || World == nullptr || not IsValid(Settings))
+	{
+		return;
+	}
+	bM_PrepareCountdownStarted = true;
+	const int32 PrepareSeconds = M_PrepareSeconds;
+	const int32 SurviveSeconds = M_WaveCount * M_SecondsBetweenWaves;
 
 	if (Settings->TimerWidgetClass)
 	{
@@ -244,12 +322,20 @@ void USovietCounterattackMission::SkipPreparation()
 		return;
 	}
 	World->GetTimerManager().ClearTimer(M_PrepareTimer);
+	Intro_UnbindTakeover();
+	M_IntroStage = EIntroStage::Done;
+	const float SurviveSeconds = static_cast<float>(M_WaveCount * M_SecondsBetweenWaves);
 	if (M_TimerWidget.IsValid())
 	{
-		M_TimerWidget->InitMissionTimer(Settings->SurviveTimerText,
-		                                static_cast<float>(M_WaveCount * M_SecondsBetweenWaves),
-		                                FMissionTimerLifetimeSettings());
+		M_TimerWidget->InitMissionTimer(Settings->SurviveTimerText, SurviveSeconds, FMissionTimerLifetimeSettings());
 	}
+	else if (Settings->TimerWidgetClass && SurviveSeconds > 0.f)
+	{
+		// Skipped before the intro was over: the countdown widget was never made.
+		M_TimerWidget = SpawnMissionTimerWidget(Settings->TimerWidgetClass, Settings->SurviveTimerText,
+		                                        SurviveSeconds, FMissionTimerLifetimeSettings());
+	}
+	bM_PrepareCountdownStarted = true;
 	OnPreparationOver();
 }
 
@@ -260,7 +346,11 @@ void USovietCounterattackMission::OnPreparationOver()
 	{
 		return;
 	}
+	// Last look at the positions (reward when all are held), then they go: they were for the preparation.
+	Positions_Poll();
 	M_Phase = EPhase::Waves;
+	Positions_OnWavesStart();
+	Intro_RemoveMarkers();
 	SetObjective(Settings->SurviveObjectiveTitle, Settings->SurviveObjectiveDescription);
 	if (M_WaveCount <= 0)
 	{
@@ -310,7 +400,13 @@ void USovietCounterattackMission::SpawnNextWave()
 		TEXT("Soviet counterattack wave %d/%d: %d centre, %d landing field, %d train"), WaveNumber, M_WaveCount,
 		Center.Num(), AirDrop.Num(), Train.Num()));
 
-	SpawnGroundGroup(Center, ESovietCounterattackSpawn::Center, WaveNumber, Settings->Spawns.CenterSpawnLocation);
+	if (WaveNumber == 1)
+	{
+		// Before the air batch and the train start: the first train waits for the cinematic.
+		Arrival_Arm(AirDrop, not Train.IsEmpty());
+	}
+	SpawnGroundGroup(Center, ESovietCounterattackSpawn::Center, WaveNumber,
+	                 Spawn_GetGroundLocation(Settings->Spawns.CenterSpawnLocation));
 	for (const FEnemyPlacementUnit& Unit : AirDrop)
 	{
 		FSovietCounterattackQueuedAirUnit& Queued = M_AirQueue.AddDefaulted_GetRef();
@@ -623,7 +719,7 @@ void USovietCounterattackMission::SpawnGroundGroup(const TArray<FEnemyPlacementU
 		RTSFunctionLibrary::ReportError("Soviet counterattack mission " + GetName() + " found no async spawner.");
 		return;
 	}
-	// Face the first route point that is not the spawn itself (the centre spawn sits on route point 1).
+	// Face the first route point that is not the spawn itself (a spawn may sit on a route point).
 	FVector FacingTarget = GetHQLocation();
 	for (const FVector& RoutePoint : Settings->AttackRoute)
 	{
@@ -709,25 +805,29 @@ void USovietCounterattackMission::FinishGroundGroupIfDone(const int32 GroupId)
 
 FVector USovietCounterattackMission::AirDrop_GetPadLocation(const int32 PadIndex) const
 {
-	const FVector Pad = Settings->Spawns.LandingPadCenters[PadIndex];
+	return Spawn_GetGroundLocation(Settings->Spawns.LandingPadCenters[PadIndex]);
+}
+
+FVector USovietCounterattackMission::Spawn_GetGroundLocation(const FVector& Point) const
+{
 	UWorld* const World = GetWorld();
-	if (World == nullptr || not FMath::IsNearlyZero(Pad.Z))
+	if (World == nullptr || not FMath::IsNearlyZero(Point.Z))
 	{
-		return Pad;
+		return Point;
 	}
 	using SovietCounterattackConstants::PadTraceHalfHeight;
 	FHitResult Hit;
-	FCollisionQueryParams Params(SCENE_QUERY_STAT(SovietCounterattackPad), false);
-	const FVector Start(Pad.X, Pad.Y, PadTraceHalfHeight);
-	const FVector End(Pad.X, Pad.Y, -PadTraceHalfHeight);
+	FCollisionQueryParams Params(SCENE_QUERY_STAT(SovietCounterattackGround), false);
+	const FVector Start(Point.X, Point.Y, PadTraceHalfHeight);
+	const FVector End(Point.X, Point.Y, -PadTraceHalfHeight);
 	if (World->LineTraceSingleByChannel(Hit, Start, End, ECC_Visibility, Params))
 	{
 		return Hit.ImpactPoint;
 	}
 	bool bProjected = false;
-	const FVector Projected = RTSFunctionLibrary::GetLocationProjected(GetMissionManagerChecked(), Pad, true,
+	const FVector Projected = RTSFunctionLibrary::GetLocationProjected(GetMissionManagerChecked(), Point, true,
 	                                                                   bProjected);
-	return bProjected ? Projected : Pad;
+	return bProjected ? Projected : Point;
 }
 
 void USovietCounterattackMission::AirDrop_LaunchNextBatchIfIdle()
@@ -809,6 +909,10 @@ void USovietCounterattackMission::AirDrop_OnUnitDelivered(AEnemyAirDrop* AirDrop
 		return;
 	}
 	RegisterSpawnedUnit(Unit);
+	if (M_AirSlots.IsValidIndex(M_ArrivalPadIndex) && &M_AirSlots[M_ArrivalPadIndex] == Slot)
+	{
+		Arrival_OnUnitDelivered(Unit);
+	}
 	if (bM_AirBatchOrdered || Slot->bResolved)
 	{
 		// Too late for its group (or a second unit): it attacks on its own.
@@ -927,7 +1031,8 @@ void USovietCounterattackMission::Train_Start(const TArray<FEnemyPlacementUnit>&
 void USovietCounterattackMission::Train_StartNextIfIdle()
 {
 	UWorld* const World = GetWorld();
-	if (not M_TrainRuns.IsEmpty() || M_TrainQueue.IsEmpty() || World == nullptr || M_Phase == EPhase::Done)
+	if (not M_TrainRuns.IsEmpty() || M_TrainQueue.IsEmpty() || World == nullptr || M_Phase == EPhase::Done
+		|| bM_HoldTrainForCinematic)
 	{
 		return;
 	}
@@ -1192,4 +1297,968 @@ int32 USovietCounterattackMission::GetUndeliveredUnitCount() const
 		Count += Queued.Units.Num();
 	}
 	return Count;
+}
+
+// ------------------------------------------------------------------
+// Dig-in intro: Dig In field manual -> markers on the ridges -> camera tour -> prepare countdown
+// ------------------------------------------------------------------
+
+void USovietCounterattackMission::Intro_Start()
+{
+	UWorld* const World = GetWorld();
+	if (World == nullptr || not IsValid(Settings))
+	{
+		return;
+	}
+	M_IntroStage = EIntroStage::Takeover;
+	// Placed first so they already stand on the ridges while the field manual explains digging in.
+	Intro_SpawnMarkers();
+	Intro_RevealPositions();
+	if (not Settings->DigInIntro.bShowDigInTakeover)
+	{
+		Intro_StartTour();
+		return;
+	}
+	UInfoTakeoverSubsystem* const InfoTakeovers = World->GetSubsystem<UInfoTakeoverSubsystem>();
+	if (InfoTakeovers == nullptr)
+	{
+		RTSFunctionLibrary::ReportError("Soviet counterattack mission " + GetName() + ": no info takeover subsystem; "
+			"the Dig In field manual is not shown.");
+		Intro_StartTour();
+		return;
+	}
+	// Bound before queueing: the subsystem can open and finish the request inside the queue call.
+	bM_IntroTakeoverQueuing = true;
+	bM_IntroTakeoverFinishedWhileQueuing = false;
+	M_DigInTakeoverHandle = InfoTakeovers->OnTakeoverRequestFinished.AddUObject(
+		this, &USovietCounterattackMission::Intro_OnTakeoverFinished);
+	M_DigInTakeoverRequestId = InfoTakeovers->QueueDigInTakeover();
+	bM_IntroTakeoverQueuing = false;
+	if (M_DigInTakeoverRequestId == INDEX_NONE || bM_IntroTakeoverFinishedWhileQueuing)
+	{
+		Intro_UnbindTakeover();
+		Intro_StartTour();
+	}
+}
+
+void USovietCounterattackMission::Intro_OnTakeoverFinished(const int32 RequestId,
+                                                           const EInfoTakeoverRequestResult Result)
+{
+	if (bM_IntroTakeoverQueuing)
+	{
+		bM_IntroTakeoverFinishedWhileQueuing = true;
+		return;
+	}
+	if (RequestId != M_DigInTakeoverRequestId || M_IntroStage != EIntroStage::Takeover)
+	{
+		return;
+	}
+	Intro_UnbindTakeover();
+	if (Result == EInfoTakeoverRequestResult::Cancelled)
+	{
+		// The world is ending.
+		return;
+	}
+	Intro_StartTour();
+}
+
+void USovietCounterattackMission::Intro_UnbindTakeover()
+{
+	if (M_DigInTakeoverHandle.IsValid())
+	{
+		if (UWorld* const World = GetWorld())
+		{
+			if (UInfoTakeoverSubsystem* const InfoTakeovers = World->GetSubsystem<UInfoTakeoverSubsystem>())
+			{
+				InfoTakeovers->OnTakeoverRequestFinished.Remove(M_DigInTakeoverHandle);
+			}
+		}
+	}
+	M_DigInTakeoverHandle.Reset();
+	M_DigInTakeoverRequestId = INDEX_NONE;
+}
+
+FVector USovietCounterattackMission::Intro_GetGroundLocation(const FVector& Location) const
+{
+	UWorld* const World = GetWorld();
+	if (World == nullptr)
+	{
+		return Location;
+	}
+	using SovietCounterattackConstants::MarkerTraceHalfHeight;
+	FHitResult Hit;
+	FCollisionQueryParams Params(SCENE_QUERY_STAT(SovietCounterattackDigInMarker), false);
+	// World static only: a unit standing on the spot must not lift the marker onto its roof.
+	const FCollisionObjectQueryParams ObjectParams(ECC_WorldStatic);
+	const FVector Start(Location.X, Location.Y, Location.Z + MarkerTraceHalfHeight);
+	const FVector End(Location.X, Location.Y, Location.Z - MarkerTraceHalfHeight);
+	if (World->LineTraceSingleByObjectType(Hit, Start, End, ObjectParams, Params))
+	{
+		return Hit.ImpactPoint;
+	}
+	return Location;
+}
+
+void USovietCounterattackMission::Intro_SpawnMarkers()
+{
+	UWorld* const World = GetWorld();
+	if (World == nullptr || not IsValid(Settings))
+	{
+		return;
+	}
+	Intro_RemoveMarkers();
+	const FSovietCounterattackDigInIntroSettings& Intro = Settings->DigInIntro;
+	UClass* const MarkerClass = Intro.MarkerClass.LoadSynchronous();
+	const int32 Count = Intro.MarkerLocations.Num();
+	// One slot per position, in MarkerLocations order (a slot stays empty when its marker could not spawn).
+	M_DigInMarkers.SetNum(Count);
+	M_DigInMarkerIconIds.Init(NAME_None, Count);
+	M_DigInPositions.SetNum(Count);
+	M_PositionHeld.Init(false, Count);
+	for (int32 Index = 0; Index < Count; ++Index)
+	{
+		const FVector Location = Intro_GetGroundLocation(Intro.MarkerLocations[Index]);
+		M_DigInPositions[Index] = Location;
+		Positions_SetIcon(Index, true);
+		if (MarkerClass == nullptr)
+		{
+			continue;
+		}
+		FVector ToFacing = Intro.MarkerFacingTarget - Location;
+		ToFacing.Z = 0.f;
+		const float Yaw = (ToFacing.IsNearlyZero() ? 0.f : ToFacing.Rotation().Yaw) + Intro.MarkerYawOffset;
+		FActorSpawnParameters Params;
+		Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		AActor* const Marker = World->SpawnActor<AActor>(MarkerClass, Location, FRotator(0.f, Yaw, 0.f), Params);
+		if (not IsValid(Marker))
+		{
+			continue;
+		}
+		// The hint Blueprint gives itself a short life span on BeginPlay; these stay for the whole preparation.
+		Marker->SetLifeSpan(0.f);
+		M_DigInMarkers[Index] = Marker;
+		Positions_SetMarkerText(Index, Intro.MarkerText);
+	}
+	if (MarkerClass == nullptr && Count > 0)
+	{
+		RTSFunctionLibrary::ReportError("Soviet counterattack mission " + GetName() + ": no dig-in marker class (set "
+			"DigInIntro.MarkerClass on the settings); only the minimap icons show the dig-in positions.");
+	}
+	if (Count > 0)
+	{
+		World->GetTimerManager().SetTimer(M_PositionPollTimer, this, &USovietCounterattackMission::Positions_Poll,
+		                                  SovietCounterattackConstants::PositionPollSeconds, true);
+	}
+}
+
+void USovietCounterattackMission::Positions_SetIcon(const int32 Index, const bool bShow)
+{
+	if (not M_DigInMarkerIconIds.IsValidIndex(Index) || not M_DigInPositions.IsValidIndex(Index)
+		|| not IsValid(Settings))
+	{
+		return;
+	}
+	if (not bShow)
+	{
+		if (M_DigInMarkerIconIds[Index] != NAME_None)
+		{
+			RemoveCustomMiniMapIcon(M_DigInMarkerIconIds[Index]);
+			M_DigInMarkerIconIds[Index] = NAME_None;
+		}
+		return;
+	}
+	if (M_DigInMarkerIconIds[Index] != NAME_None)
+	{
+		return;
+	}
+	const FName IconId(*FString::Printf(TEXT("SovietCounterattack_DigIn_%u_%d"), GetUniqueID(), Index));
+	M_DigInMarkerIconIds[Index] = AddCustomMiniMapIcon(IconId, Settings->DigInIntro.MarkerMiniMapIcon,
+	                                                   M_DigInPositions[Index], FRotator::ZeroRotator,
+	                                                   FMinimapIconTextPayload());
+}
+
+void USovietCounterattackMission::Positions_SetMarkerText(const int32 Index, const FText& Text) const
+{
+	AActor* const Marker = M_DigInMarkers.IsValidIndex(Index) ? M_DigInMarkers[Index].Get() : nullptr;
+	if (not IsValid(Marker) || Text.IsEmpty())
+	{
+		return;
+	}
+	if (UFunction* const SetTextEvent = Marker->FindFunction(SovietCounterattackConstants::MarkerSetTextEventName))
+	{
+		SovietCounterattackConstants::FMarkerSetTextParams TextParams{Text};
+		Marker->ProcessEvent(SetTextEvent, &TextParams);
+	}
+}
+
+void USovietCounterattackMission::Positions_SetHeld(const int32 Index, const bool bHeld)
+{
+	if (not M_PositionHeld.IsValidIndex(Index) || M_PositionHeld[Index] == bHeld || not IsValid(Settings))
+	{
+		return;
+	}
+	M_PositionHeld[Index] = bHeld;
+	// Held: the ghost wall and arrow go; the text widget stays and says so.
+	Positions_SetMarkerGhostVisible(Index, not bHeld);
+	Positions_SetMarkerText(Index, bHeld ? Settings->DigInIntro.MarkerHeldText : Settings->DigInIntro.MarkerText);
+	Positions_SetIcon(Index, not bHeld);
+}
+
+void USovietCounterattackMission::Positions_SetMarkerGhostVisible(const int32 Index, const bool bVisible) const
+{
+	AActor* const Marker = M_DigInMarkers.IsValidIndex(Index) ? M_DigInMarkers[Index].Get() : nullptr;
+	if (not IsValid(Marker))
+	{
+		return;
+	}
+	TArray<UPrimitiveComponent*> Primitives;
+	Marker->GetComponents<UPrimitiveComponent>(Primitives);
+	for (UPrimitiveComponent* const Primitive : Primitives)
+	{
+		if (not Primitive->IsA<UWidgetComponent>())
+		{
+			Primitive->SetVisibility(bVisible, true);
+		}
+	}
+}
+
+int32 USovietCounterattackMission::Positions_FindHeldIndex(const ATankMaster* Tank) const
+{
+	if (not IsValid(Tank) || not IsValid(Settings) || FRTSPlayers::GetOwningPlayerOfActor(Tank) != 1)
+	{
+		return INDEX_NONE;
+	}
+	const UDigInComponent* const DigIn = Tank->FindComponentByClass<UDigInComponent>();
+	if (DigIn == nullptr || not DigIn->GetIsDugIn())
+	{
+		return INDEX_NONE;
+	}
+	// The closest position in range; two vehicles on one position still hold just that one.
+	int32 Closest = INDEX_NONE;
+	float ClosestDistanceSquared = FMath::Square(Settings->DigInIntro.PositionRadius);
+	for (int32 Index = 0; Index < M_DigInPositions.Num(); ++Index)
+	{
+		const float DistanceSquared = FVector::DistSquared2D(Tank->GetActorLocation(), M_DigInPositions[Index]);
+		if (DistanceSquared <= ClosestDistanceSquared)
+		{
+			ClosestDistanceSquared = DistanceSquared;
+			Closest = Index;
+		}
+	}
+	return Closest;
+}
+
+int32 USovietCounterattackMission::GetDigInPositionsHeld() const
+{
+	int32 Held = 0;
+	for (const bool bHeld : M_PositionHeld)
+	{
+		Held += bHeld ? 1 : 0;
+	}
+	return Held;
+}
+
+void USovietCounterattackMission::Positions_Poll()
+{
+	UWorld* const World = GetWorld();
+	if (World == nullptr || not IsValid(Settings) || M_Phase != EPhase::Preparing || M_DigInPositions.IsEmpty())
+	{
+		if (World != nullptr)
+		{
+			World->GetTimerManager().ClearTimer(M_PositionPollTimer);
+		}
+		return;
+	}
+	const FSovietCounterattackDigInIntroSettings& Intro = Settings->DigInIntro;
+	TArray<bool> Held;
+	Held.Init(false, M_DigInPositions.Num());
+	for (TActorIterator<ATankMaster> It(World); It; ++It)
+	{
+		const int32 HeldIndex = Positions_FindHeldIndex(*It);
+		if (Held.IsValidIndex(HeldIndex))
+		{
+			Held[HeldIndex] = true;
+		}
+	}
+	const int32 HeldBefore = GetDigInPositionsHeld();
+	for (int32 Index = 0; Index < Held.Num(); ++Index)
+	{
+		Positions_SetHeld(Index, Held[Index]);
+	}
+	const int32 HeldNow = GetDigInPositionsHeld();
+	if (HeldNow != HeldBefore)
+	{
+		Positions_RefreshObjective();
+	}
+	if (HeldNow > 0 && not bM_FirstPositionLinePlayed)
+	{
+		bM_FirstPositionLinePlayed = true;
+		if (Intro.FirstPositionHeldLine != nullptr)
+		{
+			PlayPortrait(Intro.VoiceLinePortrait, Intro.FirstPositionHeldLine);
+		}
+	}
+}
+
+void USovietCounterattackMission::Positions_RefreshObjective()
+{
+	if (not IsValid(Settings) || M_Phase != EPhase::Preparing)
+	{
+		return;
+	}
+	const FSovietCounterattackDigInIntroSettings& Intro = Settings->DigInIntro;
+	// Once every position is held the counter has done its job and goes; it comes back if a position is lost again
+	// before the waves (the player should know a position needs a vehicle).
+	const bool bAllHeld = GetDigInPositionsHeld() >= M_DigInPositions.Num();
+	if (not Intro.bEnabled || M_DigInPositions.IsEmpty() || Intro.PositionsObjectiveLine.IsEmpty() || bAllHeld)
+	{
+		SetObjective(Settings->PrepareObjectiveTitle, Settings->PrepareObjectiveDescription);
+		return;
+	}
+	FFormatNamedArguments Args;
+	Args.Add(TEXT("Held"), GetDigInPositionsHeld());
+	Args.Add(TEXT("Total"), M_DigInPositions.Num());
+	const FText Line = FText::Format(Intro.PositionsObjectiveLine, Args);
+	SetObjective(Settings->PrepareObjectiveTitle,
+	             FText::Format(FText::FromString(TEXT("{0}\n\n{1}")), Settings->PrepareObjectiveDescription, Line));
+}
+
+void USovietCounterattackMission::Positions_OnWavesStart()
+{
+	if (UWorld* const World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(M_PositionPollTimer);
+	}
+	if (not IsValid(Settings) || M_DigInPositions.IsEmpty() || bM_AllPositionsRewardPaid)
+	{
+		return;
+	}
+	if (GetDigInPositionsHeld() < M_DigInPositions.Num())
+	{
+		return;
+	}
+	bM_AllPositionsRewardPaid = true;
+	const FSovietCounterattackDigInIntroSettings& Intro = Settings->DigInIntro;
+	if (UPlayerResourceManager* const Resources = FRTS_Statics::GetPlayerResourceManager(this))
+	{
+		for (const FSovietCounterattackResourceReward& Reward : Intro.AllPositionsHeldReward)
+		{
+			if (Reward.Amount > 0)
+			{
+				Resources->AddResource(Reward.Resource, Reward.Amount);
+			}
+		}
+	}
+	if (Intro.AllPositionsHeldLine != nullptr)
+	{
+		PlayPortrait(Intro.VoiceLinePortrait, Intro.AllPositionsHeldLine);
+	}
+	RTSFunctionLibrary::PrintString("Soviet counterattack: every dig-in position held; reward paid.");
+}
+
+void USovietCounterattackMission::Intro_RevealPositions()
+{
+	const FSovietCounterattackDigInIntroSettings& Intro = Settings->DigInIntro;
+	if (Intro.RevealRadius <= 0.f)
+	{
+		return;
+	}
+	// World time: the paused takeover does not use any of it up. Covers the tour and the whole prepare countdown,
+	// so the markers stay in sight until the waves come.
+	float Seconds = Intro.TourSettings.ReturnSeconds + Intro.RevealSecondsAfterTour
+		+ static_cast<float>(M_PrepareSeconds);
+	for (const FMissionCameraTourShot& Shot : Intro.TourShots)
+	{
+		Seconds += Shot.Seconds;
+	}
+	for (const FVector& Location : Intro.MarkerLocations)
+	{
+		RevealAreaForSeconds(Location, Intro.RevealRadius, Seconds);
+	}
+}
+
+void USovietCounterattackMission::Intro_RemoveMarkers()
+{
+	if (UWorld* const World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(M_PositionPollTimer);
+	}
+	for (const TWeakObjectPtr<AActor>& Marker : M_DigInMarkers)
+	{
+		if (Marker.IsValid())
+		{
+			Marker->Destroy();
+		}
+	}
+	M_DigInMarkers.Empty();
+	for (const FName& IconId : M_DigInMarkerIconIds)
+	{
+		if (IconId != NAME_None)
+		{
+			RemoveCustomMiniMapIcon(IconId);
+		}
+	}
+	M_DigInMarkerIconIds.Empty();
+}
+
+TArray<AActor*> USovietCounterattackMission::GetDigInMarkers() const
+{
+	TArray<AActor*> Markers;
+	for (const TWeakObjectPtr<AActor>& Marker : M_DigInMarkers)
+	{
+		if (Marker.IsValid())
+		{
+			Markers.Add(Marker.Get());
+		}
+	}
+	return Markers;
+}
+
+void USovietCounterattackMission::Intro_StartTour()
+{
+	UWorld* const World = GetWorld();
+	if (World == nullptr || not IsValid(Settings) || M_Phase != EPhase::Preparing)
+	{
+		return;
+	}
+	M_IntroStage = EIntroStage::Tour;
+	const FSovietCounterattackDigInIntroSettings& Intro = Settings->DigInIntro;
+	if (Intro.TourShots.IsEmpty())
+	{
+		Intro_Finish();
+		return;
+	}
+	// A refused tour still reports through OnCameraTourFinishedNative next frame.
+	PlayCameraTour(Intro.TourShots, Intro.TourSettings, SovietCounterattackConstants::DigInTourId);
+	if (Intro.VoiceLine == nullptr)
+	{
+		return;
+	}
+	// The tour's takeover stops a portrait that is already playing, and the tour may wait for the screen: the line
+	// starts VoiceLineDelaySeconds after the first shot is on screen.
+	World->GetTimerManager().SetTimer(M_IntroVoiceLineTimer, this,
+	                                  &USovietCounterattackMission::Intro_WaitForFirstTourShot,
+	                                  SovietCounterattackConstants::IntroVoiceLinePollSeconds, true);
+}
+
+void USovietCounterattackMission::Intro_WaitForFirstTourShot()
+{
+	UWorld* const World = GetWorld();
+	if (World == nullptr || not IsValid(Settings) || M_IntroStage != EIntroStage::Tour)
+	{
+		if (World != nullptr)
+		{
+			World->GetTimerManager().ClearTimer(M_IntroVoiceLineTimer);
+		}
+		return;
+	}
+	if (GetCameraTourShotIndex() < 0)
+	{
+		return;
+	}
+	World->GetTimerManager().SetTimer(M_IntroVoiceLineTimer, FTimerDelegate::CreateWeakLambda(this, [this]()
+	{
+		if (IsValid(Settings) && Settings->DigInIntro.VoiceLine != nullptr)
+		{
+			PlayPortrait(Settings->DigInIntro.VoiceLinePortrait, Settings->DigInIntro.VoiceLine);
+		}
+	}), FMath::Max(0.01f, Settings->DigInIntro.VoiceLineDelaySeconds), false);
+}
+
+void USovietCounterattackMission::OnCameraTourFinishedNative(const int32 ID, const bool bWasShown)
+{
+	Super::OnCameraTourFinishedNative(ID, bWasShown);
+	if (ID != SovietCounterattackConstants::DigInTourId || M_IntroStage != EIntroStage::Tour)
+	{
+		return;
+	}
+	Intro_Finish();
+}
+
+void USovietCounterattackMission::Intro_Finish()
+{
+	M_IntroStage = EIntroStage::Done;
+	Start_PrepareCountdown();
+}
+
+// ------------------------------------------------------------------
+// First wave arrival cinematic
+// ------------------------------------------------------------------
+
+void USovietCounterattackMission::Arrival_Arm(const TArray<FEnemyPlacementUnit>& AirUnits, const bool bHasTrain)
+{
+	UWorld* const World = GetWorld();
+	if (World == nullptr || not IsValid(Settings) || M_ArrivalStage != EArrivalStage::NotStarted)
+	{
+		return;
+	}
+	const FSovietCounterattackArrivalCinematicSettings& Cinematic = Settings->ArrivalCinematic;
+	const int32 PadCount = Settings->Spawns.LandingPadCenters.Num();
+	if (not Cinematic.bEnabled || Cinematic.Sequence.IsNull() || AirUnits.IsEmpty() || PadCount <= 0
+		|| not M_AirSlots.IsEmpty() || not M_AirQueue.IsEmpty())
+	{
+		// Nothing to film at the landing field (or another batch is still out): no cinematic.
+		M_ArrivalStage = EArrivalStage::Over;
+		return;
+	}
+	// The first batch flies the queue's first units, one per pad in order: film a pad that brings a vehicle.
+	M_ArrivalPadIndex = 0;
+	const int32 BatchSize = FMath::Min(PadCount, AirUnits.Num());
+	for (int32 Index = 0; Index < BatchSize; ++Index)
+	{
+		if (AirUnits[Index].Kind == EEnemyPlacementUnitKind::Vehicle)
+		{
+			M_ArrivalPadIndex = Index;
+			break;
+		}
+	}
+	M_ArrivalPadGround = AirDrop_GetPadLocation(M_ArrivalPadIndex);
+	M_ArrivalStage = EArrivalStage::Waiting;
+	M_ArrivalWaitSeconds = 0.f;
+	M_ArrivalClosingSpeed = 0.f;
+	M_ArrivalLastPadDistance = -1.f;
+	M_ArrivalResult = 0;
+	bM_ArrivalUnitDelivered = false;
+	bM_ArrivalTrainReleased = not bHasTrain;
+	bM_HoldTrainForCinematic = bHasTrain && GetCanUseTrain();
+	bM_ArrivalFilmsTrain = bM_HoldTrainForCinematic;
+	if (not bM_HoldTrainForCinematic)
+	{
+		bM_ArrivalTrainReleased = true;
+	}
+	World->GetTimerManager().SetTimer(M_ArrivalPollTimer, this, &USovietCounterattackMission::Arrival_Poll,
+	                                  SovietCounterattackConstants::ArrivalPollSeconds, true);
+}
+
+AAircraftMaster* USovietCounterattackMission::Arrival_FindAircraft() const
+{
+	UWorld* const World = GetWorld();
+	if (World == nullptr)
+	{
+		return nullptr;
+	}
+	AAircraftMaster* Closest = nullptr;
+	float ClosestDistanceSquared = TNumericLimits<float>::Max();
+	for (TActorIterator<AAircraftMaster> It(World); It; ++It)
+	{
+		AAircraftMaster* const Aircraft = *It;
+		if (not IsValid(Aircraft) || not FRTSPlayers::IsActorHostileToPlayer(Aircraft, 1))
+		{
+			continue;
+		}
+		const float DistanceSquared = FVector::DistSquared2D(Aircraft->GetActorLocation(), M_ArrivalPadGround);
+		if (DistanceSquared < ClosestDistanceSquared)
+		{
+			ClosestDistanceSquared = DistanceSquared;
+			Closest = Aircraft;
+		}
+	}
+	return Closest;
+}
+
+void USovietCounterattackMission::Arrival_Poll()
+{
+	using namespace SovietCounterattackConstants;
+	if (M_ArrivalStage != EArrivalStage::Waiting || not IsValid(Settings))
+	{
+		return;
+	}
+	const FSovietCounterattackArrivalCinematicSettings& Cinematic = Settings->ArrivalCinematic;
+	M_ArrivalWaitSeconds += ArrivalPollSeconds;
+	if (M_ArrivalWaitSeconds > Cinematic.MaxWaitSeconds)
+	{
+		RTSFunctionLibrary::PrintString("Soviet counterattack: no landing field aircraft came near its pad in time; "
+			"no arrival cinematic.");
+		Arrival_Clear(true);
+		return;
+	}
+	AAircraftMaster* const Aircraft = Arrival_FindAircraft();
+	if (not IsValid(Aircraft))
+	{
+		return;
+	}
+	if (M_ArrivalAircraft.Get() != Aircraft)
+	{
+		M_ArrivalAircraft = Aircraft;
+		M_ArrivalLastPadDistance = -1.f;
+	}
+	const float Distance = FVector::Dist2D(Aircraft->GetActorLocation(), M_ArrivalPadGround);
+	if (M_ArrivalLastPadDistance >= 0.f)
+	{
+		const float Closing = (M_ArrivalLastPadDistance - Distance) / ArrivalPollSeconds;
+		M_ArrivalClosingSpeed = FMath::Lerp(M_ArrivalClosingSpeed, Closing, ArrivalClosingSpeedBlend);
+	}
+	M_ArrivalLastPadDistance = Distance;
+	float SecondsToPad = TNumericLimits<float>::Max();
+	if (Distance <= ArrivalAtPadDistance)
+	{
+		SecondsToPad = 0.f;
+	}
+	else if (M_ArrivalClosingSpeed > ArrivalMinClosingSpeed)
+	{
+		SecondsToPad = Distance / M_ArrivalClosingSpeed;
+	}
+	const float TrainShot = bM_ArrivalFilmsTrain ? Cinematic.TrainShotSeconds : 0.f;
+	if (not bM_ArrivalTrainReleased && SecondsToPad <= Cinematic.TrainPreRollSeconds + TrainShot
+		+ Cinematic.DropLeadSeconds)
+	{
+		Arrival_ReleaseTrain();
+	}
+	if (SecondsToPad > TrainShot + Cinematic.DropLeadSeconds || GetIsCameraTourPlaying())
+	{
+		return;
+	}
+	if (not Arrival_StartCinematic())
+	{
+		Arrival_Clear(true);
+	}
+}
+
+void USovietCounterattackMission::Arrival_ReleaseTrain()
+{
+	bM_ArrivalTrainReleased = true;
+	if (not bM_HoldTrainForCinematic)
+	{
+		return;
+	}
+	bM_HoldTrainForCinematic = false;
+	Train_StartNextIfIdle();
+}
+
+UMovieSceneSequencePlayer* USovietCounterattackMission::Arrival_GetPlayer() const
+{
+	return IsValid(M_ArrivalSequenceActor) ? M_ArrivalSequenceActor->GetSequencePlayer() : nullptr;
+}
+
+float USovietCounterattackMission::Arrival_GetSequenceSeconds() const
+{
+	const UMovieSceneSequencePlayer* const Player = Arrival_GetPlayer();
+	return IsValid(Player) ? static_cast<float>(Player->GetCurrentTime().AsSeconds()) : 0.f;
+}
+
+void USovietCounterattackMission::Arrival_SetSequenceLength(const float Seconds) const
+{
+	if (UMovieSceneSequencePlayer* const Player = Arrival_GetPlayer())
+	{
+		Player->SetTimeRange(0.f, FMath::Max(0.1f, Seconds));
+	}
+}
+
+AActor* USovietCounterattackMission::GetArrivalCinematicCamera() const
+{
+	return M_ArrivalCamera;
+}
+
+bool USovietCounterattackMission::Arrival_StartCinematic()
+{
+	using namespace SovietCounterattackConstants;
+	UWorld* const World = GetWorld();
+	ACPPController* const PlayerController = FRTS_Statics::GetRTSController(this);
+	if (World == nullptr || not IsValid(Settings) || not IsValid(PlayerController))
+	{
+		return false;
+	}
+	const FSovietCounterattackArrivalCinematicSettings& Cinematic = Settings->ArrivalCinematic;
+	ULevelSequence* const Sequence = Cinematic.Sequence.LoadSynchronous();
+	if (Sequence == nullptr)
+	{
+		RTSFunctionLibrary::ReportError("Soviet counterattack mission " + GetName() + ": the arrival cinematic's "
+			"level sequence did not load; no cinematic.");
+		return false;
+	}
+
+	ASovietCargoTrain* const Train = M_TrainRuns.IsEmpty() ? nullptr : M_TrainRuns[0].Train.Get();
+	const bool bFilmTrain = IsValid(Train) && not Train->GetHasArrived() && Cinematic.TrainShotSeconds > 0.f;
+	const float TrainShotSeconds = bFilmTrain ? Cinematic.TrainShotSeconds : 0.f;
+	const float TotalSeconds = TrainShotSeconds + Cinematic.DropShotMaxSeconds;
+
+	FMovieSceneSequencePlaybackSettings PlaybackSettings;
+	// Pausing at the end reports OnFinished without an OnStop first, so the session sees a natural finish.
+	PlaybackSettings.bPauseAtEnd = true;
+	ALevelSequenceActor* SequenceActor = nullptr;
+	ULevelSequencePlayer* const Player = ULevelSequencePlayer::CreateLevelSequencePlayer(
+		World, Sequence, PlaybackSettings, SequenceActor);
+	if (not IsValid(Player) || not IsValid(SequenceActor))
+	{
+		RTSFunctionLibrary::ReportError("Soviet counterattack mission " + GetName() + ": could not create the arrival "
+			"cinematic's sequence player.");
+		return false;
+	}
+	M_ArrivalSequenceActor = SequenceActor;
+	Player->SetTimeRange(0.f, TotalSeconds);
+
+	if (not Arrival_SpawnCamera())
+	{
+		SequenceActor->Destroy();
+		M_ArrivalSequenceActor = nullptr;
+		return false;
+	}
+	if (bFilmTrain)
+	{
+		Arrival_SetupTrainShot(*Train, TrainShotSeconds);
+	}
+	else
+	{
+		M_ArrivalStage = EArrivalStage::DropShot;
+	}
+	M_ArrivalDropShotStart = TrainShotSeconds;
+	bM_ArrivalHasLookAt = false;
+	// The mission timer is not part of the HUD the takeover hides.
+	if (M_TimerWidget.IsValid() && M_TimerWidget->IsVisible())
+	{
+		M_ArrivalTimerVisibility = M_TimerWidget->GetVisibility();
+		M_TimerWidget->SetVisibility(ESlateVisibility::Collapsed);
+		bM_ArrivalHidTimer = true;
+	}
+	RevealAreaForSeconds(M_ArrivalPadGround, Cinematic.RevealRadius, TotalSeconds + ArrivalRevealExtraSeconds);
+	Arrival_TickCamera();
+
+	bool bStarted = false;
+	M_ArrivalSession = OnCinematicTakeOverWithSkipping(Player, Cinematic.bAllowSkipping, bStarted);
+	if (not bStarted || not IsValid(M_ArrivalSession))
+	{
+		M_ArrivalSession = nullptr;
+		RTSFunctionLibrary::ReportError("Soviet counterattack mission " + GetName() + ": the arrival cinematic "
+			"takeover did not start.");
+		M_ArrivalCamera->Destroy();
+		M_ArrivalCamera = nullptr;
+		SequenceActor->Destroy();
+		M_ArrivalSequenceActor = nullptr;
+		return false;
+	}
+	M_ArrivalSession->OnCompletedWithResult.AddDynamic(this, &USovietCounterattackMission::Arrival_OnSessionCompleted);
+	if (Cinematic.TimeDilation < 1.f)
+	{
+		M_ArrivalPreviousTimeDilation = UGameplayStatics::GetGlobalTimeDilation(World);
+		UGameplayStatics::SetGlobalTimeDilation(World, Cinematic.TimeDilation);
+		bM_ArrivalChangedTimeDilation = true;
+	}
+	World->GetTimerManager().ClearTimer(M_ArrivalPollTimer);
+	PlayerController->SetViewTargetWithBlend(M_ArrivalCamera, 0.f);
+	World->GetTimerManager().SetTimerForNextTick(
+		FTimerDelegate::CreateUObject(this, &USovietCounterattackMission::Arrival_TickCamera));
+	RTSFunctionLibrary::PrintString(FString::Printf(
+		TEXT("Soviet counterattack: arrival cinematic started (train shot %s, pad %d)"),
+		bFilmTrain ? TEXT("yes") : TEXT("no"), M_ArrivalPadIndex));
+	return true;
+}
+
+bool USovietCounterattackMission::Arrival_SpawnCamera()
+{
+	UWorld* const World = GetWorld();
+	if (World == nullptr || not IsValid(Settings))
+	{
+		return false;
+	}
+	FActorSpawnParameters CameraParams;
+	CameraParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	CameraParams.ObjectFlags |= RF_Transient;
+	M_ArrivalCamera = World->SpawnActor<ACameraActor>(ACameraActor::StaticClass(), M_ArrivalPadGround,
+	                                                  FRotator::ZeroRotator, CameraParams);
+	if (not IsValid(M_ArrivalCamera))
+	{
+		return false;
+	}
+	if (UCameraComponent* const CameraComponent = M_ArrivalCamera->GetCameraComponent())
+	{
+		CameraComponent->SetFieldOfView(Settings->ArrivalCinematic.FieldOfView);
+		CameraComponent->SetConstraintAspectRatio(false);
+	}
+	return true;
+}
+
+FVector USovietCounterattackMission::Arrival_GetTrackDirectionAt(const FVector& Location) const
+{
+	const TArray<FVector>& Path = Settings->Train.PathPoints;
+	FVector Direction = FVector::ForwardVector;
+	float BestDistanceSquared = TNumericLimits<float>::Max();
+	for (int32 Index = 0; Index + 1 < Path.Num(); ++Index)
+	{
+		const FVector Closest = FMath::ClosestPointOnSegment(Location, Path[Index], Path[Index + 1]);
+		const float DistanceSquared = FVector::DistSquared(Closest, Location);
+		if (DistanceSquared < BestDistanceSquared)
+		{
+			BestDistanceSquared = DistanceSquared;
+			Direction = (Path[Index + 1] - Path[Index]).GetSafeNormal2D();
+		}
+	}
+	return Direction;
+}
+
+void USovietCounterattackMission::Arrival_SetupTrainShot(const ASovietCargoTrain& Train, const float TrainShotSeconds)
+{
+	const FSovietCounterattackArrivalCinematicSettings& Cinematic = Settings->ArrivalCinematic;
+	// A fixed camera ahead of the front flatcar, beside the rails and high: the train rolls towards it.
+	const TArray<FVector> Cargo = Train.GetCargoWorldLocations();
+	const FVector Front = Cargo.IsEmpty() ? Train.GetActorLocation() : Cargo[0];
+	const FVector Direction = Arrival_GetTrackDirectionAt(Front);
+	const FVector Right = FVector::CrossProduct(FVector::UpVector, Direction).GetSafeNormal();
+	M_ArrivalTrainCameraLocation = Front + Direction * Cinematic.TrainCameraAhead
+		+ Right * Cinematic.TrainCameraSide + FVector(0.f, 0.f, Cinematic.TrainCameraHeight);
+	M_ArrivalTrainDirection = Direction;
+	M_ArrivalStage = EArrivalStage::TrainShot;
+	RevealAreaForSeconds(Front + Direction * (Cinematic.TrainCameraAhead * 0.5f), Cinematic.RevealRadius,
+	                     TrainShotSeconds + SovietCounterattackConstants::ArrivalRevealExtraSeconds);
+}
+
+void USovietCounterattackMission::Arrival_EnterDropShot()
+{
+	M_ArrivalStage = EArrivalStage::DropShot;
+	bM_ArrivalHasLookAt = false;
+}
+
+void USovietCounterattackMission::Arrival_TickCamera()
+{
+	using namespace SovietCounterattackConstants;
+	UWorld* const World = GetWorld();
+	const bool bInShot = M_ArrivalStage == EArrivalStage::TrainShot || M_ArrivalStage == EArrivalStage::DropShot;
+	if (World == nullptr || not bInShot || not IsValid(M_ArrivalCamera) || not IsValid(Settings))
+	{
+		return;
+	}
+	const FSovietCounterattackArrivalCinematicSettings& Cinematic = Settings->ArrivalCinematic;
+	const float SequenceSeconds = Arrival_GetSequenceSeconds();
+	if (M_ArrivalStage == EArrivalStage::TrainShot && SequenceSeconds >= M_ArrivalDropShotStart)
+	{
+		Arrival_EnterDropShot();
+	}
+
+	FVector CameraLocation;
+	FVector LookAt;
+	if (M_ArrivalStage == EArrivalStage::TrainShot)
+	{
+		ASovietCargoTrain* const Train = M_TrainRuns.IsEmpty() ? nullptr : M_TrainRuns[0].Train.Get();
+		const TArray<FVector> Cargo = IsValid(Train) ? Train->GetCargoWorldLocations() : TArray<FVector>();
+		CameraLocation = M_ArrivalTrainCameraLocation;
+		LookAt = (Cargo.IsEmpty() ? (IsValid(Train) ? Train->GetActorLocation() : CameraLocation) : Cargo[0])
+			+ M_ArrivalTrainDirection * Cinematic.TrainLookAhead + FVector(0.f, 0.f, ArrivalTrainLookLift);
+	}
+	else
+	{
+		const FVector Back = FRotator(0.f, Cinematic.DropCameraYaw, 0.f).Vector();
+		CameraLocation = M_ArrivalPadGround - Back * Cinematic.DropCameraDistance
+			+ FVector(0.f, 0.f, Cinematic.DropCameraHeight);
+		// Re-picked every frame: the aircraft that ends up over the filmed pad is the one to watch, not one that led
+		// the batch (aircraft take off staggered).
+		M_ArrivalAircraft = Arrival_FindAircraft();
+		const FVector PadLook = M_ArrivalPadGround + FVector(0.f, 0.f, ArrivalLookAtLift);
+		FVector Desired = PadLook;
+		if (M_ArrivalDeliveredUnit.IsValid())
+		{
+			// The vehicle is down: end on it.
+			Desired = GetUnitLocation(M_ArrivalDeliveredUnit.Get()) + FVector(0.f, 0.f, ArrivalUnitLookLift);
+		}
+		else if (M_ArrivalAircraft.IsValid())
+		{
+			const FVector Offset = (M_ArrivalAircraft->GetActorLocation() - PadLook).GetClampedToMaxSize(
+				ArrivalMaxLookOffset);
+			Desired = PadLook + Offset * Cinematic.DropLookAtAircraftWeight;
+		}
+		Desired.Z = FMath::Min(Desired.Z, M_ArrivalPadGround.Z + Cinematic.DropLookAtMaxHeight);
+		LookAt = bM_ArrivalHasLookAt
+			         ? FMath::VInterpTo(M_ArrivalLookAt, Desired, World->GetDeltaSeconds(), ArrivalLookAtInterpSpeed)
+			         : Desired;
+		M_ArrivalLookAt = LookAt;
+		bM_ArrivalHasLookAt = true;
+	}
+	M_ArrivalCamera->SetActorLocationAndRotation(CameraLocation, (LookAt - CameraLocation).Rotation());
+	if (M_ArrivalSession != nullptr && not M_ArrivalSession->GetHasCompleted())
+	{
+		World->GetTimerManager().SetTimerForNextTick(
+			FTimerDelegate::CreateUObject(this, &USovietCounterattackMission::Arrival_TickCamera));
+	}
+}
+
+void USovietCounterattackMission::Arrival_OnUnitDelivered(AActor* Unit)
+{
+	if (bM_ArrivalUnitDelivered || not IsValid(Settings))
+	{
+		return;
+	}
+	bM_ArrivalUnitDelivered = true;
+	M_ArrivalDeliveredUnit = Unit;
+	if (M_ArrivalStage == EArrivalStage::Waiting)
+	{
+		// Arrived sooner than the closing speed said: show it on the ground now rather than not at all.
+		if (not Arrival_StartCinematic())
+		{
+			Arrival_Clear(true);
+			return;
+		}
+	}
+	if (M_ArrivalStage != EArrivalStage::TrainShot && M_ArrivalStage != EArrivalStage::DropShot)
+	{
+		return;
+	}
+	const float EndSeconds = FMath::Max(Arrival_GetSequenceSeconds(), M_ArrivalDropShotStart)
+		+ Settings->ArrivalCinematic.SecondsAfterDelivery;
+	Arrival_SetSequenceLength(EndSeconds);
+}
+
+void USovietCounterattackMission::Arrival_OnSessionCompleted(const EMissionCinematicTakeOverResult Result)
+{
+	M_ArrivalResult = static_cast<int32>(Result);
+	RTSFunctionLibrary::PrintString(FString::Printf(TEXT("Soviet counterattack: arrival cinematic ended (%d)"),
+	                                                M_ArrivalResult));
+	Arrival_Clear(true);
+}
+
+void USovietCounterattackMission::Arrival_Clear(const bool bReleaseTrain)
+{
+	UWorld* const World = GetWorld();
+	if (World != nullptr)
+	{
+		World->GetTimerManager().ClearTimer(M_ArrivalPollTimer);
+	}
+	if (M_ArrivalStage != EArrivalStage::NotStarted)
+	{
+		M_ArrivalStage = EArrivalStage::Over;
+	}
+	UMissionCinematicTakeOverSession* const Session = M_ArrivalSession;
+	M_ArrivalSession = nullptr;
+	if (IsValid(Session))
+	{
+		Session->OnCompletedWithResult.RemoveAll(this);
+		if (not Session->GetHasCompleted())
+		{
+			Session->RequestCancel();
+		}
+	}
+	if (IsValid(M_ArrivalCamera))
+	{
+		ACPPController* const PlayerController = FRTS_Statics::GetRTSController(this);
+		if (IsValid(PlayerController) && PlayerController->GetViewTarget() == M_ArrivalCamera)
+		{
+			PlayerController->SetViewTargetWithBlend(PlayerController->GetPawn(), 0.f);
+		}
+		M_ArrivalCamera->SetLifeSpan(SovietCounterattackConstants::ArrivalActorLifeSpan);
+	}
+	M_ArrivalCamera = nullptr;
+	if (IsValid(M_ArrivalSequenceActor))
+	{
+		// The session may end inside this actor's player broadcast: let it go a moment later.
+		M_ArrivalSequenceActor->SetLifeSpan(SovietCounterattackConstants::ArrivalActorLifeSpan);
+	}
+	M_ArrivalSequenceActor = nullptr;
+	M_ArrivalAircraft.Reset();
+	M_ArrivalDeliveredUnit.Reset();
+	if (bM_ArrivalChangedTimeDilation && World != nullptr)
+	{
+		UGameplayStatics::SetGlobalTimeDilation(World, M_ArrivalPreviousTimeDilation);
+	}
+	bM_ArrivalChangedTimeDilation = false;
+	if (bM_ArrivalHidTimer && M_TimerWidget.IsValid())
+	{
+		M_TimerWidget->SetVisibility(M_ArrivalTimerVisibility);
+	}
+	bM_ArrivalHidTimer = false;
+	if (bReleaseTrain && bM_HoldTrainForCinematic)
+	{
+		bM_HoldTrainForCinematic = false;
+		Train_StartNextIfIdle();
+	}
+	else if (not bReleaseTrain)
+	{
+		bM_HoldTrainForCinematic = false;
+	}
 }

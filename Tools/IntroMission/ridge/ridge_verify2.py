@@ -14,6 +14,8 @@ import os
 if os.environ.get('RIDGE_SHOTS'):
     SHOTS = json.loads(os.environ['RIDGE_SHOTS'])
 SHOTS_ONLY = bool(os.environ.get('RIDGE_SHOTS'))
+SHOT_DELAY = float(os.environ.get('RIDGE_SHOT_DELAY', '0'))   # real seconds to wait in PIE before the first shot (shader compiles)
+import time
 S = {'t': 0.0, 'phase': 'load', 'mark': 0.0, 'res': {'timeline': [], 'shots': []}}
 
 
@@ -64,8 +66,12 @@ def tick(dt):
                 pc.call_method('ClickedStartGameButton')
                 unreal.SystemLibrary.execute_console_command(world, 'ShowFlag.PostProcessMaterial 0')
                 S['phase'], S['mark'], S['k'] = 'shots', S['t'], 0
+                S['shots_after'] = time.time() + SHOT_DELAY
             return
         if S['phase'] == 'shots':
+            if time.time() < S.get('shots_after', 0):
+                S['mark'] = S['t']
+                return
             names = list(SHOTS)
             if S['k'] >= len(names):
                 if SHOTS_ONLY:

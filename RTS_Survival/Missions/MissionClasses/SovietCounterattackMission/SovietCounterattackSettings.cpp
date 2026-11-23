@@ -4,6 +4,7 @@
 
 #include "RTS_Survival/Game/Difficulty/GameDifficulty.h"
 #include "RTS_Survival/Missions/MissionProps/SovietCargoTrain/SovietCargoTrain.h"
+#include "LevelSequence.h"
 #include "RTS_Survival/Missions/MissionWidgets/W_MissionTimer.h"
 
 #define LOCTEXT_NAMESPACE "SovietCounterattack"
@@ -39,22 +40,84 @@ FSovietCounterattackSpawnSettings::FSovietCounterattackSpawnSettings()
 	};
 }
 
+namespace SovietCounterattackDefaults
+{
+	FMissionCameraTourShot MakeShot(const FVector& FocusStart, const FVector& FocusEnd, const float YawStart,
+	                                const float YawEnd, const float PitchStart, const float PitchEnd,
+	                                const float ArmStart, const float ArmEnd, const float Seconds,
+	                                const float BlendInSeconds, const FText& Title, const FText& Subtitle)
+	{
+		FMissionCameraTourShot Shot;
+		Shot.FocusStart = FocusStart;
+		Shot.FocusEnd = FocusEnd;
+		Shot.YawStart = YawStart;
+		Shot.YawEnd = YawEnd;
+		Shot.PitchStart = PitchStart;
+		Shot.PitchEnd = PitchEnd;
+		Shot.ArmLengthStart = ArmStart;
+		Shot.ArmLengthEnd = ArmEnd;
+		Shot.Seconds = Seconds;
+		Shot.BlendInSeconds = BlendInSeconds;
+		Shot.Title = Title;
+		Shot.Subtitle = Subtitle;
+		return Shot;
+	}
+}
+
+FSovietCounterattackDigInIntroSettings::FSovietCounterattackDigInIntroSettings()
+{
+	using SovietCounterattackDefaults::MakeShot;
+	// MarkerClass is set on the data asset (not here) so the cook sees the reference.
+	// The intro map's two ridges either side of the Soviet attack route: south ridge first, then the north ridge.
+	MarkerLocations = {
+		FVector(6105.f, -3617.f, 791.f),
+		FVector(7085.f, -3679.f, 791.f),
+		FVector(7149.f, 1386.f, 531.f),
+		FVector(6351.f, 1143.f, 531.f)
+	};
+	MarkerText = LOCTEXT("DigInMarker", "Dig in a vehicle here");
+	MarkerHeldText = LOCTEXT("DigInMarkerHeld", "Position held");
+	PositionsObjectiveLine = LOCTEXT("DigInPositionsLine", "Vehicles dug in at the marked positions: {Held}/{Total}");
+	FSovietCounterattackResourceReward Radixite;
+	Radixite.Resource = ERTSResourceType::Resource_Radixite;
+	Radixite.Amount = 300;
+	FSovietCounterattackResourceReward Metal;
+	Metal.Resource = ERTSResourceType::Resource_Metal;
+	Metal.Amount = 150;
+	AllPositionsHeldReward = {Radixite, Metal};
+	const FText PositionsTitle = LOCTEXT("TourPositionsTitle", "Dig-In Positions");
+	TourShots = {
+		MakeShot(FVector(6250.f, -3950.f, 791.f), FVector(6700.f, -3600.f, 791.f), 20.f, 5.f, 18.f, 14.f,
+		         3000.f, 2600.f, 5.5f, 1.5f, PositionsTitle, LOCTEXT("TourSouthRidge", "Southern ridge")),
+		MakeShot(FVector(6500.f, 1000.f, 531.f), FVector(6850.f, 1350.f, 531.f), -5.f, -20.f, 14.f, 18.f,
+		         2600.f, 3000.f, 5.5f, 1.75f, PositionsTitle, LOCTEXT("TourNorthRidge", "Northern ridge")),
+		MakeShot(FVector(6300.f, -1200.f, 600.f), FVector(7300.f, -1200.f, 600.f), 0.f, 0.f, 6.f, 4.f,
+		         4800.f, 5000.f, 5.f, 2.f, LOCTEXT("TourGapTitle", "Hold the Gap"),
+		         LOCTEXT("TourGapSubtitle", "The Soviet attack comes between both ridges"))
+	};
+}
+
+FSovietCounterattackArrivalCinematicSettings::FSovietCounterattackArrivalCinematicSettings()
+{
+	// Sequence is set on the data asset (not here) so the cook sees the reference.
+}
+
 USovietCounterattackSettings::USovietCounterattackSettings()
 {
 	using namespace SovietCounterattackDefaults;
-	NewToRTS = Make(240, 3, 100, 6, 8, 1,
+	NewToRTS = Make(150, 3, 70, 6, 8, 1,
 	                {ETankSubtype::Tank_BT7, ETankSubtype::Tank_T26, ETankSubtype::Tank_T70},
 	                {ESquadSubtype::Squad_Rus_Mosin});
-	Normal = Make(180, 4, 90, 9, 12, 1,
+	Normal = Make(150, 4, 60, 9, 12, 1,
 	              {ETankSubtype::Tank_T26, ETankSubtype::Tank_BT7_4, ETankSubtype::Tank_T70, ETankSubtype::Tank_T34_76},
 	              {ESquadSubtype::Squad_Rus_Mosin, ESquadSubtype::Squad_Rus_Okhotnik});
-	Hard = Make(150, 5, 90, 10, 13, 2,
+	Hard = Make(120, 5, 60, 10, 13, 2,
 	            {
 		            ETankSubtype::Tank_T70, ETankSubtype::Tank_T34_76, ETankSubtype::Tank_T34_76_L,
 		            ETankSubtype::Tank_T34E, ETankSubtype::Tank_SU_76
 	            },
 	            {ESquadSubtype::Squad_Rus_Mosin, ESquadSubtype::Squad_Rus_Okhotnik, ESquadSubtype::Squad_Rus_LargePTRS});
-	Brutal = Make(120, 6, 80, 12, 15, 2,
+	Brutal = Make(90, 6, 50, 12, 15, 2,
 	              {
 		              ETankSubtype::Tank_T34_76_L, ETankSubtype::Tank_T34E, ETankSubtype::Tank_T34_85,
 		              ETankSubtype::Tank_SU_85, ETankSubtype::Tank_KV_1

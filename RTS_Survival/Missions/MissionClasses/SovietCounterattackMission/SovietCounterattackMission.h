@@ -3,13 +3,22 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Components/SlateWrapperTypes.h"
 #include "RTS_Survival/Enemy/MissionPlacement/EnemyPlacementTypes.h"
+#include "RTS_Survival/GameUI/InfoTakeover/InfoTakeoverSubsystem.h"
 #include "RTS_Survival/Missions/MissionClasses/MissionBase/MissionBase.h"
+#include "RTS_Survival/Missions/MissionClasses/MissionBase/MissionCinematicTakeOverSession.h"
 
 #include "SovietCounterattackMission.generated.h"
 
+class AAircraftMaster;
+class ACameraActor;
 class AEnemyAirDrop;
+class ALevelSequenceActor;
 class ASovietCargoTrain;
+class ATankMaster;
+class UMissionCinematicTakeOverSession;
+class UMovieSceneSequencePlayer;
 class USovietCounterattackSettings;
 class UW_MissionTimer;
 struct FSovietCounterattackDifficulty;
@@ -125,8 +134,45 @@ public:
 	UFUNCTION(BlueprintPure, NotBlueprintable, Category = "Soviet Counterattack")
 	int32 GetUndeliveredUnitCount() const;
 
+	// 0 = not started, 1 = Dig In takeover open, 2 = camera tour, 3 = done (the prepare countdown runs).
+	UFUNCTION(BlueprintPure, NotBlueprintable, Category = "Soviet Counterattack|Presentation")
+	int32 GetDigInIntroStage() const { return static_cast<int32>(M_IntroStage); }
+
+	// Dig-in markers currently in the world (they stay for the prepare phase).
+	UFUNCTION(BlueprintPure, NotBlueprintable, Category = "Soviet Counterattack|Presentation")
+	TArray<AActor*> GetDigInMarkers() const;
+
+	// Dig-in positions a dug-in player vehicle holds right now (prepare phase).
+	UFUNCTION(BlueprintPure, NotBlueprintable, Category = "Soviet Counterattack|Presentation")
+	int32 GetDigInPositionsHeld() const;
+
+	// True once the all-positions-held reward was paid (when the waves started).
+	UFUNCTION(BlueprintPure, NotBlueprintable, Category = "Soviet Counterattack|Presentation")
+	bool GetAllPositionsRewardPaid() const { return bM_AllPositionsRewardPaid; }
+
+	// Pad the arrival cinematic films (index into the landing pads), -1 before it is chosen.
+	UFUNCTION(BlueprintPure, NotBlueprintable, Category = "Soviet Counterattack|Presentation")
+	int32 GetArrivalPadIndex() const { return M_ArrivalPadIndex; }
+
+	// 0 = not started, 1 = waiting for the first wave's aircraft, 2 = train shot, 3 = drop shot, 4 = over.
+	UFUNCTION(BlueprintPure, NotBlueprintable, Category = "Soviet Counterattack|Presentation")
+	int32 GetArrivalCinematicStage() const { return static_cast<int32>(M_ArrivalStage); }
+
+	// How the arrival cinematic ended (EMissionCinematicTakeOverResult as int; 0 while it has not ended).
+	UFUNCTION(BlueprintPure, NotBlueprintable, Category = "Soviet Counterattack|Presentation")
+	int32 GetArrivalCinematicResult() const { return M_ArrivalResult; }
+
+	// The camera of the arrival cinematic while it plays (tests: screenshot / location checks).
+	UFUNCTION(BlueprintPure, NotBlueprintable, Category = "Soviet Counterattack|Presentation")
+	AActor* GetArrivalCinematicCamera() const;
+
+	// The arrival cinematic's takeover session while it plays (tests can skip it like the player would).
+	UFUNCTION(BlueprintPure, NotBlueprintable, Category = "Soviet Counterattack|Presentation")
+	UMissionCinematicTakeOverSession* GetArrivalCinematicSession() const { return M_ArrivalSession; }
+
 protected:
 	virtual void OnMissionStartedNative() override;
+	virtual void OnCameraTourFinishedNative(const int32 ID, const bool bWasShown) override;
 
 private:
 	enum class EPhase : uint8
@@ -162,6 +208,66 @@ private:
 	bool GetHasValidSettings() const;
 	const FSovietCounterattackDifficulty* GetDifficulty() const;
 	void Start_Preparation();
+	// The "Prepare to defend" countdown (and the timer widget); runs once the dig-in intro is over.
+	void Start_PrepareCountdown();
+	int32 M_PrepareSeconds = 0;
+	bool bM_PrepareCountdownStarted = false;
+
+	// ----- Dig-in intro (takeover -> markers -> tour -> countdown) -----
+	enum class EIntroStage : uint8
+	{
+		NotStarted,
+		Takeover,
+		Tour,
+		Done
+	};
+
+	EIntroStage M_IntroStage = EIntroStage::NotStarted;
+	int32 M_DigInTakeoverRequestId = INDEX_NONE;
+	// The takeover can finish inside the queue call, before its request id is known.
+	bool bM_IntroTakeoverQueuing = false;
+	bool bM_IntroTakeoverFinishedWhileQueuing = false;
+	FDelegateHandle M_DigInTakeoverHandle;
+	FTimerHandle M_IntroVoiceLineTimer;
+
+	// One slot per dig-in position (MarkerLocations order); a slot is empty when its marker could not spawn.
+	UPROPERTY()
+	TArray<TWeakObjectPtr<AActor>> M_DigInMarkers;
+
+	// Minimap icon per position; NAME_None while the position is held (or the icon failed).
+	TArray<FName> M_DigInMarkerIconIds;
+
+	// Ground location of each position and whether a dug-in player vehicle holds it now.
+	TArray<FVector> M_DigInPositions;
+	TArray<bool> M_PositionHeld;
+	FTimerHandle M_PositionPollTimer;
+	bool bM_FirstPositionLinePlayed = false;
+	bool bM_AllPositionsRewardPaid = false;
+
+	void Positions_Poll();
+	void Positions_SetHeld(const int32 Index, const bool bHeld);
+	void Positions_SetIcon(const int32 Index, const bool bShow);
+	void Positions_SetMarkerText(const int32 Index, const FText& Text) const;
+	// Shows or hides a marker's ghost wall and arrow (every primitive but its text widget).
+	void Positions_SetMarkerGhostVisible(const int32 Index, const bool bVisible) const;
+	/** @return The position a dug-in player vehicle holds (closest in PositionRadius), or INDEX_NONE. */
+	int32 Positions_FindHeldIndex(const ATankMaster* Tank) const;
+	void Positions_RefreshObjective();
+	// Pays AllPositionsHeldReward (and plays its line) when every position is held as the waves start.
+	void Positions_OnWavesStart();
+
+	void Intro_Start();
+	void Intro_OnTakeoverFinished(const int32 RequestId, const EInfoTakeoverRequestResult Result);
+	void Intro_SpawnMarkers();
+	void Intro_RemoveMarkers();
+	// Lifts the fog over the dig-in positions for the tour (and a while after), so the ridges are seen.
+	void Intro_RevealPositions();
+	void Intro_StartTour();
+	// Polls until the tour shows its first shot, then starts the voice line after its delay.
+	void Intro_WaitForFirstTourShot();
+	void Intro_Finish();
+	void Intro_UnbindTakeover();
+	FVector Intro_GetGroundLocation(const FVector& Location) const;
 	void SetObjective(const FText& Title, const FText& Description);
 
 	// ----- Waves -----
@@ -216,6 +322,8 @@ private:
 	FSovietCounterattackAirSlot* AirDrop_FindSlot(const AEnemyAirDrop* AirDrop);
 	void AirDrop_CheckBatch();
 	FVector AirDrop_GetPadLocation(const int32 PadIndex) const;
+	// A settings point with z 0 is traced to the ground below it (then the navmesh); other points are used as is.
+	FVector Spawn_GetGroundLocation(const FVector& Point) const;
 	void AirDrop_ClearBatch(const bool bDestroyAirDrops);
 
 	// ----- Train -----
@@ -239,6 +347,9 @@ private:
 
 	TArray<FQueuedTrain> M_TrainQueue;
 
+	// The first wave's train waits for the arrival cinematic (see FSovietCounterattackArrivalCinematicSettings).
+	bool bM_HoldTrainForCinematic = false;
+
 	void Train_Start(const TArray<FEnemyPlacementUnit>& Units, const int32 WaveNumber);
 	void Train_StartNextIfIdle();
 	bool GetCanUseTrain() const;
@@ -246,6 +357,83 @@ private:
 	void Train_OnDeparted(ASovietCargoTrain* Train);
 	void Train_Unload(ASovietCargoTrain* Train);
 	FPendingTrainRun* Train_FindRun(const ASovietCargoTrain* Train);
+
+	// ----- First wave arrival cinematic -----
+	enum class EArrivalStage : uint8
+	{
+		NotStarted,
+		Waiting,
+		TrainShot,
+		DropShot,
+		Over
+	};
+
+	EArrivalStage M_ArrivalStage = EArrivalStage::NotStarted;
+	int32 M_ArrivalResult = 0;
+	FTimerHandle M_ArrivalPollTimer;
+	FTimerHandle M_ArrivalCameraTimer;
+	float M_ArrivalWaitSeconds = 0.f;
+	// Pad (index into M_AirSlots / LandingPadCenters) the drop shot films.
+	int32 M_ArrivalPadIndex = INDEX_NONE;
+	FVector M_ArrivalPadGround = FVector::ZeroVector;
+	// Closing speed of the filmed aircraft (cm/s, smoothed) and its last 2D distance to the pad.
+	float M_ArrivalClosingSpeed = 0.f;
+	float M_ArrivalLastPadDistance = -1.f;
+	bool bM_ArrivalTrainReleased = false;
+	// The first wave has a train, held back so the cinematic opens on it.
+	bool bM_ArrivalFilmsTrain = false;
+	// The mission timer widget was collapsed for the cinematic.
+	bool bM_ArrivalHidTimer = false;
+	ESlateVisibility M_ArrivalTimerVisibility = ESlateVisibility::SelfHitTestInvisible;
+	FVector M_ArrivalTrainDirection = FVector::ForwardVector;
+	bool bM_ArrivalUnitDelivered = false;
+	// Sequence seconds at which the drop shot starts / the shot should end.
+	float M_ArrivalDropShotStart = 0.f;
+	FVector M_ArrivalTrainCameraLocation = FVector::ZeroVector;
+	FVector M_ArrivalLookAt = FVector::ZeroVector;
+	bool bM_ArrivalHasLookAt = false;
+
+	UPROPERTY()
+	TWeakObjectPtr<AAircraftMaster> M_ArrivalAircraft;
+
+	// The filmed pad's unit once it is on the ground; the drop shot ends looking at it.
+	UPROPERTY()
+	TWeakObjectPtr<AActor> M_ArrivalDeliveredUnit;
+
+	// Game speed before the cinematic slowed it (Cinematic.TimeDilation); restored when it ends.
+	float M_ArrivalPreviousTimeDilation = 1.f;
+	bool bM_ArrivalChangedTimeDilation = false;
+
+	UPROPERTY()
+	TObjectPtr<ACameraActor> M_ArrivalCamera = nullptr;
+
+	UPROPERTY()
+	TObjectPtr<ALevelSequenceActor> M_ArrivalSequenceActor = nullptr;
+
+	UPROPERTY()
+	TObjectPtr<UMissionCinematicTakeOverSession> M_ArrivalSession = nullptr;
+
+	void Arrival_Arm(const TArray<FEnemyPlacementUnit>& AirUnits, const bool bHasTrain);
+	void Arrival_Poll();
+	AAircraftMaster* Arrival_FindAircraft() const;
+	void Arrival_ReleaseTrain();
+	bool Arrival_StartCinematic();
+	// The runtime camera both shots film through (field of view from the settings).
+	bool Arrival_SpawnCamera();
+	/** @brief Fixes the train shot's camera ahead of the train's front flatcar, beside and above the rails. */
+	void Arrival_SetupTrainShot(const ASovietCargoTrain& Train, const float TrainShotSeconds);
+	/** @return The 2D direction of travel of the train path at the point closest to Location. */
+	FVector Arrival_GetTrackDirectionAt(const FVector& Location) const;
+	void Arrival_TickCamera();
+	void Arrival_EnterDropShot();
+	void Arrival_OnUnitDelivered(AActor* Unit);
+	void Arrival_SetSequenceLength(const float Seconds) const;
+	float Arrival_GetSequenceSeconds() const;
+	UMovieSceneSequencePlayer* Arrival_GetPlayer() const;
+	UFUNCTION()
+	void Arrival_OnSessionCompleted(EMissionCinematicTakeOverResult Result);
+	// Stops waiting / playing; bReleaseTrain lets a held train go.
+	void Arrival_Clear(const bool bReleaseTrain);
 
 	// ----- Kill the remaining Soviets -----
 	UPROPERTY()
