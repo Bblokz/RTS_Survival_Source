@@ -68,6 +68,19 @@ SQUADS = [
                        "vehicles and structures. They can fight, but they are not soldiers first: keep them behind "
                        "your armour, and send them to the wrecks once the fighting has moved on.",
     },
+    {
+        # 2026-11-22 (Ger_IntroMission, shown once the Ju 87 strike on the ridge base is in); text by the user.
+        "Name": "Okhotnik",
+        "DisplayName": "Okhotnik PTRS Squad",
+        "ServiceYear": "1941",
+        "Portrait": "T_Rus_Squad_Okhotnik",
+        "Class": SQUAD_ROOT + "/Rus/Rus_Squad_PTRS.Rus_Squad_PTRS_C",
+        "Description": "Mosin PTRS squads, or \"Okhotnik\", are tank hunters that have access to improved PTRS AT "
+                       "rifles as well as grenades. The Director of Shield has put special care into improving these "
+                       "units; they fire composite rigid shells that are better able to punch through armor. They are "
+                       "known for their aggressive training and show no fear in flanking your vehicles up close. "
+                       "Do not give them the opportunity to hit weaker side armor!",
+    },
 ]
 
 asset_tools = unreal.AssetToolsHelpers.get_asset_tools()

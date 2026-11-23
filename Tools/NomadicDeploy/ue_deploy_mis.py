@@ -60,6 +60,36 @@ def ensure_ms_plain():
     return m
 
 
+STATIC_ONLY_SUFFIX = '_NomadicDeploy'
+SKELETAL_USAGES = ('used_with_skeletal_mesh', 'used_with_morph_targets', 'used_with_clothing')
+
+
+def static_only(material):
+    """MF_NomadicDeploy_VAT reads UV4/UV5 (6 vertex texcoords) and the GPU-skin vertex factory takes at most 4. Under a
+    master that is also used on skeletal meshes, the cook fails that permutation, drops the deploy MI's shader map and
+    Shipping draws the default material (the editor hides this). So switch-mode deploy MIs parent to a static-only
+    copy of the slot material's chain: <name>_NomadicDeploy, the master copy with the skeletal usages off."""
+    root = root_material(material)
+    if not any(root.get_editor_property(usage) for usage in SKELETAL_USAGES):
+        return material
+    path = material.get_path_name().split('.')[0]
+    if path.endswith(STATIC_ONLY_SUFFIX):
+        return material
+    copy_path = path + STATIC_ONLY_SUFFIX
+    if not EAL.does_asset_exist(copy_path):
+        EAL.duplicate_asset(path, copy_path)
+    copy = unreal.load_asset(copy_path)
+    if isinstance(material, unreal.MaterialInstance):
+        MEL.set_material_instance_parent(copy, static_only(material.get_editor_property('parent')))
+        MEL.update_material_instance(copy)
+    else:
+        for usage in SKELETAL_USAGES:
+            copy.set_editor_property(usage, False)
+        MEL.recompile_material(copy)
+    EAL.save_loaded_asset(copy, False)
+    return copy
+
+
 def deploy_mi(index, original, folder, offset_tex, rot_tex, frames):
     name = 'MI_%s_Deploy_%02d' % (BUILDING, index)
     path = folder + '/' + name
@@ -81,7 +111,7 @@ def deploy_mi(index, original, folder, offset_tex, rot_tex, frames):
                 MEL.set_material_instance_texture_parameter_value(mi, dst, found)
         kind = 'ms-plain'
     else:
-        MEL.set_material_instance_parent(mi, original)
+        MEL.set_material_instance_parent(mi, static_only(original))
         MEL.set_material_instance_static_switch_parameter_value(mi, 'NomadicDeploy', True)
         kind = 'switch'
     MEL.set_material_instance_texture_parameter_value(mi, 'NomadicDeployVatOffset', offset_tex)

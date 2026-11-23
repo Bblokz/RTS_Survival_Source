@@ -26,6 +26,15 @@ of the building's own slot materials, with the switch on and the building's VAT 
 
 Megascans material-attributes masters get `M_NomadicDeploy_MSPlain` instead.
 
+**Shipping: deploy MIs parent to static-only copies.** The VAT reads UV4/UV5, so a deploy MI needs 6 vertex texcoords;
+the GPU-skin vertex factory allows 4. Most building masters are also used on skeletal meshes (trucks, cranes), so the
+cook failed that permutation ("Too many texture coordinate sets defined on GPUSkin vertex input"), dropped the deploy
+MI's whole shader map and Shipping drew the default material for the deploy (the editor hides this). Since 2026-11-19
+each such master (and any intermediate MI in the chain) has a `<name>_NomadicDeploy` copy with the skeletal usages off,
+and the deploy MIs are its children; `ue_deploy_mis.py` (`static_only`) does this for new MIs. After re-running the
+`masters` step on a shared master, re-patch its `_NomadicDeploy` copy too (or delete the copy and re-run `mis`).
+Check a cook log for `Failed to compile Material` lines naming `MI_*_Deploy_*`: there must be none.
+
 Never wire a material pin from a script by bridge node index. Use `UNomadicDeployEditorLibrary`, which also clears a
 stale `UseConstant` on World Position Offset that old masters carry. A `UseConstant` makes the compiler ignore the
 wired pin.
