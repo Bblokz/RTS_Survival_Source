@@ -281,6 +281,9 @@ public:
 	/** @return The first station in the world, or null. */
 	static ABerlinForgeStation* FindForgeStation(const UObject* WorldContextObject);
 
+	// Every station carries this actor tag; UForgeStationSightedTrigger centres its ring on it.
+	static const FName StationTag;
+
 	UPROPERTY(BlueprintAssignable, Category = "Forge Station")
 	FOnForgeStationTargetDestroyed OnTargetDestroyed;
 

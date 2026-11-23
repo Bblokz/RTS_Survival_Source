@@ -1,7 +1,55 @@
 # Berlin mission (design draft)
 
-Status: concept only, nothing built. Started 2026-11-12. Lore reference: `Source/DesignTexts/Lore.txt`.
-Every item marked **(open)** is undecided.
+Status: map built (see [BerlinMap.md](BerlinMap.md)), no mission scripting yet. **Mission flow (phases, primary and
+bonus objectives, alarm and fleeing rules, decided 2026-11-22): [BerlinMissionFlow.md](BerlinMissionFlow.md)**, which
+overrides the "High-level mission structure" and "Early patrols and runners" sections below. Started 2026-11-12. Lore reference:
+`Source/DesignTexts/Lore.txt`. Every item marked **(open)** is undecided. Owner decisions of 2026-11-18 are collected in
+[Decisions 2026-11-18](#decisions-2026-11-18) and override older text below where they differ.
+
+## Decisions 2026-11-18
+
+- **Kommandant:** not personally tied to Berlin.
+- **Mechanical reward** (unlock, commander or story only): decided later, together with the global (world) map.
+- **Base:** the player **has a base** in this mission (not a fixed force). A Radixite field and a metal field are added
+  to the start area, on its edge so the middle stays free for base structures. The owner picked concept A "Ostrand" from
+  `Docs/Concepts/BerlinStartResources/v01` (main repo): a Radixite glass crater and a tram-depot metal field on the east
+  edge, **built on the map 2026-11-18** from the existing resource Blueprints (see BerlinMap.md). Of eight candidate
+  extra Radixite locations (`Docs/Concepts/BerlinExtraRadixite/v01`) the owner picked **E1, E2, E5 and E6**, built
+  2026-11-18 (BerlinMap.md).
+- **End condition:** the mission is won once the player **has the data from the radio tower next to the Zoo flak tower**
+  (the radio bunker at the tower's north-east foot on the built map). **(open)** whether an escape beat follows; as
+  written, getting the data ends the mission.
+- **What the radio tower holds (picked):** the **Forge relay**. The "radio tower next to the flak tower" is the Zoo
+  **L-Turm** (Leitturm, the fire-control and radio tower paired with each real flak tower). The Forge team repaired its old
+  antenna to send the survey telemetry east, which is why the radio "still somewhat works". The signal the resistance
+  intercepted came from this tower. Pulling the **buffered survey data out of the relay** is the win, and it ties the
+  crater and the tower into one story. **(open)** how the transfer plays out (powering the relay, holding it, who can
+  enter) and what the Forge station at the crater contributes to it.
+- **Response force** (size and timer per difficulty): the owner sets it up with nodes in the mission blueprint. The doc
+  does not fix numbers.
+- **Patrols and runners** (count, composition, runner routes, alert delay, shown objective or not): configured through a
+  **separate data asset** that holds the enemy forces per difficulty, so they can be tuned without editing the mission.
+  **(open)** the data asset's layout.
+
+## Briefing and voice lines (owner's text, 2026-11-18)
+
+Speaker: the advisor (`GermanAnnouncer` portrait), same voice and chain as every advisor line (ElevenLabs "1940s German
+Broadcast Voice - Cinematic Edition" + `settings.json` / AnnouncerFilter, see `VoiceLines/AGENTS.md`). Three separate voice
+lines. The text below is the owner's; only two typos are fixed ("hundered" -> "hundred", "fully of" -> "full of").
+
+| Line name | When | Text |
+|---|---|---|
+| `Berlin_Briefing_Crater` | Mission start, after the location intro | "I did not expect zhis in a hundred years; welkom back zu our former kapital, Kommandant! Ze crates from ze Erzgebirge convoy, zhose sample canisters, survey orders. Every one of zhem addressed to ze same place: Berlin. Thirty years nothing has lived in zhat crater. Und now ze Director of Forge sends a survey team into it. While Shield troops may take risks and seem reckless at times... ze Director of Forge does not waste men on dead ground, zhat is for sure..." |
+| `Berlin_Cinematic_Leitturm` | During the mission cinematic (camera on the Zoo tower) | "Ze signal we picked up comes from ze old Leitturm at ze Zoo. Zhey have repaired ze antenna, und every reading zhey take waits there before it goes east. We need zu get that data." |
+| `Berlin_Briefing_StayQuiet` | After the cinematic | "But be very careful, Kommandant. Zhis area is full of Soviet patrols, und also Shield holds ze Reichstag. If zhey raise ze alarm, reinforcements come by rail from ze east, behind you. Set up in ze Friedrichshain ruins und stay quiet." |
+
+Status (2026-11-18): **imported.** Owner's picks: Crater take 3 (eleven_v3), Leitturm take 1 (eleven_v4), StayQuiet
+take 2 (eleven_v4). Sources in `D:/Blender/BlenderProjects/BlenderTanks/VoiceLines/Announcer/AAAGerMissions/Berlin`
+(wav + `_Old` dry take + timing sidecar + `.script.txt` in the owner's spelling); SoundWaves in
+`/Game/RTS_Survival/Sounds/VoiceLines/GerFaction/Anouncer/AAAGerMissions/Berlin` (sound class
+`RTS_SClass_CinematicAndTransmissions`; 32.7 s, 12.5 s, 16.2 s); subtitles are rows of `DT_CinematicTranscripts`
+(`NewVoiceLines.bat`). Tools: `VoiceLines/VoiceChanger/Output/BerlinBriefingAudition/_tools` (`berlin.py`, `finalize.py`,
+`run_import.py`). Not yet hooked into the mission (no scripting on `Ger_Berlin`).
 
 ## Layout sketch (MapDesigner)
 
@@ -255,9 +303,12 @@ simply miss it.
 
 ## Open questions
 
-1. Is the Kommandant personally tied to Berlin, or newer to command? (Currently: not decided.)
-2. What does the player get out of the mission mechanically (unlock, commander or story only)?
-3. Fixed-force mission, or does the player get to deploy a base?
-4. Exact bunker contents, and how the radio broadcast plays out.
-5. Escape route and end condition.
-6. Difficulty scaling: response-force size and timer length per difficulty.
+1. ~~Is the Kommandant personally tied to Berlin?~~ No (2026-11-18).
+2. What does the player get out of the mission mechanically? Decided later with the global map.
+3. ~~Fixed force or base?~~ Base (2026-11-18); the start-area resource fields are in concept.
+4. Exact bunker contents, and how the radio broadcast plays out. **(open, brainstorm in progress)**
+5. ~~End condition~~: the data from the radio tower next to the Zoo flak tower (2026-11-18). Whether an escape follows is
+   still open.
+6. ~~Difficulty scaling~~: response force via mission nodes, patrols via a per-difficulty data asset (2026-11-18).
+7. Not yet in this doc: the role of the Burrower brewery enclave near the start (placed on the map 2026-11-17, see
+   `Docs/Environment/BerlinBreweryEnclave.md`), and the Spree / Moltke bridge / Hauptbahnhof flank from the sketch.

@@ -3,7 +3,7 @@
 #include "Mission_BerlinForgeStation.h"
 
 #include "Engine/World.h"
-#include "TimerManager.h"
+
 #include "RTS_Survival/Enemy/MissionPlacement/EnemyPlacementTypes.h"
 #include "RTS_Survival/Enemy/Strongpoint/EnemyStrongpoint.h"
 #include "RTS_Survival/GameUI/MainGameUI.h"
@@ -17,8 +17,6 @@
 
 namespace BerlinForgeStationMissionConstants
 {
-	// Before the plate is up, a station that is already gone waits this long so the plate is seen completing.
-	constexpr float CompleteAfterAllDeadSeconds = 2.f;
 	constexpr float TrackingValidityIntervalSeconds = 1.f;
 	constexpr int32 ArchiveSortingPriority = 0;
 	constexpr float ArchiveNotificationSeconds = 20.f;
@@ -34,6 +32,8 @@ UMission_BerlinForgeStation::UMission_BerlinForgeStation()
 	                                                  "Destroy the drill rig, the cooling plant and the command bunker. "
 	                                                  "Do not let a guard run to the Reichstag.");
 	MissionWidgetState.ObjectiveType = EMissionObjectiveType::Bonus;
+	// The Blueprint's reward sequence ends the stage with its own OnMissionComplete.
+	bCompleteMissionWhenTrackingDone = false;
 	MissionTrigger = CreateDefaultSubobject<UForgeStationSightedTrigger>(TEXT("SightedTrigger"));
 
 	CraterIntel.Key = TEXT("Berlin_ForgeCraterSurvey");
@@ -154,7 +154,7 @@ void UMission_BerlinForgeStation::StartTargetTracking()
 	}
 	if (AliveTargets.IsEmpty())
 	{
-		// Everything died before the plate came up; TickMission completes the mission.
+		// Everything died before the plate came up; TickMission fires the event.
 		return;
 	}
 	TrackActorsWithMiniMapProgress(EMissionTrackingType::TrackOnActorsDestroyed, AliveTargets,
@@ -175,60 +175,36 @@ void UMission_BerlinForgeStation::TickMission(const float DeltaTime)
 		return;
 	}
 	TrySetUpGarrison();
-	if (not M_Station.IsValid() || M_Station->GetTargetCount() == 0 || M_Station->GetAliveTargetCount() > 0)
+	// The trigger fires as soon as a target dies; the reward starts once the plate is up. Tracking normally gets
+	// there first (OnTrackingReachedMaxCountNative); this covers a station that was gone before the plate appeared.
+	if (MissionState.bIsTriggered && GetAreAllStationTargetsDestroyed())
 	{
-		M_SecondsAllTargetsDead = 0.f;
-		return;
-	}
-	// The trigger fires as soon as a target dies; complete once the plate is up.
-	if (not MissionState.bIsTriggered)
-	{
-		return;
-	}
-	M_SecondsAllTargetsDead += DeltaTime;
-	if (M_SecondsAllTargetsDead >= BerlinForgeStationMissionConstants::CompleteAfterAllDeadSeconds)
-	{
-		OnMissionComplete();
+		FireAllStationTargetsDestroyed();
 	}
 }
 
-void UMission_BerlinForgeStation::OnMissionComplete()
+bool UMission_BerlinForgeStation::GetAreAllStationTargetsDestroyed() const
 {
-	if (MissionState.bIsMissionComplete)
+	return M_Station.IsValid() && M_Station->GetTargetCount() > 0 && M_Station->GetAliveTargetCount() == 0;
+}
+
+void UMission_BerlinForgeStation::FireAllStationTargetsDestroyed()
+{
+	if (bM_HasFiredAllTargetsDestroyed)
 	{
 		return;
 	}
-	Super::OnMissionComplete();
+	bM_HasFiredAllTargetsDestroyed = true;
 	if (M_Station.IsValid())
 	{
 		M_Station->StopStation();
 	}
-	ScheduleReward();
+	BP_OnAllStationTargetsDestroyed();
 }
 
-void UMission_BerlinForgeStation::ScheduleReward()
+void UMission_BerlinForgeStation::OnTrackingReachedMaxCountNative()
 {
-	UWorld* World = GetWorld();
-	if (not IsValid(World))
-	{
-		return;
-	}
-	TWeakObjectPtr<UMission_BerlinForgeStation> WeakThis(this);
-	World->GetTimerManager().SetTimer(M_IntelTimerHandle, FTimerDelegate::CreateLambda([WeakThis]()
-	{
-		if (WeakThis.IsValid())
-		{
-			WeakThis->GiveIntel();
-		}
-	}), FMath::Max(Lines.IntelDelaySeconds, KINDA_SMALL_NUMBER), false);
-	const float ReinforcementsAfter = Lines.IntelDelaySeconds + Lines.ReinforcementsDelaySeconds;
-	World->GetTimerManager().SetTimer(M_ReinforcementsTimerHandle, FTimerDelegate::CreateLambda([WeakThis]()
-	{
-		if (WeakThis.IsValid())
-		{
-			WeakThis->LaunchReinforcements();
-		}
-	}), FMath::Max(ReinforcementsAfter, KINDA_SMALL_NUMBER), false);
+	FireAllStationTargetsDestroyed();
 }
 
 void UMission_BerlinForgeStation::GiveIntel()

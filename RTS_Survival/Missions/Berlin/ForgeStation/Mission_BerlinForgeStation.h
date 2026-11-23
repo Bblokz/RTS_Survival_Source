@@ -35,22 +35,16 @@ struct FBerlinForgeStationLines
 	// Berlin_ReinforcementsInbound: plays when the drop starts.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Lines")
 	TObjectPtr<USoundBase> ReinforcementsLine = nullptr;
-
-	// Seconds from the last target's death to the intel line and the archive entry.
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Lines", meta = (ClampMin = "0.0"))
-	float IntelDelaySeconds = 1.f;
-
-	// Seconds from the intel line to the reinforcement line and the drop.
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Lines", meta = (ClampMin = "0.0"))
-	float ReinforcementsDelaySeconds = 8.f;
 };
 
 /**
- * @brief BONUS objective of Ger_Berlin: destroy the Forge survey station (BerlinForgeStation.md). Sets up the station
- * garrison from the Berlin forces data asset of the running difficulty, shows its plate when a player unit comes near
- * (UForgeStationSightedTrigger), counts the three targets of ABerlinForgeStation and, when they are gone, plays the
- * crater intel, adds the archive entry and flies in HQ's reinforcements at the station. No effect on the Zoo waves.
- * @note Add it to the map's MissionManager Missions; place the station, its three targets and the strongpoint.
+ * @brief C++ parent of the BONUS stage Mission_Berlin_ForgeStation (BerlinForgeStation.md, BerlinMissionScripting.md
+ * section 5). Natively it sets up the station garrison before the trigger (from the Berlin forces data asset of the
+ * running difficulty), plays the sighted line and tracks the three targets once the plate is up, and fires
+ * BP_OnAllStationTargetsDestroyed once when they are gone. The Blueprint's event graph runs the reward: the waits
+ * (ScheduleSingleCallback), GiveIntel, LaunchReinforcements and OnMissionComplete. No effect on the Zoo waves.
+ * @note Use the Blueprint child in the manager's Missions; place the station, its three targets and the strongpoint.
+ * @note BP_OnAllStationTargetsDestroyed: implement the reward sequence and end it with OnMissionComplete.
  */
 UCLASS(Blueprintable, EditInlineNew)
 class RTS_SURVIVAL_API UMission_BerlinForgeStation : public UMissionBase
@@ -61,7 +55,16 @@ public:
 	UMission_BerlinForgeStation();
 
 	virtual void TickMission(float DeltaTime) override;
-	virtual void OnMissionComplete() override;
+
+	/** @brief The crater intel: archive entry (CraterIntel) and the intel line. A synchronous step. */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Forge Station")
+	void GiveIntel();
+
+	/** @brief The reinforcements line and HQ's drop at the station (payload from the forces data asset). */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Forge Station")
+	void LaunchReinforcements();
+
+	bool GetHasFiredAllTargetsDestroyed() const { return bM_HasFiredAllTargetsDestroyed; }
 
 	bool GetHasSetUpGarrison() const { return bM_HasSetUpGarrison; }
 	bool GetHasLaunchedReinforcements() const { return bM_HasLaunchedReinforcements; }
@@ -73,6 +76,12 @@ public:
 protected:
 	virtual void OnMissionStart() override;
 	virtual void OnMissionStartedNative() override;
+	// Tracking does not complete this stage (bCompleteMissionWhenTrackingDone is off); the full count starts the reward.
+	virtual void OnTrackingReachedMaxCountNative() override;
+
+	// All three station targets are gone (fired once, after the plate is up). Run the reward from here.
+	UFUNCTION(BlueprintImplementableEvent, Category = "Forge Station")
+	void BP_OnAllStationTargetsDestroyed();
 
 	// One asset per difficulty; Ironman falls back to Brutal, missing ones to Normal.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Forge Station")
@@ -99,11 +108,8 @@ private:
 	UPROPERTY()
 	TObjectPtr<UBerlinMissionForcesData> M_Forces = nullptr;
 
-	FTimerHandle M_IntelTimerHandle;
-	FTimerHandle M_ReinforcementsTimerHandle;
-	// Seconds the targets have all been gone; the plate gets a moment on screen before it completes.
-	float M_SecondsAllTargetsDead = 0.f;
 	bool bM_HasSetUpGarrison = false;
+	bool bM_HasFiredAllTargetsDestroyed = false;
 	bool bM_HasStartedTracking = false;
 	bool bM_HasLaunchedReinforcements = false;
 	bool bM_HasAddedArchiveEntry = false;
@@ -113,8 +119,7 @@ private:
 	UBerlinMissionForcesData* LoadForcesForDifficulty(const ERTSGameDifficulty Difficulty) const;
 	void StartTargetTracking();
 	void PlayLine(USoundBase* Line) const;
-	void ScheduleReward();
-	void GiveIntel();
-	void LaunchReinforcements();
+	bool GetAreAllStationTargetsDestroyed() const;
+	void FireAllStationTargetsDestroyed();
 	FVector GetGroundedLandingPoint() const;
 };

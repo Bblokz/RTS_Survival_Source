@@ -196,7 +196,8 @@ End-of-map planes `SKIRT_Plane_*` (folder MapSkirt, `MI_Berlin_HorizonSkirt`) ru
 - The track-smoke surface map is not baked, and the Berlin layer names are not in `URTSGroundSurfaceSettings`, so a bake
   would count every layer as dirt. Adding them is a C++ change for the owner to decide (suggested: rubble and mud = dirt,
   ash = rock, scrub = grass, cobble and glass = concrete).
-- Rail yard, Alexanderplatz and the Hauptbahnhof shell are generic dressing, not designed set pieces.
+- Alexanderplatz and the Hauptbahnhof shell are generic dressing, not designed set pieces. (The rail yard is designed
+  now: see "Rail yard D1" below.)
 - No landscape grass output; the Tiergarten is dead trees and logs on the scrub layer.
 
 ## Floating gaps under ruins and objects (2026-11-17)
@@ -220,3 +221,90 @@ detector and sculpt plan), `gaps_apply.py` (height sub-rectangle import + piece 
 `BP_Berlin_BreweryVaults` placed at (-11959, 34847), yaw 20, on the hall's -X side (`vaults_clear_plan.py`,
 `vaults_apply.py`): 5 footprint instances and 9 rubble instances removed from their instanced actors, 3 loose actors
 and 12 decals inside the footprint deleted.
+
+## Start-base resource fields (2026-11-18)
+
+The owner picked concept A "Ostrand" (`Docs/Concepts/BerlinStartResources/v01`, main repo) and asked for it to be built
+from the existing resource Blueprints only. `Tools/BerlinMap/poi/start_resources.py` (`check_sites()` read-only,
+`place()` reruns cleanly: it clears its own `RES_Start_` prefix, folder `Berlin/StartResources`) placed 14 actors,
+seated on the landscape by a pivot trace. Both fields sit on the east edge behind the start (13542, 44444):
+
+- **Radixite, glass crater** round (17300, 47300): `Resource_Radixite_Crater0` (the old bomb crater) ringed by one
+  `Crystal_Large`, one `Crystal_LargePoint`, three `Crystal` and two `Crystal_SmallDecal`. No Growth variants (Berlin
+  Radixite does not root or regrow). Placed total 4,635.
+- **Metal, wrecked tram depot** in X 10700-14800, Y 47000-49100: `Resource_Metal_Ruin1` (depot shed), three
+  `Resource_Metal_Rails` (tracks), `Resource_Metal_BrokenWaterTank`, `Resource_Metal_Barrels`. Placed total 8,975. It is
+  generic scrap, not trams: there is no tram Blueprint.
+
+Checks: a 1 m trace grid and every instanced mesh found nothing in either footprint before placing; navmesh rebuilt
+before the save, every agent paths from the assumed HQ spot (13900, 43300) to both fields (35-64 m). Pictures in
+`Saved/Berlin/start_resources/`. The save made the umap 65 MB (it was 122 MB); a commandlet load of both versions found
+the same actors, components and 3,487 instances apart from the 14 new actors, and nav covers the play area, so the
+drop is re-serialised editor data, not lost content. Pre-edit copy: `_MapBackups/Ger_Berlin_2026-11-17.umap` (same size).
+
+Crater look pass (2026-11-18, `poi/start_crater_fix.py` + `poi/crater_paint.py`): BerlinGlass painted into the
+landscape (full within ~9 m of the centre, ragged fade to ~17 m; heights untouched; patch vertices i 745-798, j
+1045-1098 through `URTSShortsLandscapeLibrary` Export/ImportLandscapeRegion), the Crater0 rim gets the instance
+material `MI_BerlinRuin_Rubble_Foot` (MM_Crater tints any diffuse yellow), the crystals' own decals (dark splats +
+crystal-shard sprites) are hidden on the placed instances, and 7 `RES_Start_CraterDecal_*` ash / glass-shard rubble
+decals sit on the rim. The crater dip is not done; a dedicated crater design is in concept
+(`Docs/Concepts/BerlinStartCrater/v01`).
+
+Start crater dip (2026-11-19, owner's pick: concept v02 option 2 "Breschenwall", look B "Mauerreste",
+`Docs/Concepts/BerlinStartCrater/v02`). Built in an own throwaway editor (`poi/crater_editor_server.py` +
+`crater_cmd.py`, command folder `Saved/BerlinCrater/cmd`), pre-edit copy `Saved/BerlinCrater/backup/`.
+- Landscape: `poi/crater_probe.py` exports vertices i 742-801, j 1040-1091 (`Saved/BerlinCrater/land/`);
+  `poi/crater_heights.py` adds the concept delta (`O2R` in the concept tools' `bsc_common.py`) to the real heights:
+  floor 1.84 m down (bowl centre 1 m N / 5 m W of the field centre), 0.74 m earth lip, nothing east of Y 49100;
+  repaints BerlinGlass on the pan floor and under the crystals, ash on the inner wall, rubble under the rim.
+- Rim: `BP_BerlinStartCraterRim` (`Blueprints/Environment/Berlin/StartCrater`, label `CRATER_Rim`, folder
+  Berlin/StartCrater) at (17300, 47300, 0): three meshes `SM_BerlinCrater_Rim_East/_South/_West` fitted to the new
+  ground (Blender `CustomMapItems/Environment/BerlinStartCrater/bsc_kit.py`; ruin-kit slots, vertex colours, UCX),
+  4 sooty brick wall stubs (3.4-5.6 m) on the far rim, low ridge on the camera side. The meshes block shells and sight
+  but not nav; 43 hidden `NavArea_Null` boxes (one per heap, one per stub) keep vehicles to the three breaches.
+- Re-seat (`poi/start_crater.py`, set_actor_location only): the 8 RES_Start_Radixite_* pieces 95-191 cm down, Crater0's
+  MainMesh rim hidden (no collision, no nav), the 7 crater decals and 5 track decals in the breaches moved with the
+  ground.
+- Nav (`poi/crater_nav_test.py`, `Saved/BerlinCrater/nav_test.json`): all 64 harvest slots reachable from the HQ for
+  every agent through the game's slot projection; breach clear widths for HeavyTank W-SW 11.75 m, N 13.75 m,
+  S 14.5 m; HQ to the bowl floor 50 m. A PIE run with a real harvester was not done.
+
+## Extra Radixite fields E1, E2, E5, E6 (2026-11-18)
+
+Owner's pick of four from eight candidates (`Docs/Concepts/BerlinExtraRadixite/v01`). `poi/extra_radixite.py`
+(`RES_Extra_<site>_*`, folder `Berlin/ExtraRadixite`; `check_sites()`, `place()`, `check_placed()`, `crater_z()` seats
+Crater0 at mean rim height, `move_to_plan()` keeps the roll). Stock Radixite Blueprints, no Growth variants, nothing
+deleted; same Berlin look as the start crater (rubble rim material, crystal decals hidden, no landscape paint).
+
+| Site | Where | Pieces | Total on the last load |
+|---|---|---|---|
+| E1 Boxhagener Trichter | (1700, 46300), south-lane start | Crater0, 2 Crystal, 2 SmallDecal | 2,880 |
+| E2 Rosenthaler Trichter | (19650, 16850), north lane | Crater0, Large, 2 Crystal, 2 SmallDecal | 4,910 |
+| E5 Drehscheibe | (-6050, 20750), south of the rail-yard fence | Crater0, 2 Large, 2 Crystal, 2 NoDecal | 7,245 |
+| E6 Kraterrand Sued | (-8000, -2900), blast-crater rim | 3 Large, 2 Crystal, LargePoint, 2 NoDecal | 9,325 |
+
+- **The crystal Blueprints re-roll on every construction-script run** (map load, gizmo or subsystem transform moves):
+  mesh, yaw, scale and `total_amount` (Large about 1,750-2,950). Crater0 is fixed at 1,600. The totals above are one roll
+  (the start crater read 4,635 when placed and 5,875 on reload).
+- Every agent paths from the assumed HQ (13900, 43300) to every site, edge and inside (126-618 m); the E5 fence gap stays
+  open; the pieces do not change the navmesh. Pictures: `Saved/Berlin/extra_radixite/`.
+- Saved 2026-11-18 21:40 (65.5 MB); verified after a reload: 47 `RES_` actors, rim materials and hidden decals kept,
+  glass paint identical to what was written.
+
+## Rail yard D1 (2026-11-22)
+
+The owner's pick D1 "Sperrbahnhof - Kompakt" is built by `Tools/BerlinMap/poi/rail_yard_d1.py`
+([BerlinRailYard.md](../Environment/BerlinRailYard.md), "Built: D1"). It adds:
+
+- a 45 x 45 m court of destructible Soviet walls with gates A and C;
+- two MG guard towers;
+- a strongpoint with dug-in KV-1 / T-34 and two squads;
+- scavengeable ramp and switch-tower targets;
+- the wooden-sleeper Trains track (`BP_RoadSpline`) along the whole rail_east line.
+
+**The generators now drift from the map:**
+- `step_water_and_rails()` would bring back the old `BERW_Rails` panels on rail_east;
+- `step_custom_poi()` would place the plain ramp and switch-tower meshes again;
+- `berlin_dress_gen.set_pieces()` would put back the yard containers, crane, shed, barrels and fence panel 00.
+
+Exclude the yard before rerunning any of them. Pre-edit copy: `_MapBackups/Ger_Berlin_2026-11-22_before_railyard.umap`.

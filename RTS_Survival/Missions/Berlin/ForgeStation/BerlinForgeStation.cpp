@@ -30,8 +30,11 @@ namespace ForgeStationConstants
 	constexpr float FinishTargetsDelaySeconds = 0.2f;
 }
 
+const FName ABerlinForgeStation::StationTag(TEXT("ForgeStation"));
+
 ABerlinForgeStation::ABerlinForgeStation()
 {
+	Tags.Add(StationTag);
 	PrimaryActorTick.bCanEverTick = true;
 	PrimaryActorTick.TickInterval = 0.f;
 	ShellMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("ShellMesh"));

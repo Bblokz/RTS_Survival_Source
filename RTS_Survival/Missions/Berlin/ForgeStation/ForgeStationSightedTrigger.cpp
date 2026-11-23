@@ -2,47 +2,31 @@
 
 #include "ForgeStationSightedTrigger.h"
 
-#include "Engine/OverlapResult.h"
 #include "Engine/World.h"
-#include "RTS_Survival/RTSCollisionTraceChannels.h"
 #include "RTS_Survival/Missions/Berlin/ForgeStation/BerlinForgeStation.h"
+
+namespace ForgeStationSightedTriggerConstants
+{
+	// Outermost guard post + guard reach + 10 m (BerlinForgeStation.md section 5).
+	constexpr float RingRadius = 10000.f;
+	// The station pivot on Ger_Berlin, used when no actor carries the tag.
+	const FVector StationPivot(363.f, 1382.f, 0.f);
+}
+
+UForgeStationSightedTrigger::UForgeStationSightedTrigger()
+{
+	CentreActorTag = ABerlinForgeStation::StationTag;
+	CentreLocation = ForgeStationSightedTriggerConstants::StationPivot;
+	Radius = ForgeStationSightedTriggerConstants::RingRadius;
+}
 
 bool UForgeStationSightedTrigger::CheckTrigger_Implementation() const
 {
 	const UWorld* World = GetWorld();
-	if (not IsValid(World))
-	{
-		return false;
-	}
-	const double Now = World->GetTimeSeconds();
-	if (M_LastCheckSeconds >= 0.0 && Now - M_LastCheckSeconds < CheckIntervalSeconds)
-	{
-		return false;
-	}
-	M_LastCheckSeconds = Now;
-	const ABerlinForgeStation* Station = ABerlinForgeStation::FindForgeStation(World);
+	const ABerlinForgeStation* Station = IsValid(World) ? ABerlinForgeStation::FindForgeStation(World) : nullptr;
 	if (IsValid(Station) && Station->GetAliveTargetCount() < Station->GetTargetCount())
 	{
 		return true;
 	}
-	const FVector Centre = IsValid(Station) ? Station->GetActorLocation() : FallbackCentre;
-	return GetIsPlayerUnitInRadius(*World, Centre);
-}
-
-bool UForgeStationSightedTrigger::GetIsPlayerUnitInRadius(const UWorld& World, const FVector& Centre) const
-{
-	FCollisionObjectQueryParams ObjectParams;
-	ObjectParams.AddObjectTypesToQuery(COLLISION_OBJ_PLAYER);
-	FCollisionQueryParams QueryParams(TEXT("ForgeStationSighted"), false);
-	TArray<FOverlapResult> Overlaps;
-	World.OverlapMultiByObjectType(Overlaps, Centre, FQuat::Identity, ObjectParams,
-	                               FCollisionShape::MakeSphere(Radius), QueryParams);
-	for (const FOverlapResult& Overlap : Overlaps)
-	{
-		if (IsValid(Overlap.GetActor()))
-		{
-			return true;
-		}
-	}
-	return false;
+	return Super::CheckTrigger_Implementation();
 }

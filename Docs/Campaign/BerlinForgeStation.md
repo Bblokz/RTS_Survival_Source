@@ -289,8 +289,9 @@ Owner's picks: A + B + C, 3 counted targets, garrison in the data asset, drop at
 | Player air drop | `Missions/PlayerAirDrop/PlayerAirDropSubsystem.h/.cpp` | `DeliverPlayerUnitsByAir(LandingPoint, FPlayerAirDropPayload)`: copies of the German drop abilities (cargo plane `GA_GerPzIIIFlak41Drop` for vehicles, `GA_GerParatroopers` for squads) fly the payload in for the player; no cost, no cooldown. |
 | Berlin forces data | `Missions/Berlin/BerlinMissionForcesData.h` | `UBerlinMissionForcesData`, one asset per difficulty; holds the station garrison (per `PostId`) and the HQ drop. Later sections of the flow (patrols, fleeing, factory) go into the same class. |
 | Station actor | `Missions/Berlin/ForgeStation/BerlinForgeStation.h/.cpp` | `ABerlinForgeStation`: shell mesh; builds the lights, Niagara, sounds and turning parts at BeginPlay; runs the sedation cycle (writes `SedationPulse` / `SedationFrost` to `MPC_ForgeSedation`); swaps each dead target for its wreck and stops the dressing linked to it; no new cycle once the garrison is engaged; `StopStation` when the bonus is done. |
-| Trigger | `Missions/Berlin/ForgeStation/ForgeStationSightedTrigger.h/.cpp` | `UForgeStationSightedTrigger` (new `EMissionTriggerType::PlayerUnitsNear`, appended): fires when a player unit is within `Radius` (100 m) of the station, or when any target already died. |
-| Mission | `Missions/Berlin/ForgeStation/Mission_BerlinForgeStation.h/.cpp` | `UMission_BerlinForgeStation` (BONUS plate): sets the garrison from the difficulty's data asset and spawns it; after the trigger plays the sighted line and tracks the three targets (title count + minimap); on completion stops the station, plays the intel line, adds the archive entry (`CustomContent`, Lore, key `Berlin_ForgeCraterSurvey`) and, 8 s later, the reinforcement line and the drop at (1600, 3550). |
+| Trigger | `Missions/Berlin/ForgeStation/ForgeStationSightedTrigger.h/.cpp` | `UForgeStationSightedTrigger`, a child of the generic `UPlayerUnitsNearMissionTrigger` (centre = the actor tagged `ForgeStation`, fallback the station pivot; radius 100 m), which also fires when any target already died. |
+| Mission (C++ parent) | `Missions/Berlin/ForgeStation/Mission_BerlinForgeStation.h/.cpp` | `UMission_BerlinForgeStation` (BONUS plate). Natively: sets up and spawns the garrison from the difficulty's data asset **before** the trigger; once the plate is up plays the sighted line and tracks the three targets (title count + minimap); fires `BP_OnAllStationTargetsDestroyed` once (and stops the station) when they are gone. BlueprintCallable steps: `GiveIntel` (archive entry `CustomContent`, Lore, key `Berlin_ForgeCraterSurvey` + intel line) and `LaunchReinforcements` (reinforcement line + drop at (1600, 3550)). No timers. |
+| Mission stage (Blueprint) | `/Game/RTS_Survival/Blueprints/Missions/GerCampaign/Berlin/Mission_Berlin_ForgeStation` | Owns the reward flow, per `BerlinMissionScripting.md` (rules section 1, stage section 5): `BP_OnAllStationTargetsDestroyed` → `ScheduleSingleCallback(IntelDelaySeconds = 1)` → custom event `OnIntelDue` → `GiveIntel` → `ScheduleSingleCallback(ReinforcementsDelaySeconds = 8)` → custom event `OnReinforcementsDue` → `LaunchReinforcements` → `OnMissionComplete`. The callback pins are wired from the custom events' own delegate outputs (the same binding a Create Event node makes). Built with UECP `build_blueprint_graph` in a DebugGame editor. |
 | Test | `Missions/Berlin/ForgeStation/Tests/ForgeStationTestSubsystem.h/.cpp` | `-ForgeStationValidate` on Ger_Berlin (runner `Source/Tools/BerlinMap/poi/run_forge_station_test.ps1`, `-Shots` for three lit captures). **30/30 PASS** on Normal, 2026-11-22: garrison from the data asset (7 defenders), targets built with their station meshes, plate hidden until a player unit comes within the ring, both crews reach a stake and play the work montage, a full sedation cycle, wrecks on death, bonus complete, archive entry, drop aircraft flying. |
 
 ### Assets (`/Game/RTS_Survival/Blueprints/Environment/Berlin/ForgeStation`)
@@ -319,8 +320,23 @@ Placed by `Source/Tools/BerlinMap/poi/forge_place.py` in a throwaway editor (`fo
 - `FORGE_Station` replaces `POI_ForgeSurveyStation` (same transform). **Note:** `berlin_map_build.step_custom_poi()`
   would place the old one-mesh station again; do not re-run it without removing that entry.
 - `FORGE_Target_Rig / _CryoBlock / _CommandBunker`, `FORGE_Strongpoint` (id `ForgeStation`, 7 named posts, two rim
-  circuits), `FORGE_Megaphone`, `FORGE_Stake_1..4` + `FORGE_Canister_*` on the rim; the mission is in
+  circuits), `FORGE_Megaphone`, `FORGE_Stake_1..4` + `FORGE_Canister_*` on the rim; the mission (since the
+  reshape the Blueprint stage `Mission_Berlin_ForgeStation`) is in
   `BP_MissionManager`'s Missions.
+
+### Reshape to a Blueprint stage (2026-11-22, owner-approved via the scripting session)
+
+- Removed from C++: the intel and reinforcement `FTimerHandle`s and the tick-driven completion.
+- **Tracking:** `TrackActorsWithMiniMapProgress` normally completes its mission when the count is full. The scripting
+  session added `bCompleteMissionWhenTrackingDone` + `OnTrackingReachedMaxCountNative` / `BP_OnTrackingReachedMaxCount`
+  to `UMissionBase`; the Forge class sets the flag to false and fires `BP_OnAllStationTargetsDestroyed` from the
+  native twin, so only the Blueprint's `OnMissionComplete` ends the stage.
+- Ger_Berlin: the manager's `Missions` held only this stage, so it sits at index 0, not the planned index 9; the
+  scripting session lays out the array. Pre-edit copy `Saved/BerlinForge/backup/Ger_Berlin_before_forge_bp_stage.umap`.
+- Open question 5 (crews react to the alarm): the hook is there (`OnOtherMissionEndedNative`, alarm =
+  `Mission_Berlin_StayUndetected` failing), not built until the owner decides.
+- Compiled in the DebugGame editor target; the Development DLL was rebuilt at 18:39 on the user's go-ahead (it also
+  carries the scripting session's G1-G4 and tracking flag). Test run with `run_forge_station_test.ps1 -DebugGame`: 29/29 PASS after the reshape.
 
 ### Not done / open
 

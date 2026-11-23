@@ -44,8 +44,9 @@ namespace ForgeStationTestPrivate
 	constexpr double CheckPlateAt = 60.0;
 	constexpr double KillTargetsAt = 62.0;
 	constexpr double CheckWrecksAt = 66.0;
-	constexpr double CheckCompleteAt = 72.0;
-	constexpr double CheckReinforcementsAt = 84.0;
+	// The Blueprint reward: 1 s to the intel, 8 s more to the drop, then complete (BerlinMissionScripting.md 5).
+	constexpr double CheckCompleteAt = 78.0;
+	constexpr double CheckReinforcementsAt = 80.0;
 	// The player unit is moved this far from the station pivot, inside the 100 m ring, on the player's side.
 	constexpr float PlayerUnitDistance = 8500.f;
 	constexpr int32 LocalPlayer = 1;
@@ -478,6 +479,10 @@ void UForgeStationTestSubsystem::CheckWrecks()
 
 void UForgeStationTestSubsystem::CheckComplete()
 {
+	Check(M_Mission.IsValid() && M_Mission->GetHasFiredAllTargetsDestroyed(), TEXT("all_targets_destroyed_event_fired"),
+	      TEXT(""));
+	Check(M_Mission.IsValid() && M_Mission->GetClass()->IsInBlueprint(), TEXT("mission_is_blueprint_stage"),
+	      M_Mission.IsValid() ? M_Mission->GetClass()->GetName() : TEXT("none"));
 	Check(M_Mission.IsValid() && M_Mission->GetIsPlateShown(), TEXT("plate_shown_by_target_death"), TEXT(""));
 	Check(M_Mission.IsValid() && M_Mission->GetIsBonusComplete(), TEXT("bonus_completed"), TEXT(""));
 	Check(M_Mission.IsValid() && M_Mission->GetHasAddedArchiveEntry(), TEXT("archive_entry_added"), TEXT(""));
