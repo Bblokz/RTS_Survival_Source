@@ -288,7 +288,8 @@ bool ATrainUnit::GetIsValidAssignedRoadSpline() const
 
 bool ATrainUnit::TryCacheRoadSplineComponentFromAssignedRoad()
 {
-	if (GetIsValidRoadSplineComponent())
+	// Quiet check: the component is expected to be unset the first time this runs.
+	if (M_RoadSplineComponent.IsValid())
 	{
 		return true;
 	}

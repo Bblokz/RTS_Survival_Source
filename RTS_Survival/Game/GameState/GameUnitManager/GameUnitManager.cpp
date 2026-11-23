@@ -45,7 +45,8 @@ namespace GameUnitManagerDetailedState
 	{
 		for (ASquadUnit* SquadUnit : SquadUnits)
 		{
-			if (not RTSFunctionLibrary::RTSIsValid(SquadUnit))
+			// Soldiers without a squad (cinematic actors, soldiers still being spawned) have no controller to add.
+			if (not RTSFunctionLibrary::RTSIsValid(SquadUnit) || not SquadUnit->GetHasSquadController())
 			{
 				continue;
 			}

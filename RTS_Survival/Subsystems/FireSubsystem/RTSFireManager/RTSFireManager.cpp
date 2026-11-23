@@ -595,6 +595,11 @@ void ARTSFireManager::InitPoolsFromSettings(const URTSFirePoolSettings* Settings
 	for (const auto& Pair : Settings->FireSettingsByType)
 	{
 		const FFireSettingsForType& FireSettings = Pair.Value;
+		// The settings map keeps an empty placeholder row for None; it is not a fire type and has no system.
+		if (Pair.Key == ERTSFireType::None && FireSettings.FireSystem.IsNull())
+		{
+			continue;
+		}
 		UNiagaraSystem* NiagaraSystem = FireSettings.FireSystem.LoadSynchronous();
 		if (not IsValid(NiagaraSystem))
 		{

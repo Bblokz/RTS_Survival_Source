@@ -669,7 +669,9 @@ void URTSOverlapEvasionComponent::TryEvasion(
 void URTSOverlapEvasionComponent::TryEvasionSquadUnit(AActor* OtherActor, const FVector& ContactLocation) const
 {
 	ASquadUnit* SquadUnit = Cast<ASquadUnit>(OtherActor);
-	if (not IsValid(SquadUnit) || not SquadUnit->GetIsSquadUnitIdleAndNotEvading())
+	// A soldier spawned onto the vehicle (squads that start in its cargo) overlaps it before its squad is assigned.
+	if (not IsValid(SquadUnit) || not SquadUnit->GetHasSquadController()
+		|| not SquadUnit->GetIsSquadUnitIdleAndNotEvading())
 	{
 		return;
 	}

@@ -140,7 +140,8 @@ void AFieldConstruction::InitialiseFromPreview(UStaticMeshComponent* PreviewMesh
 
 	if (not IsValid(PreviewMeshComponent))
 	{
-		RTSFunctionLibrary::ReportError("Preview mesh component is invalid in AFieldConstruction::InitialiseFromPreview");
+		// AI field construction orders have no player preview to fade from: the construction shows its own materials
+		// at once (the build timer runs in the ability component either way).
 		return;
 	}
 

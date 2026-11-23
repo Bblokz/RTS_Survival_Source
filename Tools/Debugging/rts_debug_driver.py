@@ -3,6 +3,8 @@
 # Settings come from environment variables:
 #   RTS_DBG_EXE, RTS_DBG_ARGS (one string, split on '|'), RTS_DBG_CWD, RTS_DBG_LOG,
 #   RTS_DBG_MAX_SECONDS, RTS_DBG_DUMP (minidump path written on a crash).
+#   Optional: RTS_DBG_BREAK_ON (function names split on ';'): log the stack of each hit and continue, up to
+#   RTS_DBG_BREAK_MAX hits (default 200), then the breakpoints are disabled. For finding who calls an error report.
 import os
 import time
 import lldb
@@ -69,9 +71,19 @@ def run():
     if not target.IsValid():
         log.write("RTS_DBG target_invalid %s" % executable)
         return
+    named_breakpoint_ids = set()
+    for function_name in [Name for Name in os.environ.get("RTS_DBG_BREAK_ON", "").split(";") if Name]:
+        breakpoint = target.BreakpointCreateByName(function_name)
+        named_breakpoint_ids.add(breakpoint.GetID())
+        log.write("RTS_DBG named_breakpoint %s locations=%d" % (function_name, breakpoint.GetNumLocations()))
+    named_breakpoint_max = int(os.environ.get("RTS_DBG_BREAK_MAX", "200"))
+    named_breakpoint_hits = 0
     listener = debugger.GetListener()
     launch_info = lldb.SBLaunchInfo(arguments)
     launch_info.SetWorkingDirectory(working_directory)
+    # SBLaunchInfo starts with an empty environment. Without SystemRoot, PATH and the rest, the NVIDIA D3D12 driver
+    # fails to create a device (0x887A0004) and the game falls back to the integrated GPU; WMI fails with 8007007e.
+    launch_info.SetEnvironmentEntries(["%s=%s" % (key, value) for key, value in os.environ.items()], True)
     error = lldb.SBError()
     process = target.Launch(launch_info, error)
     if not error.Success():
@@ -115,6 +127,18 @@ def run():
         description = get_stop_description(stopped_thread)
         lowered = description.lower()
         if THREAD_NAME_CODE in lowered:
+            process.Continue()
+            continue
+        is_named_breakpoint = (stopped_thread.GetStopReason() == lldb.eStopReasonBreakpoint and
+                               stopped_thread.GetStopReasonDataAtIndex(0) in named_breakpoint_ids)
+        if is_named_breakpoint:
+            named_breakpoint_hits += 1
+            log.write("RTS_DBG NAMED_HIT #%d" % named_breakpoint_hits)
+            log_thread(log, stopped_thread, FRAMES_ON_STOP)
+            if named_breakpoint_hits >= named_breakpoint_max:
+                for breakpoint_id in named_breakpoint_ids:
+                    target.FindBreakpointByID(breakpoint_id).SetEnabled(False)
+                log.write("RTS_DBG named breakpoints disabled after %d hits" % named_breakpoint_hits)
             process.Continue()
             continue
         if BREAKPOINT_CODE in lowered or stopped_thread.GetStopReason() == lldb.eStopReasonBreakpoint:

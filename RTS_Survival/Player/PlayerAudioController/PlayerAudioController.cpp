@@ -665,6 +665,12 @@ USoundBase* UPlayerAudioController::GetAnnouncerVoiceLineFromType(const EAnnounc
 			"as custom voice lines should be provided manually!");
 		return nullptr;
 	}
+	// The player controller Blueprint fills the announcer lines in its BeginPlay; every map boots paused behind the
+	// start screen before that (one "GamePaused" request per map), and there is no announcer to play yet.
+	if (M_AnnouncerVoiceLineData.VoiceLines.IsEmpty())
+	{
+		return nullptr;
+	}
 	FVoiceLineData* VoiceLinesPtr = nullptr;
 	if (not M_AnnouncerVoiceLineData.GetVoiceLinesForType(VoiceLineType, VoiceLinesPtr))
 	{

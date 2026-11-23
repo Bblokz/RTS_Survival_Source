@@ -2,6 +2,7 @@
 
 
 #include "Commands.h"
+#include "RTS_Survival/RTSComponents/CargoMechanic/Cargo/Cargo.h"
 
 #include "RTS_Survival/DeveloperSettings.h"
 #include "RTS_Survival/Enemy/EnemyController/EnemyController.h"
@@ -521,7 +522,11 @@ bool UCommandData::EnsureIsValidPlayerResourceManager() const
 	}
 
 	// The pre-game hangar has no resources; its units only take the preview's move and attack orders.
-	if (not FRTS_Statics::GetIsInPreGameHangar(OwnerActor))
+	// While the world tears down (map change, quit) the resource manager is already gone and units ending their
+	// orders ask for it: expected, not an error.
+	const UWorld* OwnerWorld = IsValid(OwnerActor) ? OwnerActor->GetWorld() : nullptr;
+	const bool bIsWorldTearingDown = IsEngineExitRequested() || (IsValid(OwnerWorld) && OwnerWorld->bIsTearingDown);
+	if (not bIsWorldTearingDown && not FRTS_Statics::GetIsInPreGameHangar(OwnerActor))
 	{
 		RTSFunctionLibrary::ReportError(
 			"Player resource manager is not valid in UCommandData. This is required for certain commands to function "
@@ -3550,6 +3555,10 @@ ECommandQueueError ICommands::EnterCargo(AActor* CarrierActor, const bool bSetUn
 	{
 		return ECommandQueueError::CommandDataInvalid;
 	}
+	if (IsValid(CarrierActor) && not IsValid(CarrierActor->FindComponentByClass<UCargo>()))
+	{
+		return EnterCargo_TakeCoverAtTargetInstead(*CarrierActor, bSetUnitToIdle);
+	}
 
 	const ECommandQueueError AbilityError = GetIsAbilityOnCommandCardAndNotOnCooldown(EAbilityID::IdEnterCargo);
 	if (AbilityError != ECommandQueueError::NoError) { return AbilityError; }
@@ -3564,6 +3573,25 @@ ECommandQueueError ICommands::EnterCargo(AActor* CarrierActor, const bool bSetUn
 		FVector::ZeroVector,
 		CarrierActor,
 		FRotator::ZeroRotator);
+}
+
+ECommandQueueError ICommands::EnterCargo_TakeCoverAtTargetInstead(const AActor& CoverActor, const bool bSetUnitToIdle)
+{
+	// Trenches no longer carry a UCargo: soldiers use the cover system there. Mission and level orders that still
+	// send squads "into" a trench walk them to it and, where the card allows, have them take the cover and hold.
+	const ECommandQueueError MoveError = MoveToLocation(CoverActor.GetActorLocation(), bSetUnitToIdle,
+	                                                   FRotator::ZeroRotator);
+	if (MoveError != ECommandQueueError::NoError)
+	{
+		return MoveError;
+	}
+	// Squads whose card has the cover order also hold in the trench's cover; the others take it through the automatic
+	// cover system once they idle there.
+	if (GetIsAbilityOnCommandCardAndNotOnCooldown(EAbilityID::IdEnterCoverAndHold) == ECommandQueueError::NoError)
+	{
+		EnterCoverAndHold(false);
+	}
+	return ECommandQueueError::NoError;
 }
 
 ECommandQueueError ICommands::ManAbandonedTeamWeapon(AActor* TeamWeaponActor, const bool bSetUnitToIdle)

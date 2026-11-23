@@ -319,6 +319,19 @@ void UCargo::SetupCargo(UPrimitiveComponent* MeshComponent, const int32 MaxSuppo
 	M_SocketOccupancy.M_AllCargoSockets = FilterSocketsContains(AllSocketNames, TEXT("cargo"));
 	M_EntranceSockets = FilterSocketsContains(AllSocketNames, TEXT("entrance"));
 
+	// A variant with its own hull and no seats at all (the Sd.Kfz. 250 Ammo Carrier inherits the transport's cargo
+	// component) carries no troops: switch the cargo off instead of reporting the missing sockets.
+	if (M_SocketOccupancy.M_AllCargoSockets.Num() == 0 && M_EntranceSockets.Num() == 0)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("UCargo::SetupCargo: %s has no cargo or entrance sockets; it carries no troops."),
+		       *GetNameSafe(GetOwner()));
+		bM_IsEnabled = false;
+		M_VacancyState.M_MaxSquadsSupported = 0;
+		M_VacancyState.M_CurrentSquads = 0;
+		M_VacancyState.M_InsideSquads.Empty();
+		return;
+	}
+
 	if (M_SocketOccupancy.M_AllCargoSockets.Num() == 0)
 	{
 		RTSFunctionLibrary::ReportError(

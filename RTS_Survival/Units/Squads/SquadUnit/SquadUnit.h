@@ -486,6 +486,9 @@ public:
 	 */
 	TObjectPtr<ASquadController> GetSquadControllerChecked() const;
 
+	// Quiet: a soldier has no squad controller yet while its squad is still spawning it (SpawnActor runs first).
+	bool GetHasSquadController() const { return IsValid(M_SquadController); }
+
 	/** 
 	 * @return The AI controller class of this unit, if valid; otherwise, attempts to repair it.
 	 * Returns nullptr if repairs fail.

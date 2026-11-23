@@ -3681,6 +3681,15 @@ FVector ASquadController::FindIdealSpawnLocation()
 			// Successfully projected onto navmesh
 			return ProjectedLocation.Location;
 		}
+		// A grid point more than 2 m from the navmesh (squad placed above or below the ground) is out of reach of the
+		// tight search, and the traces below only look down to the grid point, so its units spawned in the air at the
+		// fallback. Search further up and down first (2026-11-20 Shipping runs: fallback spawns 16 -> 3 over all maps).
+		constexpr float WideProjectionHalfHeight = 1500.f;
+		const FVector WideProjectionExtent(ProjectionExtent.X, ProjectionExtent.Y, WideProjectionHalfHeight);
+		if (NavSys->ProjectPointToNavigation(InitialLocation, ProjectedLocation, WideProjectionExtent))
+		{
+			return ProjectedLocation.Location;
+		}
 	}
 
 	// If NavMesh projection failed, perform a visibility trace from 250 units above the initial location down to the initial position
@@ -3862,11 +3871,17 @@ FVector ASquadController::GetSpawnLocationForSquad() const
 
 FVector ASquadController::FindIdealSpawnLocation_GetNextGridPoint()
 {
-	constexpr int32 MaxUnits = 8;
-	if (M_SpawnIndex >= MaxUnits)
+	if (not M_Offsets.IsValidIndex(M_SpawnIndex))
 	{
-		RTSFunctionLibrary::ReportError("SpawnIndex exceeds the number of grid points.");
-		return M_GridOriginLocation;
+		// Squads larger than the 8-point grid (and spawns before a grid exists) used to stack every remaining soldier
+		// on the grid origin; they get points on a ring outside the grid instead.
+		constexpr float GoldenAngleRadians = 2.39996323f;
+		constexpr float ExtraRingRadiusFactor = 1.1f;
+		const int32 ExtraIndex = FMath::Max(0, M_SpawnIndex - M_Offsets.Num());
+		M_SpawnIndex++;
+		const float Angle = ExtraIndex * GoldenAngleRadians;
+		const float Radius = FMath::Max(M_GridSize, 1.f) * ExtraRingRadiusFactor;
+		return M_GridOriginLocation + FVector(FMath::Cos(Angle) * Radius, FMath::Sin(Angle) * Radius, 0.f);
 	}
 
 	// Get the next offset from the precomputed offsets

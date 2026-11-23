@@ -459,7 +459,8 @@ bool ASquadUnit::GetCanUseAutomaticCover() const
 	{
 		return false;
 	}
-	return not GetIsValidSquadController() || M_SquadController->GetIsUnitIdle();
+	// Soldiers without a squad (cinematic actors) count as idle; quiet check, the missing squad is expected there.
+	return not GetHasSquadController() || M_SquadController->GetIsUnitIdle();
 }
 
 bool ASquadUnit::GetMayKeepAutomaticCover() const

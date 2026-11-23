@@ -1078,6 +1078,14 @@ public:
 	/** Called after a command gains its execution serial and before its ability-specific execution begins. */
 	virtual void OnCommandExecutionStarting(EAbilityID AbilityStarting);
 
+	/**
+	 * @brief An enter-cargo order on an actor without UCargo (a trench): walk there and take its cover instead.
+	 * @param CoverActor The ordered target.
+	 * @param bSetUnitToIdle Replace the current queue.
+	 * @return The move order's queue result.
+	 */
+	ECommandQueueError EnterCargo_TakeCoverAtTargetInstead(const AActor& CoverActor, bool bSetUnitToIdle);
+
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="Commands")
 	virtual ECommandQueueError EnterCargo(
 		AActor* CarrierActor,

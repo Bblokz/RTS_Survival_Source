@@ -268,9 +268,8 @@ void UFieldConstructionAbilityComponent::TerminateFieldConstructionCommand(AActo
 	if (M_ActiveConstructionState.M_CurrentPhase == EFieldConstructionAbilityPhase::MovingToLocation)
 	{
 		DestroyPreviewActor(StaticPreviewActor);
-		AStaticPreviewMesh* PreviewActor = GetIsValidPreviewActor()
-			                                   ? M_ActiveConstructionState.M_PreviewActor.Get()
-			                                   : nullptr;
+		// The preview is optional here (AI orders have none, and the caller may have destroyed it already): no error.
+		AStaticPreviewMesh* PreviewActor = M_ActiveConstructionState.M_PreviewActor.Get();
 		DestroyPreviewActor(PreviewActor);
 		if (GetIsValidSquadController())
 		{
@@ -376,9 +375,8 @@ void UFieldConstructionAbilityComponent::StartConstructionPhase()
 		DisableSquadWeapons(false);
 		RemoveEquipmentFromSquad();
 		StopConstructionAnimation();
-		AStaticPreviewMesh* PreviewActor = GetIsValidPreviewActor()
-			                                   ? M_ActiveConstructionState.M_PreviewActor.Get()
-			                                   : nullptr;
+		// The preview is optional here (AI orders have none, and the caller may have destroyed it already): no error.
+		AStaticPreviewMesh* PreviewActor = M_ActiveConstructionState.M_PreviewActor.Get();
 		DestroyPreviewActor(PreviewActor);
 		if (GetIsValidSquadController())
 		{
@@ -389,9 +387,8 @@ void UFieldConstructionAbilityComponent::StartConstructionPhase()
 	}
 	TeleportSquadUnitsAroundConstructionSite();
 	M_FieldConstructionInProgress = SpawnedConstruction;
-	AStaticPreviewMesh* PreviewActor = GetIsValidPreviewActor()
-		                                   ? M_ActiveConstructionState.M_PreviewActor.Get()
-		                                   : nullptr;
+	// The preview is optional here (AI orders have none, and the caller may have destroyed it already): no error.
+	AStaticPreviewMesh* PreviewActor = M_ActiveConstructionState.M_PreviewActor.Get();
 	UStaticMeshComponent* PreviewMeshComponent = GetPreviewMeshComponent(PreviewActor);
 	SetupSpawnedConstruction(SpawnedConstruction, PreviewMeshComponent);
 	DestroyPreviewActor(PreviewActor);
@@ -938,7 +935,7 @@ void UFieldConstructionAbilityComponent::TeleportSquadUnitsAroundConstructionSit
 	// Determine the construction XY footprint radius (half-extent) from the placed preview,
 	// falling back to the configured preview mesh.
 	float ConstructionFootprintRadiusXY = 0.f;
-	if (GetIsValidPreviewActor())
+	if (M_ActiveConstructionState.M_PreviewActor.IsValid())
 	{
 		if (UStaticMeshComponent* PreviewMeshComponent = GetPreviewMeshComponent(
 			M_ActiveConstructionState.M_PreviewActor.Get()))
