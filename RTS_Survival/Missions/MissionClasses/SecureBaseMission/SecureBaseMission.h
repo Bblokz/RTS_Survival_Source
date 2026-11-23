@@ -10,6 +10,8 @@
 #include "RTS_Survival/Missions/MissionProps/PropSinkDeath/MissionPropSinkDeath.h"
 #include "RTS_Survival/Enemy/AirDrop/EnemyAirDrop.h"
 #include "RTS_Survival/GlobalAbilitySystem/GlobalAbilityType/EGlobalAbilityType.h"
+#include "RTS_Survival/GlobalAbilitySystem/GlobalAbilityType/MissionPlayerGlobalAbilitySettings.h"
+#include "RTS_Survival/Units/Enums/Enum_UnitType.h"
 
 #include "SecureBaseMission.generated.h"
 
@@ -192,6 +194,40 @@ struct FSecureBaseAssaultResponse
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Assault Response|Air Support",
 		meta = (EditCondition = "bEnabled"))
 	bool bAirSupportStaysOnTarget = true;
+
+	// Squad whose info takeover opens once the strike is in (the enemy unit the player should learn about first);
+	// Squad_None shows none. Waits until a living squad of this type stands on the map.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Assault Response|Squad Intel",
+		meta = (EditCondition = "bEnabled"))
+	ESquadSubtype IntelSquadSubtype = ESquadSubtype::Squad_None;
+
+	// Row of DT_SquadInfoTakeovers shown for that squad.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Assault Response|Squad Intel",
+		meta = (EditCondition = "bEnabled"))
+	FName IntelSquadLibraryEntry = NAME_None;
+
+	// Seconds after the strike aircraft took off before the squad takeover opens.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Assault Response|Squad Intel",
+		meta = (EditCondition = "bEnabled", ClampMin = "0.0"))
+	float IntelSquadDelaySeconds = 8.f;
+
+	// Ability the player keeps after the strike (charges, cooldown, no cost); GA_None grants nothing.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Assault Response|Granted Ability",
+		meta = (EditCondition = "bEnabled"))
+	FMissionGrantedGlobalAbility GrantedAbility;
+
+	// Seconds after the strike aircraft took off before the ability is granted and GrantedAbilityLine plays.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Assault Response|Granted Ability",
+		meta = (EditCondition = "bEnabled", ClampMin = "0.0"))
+	float GrantedAbilityDelaySeconds = 60.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Assault Response|Granted Ability",
+		meta = (EditCondition = "bEnabled"))
+	TObjectPtr<USoundBase> GrantedAbilityLine = nullptr;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Assault Response|Granted Ability",
+		meta = (EditCondition = "bEnabled"))
+	ERTSPortraitTypes GrantedAbilityPortrait = ERTSPortraitTypes::GermanAnnouncer;
 };
 
 /**
@@ -259,6 +295,14 @@ public:
 	/** @return True once the air support ability was executed. */
 	UFUNCTION(BlueprintPure, NotBlueprintable, Category = "Secure Base|Assault Response")
 	bool GetHasAirSupportLaunched() const { return bM_HasAirSupportLaunched; }
+
+	/** @return True once the intel squad's info takeover was requested. */
+	UFUNCTION(BlueprintPure, NotBlueprintable, Category = "Secure Base|Assault Response")
+	bool GetHasShownIntelSquadTakeover() const { return bM_HasShownIntelSquadTakeover; }
+
+	/** @return True once AssaultResponse.GrantedAbility was handed to the player. */
+	UFUNCTION(BlueprintPure, NotBlueprintable, Category = "Secure Base|Assault Response")
+	bool GetHasGrantedAbility() const { return bM_HasGrantedAbility; }
 
 	/** @brief Starts the assault response as if a player unit entered the trigger (tests, scripted events). */
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Secure Base|Assault Response")
@@ -404,8 +448,14 @@ private:
 	FTimerHandle M_AssaultTriggerPollTimer;
 	FTimerHandle M_AirSupportLineTimer;
 	FTimerHandle M_AirSupportStrikeTimer;
+	FTimerHandle M_IntelSquadTimer;
+	FTimerHandle M_GrantedAbilityTimer;
 	bool bM_HasAssaultResponseStarted = false;
 	bool bM_HasAirSupportLaunched = false;
+	bool bM_HasShownIntelSquadTakeover = false;
+	bool bM_HasGrantedAbility = false;
+	// Polls after IntelSquadDelaySeconds until a squad of IntelSquadSubtype stands (its drop may still be landing).
+	int32 M_IntelSquadPollsLeft = 0;
 
 	void ArmAssaultTrigger();
 	// Starts the response once a living player unit stands in the trigger box.
@@ -414,6 +464,11 @@ private:
 	void SpawnResponseAirDrop(const int32 DropIndex);
 	void PlayAirSupportLine();
 	void LaunchAirSupport();
+	// After the strike took off: the intel squad takeover and the granted ability follow on their own delays.
+	void ScheduleFollowUpsAfterAirSupport();
+	void TryShowIntelSquadTakeover();
+	AActor* FindLivingIntelSquad() const;
+	void GrantAbilityToPlayer();
 
 	int32 M_PendingLifeSpawns = 0;
 	float M_SecondsWaitedForBaseLife = 0.f;

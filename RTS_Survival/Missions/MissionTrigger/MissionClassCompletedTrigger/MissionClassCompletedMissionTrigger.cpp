@@ -22,6 +22,10 @@ bool UMissionClassCompletedMissionTrigger::CheckTrigger_Implementation() const
 		return false;
 	}
 
-	return MissionManager->GetHasCompletedMissionClassExact(MissionClassToWatch);
+	if (MissionManager->GetHasCompletedMissionClassExact(MissionClassToWatch))
+	{
+		return true;
+	}
+	return bAlsoTriggerWhenFailed && MissionManager->GetHasFailedMissionClassExact(MissionClassToWatch);
 }
 

@@ -28,6 +28,17 @@ enum class EMissionWidgetNextButton :uint8
 	Btn_OK
 };
 
+/**
+ * @brief How the mission panel presents a mission: major objectives must be done, bonus objectives are optional.
+ * Major is entry 0 so every mission saved before this existed loads as major.
+ */
+UENUM(BlueprintType)
+enum class EMissionObjectiveType : uint8
+{
+	Major UMETA(DisplayName = "Major Objective"),
+	Bonus UMETA(DisplayName = "Bonus Objective"),
+};
+
 USTRUCT(BlueprintType)
 struct FMissionWidgetState
 {
@@ -45,4 +56,8 @@ struct FMissionWidgetState
 	// The button used in the expanded version of the widget that will complete the current mission when clicked.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	EMissionWidgetNextButton NextButtonType = EMissionWidgetNextButton::Btn_Next;
+
+	// Blue shield + star for major objectives, green shield + diamond for optional bonus objectives.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	EMissionObjectiveType ObjectiveType = EMissionObjectiveType::Major;
 };

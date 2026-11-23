@@ -122,6 +122,8 @@ namespace UISnapshotConstants
 	// Hovers this card of the tactical map's mission panel (0 = top); -UISnapshotTacticalMissionSweep=P holds its
 	// light band at progress P.
 	const TCHAR* const PreviewMissionsSwitch = TEXT("UISnapshotPreviewMissions");
+	// Clicks every in-use mission's expand / collapse knob once, on the first capture of the trainer selection.
+	const TCHAR* const ToggleMissionsSwitch = TEXT("UISnapshotToggleMissions");
 	const TCHAR* const HoverTacticalMissionSwitch = TEXT("UISnapshotHoverTacticalMission=");
 	const TCHAR* const TacticalMissionSweepSwitch = TEXT("UISnapshotTacticalMissionSweep=");
 	// Moves the Slate cursor over this card instead of forcing the hover (needs the map laid out: step 1 or later).
@@ -770,6 +772,8 @@ void UUISnapshotSubsystem::ApplyCurrentStep()
 	StartWeaponReloads();
 	CollapseMissionOnce();
 	PreviewMissionsOnce();
+	ToggleMissionsOnceForTrainerStep(Step);
+	LogMissionWidgetsOnce();
 	// Filters first, so the tactical map's toggles show the modes when it opens.
 	ShowMapObjectFiltersForStep();
 	ToggleFullMapForStep();
@@ -1014,21 +1018,35 @@ void UUISnapshotSubsystem::PreviewMissionsOnce()
 		const TCHAR* Title;
 		const TCHAR* Description;
 		bool bStartCollapsed;
+		EMissionObjectiveType ObjectiveType;
+		// Expanded with an OK button instead of the collapse knob (EMissionWidgetState::OMS_ExpandedNext).
+		bool bUseNextAsExpanded;
+		EMissionTextSpeed TextSpeed;
 	};
 	const FPreviewMission PreviewMissions[] = {
 		{
 			TEXT("Secure the Line"),
-			TEXT("Destroy the Soviet rig crane and the fuel trucks before the HQ glider lands. "
-				"<Text_Armor>2/7</> targets destroyed."),
-			false
+			// Tagged like real mission texts, typed out over 2 s: it must end fully inside the plate.
+			TEXT("<text>Destroy the Soviet rig crane and the fuel trucks before the HQ glider lands. "
+				"Two of the seven targets are destroyed.</>"),
+			false, EMissionObjectiveType::Major, false, EMissionTextSpeed::TS_2Seconds
 		},
 		{
 			TEXT("Hold the Ridge"),
 			TEXT("Dig in along the ridge north of the village and hold it until the relief column arrives. Soviet "
 				"armour is expected from the east; keep your anti-tank guns covering the road."),
-			true
+			true, EMissionObjectiveType::Major, false, EMissionTextSpeed::TS_None
 		},
-		{TEXT("Don't lose your HQ"), TEXT("If your headquarters is destroyed the operation fails."), true},
+		{
+			TEXT("Destroy the megaphone tower"),
+			TEXT("The tower in the yard keeps the Soviet infantry fighting. Silencing it is optional."),
+			false, EMissionObjectiveType::Bonus, true, EMissionTextSpeed::TS_None
+		},
+		{
+			TEXT("Capture the depot supply point"),
+			TEXT("A Soviet supply point sits by the rail depot. Capture it for extra supplies."),
+			true, EMissionObjectiveType::Bonus, false, EMissionTextSpeed::TS_None
+		},
 	};
 	for (const FPreviewMission& PreviewMission : PreviewMissions)
 	{
@@ -1042,8 +1060,13 @@ void UUISnapshotSubsystem::PreviewMissionsOnce()
 		FMissionWidgetState WidgetState;
 		WidgetState.MissionTitle = FText::FromString(PreviewMission.Title);
 		WidgetState.MissionDescription = FText::FromString(PreviewMission.Description);
-		MissionWidget->InitMissionWidget(WidgetState, PlaceholderMission, false, PreviewMission.bStartCollapsed);
-		UE_LOG(LogTemp, Display, TEXT("UISNAPSHOT preview mission: %s"), PreviewMission.Title);
+		WidgetState.ObjectiveType = PreviewMission.ObjectiveType;
+		WidgetState.TextSpeed = PreviewMission.TextSpeed;
+		WidgetState.NextButtonType = EMissionWidgetNextButton::Btn_OK;
+		MissionWidget->InitMissionWidget(WidgetState, PlaceholderMission, PreviewMission.bUseNextAsExpanded,
+		                                 PreviewMission.bStartCollapsed);
+		UE_LOG(LogTemp, Display, TEXT("UISNAPSHOT preview mission: %s (%s)"), PreviewMission.Title,
+		       PreviewMission.ObjectiveType == EMissionObjectiveType::Bonus ? TEXT("bonus") : TEXT("major"));
 	}
 }
 
@@ -1165,6 +1188,62 @@ bool UUISnapshotSubsystem::ClickGlassButtonIn(UUserWidget* const OwnerWidget, co
 	return true;
 }
 
+void UUISnapshotSubsystem::ToggleMissionsOnceForTrainerStep(const FSnapshotStep& Step)
+{
+	if (bM_HasToggledMissions || Step.Selection != EUISnapshotSelection::Trainer
+		|| not FParse::Param(FCommandLine::Get(), UISnapshotConstants::ToggleMissionsSwitch))
+	{
+		return;
+	}
+	bM_HasToggledMissions = true;
+	TArray<UW_Mission*> MissionWidgets;
+	GetMissionWidgetsInUse(MissionWidgets);
+	for (UW_Mission* const MissionWidget : MissionWidgets)
+	{
+		const bool bWasExpanded = MissionWidget->GetIsShowingDescription();
+		const bool bClicked = MissionWidget->SimulateClickObjectiveToggle();
+		UE_LOG(LogTemp, Display, TEXT("UISNAPSHOT toggled mission %s clicked=%d expanded %d -> %d"),
+		       *MissionWidget->GetShownWidgetState().MissionTitle.ToString(), bClicked ? 1 : 0,
+		       bWasExpanded ? 1 : 0, MissionWidget->GetIsShowingDescription() ? 1 : 0);
+	}
+	bM_HasLoggedMissionWidgets = false;
+}
+
+void UUISnapshotSubsystem::LogMissionWidgetsOnce()
+{
+	if (bM_HasLoggedMissionWidgets)
+	{
+		return;
+	}
+	bM_HasLoggedMissionWidgets = true;
+	TArray<UW_Mission*> MissionWidgets;
+	GetMissionWidgetsInUse(MissionWidgets);
+	for (const UW_Mission* const MissionWidget : MissionWidgets)
+	{
+		const FMissionWidgetState& WidgetState = MissionWidget->GetShownWidgetState();
+		UE_LOG(LogTemp, Display, TEXT("UISNAPSHOT mission widget '%s' type=%s expanded=%d buttons bound=%d"),
+		       *WidgetState.MissionTitle.ToString(),
+		       WidgetState.ObjectiveType == EMissionObjectiveType::Bonus ? TEXT("bonus") : TEXT("major"),
+		       MissionWidget->GetIsShowingDescription() ? 1 : 0,
+		       MissionWidget->GetAreObjectivePlateButtonsBound() ? 1 : 0);
+	}
+}
+
+void UUISnapshotSubsystem::GetMissionWidgetsInUse(TArray<UW_Mission*>& OutMissionWidgets) const
+{
+	OutMissionWidgets.Reset();
+	TArray<UUserWidget*> MainGameUIs;
+	UWidgetBlueprintLibrary::GetAllWidgetsOfClass(GetWorld(), MainGameUIs, UMainGameUI::StaticClass(), false);
+	const UMainGameUI* const MainGameUI = MainGameUIs.Num() > 0 ? Cast<UMainGameUI>(MainGameUIs[0]) : nullptr;
+	const UW_MissionWidgetManager* const MissionWidgetManager = IsValid(MainGameUI)
+		                                                            ? MainGameUI->GetMissionManagerWidget()
+		                                                            : nullptr;
+	if (IsValid(MissionWidgetManager))
+	{
+		MissionWidgetManager->GetMissionWidgetsInUse(OutMissionWidgets);
+	}
+}
+
 void UUISnapshotSubsystem::CollapseMissionOnce()
 {
 	if (bM_HasCollapsedMission || not FParse::Param(FCommandLine::Get(), UISnapshotConstants::CollapseMissionSwitch))
@@ -1177,6 +1256,15 @@ void UUISnapshotSubsystem::CollapseMissionOnce()
 	{
 		if (not IsValid(Widget) || not IsValid(Widget->WidgetTree))
 		{
+			continue;
+		}
+		UW_Mission* const MissionWidget = Cast<UW_Mission>(Widget);
+		if (IsValid(MissionWidget) && MissionWidget->GetIsShowingDescription()
+			&& MissionWidget->SimulateClickObjectiveToggle())
+		{
+			// Objective plates replace W_BP_Mission's own collapse button.
+			bM_HasCollapsedMission = true;
+			UE_LOG(LogTemp, Display, TEXT("UISNAPSHOT collapsed mission %s"), *Widget->GetName());
 			continue;
 		}
 		UButton* const CollapseButton = Cast<UButton>(Widget->WidgetTree->FindWidget(UISnapshotConstants::MissionCollapseButtonName));

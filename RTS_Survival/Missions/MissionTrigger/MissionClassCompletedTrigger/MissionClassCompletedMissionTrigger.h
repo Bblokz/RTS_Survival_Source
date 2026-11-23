@@ -25,6 +25,10 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mission Trigger|Mission Class Completed")
 	TSubclassOf<UMissionBase> MissionClassToWatch;
 
+	// Also activate when the watched mission FAILED (e.g. a stealth stage that fails when the alarm is raised).
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mission Trigger|Mission Class Completed")
+	bool bAlsoTriggerWhenFailed = false;
+
 	virtual bool CheckTrigger_Implementation() const override;
 };
 

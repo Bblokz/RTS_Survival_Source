@@ -258,6 +258,7 @@ void AMissionManager::OnAnyMissionCompleted(UMissionBase* CompletedMission, cons
 	{
 		PlayMissionSound(EMissionSoundType::MissionCompleted);
 	}
+	NotifyActiveMissionsOfEndedMission(CompletedMission, true);
 }
 
 void AMissionManager::OnAnyMissionStarted(UMissionBase* LoadedMission)
@@ -267,9 +268,37 @@ void AMissionManager::OnAnyMissionStarted(UMissionBase* LoadedMission)
 
 void AMissionManager::OnAnyMissionFailed(UMissionBase* FailedMission)
 {
+	if (EnsureMissionIsValid(FailedMission) && IsValid(FailedMission->GetClass()))
+	{
+		M_FailedMissionClassPaths.Add(FailedMission->GetClass()->GetClassPathName());
+	}
 	RemoveAllMissionTriggerAreasForMission(FailedMission);
 	RemoveActiveMission(FailedMission);
 	PlayMissionSound(EMissionSoundType::MissionFailed);
+	NotifyActiveMissionsOfEndedMission(FailedMission, false);
+}
+
+void AMissionManager::NotifyActiveMissionsOfEndedMission(const UMissionBase* EndedMission, const bool bCompleted)
+{
+	if (not IsValid(EndedMission))
+	{
+		return;
+	}
+	// A stage may complete, fail or activate missions from its event, which changes M_ActiveMissions: use a snapshot.
+	TArray<TWeakObjectPtr<UMissionBase>> MissionsToNotify;
+	MissionsToNotify.Reserve(M_ActiveMissions.Num());
+	for (UMissionBase* ActiveMission : M_ActiveMissions)
+	{
+		MissionsToNotify.Add(ActiveMission);
+	}
+	for (const TWeakObjectPtr<UMissionBase>& MissionToNotify : MissionsToNotify)
+	{
+		if (not MissionToNotify.IsValid() || MissionToNotify.Get() == EndedMission)
+		{
+			continue;
+		}
+		MissionToNotify->OnOtherMissionEnded(EndedMission, bCompleted);
+	}
 }
 
 void AMissionManager::SetMissionDifficulty(const int32 NewDifficultyPercentage, const ERTSGameDifficulty GameDifficulty)
@@ -796,6 +825,22 @@ bool AMissionManager::GetHasCompletedMissionClassExact(TSubclassOf<UMissionBase>
 	return M_CompletedMissionClassPaths.Contains(MissionClassRaw->GetClassPathName());
 }
 
+bool AMissionManager::GetHasFailedMissionClassExact(TSubclassOf<UMissionBase> MissionClass) const
+{
+	if (not MissionClass)
+	{
+		return false;
+	}
+
+	const UClass* MissionClassRaw = MissionClass.Get();
+	if (not IsValid(MissionClassRaw))
+	{
+		return false;
+	}
+
+	return M_FailedMissionClassPaths.Contains(MissionClassRaw->GetClassPathName());
+}
+
 void AMissionManager::RemoveDontLoseCommanderMission(
 	const ERemoveDontLoseCommanderPost PostRemovalAction,
 	const TSubclassOf<UMissionBase> MissionClassToActivate)
@@ -1098,6 +1143,7 @@ void AMissionManager::BeginPlay()
 {
 	Super::BeginPlay();
 	M_CompletedMissionClassPaths.Empty();
+	M_FailedMissionClassPaths.Empty();
 	BeginPlay_InitPlayerController();
 	BeginPlay_InitMissionScheduler();
 	BeginPlay_InitMissionTriggerVolumesManager();
@@ -1163,6 +1209,11 @@ void AMissionManager::PostInit_CheckOverrideCommander() const
 	{
 		return;
 	}
+	// The backup is for launching the map directly; a campaign operation keeps the campaign's commander.
+	if (GameInstance->GetIsCampaignOperation())
+	{
+		return;
+	}
 	GameInstance->SetPlayerCommander(PlayerFactionBackupData.PlayerCommander);
 }
 
@@ -1194,6 +1245,7 @@ void AMissionManager::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	M_TrackedEnemyActorRefCounts.Empty();
 	M_EnemyUnitDestroyedCallbacks.Empty();
 	M_CompletedMissionClassPaths.Empty();
+	M_FailedMissionClassPaths.Empty();
 
 	for (UMissionBase* Mission : M_ActiveMissions)
 	{
@@ -2740,6 +2792,11 @@ void AMissionManager::TriggerVictory(const bool bShowBackToMenu)
 		return;
 	}
 	PlayEndStateMusic(ERTSMusicType::Victory);
+	if (URTSGameInstance* CampaignGameInstance = Cast<URTSGameInstance>(GetGameInstance()))
+	{
+		// No effect outside a campaign operation. A defeat is only reported when the player gives the mission up.
+		CampaignGameInstance->ReportWorldMissionResult(EWorldMissionOutcome::Victory);
+	}
 	if (not M_MissionEndWidget && M_MissionEndWidgetClass.LoadSynchronous() == nullptr)
 	{
 		// Without the end screen a paused and locked game would leave the player stuck: continue at once instead.
@@ -2860,6 +2917,12 @@ FText AMissionManager::GetDefeatReasonText(const ERTSDefeatType DefeatType)
 
 TSoftObjectPtr<UWorld> AMissionManager::GetVictoryContinueLevel() const
 {
+	// A campaign operation always returns to the world map, whatever this map was set up to continue to.
+	const URTSGameInstance* CampaignGameInstance = Cast<URTSGameInstance>(GetGameInstance());
+	if (IsValid(CampaignGameInstance) && CampaignGameInstance->GetIsCampaignOperation())
+	{
+		return URTSGameInstance::GetWorldCampaignMap();
+	}
 	return GetIsValidMapToLoadOnContinueVictory() ? M_MapToLoadOnContinueVictory : GetVictoryMenuLevelOrDefaultMap();
 }
 

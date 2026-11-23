@@ -7,6 +7,7 @@
 #include "RTS_Survival/GameUI/TrainingUI/TrainingOptions/TrainingOptions.h"
 #include "RTS_Survival/Player/Abilities.h"
 #include "RTS_Survival/GameUI/LocationIntro/LocationIntroTypes.h"
+#include "RTS_Survival/GlobalAbilitySystem/GlobalAbilityType/EGlobalAbilityType.h"
 
 #include "MissionMapTestLibrary.generated.h"
 
@@ -117,4 +118,39 @@ public:
 	 * @return False when the mission was not waiting for its trigger.
 	 */
 	static bool MapTest_FireMissionTrigger(UMissionBase* Mission);
+
+	// ---- Player global abilities ----
+
+	/**
+	 * @brief Uses one of the player's loaded global abilities at a location the way an aimed click does: it pays,
+	 * starts the cooldown and takes a charge, so tests can spend a mission-granted ability.
+	 * @param WorldContextObject Any object of the PIE world.
+	 * @param Ability The loaded ability to use.
+	 * @param Location Ground location the ability is aimed at.
+	 * @return True when the ability was used (it was loaded and not blocked); always false without map tests.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Mission|MapTests", meta = (WorldContext = "WorldContextObject"))
+	static bool MapTest_UsePlayerGlobalAbility(const UObject* WorldContextObject, EGlobalAbility Ability,
+	                                           FVector Location);
+
+	/**
+	 * @brief What the player sees of one global ability: whether it is on the side panel and its charges, cooldown,
+	 * cost and strike size.
+	 * @param WorldContextObject Any object of the PIE world.
+	 * @param Ability The ability to report.
+	 * @param bOutLoaded The ability is among the player's loaded (panel) abilities.
+	 * @param bOutPanelVisible The global ability side panel is shown.
+	 * @param OutLoadedCount Number of abilities on the panel.
+	 * @param OutCharges Uses left; -1 = unlimited.
+	 * @param OutCooldownTime Seconds between uses.
+	 * @param OutCooldownRemaining Seconds until the next use.
+	 * @param OutResourceCostCount Resource types the ability costs (0 = free).
+	 * @param OutStrafeAircraft Aircraft per strike for strafing abilities, else 0.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Mission|MapTests", meta = (WorldContext = "WorldContextObject"))
+	static void MapTest_GetPlayerGlobalAbilityState(const UObject* WorldContextObject, EGlobalAbility Ability,
+	                                                bool& bOutLoaded, bool& bOutPanelVisible, int32& OutLoadedCount,
+	                                                int32& OutCharges, int32& OutCooldownTime,
+	                                                int32& OutCooldownRemaining, int32& OutResourceCostCount,
+	                                                int32& OutStrafeAircraft);
 };

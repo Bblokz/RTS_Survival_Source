@@ -167,6 +167,42 @@ void UMissionBase::OnMissionFailed()
 	BP_OnMissionFailed();
 }
 
+void UMissionBase::OnOtherMissionEnded(const UMissionBase* EndedMission, const bool bCompleted)
+{
+	if (not IsValid(EndedMission))
+	{
+		return;
+	}
+	// Before the trigger fired the stage's graph has not started (no BP_OnMissionStart yet), so it has nothing to react.
+	if (MissionState.bIsMissionComplete || not MissionState.bIsMissionStarted || not MissionState.bIsTriggered)
+	{
+		return;
+	}
+	const TSubclassOf<UMissionBase> EndedMissionClass = EndedMission->GetClass();
+	OnOtherMissionEndedNative(EndedMissionClass, bCompleted);
+	BP_OnOtherMissionEnded(EndedMissionClass, bCompleted);
+}
+
+bool UMissionBase::GetHasMissionClassCompleted(TSubclassOf<UMissionBase> MissionClass) const
+{
+	const AMissionManager* MissionManager = GetMissionManagerChecked();
+	if (not IsValid(MissionManager))
+	{
+		return false;
+	}
+	return MissionManager->GetHasCompletedMissionClassExact(MissionClass);
+}
+
+bool UMissionBase::GetHasMissionClassFailed(TSubclassOf<UMissionBase> MissionClass) const
+{
+	const AMissionManager* MissionManager = GetMissionManagerChecked();
+	if (not IsValid(MissionManager))
+	{
+		return false;
+	}
+	return MissionManager->GetHasFailedMissionClassExact(MissionClass);
+}
+
 void UMissionBase::StartNextMissionIgnoringTrigger()
 {
 	if (not GetIsValidMissionManager())
@@ -1322,6 +1358,23 @@ void UMissionBase::AddArchiveItem(const ERTSArchiveItem ItemType, const FTrainin
 	MainGameUI->AddNewArchiveItem(ItemType, OptionalUnit, SortingPriority, NotificationTime);
 }
 
+void UMissionBase::AddCustomArchiveItem(const FArchiveCustomContent& Content, const int32 SortingPriority,
+                                        const float NotificationTime) const
+{
+	if (not GetIsValidMissionManager())
+	{
+		return;
+	}
+	UMainGameUI* MainGameUI = FRTS_Statics::GetMainGameUI(M_MissionManager.Get());
+	if (not MainGameUI)
+	{
+		RTSFunctionLibrary::ReportError("Mission failed to add a custom archive item as the main game UI is null."
+			"\nAt UMissionBase::AddCustomArchiveItem()");
+		return;
+	}
+	MainGameUI->AddNewCustomArchiveItem(Content, SortingPriority, NotificationTime);
+}
+
 AActor* UMissionBase::FindActorInRange(
 	const FVector Location,
 	const float Range,
@@ -2270,6 +2323,13 @@ void UMissionBase::Tracking_OnReachedMaxCount()
 		return;
 	}
 
+	OnTrackingReachedMaxCountNative();
+	BP_OnTrackingReachedMaxCount();
+	// The event may already have ended the mission (e.g. a graph that completes or fails at once).
+	if (not bCompleteMissionWhenTrackingDone || MissionState.bIsMissionComplete)
+	{
+		return;
+	}
 	OnMissionComplete();
 }
 

@@ -15,6 +15,7 @@
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/Missions/MissionProps/FuelCrane/MissionFuelCrane.h"
 #include "RTS_Survival/Units/Tanks/TankMaster.h"
+#include "RTS_Survival/Units/SquadController.h"
 #include "RTS_Survival/Player/AsyncRTSAssetsSpawner/RTSAsyncSpawner.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
@@ -848,6 +849,109 @@ void USecureBaseMission::LaunchAirSupport()
 	M_AirSupportAbility = Ability;
 	Ability->InitGlobalAbility(SecureBaseMissionPrivate::PlayerIndex, Manager, PlayerController);
 	Ability->ExecuteAbilityAtLocation(AssaultResponse.AirSupportTarget);
+	ScheduleFollowUpsAfterAirSupport();
+}
+
+void USecureBaseMission::ScheduleFollowUpsAfterAirSupport()
+{
+	UWorld* const World = GetWorld();
+	if (World == nullptr)
+	{
+		return;
+	}
+	TWeakObjectPtr<USecureBaseMission> WeakThis(this);
+	if (AssaultResponse.IntelSquadSubtype != ESquadSubtype::Squad_None
+		&& not AssaultResponse.IntelSquadLibraryEntry.IsNone())
+	{
+		// The squad's drop may still be in the air: look once a second for up to a minute.
+		constexpr int32 IntelSquadMaxPolls = 60;
+		constexpr float IntelSquadPollSeconds = 1.f;
+		M_IntelSquadPollsLeft = IntelSquadMaxPolls;
+		World->GetTimerManager().SetTimer(M_IntelSquadTimer, FTimerDelegate::CreateWeakLambda(this, [WeakThis]()
+		{
+			if (WeakThis.IsValid())
+			{
+				WeakThis->TryShowIntelSquadTakeover();
+			}
+		}), IntelSquadPollSeconds, true, FMath::Max(0.01f, AssaultResponse.IntelSquadDelaySeconds));
+	}
+	if (AssaultResponse.GrantedAbility.Ability != EGlobalAbility::GA_None)
+	{
+		World->GetTimerManager().SetTimer(M_GrantedAbilityTimer, FTimerDelegate::CreateWeakLambda(this, [WeakThis]()
+		{
+			if (WeakThis.IsValid())
+			{
+				WeakThis->GrantAbilityToPlayer();
+			}
+		}), FMath::Max(0.01f, AssaultResponse.GrantedAbilityDelaySeconds), false);
+	}
+}
+
+void USecureBaseMission::TryShowIntelSquadTakeover()
+{
+	AActor* const Squad = FindLivingIntelSquad();
+	M_IntelSquadPollsLeft -= 1;
+	const bool bShouldStopPolling = Squad != nullptr || M_IntelSquadPollsLeft <= 0;
+	if (bShouldStopPolling)
+	{
+		if (UWorld* const World = GetWorld())
+		{
+			World->GetTimerManager().ClearTimer(M_IntelSquadTimer);
+		}
+	}
+	if (Squad == nullptr)
+	{
+		return;
+	}
+	bM_HasShownIntelSquadTakeover = true;
+	ShowSquadInfoTakeover(Squad, AssaultResponse.IntelSquadLibraryEntry);
+}
+
+AActor* USecureBaseMission::FindLivingIntelSquad() const
+{
+	UWorld* const World = GetWorld();
+	if (World == nullptr)
+	{
+		return nullptr;
+	}
+	for (TActorIterator<ASquadController> It(World); It; ++It)
+	{
+		ASquadController* const Squad = *It;
+		const URTSComponent* const RTSComponent = IsValid(Squad) ? Squad->FindComponentByClass<URTSComponent>() : nullptr;
+		if (RTSComponent == nullptr || RTSComponent->GetOwningPlayer() == SecureBaseMissionPrivate::PlayerIndex)
+		{
+			continue;
+		}
+		if (RTSComponent->GetSubtypeAsSquadSubtype() == AssaultResponse.IntelSquadSubtype
+			&& not Squad->GetSquadUnitsChecked().IsEmpty())
+		{
+			return Squad;
+		}
+	}
+	return nullptr;
+}
+
+void USecureBaseMission::GrantAbilityToPlayer()
+{
+	if (bM_HasGrantedAbility)
+	{
+		return;
+	}
+	ACPPController* const PlayerController = FRTS_Statics::GetRTSController(this);
+	UGlobalAbilitiesManager* const Manager = IsValid(PlayerController)
+		                                         ? PlayerController->GetGlobalAbilitiesManager()
+		                                         : nullptr;
+	if (not IsValid(Manager) || Manager->GrantMissionGlobalAbility(AssaultResponse.GrantedAbility) == nullptr)
+	{
+		RTSFunctionLibrary::ReportError("Secure base mission " + GetName() + ": could not grant "
+			+ UEnum::GetValueAsString(AssaultResponse.GrantedAbility.Ability) + " to the player.");
+		return;
+	}
+	bM_HasGrantedAbility = true;
+	if (AssaultResponse.GrantedAbilityLine != nullptr)
+	{
+		PlayPortrait(AssaultResponse.GrantedAbilityPortrait, AssaultResponse.GrantedAbilityLine);
+	}
 }
 
 void USecureBaseMission::PollTargets()
@@ -930,6 +1034,8 @@ void USecureBaseMission::OnCleanUpMission()
 		// The response (lines, strike) outlives a completed mission; only a map unload stops it.
 		World->GetTimerManager().ClearTimer(M_AirSupportLineTimer);
 		World->GetTimerManager().ClearTimer(M_AirSupportStrikeTimer);
+		World->GetTimerManager().ClearTimer(M_IntelSquadTimer);
+		World->GetTimerManager().ClearTimer(M_GrantedAbilityTimer);
 	}
 	Super::OnCleanUpMission();
 }

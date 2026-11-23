@@ -720,6 +720,61 @@ void AEnemyController::RetreatAllFormations(
 		MaxTimeWaitTillCounterAttack);
 }
 
+bool AEnemyController::RetreatUnitToRallyPoint(AActor* UnitActor, const FVector& RallyLocation)
+{
+	if (not GetIsValidFormationController() || not GetIsValidEnemyRetreatController())
+	{
+		return false;
+	}
+	ICommands* Commands = Cast<ICommands>(UnitActor);
+	if (not Commands)
+	{
+		return false;
+	}
+
+	// The formation would keep ordering the unit back to its waypoints.
+	TArray<ASquadController*> SquadControllers;
+	TArray<ATankMaster*> TankMasters;
+	if (ASquadController* SquadController = Cast<ASquadController>(UnitActor))
+	{
+		SquadControllers.Add(SquadController);
+	}
+	else if (ATankMaster* TankMaster = Cast<ATankMaster>(UnitActor))
+	{
+		TankMasters.Add(TankMaster);
+	}
+	M_FormationController->RemoveUnitsFromAnyFormation(SquadControllers, TankMasters);
+
+	bool bWasProjected = false;
+	const FVector ProjectedRally = RTSFunctionLibrary::GetLocationProjected(this, RallyLocation, true, bWasProjected);
+	const FVector RetreatLocation = bWasProjected ? ProjectedRally : RallyLocation;
+	const bool bIsSquad = Commands->GetIsSquadUnit();
+	const ECommandQueueError CommandError = bIsSquad
+		                                        ? Commands->RetreatToLocation(RetreatLocation, true)
+		                                        : Commands->ReverseUnitToLocation(RetreatLocation, true);
+	if (CommandError != ECommandQueueError::NoError)
+	{
+		return false;
+	}
+
+	FRetreatElement RetreatElement;
+	RetreatElement.Unit = TWeakInterfacePtr<ICommands>(Commands);
+	RetreatElement.RetreatLocation = RetreatLocation;
+	const TArray<FRetreatElement> SquadElements = bIsSquad ? TArray<FRetreatElement>{RetreatElement} : TArray<FRetreatElement>{};
+	const TArray<FRetreatElement> ReverseElements = bIsSquad ? TArray<FRetreatElement>{} : TArray<FRetreatElement>{RetreatElement};
+	// RemoveUnits: the unit disappears at the rally point; the counterattack timers are never used.
+	constexpr float NoCounterattackDelaySeconds = 0.f;
+	constexpr float NoCounterattackTimeoutSeconds = 0.f;
+	M_EnemyRetreatController->StartRetreat(
+		SquadElements,
+		ReverseElements,
+		RetreatLocation,
+		EPostRetreatCounterStrategy::RemoveUnits,
+		NoCounterattackDelaySeconds,
+		NoCounterattackTimeoutSeconds);
+	return true;
+}
+
 void AEnemyController::AddToWaveSupply(const int32 AddSupply)
 {
 	M_Resources.WaveSupply += AddSupply;

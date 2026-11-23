@@ -20,6 +20,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetSystemLibrary.h"
 #include "RTS_Survival/GameUI/Portrait/PortraitSubtitle/SubtitleStyleDefaults.h"
+#include "RTS_Survival/Game/RTSGameInstance/RTSGameInstance.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "UObject/ConstructorHelpers.h"
 
@@ -232,6 +233,12 @@ void UW_MissionEnd::SetupEndScreen(const EMissionDebriefOutcome Outcome, const F
 		                        : NSLOCTEXT("MissionEnd", "Restart", "RESTART"));
 	M_SecondaryLabel->SetText(bVictory ? NSLOCTEXT("MissionEnd", "MainMenu", "MAIN MENU")
 		                          : NSLOCTEXT("MissionEnd", "Quit", "QUIT"));
+	const URTSGameInstance* const CampaignGameInstance = Cast<URTSGameInstance>(GetGameInstance());
+	if (not bVictory && IsValid(CampaignGameInstance) && CampaignGameInstance->GetIsCampaignOperation())
+	{
+		// In the campaign, giving a lost mission up returns to the world map and hands the enemy a turn.
+		M_SecondaryLabel->SetText(NSLOCTEXT("MissionEnd", "Withdraw", "WITHDRAW"));
+	}
 	const bool bShowSecondary = not bVictory || bShowBackToMenu;
 	M_SecondaryButton->SetVisibility(bShowSecondary ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
 }
@@ -299,6 +306,13 @@ void UW_MissionEnd::HandleSecondaryClicked()
 	if (M_Outcome == EMissionDebriefOutcome::Victory)
 	{
 		OpenLevel(M_MenuLevel, TEXT("return to the main menu"));
+		return;
+	}
+	URTSGameInstance* const CampaignGameInstance = Cast<URTSGameInstance>(GetGameInstance());
+	if (IsValid(CampaignGameInstance) && CampaignGameInstance->GetIsCampaignOperation())
+	{
+		CampaignGameInstance->ReportWorldMissionResult(EWorldMissionOutcome::Defeat);
+		OpenLevel(URTSGameInstance::GetWorldCampaignMap(), TEXT("withdraw to the world map"));
 		return;
 	}
 	APlayerController* const OwningPlayer = GetOwningPlayer();

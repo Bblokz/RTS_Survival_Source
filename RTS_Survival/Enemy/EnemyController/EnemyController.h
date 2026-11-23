@@ -407,6 +407,15 @@ public:
 		const float TileTillCounterAttackAfterLastRetreatingUnitReached = 60.f,
 		const float MaxTimeWaitTillCounterAttack = 120.f);
 
+	/**
+	 * @brief Pulls one unit out of its formation and sends it to a rally point, e.g. a beaten squad falling back to
+	 * its base. The retreat controller tracks it and removes it on arrival, as if it went inside.
+	 * @param UnitActor A squad controller or vehicle of this enemy.
+	 * @param RallyLocation Where it runs to; projected onto the navmesh when possible.
+	 * @return True when the order was issued and the retreat controller tracks the unit.
+	 */
+	bool RetreatUnitToRallyPoint(AActor* UnitActor, const FVector& RallyLocation);
+
 	// ------------------------------------------------------------
 	// Enemy Resources Management
 	// ------------------------------------------------------------

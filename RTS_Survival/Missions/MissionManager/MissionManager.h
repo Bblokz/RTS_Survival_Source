@@ -351,6 +351,7 @@ public:
 	 */
 	void ActivateNewMission(UMissionBase* NewMission);
 	bool GetHasCompletedMissionClassExact(TSubclassOf<UMissionBase> MissionClass) const;
+	bool GetHasFailedMissionClassExact(TSubclassOf<UMissionBase> MissionClass) const;
 	/**
 	 * @brief Completes the active commander-loss mission before optionally creating its replacement.
 	 * @param PostRemovalAction Determines whether a replacement mission should be activated.
@@ -537,6 +538,17 @@ private:
 	// We store class paths instead of raw UClass pointers to avoid stale class pointer crashes when classes unload.
 	UPROPERTY(Transient)
 	TSet<FTopLevelAssetPath> M_CompletedMissionClassPaths;
+
+	// Same as M_CompletedMissionClassPaths for failed missions; class-completed triggers can opt in to these.
+	UPROPERTY(Transient)
+	TSet<FTopLevelAssetPath> M_FailedMissionClassPaths;
+
+	/**
+	 * @brief Tells every other started mission that a mission ended, so stages react in their own event graph.
+	 * @param EndedMission The mission that just completed or failed; it is never notified itself.
+	 * @param bCompleted True when it completed, false when it failed.
+	 */
+	void NotifyActiveMissionsOfEndedMission(const UMissionBase* EndedMission, const bool bCompleted);
 
 	UPROPERTY()
 	TSubclassOf<UW_MissionWidgetManager> M_WidgetManagerClass;

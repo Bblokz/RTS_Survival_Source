@@ -84,6 +84,8 @@ public:
 	const FGLobalAbilityCostState& GetAbilityCosts() const;
 	const FGlobalAbilityUISettings& GetUISettings() const;
 	const FGlobalAbilitySoundSettings& GetSoundSettings() const { return M_AbilitySoundSettings; }
+	// Uses left of a mission-granted ability; INDEX_NONE = unlimited (every commander kit ability).
+	int32 GetRemainingCharges() const { return M_RemainingCharges; }
 
 	FOnGlobalAbilityEnded OnGlobalAbilityEnded;
 
@@ -124,7 +126,11 @@ protected:
 private:
 	UPROPERTY(Transient)
 	int32 M_OwningPlayer = INDEX_NONE;
-	
+
+	// Set by UGlobalAbilitiesManager::GrantMissionGlobalAbility; at 0 the ability is blocked (and leaves the panel).
+	UPROPERTY(Transient)
+	int32 M_RemainingCharges = INDEX_NONE;
+
 	void CreateMarker(const FVector& ExecuteLocation);
 	void OnValidMarkerSpawned(UNiagaraComponent* MarkerEffect);
 	void DestroyMarker(UNiagaraComponent* MarkerEffect);

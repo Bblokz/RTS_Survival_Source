@@ -78,6 +78,7 @@ public:
 	void SkipFadeIn();
 
 	bool GetAreButtonsRevealed() const { return bM_AreButtonsRevealed; }
+	EMissionDebriefOutcome GetOutcome() const { return M_Outcome; }
 
 	// Continue on victory, Restart on defeat; tests press it.
 	UButton* GetPrimaryButton() const { return M_PrimaryButton; }

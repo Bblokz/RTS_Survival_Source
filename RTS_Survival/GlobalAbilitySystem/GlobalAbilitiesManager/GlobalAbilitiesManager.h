@@ -95,6 +95,19 @@ public:
 
 	bool GetIsAbilityPreviewManager() const { return bM_IsAbilityPreviewManager; }
 
+	/**
+	 * @brief Missions hand the player an extra ability at a scripted moment. When the mission hid the commander's kit
+	 * (collapsed panel), the panel comes back showing only the granted abilities; an ability with charges leaves the
+	 * panel once they are used up.
+	 * @param Grant Which ability, its charges, cooldown, cost and strafing overrides.
+	 * @return The granted ability, or null when this is no player manager or the ability is not in the data asset.
+	 */
+	UGlobalAbility* GrantMissionGlobalAbility(const FMissionGrantedGlobalAbility& Grant);
+
+	// The side panel is shown (missions can hide it until they grant an ability).
+	bool GetIsAbilityPanelVisible() const;
+	int32 GetLoadedAbilityCount() const { return M_GlobalAbilities.Num(); }
+
 	// Called when the game starts
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
@@ -246,6 +259,22 @@ private:
 	
 	UPROPERTY()
 	TArray<TObjectPtr<UGlobalAbility>> M_GlobalAbilities;
+
+	// Mission grants whose charges ran out: off the panel, but kept alive while their last strike may still fly.
+	UPROPERTY()
+	TArray<TObjectPtr<UGlobalAbility>> M_SpentMissionAbilities;
+
+	// The mission hid the kit before its first grant, so the panel shows the mission's grants only.
+	bool bM_PanelShowsOnlyMissionGrants = false;
+
+	UGlobalAbility* CreateMissionGrantedAbilityCopy(const FMissionGrantedGlobalAbility& Grant);
+	void ApplyMissionGrantOverrides(UGlobalAbility* Ability, const FMissionGrantedGlobalAbility& Grant);
+	void AddMissionGrantToPanel(UGlobalAbility* Ability);
+	// Takes one charge after a use; a spent ability leaves the panel (which collapses again when it was its last).
+	void ConsumeMissionCharge(UGlobalAbility* Ability);
+	void RefreshPanelAfterMissionGrantChange();
+	// "Charges left: N" under the tooltip text of an ability with charges; the text unchanged otherwise.
+	FText AppendChargesToDescription(const UGlobalAbility* Ability, const FText& Description) const;
 
 	FTimerHandle M_CheckRequirementsTimerHandle;
 	FTimerHandle M_CooldownTimerHandle;

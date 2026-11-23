@@ -17,6 +17,7 @@ class RTS_SURVIVAL_API UDontLoseHQMission : public UMissionBase
 
 protected:
 	virtual void OnMissionStart() override;
+	virtual void OnMissionStartedNative() override;
 	virtual void OnMissionComplete() override;
 	virtual void OnMissionFailed() override;
 

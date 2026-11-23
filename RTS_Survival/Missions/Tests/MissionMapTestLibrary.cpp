@@ -14,6 +14,9 @@
 #include "RTS_Survival/Missions/MissionManager/MissionManager.h"
 #include "RTS_Survival/Player/Camera/CameraController/PlayerCameraController.h"
 #include "RTS_Survival/Player/CPPController.h"
+#include "RTS_Survival/GlobalAbilitySystem/GlobalAbilities/GlobalAbility.h"
+#include "RTS_Survival/GlobalAbilitySystem/GlobalAbilities/AircraftStrafing/GA_AircraftStrafing.h"
+#include "RTS_Survival/GlobalAbilitySystem/GlobalAbilitiesManager/GlobalAbilitiesManager.h"
 #include "RTS_Survival/Units/Tanks/WheeledTank/BaseTruck/NomadicVehicle.h"
 #include "RTS_Survival/Utils/RTSMapTests/RTSMapTests.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
@@ -278,5 +281,78 @@ bool UMissionMapTestLibrary::MapTest_FireMissionTrigger(UMissionBase* Mission)
 	return true;
 #else
 	return false;
+#endif
+}
+
+namespace MissionMapTestLibraryPrivate
+{
+	UGlobalAbilitiesManager* GetPlayerGlobalAbilitiesManager(const UObject* WorldContextObject)
+	{
+		ACPPController* const PlayerController = FRTS_Statics::GetRTSController(WorldContextObject);
+		return IsValid(PlayerController) ? PlayerController->GetGlobalAbilitiesManager() : nullptr;
+	}
+}
+
+bool UMissionMapTestLibrary::MapTest_UsePlayerGlobalAbility(const UObject* WorldContextObject,
+                                                            const EGlobalAbility Ability, const FVector Location)
+{
+#if RTS_WITH_MAP_TESTS
+	const UGlobalAbilitiesManager* const Manager =
+		MissionMapTestLibraryPrivate::GetPlayerGlobalAbilitiesManager(WorldContextObject);
+	UGlobalAbility* const LoadedAbility = IsValid(Manager) ? Manager->FindLoadedAbilityByType(Ability) : nullptr;
+	if (not IsValid(LoadedAbility))
+	{
+		return false;
+	}
+	// A used ability always starts its cooldown or loses a charge: compare to tell a blocked click apart.
+	const int32 CooldownBefore = LoadedAbility->GetAbilityCosts().CoolDownRemaining;
+	const int32 ChargesBefore = LoadedAbility->GetRemainingCharges();
+	LoadedAbility->OnClickedAbilityLocation(Location);
+	return LoadedAbility->GetAbilityCosts().CoolDownRemaining != CooldownBefore
+		|| LoadedAbility->GetRemainingCharges() != ChargesBefore;
+#else
+	return false;
+#endif
+}
+
+void UMissionMapTestLibrary::MapTest_GetPlayerGlobalAbilityState(const UObject* WorldContextObject,
+                                                                 const EGlobalAbility Ability, bool& bOutLoaded,
+                                                                 bool& bOutPanelVisible, int32& OutLoadedCount,
+                                                                 int32& OutCharges, int32& OutCooldownTime,
+                                                                 int32& OutCooldownRemaining,
+                                                                 int32& OutResourceCostCount,
+                                                                 int32& OutStrafeAircraft)
+{
+	bOutLoaded = false;
+	bOutPanelVisible = false;
+	OutLoadedCount = 0;
+	OutCharges = INDEX_NONE;
+	OutCooldownTime = 0;
+	OutCooldownRemaining = 0;
+	OutResourceCostCount = 0;
+	OutStrafeAircraft = 0;
+#if RTS_WITH_MAP_TESTS
+	const UGlobalAbilitiesManager* const Manager =
+		MissionMapTestLibraryPrivate::GetPlayerGlobalAbilitiesManager(WorldContextObject);
+	if (not IsValid(Manager))
+	{
+		return;
+	}
+	bOutPanelVisible = Manager->GetIsAbilityPanelVisible();
+	OutLoadedCount = Manager->GetLoadedAbilityCount();
+	const UGlobalAbility* const LoadedAbility = Manager->FindLoadedAbilityByType(Ability);
+	if (not IsValid(LoadedAbility))
+	{
+		return;
+	}
+	bOutLoaded = true;
+	OutCharges = LoadedAbility->GetRemainingCharges();
+	OutCooldownTime = LoadedAbility->GetAbilityCosts().CoolDownTime;
+	OutCooldownRemaining = LoadedAbility->GetAbilityCosts().CoolDownRemaining;
+	OutResourceCostCount = LoadedAbility->GetAbilityCosts().Costs.ResourceCosts.Num();
+	if (const UGA_AircraftStrafing* const Strafing = Cast<UGA_AircraftStrafing>(LoadedAbility))
+	{
+		OutStrafeAircraft = Strafing->GetAircraftCount();
+	}
 #endif
 }

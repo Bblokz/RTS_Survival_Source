@@ -456,9 +456,44 @@ public:
 	virtual void BeginDestroy() override;
 
 	virtual void OnTriggerAreaCallback(AActor* OverlappingActor, const int32 TriggerID, ATriggerArea* TriggerVolume);
-	
+
+	/**
+	 * @brief Called by the mission manager when another mission completed or failed. Only started missions (trigger
+	 * fired) that are not complete pass it on to OnOtherMissionEndedNative and BP_OnOtherMissionEnded.
+	 * @param EndedMission The mission that ended.
+	 * @param bCompleted True when it completed, false when it failed.
+	 */
+	void OnOtherMissionEnded(const UMissionBase* EndedMission, const bool bCompleted);
 
 protected:
+	/** @return Whether a mission of exactly this class has completed on this map; use the Blueprint class, not a parent. */
+	UFUNCTION(BlueprintPure, Category = "Mission|OtherMissions")
+	bool GetHasMissionClassCompleted(TSubclassOf<UMissionBase> MissionClass) const;
+
+	/** @return Whether a mission of exactly this class has failed on this map; use the Blueprint class, not a parent. */
+	UFUNCTION(BlueprintPure, Category = "Mission|OtherMissions")
+	bool GetHasMissionClassFailed(TSubclassOf<UMissionBase> MissionClass) const;
+
+	// When true (default) the mission completes itself once TrackingFunction / TrackActorsWithMiniMapProgress counts
+	// every tracked actor. Turn it off for a stage whose graph plays lines and waits before calling OnMissionComplete.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mission|Tracking")
+	bool bCompleteMissionWhenTrackingDone = true;
+
+	// Native twin of BP_OnTrackingReachedMaxCount for C++ mission classes; runs right before it.
+	virtual void OnTrackingReachedMaxCountNative() {}
+
+	// Every tracked actor is counted. Fires whether or not bCompleteMissionWhenTrackingDone completes the mission next.
+	UFUNCTION(BlueprintImplementableEvent, Category = "Mission|Tracking")
+	void BP_OnTrackingReachedMaxCount();
+
+	// Native twin of BP_OnOtherMissionEnded for C++ mission classes; runs right before it.
+	virtual void OnOtherMissionEndedNative(TSubclassOf<UMissionBase> EndedMissionClass, const bool bCompleted) {}
+
+	// Another mission completed or failed (e.g. the alarm stage failing), so this stage can react in its own event
+	// graph without polling. Not sent to the mission that ended, nor before this mission's trigger fired.
+	UFUNCTION(BlueprintImplementableEvent, Category = "Mission|OtherMissions")
+	void BP_OnOtherMissionEnded(TSubclassOf<UMissionBase> EndedMissionClass, const bool bCompleted);
+
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	AMissionManager* GetMissionManagerChecked() const;
 	
@@ -782,6 +817,20 @@ protected:
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void AddArchiveItem(const ERTSArchiveItem ItemType, const FTrainingOption OptionalUnit = FTrainingOption(),
 	                    const int32 SortingPriority = 0, const float NotificationTime = 20) const;
+
+	/**
+	 * @brief Adds an archive entry with its own title, text and image (lore found in a mission, e.g. the Demeter pod),
+	 * where AddArchiveItem only takes the fixed DT_ArchiveItem rows.
+	 * @param Content Title, rich-text description, optional image and archive tab (SortType).
+	 * @param SortingPriority Higher sorts first in its tab.
+	 * @param NotificationTime Seconds the "new archive entry" notification shows.
+	 */
+	// BlueprintPure=false: a const BlueprintCallable is otherwise a pure node, which never runs without an output.
+	UFUNCTION(BlueprintCallable, BlueprintPure = false, NotBlueprintable, Category = "Mission|Archive",
+		meta = (AutoCreateRefTerm = "Content"))
+	void AddCustomArchiveItem(const FArchiveCustomContent& Content, const int32 SortingPriority = 0,
+	                          const float NotificationTime = 20) const;
+
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="FindUnits")
 	AActor* FindActorInRange(
 		const FVector Location,

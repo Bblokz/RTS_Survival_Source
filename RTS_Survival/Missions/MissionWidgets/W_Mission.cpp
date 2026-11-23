@@ -35,6 +35,7 @@ void UW_Mission::InitMissionWidget(const FMissionWidgetState& WidgetState,
 	// Respect global-hide and pooling state.
 	ApplyVisibilityPolicy();
 
+	ApplyObjectivePlateState();
 	OnChangeWidgetState(WidgetType, WidgetState.TextSpeed);
 }
 
@@ -49,6 +50,7 @@ void UW_Mission::RefreshMissionWidget(const FMissionWidgetState& WidgetState)
 	M_RichTitle->SetText(WidgetState.MissionTitle);
 	M_RichDescription->SetText(WidgetState.MissionDescription);
 	M_NextButtonType = WidgetState.NextButtonType;
+	ApplyObjectivePlateState();
 }
 
 URichTextBlock* UW_Mission::GetRichDescriptionBlock() const
@@ -65,6 +67,7 @@ void UW_Mission::EnsureMissionShowsTitleOnly()
 
 	constexpr EMissionWidgetState CollapsedState = EMissionWidgetState::OMS_Minimized;
 	M_WidgetState = CollapsedState;
+	ApplyObjectivePlateState();
 	OnChangeWidgetState(CollapsedState, EMissionTextSpeed::TS_None);
 }
 
@@ -76,6 +79,7 @@ void UW_Mission::MarkWidgetAsFree()
 	bM_IsInUse = false;
 	M_AssociatedMission.Reset();
 	M_ShownWidgetState = FMissionWidgetState();
+	ApplyObjectivePlateState();
 }
 
 void UW_Mission::OnHideAllGameUI(const bool bHide)
