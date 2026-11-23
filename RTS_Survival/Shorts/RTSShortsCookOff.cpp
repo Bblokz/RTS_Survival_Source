@@ -4,7 +4,11 @@
 
 #include "Components/StaticMeshComponent.h"
 #include "Engine/World.h"
+#include "NiagaraComponent.h"
+#include "GameFramework/WorldSettings.h"
+#include "UObject/UObjectIterator.h"
 #include "RTS_Survival/Units/Tanks/TankMaster.h"
+#include "RTS_Survival/Units/Tanks/WreckTurretToss/WreckPartFlightComponent.h"
 #include "RTS_Survival/Units/Tanks/WreckTurretToss/WreckTurretTossComponent.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogRTSShortsCookOff, Log, All);
@@ -22,12 +26,14 @@ namespace RTSShortsCookOffPrivate
 	 */
 	bool GetIsWreckActor(const AActor& Actor)
 	{
-		if (Actor.FindComponentByClass<UWreckTurretTossComponent>() != nullptr)
+		if (Actor.FindComponentByClass<UWreckTurretTossComponent>() != nullptr
+			|| Actor.FindComponentByClass<UWreckPartFlightComponent>() != nullptr)
 		{
 			return true;
 		}
 		const FString ClassName = Actor.GetClass()->GetName();
-		const TCHAR* const WreckWords[] = {TEXT("Wreck"), TEXT("Destroyed"), TEXT("Debris"), TEXT("Collapse")};
+		// Env_Dest_*: the wreck of a fuel explosion death, which has no thrown part and so no flight component.
+		const TCHAR* const WreckWords[] = {TEXT("Wreck"), TEXT("Destroyed"), TEXT("Debris"), TEXT("Collapse"), TEXT("Env_Dest")};
 		for (const TCHAR* const Word : WreckWords)
 		{
 			if (ClassName.Contains(Word))
@@ -38,10 +44,14 @@ namespace RTSShortsCookOffPrivate
 		return false;
 	}
 
-	/** The wreck's turret while the toss simulates it: the only static mesh of a tossing wreck that simulates physics. */
+	/**
+	 * The wreck's thrown part while it simulates: the turret of an ammo cook-off or the engine deck of a fuel
+	 * explosion, the only static mesh of such a wreck that simulates physics.
+	 */
 	UStaticMeshComponent* FindFlyingTurret(const AActor& Wreck)
 	{
-		if (Wreck.FindComponentByClass<UWreckTurretTossComponent>() == nullptr)
+		if (Wreck.FindComponentByClass<UWreckTurretTossComponent>() == nullptr
+			&& Wreck.FindComponentByClass<UWreckPartFlightComponent>() == nullptr)
 		{
 			return nullptr;
 		}
@@ -66,6 +76,7 @@ void ARTSShortsDirector::BeginCookOff(const int32 SegmentIndex)
 	}
 	M_CookOff = FRTSShortsCookOffState();
 	M_CookOff.bIsActive = true;
+	const int32 Doused = StopLingeringStageFires(SegmentIndex);
 	M_CookOff.EffectIdsAtBegin = CollectActiveEffectIds();
 	// FrameCamera has framed the tank: its aim point is where the camera looks at the tank's distance.
 	if (GetIsValidCamera() && IsValid(M_Units[SegmentIndex].Get()))
@@ -77,8 +88,33 @@ void ARTSShortsDirector::BeginCookOff(const int32 SegmentIndex)
 	}
 	M_CookOff.ActorSpawnedHandle = GetWorld()->AddOnActorSpawnedHandler(
 		FOnActorSpawned::FDelegate::CreateUObject(this, &ARTSShortsDirector::OnCookOffActorSpawned));
-	UE_LOG(LogRTSShortsCookOff, Display, TEXT("RTS_SHORTS_COOKOFF_SEGMENT segment=%d unit=%s"), SegmentIndex,
-	       *GetNameSafe(M_Units[SegmentIndex].Get()));
+	UE_LOG(LogRTSShortsCookOff, Display, TEXT("RTS_SHORTS_COOKOFF_SEGMENT segment=%d unit=%s doused=%d"), SegmentIndex,
+	       *GetNameSafe(M_Units[SegmentIndex].Get()), Doused);
+}
+
+int32 ARTSShortsDirector::StopLingeringStageFires(const int32 SegmentIndex) const
+{
+	const AActor* Unit = M_Units.IsValidIndex(SegmentIndex) ? M_Units[SegmentIndex].Get() : nullptr;
+	if (not IsValid(Unit))
+	{
+		return 0;
+	}
+	// A dead tank's looping fires are spawned at a location, owned by the world settings: the stage flush keeps those
+	// (level actors), and they burned on through the next tank's whole segment.
+	constexpr float StageRadiusCm = 3000.f;
+	const FVector StageLocation = Unit->GetActorLocation();
+	int32 Stopped = 0;
+	for (TObjectIterator<UNiagaraComponent> It; It; ++It)
+	{
+		UNiagaraComponent* Component = *It;
+		if (Component->GetWorld() == GetWorld() && Component->IsActive() && Cast<AWorldSettings>(Component->GetOwner()) != nullptr
+			&& FVector::Dist(Component->GetComponentLocation(), StageLocation) < StageRadiusCm)
+		{
+			Component->DeactivateImmediate();
+			++Stopped;
+		}
+	}
+	return Stopped;
 }
 
 void ARTSShortsDirector::OnCookOffActorSpawned(AActor* SpawnedActor)
@@ -101,18 +137,27 @@ void ARTSShortsDirector::TickCookOff(const int32 LocalFrame)
 	if (not M_CookOff.bCookOffStarted && LocalFrame >= FMath::RoundToInt(CookOff.StartAtSeconds * M_Job.Fps))
 	{
 		M_CookOff.bCookOffStarted = true;
-		if (IsValid(Tank))
+		if (IsValid(Tank) && CookOff.bEngineFire)
+		{
+			Tank->Debug_StartEngineFire();
+		}
+		else if (IsValid(Tank))
 		{
 			Tank->Debug_StartAmmoCookOff();
 		}
-		UE_LOG(LogRTSShortsCookOff, Display, TEXT("RTS_SHORTS_COOKOFF_START local=%d tank=%d"), LocalFrame, IsValid(Tank) ? 1 : 0);
+		UE_LOG(LogRTSShortsCookOff, Display, TEXT("RTS_SHORTS_COOKOFF_START local=%d tank=%d fuel=%d"), LocalFrame,
+		       IsValid(Tank) ? 1 : 0, CookOff.bEngineFire ? 1 : 0);
 	}
 	const int32 DeathFrame = FMath::RoundToInt((CookOff.StartAtSeconds + CookOff.DieAfterSeconds) * M_Job.Fps);
 	if (M_CookOff.DeathLocalFrame < 0 && LocalFrame >= DeathFrame)
 	{
 		// Set before the death so the wreck it spawns is recorded.
 		M_CookOff.DeathLocalFrame = LocalFrame;
-		if (IsValid(Tank))
+		if (IsValid(Tank) && CookOff.bEngineFire)
+		{
+			Tank->Debug_DieDuringEngineFire();
+		}
+		else if (IsValid(Tank))
 		{
 			Tank->Debug_DieDuringAmmoCookOff();
 		}

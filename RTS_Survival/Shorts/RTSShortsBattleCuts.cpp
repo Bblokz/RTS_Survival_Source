@@ -24,6 +24,11 @@ namespace RTSShortsBattleCutsPrivate
 	constexpr float TargetAimHeightCm = 120.f;
 	// A unit this close to its nearest enemy scores the most (the fight is round it).
 	constexpr float CloseFightCm = 8000.f;
+	// Vehicles of either line within this radius of a unit count towards its group: a shot of a group shows the fight,
+	// a shot of a lone vehicle does not. Each one adds GroupScorePerVehicle, up to GroupScoreMaxVehicles of them.
+	constexpr float GroupRadiusCm = 3000.f;
+	constexpr float GroupScorePerVehicle = 0.35f;
+	constexpr int32 GroupScoreMaxVehicles = 8;
 	// Squads are filmed now and then for the infantry and the guns: this much extra score on every third shot.
 	constexpr float SquadTurnScore = 1.5f;
 	// Reinforcements driving in are filmed on every fourth shot while there are any.
@@ -237,7 +242,20 @@ void ARTSShortsDirector::StartBattleCutShot(const FRTSShortsBattleCuts& Settings
 					NearestEnemy = FMath::Min(NearestEnemy, FVector::Dist2D(Point, Enemy->GetActorLocation()));
 				}
 			}
-			float Score = State.Random.FRand() + 1.5f * (1.f - FMath::Clamp(NearestEnemy / CloseFightCm, 0.f, 1.f));
+			int32 GroupVehicles = 0;
+			for (const TArray<TWeakObjectPtr<AActor>>* GroupLine : {&M_Battle.PlayerUnits, &M_Battle.EnemyUnits})
+			{
+				for (const TWeakObjectPtr<AActor>& Other : *GroupLine)
+				{
+					if (Other.IsValid() && Other.Get() != Candidate && Cast<ASquadUnit>(Other.Get()) == nullptr && Other->IsUnitAlive()
+						&& FVector::Dist2D(Point, Other->GetActorLocation()) < GroupRadiusCm)
+					{
+						++GroupVehicles;
+					}
+				}
+			}
+			float Score = State.Random.FRand() + 1.5f * (1.f - FMath::Clamp(NearestEnemy / CloseFightCm, 0.f, 1.f))
+				+ GroupScorePerVehicle * FMath::Min(GroupVehicles, GroupScoreMaxVehicles);
 			const int32 RecentIndex = State.Recent.IndexOfByKey(TWeakObjectPtr<AActor>(Candidate));
 			if (RecentIndex != INDEX_NONE && RecentIndex >= State.Recent.Num() - Settings.RepeatGap)
 			{
@@ -313,7 +331,8 @@ void ARTSShortsDirector::StartBattleCutShot(const FRTSShortsBattleCuts& Settings
 		const ERTSShortsBattleShot Close[] = {ERTSShortsBattleShot::OverShoulder, ERTSShortsBattleShot::Flank, ERTSShortsBattleShot::FrontQuarter};
 		Shot = Close[State.ShotIndex % 3];
 	}
-	const float SquadScale = bSquad ? 0.6f : 1.f;
+	// Squads are framed closer in a close shot; a wide shot keeps its distance so the vehicles round them stay in view.
+	const float SquadScale = bSquad && Shot != ERTSShortsBattleShot::Wide ? 0.6f : 1.f;
 	float Distance = Settings.Distance * SquadScale;
 	float Height = Settings.Height * SquadScale;
 	float Focal = Settings.FocalLength;
@@ -344,7 +363,9 @@ void ARTSShortsDirector::StartBattleCutShot(const FRTSShortsBattleCuts& Settings
 	State.PanSign = State.Random.FRand() < 0.5f ? -1.f : 1.f;
 	// Try the shot's side picked at random, then the mirrored side, then closer in; the first view nothing blocks wins.
 	const float Side = State.Random.FRand() < 0.5f ? -1.f : 1.f;
-	const float YawOffset = GetShotYawOffset(Shot);
+	// Wide shots vary their bearing: from behind the line, three-quarter, or from the side across both lines.
+	const float WideBearings[] = {155.f, 115.f, 75.f};
+	const float YawOffset = Shot == ERTSShortsBattleShot::Wide ? WideBearings[State.Random.RandRange(0, 2)] : GetShotYawOffset(Shot);
 	const AActor* SubjectActor = bSquad ? nullptr : Best;
 	bool bClear = false;
 	// Bearings tried in turn: the shot's own on either side, then swung 30 and 60 degrees; nearer in after that.

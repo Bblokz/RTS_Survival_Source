@@ -151,7 +151,7 @@ namespace RTSShortsSquadTacticsPrivate
 
 AActor* ARTSShortsDirector::GetSquadTacticsTarget() const
 {
-	AActor* Target = M_Battle.Evasion.bIsActive ? M_Battle.Evasion.Unit.Get()
+	AActor* Target = M_Battle.Evasion.bIsActive && not M_Battle.Evasion.Evaders.IsEmpty() ? M_Battle.Evasion.Evaders[0].Unit.Get()
 		                 : (M_Units.IsValidIndex(M_CurrentSegment) ? M_Units[M_CurrentSegment].Get() : nullptr);
 	return IsValid(Target) && Target->IsUnitAlive() ? Target : nullptr;
 }

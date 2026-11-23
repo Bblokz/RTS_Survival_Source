@@ -1,6 +1,7 @@
 // Copyright (C) 2020-2026 Bas Blokzijl - All rights reserved.
 
 #include "RTSShortsDirector.h"
+#include "RTS_Survival/RTSComponents/VehicleFireFeedbackComponent/VehicleFireFeedbackComponent.h"
 #include "RTS_Survival/GlobalAbilitySystem/GlobalAbilities/Paratroopers/GA_Paratroopers.h"
 
 #include "CineCameraActor.h"
@@ -53,6 +54,7 @@
 #include "RTS_Survival/Game/GameState/HideGameUI/RTSUIElement.h"
 #include "RTS_Survival/Interfaces/Commands.h"
 #include "RTS_Survival/DeveloperSettings.h"
+#include "RTS_Survival/Game/GameState/CPPGameState.h"
 #include "RTS_Survival/FOWSystem/FowComponent/FowComp.h"
 #include "RTS_Survival/RTSComponents/HealthComponent.h"
 #include "RTS_Survival/Weapons/Projectile/Projectile.h"
@@ -64,6 +66,8 @@
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/Utils/CollisionSetup/FRTS_CollisionSetup.h"
 #include "RTS_Survival/Units/SquadController.h"
+#include "RTS_Survival/Behaviours/BehaviourComp.h"
+#include "RTS_Survival/Behaviours/Behaviour.h"
 #include "RTS_Survival/RTSComponents/RTSTargetAcquisition/RTSEngagementStance/RTSAggroBehaviour.h"
 #include "RTS_Survival/Navigation/CoverFinder/CoverFinderDeveloperSettings.h"
 #include "RTS_Survival/Units/Squads/SquadUnit/SquadUnit.h"
@@ -75,6 +79,7 @@
 #include "RTS_Survival/Weapons/Turret/CPPTurretsMaster.h"
 #include "RTS_Survival/Weapons/SmallArmsProjectileManager/SmallArmsProjectileManager.h"
 #include "RTS_Survival/Weapons/WeaponData/WeaponData.h"
+#include "RTS_Survival/Weapons/WeaponData/FRTSWeaponHelpers/FRTSWeaponHelpers.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogRTSShorts, Log, All);
 
@@ -185,8 +190,16 @@ void ARTSShortsDirector::BeginPlay()
 {
 	Super::BeginPlay();
 	M_PhaseStartRealSeconds = FPlatformTime::Seconds();
-	UE_LOG(LogRTSShorts, Display, TEXT("RTS_SHORTS_DIRECTOR_BEGIN job=%s segments=%d render=%s"),
-	       *M_Job.JobName, M_Job.Segments.Num(), M_Job.bRender ? TEXT("true") : TEXT("false"));
+	// The render subsystem already picks Realistic for the game instance; this also covers a game state that
+	// began before it, and the log proves which balance the short ran.
+	ACPPGameState* const GameState = GetWorld()->GetGameState<ACPPGameState>();
+	if (IsValid(GameState))
+	{
+		GameState->SetVehicleBalance(ERTSVehicleBalance::Realistic);
+	}
+	UE_LOG(LogRTSShorts, Display, TEXT("RTS_SHORTS_DIRECTOR_BEGIN job=%s segments=%d render=%s realistic=%s"),
+	       *M_Job.JobName, M_Job.Segments.Num(), M_Job.bRender ? TEXT("true") : TEXT("false"),
+	       ACPPGameState::GetIsRealisticVehicleBalance(this) ? TEXT("true") : TEXT("false"));
 	if (M_Job.bRender)
 	{
 		StartSubmixCapture();
@@ -198,6 +211,9 @@ void ARTSShortsDirector::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	EndTeamWeaponShot();
 	EndParatrooperBattle();
 	EndPenTest();
+	EndWallHoles();
+	EndImpactShow();
+	EndSurvival();
 	StopSubmixCapture();
 	Super::EndPlay(EndPlayReason);
 }
@@ -505,6 +521,7 @@ void ARTSShortsDirector::TickRunning()
 		}
 	}
 	LogVisibleSoldierShots(Frame);
+	TickMainGunLog(Frame);
 	UpdateOrbitCamera(static_cast<float>(Local) / M_Job.Fps);
 	UpdateFlyBys(static_cast<float>(Local) / M_Job.Fps);
 	KeepSmallArmsEffectsVisible();
@@ -515,6 +532,8 @@ void ARTSShortsDirector::TickRunning()
 	TickParatrooperBattle(Local);
 	TickAircraftCrash(Local);
 	TickCookOff(Local);
+	TickWallHoles(Frame);
+	TickImpactShow(Frame);
 	KeepCombatTextsInWorld();
 	HideEngineSpheres();
 	if (M_HiddenSoldiers.IsValidIndex(M_CurrentSegment))
@@ -995,6 +1014,7 @@ void ARTSShortsDirector::FlushStageEffects(const int32 SegmentIndex) const
 void ARTSShortsDirector::BeginSegment(const int32 SegmentIndex)
 {
 	ApplySegmentStage(SegmentIndex);
+	SpawnStageProps();
 	FlushStageEffects(SegmentIndex);
 	// Nothing on stage may carry the selection outline or decal.
 	if (GetIsValidPlayerController())
@@ -1036,12 +1056,22 @@ void ARTSShortsDirector::BeginSegment(const int32 SegmentIndex)
 	}
 	const FVector TargetWorld = GetTargetWorldLocation(Segment, Unit);
 	M_SegmentTarget = nullptr;
-	if (not Segment.TargetClassPath.IsEmpty())
+	if (Segment.ImpactShow.bEnabled)
+	{
+		// The beat's own target (a wall, a squad, a tank); EndSegment removes it like any segment target.
+		M_SegmentTarget = SpawnImpactShowTarget(Segment, TargetWorld);
+	}
+	else if (not Segment.TargetClassPath.IsEmpty())
 	{
 #if RTS_WITH_MAP_TESTS
 		const FRotator FaceBack(0.f, M_Stage->GetActorRotation().Yaw + Segment.UnitYawOffset + 180.f, 0.f);
 		UClass* TargetClass = LoadClass<AActor>(nullptr, *Segment.TargetClassPath);
-		if (IsValid(TargetClass) && TargetClass->IsChildOf(AApartmentDestructibleActor::StaticClass()))
+		if (Segment.WallHoles.bEnabled)
+		{
+			// A wall or building to shoot holes into: a plain actor, turned and centred on the target point.
+			M_SegmentTarget = SpawnWallHolesTarget(Segment, TargetWorld);
+		}
+		else if (IsValid(TargetClass) && TargetClass->IsChildOf(AApartmentDestructibleActor::StaticClass()))
 		{
 			// A building: spawned deferred so its part health can be scaled before the parts are set up (a short
 			// slot has room for only a few rounds), with a wider splash so each hit takes out more of it.
@@ -1092,7 +1122,8 @@ void ARTSShortsDirector::BeginSegment(const int32 SegmentIndex)
 		ApplyInfantryFireInterval(Unit, Segment);
 		M_Manifest.Segments[SegmentIndex].CaliberMm = ReadLargestCaliberMm(Unit);
 		FrameCamera(Unit, Segment, TargetWorld);
-		if (Segment.BattleEnemyClassPaths.Num() > 0)
+		BeginMainGunLog(SegmentIndex, Unit);
+		if (Segment.BattleEnemyClassPaths.Num() > 0 || Segment.Survival.bEnabled)
 		{
 			BeginBattle(SegmentIndex, Unit);
 		}
@@ -1101,17 +1132,23 @@ void ARTSShortsDirector::BeginSegment(const int32 SegmentIndex)
 			BeginConvoy(SegmentIndex, Unit);
 		}
 		BeginTeamWeaponShot(SegmentIndex);
+		BeginWallHoles(SegmentIndex, Unit);
+		BeginImpactShow(SegmentIndex, Unit);
 	}
 	BeginAircraftCrash(SegmentIndex);
 	BeginCookOff(SegmentIndex);
-	UE_LOG(LogRTSShorts, Display, TEXT("RTS_SHORTS_SEGMENT_BEGIN index=%d subtype=%s frame=%d caliber=%d range=%.0f target=%s"),
+	UE_LOG(LogRTSShorts, Display, TEXT("RTS_SHORTS_SEGMENT_BEGIN index=%d subtype=%s frame=%d caliber=%d range=%.0f shortestTurretRange=%.0f target=%s"),
 	       SegmentIndex, *Segment.Subtype, GetTimelineFrame(), M_Manifest.Segments[SegmentIndex].CaliberMm,
-	       ReadLargestWeaponRange(Unit), *TargetWorld.ToString());
+	       ReadLargestWeaponRange(Unit), ReadShortestTurretRange(Unit), *TargetWorld.ToString());
 	WriteManifest();
 }
 
 void ARTSShortsDirector::EndSegment(const int32 SegmentIndex)
 {
+	EndMainGunLog();
+	EndWallHoles();
+	EndImpactShow();
+	EndSurvival();
 	EndTeamWeaponShot();
 	EndParatrooperBattle();
 	EndAircraftCrash();
@@ -1218,6 +1255,15 @@ void ARTSShortsDirector::PlaceUnitOnStage(AActor* Unit, const FRTSShortsSegment&
 				Turret->SetTurretRotationSpeed(Segment.TurretRotationSpeed);
 			}
 		}
+	}
+	if (not FMath::IsNearlyEqual(Segment.HullRecoilScale, 1.f))
+	{
+		TInlineComponentArray<UVehicleFireFeedbackComponent*> FeedbackComponents(Unit);
+		for (UVehicleFireFeedbackComponent* Feedback : FeedbackComponents)
+		{
+			Feedback->SetKickScale(Segment.HullRecoilScale);
+		}
+		UE_LOG(LogRTSShorts, Display, TEXT("RTS_SHORTS_HULL_RECOIL scale=%.2f components=%d"), Segment.HullRecoilScale, FeedbackComponents.Num());
 	}
 	if (UPrimitiveComponent* Root = Cast<UPrimitiveComponent>(Unit->GetRootComponent()))
 	{
@@ -1831,6 +1877,9 @@ void ARTSShortsDirector::FrameCamera(const AActor* Unit, const FRTSShortsSegment
 		M_Orbit.HoldSeconds = FMath::Max(0.f, Params.OrbitHoldSeconds);
 		M_Orbit.ReturnDegrees = Params.OrbitReturnDegrees;
 		M_Orbit.ReturnSeconds = FMath::Max(0.1f, Params.OrbitReturnSeconds);
+		M_Orbit.bRepeat = Params.bOrbitRepeat;
+		M_Orbit.bAroundUnit = Params.bOrbitAroundUnit;
+		M_Orbit.UnitPivot = Origin + Right * Params.LateralShift;
 		M_Orbit.PushInStartSeconds = Params.OrbitPushInStartSeconds;
 		M_Orbit.PushInSeconds = FMath::Max(0.1f, Params.OrbitPushInSeconds);
 		M_Orbit.PushInDistanceScale = Params.OrbitPushInDistanceScale;
@@ -1876,9 +1925,33 @@ void ARTSShortsDirector::UpdateOrbitCamera(const float SegmentSeconds) const
 		const float ReturnStartSeconds = M_Orbit.StartSeconds + M_Orbit.DurationSeconds + M_Orbit.HoldSeconds;
 		const float ReturnEased = EaseSweep(SegmentSeconds - ReturnStartSeconds, M_Orbit.ReturnSeconds);
 		OrbitAngle += M_Orbit.ReturnDegrees * ReturnEased;
+		if (M_Orbit.bRepeat)
+		{
+			// Endless pan: after each sweep and a rest, sweep back over the same arc (signs alternate).
+			const float CycleSeconds = M_Orbit.ReturnSeconds + M_Orbit.HoldSeconds;
+			const float SinceReturn = SegmentSeconds - ReturnStartSeconds;
+			if (SinceReturn > CycleSeconds)
+			{
+				const int32 Sweep = FMath::FloorToInt(SinceReturn / CycleSeconds);
+				const float SweepEased = EaseSweep(SinceReturn - Sweep * CycleSeconds, M_Orbit.ReturnSeconds);
+				const float Sign = Sweep % 2 == 1 ? -1.f : 1.f;
+				// Sweeps 0..Sweep-1 are done: an odd count ends at the far side (ReturnDegrees), an even one back at 0.
+				OrbitAngle = M_Orbit.Degrees + M_Orbit.ReturnDegrees * ((Sweep % 2 == 1 ? 1.f : 0.f) + Sign * SweepEased);
+			}
+		}
 		// The framing height is back by the time the return sweep passes the starting view.
 		const float StartViewFraction = FMath::Max(FMath::Abs(M_Orbit.Degrees / M_Orbit.ReturnDegrees), KINDA_SMALL_NUMBER);
 		HeightScale = FMath::Lerp(HeightScale, 1.f, FMath::Min(ReturnEased / StartViewFraction, 1.f));
+	}
+	if (M_Orbit.bAroundUnit)
+	{
+		const FVector Camera0 = M_Orbit.Pivot + M_Orbit.StartOffset;
+		const FVector TurnedCamera = M_Orbit.UnitPivot + (Camera0 - M_Orbit.UnitPivot).RotateAngleAxis(OrbitAngle, FVector::UpVector);
+		const FVector TurnedLookAt = M_Orbit.UnitPivot + (M_Orbit.Pivot - M_Orbit.UnitPivot).RotateAngleAxis(OrbitAngle, FVector::UpVector);
+		FRotator TurnedRotation = (TurnedLookAt - TurnedCamera).Rotation();
+		TurnedRotation.Roll = 0.f;
+		M_Camera->SetActorLocationAndRotation(TurnedCamera, TurnedRotation);
+		return;
 	}
 	FVector Offset = M_Orbit.StartOffset.RotateAngleAxis(OrbitAngle, FVector::UpVector);
 	Offset.Z *= HeightScale;
@@ -2084,12 +2157,44 @@ float ARTSShortsDirector::ReadLargestWeaponRange(const AActor* Unit) const
 	return Largest;
 }
 
+float ARTSShortsDirector::ReadShortestTurretRange(const AActor* Unit) const
+{
+	// The same turret set ATankMaster::ExecuteAttackGroundCommand hands the ground point to: registered turrets
+	// (cupola gunners on another turret's mesh) plus turrets attached to the unit directly.
+	TArray<ACPPTurretsMaster*> UnitTurrets = GetUnitTurrets(Unit);
+	if (IsValid(Unit))
+	{
+		TArray<AActor*> Attached;
+		Unit->GetAttachedActors(Attached);
+		for (AActor* Child : Attached)
+		{
+			if (ACPPTurretsMaster* Turret = Cast<ACPPTurretsMaster>(Child))
+			{
+				UnitTurrets.AddUnique(Turret);
+			}
+		}
+	}
+	float Shortest = 0.f;
+	for (const ACPPTurretsMaster* Turret : UnitTurrets)
+	{
+		const float TurretRange = IsValid(Turret) ? Turret->GetMaxWeaponRange() : 0.f;
+		if (TurretRange > 0.f && (Shortest <= 0.f || TurretRange < Shortest))
+		{
+			Shortest = TurretRange;
+		}
+	}
+	return Shortest;
+}
+
 FVector ARTSShortsDirector::GetTargetWorldLocation(const FRTSShortsSegment& Segment, const AActor* Unit) const
 {
 	const FTransform StageTransform = M_Stage->GetActorTransform();
 	FVector Offset = Segment.TargetOffset;
-	// Keep the impact well inside the weapon's range, else the tank drives instead of firing.
-	const float Range = ReadLargestWeaponRange(Unit);
+	// Keep the impact well inside the range of EVERY turret, else the tank drives instead of firing: a cupola MG or
+	// second turret with less range than the main gun asked the tank to close in and the drift lock snapped it back
+	// every 20 frames (Pz IV H, double-turret Pz IV, Tiger Rail rocked back and forth, 2026-11-09).
+	const float ShortestTurretRange = ReadShortestTurretRange(Unit);
+	const float Range = ShortestTurretRange > 0.f ? ShortestTurretRange : ReadLargestWeaponRange(Unit);
 	const float MaxDistance = Range > 0.f ? Range * RTSShortsDirectorPrivate::RangeUseFraction : 0.f;
 	if (MaxDistance > 0.f && Offset.Size2D() > MaxDistance)
 	{
@@ -2112,6 +2217,17 @@ void ARTSShortsDirector::OrderAttackGround(const int32 SegmentIndex)
 	if (GetIsAircraftCrashSegment(SegmentIndex))
 	{
 		// The crash aircraft flies its straight run; KillAtSeconds, not a fire order, drives the segment.
+		return;
+	}
+	if (M_WallHoles.bIsActive)
+	{
+		// Every attacker of the round fires at its own aim point on the target.
+		OrderWallHolesFire(SegmentIndex);
+		return;
+	}
+	if (M_ImpactShow.bIsActive)
+	{
+		OrderImpactShowFire(SegmentIndex);
 		return;
 	}
 	if (M_Convoy.bIsActive)
@@ -2181,9 +2297,12 @@ void ARTSShortsDirector::ReleaseOutOfRangeHullWeapons(AActor* Unit, const FVecto
 				HullRange = FMath::Max(HullRange, Weapon->GetRange());
 			}
 		}
-		const UMeshComponent* HullMesh = Hull->GetModuleBindingMesh();
-		const float Distance = FVector::Dist(IsValid(HullMesh) ? HullMesh->GetComponentLocation() : Unit->GetActorLocation(), Target);
-		if (Distance <= HullRange)
+		// Measured like UHullWeaponComponent::GetIsTargetInRange does: from the tank's origin, not the hull mesh. From
+		// the mesh (further forward) the Pz IV H's 3200 MG read in range at a target 3306 from the origin, stayed on
+		// the order and rocked the tank (2026-11-09). A 10 % margin keeps a weapon on the edge from doing the same.
+		constexpr float InRangeMargin = 0.9f;
+		const float Distance = FVector::Dist(Unit->GetActorLocation(), Target);
+		if (Distance <= HullRange * InRangeMargin)
 		{
 			continue;
 		}
@@ -2196,6 +2315,16 @@ void ARTSShortsDirector::ReleaseOutOfRangeHullWeapons(AActor* Unit, const FVecto
 void ARTSShortsDirector::OrderStop(const int32 SegmentIndex)
 {
 	bM_StopOrdered = true;
+	if (M_WallHoles.bIsActive)
+	{
+		// TickWallHoles decides the cease-fire (time or the target's health).
+		return;
+	}
+	if (M_ImpactShow.bIsActive)
+	{
+		// TickImpactShow stops the gun after the beat's last shell.
+		return;
+	}
 	if (M_Battle.bIsActive)
 	{
 		// A battle plays until one side is gone; the slot end (or the decision) ends it, not a stop order.
@@ -2358,6 +2487,7 @@ void ARTSShortsDirector::ForceSoundsNonSpatialized() const
 	}
 	// Attenuation assets are copied into each new active sound, so switching them to 2D here makes every sound
 	// started afterwards non-spatialized regardless of how the active-sound flag is consumed.
+	const bool bNoDistanceAttenuation = M_Job.bNoDistanceAttenuation;
 	for (TObjectIterator<USoundAttenuation> It; It; ++It)
 	{
 		if (It->Attenuation.bSpatialize)
@@ -2365,14 +2495,23 @@ void ARTSShortsDirector::ForceSoundsNonSpatialized() const
 			It->Attenuation.bSpatialize = false;
 			UE_LOG(LogRTSShorts, Display, TEXT("RTS_SHORTS_ATTENUATION_2D %s"), *It->GetName());
 		}
+		if (bNoDistanceAttenuation && It->Attenuation.bAttenuate)
+		{
+			It->Attenuation.bAttenuate = false;
+			UE_LOG(LogRTSShorts, Display, TEXT("RTS_SHORTS_ATTENUATION_FLAT %s"), *It->GetName());
+		}
 	}
-	FAudioThread::RunCommandOnAudioThread([AudioDevice]()
+	FAudioThread::RunCommandOnAudioThread([AudioDevice, bNoDistanceAttenuation]()
 	{
 		for (FActiveSound* ActiveSound : AudioDevice->GetActiveSounds())
 		{
 			if (ActiveSound != nullptr)
 			{
 				ActiveSound->bAllowSpatialization = false;
+				if (bNoDistanceAttenuation)
+				{
+					ActiveSound->bHasAttenuationSettings = false;
+				}
 			}
 		}
 	});
@@ -2656,6 +2795,54 @@ AActor* ARTSShortsDirector::SpawnBattleParticipant(const FString& ClassPath, con
 #endif
 }
 
+void ARTSShortsDirector::AddBattleEnemyBehaviours(const FRTSShortsSegment& Segment, AActor* Enemy) const
+{
+	if (Segment.BattleEnemyBehaviourClassPaths.IsEmpty() || not IsValid(Enemy) || Cast<ASquadController>(Enemy) != nullptr)
+	{
+		return;
+	}
+	UBehaviourComp* BehaviourComponent = Enemy->FindComponentByClass<UBehaviourComp>();
+	if (not IsValid(BehaviourComponent))
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Shorts battle enemy has no behaviour component: ") + Enemy->GetName());
+		return;
+	}
+	for (const FString& ClassPath : Segment.BattleEnemyBehaviourClassPaths)
+	{
+		const TSubclassOf<UBehaviour> BehaviourClass = LoadClass<UBehaviour>(nullptr, *ClassPath);
+		if (BehaviourClass == nullptr)
+		{
+			RTSFunctionLibrary::ReportError(TEXT("Shorts battle enemy behaviour not found: ") + ClassPath);
+			continue;
+		}
+		if (BehaviourComponent->GetBehaviourByClass(BehaviourClass) == nullptr)
+		{
+			BehaviourComponent->AddBehaviour(BehaviourClass);
+		}
+		UE_LOG(LogRTSShorts, Display, TEXT("RTS_SHORTS_ENEMY_BEHAVIOUR unit=%s behaviour=%s"), *Enemy->GetName(),
+		       *BehaviourClass->GetName());
+	}
+	// The behaviour applies its round on a later tick: log what each gun really loads once it has.
+	const TWeakObjectPtr<AActor> WeakEnemy = Enemy;
+	FTimerHandle ShellLogHandle;
+	GetWorld()->GetTimerManager().SetTimer(ShellLogHandle, FTimerDelegate::CreateLambda([WeakEnemy]()
+	{
+		const ATankMaster* Tank = Cast<ATankMaster>(WeakEnemy.Get());
+		if (Tank == nullptr)
+		{
+			return;
+		}
+		for (UWeaponState* Weapon : FRTSWeaponHelpers::GetWeaponsMountedOnTank(Tank))
+		{
+			if (IsValid(Weapon))
+			{
+				UE_LOG(LogRTSShorts, Display, TEXT("RTS_SHORTS_ENEMY_SHELL unit=%s shell=%s"), *Tank->GetName(),
+				       *UEnum::GetValueAsString(Weapon->GetRawWeaponData().ShellType));
+			}
+		}
+	}), 2.f, false);
+}
+
 void ARTSShortsDirector::BeginBattle(const int32 SegmentIndex, AActor* MainUnit)
 {
 	const FRTSShortsSegment& Segment = M_Job.Segments[SegmentIndex];
@@ -2689,6 +2876,7 @@ void ARTSShortsDirector::BeginBattle(const int32 SegmentIndex, AActor* MainUnit)
 		if (IsValid(Enemy))
 		{
 			(Cast<ASquadController>(Enemy) != nullptr ? M_Battle.EnemySquads : M_Battle.EnemyUnits).Add(Enemy);
+			AddBattleEnemyBehaviours(Segment, Enemy);
 		}
 	}
 	SpawnBattleReinforcements(Segment);
@@ -2752,6 +2940,7 @@ void ARTSShortsDirector::BeginBattle(const int32 SegmentIndex, AActor* MainUnit)
 	BeginParatrooperBattle();
 	UpdateParatrooperRangeBehaviour(false);
 	BeginBattleCuts(Segment);
+	BeginSurvival(SegmentIndex);
 }
 
 void ARTSShortsDirector::MatchSoldierToSquadOwner(ASquadUnit* Soldier, const uint8 SquadOwner)
@@ -3478,7 +3667,8 @@ void ARTSShortsDirector::IssueBattleOrders()
 			}
 			AActor* Target = FindNearestAlive(Attacker.Get(), Defenders);
 			ICommands* Commands = Cast<ICommands>(Attacker.Get());
-			if (Target == nullptr || Commands == nullptr || GetIsBattleTargetTooFar(Attacker.Get(), Target))
+			if (Target == nullptr || Commands == nullptr || GetIsBattleTargetTooFar(Attacker.Get(), Target)
+				|| GetIsSurvivalTargetOutOfReach(Attacker.Get(), Target))
 			{
 				continue;
 			}
@@ -3517,6 +3707,7 @@ void ARTSShortsDirector::TickBattle(const int32 Frame)
 	TickSoloEvasion(Frame);
 	TickSquadTactics(Frame);
 	TrackBattleEvents(Frame);
+	TickSurvival(Frame);
 	TickPenTest(Frame);
 	LogBattleSquadPositions(Frame);
 	constexpr int32 OrderEveryFrames = 20;
@@ -3535,7 +3726,9 @@ void ARTSShortsDirector::TickBattle(const int32 Frame)
 	const int32 EnemiesAlive = CountAlive(M_Battle.EnemyUnits) + (bSquadGrace ? CountWaitingSquads(M_Battle.EnemySquads) : 0);
 	const bool bDropPending = Segment.ParatrooperAbility != EGlobalAbility::GA_None
 		&& GetIsValidParatrooperAbility() && M_ParatrooperAbility->GetHasActiveDrop();
-	if (M_Battle.DecidedFrame < 0 && not bDropPending && (PlayersAlive == 0 || EnemiesAlive == 0))
+	// Segment.Survival: the enemy side is empty before every wave, so only the defenders' fall decides it.
+	const bool bEnemiesDecide = not Segment.Survival.bEnabled;
+	if (M_Battle.DecidedFrame < 0 && not bDropPending && (PlayersAlive == 0 || (bEnemiesDecide && EnemiesAlive == 0)))
 	{
 		M_Battle.DecidedFrame = Frame;
 		M_Battle.bPlayerWon = PlayersAlive > 0;

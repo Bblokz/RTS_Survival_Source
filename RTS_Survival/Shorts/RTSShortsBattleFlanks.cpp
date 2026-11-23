@@ -122,7 +122,7 @@ void ARTSShortsDirector::OrderBattleFlankRoute(FRTSShortsBattleFlankState& Flank
 
 bool ARTSShortsDirector::GetIsBattleUnitSelfDirected(const AActor* Unit) const
 {
-	if (M_Battle.Evasion.bIsActive && M_Battle.Evasion.Unit.Get() == Unit)
+	if (GetIsEvader(Unit))
 	{
 		return true;
 	}

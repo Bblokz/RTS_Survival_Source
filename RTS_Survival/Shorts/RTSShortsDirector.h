@@ -35,6 +35,10 @@ struct FRTSShortsOrbitState
 	float HoldSeconds = 0.f;
 	float ReturnDegrees = 0.f;
 	float ReturnSeconds = 1.f;
+	bool bRepeat = false;
+	// Camera.bOrbitAroundUnit: the camera and its look-at turn round this point instead of round Pivot.
+	bool bAroundUnit = false;
+	FVector UnitPivot = FVector::ZeroVector;
 	float PushInStartSeconds = 0.f;
 	float PushInSeconds = 1.f;
 	float PushInDistanceScale = 1.f;
@@ -135,19 +139,34 @@ enum class ERTSShortsSoloEvasionPhase : uint8
 	Reversing
 };
 
-/** Segment.BattleSoloEvasion running: the cycle, the attacker it faces and the follow camera's offsets. */
+/** One defender under Segment.BattleSoloEvasion: its stop, shoot, reverse cycle and the attacker it faces. */
 USTRUCT()
-struct FRTSShortsSoloEvasionState
+struct FRTSShortsEvaderState
 {
 	GENERATED_BODY()
 
-	bool bIsActive = false;
 	ERTSShortsSoloEvasionPhase Phase = ERTSShortsSoloEvasionPhase::WaitingForFireOrder;
 	float PhaseStartSeconds = 0.f;
 	float LastTurnOrderSeconds = 0.f;
 	TWeakObjectPtr<AActor> Unit;
 	// Kept until it is dead: spreading shots over the attackers leaves all of them alive and firing.
 	TWeakObjectPtr<AActor> Threat;
+	// It gives ground at most RetreatRadiusCm from here.
+	FVector StartLocation = FVector::ZeroVector;
+};
+
+/**
+ * Segment.BattleSoloEvasion running: every defender's cycle (the segment's unit plus its tank allies, so a team of
+ * defenders fights like the solo vehicle does) and the follow camera's offsets.
+ */
+USTRUCT()
+struct FRTSShortsSoloEvasionState
+{
+	GENERATED_BODY()
+
+	bool bIsActive = false;
+	TArray<FRTSShortsEvaderState> Evaders;
+	// The living defenders' centre when the battle began: the camera moves by how far that centre has moved since.
 	FVector StartLocation = FVector::ZeroVector;
 	FVector CameraStartLocation = FVector::ZeroVector;
 	// Smoothed unit location the camera follows; its offset from StartLocation moves the camera.
@@ -289,6 +308,141 @@ struct FRTSShortsPenTestState
 	TSet<uint32> EffectIdsAtBegin;
 };
 
+/** Segment.Survival: one spawned wave unit until it is released to the battle's attack orders. */
+struct FRTSShortsSurvivalPending
+{
+	TWeakObjectPtr<AActor> Unit;
+	int32 SpawnFrame = 0;
+	int32 WaveIndex = 0;
+	// Settings.AdvanceOffsetX > 0: the world point it drives to; released when it gets there.
+	bool bAdvancing = false;
+	FVector AdvancePoint = FVector::ZeroVector;
+};
+
+/** Segment.Survival running: waves spawned so far, units on their way in, aircraft runs and the defenders' losses. */
+struct FRTSShortsSurvivalState
+{
+	bool bIsActive = false;
+	int32 NextWave = 0;
+	// Round-robin index into Settings.SpawnOffsets and the frame each spot was last used.
+	int32 NextSpawn = 0;
+	TArray<int32> SpawnUsedFrame;
+	TArray<FRTSShortsSurvivalPending> Pending;
+	// Every wave unit per wave (for the first-seen frame) and the aircraft with their spawn frames.
+	TArray<TArray<TWeakObjectPtr<AActor>>> WaveUnits;
+	TArray<TWeakObjectPtr<AActor>> Aircraft;
+	TArray<int32> AircraftFrames;
+	// Defenders (the segment's unit, its allies and squads) and how many were alive last tick.
+	TArray<TWeakObjectPtr<AActor>> Defenders;
+	int32 DefendersAlive = 0;
+	int32 EnemiesSpawned = 0;
+	int32 BeginFrame = 0;
+	// Diagnostics: the first shells of each side are logged with the distance to the nearest unit of the other side.
+	FDelegateHandle LaunchHandle;
+	int32 PlayerShellsLogged = 0;
+	int32 EnemyShellsLogged = 0;
+};
+
+/** Segment.WallHoles running: the attackers, their aim points and the round's phase. */
+struct FRTSShortsWallHolesState
+{
+	bool bIsActive = false;
+	// The segment's own unit first, then the spawned copies (destroyed when the round ends).
+	TArray<TWeakObjectPtr<AActor>> Attackers;
+	TArray<TWeakObjectPtr<AActor>> SpawnedAttackers;
+	// Where each attacker stands; one that drifts (drives toward its aim point) is put back.
+	TArray<FVector> PlacedLocations;
+	TArray<FRotator> PlacedRotations;
+	TArray<int32> AimIndex;
+	// Settings.AimGroups: each attacker's first and one-past-last index into AimPoints.
+	TArray<int32> AimBlockStart;
+	TArray<int32> AimBlockEnd;
+	// Every weapon the round blocked (secondaries all round, main guns after the cease-fire): freed at the end.
+	TArray<TWeakObjectPtr<class UWeaponState>> RestrictedWeapons;
+	TSet<TWeakObjectPtr<UObject>> MainGunOwners;
+	// The target's stage frame: origin on the ground at the target point.
+	FVector TargetPoint = FVector::ZeroVector;
+	float StageYaw = 0.f;
+	float StartHealth = 0.f;
+	// Every target (M_SegmentTarget first, then Settings.ExtraTargetOffsets) with its health when the round began, its
+	// fraction last tick and its largest drop between two ticks (about one shell): the cease-fire looks one shell ahead.
+	TArray<TWeakObjectPtr<AActor>> Targets;
+	TArray<TWeakObjectPtr<AActor>> ExtraTargets;
+	TArray<float> TargetStartHealth;
+	TArray<float> TargetLastFraction;
+	TArray<float> TargetLargestDrop;
+	// Average over the targets, last tick.
+	float LastHealthFraction = 1.f;
+	int32 LastDamageFrame = -1;
+	int32 BeginFrame = 0;
+	int32 FireFrame = -1;
+	int32 LastRetargetFrame = -1;
+	int32 CeaseFrame = -1;
+	int32 DeathFrame = -1;
+	int32 NextShot = 0;
+	// The shot being shown (index into Settings.Shots) and the frame it started, for glides.
+	int32 ActiveShot = -1;
+	int32 ActiveShotFrame = 0;
+	bool bEnded = false;
+	FDelegateHandle LaunchHandle;
+};
+
+/** Segment.ImpactShow running: the target, the main gun, its shells and the beat's camera. */
+struct FRTSShortsImpactShowState
+{
+	bool bIsActive = false;
+	TWeakObjectPtr<AActor> Unit;
+	// The actor the unit is ordered to attack (a squad's soldier for a squad target), null for ground fire.
+	TWeakObjectPtr<AActor> AttackTarget;
+	TWeakObjectPtr<class UWeaponState> MainGun;
+	TWeakObjectPtr<UObject> MainGunOwner;
+	uint32 MainGunName = 0;
+	TArray<TWeakObjectPtr<class UWeaponState>> RestrictedWeapons;
+	// Launch id of every beat shell, mapped to its 0-based index.
+	TMap<uint32, int32> ShellByLaunchId;
+	TSet<int32> ShellsWithImpact;
+	TMap<uint32, FString> VerdictByLaunchId;
+	// Squad soldiers whose animation was forced to tick (offscreen renders froze them mid-stride, round 1).
+	TSet<TWeakObjectPtr<AActor>> AnimForced;
+	// The target's stage frame: origin on the ground at the target point.
+	FVector TargetPoint = FVector::ZeroVector;
+	float StageYaw = 0.f;
+	int32 BeginFrame = 0;
+	int32 FireFrame = -1;
+	int32 FirstLaunchFrame = -1;
+	int32 FirstImpactFrame = -1;
+	FVector FirstImpactLocation = FVector::ZeroVector;
+	int32 LastShellImpactFrame = -1;
+	// The impact the close shot frames: the first one, then the first that showed the beat if that came later.
+	int32 FramedImpactFrame = -1;
+	FVector FramedImpactLocation = FVector::ZeroVector;
+	// The settle glide onto the framed impact starts from the frame origin the shot had then.
+	int32 SettleFromFrame = -1;
+	FVector SettleFrom = FVector::ZeroVector;
+	FVector LastFrameOrigin = FVector::ZeroVector;
+	int32 NextShot = 0;
+	int32 ActiveShot = -1;
+	int32 ActiveShotFrame = 0;
+	// Output frame the slow motion began (-1: none yet), and whether it has ended.
+	int32 SlowMoFrame = -1;
+	bool bSlowMoDone = false;
+	bool bGunBlocked = false;
+	// Settings.ReleaseGunAtSeconds passed (or no release time): the main gun may fire once ordered.
+	bool bGunReleased = false;
+	// 1-based attempt (see FRTSShortsImpactShow::MaxAttempts) and where the latest attempt aimed.
+	int32 Attempt = 1;
+	// Shells fired before the latest attempt, so a burst (Shells > 1) counts its own shells.
+	int32 AttemptShellBase = 0;
+	// Frame of the latest beat-shell launch and of the latest squad re-target (bursts only).
+	int32 LastLaunchFrame = -1;
+	int32 LastRetargetFrame = -1;
+	FVector AimPoint = FVector::ZeroVector;
+	bool bEnded = false;
+	FDelegateHandle LaunchHandle;
+	FDelegateHandle ImpactHandle;
+	FDelegateHandle ArmorHandle;
+};
+
 /** Convoy segment: the vehicles driving in a wedge, their pinned turrets and the follow camera's offsets. */
 USTRUCT()
 struct FRTSShortsConvoyState
@@ -417,6 +571,15 @@ private:
 	void ApplyInfantryFireInterval(AActor* Unit, const FRTSShortsSegment& Segment) const;
 	/** Logs RTS_SHORTS_SHOT when the framed soldier's magazine count drops (one line per round). */
 	void LogVisibleSoldierShots(const int32 Frame);
+	/**
+	 * Size and rate-of-fire stacks (RTSShortsMainGunLog.cpp): logs the placed unit's hull and with-gun length
+	 * (RTS_SHORTS_HULL) and its main-gun weapons (RTS_SHORTS_MAINGUN); Segment.bMainGunOnly blocks every smaller weapon.
+	 */
+	void BeginMainGunLog(const int32 SegmentIndex, AActor* Unit);
+	/** One RTS_SHORTS_ROUND line per main-gun round (magazine drop), RTS_SHORTS_RELOAD on reload start and end. */
+	void TickMainGunLog(const int32 Frame);
+	void EndMainGunLog();
+	void LogUnitHullSize(const int32 SegmentIndex, const AActor* Unit) const;
 	/** Segment.bDisarmTarget: the spawned dummy target can be shot but never fires back. */
 	void DisarmSegmentTarget() const;
 	void PlaceSquadMembers(AActor* Unit, const FVector& Location, const FRotator& Rotation) const;
@@ -424,6 +587,8 @@ private:
 	void FrameImpactCamera(const AActor* Unit, const FRTSShortsSegment& Segment) const;
 	/** Segment.BattleEnemyClassPaths: spawns both lines (the segment's unit leads the player line) and makes them see each other. */
 	void BeginBattle(const int32 SegmentIndex, AActor* MainUnit);
+	/** Segment.BattleEnemyBehaviourClassPaths: adds each behaviour to one enemy vehicle (squads are skipped). */
+	void AddBattleEnemyBehaviours(const FRTSShortsSegment& Segment, AActor* Enemy) const;
 	/**
 	 * @brief Allows support weapons to stand behind a battle line while retaining the default line layout elsewhere.
 	 * @param Segment Layout and spacing for the current battle.
@@ -478,11 +643,20 @@ private:
 	 * @param Settings The segment's evasion settings.
 	 * @param SegmentSeconds Segment-local time, the start of the new phase.
 	 */
-	void EnterSoloReverse(const FRTSShortsSoloEvasion& Settings, float SegmentSeconds);
-	void EnterSoloHold(float SegmentSeconds);
-	void TurnSoloTowardsThreat(float SegmentSeconds);
-	void PickSoloThreat();
-	void AimSoloAtThreat() const;
+	void EnterSoloReverse(FRTSShortsEvaderState& Evader, const FRTSShortsSoloEvasion& Settings, float SegmentSeconds);
+	void TickEvaderCycle(FRTSShortsEvaderState& Evader, const FRTSShortsSoloEvasion& Settings, float SegmentSeconds);
+	void EnterSoloHold(FRTSShortsEvaderState& Evader, float SegmentSeconds);
+	void TurnSoloTowardsThreat(FRTSShortsEvaderState& Evader, float SegmentSeconds);
+	void PickSoloThreat(FRTSShortsEvaderState& Evader);
+	void AimSoloAtThreat(const FRTSShortsEvaderState& Evader) const;
+	/** The defender's gun range for picking threats: its shortest turret's, else its largest weapon's. */
+	float GetEvaderRange(const AActor* Unit) const;
+	bool GetIsThreatInRange(const FRTSShortsEvaderState& Evader) const;
+	/** The living defender nearest to the actor (null when every defender is dead). */
+	AActor* GetNearestEvader(const AActor& From) const;
+	bool GetIsEvader(const AActor* Unit) const;
+	/** Centre of the living defenders; false when none is left. */
+	bool GetEvadersCentre(FVector& OutCentre) const;
 	void UpdateSoloFollowCamera(const FRTSShortsSoloEvasion& Settings);
 	/** Sends attackers the evading unit has turned to face round its side again, and back to attacking once there. */
 	void TickBattleReflanks(const FRTSShortsSoloEvasion& Settings, float SegmentSeconds);
@@ -500,7 +674,62 @@ private:
 	void OnPenArmorHit(const FMapTestArmorHitReport& Report);
 	/** Where a world point lands on the rendered frame (0..1 from the top left), or negative when behind the camera. */
 	FVector2D ProjectToFrame(const FVector& WorldLocation) const;
-	void OrderBattleReflank(AActor& Attacker, FRTSShortsReflankState& Reflank, const FRTSShortsSoloEvasion& Settings, float SegmentSeconds);
+	// Segment.Survival (RTSShortsSurvival.cpp): defenders hold a hilltop against tiered waves until the last one dies.
+	void BeginSurvival(int32 SegmentIndex);
+	void TickSurvival(int32 Frame);
+	void EndSurvival();
+	void SpawnSurvivalWave(int32 WaveIndex, int32 Frame);
+	AActor* SpawnSurvivalAircraft(const FString& ClassPath, int32 Frame);
+	/** Next spawn spot (stage-local cm) the camera cannot see and no unit took in the last seconds; false if none. */
+	bool PickSurvivalSpawn(FVector& OutWorldLocation, int32 Frame);
+	void ReleaseSurvivalUnits(int32 Frame);
+	void RecordSurvivalSightings(int32 Frame);
+	/** Adds Segment.Survival's range behaviour to a unit or squad controller once. */
+	void ApplySurvivalRange(AActor* Unit) const;
+	/** True when the point is inside the render camera's view and no landscape stands between them. */
+	bool GetIsPointInCameraView(const FVector& Point) const;
+	/** Survival defenders take attack orders only on enemies within their weapons' reach, so they never leave the hill. */
+	bool GetIsSurvivalTargetOutOfReach(const AActor* Attacker, const AActor* Target) const;
+
+	// Segment.WallHoles (RTSShortsWallHoles.cpp): four attackers of one type shoot holes into a fresh building.
+	/** Spawns the round's target as a plain actor, turned and centred as Segment.WallHoles asks. */
+	AActor* SpawnWallHolesTarget(const FRTSShortsSegment& Segment, const FVector& TargetWorld);
+	void BeginWallHoles(int32 SegmentIndex, AActor* MainUnit);
+	void TickWallHoles(int32 Frame);
+	void EndWallHoles();
+	void OrderWallHolesFire(int32 SegmentIndex);
+	void AimWallHolesAttackers(const FRTSShortsWallHoles& Settings);
+	void CeaseWallHolesFire(int32 Frame, const FString& Reason);
+	/** Blocks every weapon of the unit but its largest-calibre one; returns that one (null before the turrets are up). */
+	class UWeaponState* BlockWallHolesSecondaries(AActor* Unit);
+	void SetWallHolesWeaponBlocked(class UWeaponState* Weapon, bool bBlocked);
+	/** The target's health over the health it had when the round began (1 when unknown, 0 when gone or dead). */
+	float GetWallHolesHealthFraction() const;
+	/** One target's health over its health when the round began (1 when unknown, 0 when gone or dead). */
+	float GetWallHolesTargetFraction(int32 TargetIndex) const;
+	void RecordWallHolesDamage();
+	FVector WallHolesFramePoint(const FVector& Offset) const;
+	/** Job.StageProps: spawned once, when the first segment begins. */
+	void SpawnStageProps();
+	/** Applies Shots[Index]'s pose for the frame (cut on its first frame, glide after). */
+	void ApplyWallHolesShot(int32 Index, int32 Frame);
+
+	// Segment.ImpactShow (RTSShortsImpactShow.cpp): one beat of "every impact of the X".
+	/** Spawns the beat's target (plain actor or enemy unit) on the target point; null for a ground beat. */
+	AActor* SpawnImpactShowTarget(const FRTSShortsSegment& Segment, const FVector& TargetWorld);
+	void BeginImpactShow(int32 SegmentIndex, AActor* MainUnit);
+	void TickImpactShow(int32 Frame);
+	void EndImpactShow();
+	void OrderImpactShowFire(int32 SegmentIndex);
+	void OnImpactShowImpact(const struct FMapTestImpactReport& Report);
+	void SetImpactShowWeaponBlocked(class UWeaponState* Weapon, bool bBlocked);
+	FVector ImpactShowFramePoint(const FVector& Offset) const;
+	void ApplyImpactShowShot(int32 Index, int32 Frame);
+	void SetImpactShowTimeDilation(float Dilation) const;
+	/** The landscape under the beat's target point gets the physical material and blocks both projectile channels. */
+	void MakeImpactShowGroundLikeGame(const FString& PhysMaterialPath);
+	void OrderBattleReflank(AActor& Attacker, AActor& Defender, FRTSShortsReflankState& Reflank, const FRTSShortsSoloEvasion& Settings,
+	                        float SegmentSeconds);
 	/** Plants Job.BattleCoverTrees once per job and publishes cover points round each trunk. */
 	void SpawnBattleCoverTrees();
 	/** Takes the cover of trees that were crushed or destroyed off the cover finder. */
@@ -657,6 +886,8 @@ private:
 	void TrackTossedTurret(int32 LocalFrame);
 	void AimCookOffCamera(const FRTSShortsCookOff& CookOff);
 	void OnCookOffActorSpawned(AActor* SpawnedActor);
+	/** @return How many looping fires a dead tank left burning at the stage were stopped before the next tank. */
+	int32 StopLingeringStageFires(int32 SegmentIndex) const;
 	void EndCookOff();
 
 	// A private copy of the designer template owns the drop; no mission ability or cooldown is modified.
@@ -740,6 +971,8 @@ private:
 	void WriteSubmixCaptureWav();
 	FVector GetTargetWorldLocation(const FRTSShortsSegment& Segment, const AActor* Unit) const;
 	float ReadLargestWeaponRange(const AActor* Unit) const;
+	/** Shortest weapon range of any turret on the unit (cupola MGs and second turrets included); 0 = no turret range. */
+	float ReadShortestTurretRange(const AActor* Unit) const;
 	void OrderAttackGround(const int32 SegmentIndex);
 	void ReleaseOutOfRangeHullWeapons(AActor* Unit, const FVector& Target) const;
 	void OrderStop(const int32 SegmentIndex);
@@ -764,6 +997,20 @@ private:
 	bool bM_FireOrdered = false;
 	// Rounds left in the framed soldier's weapons last tick (-1 = not read yet this segment).
 	int32 M_LastVisibleRounds = -1;
+	/** The segment unit's largest-calibre weapons (every barrel of a multi-gun mount) and their last magazine reading. */
+	struct FMainGunLogState
+	{
+		int32 Segment = -1;
+		TArray<TWeakObjectPtr<class UWeaponState>> Weapons;
+		TArray<int32> LastMag;
+		/** Projectiles one magazine round sends out: a fire socket each on multi-barrel weapons (Flakvierling), else 1. */
+		TArray<int32> ProjectilesPerRound;
+		TArray<bool> bWasReloading;
+		/** Smaller weapons blocked by Segment.bMainGunOnly; released at the segment's end. */
+		TArray<TWeakObjectPtr<class UWeaponState>> Blocked;
+		int32 Rounds = 0;
+	};
+	FMainGunLogState M_MainGunLog;
 	bool bM_StopOrdered = false;
 	bool bM_SecondFireOrdered = false;
 	/** Per segment: squad members hidden by MaxSquadVisible (their attack orders are cancelled every tick). */
@@ -782,6 +1029,10 @@ private:
 	FRTSShortsBattleState M_Battle;
 	FRTSShortsBattleCutState M_BattleCuts;
 	FRTSShortsPenTestState M_PenTest;
+	FRTSShortsWallHolesState M_WallHoles;
+	FRTSShortsImpactShowState M_ImpactShow;
+	FRTSShortsSurvivalState M_Survival;
+	bool bM_StagePropsSpawned = false;
 	// Segment.BattleSquadTactics.bOutlineSoldiers: the post-process volume that draws the outlines, made once per job.
 	UPROPERTY()
 	TObjectPtr<class APostProcessVolume> M_SoldierOutlineVolume;

@@ -5,9 +5,15 @@
 #include "CineCameraActor.h"
 #include "NavigationPath.h"
 #include "NavigationSystem.h"
+#include "TimerManager.h"
+#include "RTS_Survival/FOWSystem/FowComponent/FowComp.h"
 #include "RTS_Survival/Interfaces/Commands.h"
 #include "RTS_Survival/Units/SquadController.h"
 #include "RTS_Survival/Units/Squads/SquadUnit/SquadUnit.h"
+#include "RTS_Survival/Units/Tanks/TankMaster.h"
+#include "RTS_Survival/Weapons/HullWeaponComponent/HullWeaponComponent.h"
+#include "RTS_Survival/Weapons/Turret/CPPTurretsMaster.h"
+#include "RTS_Survival/Weapons/WeaponData/WeaponData.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogRTSShortsAdvance, Log, All);
 
@@ -21,6 +27,60 @@ namespace RTSShortsAdvancePrivate
 	bool GetIsAlive(const TWeakObjectPtr<AActor>& Unit)
 	{
 		return Unit.IsValid() && Unit->IsUnitAlive();
+	}
+
+	/**
+	 * User 2026-11-18: the standoff lines' turrets did not face each other (the rear vehicles swung theirs round with
+	 * the idle sweeps and lost the opening seconds turning back), and the lines should fight from where they spawn.
+	 * Every turret faces its hull's front with its idle sweeps off, every weapon's range is scaled (through the turret's
+	 * or hull weapon's own range upgrade, so its engage range follows) and so is the vision radius. False when the
+	 * tank's turrets are not up yet.
+	 */
+	bool PrepareStandoffVehicle(AActor* Unit, const float RangeScale, const float VisionScale)
+	{
+		ATankMaster* Tank = Cast<ATankMaster>(Unit);
+		if (Tank == nullptr || not GetIsAlive(Unit))
+		{
+			return true;
+		}
+		if (Tank->GetTurrets().IsEmpty())
+		{
+			return false;
+		}
+		for (ACPPTurretsMaster* Turret : Tank->GetTurrets())
+		{
+			if (not IsValid(Turret))
+			{
+				continue;
+			}
+			Turret->SnapToHullFrontAndHoldIdle();
+			if (not FMath::IsNearlyEqual(RangeScale, 1.f))
+			{
+				for (UWeaponState* Weapon : Turret->GetWeapons())
+				{
+					Turret->UpgradeWeaponRange(Weapon, RangeScale);
+				}
+			}
+		}
+		if (not FMath::IsNearlyEqual(RangeScale, 1.f))
+		{
+			for (UHullWeaponComponent* HullWeapon : Tank->GetHullWeapons())
+			{
+				if (IsValid(HullWeapon))
+				{
+					for (UWeaponState* Weapon : HullWeapon->GetWeapons())
+					{
+						HullWeapon->UpgradeWeaponRange(Weapon, RangeScale);
+					}
+				}
+			}
+		}
+		UFowComp* Fow = Unit->FindComponentByClass<UFowComp>();
+		if (Fow != nullptr && not FMath::IsNearlyEqual(VisionScale, 1.f))
+		{
+			Fow->SetVisionRadius(Fow->GetVisionRadius() * VisionScale);
+		}
+		return true;
 	}
 }
 
@@ -55,7 +115,42 @@ void ARTSShortsDirector::BeginBattleAdvance(const FRTSShortsSegment& Segment)
 		}
 	};
 	AddLine(M_Battle.PlayerUnits, false);
-	AddLine(M_Battle.EnemyUnits, true);
+	if (Settings.EnemyAdvanceCm > 0.f)
+	{
+		// Otherwise the enemy line holds where it spawned and takes attack orders from the fire order on.
+		AddLine(M_Battle.EnemyUnits, true);
+	}
+	TArray<TWeakObjectPtr<AActor>> LateVehicles;
+	int32 Prepared = 0;
+	for (const TArray<TWeakObjectPtr<AActor>>* Line : {&M_Battle.PlayerUnits, &M_Battle.EnemyUnits})
+	{
+		for (const TWeakObjectPtr<AActor>& Unit : *Line)
+		{
+			if (RTSShortsAdvancePrivate::PrepareStandoffVehicle(Unit.Get(), Settings.RangeScale, Settings.VisionScale))
+			{
+				++Prepared;
+			}
+			else
+			{
+				LateVehicles.Add(Unit);
+			}
+		}
+	}
+	if (not LateVehicles.IsEmpty())
+	{
+		const float RangeScale = Settings.RangeScale;
+		const float VisionScale = Settings.VisionScale;
+		FTimerHandle LateHandle;
+		GetWorld()->GetTimerManager().SetTimer(LateHandle, FTimerDelegate::CreateLambda([LateVehicles, RangeScale, VisionScale]()
+		{
+			for (const TWeakObjectPtr<AActor>& Vehicle : LateVehicles)
+			{
+				RTSShortsAdvancePrivate::PrepareStandoffVehicle(Vehicle.Get(), RangeScale, VisionScale);
+			}
+		}), 0.3f, false);
+	}
+	UE_LOG(LogRTSShortsAdvance, Display, TEXT("RTS_SHORTS_ADVANCE_PREPARED units=%d late=%d rangeScale=%.2f visionScale=%.2f"),
+	       Prepared, LateVehicles.Num(), Settings.RangeScale, Settings.VisionScale);
 	if (GetIsValidCamera())
 	{
 		M_Battle.AdvanceCameraStart = M_Camera->GetActorLocation();

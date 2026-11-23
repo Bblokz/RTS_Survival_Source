@@ -9,6 +9,7 @@
 #include "Misc/CommandLine.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
+#include "RTS_Survival/Game/RTSGameInstance/RTSGameInstance.h"
 #include "MoviePipeline.h"
 #include "MoviePipelineAntiAliasingSetting.h"
 #include "MoviePipelineDeferredPasses.h"
@@ -64,6 +65,12 @@ void URTSShortsRenderSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 	FApp::SetVolumeMultiplier(1.f);
 	UE_LOG(LogRTSShortsRender, Display, TEXT("RTS_SHORTS_FOCUS_FORCED hasFocus=%s unfocusedMultiplier=%.2f"),
 	       FApp::HasFocus() ? TEXT("true") : TEXT("false"), FApp::GetUnfocusedVolumeMultiplier());
+	// Shorts always show the realistic vehicle balance (lower health, overmatch kills); the setting is otherwise
+	// only applied to PIE, so a standalone render ran Arcade. Every map's game state reads it from here.
+	if (URTSGameInstance* const RTSGameInstance = Cast<URTSGameInstance>(GetGameInstance()))
+	{
+		RTSGameInstance->SetVehicleBalance(ERTSVehicleBalance::Realistic);
+	}
 	bM_HasJob = true;
 	FCoreUObjectDelegates::PostLoadMapWithWorld.AddUObject(this, &URTSShortsRenderSubsystem::OnPostLoadMap);
 	UE_LOG(LogRTSShortsRender, Display, TEXT("RTS_SHORTS_JOB_LOADED name=%s segments=%d out=%s"),

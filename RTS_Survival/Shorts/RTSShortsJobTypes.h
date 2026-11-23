@@ -128,6 +128,20 @@ struct FRTSShortsCameraParams
 	float OrbitReturnSeconds = 3.f;
 
 	/**
+	 * Opt-in endless pan: after the return sweep the camera keeps sweeping back and forth over the same arc
+	 * (ReturnDegrees, then -ReturnDegrees, ...), resting OrbitHoldSeconds at each end. For shorts with no fixed length.
+	 */
+	UPROPERTY()
+	bool bOrbitRepeat = false;
+
+	/**
+	 * Opt-in: the pan turns round the framed unit's line (its location plus LateralShift) instead of round the look-at
+	 * point, turning the view with it, so a close camera keeps the unit in frame while the view sweeps across.
+	 */
+	UPROPERTY()
+	bool bOrbitAroundUnit = false;
+
+	/**
 	 * Team weapon battles: segment-local second at which the camera pushes in on the guns still standing, to show their
 	 * crews at work (0 = no push-in). The focus is fixed when the push-in starts.
 	 */
@@ -456,6 +470,13 @@ struct FRTSShortsCookOff
 	/** How fast (1/s) the aim follows; lower lags more and keeps the motion calm. */
 	UPROPERTY()
 	float AimTrackSpeed = 2.5f;
+
+	/**
+	 * Fuel cook-off instead: the engine catches fire at StartAtSeconds (it leaks burning fuel), and the death that follows
+	 * is the fuel explosion; heavy tanks with an engine deck throw it, which the camera follows like a turret.
+	 */
+	UPROPERTY()
+	bool bEngineFire = false;
 };
 
 /** @brief A battle unit that waits far from the lines and drives in later, joining its side when it arrives. */
@@ -652,6 +673,14 @@ struct FRTSShortsBattleAdvance
 	/** How quickly the opening camera follows the German line's living vehicles (1/s); 0 leaves it where it was framed. */
 	UPROPERTY()
 	float CameraFollowSpeed = 1.2f;
+
+	/** Every vehicle's weapon ranges and vision radius times these for the battle (user 2026-11-18: 2 and 2, so the lines
+	 *  fight from where they spawn). At the start every turret also faces its hull's front with its idle sweeps off. */
+	UPROPERTY()
+	float RangeScale = 1.f;
+
+	UPROPERTY()
+	float VisionScale = 1.f;
 };
 
 /**
@@ -760,6 +789,296 @@ struct FRTSShortsPenTest
 	bool bStopJobOnPenetration = true;
 };
 
+/**
+ * @brief One camera shot of a wall-holes round, in the target's stage frame: origin at the target point on the ground,
+ * X along the stage forward (from the attackers toward the target), Y to the stage's right, Z up. The shot starts
+ * AtSeconds after its anchor and, with MoveSeconds > 0, glides from Offset/LookOffset/FocalLength to the End values.
+ */
+USTRUCT()
+struct FRTSShortsWallHolesShot
+{
+	GENERATED_BODY()
+
+	/** "Begin" (segment start), "Fire" (the fire order) or "Cease" (the cease-fire, or the target's death). */
+	UPROPERTY()
+	FString Anchor = TEXT("Begin");
+
+	UPROPERTY()
+	float AtSeconds = 0.f;
+
+	UPROPERTY()
+	FVector Offset = FVector(-4200.f, 900.f, 900.f);
+
+	UPROPERTY()
+	FVector LookOffset = FVector(0.f, 0.f, 250.f);
+
+	UPROPERTY()
+	float FocalLength = 18.f;
+
+	/** 0 keeps the shot still; otherwise it glides to the End values over this many seconds (smoothstep). */
+	UPROPERTY()
+	float MoveSeconds = 0.f;
+
+	UPROPERTY()
+	FVector EndOffset = FVector::ZeroVector;
+
+	UPROPERTY()
+	FVector EndLookOffset = FVector::ZeroVector;
+
+	/** <= 0 keeps FocalLength. */
+	UPROPERTY()
+	float EndFocalLength = 0.f;
+
+	/** Segment.ImpactShow only: "Impact" puts the offsets' origin on the beat's first impact point (same axes) instead
+	 *  of the target point, so a close shot frames the hit wherever the shell landed. "AimThenImpact" starts on the aim
+	 *  point (Settings.AimOffset on the target) for a cut before the hit, and glides onto the real impact point in the
+	 *  0.2 s after it lands. */
+	UPROPERTY()
+	FString Frame = TEXT("Target");
+};
+
+/**
+ * @brief Wall-holes rounds ("what do four X do to a wall?"): the segment's unit and BattleAllyClassPaths (all one type)
+ * fire their main guns at a fresh TargetClassPath building, which shows the shell holes of UWallHoleDamageComponent.
+ * The volley stops after FireSeconds or once the target is down to StopAtHealthFraction (unless bAllowKill), the
+ * camera cuts to the result, and the round ends ResultHoldSeconds after the cease-fire.
+ */
+USTRUCT()
+struct FRTSShortsWallHoles
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	bool bEnabled = false;
+
+	/** Yaw of the target relative to the stage forward (0: its local X along the stage forward). */
+	UPROPERTY()
+	float TargetYaw = 90.f;
+
+	/** Move the target so its bounds centre (XY) stands on the target point; walls have their origin at a mesh end. */
+	UPROPERTY()
+	bool bCentreTargetOnBounds = true;
+
+	/** Where the (first) target stands, in the target's stage frame (see FRTSShortsWallHolesShot); 0 = on the target point. */
+	UPROPERTY()
+	FVector PrimaryOffset = FVector::ZeroVector;
+
+	/**
+	 * More targets of the same class (e.g. a second tree), in the target's stage frame, each turned ExtraTargetYaws[i]
+	 * (stage-relative, TargetYaw when missing). Health, the cease-fire and the result count all targets: the bar shows
+	 * their average, each target is spared on its own, and the round counts as a kill once every target is down.
+	 */
+	UPROPERTY()
+	TArray<FVector> ExtraTargetOffsets;
+
+	UPROPERTY()
+	TArray<float> ExtraTargetYaws;
+
+	/** Seconds of fire from the fire order (Segment.FireAtSeconds). */
+	UPROPERTY()
+	float FireSeconds = 7.f;
+
+	/**
+	 * After MinFireSeconds, the volley also stops once the wall took no damage for CeaseAfterIdleSeconds (single-shot guns
+	 * reload for 5-6 s: the critic saw 3.5 s of nothing after their volley). <= 0 turns this off.
+	 */
+	UPROPERTY()
+	float CeaseAfterIdleSeconds = 1.5f;
+
+	UPROPERTY()
+	float MinFireSeconds = 3.f;
+
+	/** The volley stops early once the target's health fraction is at or below this (ignored with bAllowKill). */
+	UPROPERTY()
+	float StopAtHealthFraction = 0.3f;
+
+	/** The finale: the target may die; the volley runs until it does or FireSeconds pass. */
+	UPROPERTY()
+	bool bAllowKill = false;
+
+	/** Seconds the round runs on after the cease-fire (the result shot). */
+	UPROPERTY()
+	float ResultHoldSeconds = 4.f;
+
+	/** With bAllowKill: seconds after the target died before the round ends (the collapse). */
+	UPROPERTY()
+	float DeathHoldSeconds = 4.5f;
+
+	/**
+	 * Aim points in the target's stage frame (see FRTSShortsWallHolesShot), spread over the face the attackers see.
+	 * Attacker i starts on point i and steps to the next point every RetargetSeconds, so the holes spread.
+	 */
+	UPROPERTY()
+	TArray<FVector> AimPoints;
+
+	/**
+	 * Splits the attackers by their side of the line (stage Y) into this many groups and AimPoints into as many
+	 * consecutive blocks; each attacker cycles only its group's block (two trees: the left pair keeps to the left trunk,
+	 * the right pair to the right one, instead of all four firing across the line at one tree). <= 1: one group.
+	 */
+	UPROPERTY()
+	int32 AimGroups = 1;
+
+	/** <= 0: every attacker keeps its first aim point. */
+	UPROPERTY()
+	float RetargetSeconds = 1.6f;
+
+	/** Only each attacker's largest-calibre gun fires (MG hits would use up the wall's 6 hole slots with pin holes). */
+	UPROPERTY()
+	bool bMainGunOnly = true;
+
+	/** Camera shots in order; a shot replaces the one before when its time comes. */
+	UPROPERTY()
+	TArray<FRTSShortsWallHolesShot> Shots;
+};
+
+/**
+ * @brief Impact showcase beat ("every impact of the X"): the segment's unit fires Shells main-gun shells at one target
+ * picked so its weapon plays one surface's impact effect (sand ground, a soldier, a concrete wall, a vehicle it
+ * penetrates, armour it bounces off). Every impact is recorded with the surface and effect the projectile resolved, so
+ * the post step labels the beat from what really played. The camera is driven by Shots, poses in the target's stage
+ * frame (origin on the ground at the target point, X along the stage forward, away from the shooter) anchored on
+ * "Begin" (segment start), "Fire" (first shell launched) or "Impact" (first impact of the beat).
+ */
+USTRUCT()
+struct FRTSShortsImpactShow
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	bool bEnabled = false;
+
+	/** The effect the beat is meant to show: "Sand", "Flesh", "Stone", "Metal" or "Bounce" (checked against the impacts). */
+	UPROPERTY()
+	FString Beat;
+
+	/** "Ground" (attack-ground on the target point), "Actor" (a plain actor, fired at as ground) or "Unit" (an enemy
+	 *  vehicle or squad for TargetOwningPlayer, attacked as a unit; a squad's soldier nearest the point is the target). */
+	UPROPERTY()
+	FString TargetKind = TEXT("Ground");
+
+	UPROPERTY()
+	FString TargetClassPath;
+
+	/** Target yaw relative to the stage forward (180: a vehicle faces the shooter). */
+	UPROPERTY()
+	float TargetYaw = 180.f;
+
+	/** Actor targets: move it so its bounds centre (XY) stands on the target point (walls have their origin at an end). */
+	UPROPERTY()
+	bool bCentreTargetOnBounds = true;
+
+	/** Ground and Actor targets: the aim point in the target frame. */
+	UPROPERTY()
+	FVector AimOffset = FVector::ZeroVector;
+
+	/** Unit targets: fire at the AimOffset point on the unit (attack ground) instead of letting the gun pick one of the
+	 *  unit's aim points; one T-70 aim point let three 75 mm shells fly past it (Pz IV G retake). */
+	UPROPERTY()
+	bool bFireAtAimPoint = false;
+
+	/** Main-gun shells fired in the beat (per attempt); the gun is blocked after the last one launched. */
+	UPROPERTY()
+	int32 Shells = 1;
+
+	/** Shells > 1 (an autocannon burst): the burst counts as over once every launched shell landed and the gun has not
+	 *  fired for this long (the soldier it aimed at died, or the magazine ran dry). Squad targets: after
+	 *  BurstRetargetSeconds without a launch the gun is ordered onto the nearest soldier still standing. */
+	UPROPERTY()
+	float BurstIdleSeconds = 3.0f;
+
+	UPROPERTY()
+	float BurstRetargetSeconds = 1.2f;
+
+	/** When a shell's first impact is not the beat's surface (a glacis ricochet in a metal beat), the beat fires again,
+	 *  up to this many attempts in all; the camera restarts with each attempt and the post cuts to the one that worked. */
+	UPROPERTY()
+	int32 MaxAttempts = 3;
+
+	/** >= 0: the main gun stays blocked until this many seconds into the beat (the turret aims meanwhile), so the shell
+	 *  leaves at a known time and the shots can be timed round it (the launch came 0.6 to 8.7 s after the fire order,
+	 *  round 4). Retries fire as soon as they can. */
+	UPROPERTY()
+	float ReleaseGunAtSeconds = -1.f;
+
+	/** Seconds after a failed attempt's impact before the next one is ordered. */
+	UPROPERTY()
+	float RetryDelaySeconds = 0.5f;
+
+	/** Unit targets: max health scaled by this (a penetrated tank must not burn out over the impact). */
+	UPROPERTY()
+	float TargetHealthScale = 1.f;
+
+	/** The target takes no damage at all (no kill, no cook-off, no collapse covering the impact). */
+	UPROPERTY()
+	bool bTargetInvulnerable = false;
+
+	/**
+	 * Non-empty: the landscape under the target point gets this physical material and blocks both projectile trace
+	 * channels for the beat, like a game map's landscape (the Shorts desert stage's landscape let shells through).
+	 */
+	UPROPERTY()
+	FString GroundPhysMaterialPath;
+
+	/** The beat ends this long after the last shell's first impact. */
+	UPROPERTY()
+	float HoldAfterImpactSeconds = 3.f;
+
+	/** The beat ends this long after the fire order when the shells never landed. */
+	UPROPERTY()
+	float TimeoutSeconds = 12.f;
+
+	/** < 1: world time runs this fast from the beat's first impact for SlowMoSeconds of output time. Do not use in
+	 *  renders: MRQ switches to relative frame numbers under time dilation and the take's frames no longer match the
+	 *  manifest (frame gaps, 2026-11-21); impactshow_post.py slows the impact instead. */
+	UPROPERTY()
+	float ImpactTimeDilation = 1.f;
+
+	UPROPERTY()
+	float SlowMoSeconds = 0.f;
+
+	/** Seconds over which time eases back to normal after the slow motion. */
+	UPROPERTY()
+	float SlowMoEaseOutSeconds = 0.4f;
+
+	/** Camera shots in order; a shot replaces the one before when its time comes. Anchors: Begin, Fire, Impact. */
+	UPROPERTY()
+	TArray<FRTSShortsWallHolesShot> Shots;
+};
+
+/** One impact or bounce effect a beat's shell played (Segment.ImpactShow), as the projectile resolved it. */
+USTRUCT()
+struct FRTSShortsImpactRecord
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	int32 Frame = -1;
+
+	UPROPERTY()
+	int32 ShellIndex = 0;
+
+	/** "Sand", "Metal", "Flesh", "Air", "Stone" or "Bounce". */
+	UPROPERTY()
+	FString Surface;
+
+	UPROPERTY()
+	FString EffectName;
+
+	UPROPERTY()
+	FString HitActor;
+
+	/** Armour verdict of the shell's hit on a vehicle (Bounce, Penetration, ...), empty for other targets. */
+	UPROPERTY()
+	FString Verdict;
+
+	UPROPERTY()
+	float ScreenX = -1.f;
+
+	UPROPERTY()
+	float ScreenY = -1.f;
+};
+
 USTRUCT()
 struct FRTSShortsCoverTree
 {
@@ -777,6 +1096,117 @@ struct FRTSShortsCoverTree
 
 	UPROPERTY()
 	float Yaw = 0.f;
+};
+
+/** @brief A static mesh the director places for one job only (set dressing, e.g. the industrial plant round a wall-holes
+ * target), so a stage can be dressed per job without saving the map (which drops its baked navmesh). */
+USTRUCT()
+struct FRTSShortsStageProp
+{
+	GENERATED_BODY()
+
+	/** Static mesh object path, e.g. /Game/RTS_Survival/Meshes/Industrial/Zone/Meshes/Warehouses/SM_Warehouse_03. */
+	UPROPERTY()
+	FString MeshPath;
+
+	/** Stage-local centimetres (X stage forward, Y right); the mesh pivot is put on the ground found below, minus SinkCm. */
+	UPROPERTY()
+	FVector Offset = FVector::ZeroVector;
+
+	UPROPERTY()
+	float Yaw = 0.f;
+
+	UPROPERTY()
+	FVector Scale = FVector::OneVector;
+
+	UPROPERTY()
+	float SinkCm = 5.f;
+
+	/** Off by default: a prop with collision would stop shells that missed the target and blow up beside it. */
+	UPROPERTY()
+	bool bCollision = false;
+};
+
+/** @brief One wave of Segment.Survival: what spawns, when, and at which tier (the job generator rolls the units). */
+USTRUCT()
+struct FRTSShortsSurvivalWave
+{
+	GENERATED_BODY()
+
+	/** Segment-local second the wave spawns. */
+	UPROPERTY()
+	float AtSeconds = 0.f;
+
+	UPROPERTY()
+	int32 Tier = 0;
+
+	/** 1-based wave number shown on screen. */
+	UPROPERTY()
+	int32 Number = 1;
+
+	/** Ground units and squads; they spawn hidden behind the ridge and come into view over its crest. */
+	UPROPERTY()
+	TArray<FString> ClassPaths;
+
+	/** Aircraft flying one strafing (no bombs) or carpet-bombing (bombs) run over the defenders, then leaving. */
+	UPROPERTY()
+	TArray<FString> AircraftClassPaths;
+};
+
+/**
+ * @brief "How long can they survive?": the segment's unit and BattleAllyClassPaths hold a hilltop while Soviet waves of
+ * rising tiers come over a ridge in front of them. The segment ends when the last defender dies (or at SlotSeconds).
+ */
+USTRUCT()
+struct FRTSShortsSurvival
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	bool bEnabled = false;
+
+	/** Stage-local spawn points (cm) hidden from the camera; each unit takes the next free one, round-robin. */
+	UPROPERTY()
+	TArray<FVector> SpawnOffsets;
+
+	/** Stage-local point (cm) the waves drive to first (the ramp's foot); they are released to attack on the way. */
+	UPROPERTY()
+	FVector RallyOffset = FVector(4500.f, 0.f, 0.f);
+
+	/**
+	 * Stage-local X (cm) of the line the waves drive straight to (a plain move, no stopping) before they fight, so they
+	 * close to where every defender reaches them instead of parking at the edge of their own range. 0: attack-move
+	 * to RallyOffset and release at ReleaseRangeFraction, as before.
+	 */
+	UPROPERTY()
+	float AdvanceOffsetX = 0.f;
+
+	/** Each unit's advance point keeps its spawn's stage-local Y, clamped to this (cm), so the wave arrives spread out. */
+	UPROPERTY()
+	float AdvanceHalfWidthCm = 2500.f;
+
+	/** A wave unit is released to attack when a defender is within this fraction of its longest weapon's range (attack-move halts it at about 1.0). */
+	UPROPERTY()
+	float ReleaseRangeFraction = 1.05f;
+
+	/** Released anyway this long after it spawned. */
+	UPROPERTY()
+	float ReleaseAfterSeconds = 45.f;
+
+	/** Weapon range multiplier on every unit of the short, both sides (3 = 300 %). */
+	UPROPERTY()
+	float RangeMultiplier = 3.f;
+
+	/** Aircraft spawn this far out past the defenders (cm, along the stage's +X), at AircraftHeightCm over them. */
+	UPROPERTY()
+	float AircraftStartDistanceCm = 70000.f;
+
+	UPROPERTY()
+	float AircraftHeightCm = 4500.f;
+
+	/** Waves in spawn order. */
+	UPROPERTY()
+	TArray<FRTSShortsSurvivalWave> Waves;
 };
 
 /**
@@ -869,6 +1299,10 @@ struct FRTSShortsSegment
 	/** Squads: issue a switch-weapons command right after placement (rifle squads otherwise fight with their Panzerfausts). */
 	UPROPERTY()
 	bool bSwitchWeapons = false;
+
+	/** Rate-of-fire stacks: only the largest-calibre weapons fire (MGs and secondary guns are blocked for the segment). */
+	UPROPERTY()
+	bool bMainGunOnly = false;
 
 	/** Squads with MaxSquadVisible: members whose weapon class name contains this are shown first (e.g. "Kar98_C"). */
 	UPROPERTY()
@@ -972,6 +1406,13 @@ struct FRTSShortsSegment
 	/** Optional stage-axis offsets from the enemy line origin, indexed like BattleEnemyClassPaths. */
 	UPROPERTY()
 	TArray<FVector> BattleEnemyOffsets;
+
+	/**
+	 * Battle: behaviour Blueprints (/Game/..._C) added to every enemy vehicle as it spawns, for example
+	 * BP_Beh_Permanent_SetHEATShells so a weak gun in the enemy line fires HEAT. Squads are skipped.
+	 */
+	UPROPERTY()
+	TArray<FString> BattleEnemyBehaviourClassPaths;
 
 	UPROPERTY()
 	float BattleSpacing = 700.f;
@@ -1092,6 +1533,11 @@ struct FRTSShortsSegment
 	UPROPERTY()
 	float TurretRotationSpeed = 0.f;
 
+	/** Scale on the hull's fire feedback (recoil kick) of the staged unit; 1 keeps the unit's own (user 2026-11-20:
+	 *  caliber stacks at 0.5). */
+	UPROPERTY()
+	float HullRecoilScale = 1.f;
+
 	UPROPERTY()
 	FRTSShortsCameraParams Camera;
 
@@ -1135,6 +1581,18 @@ struct FRTSShortsSegment
 	UPROPERTY()
 	FRTSShortsPenTest PenTest;
 
+	/** Four attackers of one type shoot holes into a fresh building, then the camera shows the result. */
+	UPROPERTY()
+	FRTSShortsWallHoles WallHoles;
+
+	/** "How long can they survive?": defenders on a hilltop against tiered Soviet waves. */
+	UPROPERTY()
+	FRTSShortsSurvival Survival;
+
+	/** One beat of an impact showcase: the unit's main gun on a target that shows one impact effect. */
+	UPROPERTY()
+	FRTSShortsImpactShow ImpactShow;
+
 	/** Aircraft passes flown during this segment. */
 	UPROPERTY()
 	TArray<FRTSShortsFlyBy> FlyBys;
@@ -1143,7 +1601,7 @@ struct FRTSShortsSegment
 	UPROPERTY()
 	FRTSShortsAircraftCrash AircraftCrash;
 
-	/** Ammo cook-off death of the segment's tank (turret toss); off unless CookOff.StartAtSeconds >= 0. */
+	/** Ammo (turret toss) or fuel cook-off death of the segment's tank; off unless CookOff.StartAtSeconds >= 0. */
 	UPROPERTY()
 	FRTSShortsCookOff CookOff;
 };
@@ -1210,6 +1668,10 @@ struct FRTSShortsJob
 	UPROPERTY()
 	TArray<FRTSShortsCoverTree> BattleCoverTrees;
 
+	/** Static meshes placed round the job's stage when its first segment begins and kept for the whole job. */
+	UPROPERTY()
+	TArray<FRTSShortsStageProp> StageProps;
+
 	/** Actors whose name or label starts with any of these are hidden for this job (e.g. a backdrop hill over a second mark). */
 	UPROPERTY()
 	TArray<FString> HiddenActorPrefixes;
@@ -1260,6 +1722,13 @@ struct FRTSShortsJob
 	 */
 	UPROPERTY()
 	bool bRecordAudio = false;
+
+	/**
+	 * Size and rate-of-fire stacks: every sound plays at full volume whatever its distance to the camera. Their cameras
+	 * stand up to ~80 m back and the Flakvierling's attenuation silenced it there (RateOfFire01 take 1, 2026-11-11).
+	 */
+	UPROPERTY()
+	bool bNoDistanceAttenuation = false;
 
 	/** Diagnostic: play known cues through the different playback paths at fixed frames of segment 0 (see director). */
 	UPROPERTY()
@@ -1438,6 +1907,131 @@ struct FRTSShortsManifestSegment
 	/** Attackers destroyed before they fired. */
 	UPROPERTY()
 	int32 PenAttackersLostUnfired = 0;
+
+	/** Segment.WallHoles: output frames of the fire order, the cease-fire and the target's death (-1: none). */
+	UPROPERTY()
+	int32 WallFireFrame = -1;
+
+	UPROPERTY()
+	int32 WallCeaseFrame = -1;
+
+	UPROPERTY()
+	int32 WallDeathFrame = -1;
+
+	/** "time", "health", "killed" or empty while firing. */
+	UPROPERTY()
+	FString WallCeaseReason;
+
+	UPROPERTY()
+	int32 WallAttackers = 0;
+
+	/** Main-gun shells the attackers launched during the volley. */
+	UPROPERTY()
+	int32 WallShells = 0;
+
+	UPROPERTY()
+	int32 WallAttackerCalibreMm = 0;
+
+	/** Target health fraction (0..1) every WallHealthSampleFrames output frames from WallFireFrame on. */
+	UPROPERTY()
+	TArray<float> WallHealthSamples;
+
+	UPROPERTY()
+	int32 WallHealthSampleFrames = 6;
+
+	UPROPERTY()
+	float WallHealthStart = 0.f;
+
+	UPROPERTY()
+	float WallHealthEnd = 0.f;
+
+	/** Holes and knocked-out grid cells on the target at the cease-fire. */
+	UPROPERTY()
+	int32 WallHoleCount = 0;
+
+	UPROPERTY()
+	int32 WallHiddenCells = 0;
+
+	/** Camera shots applied in this segment (output frame each started). */
+	UPROPERTY()
+	TArray<int32> WallShotFrames;
+
+	/** Segment.Survival: output frame, tier and number of every wave that spawned. */
+	UPROPERTY()
+	TArray<int32> SurvivalWaveFrames;
+
+	UPROPERTY()
+	TArray<int32> SurvivalWaveTiers;
+
+	UPROPERTY()
+	TArray<int32> SurvivalWaveNumbers;
+
+	/** Output frame each wave's first unit came into the camera's view (-1: never seen). */
+	UPROPERTY()
+	TArray<int32> SurvivalWaveSeenFrames;
+
+	/** Output frames a shell was launched (either side, one entry per frame): the cut keeps the shooting at normal speed. */
+	UPROPERTY()
+	TArray<int32> SurvivalShotFrames;
+
+	/** Output frame each defender died, in death order. */
+	UPROPERTY()
+	TArray<int32> SurvivalDefenderDeathFrames;
+
+	UPROPERTY()
+	int32 SurvivalDefenders = 0;
+
+	/** Output frame the last defender died (-1: they lasted to the end of the segment). */
+	UPROPERTY()
+	int32 SurvivalEndFrame = -1;
+
+	UPROPERTY()
+	int32 SurvivalEnemiesSpawned = 0;
+
+	UPROPERTY()
+	int32 SurvivalEnemiesKilled = 0;
+
+	/** Segment.ImpactShow: the beat, the main gun, the fire order, first impact and every impact effect played. */
+	UPROPERTY()
+	FString ImpactBeat;
+
+	UPROPERTY()
+	FString ImpactWeaponName;
+
+	UPROPERTY()
+	int32 ImpactShellsFired = 0;
+
+	UPROPERTY()
+	int32 ImpactLaunchFrame = -1;
+
+	UPROPERTY()
+	int32 ImpactFirstFrame = -1;
+
+	UPROPERTY()
+	int32 ImpactEndFrame = -1;
+
+	/** The expected effect played (an impact on the beat's surface, or a bounce for "Bounce"). */
+	UPROPERTY()
+	bool bImpactBeatShown = false;
+
+	/** Index of the shell whose first impact showed the beat's surface (-1: none); launch and first-impact frames above
+	 *  belong to the latest attempt, which is this shell's when the beat was shown. */
+	UPROPERTY()
+	int32 ImpactShownShell = -1;
+
+	UPROPERTY()
+	int32 ImpactAttempts = 0;
+
+	/** Distance (cm) from the aim point to the shown impact; a sand shell that overflew its aim landed 34 m off (round 2). */
+	UPROPERTY()
+	float ImpactMissCm = -1.f;
+
+	UPROPERTY()
+	TArray<FRTSShortsImpactRecord> Impacts;
+
+	/** Weapon's own effect for the beat's surface (or its bounce effect); empty when it has none. */
+	UPROPERTY()
+	FString ImpactExpectedEffect;
 };
 
 /**
