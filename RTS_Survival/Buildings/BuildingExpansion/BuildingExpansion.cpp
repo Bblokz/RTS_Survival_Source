@@ -464,7 +464,7 @@ void ABuildingExpansion::VerticalDestruction(const FRTSVerticalCollapseSettings&
 	FRTS_VerticalCollapse::StartVerticalCollapse(
 		this,
 		CollapseSettings,
-		CollapseFX,
+		GetCollapseFXWithDeathVfxLifetime(CollapseFX),
 		OnFinished);
 }
 
@@ -641,6 +641,7 @@ bool ABuildingExpansion::GetHasBlueprintDeath() const
 
 void ABuildingExpansion::DestroyAndSpawnActors(const FDestroySpawnActorsParameters& SpawnParams, FCollapseFX CollapseFX)
 {
+	CollapseFX = GetCollapseFXWithDeathVfxLifetime(CollapseFX);
 	if (DeathSpawnClassesToSkip.IsEmpty())
 	{
 		Super::DestroyAndSpawnActors(SpawnParams, CollapseFX);
@@ -975,7 +976,17 @@ void ABuildingExpansion::CollapseMesh(UGeometryCollectionComponent* GeoCollapseC
                                       FCollapseFX CollapseFX)
 {
 	FRTS_Collapse::CollapseMesh(this, GeoCollapseComp, GeoCollection, MeshToCollapse, CollapseDuration, CollapseForce,
-	                            CollapseFX);
+	                            GetCollapseFXWithDeathVfxLifetime(CollapseFX));
+}
+
+FCollapseFX ABuildingExpansion::GetCollapseFXWithDeathVfxLifetime(const FCollapseFX& CollapseFX) const
+{
+	FCollapseFX LimitedFX = CollapseFX;
+	if (DeathVfxLifetime > 0.f)
+	{
+		LimitedFX.VfxLifetime = DeathVfxLifetime;
+	}
+	return LimitedFX;
 }
 
 void ABuildingExpansion::CollapseMeshWithSwapping(

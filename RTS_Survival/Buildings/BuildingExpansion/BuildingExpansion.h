@@ -247,6 +247,12 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Death")
 	TArray<TSoftClassPtr<AActor>> DeathSpawnClassesToSkip;
 
+	// When above 0, overrides VfxLifetime of every CollapseFX the death graph passes in (VerticalDestruction,
+	// CollapseMesh, DestroyAndSpawnActors). Soviet fuel tanks, megaphones and the container hut die with the looping
+	// NS_Fire_Tank, which never ends on its own (8 s, 2026-11-22).
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Death")
+	float DeathVfxLifetime = 0.f;
+
 	UFUNCTION(BlueprintImplementableEvent)
 	void BP_OnUnitDies();
 
@@ -378,6 +384,9 @@ private:
 	
 	UFUNCTION()
 	void OnVerticalDestructionComplete();
+
+	/** @return A copy of CollapseFX that carries DeathVfxLifetime when this class sets one. */
+	FCollapseFX GetCollapseFXWithDeathVfxLifetime(const FCollapseFX& CollapseFX) const;
 
 	FBxpData GetBxpData(const EBuildingExpansionType BxpSubType, ABuildingExpansion* BxpRequesting) const;
 

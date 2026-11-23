@@ -75,12 +75,19 @@ struct FCollapseFX
 	UPROPERTY(BlueprintReadWrite, EditDefaultsOnly)
 	FCollapseParameters CollapseNiagaraParameters;
 
+	// Seconds after which the spawned CollapseVfx stops and is removed; 0 lets the system end by itself.
+	// Needed for looping systems such as NS_Fire_Tank, which otherwise burn forever once the owner is gone.
+	UPROPERTY(BlueprintReadWrite, EditDefaultsOnly)
+	float VfxLifetime = 0.f;
+
 	void CreateFX(const AActor* WorldContext) const;
 	// Spawns CollapseVfx at the exact location (no FxLocationOffset applied), adjusted like CreateFX.
 	void SpawnVfxAtLocation(const UObject* WorldContext, const FVector& SpawnLocation) const;
 	// Plays CollapseSfx at the exact location (no FxLocationOffset applied).
 	void PlaySfxAtLocation(const UObject* WorldContext, const FVector& SpawnLocation) const;
+	// Applies the Niagara parameters and the VfxLifetime limit to a freshly spawned CollapseVfx component.
 	void AdjustFX(UNiagaraComponent* NiagaraComp) const;
+	void LimitVfxLifetime(UNiagaraComponent* NiagaraComp) const;
 	void AdjustFxForSetScaleColorLifetime(UNiagaraComponent* NiagaraComp) const;
 	void AdjustFxForSandbagSizeAndCount(UNiagaraComponent* NiagaraComp) const;
 };
