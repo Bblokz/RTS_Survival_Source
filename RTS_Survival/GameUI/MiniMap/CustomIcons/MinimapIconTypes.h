@@ -30,6 +30,11 @@ enum class EMinimapIconType : uint8
 	SupplyFlag_GerBreakthrough UMETA(DisplayName = "Supply Flag Ger Breakthrough"),
 	SupplyFlag_GerStrikeDivision UMETA(DisplayName = "Supply Flag Ger Strike Division"),
 	SupplyFlag_GerItalian UMETA(DisplayName = "Supply Flag Ger Italian"),
+	// Direction-finder stations (Oder-Warthe): the station's loop aerial with the flag of its holder, upright.
+	DFStation_DirectorOfShield UMETA(DisplayName = "DF Station Director of Shield"),
+	DFStation_DirectorOfForge UMETA(DisplayName = "DF Station Director of Forge"),
+	DFStation_GerBreakthrough UMETA(DisplayName = "DF Station Ger Breakthrough"),
+	DFStation_GerStrikeDivision UMETA(DisplayName = "DF Station Ger Strike Division"),
 };
 
 /** @return True for icons drawn as upright pictures (side views, flags): they must not turn with the minimap. */
@@ -44,6 +49,10 @@ inline bool Global_GetIsUprightMinimapIcon(const EMinimapIconType IconType)
 	case EMinimapIconType::SupplyFlag_GerBreakthrough:
 	case EMinimapIconType::SupplyFlag_GerStrikeDivision:
 	case EMinimapIconType::SupplyFlag_GerItalian:
+	case EMinimapIconType::DFStation_DirectorOfShield:
+	case EMinimapIconType::DFStation_DirectorOfForge:
+	case EMinimapIconType::DFStation_GerBreakthrough:
+	case EMinimapIconType::DFStation_GerStrikeDivision:
 		return true;
 	default:
 		return false;

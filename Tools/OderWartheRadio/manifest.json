@@ -1,0 +1,103 @@
+{
+  "morse": {
+    "Routine": [
+      {
+        "name": "OW_Morse_Routine_01",
+        "text": "AA5",
+        "seconds": 2.29
+      },
+      {
+        "name": "OW_Morse_Routine_02",
+        "text": "NU6",
+        "seconds": 2.59
+      },
+      {
+        "name": "OW_Morse_Routine_03",
+        "text": "GB5",
+        "seconds": 2.87
+      },
+      {
+        "name": "OW_Morse_Routine_04",
+        "text": "GU6",
+        "seconds": 2.98
+      }
+    ],
+    "Reply": [
+      {
+        "name": "OW_Morse_Reply_01",
+        "text": "WN5 TMM K",
+        "seconds": 4.9
+      },
+      {
+        "name": "OW_Morse_Reply_02",
+        "text": "UD5 IIDE K",
+        "seconds": 4.95
+      },
+      {
+        "name": "OW_Morse_Reply_03",
+        "text": "GD6 ENW K",
+        "seconds": 4.97
+      },
+      {
+        "name": "OW_Morse_Reply_04",
+        "text": "VD3 ITR K",
+        "seconds": 4.94
+      }
+    ],
+    "AttackOrder": [
+      {
+        "name": "OW_Morse_AttackOrder_01",
+        "text": "VVV AA3 EKNU SAK AR",
+        "seconds": 7.73
+      },
+      {
+        "name": "OW_Morse_AttackOrder_02",
+        "text": "VVV XR1 KNT NRD AR",
+        "seconds": 7.89
+      },
+      {
+        "name": "OW_Morse_AttackOrder_03",
+        "text": "VVV BW9 EANK AUE AR",
+        "seconds": 7.94
+      },
+      {
+        "name": "OW_Morse_AttackOrder_04",
+        "text": "VVV FB5 GTE ABN AR",
+        "seconds": 7.38
+      }
+    ]
+  },
+  "static": {
+    "Routine": [
+      "OW_Static_Routine_01",
+      "OW_Static_Routine_02",
+      "OW_Static_Routine_03"
+    ],
+    "Reply": [
+      "OW_Static_Reply_01",
+      "OW_Static_Reply_02",
+      "OW_Static_Reply_03"
+    ],
+    "AttackOrder": [
+      "OW_Static_AttackOrder_01",
+      "OW_Static_AttackOrder_02",
+      "OW_Static_AttackOrder_03"
+    ]
+  },
+  "lock_on": [
+    "OW_StationLockOn_01",
+    "OW_StationLockOn_02",
+    "OW_StationLockOn_03"
+  ],
+  "jammer": "OW_JammerBed_Loop",
+  "cue_volume": {
+    "Burst_Routine": 0.3,
+    "Burst_Reply": 0.48,
+    "Burst_AttackOrder": 0.66,
+    "Static_Routine": 0.24,
+    "Static_Reply": 0.32,
+    "Static_AttackOrder": 0.38,
+    "JammerBed": 0.16,
+    "StationLockOn": 0.7
+  }
+}

@@ -1,0 +1,356 @@
+{
+ "key": "C_bunker",
+ "title": "C  Werk-Peilstand: 1930s pillbox with a loop on its steel cupola",
+ "notes": [
+  "An old Festungsfront MG pillbox (concrete, 6 x 5 m) re-used as the receiver room; the line's own architecture.",
+  "Steel observation cupola on the roof; the loop shaft comes up through it and turns (same loop as A).",
+  "Generator in a sandbagged revetment on the right; cable in a shallow trench to the pillbox door.",
+  "Flag front-left on its plinth, holder mark on the pillbox face (stencilled red star / painted Balkenkreuz).",
+  "Matches the Werke and dragon's teeth around it; reads 'bunker' first and 'radio' second."
+ ],
+ "subtitle": "Panzer IV + soldier for scale  |  origin = capture centre (25 m radius)  |  site 14 x 12 m, loop top 6.7 m, flag 7.5 m",
+ "footprint": [
+  12.1,
+  11.6
+ ],
+ "height": 6.7,
+ "mast_height": 8.1,
+ "views": {
+  "rts": {
+   "file": "C_bunker_rts.png",
+   "size": [
+    1600,
+    1100
+   ],
+   "px_per_m": 54.54545454545455,
+   "caption": null,
+   "labels": [
+    {
+     "text": "Fortress pillbox (receiver room)",
+     "kind": "hut",
+     "xy": [
+      844.8,
+      408.4
+     ]
+    },
+    {
+     "text": "Rotating loop aerial",
+     "kind": "aerial",
+     "xy": [
+      957.4,
+      274.2
+     ]
+    },
+    {
+     "text": "Generator (runs while held)",
+     "kind": "gen",
+     "xy": [
+      1040.6,
+      670.2
+     ]
+    },
+    {
+     "text": "Capture flag (rises 5.5 m)",
+     "kind": "flag",
+     "xy": [
+      547.2,
+      288.5
+     ]
+    },
+    {
+     "text": "Holder sign (red star / Balkenkreuz)",
+     "kind": "held",
+     "xy": [
+      785.2,
+      753.1
+     ]
+    },
+    {
+     "text": "Capture bar (UI) 9 m",
+     "kind": "ui",
+     "xy": [
+      800.0,
+      259.9
+     ]
+    }
+   ]
+  },
+  "rear": {
+   "file": "C_bunker_rear.png",
+   "size": [
+    800,
+    550
+   ],
+   "px_per_m": 27.272727272727273,
+   "caption": null,
+   "labels": [
+    {
+     "text": "Fortress pillbox (receiver room)",
+     "kind": "hut",
+     "xy": [
+      377.6,
+      327.4
+     ]
+    },
+    {
+     "text": "Rotating loop aerial",
+     "kind": "aerial",
+     "xy": [
+      321.3,
+      224.1
+     ]
+    },
+    {
+     "text": "Generator (runs while held)",
+     "kind": "gen",
+     "xy": [
+      279.7,
+      224.1
+     ]
+    },
+    {
+     "text": "Capture flag (rises 5.5 m)",
+     "kind": "flag",
+     "xy": [
+      526.4,
+      166.3
+     ]
+    },
+    {
+     "text": "Holder sign (red star / Balkenkreuz)",
+     "kind": "held",
+     "xy": [
+      407.4,
+      205.7
+     ]
+    },
+    {
+     "text": "Capture bar (UI) 9 m",
+     "kind": "ui",
+     "xy": [
+      400.0,
+      129.9
+     ]
+    }
+   ]
+  },
+  "top": {
+   "file": "C_bunker_top.png",
+   "size": [
+    800,
+    800
+   ],
+   "px_per_m": 35.29411764705882,
+   "caption": null,
+   "labels": [
+    {
+     "text": "Fortress pillbox (receiver room)",
+     "kind": "hut",
+     "xy": [
+      336.5,
+      262.4
+     ]
+    },
+    {
+     "text": "Rotating loop aerial",
+     "kind": "aerial",
+     "xy": [
+      421.2,
+      255.3
+     ]
+    },
+    {
+     "text": "Generator (runs while held)",
+     "kind": "gen",
+     "xy": [
+      604.7,
+      417.6
+     ]
+    },
+    {
+     "text": "Capture flag (rises 5.5 m)",
+     "kind": "flag",
+     "xy": [
+      251.8,
+      474.1
+     ]
+    },
+    {
+     "text": "Holder sign (red star / Balkenkreuz)",
+     "kind": "held",
+     "xy": [
+      512.9,
+      572.9
+     ]
+    },
+    {
+     "text": "Capture bar (UI) 9 m",
+     "kind": "ui",
+     "xy": [
+      400.0,
+      400.0
+     ]
+    }
+   ],
+   "grid": [
+    [
+     -658.8,
+     1511.8,
+     -658.8,
+     -605.9
+    ],
+    [
+     -482.4,
+     1511.8,
+     -482.4,
+     -605.9
+    ],
+    [
+     -305.9,
+     1511.8,
+     -305.9,
+     -605.9
+    ],
+    [
+     -129.4,
+     1511.8,
+     -129.4,
+     -605.9
+    ],
+    [
+     47.1,
+     1511.8,
+     47.1,
+     -605.9
+    ],
+    [
+     223.5,
+     1511.8,
+     223.5,
+     -605.9
+    ],
+    [
+     400.0,
+     1511.8,
+     400.0,
+     -605.9
+    ],
+    [
+     576.5,
+     1511.8,
+     576.5,
+     -605.9
+    ],
+    [
+     752.9,
+     1511.8,
+     752.9,
+     -605.9
+    ],
+    [
+     929.4,
+     1511.8,
+     929.4,
+     -605.9
+    ],
+    [
+     1105.9,
+     1511.8,
+     1105.9,
+     -605.9
+    ],
+    [
+     1282.4,
+     1511.8,
+     1282.4,
+     -605.9
+    ],
+    [
+     1458.8,
+     1511.8,
+     1458.8,
+     -605.9
+    ],
+    [
+     -658.8,
+     1511.8,
+     1458.8,
+     1511.8
+    ],
+    [
+     -658.8,
+     1335.3,
+     1458.8,
+     1335.3
+    ],
+    [
+     -658.8,
+     1158.8,
+     1458.8,
+     1158.8
+    ],
+    [
+     -658.8,
+     982.4,
+     1458.8,
+     982.4
+    ],
+    [
+     -658.8,
+     805.9,
+     1458.8,
+     805.9
+    ],
+    [
+     -658.8,
+     629.4,
+     1458.8,
+     629.4
+    ],
+    [
+     -658.8,
+     452.9,
+     1458.8,
+     452.9
+    ],
+    [
+     -658.8,
+     276.5,
+     1458.8,
+     276.5
+    ],
+    [
+     -658.8,
+     100.0,
+     1458.8,
+     100.0
+    ],
+    [
+     -658.8,
+     -76.5,
+     1458.8,
+     -76.5
+    ],
+    [
+     -658.8,
+     -252.9,
+     1458.8,
+     -252.9
+    ],
+    [
+     -658.8,
+     -429.4,
+     1458.8,
+     -429.4
+    ],
+    [
+     -658.8,
+     -605.9,
+     1458.8,
+     -605.9
+    ]
+   ]
+  }
+ },
+ "main_view": "rts"
+}

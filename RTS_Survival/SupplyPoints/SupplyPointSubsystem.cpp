@@ -154,7 +154,8 @@ void USupplyPointSubsystem::OnSupplyPointOwnerChanged(ASupplyPoint* SupplyPoint,
 		Run->SupplyTruck.Reset();
 	}
 	const uint8 NewOwner = SupplyPoint->GetOwningPlayer();
-	if (NewOwner == SupplyPointConstants::NeutralOwner)
+	// Capture-only points (direction-finder stations) send no trucks and play no supply lines.
+	if (NewOwner == SupplyPointConstants::NeutralOwner or not SupplyPoint->GetSupplyPointSettings().bRunsSupplies)
 	{
 		return;
 	}

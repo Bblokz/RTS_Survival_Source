@@ -5,11 +5,11 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "RTS_Survival/FactionSystem/Factions/Factions.h"
+#include "RTS_Survival/GameUI/MiniMap/CustomIcons/MinimapIconTypes.h"
 #include "RTS_Survival/SupplyPoints/SupplyPointTypes.h"
 #include "SupplyPoint.generated.h"
 
 class ATankMaster;
-enum class EMinimapIconType : uint8;
 class USupplyTruckComponent;
 class UMaterialInterface;
 class USceneComponent;
@@ -51,6 +51,8 @@ struct FSupplyPointCaptureState
  * Tune the instance through SupplyPointSettings; the Blueprint supplies the meshes and reacts to the BP events.
  * The flag is the component named FlagComponentName (or the one handed to InitSupplyPoint); add a
  * USupplyPointCraneComponent for the crane, stockpile and truck cargo visuals.
+ * Components tagged EnemyHeld show only while the player does not hold the point, components tagged PlayerHeld only
+ * while the player does. Capture-only sites turn SupplyPointSettings.bRunsSupplies off and set their own minimap icons.
  */
 UCLASS(Blueprintable)
 class RTS_SURVIVAL_API ASupplyPoint : public AActor
@@ -74,6 +76,10 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Supply Point")
 	float GetCaptureProgress() const { return M_CaptureState.Progress; }
+
+	// The minimap icon of the holder: the override maps first, else the supply flag of the player's faction or of the
+	// map's enemy director.
+	EMinimapIconType GetMiniMapIconOfHolder() const;
 
 	const FSupplyPointSettings& GetSupplyPointSettings() const { return SupplyPointSettings; }
 
@@ -128,6 +134,16 @@ protected:
 	// Flag material while the player holds the point, per player faction.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Supply Point|Flag")
 	TMap<ERTSFaction, TObjectPtr<UMaterialInterface>> PlayerFlagMaterials;
+
+	// Minimap icon while the enemy (or nobody) holds the point, per enemy director; a director without an entry shows
+	// its supply flag. Capture-only children (the direction-finder stations) put their own icons here.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Supply Point|MiniMap")
+	TMap<EEnemyDirector, EMinimapIconType> EnemyMiniMapIcons;
+
+	// Minimap icon while the player holds the point, per player faction; a faction without an entry shows its supply
+	// flag.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Supply Point|MiniMap")
+	TMap<ERTSFaction, EMinimapIconType> PlayerMiniMapIcons;
 
 	// Name of the flag component (not the pole) on the Blueprint; found at BeginPlay unless InitSupplyPoint was
 	// called with another component.
@@ -195,11 +211,11 @@ private:
 	void SetOwningPlayer(uint8 NewOwningPlayer);
 	void UpdateFlagVisuals(float DeltaSeconds);
 	void ApplyShownFlagProgress();
-	// The minimap shows the flag of the holder: the player's faction, else the map's enemy director.
-	EMinimapIconType GetMiniMapIconOfHolder() const;
 	void UpdateMiniMapIcon() const;
 	// Gives the flag mesh the banner of the player whose flag is on the pole.
 	void ApplyFlagFaction() const;
+	// Shows the EnemyHeld or the PlayerHeld tagged components, whichever matches the holder.
+	void UpdateHolderParts() const;
 
 	// ---- Supply cycle ----
 	void StartPreparingSupplies();

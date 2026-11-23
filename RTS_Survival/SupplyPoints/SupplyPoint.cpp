@@ -32,6 +32,9 @@ namespace SupplyPointPrivate
 	constexpr int32 MiniMapIconMaxRetries = 20;
 	constexpr float TruckPointDistance = 1400.f;
 	const FVector TruckParkDefaultLocation(0.f, 700.f, 0.f);
+	// Component tags of the holder look: shown while the enemy (or nobody) / the player holds the point.
+	const FName EnemyHeldPartTag(TEXT("EnemyHeld"));
+	const FName PlayerHeldPartTag(TEXT("PlayerHeld"));
 }
 
 ASupplyPoint::ASupplyPoint()
@@ -93,6 +96,7 @@ void ASupplyPoint::BeginPlay_ApplyInitialOwner()
 {
 	const uint8 InitialOwner = SupplyPointSettings.InitialOwningPlayer;
 	ApplyFlagFaction();
+	UpdateHolderParts();
 	if (InitialOwner == SupplyPointConstants::NeutralOwner)
 	{
 		return;
@@ -441,8 +445,9 @@ void ASupplyPoint::SetOwningPlayer(const uint8 NewOwningPlayer)
 		StopCaptureProgressBar();
 	}
 	UpdateMiniMapIcon();
+	UpdateHolderParts();
 	BP_OnOwnerChanged(NewOwningPlayer, PreviousOwner);
-	if (NewOwningPlayer != SupplyPointConstants::NeutralOwner)
+	if (NewOwningPlayer != SupplyPointConstants::NeutralOwner and SupplyPointSettings.bRunsSupplies)
 	{
 		StartPreparingSupplies();
 	}
@@ -467,6 +472,10 @@ EMinimapIconType ASupplyPoint::GetMiniMapIconOfHolder() const
 {
 	if (M_CaptureState.OwningPlayer != SupplyPointConstants::PlayerOwner)
 	{
+		if (const EMinimapIconType* EnemyIcon = EnemyMiniMapIcons.Find(SupplyPointSettings.EnemyDirector))
+		{
+			return *EnemyIcon;
+		}
 		switch (SupplyPointSettings.EnemyDirector)
 		{
 		case EEnemyDirector::DirectorOfForge: return EMinimapIconType::SupplyFlag_DirectorOfForge;
@@ -474,7 +483,12 @@ EMinimapIconType ASupplyPoint::GetMiniMapIconOfHolder() const
 		default: return EMinimapIconType::SupplyFlag_DirectorOfShield;
 		}
 	}
-	switch (FRTS_Statics::GetPlayerFaction(this))
+	const ERTSFaction PlayerFaction = FRTS_Statics::GetPlayerFaction(this);
+	if (const EMinimapIconType* PlayerIcon = PlayerMiniMapIcons.Find(PlayerFaction))
+	{
+		return *PlayerIcon;
+	}
+	switch (PlayerFaction)
 	{
 	case ERTSFaction::GerBreakthroughDoctrine: return EMinimapIconType::SupplyFlag_GerBreakthrough;
 	// The Italian faction has no flag asset yet (SupplyFlag_GerItalian has no icon): it shows the default below.
@@ -513,6 +527,27 @@ void ASupplyPoint::ApplyFlagFaction() const
 		return;
 	}
 	FlagMesh->SetMaterial(FlagMaterialSlot, *FlagMaterial);
+}
+
+void ASupplyPoint::UpdateHolderParts() const
+{
+	const bool bIsPlayerHeld = M_CaptureState.OwningPlayer == SupplyPointConstants::PlayerOwner;
+	TInlineComponentArray<USceneComponent*> SceneComponents(this);
+	for (USceneComponent* SceneComponent : SceneComponents)
+	{
+		if (not IsValid(SceneComponent))
+		{
+			continue;
+		}
+		if (SceneComponent->ComponentHasTag(SupplyPointPrivate::EnemyHeldPartTag))
+		{
+			SceneComponent->SetVisibility(not bIsPlayerHeld, true);
+		}
+		else if (SceneComponent->ComponentHasTag(SupplyPointPrivate::PlayerHeldPartTag))
+		{
+			SceneComponent->SetVisibility(bIsPlayerHeld, true);
+		}
+	}
 }
 
 void ASupplyPoint::ApplyShownFlagProgress()

@@ -72,7 +72,9 @@ section and the alternatives table, are from memory: **verify** before any of th
 
 1. **It comes straight after Berlin.** In the Berlin doc the Shield response force arrives **from the east by rail and
    by road** (checked in BerlinMission.md). This line is directly east of Berlin, so it is where that force is commanded from.
-2. **It gives a reason for the mission.** **Proposal:** when the resistance gets the Zoo tower radio working in Berlin,
+2. **It gives a reason for the mission.** *Superseded 2026-11-22: the reason is now a Shield jammer that blinds the
+   resistance after Berlin, run by an old 1945 Red Army veteran (OderWartheMissionFlow.md section 11). The text below is
+   the earlier proposal.* **Proposal:** when the resistance gets the Zoo tower radio working in Berlin,
    it also hears heavy Shield command traffic. One bearing from Berlin points east into the Oder-Warthe Bend, but one
    bearing only gives a direction, not a place. Hence this mission. The traffic is heavy *because of* the Berlin
    broadcast: the CSD thought the Germans were dead and is now hunting them.
@@ -121,7 +123,7 @@ The campaign map is generated from anchor points. What exists in code (checked i
 
 Proposal:
 
-- **Tier 2**, 2-4 hops from the player HQ.
+- **Tier 3** (decided 2026-11-22; was tier 2), 2-4 hops from the player HQ.
 - **Adjacency:** at least one enemy **Barracks or Factory** within 2 hops (the command post commands something nearby).
 - **New `EMapMission` entry** (name **(open)**, for example `RadioDirectionFinding`). Note: Berlin and the Ore Mountains
   have no `EMapMission` entry yet either. How the story missions map onto the enum is **(open)**.

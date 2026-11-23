@@ -46,6 +46,7 @@ void UW_Portrait::SetDefaultSubtitleSetup()
 	SpeakerNames.Add(ERTSPortraitTypes::GermanLuchsScavenger,
 	                 NSLOCTEXT("Portrait", "SpeakerLuchsCommander", "Luchs Commander"));
 	SpeakerNames.Add(ERTSPortraitTypes::SovietIS2Driver, NSLOCTEXT("Portrait", "SpeakerIS2Driver", "IS-2 Driver"));
+	SpeakerNames.Add(ERTSPortraitTypes::SovietInterceptStarik, NSLOCTEXT("Portrait", "SpeakerStarik", "Starik"));
 
 	static ConstructorHelpers::FObjectFinder<UFont> MainFont(SubtitleStyleDefaults::MainFontPath);
 	static ConstructorHelpers::FObjectFinder<UFont> ReadableFont(SubtitleStyleDefaults::ReadableFontPath);

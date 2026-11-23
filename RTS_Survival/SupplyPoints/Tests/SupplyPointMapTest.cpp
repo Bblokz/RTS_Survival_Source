@@ -9,6 +9,9 @@
 // Blueprint instead of the bare C++ class (its crane must then put every load into the truck), and
 // -SupplyPointPictures saves a picture from the RTS camera angle every 1.5 s while a truck is in the bay
 // (Saved/SupplyPointTest/Pictures).
+// A point whose settings turn bRunsSupplies off (the direction-finder stations) runs a capture-only branch instead of
+// the truck runs: the holder look (EnemyHeld / PlayerHeld tagged parts) and the minimap icon (type and texture) must
+// follow the capture, and no supply cycle or truck may start; -SupplyPointPictures then takes a picture every 1.5 s.
 // Logs RTS_SUPPLYPOINT_TEST lines and quits. Everything lives in this file, behind RTS_WITH_MAP_TESTS.
 
 #include "RTS_Survival/Utils/RTSMapTests/RTSMapTests.h"
@@ -25,6 +28,7 @@
 #include "Misc/CommandLine.h"
 #include "Misc/DelayedAutoRegister.h"
 #include "Misc/Parse.h"
+#include "RTS_Survival/FOWSystem/FowManager/FowManager.h"
 #include "RTS_Survival/Player/AsyncRTSAssetsSpawner/RTSAsyncSpawner.h"
 #include "RTS_Survival/Player/CPPController.h"
 #include "RTS_Survival/Player/PlayerResourceManager/PlayerResourceManager.h"
@@ -64,6 +68,12 @@ namespace SupplyPointMapTestPrivate
 	constexpr float PictureFieldOfView = 50.f;
 	constexpr float HqForceDeploySeconds = 3.f;
 	constexpr float ParkYawToleranceDegrees = 25.f;
+	// Capture-only points: the enemy look is checked once the minimap icon had time to register (1 s retry timer),
+	// and no truck may show up for this long after the capture (the dispatch delay is 6 s).
+	constexpr float CaptureOnlyEnemyLookCheckSeconds = 2.f;
+	constexpr float CaptureOnlyNoTruckSeconds = 12.f;
+	const FName EnemyHeldPartTag(TEXT("EnemyHeld"));
+	const FName PlayerHeldPartTag(TEXT("PlayerHeld"));
 
 	const ERTSResourceType CargoTypes[] = {
 		ERTSResourceType::Resource_Radixite, ERTSResourceType::Resource_Metal, ERTSResourceType::Resource_VehicleParts
@@ -80,6 +90,7 @@ namespace SupplyPointMapTestPrivate
 		SecondTruckLoading,
 		SecondTruckLost,
 		ThirdTruckRecall,
+		CaptureOnlyHold,
 		Finished
 	};
 
@@ -154,6 +165,9 @@ public:
 		case EStep::ThirdTruckRecall:
 			TickThirdTruckRecall(*World);
 			break;
+		case EStep::CaptureOnlyHold:
+			TickCaptureOnlyHold(*World);
+			break;
 		case EStep::Finished:
 			return false;
 		}
@@ -185,6 +199,7 @@ private:
 	float M_LastFlagProgress = 0.f;
 	bool bM_SawFlagRising = false;
 	bool bM_SawCaptureBar = false;
+	bool bM_CheckedEnemyLook = false;
 	bool bM_SawTruckLoading = false;
 	bool bM_FirstTruckDelivered = false;
 	bool bM_FirstTruckRunEnded = false;
@@ -244,7 +259,7 @@ private:
 				or M_Truck->GetSupplyTruckState() == ESupplyTruckState::BeingLoaded
 				or M_Truck->GetSupplyTruckState() == ESupplyTruckState::DrivingToExit
 				or M_Truck->GetSupplyTruckState() == ESupplyTruckState::DrivingToPark);
-		if (not bTruckAtPoint and M_PictureCount > 0)
+		if (not bTruckAtPoint and M_PictureCount > 0 and M_Settings.bRunsSupplies)
 		{
 			return;
 		}
@@ -265,6 +280,15 @@ private:
 			return;
 		}
 		M_NextPictureSeconds = World.GetTimeSeconds() + PictureIntervalSeconds;
+		if (not M_Settings.bRunsSupplies)
+		{
+			const FString CaptureFileName = FString::Printf(TEXT("capture_%03d_owner%d_flag%03d.png"), M_PictureCount++,
+			                                                M_SupplyPoint->GetOwningPlayer(),
+			                                                FMath::RoundToInt(M_SupplyPoint->GetCaptureProgress() * 100.f));
+			FGrenadeTestHelpers::SaveCapture(World, *M_PictureTarget,
+			                                 FPaths::ProjectSavedDir() / TEXT("SupplyPointTest/Pictures"), CaptureFileName);
+			return;
+		}
 		const FString FileName = FString::Printf(TEXT("supply_%03d_point%d_truck%d.png"), M_PictureCount++,
 		                                         static_cast<int32>(M_SupplyPoint->GetSupplyPointState()),
 		                                         M_Truck.IsValid()
@@ -506,6 +530,15 @@ private:
 			FinishTest(World);
 			return;
 		}
+		if (not M_Settings.bRunsSupplies and not bM_CheckedEnemyLook
+			and GetStepSeconds(World) >= SupplyPointMapTestPrivate::CaptureOnlyEnemyLookCheckSeconds)
+		{
+			bM_CheckedEnemyLook = true;
+			Check(M_SupplyPoint->GetOwningPlayer() == SupplyPointConstants::EnemyOwner,
+			      TEXT("still_enemy_held_at_look_check"));
+			CheckHolderLook(false, TEXT("enemy_look_while_enemy_held"));
+			CheckMiniMapIcon(World, TEXT("minimap_icon_enemy_held"));
+		}
 		const float FlagProgress = M_SupplyPoint->GetCaptureProgress();
 		bM_SawFlagRising |= FlagProgress > 0.05f and FlagProgress < 0.95f and FlagProgress > M_LastFlagProgress;
 		bM_SawCaptureBar |= M_SupplyPoint->GetIsCaptureProgressBarShown();
@@ -520,6 +553,12 @@ private:
 		// The enemy flag comes down first, then the player's goes up: twice the capture duration.
 		Check(GetStepSeconds(World) >= M_Settings.CaptureDuration * 1.8f, TEXT("capture_took_lower_plus_raise"),
 		      FString::Printf(TEXT("seconds=%.1f"), GetStepSeconds(World)));
+		if (not M_Settings.bRunsSupplies)
+		{
+			CheckCaptureOnlyAfterCapture(World);
+			EnterStep(World, SupplyPointMapTestPrivate::EStep::CaptureOnlyHold);
+			return;
+		}
 		Check(M_SupplyPoint->GetSupplyPointState() == ESupplyPointState::PreparingSupplies,
 		      TEXT("supplies_preparing_after_capture"));
 		RememberResources();
@@ -720,6 +759,86 @@ private:
 		Check(SupplySubsystem != nullptr and SupplySubsystem->GetSupplyTruckOfPoint(M_SupplyPoint.Get()) == nullptr,
 		      TEXT("lost_point_has_no_truck"));
 		FinishTest(World);
+	}
+
+	// ---- capture-only points (bRunsSupplies off) ----
+
+	void CheckCaptureOnlyAfterCapture(UWorld& World)
+	{
+		Check(M_SupplyPoint->GetSupplyPointState() == ESupplyPointState::Inactive, TEXT("capture_only_no_supply_cycle"),
+		      FString::Printf(TEXT("state=%d"), static_cast<int32>(M_SupplyPoint->GetSupplyPointState())));
+		Check(FMath::IsNearlyEqual(M_SupplyPoint->GetCaptureProgress(), 1.f), TEXT("flag_fully_up_after_capture"),
+		      FString::Printf(TEXT("progress=%.2f"), M_SupplyPoint->GetCaptureProgress()));
+		CheckHolderLook(true, TEXT("player_look_after_capture"));
+		CheckMiniMapIcon(World, TEXT("minimap_icon_player_held"));
+	}
+
+	void TickCaptureOnlyHold(UWorld& World)
+	{
+		if (not M_SupplyPoint.IsValid())
+		{
+			FinishTest(World);
+			return;
+		}
+		if (GetStepSeconds(World) < SupplyPointMapTestPrivate::CaptureOnlyNoTruckSeconds)
+		{
+			return;
+		}
+		const USupplyPointSubsystem* SupplySubsystem = USupplyPointSubsystem::Get(M_SupplyPoint.Get());
+		Check(SupplySubsystem != nullptr and SupplySubsystem->GetSupplyTruckOfPoint(M_SupplyPoint.Get()) == nullptr,
+		      TEXT("capture_only_sends_no_truck"));
+		Check(M_SupplyPoint->GetSupplyPointState() == ESupplyPointState::Inactive, TEXT("capture_only_stays_inactive"));
+		Check(M_SupplyPoint->GetOwningPlayer() == SupplyPointConstants::PlayerOwner,
+		      TEXT("capture_only_still_player_held"));
+		FinishTest(World);
+	}
+
+	/** Every EnemyHeld / PlayerHeld tagged part must be shown exactly when its holder holds the point. */
+	void CheckHolderLook(const bool bExpectPlayerLook, const TCHAR* Description)
+	{
+		TInlineComponentArray<USceneComponent*> Parts(M_SupplyPoint.Get());
+		int32 TaggedParts = 0;
+		int32 WrongParts = 0;
+		for (const USceneComponent* Part : Parts)
+		{
+			const bool bIsPlayerPart = Part->ComponentHasTag(SupplyPointMapTestPrivate::PlayerHeldPartTag);
+			if (not bIsPlayerPart and not Part->ComponentHasTag(SupplyPointMapTestPrivate::EnemyHeldPartTag))
+			{
+				continue;
+			}
+			++TaggedParts;
+			WrongParts += Part->IsVisible() == (bIsPlayerPart == bExpectPlayerLook) ? 0 : 1;
+		}
+		Check(TaggedParts > 0 and WrongParts == 0, Description,
+		      FString::Printf(TEXT("tagged=%d wrong=%d"), TaggedParts, WrongParts));
+	}
+
+	/** The holder icon must be drawn on the minimap, and the icon data asset must have a texture for it. */
+	void CheckMiniMapIcon(UWorld& World, const TCHAR* Description)
+	{
+		AFowManager* FowManager = FRTS_Statics::GetFowManager(&World);
+		if (not IsValid(FowManager))
+		{
+			Check(false, Description, TEXT("no_fow_manager"));
+			return;
+		}
+		const EMinimapIconType Expected = M_SupplyPoint->GetMiniMapIconOfHolder();
+		FowManager->RefreshCustomMiniMapIconDrawDataForMiniMap();
+		bool bIsDrawn = false;
+		for (const FRTSMinimapCustomIconDrawData& DrawData : FowManager->GetCustomMiniMapIconDrawData())
+		{
+			bIsDrawn |= DrawData.M_IconType == Expected;
+		}
+		TArray<FRTSMinimapIconBrushData> Brushes;
+		FowManager->AppendCustomMiniMapIconBrushData(Brushes);
+		const FRTSMinimapIconBrushData* Brush = Brushes.FindByPredicate([Expected](const FRTSMinimapIconBrushData& Data)
+		{
+			return Data.M_IconType == Expected;
+		});
+		const bool bHasTexture = Brush != nullptr and Brush->M_Texture.IsValid();
+		Check(bIsDrawn and bHasTexture, Description,
+		      FString::Printf(TEXT("icon=%s drawn=%d texture=%s"), *UEnum::GetValueAsString(Expected), bIsDrawn ? 1 : 0,
+		                      bHasTexture ? *Brush->M_Texture->GetName() : TEXT("none")));
 	}
 
 	void FinishTest(UWorld& World)

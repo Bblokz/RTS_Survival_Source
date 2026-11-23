@@ -125,6 +125,11 @@ struct FSupplyPointSettings
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Supply Point|Capture", meta = (ClampMin = "0.1"))
 	float CaptureDecayDuration = 20.f;
 
+	// Off for capture-only sites (the Oder-Warthe direction-finder stations): no supplies timer, no supply truck and
+	// no supply announcer lines; the flag, the minimap icon and the owner events work as usual.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Supply Point|Supplies")
+	bool bRunsSupplies = true;
+
 	// Seconds after capture (and after every loaded truck) until the next load of supplies is ready.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Supply Point|Supplies", meta = (ClampMin = "0.0"))
 	float SuppliesReadyTime = 45.f;

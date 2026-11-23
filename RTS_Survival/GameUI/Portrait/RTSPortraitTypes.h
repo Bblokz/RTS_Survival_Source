@@ -27,4 +27,7 @@ enum class ERTSPortraitTypes :uint8
 	// IS-2 driver at his station, band of daylight across his eyes (panel-glow + dial + station-tremor material;
 	// his head never moves).
 	SovietIS2Driver,
+	// Intercepted Soviet radio, no face: a receiver card with a live signal trace. Speaker "Starik", the recurring
+	// 1945 veteran first heard on Oder-Warthe; Shield operator intercepts reuse it with a transcript speaker override.
+	SovietInterceptStarik,
 };
