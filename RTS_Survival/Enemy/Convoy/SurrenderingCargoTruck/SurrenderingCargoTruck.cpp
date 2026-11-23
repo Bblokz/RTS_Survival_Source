@@ -5,12 +5,17 @@
 #include "EngineUtils.h"
 #include "NiagaraFunctionLibrary.h"
 #include "TimerManager.h"
+#include "Components/StaticMeshComponent.h"
 #include "Components/WidgetComponent.h"
 #include "Engine/DamageEvents.h"
+#include "Engine/StaticMesh.h"
 #include "Engine/World.h"
 #include "Kismet/GameplayStatics.h"
 #include "RTS_Survival/Enemy/Convoy/Convoy.h"
+#include "RTS_Survival/Enemy/Convoy/ConvoyDefinition.h"
 #include "RTS_Survival/Enemy/Convoy/ConvoyRoute.h"
+#include "RTS_Survival/Enemy/Convoy/SurrenderingCargoTruck/SurrenderingTruckSubsystem.h"
+#include "RTS_Survival/Player/PortraitManager/PortraitManager.h"
 #include "RTS_Survival/Game/GameState/GameUnitManager/GameUnitManager.h"
 #include "RTS_Survival/Game/Players/RTSPlayers.h"
 #include "RTS_Survival/RTSComponents/HealthComponent.h"
@@ -186,12 +191,13 @@ void ASurrenderingCargoTruck::CheckSurrender()
 
 void ASurrenderingCargoTruck::CheckSurrender_InConvoy()
 {
-	if (not SurrenderSettings.bCanSurrender or not GetIsTruckAlive())
+	if (not GetIsTruckAlive())
 	{
 		return;
 	}
+	// Found even while surrender is off: the case truck needs its convoy to tell an escape from a removal.
 	const AConvoy* Convoy = GetConvoyOfTruck();
-	if (Convoy == nullptr)
+	if (Convoy == nullptr or not SurrenderSettings.bCanSurrender)
 	{
 		return;
 	}
@@ -424,6 +430,14 @@ void ASurrenderingCargoTruck::ShowCountdownWidget()
 	CountdownComponent->SetRelativeLocation(ScuttleSettings.CountdownWidgetOffset);
 	CountdownComponent->RegisterComponent();
 	M_ScuttleState.CountdownWidgetComponent = CountdownComponent;
+	// The "hide all game UI" toggle only reaches widgets that exist when it is pressed.
+	const USurrenderingTruckSubsystem* Subsystem = USurrenderingTruckSubsystem::Get(this);
+	UW_SurrenderingTruckCountdown* CountdownWidget = Cast<UW_SurrenderingTruckCountdown>(
+		CountdownComponent->GetUserWidgetObject());
+	if (Subsystem != nullptr and Subsystem->GetIsGameUIHidden() and CountdownWidget != nullptr)
+	{
+		CountdownWidget->OnHideAllGameUI(true);
+	}
 	RefreshCountdownWidget();
 	UWorld* World = GetWorld();
 	if (World == nullptr)
@@ -568,9 +582,13 @@ void ASurrenderingCargoTruck::Surrender()
 		M_SurrenderState = ESurrenderingTruckState::Lost;
 		return;
 	}
+	Surrender_RefreshHealthBarForCaptor();
+	Surrender_ShowWhiteFlag();
 	UE_LOG(LogConvoy, Log, TEXT("Surrendering truck %s surrendered to player %d (cargo radixite=%d metal=%d parts=%d)"),
 	       *GetName(), SurrenderSettings.CapturingPlayer, M_CapturedCargo.Radixite, M_CapturedCargo.Metal,
 	       M_CapturedCargo.VehicleParts);
+	// Before the events: a listener that removes the truck must not leave the line unclaimed for the next one.
+	Surrender_TryPlayFirstSurrenderLine();
 	OnSurrendered.Broadcast(this);
 	BP_OnSurrendered(SurrenderSettings.CapturingPlayer);
 	if (M_SurrenderState == ESurrenderingTruckState::Surrendered)
@@ -634,6 +652,85 @@ bool ASurrenderingCargoTruck::Surrender_SetupSupplyTruck()
 	return true;
 }
 
+void ASurrenderingCargoTruck::Surrender_RefreshHealthBarForCaptor() const
+{
+	UHealthComponent* TruckHealth = GetHealthComponent();
+	if (not IsValid(TruckHealth))
+	{
+		return;
+	}
+	// Re-applying the same customization re-reads the owner: the captor's colours instead of the enemy colour.
+	TruckHealth->ChangeCustomizationSettings(TruckHealth->GetCustomizationSettings());
+	// The player's visibility strategy from the user settings, not the enemy one; without one the unit keeps its own.
+	if (UGameUnitManager* UnitManager = FRTS_Statics::GetGameUnitManager(this))
+	{
+		UnitManager->TryApplyHealthBarVisibilityFromUserSettings(TruckHealth);
+	}
+}
+
+void ASurrenderingCargoTruck::Surrender_ShowWhiteFlag()
+{
+	UStaticMesh* FlagMesh = DisplaySettings.WhiteFlagMesh.Get();
+	if (FlagMesh == nullptr or IsValid(M_WhiteFlagComponent))
+	{
+		return;
+	}
+	USceneComponent* AttachParent = FindWhiteFlagAttachParent();
+	if (not IsValid(AttachParent))
+	{
+		return;
+	}
+	UStaticMeshComponent* FlagComponent = NewObject<UStaticMeshComponent>(this, TEXT("SurrenderWhiteFlag"));
+	FlagComponent->SetStaticMesh(FlagMesh);
+	FlagComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	FlagComponent->SetGenerateOverlapEvents(false);
+	FlagComponent->SetCanEverAffectNavigation(false);
+	const bool bUseSocket = not DisplaySettings.WhiteFlagSocket.IsNone()
+		and AttachParent->DoesSocketExist(DisplaySettings.WhiteFlagSocket);
+	FlagComponent->SetupAttachment(AttachParent, bUseSocket ? DisplaySettings.WhiteFlagSocket : NAME_None);
+	FlagComponent->SetRelativeTransform(DisplaySettings.WhiteFlagRelativeTransform);
+	// Hidden with the actor by the fog of war; no hidden flag of its own, or it would stay hidden once revealed.
+	FlagComponent->RegisterComponent();
+	M_WhiteFlagComponent = FlagComponent;
+}
+
+USceneComponent* ASurrenderingCargoTruck::FindWhiteFlagAttachParent() const
+{
+	if (DisplaySettings.WhiteFlagSocket.IsNone())
+	{
+		return GetRootComponent();
+	}
+	TInlineComponentArray<USceneComponent*> SceneComponents(this);
+	for (USceneComponent* Candidate : SceneComponents)
+	{
+		if (IsValid(Candidate) and Candidate->DoesSocketExist(DisplaySettings.WhiteFlagSocket))
+		{
+			return Candidate;
+		}
+	}
+	UE_LOG(LogConvoy, Warning, TEXT("Surrendering truck %s has no socket %s for the white flag; it hangs from the root."),
+	       *GetName(), *DisplaySettings.WhiteFlagSocket.ToString());
+	return GetRootComponent();
+}
+
+void ASurrenderingCargoTruck::Surrender_TryPlayFirstSurrenderLine()
+{
+	USurrenderingTruckSubsystem* Subsystem = USurrenderingTruckSubsystem::Get(this);
+	if (Subsystem == nullptr or not Subsystem->TryClaimFirstSurrender())
+	{
+		return;
+	}
+	if (IsValid(DisplaySettings.FirstSurrenderVoiceLine))
+	{
+		if (UPlayerPortraitManager* PortraitManager = FRTS_Statics::GetPlayerPortraitManager(this))
+		{
+			PortraitManager->PlayPortrait(DisplaySettings.FirstSurrenderPortrait, DisplaySettings.FirstSurrenderVoiceLine);
+		}
+	}
+	BP_OnFirstSurrenderInWorld();
+	Subsystem->BroadcastFirstTruckSurrendered(this);
+}
+
 void ASurrenderingCargoTruck::ScheduleDriveToDropOff()
 {
 	UWorld* World = GetWorld();
@@ -671,29 +768,48 @@ FSupplyTruckCargo ASurrenderingCargoTruck::BuildCapturedCargo() const
 			+ " has no convoy to read its cargo from and no fixed cargo; it carries nothing.");
 		return Cargo;
 	}
-	const float Multiplier = FMath::Max(0.f, DeliverySettings.CapturedCargoMultiplier);
-	for (const TPair<ERTSResourceType, int32>& Pair : Convoy->GetCargoPerTruck().Resources)
+	// The truck's own cargo (a mixed column's override) wins over the definition's.
+	const UConvoyDefinition* Definition = Convoy->GetDefinition();
+	EConvoyCargoType CargoType = IsValid(Definition) ? Definition->Cargo.CargoType : EConvoyCargoType::Fuel;
+	EConvoyCargoType TruckCargoType = CargoType;
+	if (Convoy->GetTruckCargoType(this, TruckCargoType))
 	{
-		const int32 Amount = FMath::RoundToInt(Pair.Value * Multiplier);
-		switch (Pair.Key)
-		{
-		case ERTSResourceType::Resource_Radixite:
-			Cargo.Radixite += Amount;
-			break;
-		case ERTSResourceType::Resource_Metal:
-			Cargo.Metal += Amount;
-			break;
-		case ERTSResourceType::Resource_VehicleParts:
-			Cargo.VehicleParts += Amount;
-			break;
-		default:
-			// A supply truck only carries what the player stores; use FixedCargo for anything else.
-			UE_LOG(LogConvoy, Warning, TEXT("Surrendering truck %s cannot carry %s (%d); it is left out."),
-			       *GetName(), *Global_GetResourceTypeAsString(Pair.Key), Amount);
-			break;
-		}
+		CargoType = TruckCargoType;
+	}
+	const ERTSResourceType PayoutResource = DeliverySettings.PayoutMapping.GetPayoutResource(CargoType);
+	const float Multiplier = FMath::Max(0.f, DeliverySettings.CapturedCargoMultiplier);
+	// The whole share of one truck, whatever resources its cache holds, paid in the cargo type's resource.
+	const int32 Amount = FMath::RoundToInt(Convoy->GetCargoPerTruck().GetTotal() * Multiplier);
+	AddToCapturedCargo(Cargo, PayoutResource, Amount);
+	if (Cargo.GetIsEmpty())
+	{
+		UE_LOG(LogConvoy, Warning, TEXT("Surrendering truck %s: %s cargo pays %d %s; it carries nothing."), *GetName(),
+		       *ConvoyNames::GetCargoName(CargoType), Amount, *Global_GetResourceTypeAsString(PayoutResource));
 	}
 	return Cargo;
+}
+
+void ASurrenderingCargoTruck::AddToCapturedCargo(FSupplyTruckCargo& Cargo, const ERTSResourceType ResourceType,
+                                                 const int32 Amount)
+{
+	switch (ResourceType)
+	{
+	case ERTSResourceType::Resource_Radixite:
+		Cargo.Radixite += Amount;
+		break;
+	case ERTSResourceType::Resource_Metal:
+		Cargo.Metal += Amount;
+		break;
+	case ERTSResourceType::Resource_VehicleParts:
+		Cargo.VehicleParts += Amount;
+		break;
+	default:
+		// A supply truck only carries what the player stores; fix PayoutMapping or use FixedCargo.
+		RTSFunctionLibrary::ReportError("Surrendering truck PayoutMapping points at "
+			+ Global_GetResourceTypeAsString(ResourceType) + ", which a supply truck cannot carry; the cargo is "
+			"left out. Use Radixite, Metal or VehicleParts.");
+		break;
+	}
 }
 
 // ------------------------------------------------------------------
@@ -777,6 +893,7 @@ void ASurrenderingCargoTruck::OnSupplyRunEnded(USupplyTruckComponent* SupplyTruc
 		UE_LOG(LogConvoy, Log, TEXT("Captured truck %s delivered its cargo."), *GetName());
 		OnCapturedCargoDelivered.Broadcast(this, M_CapturedCargo);
 		BP_OnCapturedCargoDelivered(M_CapturedCargo);
+		HandleCapturedCargoDelivered();
 		return;
 	}
 	M_SurrenderState = ESurrenderingTruckState::Lost;

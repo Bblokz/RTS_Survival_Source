@@ -3,7 +3,10 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "RTS_Survival/Enemy/Convoy/ConvoyTypes.h"
 #include "RTS_Survival/Enemy/Convoy/SurrenderingCargoTruck/W_SurrenderingTruckCountdown.h"
+#include "RTS_Survival/GameUI/Portrait/RTSPortraitTypes.h"
+#include "RTS_Survival/Resources/ResourceTypes/ResourceTypes.h"
 #include "RTS_Survival/SupplyPoints/SupplyPointTypes.h"
 #include "RTS_Survival/Units/Tanks/TrackedTank/TrackedTankMaster.h"
 #include "RTS_Survival/Weapons/WeaponData/RTSDamageTypes/RTSDamageTypes.h"
@@ -14,6 +17,8 @@ class AConvoy;
 class ASurrenderingCargoTruck;
 class UNiagaraSystem;
 class USoundBase;
+class UStaticMesh;
+class UStaticMeshComponent;
 class USupplyTruckComponent;
 class UWidgetComponent;
 
@@ -169,6 +174,40 @@ struct FSurrenderingTruckScuttleSettings
 	float CountdownRefreshSeconds = 0.1f;
 };
 
+/**
+ * Which resource a captured truck pays for its convoy's cargo type (owner pick 2026-11-23). A supply truck only
+ * carries what the player stores: Radixite, metal or vehicle parts.
+ */
+USTRUCT(BlueprintType)
+struct FSurrenderingTruckPayoutMapping
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Payout")
+	ERTSResourceType FuelPaysAs = ERTSResourceType::Resource_Radixite;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Payout")
+	ERTSResourceType VehiclePartsPaysAs = ERTSResourceType::Resource_VehicleParts;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Payout")
+	ERTSResourceType AmmoPaysAs = ERTSResourceType::Resource_Metal;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Payout")
+	ERTSResourceType ConcretePaysAs = ERTSResourceType::Resource_Metal;
+
+	ERTSResourceType GetPayoutResource(const EConvoyCargoType CargoType) const
+	{
+		switch (CargoType)
+		{
+		case EConvoyCargoType::VehicleParts: return VehiclePartsPaysAs;
+		case EConvoyCargoType::Ammo: return AmmoPaysAs;
+		case EConvoyCargoType::Concrete: return ConcretePaysAs;
+		case EConvoyCargoType::Fuel:
+		default: return FuelPaysAs;
+		}
+	}
+};
+
 /** Where a captured truck drives and what it pays there. */
 USTRUCT(BlueprintType)
 struct FSurrenderingTruckDeliverySettings
@@ -180,9 +219,13 @@ struct FSurrenderingTruckDeliverySettings
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Delivery")
 	FName DropOffTag = TEXT("CapturedTruckDropOff");
 
-	// Multiplies the convoy's per-truck cargo (what this truck's cache would pay) for the captured payout.
+	// The captured payout: the whole per-truck cargo value of the convoy (all resources of one truck's cache
+	// summed) times this, paid in PayoutMapping's resource for the convoy's cargo type.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Delivery", meta = (ClampMin = "0"))
 	float CapturedCargoMultiplier = 2.5f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Delivery")
+	FSurrenderingTruckPayoutMapping PayoutMapping;
 
 	// On: pay FixedCargo instead of the convoy's cargo (also used when the truck has no convoy).
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Delivery")
@@ -190,6 +233,32 @@ struct FSurrenderingTruckDeliverySettings
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Delivery", meta = (EditCondition = "bUseFixedCargo"))
 	FSupplyTruckCargo FixedCargo;
+};
+
+/** What shows the surrender (owner pick 2026-11-23): a white flag, the captor's colours, one Advisor line. */
+USTRUCT(BlueprintType)
+struct FSurrenderingTruckDisplaySettings
+{
+	GENERATED_BODY()
+
+	// Shown on the truck from the surrender on (none = no flag). The project has no white flag mesh yet.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Surrender Display")
+	TObjectPtr<UStaticMesh> WhiteFlagMesh = nullptr;
+
+	// Socket on any mesh of the truck the flag hangs from; none (or not found) = the truck's root.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Surrender Display")
+	FName WhiteFlagSocket = NAME_None;
+
+	// Relative to the socket (or root).
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Surrender Display")
+	FTransform WhiteFlagRelativeTransform = FTransform(FVector(0.f, 0.f, 300.f));
+
+	// Played once per world, by the first truck that surrenders (Advisor: "they're giving up..." ); none = no line.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Surrender Display")
+	TObjectPtr<USoundBase> FirstSurrenderVoiceLine = nullptr;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Surrender Display")
+	ERTSPortraitTypes FirstSurrenderPortrait = ERTSPortraitTypes::GermanAnnouncer;
 };
 
 /** Runtime state of the scuttle countdown. */
@@ -215,7 +284,8 @@ struct FSurrenderingTruckScuttleState
 /**
  * @brief Point FConvoyTruckSpec::TruckClass at a Blueprint child: once its escort is gone the crew waits a short
  * countdown for infantry to take the truck, then blows it up. A taken truck changes owner and drives itself
- * (USupplyTruckComponent) to the drop-off, paying its cargo on arrival. Only trucks of this class do this.
+ * (USupplyTruckComponent) to the drop-off, paying 2.5x its cargo (by PayoutMapping) on arrival. Only trucks of this
+ * class do this. Rules, settings and Blueprint API: Docs/Missions/SurrenderingCargoTruck.md.
  * @note InitTrackedTank: call in the Blueprint child, as for any tracked tank master.
  * @note SetupTurret: call in the Blueprint child for each turret, as for any tracked tank master.
  */
@@ -251,12 +321,26 @@ public:
 	UFUNCTION(BlueprintPure, NotBlueprintable, Category = "Surrendering Truck")
 	float GetScuttleSecondsLeft() const;
 
+	/** @return True while the truck holds itself in place (scuttle countdown that stops it, or just surrendered). */
+	UFUNCTION(BlueprintPure, NotBlueprintable, Category = "Surrendering Truck")
+	bool GetIsHeldInPlace() const
+	{
+		return (M_SurrenderState == ESurrenderingTruckState::ScuttleCountdown and ScuttleSettings.bStopDuringCountdown)
+			or M_SurrenderState == ESurrenderingTruckState::Surrendered;
+	}
+
+	// The convoy converts the cache of a truck with its own cargo type with the same mapping.
+	const FSurrenderingTruckPayoutMapping& GetPayoutMapping() const { return DeliverySettings.PayoutMapping; }
+
 	// What the truck pays on arrival; empty until it surrenders.
 	UFUNCTION(BlueprintPure, NotBlueprintable, Category = "Surrendering Truck")
 	const FSupplyTruckCargo& GetCapturedCargo() const { return M_CapturedCargo; }
 
 	virtual float TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator,
 	                         AActor* DamageCauser) override;
+
+	/** @return False when the convoy must not drop its cargo cache for this truck (the case truck has its own). */
+	virtual bool GetDropsConvoyCargoCache() const { return true; }
 
 	// The escort is gone: the scuttle countdown started.
 	UPROPERTY(BlueprintAssignable, Category = "Surrendering Truck")
@@ -283,6 +367,12 @@ protected:
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void UnitDies(const ERTSDeathType DeathType) override;
 
+	// Called once when the captured truck paid its cargo at the drop-off, before it is removed.
+	virtual void HandleCapturedCargoDelivered() {}
+
+	/** @return The convoy the truck drove in; kept after it left alive at the exit, cleared when it surrendered. */
+	AConvoy* GetLastKnownConvoy() const { return M_Convoy.Get(); }
+
 	// Crew warning (shout, flare, smoke) as the countdown starts.
 	UFUNCTION(BlueprintImplementableEvent, Category = "Surrendering Truck")
 	void BP_OnScuttleCountdownStarted(float CountdownSeconds);
@@ -291,9 +381,13 @@ protected:
 	UFUNCTION(BlueprintImplementableEvent, Category = "Surrendering Truck")
 	void BP_OnScuttled();
 
-	// Show the surrender here: white flag, voice line, minimap icon.
+	// Extra surrender show; the white flag, health bar colour, minimap colour and first Advisor line are done in C++.
 	UFUNCTION(BlueprintImplementableEvent, Category = "Surrendering Truck")
 	void BP_OnSurrendered(int32 NewOwningPlayer);
+
+	// This was the first truck in the world to surrender (the surrender line just played, when set).
+	UFUNCTION(BlueprintImplementableEvent, Category = "Surrendering Truck")
+	void BP_OnFirstSurrenderInWorld();
 
 	UFUNCTION(BlueprintImplementableEvent, Category = "Surrendering Truck")
 	void BP_OnDriveToDropOffStarted(AActor* DropOffTarget);
@@ -312,6 +406,9 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Surrendering Truck")
 	FSurrenderingTruckDeliverySettings DeliverySettings;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Surrendering Truck")
+	FSurrenderingTruckDisplaySettings DisplaySettings;
 
 private:
 	void BeginPlay_StartSurrenderChecks();
@@ -351,9 +448,15 @@ private:
 	void Surrender_LeaveConvoy();
 	void Surrender_ChangeOwnerToCaptor();
 	bool Surrender_SetupSupplyTruck();
+	// The health bar only reads the owner when it is set up: give it the captor's colour and visibility rules.
+	void Surrender_RefreshHealthBarForCaptor() const;
+	void Surrender_ShowWhiteFlag();
+	USceneComponent* FindWhiteFlagAttachParent() const;
+	void Surrender_TryPlayFirstSurrenderLine();
 	void ScheduleDriveToDropOff();
 
 	FSupplyTruckCargo BuildCapturedCargo() const;
+	static void AddToCapturedCargo(FSupplyTruckCargo& Cargo, ERTSResourceType ResourceType, int32 Amount);
 	void StartDriveToDropOff();
 	AActor* FindDropOffTarget() const;
 	FTransform GetDeliveryTransformOfDropOff(const AActor& DropOff) const;
@@ -384,6 +487,10 @@ private:
 
 	UPROPERTY()
 	FSurrenderingTruckScuttleState M_ScuttleState;
+
+	// Created when the truck surrenders (DisplaySettings.WhiteFlagMesh); goes with the truck.
+	UPROPERTY()
+	TObjectPtr<UStaticMeshComponent> M_WhiteFlagComponent;
 
 	FTimerHandle M_SurrenderCheckTimerHandle;
 	FTimerHandle M_DriveToDropOffTimerHandle;

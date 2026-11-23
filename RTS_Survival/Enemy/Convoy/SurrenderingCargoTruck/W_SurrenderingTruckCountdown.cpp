@@ -23,6 +23,11 @@ namespace SurrenderingTruckCountdownLayout
 	const FLinearColor TextColour(1.f, 0.85f, 0.75f, 1.f);
 }
 
+void UW_SurrenderingTruckCountdown::OnHideAllGameUI(const bool bHide)
+{
+	SetVisibility(bHide ? ESlateVisibility::Collapsed : ESlateVisibility::HitTestInvisible);
+}
+
 bool UW_SurrenderingTruckCountdown::Initialize()
 {
 	const bool bInitializedNow = Super::Initialize();
