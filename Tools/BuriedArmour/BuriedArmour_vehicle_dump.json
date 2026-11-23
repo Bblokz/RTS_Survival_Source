@@ -1,0 +1,3277 @@
+{
+ "vehicles": {
+  "StuGIII": {
+   "bp": "/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Medium/Stug/Ger_Vehicle_StugIII",
+   "components": [
+    {
+     "actor": "Ger_Vehicle_StugIII_C",
+     "chain": [],
+     "comp": "TrackMesh",
+     "class": "SkeletalMeshComponent",
+     "xf": {
+      "loc": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quat": [
+       0.0,
+       0.0,
+       0.0,
+       1.0
+      ],
+      "scale": [
+       1.0,
+       1.0,
+       1.0
+      ]
+     },
+     "visible": true,
+     "parent": null,
+     "socket": "None",
+     "mesh": "/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Medium/PanzerIII/Meshes/SK_PanzerIII_Tracks",
+     "mats": [
+      "/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/MasterMaterials/DerivedUsedMutlipleTimes/MI_PanzerIV_Wheels",
+      "/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/MasterMaterials/DerivedUsedMutlipleTimes/MI_PanzerIVTracks",
+      "/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/MasterMaterials/DerivedUsedMutlipleTimes/MI_PanzerIVTracks"
+     ],
+     "export": {
+      "fbx": "D:/UE5Projects/RTS_Survival/Saved/BuriedArmour/dump/fbx/SK_PanzerIII_Tracks.fbx",
+      "class": "SkeletalMesh",
+      "bbox_err": "'BoxSphereBounds' object has no attribute 'get_box'"
+     }
+    },
+    {
+     "actor": "Ger_Vehicle_StugIII_C",
+     "chain": [],
+     "comp": "Selectionarea",
+     "class": "BoxComponent",
+     "xf": {
+      "loc": [
+       10.0,
+       0.0,
+       129.44076799999993
+      ],
+      "quat": [
+       0.0,
+       0.0,
+       0.0,
+       1.0
+      ],
+      "scale": [
+       7.5,
+       4.0,
+       3.0
+      ]
+     },
+     "visible": false,
+     "parent": "TrackMesh",
+     "socket": "None"
+    },
+    {
+     "actor": "Ger_Vehicle_StugIII_C",
+     "chain": [],
+     "comp": "SelectedDecal",
+     "class": "DecalComponent",
+     "xf": {
+      "loc": [
+       12.05334000000039,
+       3.099999958067201e-05,
+       -10.505773999999974
+      ],
+      "quat": [
+       -1.3234889800848443e-23,
+       -0.7071067811865475,
+       2.6469779601696886e-23,
+       0.7071067811865476
+      ],
+      "scale": [
+       1.0,
+       10.0,
+       10.0
+      ]
+     },
+     "visible": false,
+     "parent": "TrackMesh",
+     "socket": "None"
+    },
+    {
+     "actor": "Ger_Vehicle_StugIII_C",
+     "chain": [],
+     "comp": "NS_TrackSmokes",
+     "class": "NiagaraComponent",
+     "xf": {
+      "loc": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quat": [
+       0.0,
+       0.0,
+       0.0,
+       1.0
+      ],
+      "scale": [
+       1.0,
+       1.0,
+       1.0
+      ]
+     },
+     "visible": false,
+     "parent": "TrackMesh",
+     "socket": "None"
+    },
+    {
+     "actor": "Ger_Vehicle_StugIII_C",
+     "chain": [],
+     "comp": "Hull",
+     "class": "StaticMeshComponent",
+     "xf": {
+      "loc": [
+       83.06543242931366,
+       2.0,
+       -4.0
+      ],
+      "quat": [
+       0.0,
+       0.0,
+       0.0,
+       1.0
+      ],
+      "scale": [
+       1.0,
+       1.0,
+       1.0
+      ]
+     },
+     "visible": true,
+     "parent": "TrackMesh",
+     "socket": "None",
+     "mesh": "/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Medium/Stug/Meshes/SM_StugIII_BaseMesh",
+     "mats": [
+      "/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Medium/Stug/Materials/MI_StugIII_Hull_DesertAPO"
+     ],
+     "export": {
+      "fbx": "D:/UE5Projects/RTS_Survival/Saved/BuriedArmour/dump/fbx/SM_StugIII_BaseMesh.fbx",
+      "class": "StaticMesh",
+      "bbox": [
+       [
+        -336.21446228027344,
+        -160.77064514160156,
+        24.790252685546875
+       ],
+       [
+        208.29164123535156,
+        158.96754455566406,
+        363.3766174316406
+       ]
+      ]
+     }
+    },
+    {
+     "actor": "Ger_Vehicle_StugIII_C",
+     "chain": [],
+     "comp": "Turret",
+     "class": "ChildActorComponent",
+     "xf": {
+      "loc": [
+       96.06543242931366,
+       11.0,
+       159.0
+      ],
+      "quat": [
+       0.0,
+       0.0,
+       0.0,
+       1.0
+      ],
+      "scale": [
+       1.0,
+       1.0,
+       1.0
+      ]
+     },
+     "visible": true,
+     "parent": "Hull",
+     "socket": "Turret",
+     "child_actor": "EmbTurret_StugIII_C"
+    },
+    {
+     "actor": "EmbTurret_StugIII_C",
+     "chain": [
+      "Turret"
+     ],
+     "comp": "Turret",
+     "class": "SkeletalMeshComponent",
+     "xf": {
+      "loc": [
+       96.06543242931366,
+       11.0,
+       159.0
+      ],
+      "quat": [
+       0.0,
+       0.0,
+       0.0,
+       1.0
+      ],
+      "scale": [
+       1.0,
+       1.0,
+       1.0
+      ]
+     },
+     "visible": true,
+     "parent": "Turret",
+     "socket": "None",
+     "mesh": "/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Medium/Stug/Meshes/SK_StugIII_Turret",
+     "mats": [
+      "/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Medium/Stug/Materials/MI_StugIII_Hull_DesertAPO"
+     ],
+     "export": {
+      "fbx": "D:/UE5Projects/RTS_Survival/Saved/BuriedArmour/dump/fbx/SK_StugIII_Turret.fbx",
+      "class": "SkeletalMesh",
+      "bbox_err": "'BoxSphereBounds' object has no attribute 'get_box'"
+     }
+    },
+    {
+     "actor": "Ger_Vehicle_StugIII_C",
+     "chain": [],
+     "comp": "NS_Exhaust",
+     "class": "NiagaraComponent",
+     "xf": {
+      "loc": [
+       -238.93456757068634,
+       1.9999999378087523,
+       111.82844150416668
+      ],
+      "quat": [
+       0.0,
+       0.0,
+       0.0,
+       1.0
+      ],
+      "scale": [
+       0.25,
+       0.25,
+       0.25
+      ]
+     },
+     "visible": true,
+     "parent": "Hull",
+     "socket": "Exhaust"
+    },
+    {
+     "actor": "Ger_Vehicle_StugIII_C",
+     "chain": [],
+     "comp": "TopMG",
+     "class": "ChildActorComponent",
+     "xf": {
+      "loc": [
+       44.63156901853381,
+       78.99999976824984,
+       223.00000049039545
+      ],
+      "quat": [
+       0.0,
+       0.0,
+       0.0,
+       1.0
+      ],
+      "scale": [
+       1.0,
+       1.0,
+       1.0
+      ]
+     },
+     "visible": true,
+     "parent": "Hull",
+     "socket": "TopMG",
+     "child_actor": "Ger_EmbTurret_MG34_C"
+    },
+    {
+     "actor": "Ger_EmbTurret_MG34_C",
+     "chain": [
+      "TopMG"
+     ],
+     "comp": "Turret",
+     "class": "SkeletalMeshComponent",
+     "xf": {
+      "loc": [
+       44.63156901853381,
+       78.99999976824984,
+       223.00000049039545
+      ],
+      "quat": [
+       0.0,
+       0.0,
+       0.0,
+       1.0
+      ],
+      "scale": [
+       1.0,
+       1.0,
+       1.0
+      ]
+     },
+     "visible": true,
+     "parent": "TopMG",
+     "socket": "None",
+     "mesh": "/Game/RTS_Survival/Blueprints/Turrets/EmbeddedTurrets/MG34Top/Meshes/SK_MG34_Top",
+     "mats": [
+      "/Game/RTS_Survival/Blueprints/Turrets/EmbeddedTurrets/MG34Top/Meshes/M_MG34"
+     ],
+     "export": {
+      "fbx": "D:/UE5Projects/RTS_Survival/Saved/BuriedArmour/dump/fbx/SK_MG34_Top.fbx",
+      "class": "SkeletalMesh",
+      "bbox_err": "'BoxSphereBounds' object has no attribute 'get_box'"
+     }
+    },
+    {
+     "actor": "Ger_Vehicle_StugIII_C",
+     "chain": [],
+     "comp": "EngineSound",
+     "class": "AudioComponent",
+     "xf": {
+      "loc": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quat": [
+       0.0,
+       0.0,
+       0.0,
+       1.0
+      ],
+      "scale": [
+       1.0,
+       1.0,
+       1.0
+      ]
+     },
+     "visible": true,
+     "parent": "TrackMesh",
+     "socket": "None"
+    },
+    {
+     "actor": "Ger_Vehicle_StugIII_C",
+     "chain": [],
+     "comp": "BillboardComponent_2",
+     "class": "BillboardComponent",
+     "xf": {
+      "loc": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quat": [
+       0.0,
+       0.0,
+       0.0,
+       1.0
+      ],
+      "scale": [
+       0.5,
+       0.5,
+       0.5
+      ]
+     },
+     "visible": false,
+     "parent": "EngineSound",
+     "socket": "None"
+    }
+   ]
+  },
+  "Wespe": {
+   "bp": "/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Light/Wespe/Ger_Vehicle_Wespe",
+   "components": [
+    {
+     "actor": "Ger_Vehicle_Wespe_C",
+     "chain": [],
+     "comp": "TrackMesh",
+     "class": "SkeletalMeshComponent",
+     "xf": {
+      "loc": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quat": [
+       0.0,
+       0.0,
+       0.0,
+       1.0
+      ],
+      "scale": [
+       1.0,
+       1.0,
+       1.0
+      ]
+     },
+     "visible": true,
+     "parent": null,
+     "socket": "None",
+     "mesh": "/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Light/Panzer1/Meshes/SK_Pazner1_Tracks",
+     "mats": [
+      "/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/MasterMaterials/DerivedUsedMutlipleTimes/MI_PanzerIV_Wheels",
+      "/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/MasterMaterials/DerivedUsedMutlipleTimes/MI_PanzerIVTracks",
+      "/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/MasterMaterials/DerivedUsedMutlipleTimes/MI_PanzerIV_Wheels"
+     ],
+     "export": {
+      "fbx": "D:/UE5Projects/RTS_Survival/Saved/BuriedArmour/dump/fbx/SK_Pazner1_Tracks.fbx",
+      "class": "SkeletalMesh",
+      "bbox_err": "'BoxSphereBounds' object has no attribute 'get_box'"
+     }
+    },
+    {
+     "actor": "Ger_Vehicle_Wespe_C",
+     "chain": [],
+     "comp": "Selectionarea",
+     "class": "BoxComponent",
+     "xf": {
+      "loc": [
+       -6.000000212225132e-06,
+       0.0,
+       129.44076799999993
+      ],
+      "quat": [
+       0.0,
+       0.0,
+       0.0,
+       1.0
+      ],
+      "scale": [
+       7.5,
+       3.5,
+       3.0
+      ]
+     },
+     "visible": false,
+     "parent": "TrackMesh",
+     "socket": "None"
+    },
+    {
+     "actor": "Ger_Vehicle_Wespe_C",
+     "chain": [],
+     "comp": "SelectedDecal",
+     "class": "DecalComponent",
+     "xf": {
+      "loc": [
+       12.05334000000039,
+       3.099999958067201e-05,
+       -10.505773999999974
+      ],
+      "quat": [
+       -1.3234889800848443e-23,
+       -0.7071067811865475,
+       2.6469779601696886e-23,
+       0.7071067811865476
+      ],
+      "scale": [
+       1.0,
+       10.0,
+       10.0
+      ]
+     },
+     "visible": false,
+     "parent": "TrackMesh",
+     "socket": "None"
+    },
+    {
+     "actor": "Ger_Vehicle_Wespe_C",
+     "chain": [],
+     "comp": "NS_TrackSmokes",
+     "class": "NiagaraComponent",
+     "xf": {
+      "loc": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quat": [
+       0.0,
+       0.0,
+       0.0,
+       1.0
+      ],
+      "scale": [
+       1.0,
+       1.0,
+       1.0
+      ]
+     },
+     "visible": true,
+     "parent": "TrackMesh",
+     "socket": "None"
+    },
+    {
+     "actor": "Ger_Vehicle_Wespe_C",
+     "chain": [],
+     "comp": "Hull",
+     "class": "StaticMeshComponent",
+     "xf": {
+      "loc": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quat": [
+       0.0,
+       0.0,
+       0.0,
+       1.0
+      ],
+      "scale": [
+       1.0,
+       1.0,
+       1.0
+      ]
+     },
+     "visible": true,
+     "parent": "TrackMesh",
+     "socket": "None",
+     "mesh": "/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Light/Wespe/Meshes/SM_Wespe_Hull",
+     "mats": [
+      "/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Light/Wespe/Materials/MI_Hull_Wespe"
+     ],
+     "export": {
+      "fbx": "D:/UE5Projects/RTS_Survival/Saved/BuriedArmour/dump/fbx/SM_Wespe_Hull.fbx",
+      "class": "StaticMesh",
+      "bbox": [
+       [
+        -258.908935546875,
+        -108.1718864440918,
+        30.85174560546875
+       ],
+       [
+        212.08572387695312,
+        107.26509475708008,
+        208.54244995117188
+       ]
+      ]
+     }
+    },
+    {
+     "actor": "Ger_Vehicle_Wespe_C",
+     "chain": [],
+     "comp": "NS_Exhaust",
+     "class": "NiagaraComponent",
+     "xf": {
+      "loc": [
+       -350.4907392201512,
+       -2.000000599447958,
+       169.2534349641628
+      ],
+      "quat": [
+       0.0,
+       0.0,
+       0.0,
+       1.0
+      ],
+      "scale": [
+       0.4,
+       0.4,
+       2.0
+      ]
+     },
+     "visible": true,
+     "parent": "Hull",
+     "socket": "Exhaust"
+    },
+    {
+     "actor": "Ger_Vehicle_Wespe_C",
+     "chain": [],
+     "comp": "Crew1",
+     "class": "SkeletalMeshComponent",
+     "xf": {
+      "loc": [
+       -88.0,
+       -45.0,
+       133.9000000000001
+      ],
+      "quat": [
+       0.0,
+       0.0,
+       -0.7071067811865476,
+       0.7071067811865477
+      ],
+      "scale": [
+       1.0,
+       1.0,
+       1.0
+      ]
+     },
+     "visible": true,
+     "parent": "Hull",
+     "socket": "None",
+     "mesh": "/Game/RTS_Survival/Blueprints/Squads/SquadUnits/Skeletons/PostApocalyptic/Mesh/SK_PostApoSoldier",
+     "mats": [
+      "/Game/RTS_Survival/Blueprints/Squads/SquadUnits/Skeletons/PostApocalyptic/Material/M_ScavengerNoCamo"
+     ],
+     "export": {
+      "fbx": "D:/UE5Projects/RTS_Survival/Saved/BuriedArmour/dump/fbx/SK_PostApoSoldier.fbx",
+      "class": "SkeletalMesh",
+      "bbox_err": "'BoxSphereBounds' object has no attribute 'get_box'"
+     }
+    },
+    {
+     "actor": "Ger_Vehicle_Wespe_C",
+     "chain": [],
+     "comp": "Crew2",
+     "class": "SkeletalMeshComponent",
+     "xf": {
+      "loc": [
+       -88.0,
+       46.0,
+       133.9000000000001
+      ],
+      "quat": [
+       0.0,
+       0.0,
+       0.7071067811865476,
+       0.7071067811865477
+      ],
+      "scale": [
+       1.0,
+       1.0,
+       1.0
+      ]
+     },
+     "visible": true,
+     "parent": "Hull",
+     "socket": "None",
+     "mesh": "/Game/RTS_Survival/Blueprints/Squads/SquadUnits/Skeletons/PostApocalyptic/Mesh/SK_PostApoSoldier",
+     "mats": [
+      "/Game/RTS_Survival/Blueprints/Squads/SquadUnits/Skeletons/PostApocalyptic/Material/M_ScavengerNoCamo"
+     ],
+     "export": {
+      "fbx": "D:/UE5Projects/RTS_Survival/Saved/BuriedArmour/dump/fbx/SK_PostApoSoldier.fbx",
+      "class": "SkeletalMesh",
+      "bbox_err": "'BoxSphereBounds' object has no attribute 'get_box'"
+     }
+    },
+    {
+     "actor": "Ger_Vehicle_Wespe_C",
+     "chain": [],
+     "comp": "Crew3",
+     "class": "SkeletalMeshComponent",
+     "xf": {
+      "loc": [
+       -202.0,
+       28.0,
+       60.80000000000018
+      ],
+      "quat": [
+       0.0,
+       0.0,
+       -0.7071067811865476,
+       0.7071067811865477
+      ],
+      "scale": [
+       1.0,
+       1.0,
+       1.0
+      ]
+     },
+     "visible": true,
+     "parent": "Hull",
+     "socket": "None",
+     "mesh": "/Game/RTS_Survival/Blueprints/Squads/SquadUnits/Skeletons/PostApocalyptic/Mesh/SK_PostApoSoldier",
+     "mats": [
+      "/Game/RTS_Survival/Blueprints/Squads/SquadUnits/Skeletons/PostApocalyptic/Material/M_ScavengerNoCamo"
+     ],
+     "export": {
+      "fbx": "D:/UE5Projects/RTS_Survival/Saved/BuriedArmour/dump/fbx/SK_PostApoSoldier.fbx",
+      "class": "SkeletalMesh",
+      "bbox_err": "'BoxSphereBounds' object has no attribute 'get_box'"
+     }
+    },
+    {
+     "actor": "Ger_Vehicle_Wespe_C",
+     "chain": [],
+     "comp": "Crew4",
+     "class": "SkeletalMeshComponent",
+     "xf": {
+      "loc": [
+       -210.0,
+       -32.0,
+       60.80000000000018
+      ],
+      "quat": [
+       0.0,
+       0.0,
+       -0.7071067811865476,
+       0.7071067811865477
+      ],
+      "scale": [
+       1.0,
+       1.0,
+       1.0
+      ]
+     },
+     "visible": true,
+     "parent": "Hull",
+     "socket": "None",
+     "mesh": "/Game/RTS_Survival/Blueprints/Squads/SquadUnits/Skeletons/PostApocalyptic/Mesh/SK_PostApoSoldier",
+     "mats": [
+      "/Game/RTS_Survival/Blueprints/Squads/SquadUnits/Skeletons/PostApocalyptic/Material/M_ScavengerNoCamo"
+     ],
+     "export": {
+      "fbx": "D:/UE5Projects/RTS_Survival/Saved/BuriedArmour/dump/fbx/SK_PostApoSoldier.fbx",
+      "class": "SkeletalMesh",
+      "bbox_err": "'BoxSphereBounds' object has no attribute 'get_box'"
+     }
+    },
+    {
+     "actor": "Ger_Vehicle_Wespe_C",
+     "chain": [],
+     "comp": "ReadyRound1",
+     "class": "StaticMeshComponent",
+     "xf": {
+      "loc": [
+       -212.0,
+       80.0,
+       110.0
+      ],
+      "quat": [
+       0.0,
+       0.0,
+       0.0,
+       1.0
+      ],
+      "scale": [
+       1.0,
+       1.0,
+       1.0
+      ]
+     },
+     "visible": true,
+     "parent": "Hull",
+     "socket": "None",
+     "mesh": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerPits/Meshes/SM_GerPit_Shell_105",
+     "mats": [
+      "/Game/RTS_Survival/Meshes/Props/Ammo/Materials/M_Ger_AmmoBox"
+     ],
+     "export": {
+      "fbx": "D:/UE5Projects/RTS_Survival/Saved/BuriedArmour/dump/fbx/SM_GerPit_Shell_105.fbx",
+      "class": "StaticMesh",
+      "bbox": [
+       [
+        -24.0,
+        -5.40749979019165,
+        -5.40749979019165
+       ],
+       [
+        24.0,
+        5.40749979019165,
+        5.40749979019165
+       ]
+      ]
+     }
+    },
+    {
+     "actor": "Ger_Vehicle_Wespe_C",
+     "chain": [],
+     "comp": "ReadyRound2",
+     "class": "StaticMeshComponent",
+     "xf": {
+      "loc": [
+       -197.0,
+       80.0,
+       110.0
+      ],
+      "quat": [
+       0.0,
+       0.0,
+       0.0,
+       1.0
+      ],
+      "scale": [
+       1.0,
+       1.0,
+       1.0
+      ]
+     },
+     "visible": true,
+     "parent": "Hull",
+     "socket": "None",
+     "mesh": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerPits/Meshes/SM_GerPit_Shell_105",
+     "mats": [
+      "/Game/RTS_Survival/Meshes/Props/Ammo/Materials/M_Ger_AmmoBox"
+     ],
+     "export": {
+      "fbx": "D:/UE5Projects/RTS_Survival/Saved/BuriedArmour/dump/fbx/SM_GerPit_Shell_105.fbx",
+      "class": "StaticMesh",
+      "bbox": [
+       [
+        -24.0,
+        -5.40749979019165,
+        -5.40749979019165
+       ],
+       [
+        24.0,
+        5.40749979019165,
+        5.40749979019165
+       ]
+      ]
+     }
+    },
+    {
+     "actor": "Ger_Vehicle_Wespe_C",
+     "chain": [],
+     "comp": "ReadyRound3",
+     "class": "StaticMeshComponent",
+     "xf": {
+      "loc": [
+       -182.0,
+       80.0,
+       110.0
+      ],
+      "quat": [
+       0.0,
+       0.0,
+       0.0,
+       1.0
+      ],
+      "scale": [
+       1.0,
+       1.0,
+       1.0
+      ]
+     },
+     "visible": true,
+     "parent": "Hull",
+     "socket": "None",
+     "mesh": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerPits/Meshes/SM_GerPit_Shell_105",
+     "mats": [
+      "/Game/RTS_Survival/Meshes/Props/Ammo/Materials/M_Ger_AmmoBox"
+     ],
+     "export": {
+      "fbx": "D:/UE5Projects/RTS_Survival/Saved/BuriedArmour/dump/fbx/SM_GerPit_Shell_105.fbx",
+      "class": "StaticMesh",
+      "bbox": [
+       [
+        -24.0,
+        -5.40749979019165,
+        -5.40749979019165
+       ],
+       [
+        24.0,
+        5.40749979019165,
+        5.40749979019165
+       ]
+      ]
+     }
+    },
+    {
+     "actor": "Ger_Vehicle_Wespe_C",
+     "chain": [],
+     "comp": "TurretMesh",
+     "class": "SkeletalMeshComponent",
+     "xf": {
+      "loc": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quat": [
+       0.0,
+       0.0,
+       0.0,
+       1.0
+      ],
+      "scale": [
+       1.0,
+       1.0,
+       1.0
+      ]
+     },
+     "visible": true,
+     "parent": "Hull",
+     "socket": "None",
+     "mesh": "/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Light/Wespe/Meshes/SK_Wespe_Gun",
+     "mats": [
+      "/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Light/Wespe/Materials/MI_Hull_Wespe"
+     ],
+     "export": {
+      "fbx": "D:/UE5Projects/RTS_Survival/Saved/BuriedArmour/dump/fbx/SK_Wespe_Gun.fbx",
+      "class": "SkeletalMesh",
+      "bbox_err": "'BoxSphereBounds' object has no attribute 'get_box'"
+     }
+    },
+    {
+     "actor": "Ger_Vehicle_Wespe_C",
+     "chain": [],
+     "comp": "EngineSound",
+     "class": "AudioComponent",
+     "xf": {
+      "loc": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quat": [
+       0.0,
+       0.0,
+       0.0,
+       1.0
+      ],
+      "scale": [
+       1.0,
+       1.0,
+       1.0
+      ]
+     },
+     "visible": true,
+     "parent": "TrackMesh",
+     "socket": "None"
+    },
+    {
+     "actor": "Ger_Vehicle_Wespe_C",
+     "chain": [],
+     "comp": "BillboardComponent_2",
+     "class": "BillboardComponent",
+     "xf": {
+      "loc": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quat": [
+       0.0,
+       0.0,
+       0.0,
+       1.0
+      ],
+      "scale": [
+       0.5,
+       0.5,
+       0.5
+      ]
+     },
+     "visible": false,
+     "parent": "EngineSound",
+     "socket": "None"
+    },
+    {
+     "actor": "Ger_Vehicle_Wespe_C",
+     "chain": [],
+     "comp": "EmbeddedTurret",
+     "class": "ChildActorComponent",
+     "xf": {
+      "loc": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quat": [
+       0.0,
+       0.0,
+       0.0,
+       1.0
+      ],
+      "scale": [
+       1.0,
+       1.0,
+       1.0
+      ]
+     },
+     "visible": true,
+     "parent": "TrackMesh",
+     "socket": "None",
+     "child_actor": "Ger_EmbTurret_Wespe_C"
+    },
+    {
+     "actor": "Ger_EmbTurret_Wespe_C",
+     "chain": [
+      "EmbeddedTurret"
+     ],
+     "comp": "Turret",
+     "class": "SkeletalMeshComponent",
+     "xf": {
+      "loc": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quat": [
+       0.0,
+       0.0,
+       0.0,
+       1.0
+      ],
+      "scale": [
+       1.0,
+       1.0,
+       1.0
+      ]
+     },
+     "visible": true,
+     "parent": "EmbeddedTurret",
+     "socket": "None"
+    }
+   ]
+  },
+  "FlakLuchs": {
+   "bp": "/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Light/PanzerII_Luchs/Ger_Vehicle_PanzerII_Luchs_FlakLuchs",
+   "components": [
+    {
+     "actor": "Ger_Vehicle_PanzerII_Luchs_FlakLuchs_C",
+     "chain": [],
+     "comp": "TrackMesh",
+     "class": "SkeletalMeshComponent",
+     "xf": {
+      "loc": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quat": [
+       0.0,
+       0.0,
+       0.0,
+       1.0
+      ],
+      "scale": [
+       1.0,
+       1.0,
+       1.0
+      ]
+     },
+     "visible": true,
+     "parent": null,
+     "socket": "None",
+     "mesh": "/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Light/Panzer1/Meshes/SK_Pazner1_Tracks",
+     "mats": [
+      "/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/MasterMaterials/DerivedUsedMutlipleTimes/MI_PanzerIV_Wheels",
+      "/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/MasterMaterials/DerivedUsedMutlipleTimes/MI_PanzerIVTracks",
+      "/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/MasterMaterials/DerivedUsedMutlipleTimes/MI_PanzerIV_Wheels"
+     ],
+     "export": {
+      "fbx": "D:/UE5Projects/RTS_Survival/Saved/BuriedArmour/dump/fbx/SK_Pazner1_Tracks.fbx",
+      "class": "SkeletalMesh",
+      "bbox_err": "'BoxSphereBounds' object has no attribute 'get_box'"
+     }
+    },
+    {
+     "actor": "Ger_Vehicle_PanzerII_Luchs_FlakLuchs_C",
+     "chain": [],
+     "comp": "Selectionarea",
+     "class": "BoxComponent",
+     "xf": {
+      "loc": [
+       -15.000006000000212,
+       0.0,
+       89.44076769595767
+      ],
+      "quat": [
+       0.0,
+       0.0,
+       0.0,
+       1.0
+      ],
+      "scale": [
+       6.0,
+       3.0,
+       3.0
+      ]
+     },
+     "visible": false,
+     "parent": "TrackMesh",
+     "socket": "None"
+    },
+    {
+     "actor": "Ger_Vehicle_PanzerII_Luchs_FlakLuchs_C",
+     "chain": [],
+     "comp": "SelectedDecal",
+     "class": "DecalComponent",
+     "xf": {
+      "loc": [
+       4.053339958190918,
+       3.0517578125e-05,
+       -10.50577449798584
+      ],
+      "quat": [
+       -1.3234889800848443e-23,
+       -0.7071067811865475,
+       2.6469779601696886e-23,
+       0.7071067811865476
+      ],
+      "scale": [
+       1.0,
+       8.0,
+       11.0
+      ]
+     },
+     "visible": false,
+     "parent": "TrackMesh",
+     "socket": "None"
+    },
+    {
+     "actor": "Ger_Vehicle_PanzerII_Luchs_FlakLuchs_C",
+     "chain": [],
+     "comp": "NS_TrackSmokes",
+     "class": "NiagaraComponent",
+     "xf": {
+      "loc": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quat": [
+       0.0,
+       0.0,
+       0.0,
+       1.0
+      ],
+      "scale": [
+       1.0,
+       1.0,
+       1.0
+      ]
+     },
+     "visible": true,
+     "parent": "TrackMesh",
+     "socket": "None"
+    },
+    {
+     "actor": "Ger_Vehicle_PanzerII_Luchs_FlakLuchs_C",
+     "chain": [],
+     "comp": "Hull",
+     "class": "StaticMeshComponent",
+     "xf": {
+      "loc": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quat": [
+       0.0,
+       0.0,
+       0.0,
+       1.0
+      ],
+      "scale": [
+       1.0,
+       1.0,
+       1.0
+      ]
+     },
+     "visible": true,
+     "parent": "TrackMesh",
+     "socket": "None",
+     "mesh": "/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Light/PanzerII_Luchs/Meshes/SM_Luchs_Hull",
+     "mats": [
+      "/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Light/PanzerII_Luchs/Materials/MI_Hull_Luchs_Camo"
+     ],
+     "export": {
+      "fbx": "D:/UE5Projects/RTS_Survival/Saved/BuriedArmour/dump/fbx/SM_Luchs_Hull.fbx",
+      "class": "StaticMesh",
+      "bbox": [
+       [
+        -231.62337493896484,
+        -125.2799301147461,
+        9.277801513671875
+       ],
+       [
+        224.6551284790039,
+        120.73224639892578,
+        300.3222351074219
+       ]
+      ]
+     }
+    },
+    {
+     "actor": "Ger_Vehicle_PanzerII_Luchs_FlakLuchs_C",
+     "chain": [],
+     "comp": "NS_Exhaust",
+     "class": "NiagaraComponent",
+     "xf": {
+      "loc": [
+       -221.155051210877,
+       -45.0,
+       107.75046628826294
+      ],
+      "quat": [
+       0.0,
+       0.0,
+       0.0,
+       1.0
+      ],
+      "scale": [
+       0.13333333333333333,
+       0.13333333333333333,
+       0.19999999999999998
+      ]
+     },
+     "visible": true,
+     "parent": "Hull",
+     "socket": "Exhaust"
+    },
+    {
+     "actor": "Ger_Vehicle_PanzerII_Luchs_FlakLuchs_C",
+     "chain": [],
+     "comp": "Turret",
+     "class": "ChildActorComponent",
+     "xf": {
+      "loc": [
+       7.670000000000073,
+       0.0,
+       182.5
+      ],
+      "quat": [
+       0.0,
+       0.0,
+       0.0,
+       1.0
+      ],
+      "scale": [
+       1.0,
+       1.0,
+       1.0
+      ]
+     },
+     "visible": true,
+     "parent": "Hull",
+     "socket": "Turret",
+     "child_actor": "Ger_Turret_PZ_II_Luchs_FlakLuchs_C"
+    },
+    {
+     "actor": "Ger_Turret_PZ_II_Luchs_FlakLuchs_C",
+     "chain": [
+      "Turret"
+     ],
+     "comp": "Turret",
+     "class": "SkeletalMeshComponent",
+     "xf": {
+      "loc": [
+       7.670000000000073,
+       0.0,
+       182.5
+      ],
+      "quat": [
+       0.0,
+       0.0,
+       0.0,
+       1.0
+      ],
+      "scale": [
+       1.0,
+       1.0,
+       1.0
+      ]
+     },
+     "visible": true,
+     "parent": "Turret",
+     "socket": "None",
+     "mesh": "/Game/RTS_Survival/Blueprints/Turrets/German/Light/PZII_Luchs_Turret/FlakLuchs/Meshes/SK_FlakLuchs_TwinWeaponSystem",
+     "mats": [
+      "/Game/RTS_Survival/Blueprints/Turrets/German/Light/PZII_Luchs_Turret/FlakLuchs/Materials/MI_FlakLuchs_Camo"
+     ],
+     "export": {
+      "fbx": "D:/UE5Projects/RTS_Survival/Saved/BuriedArmour/dump/fbx/SK_FlakLuchs_TwinWeaponSystem.fbx",
+      "class": "SkeletalMesh",
+      "bbox_err": "'BoxSphereBounds' object has no attribute 'get_box'"
+     }
+    },
+    {
+     "actor": "Ger_Turret_PZ_II_Luchs_FlakLuchs_C",
+     "chain": [
+      "Turret"
+     ],
+     "comp": "TurretCollision",
+     "class": "StaticMeshComponent",
+     "xf": {
+      "loc": [
+       7.670000000000073,
+       0.0,
+       124.5
+      ],
+      "quat": [
+       0.0,
+       0.0,
+       0.0,
+       1.0
+      ],
+      "scale": [
+       1.0,
+       1.0,
+       1.0
+      ]
+     },
+     "visible": true,
+     "parent": "Turret",
+     "socket": "None",
+     "mesh": "/Game/RTS_Survival/Blueprints/Turrets/German/Light/PZII_Luchs_Turret/FlakLuchs/Meshes/SM_FlakLuchs_TurretCasing",
+     "mats": [
+      "/Game/RTS_Survival/Blueprints/Turrets/German/Light/PZII_Luchs_Turret/FlakLuchs/Materials/MI_FlakLuchs_Camo"
+     ],
+     "export": {
+      "fbx": "D:/UE5Projects/RTS_Survival/Saved/BuriedArmour/dump/fbx/SM_FlakLuchs_TurretCasing.fbx",
+      "class": "StaticMesh",
+      "bbox": [
+       [
+        -80.9717903137207,
+        -83.00680160522461,
+        0.5623359680175781
+       ],
+       [
+        74.0772819519043,
+        82.48208999633789,
+        50.497859954833984
+       ]
+      ]
+     }
+    },
+    {
+     "actor": "Ger_Turret_PZ_II_Luchs_FlakLuchs_C",
+     "chain": [
+      "Turret"
+     ],
+     "comp": "Crew1",
+     "class": "SkeletalMeshComponent",
+     "xf": {
+      "loc": [
+       7.670000000000073,
+       0.0,
+       182.5
+      ],
+      "quat": [
+       0.0,
+       0.0,
+       0.0,
+       1.0
+      ],
+      "scale": [
+       1.0,
+       1.0,
+       1.0
+      ]
+     },
+     "visible": true,
+     "parent": "Turret",
+     "socket": "None",
+     "mesh": "/Game/RTS_Survival/Blueprints/Squads/SquadUnits/Skeletons/PostApocalyptic/Mesh/SK_PostApoSoldier",
+     "mats": [
+      "/Game/RTS_Survival/Blueprints/Squads/SquadUnits/Skeletons/PostApocalyptic/Material/M_ScavengerNoCamo"
+     ],
+     "export": {
+      "fbx": "D:/UE5Projects/RTS_Survival/Saved/BuriedArmour/dump/fbx/SK_PostApoSoldier.fbx",
+      "class": "SkeletalMesh",
+      "bbox_err": "'BoxSphereBounds' object has no attribute 'get_box'"
+     }
+    },
+    {
+     "actor": "Ger_Turret_PZ_II_Luchs_FlakLuchs_C",
+     "chain": [
+      "Turret"
+     ],
+     "comp": "Crew2",
+     "class": "SkeletalMeshComponent",
+     "xf": {
+      "loc": [
+       7.670000000000073,
+       0.0,
+       182.5
+      ],
+      "quat": [
+       0.0,
+       0.0,
+       0.0,
+       1.0
+      ],
+      "scale": [
+       1.0,
+       1.0,
+       1.0
+      ]
+     },
+     "visible": true,
+     "parent": "Turret",
+     "socket": "None",
+     "mesh": "/Game/RTS_Survival/Blueprints/Squads/SquadUnits/Skeletons/PostApocalyptic/Mesh/SK_PostApoSoldier",
+     "mats": [
+      "/Game/RTS_Survival/Blueprints/Squads/SquadUnits/Skeletons/PostApocalyptic/Material/M_ScavengerNoCamo"
+     ],
+     "export": {
+      "fbx": "D:/UE5Projects/RTS_Survival/Saved/BuriedArmour/dump/fbx/SK_PostApoSoldier.fbx",
+      "class": "SkeletalMesh",
+      "bbox_err": "'BoxSphereBounds' object has no attribute 'get_box'"
+     }
+    },
+    {
+     "actor": "Ger_Turret_PZ_II_Luchs_FlakLuchs_C",
+     "chain": [
+      "Turret"
+     ],
+     "comp": "Drum",
+     "class": "StaticMeshComponent",
+     "xf": {
+      "loc": [
+       7.670000000000073,
+       0.0,
+       182.5
+      ],
+      "quat": [
+       0.0,
+       0.0,
+       7.091502851608294e-08,
+       -0.9999999999999976
+      ],
+      "scale": [
+       1.0,
+       1.0,
+       1.0
+      ]
+     },
+     "visible": true,
+     "parent": "Crew2",
+     "socket": "ik_foot_root",
+     "mesh": "/Game/RTS_Survival/Blueprints/Turrets/German/Light/PZII_Luchs_Turret/FlakLuchs/Meshes/SM_FlakLuchs_Drum",
+     "mats": [
+      "/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Light/PanzerII_Luchs/Materials/MI_Hull_Luchs"
+     ],
+     "export": {
+      "fbx": "D:/UE5Projects/RTS_Survival/Saved/BuriedArmour/dump/fbx/SM_FlakLuchs_Drum.fbx",
+      "class": "StaticMesh",
+      "bbox": [
+       [
+        -12.000000953674316,
+        -5.250000476837158,
+        -12.0
+       ],
+       [
+        12.000000953674316,
+        3.750002384185791,
+        12.0
+       ]
+      ]
+     }
+    },
+    {
+     "actor": "Ger_Vehicle_PanzerII_Luchs_FlakLuchs_C",
+     "chain": [],
+     "comp": "EngineSound",
+     "class": "AudioComponent",
+     "xf": {
+      "loc": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quat": [
+       0.0,
+       0.0,
+       0.0,
+       1.0
+      ],
+      "scale": [
+       1.0,
+       1.0,
+       1.0
+      ]
+     },
+     "visible": true,
+     "parent": "TrackMesh",
+     "socket": "None"
+    },
+    {
+     "actor": "Ger_Vehicle_PanzerII_Luchs_FlakLuchs_C",
+     "chain": [],
+     "comp": "BillboardComponent_2",
+     "class": "BillboardComponent",
+     "xf": {
+      "loc": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quat": [
+       0.0,
+       0.0,
+       0.0,
+       1.0
+      ],
+      "scale": [
+       0.5,
+       0.5,
+       0.5
+      ]
+     },
+     "visible": false,
+     "parent": "EngineSound",
+     "socket": "None"
+    }
+   ]
+  },
+  "PzIV_F1_Assault": {
+   "bp": "/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Medium/PanzerIV/Ger_Vehicle_PanzerIV_F1_Assault",
+   "components": [
+    {
+     "actor": "Ger_Vehicle_PanzerIV_F1_Assault_C",
+     "chain": [],
+     "comp": "TrackMesh",
+     "class": "SkeletalMeshComponent",
+     "xf": {
+      "loc": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quat": [
+       0.0,
+       0.0,
+       0.0,
+       1.0
+      ],
+      "scale": [
+       1.0,
+       1.0,
+       1.0
+      ]
+     },
+     "visible": true,
+     "parent": null,
+     "socket": "None",
+     "mesh": "/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Medium/PanzerIV/Meshes/SK_PanzerIV_Tracks",
+     "mats": [
+      "/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/MasterMaterials/DerivedUsedMutlipleTimes/MI_PanzerIV_Wheels",
+      "/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/MasterMaterials/DerivedUsedMutlipleTimes/MI_PanzerIVTracks",
+      "/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/MasterMaterials/DerivedUsedMutlipleTimes/MI_PanzerIVTracks"
+     ],
+     "export": {
+      "fbx": "D:/UE5Projects/RTS_Survival/Saved/BuriedArmour/dump/fbx/SK_PanzerIV_Tracks.fbx",
+      "class": "SkeletalMesh",
+      "bbox_err": "'BoxSphereBounds' object has no attribute 'get_box'"
+     }
+    },
+    {
+     "actor": "Ger_Vehicle_PanzerIV_F1_Assault_C",
+     "chain": [],
+     "comp": "Selectionarea",
+     "class": "BoxComponent",
+     "xf": {
+      "loc": [
+       0.0,
+       0.0,
+       89.44076769595767
+      ],
+      "quat": [
+       0.0,
+       0.0,
+       0.0,
+       1.0
+      ],
+      "scale": [
+       8.0,
+       4.0,
+       3.0
+      ]
+     },
+     "visible": false,
+     "parent": "TrackMesh",
+     "socket": "None"
+    },
+    {
+     "actor": "Ger_Vehicle_PanzerIV_F1_Assault_C",
+     "chain": [],
+     "comp": "SelectedDecal",
+     "class": "DecalComponent",
+     "xf": {
+      "loc": [
+       4.053339958190918,
+       3.0517578125e-05,
+       -10.50577449798584
+      ],
+      "quat": [
+       -1.3234889800848443e-23,
+       -0.7071067811865475,
+       2.6469779601696886e-23,
+       0.7071067811865476
+      ],
+      "scale": [
+       1.0,
+       9.0,
+       12.5
+      ]
+     },
+     "visible": false,
+     "parent": "TrackMesh",
+     "socket": "None"
+    },
+    {
+     "actor": "Ger_Vehicle_PanzerIV_F1_Assault_C",
+     "chain": [],
+     "comp": "NS_TrackSmokes",
+     "class": "NiagaraComponent",
+     "xf": {
+      "loc": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quat": [
+       0.0,
+       0.0,
+       0.0,
+       1.0
+      ],
+      "scale": [
+       1.0,
+       1.0,
+       1.0
+      ]
+     },
+     "visible": true,
+     "parent": "TrackMesh",
+     "socket": "None"
+    },
+    {
+     "actor": "Ger_Vehicle_PanzerIV_F1_Assault_C",
+     "chain": [],
+     "comp": "Hull",
+     "class": "StaticMeshComponent",
+     "xf": {
+      "loc": [
+       1.0,
+       2.0,
+       -4.0
+      ],
+      "quat": [
+       0.0,
+       0.0,
+       0.0,
+       1.0
+      ],
+      "scale": [
+       1.0,
+       1.0,
+       1.0
+      ]
+     },
+     "visible": true,
+     "parent": "TrackMesh",
+     "socket": "None",
+     "mesh": "/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Medium/PanzerIV/Meshes/SM_PanzerIV_Hull",
+     "mats": [
+      "/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Medium/PanzerIV/Meshes/MI_PZIV_Hull_DesertAPO"
+     ],
+     "export": {
+      "fbx": "D:/UE5Projects/RTS_Survival/Saved/BuriedArmour/dump/fbx/SM_PanzerIV_Hull.fbx",
+      "class": "StaticMesh",
+      "bbox": [
+       [
+        -301.5951385498047,
+        -153.63030242919922,
+        34.29896545410156
+       ],
+       [
+        284.1875762939453,
+        179.02930450439453,
+        201.64297485351562
+       ]
+      ]
+     }
+    },
+    {
+     "actor": "Ger_Vehicle_PanzerIV_F1_Assault_C",
+     "chain": [],
+     "comp": "Turret",
+     "class": "ChildActorComponent",
+     "xf": {
+      "loc": [
+       1.0,
+       2.0,
+       186.0
+      ],
+      "quat": [
+       0.0,
+       0.0,
+       0.0,
+       1.0
+      ],
+      "scale": [
+       1.0,
+       1.0,
+       1.0
+      ]
+     },
+     "visible": true,
+     "parent": "Hull",
+     "socket": "Turret"
+    },
+    {
+     "actor": "Ger_Vehicle_PanzerIV_F1_Assault_C",
+     "chain": [],
+     "comp": "HullMg",
+     "class": "StaticMeshComponent",
+     "xf": {
+      "loc": [
+       178.58970973860778,
+       65.25184482939221,
+       147.00538600462914
+      ],
+      "quat": [
+       0.0,
+       0.0,
+       0.0,
+       1.0
+      ],
+      "scale": [
+       1.0,
+       1.0,
+       1.0
+      ]
+     },
+     "visible": true,
+     "parent": "Hull",
+     "socket": "HullMg",
+     "mesh": "/Game/RTS_Survival/Blueprints/Turrets/German/HullWeapons/Meshes/SM_HullMg_Panther",
+     "mats": [
+      "/Game/RTS_Survival/Meshes/Buildings/Radar/Textures/Steel_-_Satin"
+     ],
+     "export": {
+      "fbx": "D:/UE5Projects/RTS_Survival/Saved/BuriedArmour/dump/fbx/SM_HullMg_Panther.fbx",
+      "class": "StaticMesh",
+      "bbox": [
+       [
+        -1.52587890625e-05,
+        -9.220855712890625,
+        -9.220870971679688
+       ],
+       [
+        43.12254333496094,
+        9.220855712890625,
+        9.220916748046875
+       ]
+      ]
+     }
+    },
+    {
+     "actor": "Ger_Vehicle_PanzerIV_F1_Assault_C",
+     "chain": [],
+     "comp": "NS_Exhaust",
+     "class": "NiagaraComponent",
+     "xf": {
+      "loc": [
+       -287.4427966143994,
+       -15.46448235571006,
+       206.78628384547392
+      ],
+      "quat": [
+       0.0,
+       0.0,
+       0.0,
+       1.0
+      ],
+      "scale": [
+       0.25,
+       0.25,
+       0.25
+      ]
+     },
+     "visible": true,
+     "parent": "Hull",
+     "socket": "Exhaust"
+    },
+    {
+     "actor": "Ger_Vehicle_PanzerIV_F1_Assault_C",
+     "chain": [],
+     "comp": "EngineSound",
+     "class": "AudioComponent",
+     "xf": {
+      "loc": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quat": [
+       0.0,
+       0.0,
+       0.0,
+       1.0
+      ],
+      "scale": [
+       1.0,
+       1.0,
+       1.0
+      ]
+     },
+     "visible": true,
+     "parent": "TrackMesh",
+     "socket": "None"
+    },
+    {
+     "actor": "Ger_Vehicle_PanzerIV_F1_Assault_C",
+     "chain": [],
+     "comp": "BillboardComponent_2",
+     "class": "BillboardComponent",
+     "xf": {
+      "loc": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quat": [
+       0.0,
+       0.0,
+       0.0,
+       1.0
+      ],
+      "scale": [
+       0.5,
+       0.5,
+       0.5
+      ]
+     },
+     "visible": false,
+     "parent": "EngineSound",
+     "socket": "None"
+    },
+    {
+     "actor": "Ger_Vehicle_PanzerIV_F1_Assault_C",
+     "chain": [],
+     "comp": "Compartment",
+     "class": "StaticMeshComponent",
+     "xf": {
+      "loc": [
+       1.0,
+       2.0,
+       -4.0
+      ],
+      "quat": [
+       0.0,
+       0.0,
+       0.0,
+       1.0
+      ],
+      "scale": [
+       1.0,
+       1.0,
+       1.0
+      ]
+     },
+     "visible": true,
+     "parent": "Hull",
+     "socket": "None",
+     "mesh": "/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Medium/PanzerIV/Meshes/SM_Compartment_PzIVF1_Assault",
+     "mats": [
+      "/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Medium/PanzerIV/Meshes/MI_PZIV_Hull_DesertAPO",
+      "/Game/SandBagPack/Materials/MI_Rus_SandBag_01"
+     ],
+     "export": {
+      "fbx": "D:/UE5Projects/RTS_Survival/Saved/BuriedArmour/dump/fbx/SM_Compartment_PzIVF1_Assault.fbx",
+      "class": "StaticMesh",
+      "bbox": [
+       [
+        -188.3870506286621,
+        -115.26897430419922,
+        179.89407348632812
+       ],
+       [
+        109.77713394165039,
+        116.1502456665039,
+        281.0
+       ]
+      ]
+     }
+    }
+   ]
+  },
+  "Sdkfz251_MortarTW": {
+   "bp": "/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_ArmoredCar/Sdkfz251_MortarTW/Ger_ArmoredCar_251_MortarTW",
+   "components": [
+    {
+     "actor": "Ger_ArmoredCar_251_MortarTW_C",
+     "chain": [],
+     "comp": "TrackMesh",
+     "class": "SkeletalMeshComponent",
+     "xf": {
+      "loc": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quat": [
+       0.0,
+       0.0,
+       0.0,
+       1.0
+      ],
+      "scale": [
+       1.0,
+       1.0,
+       1.0
+      ]
+     },
+     "visible": true,
+     "parent": null,
+     "socket": "None",
+     "mesh": "/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_ArmoredCar/Sdkfz-251_75mm/Meshes/SK_SDKFZ251_Tracks",
+     "mats": [
+      "/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_ArmoredCar/Sdkfz-250/Meshes/Materials/FrontWheels/M_Sdkfz-250_FrontWheel",
+      "/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_ArmoredCar/Sdkfz-250/Meshes/Materials/MI_Sdkfz-250_Wheels",
+      "/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_ArmoredCar/Sdkfz-250/Meshes/Materials/Tracks/MI_Sdkfz-250_Tracks",
+      "/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_ArmoredCar/Sdkfz-250/Meshes/Materials/Tracks/MI_Sdkfz-250_Tracks"
+     ],
+     "export": {
+      "fbx": "D:/UE5Projects/RTS_Survival/Saved/BuriedArmour/dump/fbx/SK_SDKFZ251_Tracks.fbx",
+      "class": "SkeletalMesh",
+      "bbox_err": "'BoxSphereBounds' object has no attribute 'get_box'"
+     }
+    },
+    {
+     "actor": "Ger_ArmoredCar_251_MortarTW_C",
+     "chain": [],
+     "comp": "Selectionarea",
+     "class": "BoxComponent",
+     "xf": {
+      "loc": [
+       -15.00000638149504,
+       7.0,
+       89.44076769595767
+      ],
+      "quat": [
+       0.0,
+       0.0,
+       0.0,
+       1.0
+      ],
+      "scale": [
+       12.0,
+       6.25,
+       4.0
+      ]
+     },
+     "visible": false,
+     "parent": "TrackMesh",
+     "socket": "None"
+    },
+    {
+     "actor": "Ger_ArmoredCar_251_MortarTW_C",
+     "chain": [],
+     "comp": "SelectedDecal",
+     "class": "DecalComponent",
+     "xf": {
+      "loc": [
+       4.053339958190918,
+       3.0517578125e-05,
+       -10.50577449798584
+      ],
+      "quat": [
+       -1.3234889800848443e-23,
+       -0.7071067811865475,
+       2.6469779601696886e-23,
+       0.7071067811865476
+      ],
+      "scale": [
+       1.0,
+       9.0,
+       12.0
+      ]
+     },
+     "visible": false,
+     "parent": "TrackMesh",
+     "socket": "None"
+    },
+    {
+     "actor": "Ger_ArmoredCar_251_MortarTW_C",
+     "chain": [],
+     "comp": "NS_TrackSmokes",
+     "class": "NiagaraComponent",
+     "xf": {
+      "loc": [
+       0.0,
+       -5.950434684338688,
+       -2.9081479624437634e-07
+      ],
+      "quat": [
+       0.0,
+       0.0,
+       0.0,
+       1.0
+      ],
+      "scale": [
+       1.0,
+       1.0,
+       1.0
+      ]
+     },
+     "visible": false,
+     "parent": "TrackMesh",
+     "socket": "None"
+    },
+    {
+     "actor": "Ger_ArmoredCar_251_MortarTW_C",
+     "chain": [],
+     "comp": "Hull",
+     "class": "StaticMeshComponent",
+     "xf": {
+      "loc": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quat": [
+       0.0,
+       0.0,
+       0.0,
+       1.0
+      ],
+      "scale": [
+       1.0,
+       1.0,
+       1.0
+      ]
+     },
+     "visible": true,
+     "parent": "TrackMesh",
+     "socket": "None",
+     "mesh": "/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_ArmoredCar/Sdkfz251_MortarTW/Meshes/Sdkfz_251_MortarTW",
+     "mats": [
+      "/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_ArmoredCar/Sdkfz-251_75mm/Meshes/Materials/MI_Sdkfz_251_Hull_DesertAPO"
+     ],
+     "export": {
+      "fbx": "D:/UE5Projects/RTS_Survival/Saved/BuriedArmour/dump/fbx/Sdkfz_251_MortarTW.fbx",
+      "class": "StaticMesh",
+      "bbox": [
+       [
+        -288.1222229003906,
+        -131.0342254638672,
+        25.591934204101562
+       ],
+       [
+        287.8983459472656,
+        121.36203002929688,
+        206.25918579101562
+       ]
+      ]
+     }
+    },
+    {
+     "actor": "Ger_ArmoredCar_251_MortarTW_C",
+     "chain": [],
+     "comp": "NS_Exhaust",
+     "class": "NiagaraComponent",
+     "xf": {
+      "loc": [
+       -251.68306541857237,
+       -5.317029430778348,
+       84.31263454968894
+      ],
+      "quat": [
+       0.0,
+       0.0,
+       0.0,
+       1.0
+      ],
+      "scale": [
+       0.2,
+       0.2,
+       0.3
+      ]
+     },
+     "visible": true,
+     "parent": "Hull",
+     "socket": "Exhaust"
+    },
+    {
+     "actor": "Ger_ArmoredCar_251_MortarTW_C",
+     "chain": [],
+     "comp": "Driver",
+     "class": "SkeletalMeshComponent",
+     "xf": {
+      "loc": [
+       -8.0,
+       -36.0,
+       68.0
+      ],
+      "quat": [
+       0.0,
+       0.0,
+       -0.7071067811865476,
+       0.7071067811865477
+      ],
+      "scale": [
+       1.0,
+       1.0,
+       1.0
+      ]
+     },
+     "visible": true,
+     "parent": "Hull",
+     "socket": "None",
+     "mesh": "/Game/RTS_Survival/Blueprints/Squads/SquadUnits/Skeletons/PostApocalyptic/Mesh/SK_PostApoSoldier",
+     "mats": [
+      "/Game/RTS_Survival/Blueprints/Squads/SquadUnits/Skeletons/PostApocalyptic/Material/M_ScavengerNoCamo"
+     ],
+     "export": {
+      "fbx": "D:/UE5Projects/RTS_Survival/Saved/BuriedArmour/dump/fbx/SK_PostApoSoldier.fbx",
+      "class": "SkeletalMesh",
+      "bbox_err": "'BoxSphereBounds' object has no attribute 'get_box'"
+     }
+    },
+    {
+     "actor": "Ger_ArmoredCar_251_MortarTW_C",
+     "chain": [],
+     "comp": "MortarTurret",
+     "class": "ChildActorComponent",
+     "xf": {
+      "loc": [
+       -117.40000000000146,
+       -1.0,
+       42.0
+      ],
+      "quat": [
+       0.0,
+       0.0,
+       0.0,
+       1.0
+      ],
+      "scale": [
+       1.0,
+       1.0,
+       1.0
+      ]
+     },
+     "visible": true,
+     "parent": "Hull",
+     "socket": "None",
+     "child_actor": "Ger_EmbTurret_251MortarTW_C"
+    },
+    {
+     "actor": "Ger_EmbTurret_251MortarTW_C",
+     "chain": [
+      "MortarTurret"
+     ],
+     "comp": "Turret",
+     "class": "SkeletalMeshComponent",
+     "xf": {
+      "loc": [
+       -117.40000000000146,
+       -1.0,
+       42.0
+      ],
+      "quat": [
+       0.0,
+       0.0,
+       0.0,
+       1.0
+      ],
+      "scale": [
+       1.0,
+       1.0,
+       1.0
+      ]
+     },
+     "visible": true,
+     "parent": "MortarTurret",
+     "socket": "None",
+     "mesh": "/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_ArmoredCar/Sdkfz251_MortarTW/Mortar/SK_GrW34_251MortarTW",
+     "mats": [
+      "/Game/RTS_Survival/Blueprints/Squads/TeamWeapons/WheeledMortar/Mesh/MI_gerMortar"
+     ],
+     "export": {
+      "fbx": "D:/UE5Projects/RTS_Survival/Saved/BuriedArmour/dump/fbx/SK_GrW34_251MortarTW.fbx",
+      "class": "SkeletalMesh",
+      "bbox_err": "'BoxSphereBounds' object has no attribute 'get_box'"
+     }
+    },
+    {
+     "actor": "Ger_EmbTurret_251MortarTW_C",
+     "chain": [
+      "MortarTurret"
+     ],
+     "comp": "Crew1",
+     "class": "SkeletalMeshComponent",
+     "xf": {
+      "loc": [
+       -157.75714285714275,
+       66.8571428571413,
+       88.07142857142844
+      ],
+      "quat": [
+       0.0,
+       0.0,
+       0.9999999999999999,
+       6.123233995736766e-17
+      ],
+      "scale": [
+       1.0,
+       1.0,
+       1.0
+      ]
+     },
+     "visible": true,
+     "parent": "Turret",
+     "socket": "None",
+     "mesh": "/Game/RTS_Survival/Blueprints/Squads/SquadUnits/Skeletons/PostApocalyptic/Mesh/SK_PostApoSoldier",
+     "mats": [
+      "/Game/RTS_Survival/Blueprints/Squads/SquadUnits/Skeletons/PostApocalyptic/Material/M_ScavengerNoCamo"
+     ],
+     "export": {
+      "fbx": "D:/UE5Projects/RTS_Survival/Saved/BuriedArmour/dump/fbx/SK_PostApoSoldier.fbx",
+      "class": "SkeletalMesh",
+      "bbox_err": "'BoxSphereBounds' object has no attribute 'get_box'"
+     }
+    },
+    {
+     "actor": "Ger_EmbTurret_251MortarTW_C",
+     "chain": [
+      "MortarTurret"
+     ],
+     "comp": "Crew2",
+     "class": "SkeletalMeshComponent",
+     "xf": {
+      "loc": [
+       -168.471428571429,
+       -63.5,
+       88.07142857142844
+      ],
+      "quat": [
+       0.0,
+       0.0,
+       0.0,
+       1.0
+      ],
+      "scale": [
+       1.0,
+       1.0,
+       1.0
+      ]
+     },
+     "visible": true,
+     "parent": "Turret",
+     "socket": "None",
+     "mesh": "/Game/RTS_Survival/Blueprints/Squads/SquadUnits/Skeletons/PostApocalyptic/Mesh/SK_PostApoSoldier",
+     "mats": [
+      "/Game/RTS_Survival/Blueprints/Squads/SquadUnits/Skeletons/PostApocalyptic/Material/M_ScavengerNoCamo"
+     ],
+     "export": {
+      "fbx": "D:/UE5Projects/RTS_Survival/Saved/BuriedArmour/dump/fbx/SK_PostApoSoldier.fbx",
+      "class": "SkeletalMesh",
+      "bbox_err": "'BoxSphereBounds' object has no attribute 'get_box'"
+     }
+    },
+    {
+     "actor": "Ger_EmbTurret_251MortarTW_C",
+     "chain": [
+      "MortarTurret"
+     ],
+     "comp": "Crew3",
+     "class": "SkeletalMeshComponent",
+     "xf": {
+      "loc": [
+       -286.3285714285739,
+       -38.5,
+       88.07142857142844
+      ],
+      "quat": [
+       0.0,
+       0.0,
+       -0.7071067811865476,
+       0.7071067811865477
+      ],
+      "scale": [
+       1.0,
+       1.0,
+       1.0
+      ]
+     },
+     "visible": true,
+     "parent": "Turret",
+     "socket": "None",
+     "mesh": "/Game/RTS_Survival/Blueprints/Squads/SquadUnits/Skeletons/PostApocalyptic/Mesh/SK_PostApoSoldier",
+     "mats": [
+      "/Game/RTS_Survival/Blueprints/Squads/SquadUnits/Skeletons/PostApocalyptic/Material/M_ScavengerNoCamo"
+     ],
+     "export": {
+      "fbx": "D:/UE5Projects/RTS_Survival/Saved/BuriedArmour/dump/fbx/SK_PostApoSoldier.fbx",
+      "class": "SkeletalMesh",
+      "bbox_err": "'BoxSphereBounds' object has no attribute 'get_box'"
+     }
+    },
+    {
+     "actor": "Ger_ArmoredCar_251_MortarTW_C",
+     "chain": [],
+     "comp": "TopMG",
+     "class": "ChildActorComponent",
+     "xf": {
+      "loc": [
+       6.404130820737919,
+       -1.7451020539738238e-07,
+       200.6258754420428
+      ],
+      "quat": [
+       0.0,
+       0.0,
+       0.0,
+       1.0
+      ],
+      "scale": [
+       1.0,
+       1.0,
+       1.0
+      ]
+     },
+     "visible": true,
+     "parent": "Hull",
+     "socket": "Mg",
+     "child_actor": "Ger_EmbTurret_MG34_251MortarTW_C"
+    },
+    {
+     "actor": "Ger_EmbTurret_MG34_251MortarTW_C",
+     "chain": [
+      "TopMG"
+     ],
+     "comp": "Turret",
+     "class": "SkeletalMeshComponent",
+     "xf": {
+      "loc": [
+       6.404130820737919,
+       -1.7451020539738238e-07,
+       200.6258754420428
+      ],
+      "quat": [
+       0.0,
+       0.0,
+       0.0,
+       1.0
+      ],
+      "scale": [
+       1.0,
+       1.0,
+       1.0
+      ]
+     },
+     "visible": true,
+     "parent": "TopMG",
+     "socket": "None",
+     "mesh": "/Game/RTS_Survival/Blueprints/Turrets/EmbeddedTurrets/MG34Top/Meshes/SK_MG34_Top",
+     "mats": [
+      "/Game/RTS_Survival/Blueprints/Turrets/EmbeddedTurrets/MG34Top/Meshes/M_MG34"
+     ],
+     "export": {
+      "fbx": "D:/UE5Projects/RTS_Survival/Saved/BuriedArmour/dump/fbx/SK_MG34_Top.fbx",
+      "class": "SkeletalMesh",
+      "bbox_err": "'BoxSphereBounds' object has no attribute 'get_box'"
+     }
+    },
+    {
+     "actor": "Ger_EmbTurret_MG34_251MortarTW_C",
+     "chain": [
+      "TopMG"
+     ],
+     "comp": "Crew1",
+     "class": "SkeletalMeshComponent",
+     "xf": {
+      "loc": [
+       7.404130820737919,
+       -1.7451020539738238e-07,
+       80.6258754420428
+      ],
+      "quat": [
+       0.0,
+       0.0,
+       0.0,
+       1.0
+      ],
+      "scale": [
+       1.0,
+       1.0,
+       1.0
+      ]
+     },
+     "visible": true,
+     "parent": "Turret",
+     "socket": "None",
+     "mesh": "/Game/RTS_Survival/Blueprints/Squads/SquadUnits/Skeletons/PostApocalyptic/Mesh/SK_PostApoSoldier",
+     "mats": [
+      "/Game/RTS_Survival/Blueprints/Squads/SquadUnits/Skeletons/PostApocalyptic/Material/M_ScavengerNoCamo"
+     ],
+     "export": {
+      "fbx": "D:/UE5Projects/RTS_Survival/Saved/BuriedArmour/dump/fbx/SK_PostApoSoldier.fbx",
+      "class": "SkeletalMesh",
+      "bbox_err": "'BoxSphereBounds' object has no attribute 'get_box'"
+     }
+    },
+    {
+     "actor": "Ger_ArmoredCar_251_MortarTW_C",
+     "chain": [],
+     "comp": "TopMG1",
+     "class": "ChildActorComponent",
+     "xf": {
+      "loc": [
+       -212.13419448363857,
+       39.90340746659422,
+       201.81549814889058
+      ],
+      "quat": [
+       0.0,
+       0.0,
+       0.9999999999999999,
+       6.123233995736766e-17
+      ],
+      "scale": [
+       1.0,
+       1.0,
+       1.0
+      ]
+     },
+     "visible": true,
+     "parent": "Hull",
+     "socket": "Mg_9",
+     "child_actor": "Ger_EmbTurret_MG34_251MortarTW_C"
+    },
+    {
+     "actor": "Ger_EmbTurret_MG34_251MortarTW_C",
+     "chain": [
+      "TopMG1"
+     ],
+     "comp": "Turret",
+     "class": "SkeletalMeshComponent",
+     "xf": {
+      "loc": [
+       -212.13419448363857,
+       39.90340746659422,
+       201.81549814889058
+      ],
+      "quat": [
+       0.0,
+       0.0,
+       0.9999999999999999,
+       6.123233995736766e-17
+      ],
+      "scale": [
+       1.0,
+       1.0,
+       1.0
+      ]
+     },
+     "visible": true,
+     "parent": "TopMG1",
+     "socket": "None",
+     "mesh": "/Game/RTS_Survival/Blueprints/Turrets/EmbeddedTurrets/MG34Top/Meshes/SK_MG34_Top",
+     "mats": [
+      "/Game/RTS_Survival/Blueprints/Turrets/EmbeddedTurrets/MG34Top/Meshes/M_MG34"
+     ],
+     "export": {
+      "fbx": "D:/UE5Projects/RTS_Survival/Saved/BuriedArmour/dump/fbx/SK_MG34_Top.fbx",
+      "class": "SkeletalMesh",
+      "bbox_err": "'BoxSphereBounds' object has no attribute 'get_box'"
+     }
+    },
+    {
+     "actor": "Ger_EmbTurret_MG34_251MortarTW_C",
+     "chain": [
+      "TopMG1"
+     ],
+     "comp": "Crew1",
+     "class": "SkeletalMeshComponent",
+     "xf": {
+      "loc": [
+       -213.13419448363857,
+       39.90340746659422,
+       81.81549814889058
+      ],
+      "quat": [
+       0.0,
+       0.0,
+       0.9999999999999999,
+       6.123233995736766e-17
+      ],
+      "scale": [
+       1.0,
+       1.0,
+       1.0
+      ]
+     },
+     "visible": true,
+     "parent": "Turret",
+     "socket": "None",
+     "mesh": "/Game/RTS_Survival/Blueprints/Squads/SquadUnits/Skeletons/PostApocalyptic/Mesh/SK_PostApoSoldier",
+     "mats": [
+      "/Game/RTS_Survival/Blueprints/Squads/SquadUnits/Skeletons/PostApocalyptic/Material/M_ScavengerNoCamo"
+     ],
+     "export": {
+      "fbx": "D:/UE5Projects/RTS_Survival/Saved/BuriedArmour/dump/fbx/SK_PostApoSoldier.fbx",
+      "class": "SkeletalMesh",
+      "bbox_err": "'BoxSphereBounds' object has no attribute 'get_box'"
+     }
+    },
+    {
+     "actor": "Ger_ArmoredCar_251_MortarTW_C",
+     "chain": [],
+     "comp": "EngineSound",
+     "class": "AudioComponent",
+     "xf": {
+      "loc": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quat": [
+       0.0,
+       0.0,
+       0.0,
+       1.0
+      ],
+      "scale": [
+       1.0,
+       1.0,
+       1.0
+      ]
+     },
+     "visible": true,
+     "parent": "TrackMesh",
+     "socket": "None"
+    },
+    {
+     "actor": "Ger_ArmoredCar_251_MortarTW_C",
+     "chain": [],
+     "comp": "BillboardComponent_2",
+     "class": "BillboardComponent",
+     "xf": {
+      "loc": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quat": [
+       0.0,
+       0.0,
+       0.0,
+       1.0
+      ],
+      "scale": [
+       0.5,
+       0.5,
+       0.5
+      ]
+     },
+     "visible": false,
+     "parent": "EngineSound",
+     "socket": "None"
+    }
+   ]
+  },
+  "Sdkfz251_Transport": {
+   "bp": "/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_ArmoredCar/Sdkfz251_Transport/Ger_ArmoredCar_251_Transport",
+   "components": [
+    {
+     "actor": "Ger_ArmoredCar_251_Transport_C",
+     "chain": [],
+     "comp": "TrackMesh",
+     "class": "SkeletalMeshComponent",
+     "xf": {
+      "loc": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quat": [
+       0.0,
+       0.0,
+       0.0,
+       1.0
+      ],
+      "scale": [
+       1.0,
+       1.0,
+       1.0
+      ]
+     },
+     "visible": true,
+     "parent": null,
+     "socket": "None",
+     "mesh": "/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_ArmoredCar/Sdkfz-251_75mm/Meshes/SK_SDKFZ251_Tracks",
+     "mats": [
+      "/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_ArmoredCar/Sdkfz-250/Meshes/Materials/FrontWheels/M_Sdkfz-250_FrontWheel",
+      "/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_ArmoredCar/Sdkfz-250/Meshes/Materials/MI_Sdkfz-250_Wheels",
+      "/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_ArmoredCar/Sdkfz-250/Meshes/Materials/Tracks/MI_Sdkfz-250_Tracks",
+      "/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_ArmoredCar/Sdkfz-250/Meshes/Materials/Tracks/MI_Sdkfz-250_Tracks"
+     ],
+     "export": {
+      "fbx": "D:/UE5Projects/RTS_Survival/Saved/BuriedArmour/dump/fbx/SK_SDKFZ251_Tracks.fbx",
+      "class": "SkeletalMesh",
+      "bbox_err": "'BoxSphereBounds' object has no attribute 'get_box'"
+     }
+    },
+    {
+     "actor": "Ger_ArmoredCar_251_Transport_C",
+     "chain": [],
+     "comp": "Selectionarea",
+     "class": "BoxComponent",
+     "xf": {
+      "loc": [
+       -15.00000638149504,
+       7.0,
+       89.44076769595767
+      ],
+      "quat": [
+       0.0,
+       0.0,
+       0.0,
+       1.0
+      ],
+      "scale": [
+       12.0,
+       6.25,
+       4.0
+      ]
+     },
+     "visible": false,
+     "parent": "TrackMesh",
+     "socket": "None"
+    },
+    {
+     "actor": "Ger_ArmoredCar_251_Transport_C",
+     "chain": [],
+     "comp": "SelectedDecal",
+     "class": "DecalComponent",
+     "xf": {
+      "loc": [
+       4.053339958190918,
+       3.0517578125e-05,
+       -10.50577449798584
+      ],
+      "quat": [
+       -1.3234889800848443e-23,
+       -0.7071067811865475,
+       2.6469779601696886e-23,
+       0.7071067811865476
+      ],
+      "scale": [
+       1.0,
+       9.0,
+       12.0
+      ]
+     },
+     "visible": false,
+     "parent": "TrackMesh",
+     "socket": "None"
+    },
+    {
+     "actor": "Ger_ArmoredCar_251_Transport_C",
+     "chain": [],
+     "comp": "NS_TrackSmokes",
+     "class": "NiagaraComponent",
+     "xf": {
+      "loc": [
+       0.0,
+       -5.950434684338688,
+       -2.9081479624437634e-07
+      ],
+      "quat": [
+       0.0,
+       0.0,
+       0.0,
+       1.0
+      ],
+      "scale": [
+       1.0,
+       1.0,
+       1.0
+      ]
+     },
+     "visible": false,
+     "parent": "TrackMesh",
+     "socket": "None"
+    },
+    {
+     "actor": "Ger_ArmoredCar_251_Transport_C",
+     "chain": [],
+     "comp": "Hull",
+     "class": "StaticMeshComponent",
+     "xf": {
+      "loc": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quat": [
+       0.0,
+       0.0,
+       0.0,
+       1.0
+      ],
+      "scale": [
+       1.0,
+       1.0,
+       1.0
+      ]
+     },
+     "visible": true,
+     "parent": "TrackMesh",
+     "socket": "None",
+     "mesh": "/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_ArmoredCar/Sdkfz251_Transport/Meshes/Sdkfz_251_mortar",
+     "mats": [
+      "/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_ArmoredCar/Sdkfz-251_75mm/Meshes/Materials/MI_Sdkfz_251_Hull_DesertAPO"
+     ],
+     "export": {
+      "fbx": "D:/UE5Projects/RTS_Survival/Saved/BuriedArmour/dump/fbx/Sdkfz_251_mortar.fbx",
+      "class": "StaticMesh",
+      "bbox": [
+       [
+        -288.1222229003906,
+        -130.19884872436523,
+        25.591934204101562
+       ],
+       [
+        287.8983459472656,
+        121.44620132446289,
+        220.618896484375
+       ]
+      ]
+     }
+    },
+    {
+     "actor": "Ger_ArmoredCar_251_Transport_C",
+     "chain": [],
+     "comp": "NS_Exhaust",
+     "class": "NiagaraComponent",
+     "xf": {
+      "loc": [
+       -251.68306541857237,
+       -5.317029430778348,
+       84.31263454968894
+      ],
+      "quat": [
+       0.0,
+       0.0,
+       0.0,
+       1.0
+      ],
+      "scale": [
+       0.2,
+       0.2,
+       0.3
+      ]
+     },
+     "visible": true,
+     "parent": "Hull",
+     "socket": "Exhaust"
+    },
+    {
+     "actor": "Ger_ArmoredCar_251_Transport_C",
+     "chain": [],
+     "comp": "TopMG",
+     "class": "ChildActorComponent",
+     "xf": {
+      "loc": [
+       6.404130820737919,
+       -1.7451020539738238e-07,
+       200.6258754420428
+      ],
+      "quat": [
+       0.0,
+       0.0,
+       0.0,
+       1.0
+      ],
+      "scale": [
+       1.0,
+       1.0,
+       1.0
+      ]
+     },
+     "visible": true,
+     "parent": "Hull",
+     "socket": "Mg",
+     "child_actor": "Ger_EmbTurret_MG34_251Mortar_C"
+    },
+    {
+     "actor": "Ger_EmbTurret_MG34_251Mortar_C",
+     "chain": [
+      "TopMG"
+     ],
+     "comp": "Turret",
+     "class": "SkeletalMeshComponent",
+     "xf": {
+      "loc": [
+       6.404130820737919,
+       -1.7451020539738238e-07,
+       200.6258754420428
+      ],
+      "quat": [
+       0.0,
+       0.0,
+       0.0,
+       1.0
+      ],
+      "scale": [
+       1.0,
+       1.0,
+       1.0
+      ]
+     },
+     "visible": true,
+     "parent": "TopMG",
+     "socket": "None",
+     "mesh": "/Game/RTS_Survival/Blueprints/Turrets/EmbeddedTurrets/MG34Top/Meshes/SK_MG34_Top",
+     "mats": [
+      "/Game/RTS_Survival/Blueprints/Turrets/EmbeddedTurrets/MG34Top/Meshes/M_MG34"
+     ],
+     "export": {
+      "fbx": "D:/UE5Projects/RTS_Survival/Saved/BuriedArmour/dump/fbx/SK_MG34_Top.fbx",
+      "class": "SkeletalMesh",
+      "bbox_err": "'BoxSphereBounds' object has no attribute 'get_box'"
+     }
+    },
+    {
+     "actor": "Ger_EmbTurret_MG34_251Mortar_C",
+     "chain": [
+      "TopMG"
+     ],
+     "comp": "Crew1",
+     "class": "SkeletalMeshComponent",
+     "xf": {
+      "loc": [
+       7.404130820737919,
+       -1.7451020539738238e-07,
+       80.6258754420428
+      ],
+      "quat": [
+       0.0,
+       0.0,
+       0.0,
+       1.0
+      ],
+      "scale": [
+       1.0,
+       1.0,
+       1.0
+      ]
+     },
+     "visible": true,
+     "parent": "Turret",
+     "socket": "None",
+     "mesh": "/Game/RTS_Survival/Blueprints/Squads/SquadUnits/Skeletons/PostApocalyptic/Mesh/SK_PostApoSoldier",
+     "mats": [
+      "/Game/RTS_Survival/Blueprints/Squads/SquadUnits/Skeletons/PostApocalyptic/Material/M_ScavengerNoCamo"
+     ],
+     "export": {
+      "fbx": "D:/UE5Projects/RTS_Survival/Saved/BuriedArmour/dump/fbx/SK_PostApoSoldier.fbx",
+      "class": "SkeletalMesh",
+      "bbox_err": "'BoxSphereBounds' object has no attribute 'get_box'"
+     }
+    },
+    {
+     "actor": "Ger_ArmoredCar_251_Transport_C",
+     "chain": [],
+     "comp": "TopMG1",
+     "class": "ChildActorComponent",
+     "xf": {
+      "loc": [
+       -212.13419448363857,
+       39.90340746659422,
+       201.81549814889058
+      ],
+      "quat": [
+       0.0,
+       0.0,
+       0.9999999999999999,
+       6.123233995736766e-17
+      ],
+      "scale": [
+       1.0,
+       1.0,
+       1.0
+      ]
+     },
+     "visible": true,
+     "parent": "Hull",
+     "socket": "Mg_9",
+     "child_actor": "Ger_EmbTurret_MG34_C"
+    },
+    {
+     "actor": "Ger_EmbTurret_MG34_C",
+     "chain": [
+      "TopMG1"
+     ],
+     "comp": "Turret",
+     "class": "SkeletalMeshComponent",
+     "xf": {
+      "loc": [
+       -212.13419448363857,
+       39.90340746659422,
+       201.81549814889058
+      ],
+      "quat": [
+       0.0,
+       0.0,
+       0.9999999999999999,
+       6.123233995736766e-17
+      ],
+      "scale": [
+       1.0,
+       1.0,
+       1.0
+      ]
+     },
+     "visible": true,
+     "parent": "TopMG1",
+     "socket": "None",
+     "mesh": "/Game/RTS_Survival/Blueprints/Turrets/EmbeddedTurrets/MG34Top/Meshes/SK_MG34_Top",
+     "mats": [
+      "/Game/RTS_Survival/Blueprints/Turrets/EmbeddedTurrets/MG34Top/Meshes/M_MG34"
+     ],
+     "export": {
+      "fbx": "D:/UE5Projects/RTS_Survival/Saved/BuriedArmour/dump/fbx/SK_MG34_Top.fbx",
+      "class": "SkeletalMesh",
+      "bbox_err": "'BoxSphereBounds' object has no attribute 'get_box'"
+     }
+    },
+    {
+     "actor": "Ger_ArmoredCar_251_Transport_C",
+     "chain": [],
+     "comp": "Driver",
+     "class": "SkeletalMeshComponent",
+     "xf": {
+      "loc": [
+       -8.0,
+       -36.0,
+       68.0
+      ],
+      "quat": [
+       0.0,
+       0.0,
+       -0.7071067811865476,
+       0.7071067811865477
+      ],
+      "scale": [
+       1.0,
+       1.0,
+       1.0
+      ]
+     },
+     "visible": true,
+     "parent": "Hull",
+     "socket": "None",
+     "mesh": "/Game/RTS_Survival/Blueprints/Squads/SquadUnits/Skeletons/PostApocalyptic/Mesh/SK_PostApoSoldier",
+     "mats": [
+      "/Game/RTS_Survival/Blueprints/Squads/SquadUnits/Skeletons/PostApocalyptic/Material/M_ScavengerNoCamo"
+     ],
+     "export": {
+      "fbx": "D:/UE5Projects/RTS_Survival/Saved/BuriedArmour/dump/fbx/SK_PostApoSoldier.fbx",
+      "class": "SkeletalMesh",
+      "bbox_err": "'BoxSphereBounds' object has no attribute 'get_box'"
+     }
+    },
+    {
+     "actor": "Ger_ArmoredCar_251_Transport_C",
+     "chain": [],
+     "comp": "EngineSound",
+     "class": "AudioComponent",
+     "xf": {
+      "loc": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quat": [
+       0.0,
+       0.0,
+       0.0,
+       1.0
+      ],
+      "scale": [
+       1.0,
+       1.0,
+       1.0
+      ]
+     },
+     "visible": true,
+     "parent": "TrackMesh",
+     "socket": "None"
+    },
+    {
+     "actor": "Ger_ArmoredCar_251_Transport_C",
+     "chain": [],
+     "comp": "BillboardComponent_2",
+     "class": "BillboardComponent",
+     "xf": {
+      "loc": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "quat": [
+       0.0,
+       0.0,
+       0.0,
+       1.0
+      ],
+      "scale": [
+       0.5,
+       0.5,
+       0.5
+      ]
+     },
+     "visible": false,
+     "parent": "EngineSound",
+     "socket": "None"
+    }
+   ]
+  }
+ },
+ "meshes": {
+  "/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Medium/PanzerIII/Meshes/SK_PanzerIII_Tracks": {
+   "fbx": "D:/UE5Projects/RTS_Survival/Saved/BuriedArmour/dump/fbx/SK_PanzerIII_Tracks.fbx",
+   "class": "SkeletalMesh",
+   "bbox_err": "'BoxSphereBounds' object has no attribute 'get_box'"
+  },
+  "/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Medium/Stug/Meshes/SM_StugIII_BaseMesh": {
+   "fbx": "D:/UE5Projects/RTS_Survival/Saved/BuriedArmour/dump/fbx/SM_StugIII_BaseMesh.fbx",
+   "class": "StaticMesh",
+   "bbox": [
+    [
+     -336.21446228027344,
+     -160.77064514160156,
+     24.790252685546875
+    ],
+    [
+     208.29164123535156,
+     158.96754455566406,
+     363.3766174316406
+    ]
+   ]
+  },
+  "/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Medium/Stug/Meshes/SK_StugIII_Turret": {
+   "fbx": "D:/UE5Projects/RTS_Survival/Saved/BuriedArmour/dump/fbx/SK_StugIII_Turret.fbx",
+   "class": "SkeletalMesh",
+   "bbox_err": "'BoxSphereBounds' object has no attribute 'get_box'"
+  },
+  "/Game/RTS_Survival/Blueprints/Turrets/EmbeddedTurrets/MG34Top/Meshes/SK_MG34_Top": {
+   "fbx": "D:/UE5Projects/RTS_Survival/Saved/BuriedArmour/dump/fbx/SK_MG34_Top.fbx",
+   "class": "SkeletalMesh",
+   "bbox_err": "'BoxSphereBounds' object has no attribute 'get_box'"
+  },
+  "/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Light/Panzer1/Meshes/SK_Pazner1_Tracks": {
+   "fbx": "D:/UE5Projects/RTS_Survival/Saved/BuriedArmour/dump/fbx/SK_Pazner1_Tracks.fbx",
+   "class": "SkeletalMesh",
+   "bbox_err": "'BoxSphereBounds' object has no attribute 'get_box'"
+  },
+  "/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Light/Wespe/Meshes/SM_Wespe_Hull": {
+   "fbx": "D:/UE5Projects/RTS_Survival/Saved/BuriedArmour/dump/fbx/SM_Wespe_Hull.fbx",
+   "class": "StaticMesh",
+   "bbox": [
+    [
+     -258.908935546875,
+     -108.1718864440918,
+     30.85174560546875
+    ],
+    [
+     212.08572387695312,
+     107.26509475708008,
+     208.54244995117188
+    ]
+   ]
+  },
+  "/Game/RTS_Survival/Blueprints/Squads/SquadUnits/Skeletons/PostApocalyptic/Mesh/SK_PostApoSoldier": {
+   "fbx": "D:/UE5Projects/RTS_Survival/Saved/BuriedArmour/dump/fbx/SK_PostApoSoldier.fbx",
+   "class": "SkeletalMesh",
+   "bbox_err": "'BoxSphereBounds' object has no attribute 'get_box'"
+  },
+  "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerPits/Meshes/SM_GerPit_Shell_105": {
+   "fbx": "D:/UE5Projects/RTS_Survival/Saved/BuriedArmour/dump/fbx/SM_GerPit_Shell_105.fbx",
+   "class": "StaticMesh",
+   "bbox": [
+    [
+     -24.0,
+     -5.40749979019165,
+     -5.40749979019165
+    ],
+    [
+     24.0,
+     5.40749979019165,
+     5.40749979019165
+    ]
+   ]
+  },
+  "/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Light/Wespe/Meshes/SK_Wespe_Gun": {
+   "fbx": "D:/UE5Projects/RTS_Survival/Saved/BuriedArmour/dump/fbx/SK_Wespe_Gun.fbx",
+   "class": "SkeletalMesh",
+   "bbox_err": "'BoxSphereBounds' object has no attribute 'get_box'"
+  },
+  "/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Light/PanzerII_Luchs/Meshes/SM_Luchs_Hull": {
+   "fbx": "D:/UE5Projects/RTS_Survival/Saved/BuriedArmour/dump/fbx/SM_Luchs_Hull.fbx",
+   "class": "StaticMesh",
+   "bbox": [
+    [
+     -231.62337493896484,
+     -125.2799301147461,
+     9.277801513671875
+    ],
+    [
+     224.6551284790039,
+     120.73224639892578,
+     300.3222351074219
+    ]
+   ]
+  },
+  "/Game/RTS_Survival/Blueprints/Turrets/German/Light/PZII_Luchs_Turret/FlakLuchs/Meshes/SK_FlakLuchs_TwinWeaponSystem": {
+   "fbx": "D:/UE5Projects/RTS_Survival/Saved/BuriedArmour/dump/fbx/SK_FlakLuchs_TwinWeaponSystem.fbx",
+   "class": "SkeletalMesh",
+   "bbox_err": "'BoxSphereBounds' object has no attribute 'get_box'"
+  },
+  "/Game/RTS_Survival/Blueprints/Turrets/German/Light/PZII_Luchs_Turret/FlakLuchs/Meshes/SM_FlakLuchs_TurretCasing": {
+   "fbx": "D:/UE5Projects/RTS_Survival/Saved/BuriedArmour/dump/fbx/SM_FlakLuchs_TurretCasing.fbx",
+   "class": "StaticMesh",
+   "bbox": [
+    [
+     -80.9717903137207,
+     -83.00680160522461,
+     0.5623359680175781
+    ],
+    [
+     74.0772819519043,
+     82.48208999633789,
+     50.497859954833984
+    ]
+   ]
+  },
+  "/Game/RTS_Survival/Blueprints/Turrets/German/Light/PZII_Luchs_Turret/FlakLuchs/Meshes/SM_FlakLuchs_Drum": {
+   "fbx": "D:/UE5Projects/RTS_Survival/Saved/BuriedArmour/dump/fbx/SM_FlakLuchs_Drum.fbx",
+   "class": "StaticMesh",
+   "bbox": [
+    [
+     -12.000000953674316,
+     -5.250000476837158,
+     -12.0
+    ],
+    [
+     12.000000953674316,
+     3.750002384185791,
+     12.0
+    ]
+   ]
+  },
+  "/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Medium/PanzerIV/Meshes/SK_PanzerIV_Tracks": {
+   "fbx": "D:/UE5Projects/RTS_Survival/Saved/BuriedArmour/dump/fbx/SK_PanzerIV_Tracks.fbx",
+   "class": "SkeletalMesh",
+   "bbox_err": "'BoxSphereBounds' object has no attribute 'get_box'"
+  },
+  "/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Medium/PanzerIV/Meshes/SM_PanzerIV_Hull": {
+   "fbx": "D:/UE5Projects/RTS_Survival/Saved/BuriedArmour/dump/fbx/SM_PanzerIV_Hull.fbx",
+   "class": "StaticMesh",
+   "bbox": [
+    [
+     -301.5951385498047,
+     -153.63030242919922,
+     34.29896545410156
+    ],
+    [
+     284.1875762939453,
+     179.02930450439453,
+     201.64297485351562
+    ]
+   ]
+  },
+  "/Game/RTS_Survival/Blueprints/Turrets/German/HullWeapons/Meshes/SM_HullMg_Panther": {
+   "fbx": "D:/UE5Projects/RTS_Survival/Saved/BuriedArmour/dump/fbx/SM_HullMg_Panther.fbx",
+   "class": "StaticMesh",
+   "bbox": [
+    [
+     -1.52587890625e-05,
+     -9.220855712890625,
+     -9.220870971679688
+    ],
+    [
+     43.12254333496094,
+     9.220855712890625,
+     9.220916748046875
+    ]
+   ]
+  },
+  "/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Medium/PanzerIV/Meshes/SM_Compartment_PzIVF1_Assault": {
+   "fbx": "D:/UE5Projects/RTS_Survival/Saved/BuriedArmour/dump/fbx/SM_Compartment_PzIVF1_Assault.fbx",
+   "class": "StaticMesh",
+   "bbox": [
+    [
+     -188.3870506286621,
+     -115.26897430419922,
+     179.89407348632812
+    ],
+    [
+     109.77713394165039,
+     116.1502456665039,
+     281.0
+    ]
+   ]
+  },
+  "/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_ArmoredCar/Sdkfz-251_75mm/Meshes/SK_SDKFZ251_Tracks": {
+   "fbx": "D:/UE5Projects/RTS_Survival/Saved/BuriedArmour/dump/fbx/SK_SDKFZ251_Tracks.fbx",
+   "class": "SkeletalMesh",
+   "bbox_err": "'BoxSphereBounds' object has no attribute 'get_box'"
+  },
+  "/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_ArmoredCar/Sdkfz251_MortarTW/Meshes/Sdkfz_251_MortarTW": {
+   "fbx": "D:/UE5Projects/RTS_Survival/Saved/BuriedArmour/dump/fbx/Sdkfz_251_MortarTW.fbx",
+   "class": "StaticMesh",
+   "bbox": [
+    [
+     -288.1222229003906,
+     -131.0342254638672,
+     25.591934204101562
+    ],
+    [
+     287.8983459472656,
+     121.36203002929688,
+     206.25918579101562
+    ]
+   ]
+  },
+  "/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_ArmoredCar/Sdkfz251_MortarTW/Mortar/SK_GrW34_251MortarTW": {
+   "fbx": "D:/UE5Projects/RTS_Survival/Saved/BuriedArmour/dump/fbx/SK_GrW34_251MortarTW.fbx",
+   "class": "SkeletalMesh",
+   "bbox_err": "'BoxSphereBounds' object has no attribute 'get_box'"
+  },
+  "/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_ArmoredCar/Sdkfz251_Transport/Meshes/Sdkfz_251_mortar": {
+   "fbx": "D:/UE5Projects/RTS_Survival/Saved/BuriedArmour/dump/fbx/Sdkfz_251_mortar.fbx",
+   "class": "StaticMesh",
+   "bbox": [
+    [
+     -288.1222229003906,
+     -130.19884872436523,
+     25.591934204101562
+    ],
+    [
+     287.8983459472656,
+     121.44620132446289,
+     220.618896484375
+    ]
+   ]
+  }
+ },
+ "log": [
+  "export /Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Medium/PanzerIII/Meshes/SK_PanzerIII_Tracks ok=True",
+  "export /Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Medium/Stug/Meshes/SM_StugIII_BaseMesh ok=True",
+  "export /Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Medium/Stug/Meshes/SK_StugIII_Turret ok=True",
+  "export /Game/RTS_Survival/Blueprints/Turrets/EmbeddedTurrets/MG34Top/Meshes/SK_MG34_Top ok=True",
+  "StuGIII: 12 components, 4 meshes",
+  "export /Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Light/Panzer1/Meshes/SK_Pazner1_Tracks ok=True",
+  "export /Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Light/Wespe/Meshes/SM_Wespe_Hull ok=True",
+  "export /Game/RTS_Survival/Blueprints/Squads/SquadUnits/Skeletons/PostApocalyptic/Mesh/SK_PostApoSoldier ok=True",
+  "export /Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerPits/Meshes/SM_GerPit_Shell_105 ok=True",
+  "export /Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Light/Wespe/Meshes/SK_Wespe_Gun ok=True",
+  "Wespe: 18 components, 10 meshes",
+  "export /Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Light/PanzerII_Luchs/Meshes/SM_Luchs_Hull ok=True",
+  "export /Game/RTS_Survival/Blueprints/Turrets/German/Light/PZII_Luchs_Turret/FlakLuchs/Meshes/SK_FlakLuchs_TwinWeaponSystem ok=True",
+  "export /Game/RTS_Survival/Blueprints/Turrets/German/Light/PZII_Luchs_Turret/FlakLuchs/Meshes/SM_FlakLuchs_TurretCasing ok=True",
+  "export /Game/RTS_Survival/Blueprints/Turrets/German/Light/PZII_Luchs_Turret/FlakLuchs/Meshes/SM_FlakLuchs_Drum ok=True",
+  "FlakLuchs: 14 components, 7 meshes",
+  "export /Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Medium/PanzerIV/Meshes/SK_PanzerIV_Tracks ok=True",
+  "export /Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Medium/PanzerIV/Meshes/SM_PanzerIV_Hull ok=True",
+  "export /Game/RTS_Survival/Blueprints/Turrets/German/HullWeapons/Meshes/SM_HullMg_Panther ok=True",
+  "export /Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Medium/PanzerIV/Meshes/SM_Compartment_PzIVF1_Assault ok=True",
+  "PzIV_F1_Assault: 11 components, 4 meshes",
+  "export /Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_ArmoredCar/Sdkfz-251_75mm/Meshes/SK_SDKFZ251_Tracks ok=True",
+  "export /Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_ArmoredCar/Sdkfz251_MortarTW/Meshes/Sdkfz_251_MortarTW ok=True",
+  "export /Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_ArmoredCar/Sdkfz251_MortarTW/Mortar/SK_GrW34_251MortarTW ok=True",
+  "Sdkfz251_MortarTW: 20 components, 11 meshes",
+  "export /Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_ArmoredCar/Sdkfz251_Transport/Meshes/Sdkfz_251_mortar ok=True",
+  "Sdkfz251_Transport: 14 components, 6 meshes"
+ ]
+}
