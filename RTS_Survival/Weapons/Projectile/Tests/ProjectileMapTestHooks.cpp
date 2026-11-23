@@ -10,6 +10,7 @@ namespace ProjectileMapTestHooksPrivate
 {
 	FOnMapTestArmorHit ArmorHitDelegate;
 	FOnMapTestShellLaunched ShellLaunchedDelegate;
+	FOnMapTestImpact ImpactDelegate;
 	uint32 LastShellLaunchId = 0;
 	// Pooled projectiles are reused, so the id belongs to the projectile's current flight.
 	TMap<TWeakObjectPtr<const UObject>, uint32> ShellLaunchIdByProjectile;
@@ -25,10 +26,33 @@ FOnMapTestShellLaunched& FProjectileMapTestHooks::OnShellLaunched()
 	return ProjectileMapTestHooksPrivate::ShellLaunchedDelegate;
 }
 
+FOnMapTestImpact& FProjectileMapTestHooks::OnImpact()
+{
+	return ProjectileMapTestHooksPrivate::ImpactDelegate;
+}
+
 bool FProjectileMapTestHooks::GetHasListeners()
 {
 	using namespace ProjectileMapTestHooksPrivate;
-	return ArmorHitDelegate.IsBound() || ShellLaunchedDelegate.IsBound();
+	return ArmorHitDelegate.IsBound() || ShellLaunchedDelegate.IsBound() || ImpactDelegate.IsBound();
+}
+
+void FProjectileMapTestHooks::ReportImpact(const UObject* Projectile, AActor* HitActor, const uint8 Surface,
+                                           const bool bBounce, const FVector& Location, const UObject* Effect)
+{
+	using namespace ProjectileMapTestHooksPrivate;
+	if (not ImpactDelegate.IsBound())
+	{
+		return;
+	}
+	FMapTestImpactReport Report;
+	Report.ShellLaunchId = GetShellLaunchId(Projectile);
+	Report.HitActor = HitActor;
+	Report.Surface = Surface;
+	Report.bBounce = bBounce;
+	Report.Location = Location;
+	Report.EffectName = Effect != nullptr ? Effect->GetName() : FString();
+	ImpactDelegate.Broadcast(Report);
 }
 
 void FProjectileMapTestHooks::ReportShellLaunched(const UObject* Projectile, UObject* WeaponOwner,

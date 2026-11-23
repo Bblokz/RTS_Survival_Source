@@ -1418,6 +1418,43 @@ void ACPPTurretsMaster::StartIdleAnimationTimer()
 	}
 }
 
+void ACPPTurretsMaster::SnapToHullFrontAndHoldIdle()
+{
+	StopIdleAnimationTimer();
+	IdleAnimationState.M_IdleTurretRotationType = EIdleRotation::Idle_KeepLast;
+	IdleAnimationState.bM_UseLocalYawTarget = false;
+	if (GetIsValidSceneSkeletalMesh())
+	{
+		FRotator MeshRotation = SceneSkeletalMesh->GetRelativeRotation();
+		MeshRotation.Yaw = IdleAnimationState.M_BaseLocalYaw;
+		SceneSkeletalMesh->SetRelativeRotation(MeshRotation);
+	}
+	USceneComponent* const TurretRootComponent = GetRootComponent();
+	if (not TurretOwner.GetObject() || not IsValid(TurretRootComponent))
+	{
+		return;
+	}
+	// The same yaw-only steering RotateTurret_LocalYaw_Root does, completed in one step.
+	const FRotator HullFront(0.f, TurretOwner.GetInterface()->GetOwnerRotation().Yaw, 0.f);
+	SteeringState.M_TargetRotator = HullFront;
+	const USceneComponent* const ParentAttachComponent = TurretRootComponent->GetAttachParent();
+	if (IsValid(ParentAttachComponent))
+	{
+		const FQuat TargetLocalQuat = ParentAttachComponent->GetComponentQuat().Inverse() * HullFront.Quaternion();
+		FRotator Relative = TurretRootComponent->GetRelativeRotation();
+		Relative.Yaw = TargetLocalQuat.Rotator().Yaw;
+		TurretRootComponent->SetRelativeRotation(Relative.GetNormalized());
+	}
+	else
+	{
+		FRotator World = TurretRootComponent->GetComponentRotation();
+		World.Yaw = HullFront.Yaw;
+		TurretRootComponent->SetWorldRotation(World.GetNormalized());
+	}
+	bM_IsRotatedToEngage = true;
+	bM_IsFullyRotatedToTarget = true;
+}
+
 void ACPPTurretsMaster::StopIdleAnimationTimer()
 {
 	if (UWorld* World = GetWorld())

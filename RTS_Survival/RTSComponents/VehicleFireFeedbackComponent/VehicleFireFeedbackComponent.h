@@ -185,6 +185,12 @@ public:
 	void SetOptimizationComponent(URTSOptimizer* InOptimizer);
 	virtual void ForceResetRecoilAndSleep();
 
+	/**
+	 * Scales every later kick (back offset, pitch, yaw jitter, sway). 1 = authored feedback; the Shorts director
+	 * lowers it per segment (FRTSShortsSegment::HullRecoilScale) so side-profile caliber stacks rock less.
+	 */
+	void SetKickScale(const float InKickScale) { M_KickScale = FMath::Max(0.f, InKickScale); }
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void TickComponent(
@@ -223,6 +229,8 @@ protected:
 	int32 M_TrackedWeaponIndex = INDEX_NONE;
 	int32 M_TrackedWeaponCalibre = 0;
 	float M_CachedTrackedEnergy01 = 0.0f;
+	// Every kick is linear in the clamped energy, so scaling the energy scales the whole kick.
+	float M_KickScale = 1.0f;
 
 	virtual bool GetIsValidHullMesh() const;
 	virtual bool GetIsValidTrackRootMesh() const;

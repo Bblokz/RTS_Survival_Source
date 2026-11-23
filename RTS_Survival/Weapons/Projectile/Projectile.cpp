@@ -2541,6 +2541,10 @@ void AProjectile::SpawnExplosionHandleAOE(const FVector& Location, const FRotato
 
 	// Resolve impact data once.
 	const FRTSSurfaceImpactData* const Data = FindImpactData(M_ImpactVfx, HitSurface);
+#if RTS_WITH_MAP_TESTS
+	FProjectileMapTestHooks::ReportImpact(this, HitActor, static_cast<uint8>(HitSurface), false, Location,
+	                                      Data != nullptr ? Data->ImpactEffect : nullptr);
+#endif
 	if (!Data)
 	{
 		ReportMissingSurface(this, HitSurface);
@@ -2566,6 +2570,9 @@ void AProjectile::SpawnExplosionHandleAOE(const FVector& Location, const FRotato
 
 void AProjectile::SpawnBounce(const FVector& Location, const FRotator& BounceDirection) const
 {
+#if RTS_WITH_MAP_TESTS
+	FProjectileMapTestHooks::ReportImpact(this, nullptr, 0, true, Location, M_BounceVfx);
+#endif
 	// Forward to owner’s pooled bounce player (VFX + SFX).
 	const bool bValidOwner = IsValid(M_ProjectileOwner);
 	if (bValidOwner)

@@ -46,6 +46,9 @@ public:
 	
 	virtual ETargetPreference GetTargetPreference() const override {return TargetPreference;};
 	virtual  void SetTargetPreference(const ETargetPreference NewTargetPreference) override;
+
+	/** Multiplies one of this component's weapons' range and rebuilds the component's engage range from its weapons. */
+	void UpgradeWeaponRange(const UWeaponState* MyWeapon, const float RangeMlt);
 	
 
 

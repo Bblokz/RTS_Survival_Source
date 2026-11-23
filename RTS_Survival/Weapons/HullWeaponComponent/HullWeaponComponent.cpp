@@ -1072,6 +1072,22 @@ void UHullWeaponComponent::OnProjectileManagerLoaded(const TObjectPtr<ASmallArms
 	}
 }
 
+void UHullWeaponComponent::UpgradeWeaponRange(const UWeaponState* MyWeapon, const float RangeMlt)
+{
+	if (not IsValid(MyWeapon))
+	{
+		return;
+	}
+	for (UWeaponState* EachWeapon : M_TWeapons)
+	{
+		if (IsValid(EachWeapon) && EachWeapon == MyWeapon)
+		{
+			EachWeapon->UpgradeWeaponWithRangeMlt(RangeMlt);
+			UpdateHullWeaponRangeBasedOnWeapons();
+		}
+	}
+}
+
 void UHullWeaponComponent::UpdateHullWeaponRangeBasedOnWeapons()
 {
 	float FlameThrowerRange = 0.f;

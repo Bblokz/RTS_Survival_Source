@@ -65,7 +65,7 @@ void UVehicleFireFeedbackComponent::NotifyWeaponFired(
 		M_CachedTrackedEnergy01 = GetNormalisedWeaponEnergy01(M_TrackedWeaponCalibre);
 	}
 
-	ApplyFeedbackKick(M_CachedTrackedEnergy01, TurretWorldYawDegrees);
+	ApplyFeedbackKick(M_CachedTrackedEnergy01 * M_KickScale, TurretWorldYawDegrees);
 	SetTickEnabledForActiveRecoil();
 }
 

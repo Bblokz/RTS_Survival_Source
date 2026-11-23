@@ -189,6 +189,11 @@ public:
 	void ClearModuleTraverseMultiplier(const UObject* Source);
 	UMeshComponent* GetModuleBindingMesh() const;
 	void SetTurretRotationSpeed(const float NewRotationSpeed) { RotationSpeed = NewRotationSpeed; }
+	/**
+	 * Turns the turret to the hull's front at once and stops idle sweeps: while idle it keeps its last aim from now on.
+	 * For staged battles (Shorts) where a vehicle waited off stage and its idle animation left the gun facing back.
+	 */
+	void SnapToHullFrontAndHoldIdle();
 	AActor* GetCurrentTargetActor() const { return TargetingData.GetTargetActor(); }
 
 	virtual float GetTurretYawLimit() const override;

@@ -61,8 +61,22 @@ struct FMapTestShellLaunchReport
 	EWeaponName WeaponName = EWeaponName::DEFAULT_WEAPON;
 };
 
+/** One impact or bounce effect a shell played, with the surface that picked it (Shorts impact showcase). */
+struct FMapTestImpactReport
+{
+	uint32 ShellLaunchId = 0;
+	TWeakObjectPtr<AActor> HitActor;
+	// ERTSSurfaceType as resolved from the hit's physical material; ignored for a bounce.
+	uint8 Surface = 0;
+	bool bBounce = false;
+	FVector Location = FVector::ZeroVector;
+	// Asset name of the Niagara system the surface (or the bounce) maps to; empty when the weapon has none.
+	FString EffectName;
+};
+
 DECLARE_MULTICAST_DELEGATE_OneParam(FOnMapTestArmorHit, const FMapTestArmorHitReport&);
 DECLARE_MULTICAST_DELEGATE_OneParam(FOnMapTestShellLaunched, const FMapTestShellLaunchReport&);
+DECLARE_MULTICAST_DELEGATE_OneParam(FOnMapTestImpact, const FMapTestImpactReport&);
 
 /**
  * @brief Lets map tests such as the vehicle duel bench see every shell fired and every armor hit it made, with the
@@ -72,6 +86,11 @@ namespace FProjectileMapTestHooks
 {
 	RTS_SURVIVAL_API FOnMapTestArmorHit& OnArmorHit();
 	RTS_SURVIVAL_API FOnMapTestShellLaunched& OnShellLaunched();
+	RTS_SURVIVAL_API FOnMapTestImpact& OnImpact();
+
+	/** Tells the listeners which impact (or bounce) effect the projectile is about to play. */
+	RTS_SURVIVAL_API void ReportImpact(const UObject* Projectile, AActor* HitActor, uint8 Surface, bool bBounce,
+	                                   const FVector& Location, const UObject* Effect);
 
 	/** @return Whether any map test listens; the projectile skips all report work when none does. */
 	RTS_SURVIVAL_API bool GetHasListeners();
