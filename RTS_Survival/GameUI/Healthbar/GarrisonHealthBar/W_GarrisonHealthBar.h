@@ -13,7 +13,8 @@ class USizeBox;
 /**
  * @brief Widget for visualizing cargo occupancy with seat and squad feedback.
  *
- * Displays garrison slot state alongside seat or squad counts to inform players about cargo capacity.
+ * Displays garrison slot state alongside seat or squad counts to inform players about cargo capacity, and the
+ * vehicle module icons for transports (ModuleBox added at runtime when the Blueprint has none).
  */
 UCLASS()
 class RTS_SURVIVAL_API UW_GarrisonHealthBar : public UW_HealthBar
@@ -38,6 +39,8 @@ public:
 	void ForceHideCargoUI();
 
 protected:
+	virtual void NativeOnInitialized() override;
+
 	UFUNCTION(BlueprintImplementableEvent)
 	void BP_UpdateGarrisonSlot(const int32 SlotIndex, const bool bIsOccupied,
 		FTrainingOption UnitID);
@@ -56,6 +59,10 @@ protected:
 
 private:
 	bool EnsureIsValidGarrisonSlot(const int32 SlotIndex) const;
+
+	// Transports are vehicles with modules: give the bar the ModuleBox the health component fills with module
+	// icons, placed as on W_BpHealthBar_Modules, unless the widget Blueprint already has one.
+	void AddModuleBoxIfMissing();
 
 	UPROPERTY()
 	int32 M_CurrentSeatsTaken = 0;
