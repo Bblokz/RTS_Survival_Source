@@ -3,6 +3,16 @@
 #include "Kismet/KismetMathLibrary.h"
 #include "RTS_Survival/DeveloperSettings.h"
 #include "RTS_Survival/Units/Aircraft/AircaftHelpers/FRTSAircraftHelpers.h"
+#include "RTS_Survival/Units/Aircraft/AircraftState/AircraftState.h"
+
+namespace AircraftMovementConstants
+{
+	// More frames than this between two bank-to-turn frames means another flight mode ran in between.
+	constexpr uint64 MaxFlightFrameGap = 2;
+	// Long frames (hitches) are flown in steps of at most this, so turn and bank limits hold (seconds).
+	constexpr float MaxFlightStepSeconds = 1.f / 30.f;
+	constexpr int32 MaxFlightSteps = 30;
+}
 
 UAircraftMovement::UAircraftMovement()
 {
@@ -127,8 +137,77 @@ void UAircraftMovement::UpdateOwnerRotation(const FRotator& InTargetRot, const f
     PawnOwner->SetActorRotation(NewRot);
 }
 
+void UAircraftMovement::TickFlight(FAircraftFlightInput Input, const FAircraftFlightModelSettings& Settings)
+{
+	using namespace AircraftMovementConstants;
+	if (not PawnOwner || not GetWorld())
+	{
+		return;
+	}
+	if (not GetIsFlightActiveRecently())
+	{
+		M_FlightModel.Reset();
+	}
+	M_LastFlightFrame = GFrameCounter;
+
+	// A flight velocity not yet consumed by the movement update is the newer one (the update may tick after us).
+	Input.Location = PawnOwner->GetActorLocation();
+	Input.Velocity = bM_HasFlightVelocity ? M_FlightVelocity : Velocity;
+	Input.CurrentRotation = PawnOwner->GetActorRotation();
+	const float FrameSeconds = FMath::Max(Input.DeltaTime, 0.f);
+	const int32 StepCount = FMath::Clamp(FMath::CeilToInt(FrameSeconds / MaxFlightStepSeconds), 1, MaxFlightSteps);
+	Input.DeltaTime = FrameSeconds / StepCount;
+	FAircraftFlightOutput Output{Input.Velocity, Input.CurrentRotation};
+	for (int32 StepIndex = 0; StepIndex < StepCount; ++StepIndex)
+	{
+		Output = M_FlightModel.Step(Input, Settings);
+		Input.Location += Output.Velocity * Input.DeltaTime;
+		Input.Velocity = Output.Velocity;
+		Input.CurrentRotation = Output.Rotation;
+	}
+	M_FlightVelocity = Output.Velocity;
+	M_FlightVelocityFrame = GFrameCounter;
+	bM_HasFlightVelocity = true;
+	// The rotation is applied now, with this frame's time step: applying it with the velocity in the next movement
+	// update used the previous frame's step and made the turn judder with uneven frame times. The nose then leads
+	// the flight direction by one frame of turn (about 1 degree at 90 deg/s).
+	PawnOwner->SetActorRotation(Output.Rotation);
+	if constexpr (DeveloperSettings::Debugging::GAircraftMovement_Compile_DebugSymbols)
+	{
+		DrawDebugLine(PawnOwner->GetWorld(), PawnOwner->GetActorLocation(), Input.AimPoint, FColor::Purple, false,
+		              FrameSeconds * 3, 1, 10.f);
+	}
+}
+
+bool UAircraftMovement::GetIsFlightActiveRecently() const
+{
+	return M_LastFlightFrame > 0 && GFrameCounter - M_LastFlightFrame <= AircraftMovementConstants::MaxFlightFrameGap;
+}
+
+float UAircraftMovement::GetFlightYawRate() const
+{
+	return GetIsFlightActiveRecently() ? M_FlightModel.GetYawRate() : 0.f;
+}
+
+void UAircraftMovement::ApplyControlInputToVelocity(const float DeltaTime)
+{
+	// Only a velocity from this or the previous frame: a stale one would bend the first frame of a straight run.
+	const bool bHasFreshFlightVelocity = bM_HasFlightVelocity
+		&& GFrameCounter - M_FlightVelocityFrame <= 1;
+	bM_HasFlightVelocity = false;
+	if (not bHasFreshFlightVelocity)
+	{
+		Super::ApplyControlInputToVelocity(DeltaTime);
+		return;
+	}
+	ConsumeInputVector();
+	Velocity = M_FlightVelocity;
+}
+
 void UAircraftMovement::KillMovement()
 {
 	Velocity = FVector::ZeroVector;
+	bM_HasFlightVelocity = false;
+	M_FlightModel.Reset();
 	StopMovementImmediately();
 }

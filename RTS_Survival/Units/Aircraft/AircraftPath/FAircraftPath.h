@@ -103,6 +103,13 @@ struct FAircraftPathPoint
 
 	UPROPERTY()
 	EAirPathPointType PointType = EAirPathPointType::Regular;
+
+	// Dive and dive-recovery points: the flight toward them does not descend below this height (ground of the target
+	// plus a margin); it does not move with terrain following. Unset (lowest float) on every other point.
+	UPROPERTY()
+	float FloorZ = TNumericLimits<float>::Lowest();
+
+	bool GetHasFloor() const { return FloorZ > TNumericLimits<float>::Lowest(); }
 };
 
 USTRUCT()
@@ -135,6 +142,31 @@ struct FAircraftPath
 	/** @return Whether the aircraft is flying into a dive or out of it: the part of an attack run that aims. */
 	bool GetIsFlyingDiveSegment() const;
 
+	/**
+	 * @brief Bank-to-turn path following: whether the aircraft has passed the point it flies toward. True past the end
+	 * of the segment, within the acceptance radius, or when it already flies along the next segment after rounding the
+	 * corner. (No "as far from the start as the segment is long" rule: off to the side of a long last leg it ended
+	 * move orders kilometres early.)
+	 * @param Location Aircraft location.
+	 * @param AcceptanceRadius Distance to the point that counts as reached.
+	 */
+	bool GetShouldAdvancePastTargetPoint(const FVector& Location, const float AcceptanceRadius) const;
+
+	/**
+	 * @brief The point LookAheadDistance further along the path than the aircraft's projection on its segment; past
+	 * the last point it continues along the last segment, so the heading stays calm on arrival.
+	 * @param Location Aircraft location.
+	 * @param LookAheadDistance Distance along the path (cm).
+	 * @return Where the aircraft aims this frame.
+	 */
+	FVector GetLookAheadPoint(const FVector& Location, const float LookAheadDistance) const;
+
+	/** @return The floor of the segment flown now (dive and recovery); unset on every other segment. */
+	TOptional<float> GetFloorZOfCurrentSegment() const;
+
+	/** @return Path length still ahead of the aircraft: from its projection on its segment to the last point (cm). */
+	float GetRemainingLength(const FVector& Location) const;
+
 	UPROPERTY()
 	TArray<FAircraftPathPoint> PathPoints;
 
@@ -144,7 +176,71 @@ struct FAircraftPath
 	UPROPERTY()
 	UObject* Owner = nullptr;
 
+	// Bank-to-turn flight: radius of the turns the aircraft flies at cruise speed. Above zero, move and attack paths
+	// are planned as one turn at this radius and then a straight line (no S-shaped bezier the aircraft cannot fly),
+	// and a dive is only planned when the aircraft can turn onto the target in time. 0 keeps the bezier planning.
+	float PlanningTurnRadius = 0.f;
+
+	// Bank-to-turn flight: side the aircraft already turns to (1 right, -1 left, 0 none); a target far off the nose is
+	// turned to on this side, so a new order does not reverse the bank.
+	float PreferredTurnSign = 0.f;
+
+	// Bank-to-turn flight: how many attack plans past the allowed number ended without a dive. Each level widens the
+	// dive cone a little and lowers the turn-onto-target margin, so an aircraft never circles a target forever
+	// without jumping straight to a wide, banked dive.
+	int32 DiveRelaxLevel = 0;
+
+	// Bank-to-turn attack approach: the run-in ends this far from the target (0 when the path has no run-in); the
+	// aircraft keeps that end on the line to the target while it flies the run-in, so a moving target is not lost.
+	float RunInEndDistanceToTarget = 0.f;
+
+	/**
+	 * @brief Moves the last point (the run-in end) onto the line from the aircraft to the target's current position,
+	 * at the planned distance from it, while the aircraft flies the last segment.
+	 * @param AircraftLocation Aircraft location.
+	 * @param TargetLocation Where the target is now.
+	 */
+	void ReaimRunInEnd(const FVector& AircraftLocation, const FVector& TargetLocation);
+
 private:
+	/**
+	 * @brief Adds the points of one turn at PlanningTurnRadius from the start toward the end, up to where the straight
+	 * line to the end leaves the circle; an end inside the circle first gets a straight fly-out just long enough to
+	 * put it outside, so there is always one turn and never a hairpin.
+	 * @pre The start point is already in the path. Adds neither the start nor the end point.
+	 * @param StartAirPoint Where the turn begins.
+	 * @param EndAirPoint Where the straight line after the turn goes.
+	 * @param StartRotation Heading at the start (only its yaw is used).
+	 */
+	void AddTurnRadiusArc(const FVector& StartAirPoint, const FVector& EndAirPoint, const FRotator& StartRotation);
+
+	/**
+	 * @brief An end inside the turn circle cannot be reached by turning at once: adds the straight fly-out point that
+	 * puts it just on the circle's edge.
+	 * @param StartAirPoint Where the turn would begin.
+	 * @param EndAirPoint Where the line after the turn goes.
+	 * @param Forward Level heading at the start.
+	 * @param TurnSign 1 turns right, -1 left.
+	 * @return Where the turn begins: the fly-out point, or the start when no fly-out is needed.
+	 */
+	FVector AddFlyOutIfEndInsideTurn(const FVector& StartAirPoint, const FVector& EndAirPoint, const FVector& Forward,
+	                                 float TurnSign);
+
+	/**
+	 * @brief Bank-to-turn attack approach: turn toward the enemy at PlanningTurnRadius, then a straight, steadying
+	 * run-in to where the dive starts; a target too close for that is first overflown far enough to come back to.
+	 * The dive itself is planned when this path ends, with the aircraft aligned (no dive starts mid-turn).
+	 * @pre The start point is already in the path.
+	 */
+	void AddTurnRadiusAttackApproach(const FVector& StartAirPoint, const FRotator& StartRotation,
+	                                 const FVector& EnemyAirLocation, const FAircraftAttackMoveSettings& AttackMoveSettings);
+
+	/** @return Whether a turn at PlanningTurnRadius can bring the nose onto a target this far and this far off it. */
+	bool GetCanTurnOntoTarget(float Distance, float AbsAngleDeg) const;
+
+	/** @return Straight flight (cm) the aircraft needs after a turn to steady its nose before a dive. */
+	float GetDiveAlignLength() const;
+
 	/**
 	 * @brief Adds a move-to path from the start point to the end point. Uses different bezier curves
 	 * depending on the angle and the distance to the target.
