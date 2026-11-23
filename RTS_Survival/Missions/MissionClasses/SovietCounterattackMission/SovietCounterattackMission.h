@@ -170,6 +170,20 @@ public:
 	UFUNCTION(BlueprintPure, NotBlueprintable, Category = "Soviet Counterattack|Presentation")
 	UMissionCinematicTakeOverSession* GetArrivalCinematicSession() const { return M_ArrivalSession; }
 
+	/**
+	 * @brief Plays the base reinforcements line and flies BaseReinforcements' vehicles for the player's faction into
+	 * the base, one aircraft each. Runs on its own once the first wave's arrival cinematic is over; only once.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Soviet Counterattack|Presentation")
+	void DropBaseReinforcements();
+
+	UFUNCTION(BlueprintPure, NotBlueprintable, Category = "Soviet Counterattack|Presentation")
+	bool GetBaseReinforcementsDropped() const { return bM_BaseReinforcementsDropped; }
+
+	// The first wave's arrival cinematic is over: it finished, was skipped, or never played (bWasShown false).
+	UFUNCTION(BlueprintImplementableEvent, Category = "Soviet Counterattack|Presentation")
+	void BP_OnArrivalCinematicOver(const bool bWasShown, const bool bWasSkipped);
+
 protected:
 	virtual void OnMissionStartedNative() override;
 	virtual void OnCameraTourFinishedNative(const int32 ID, const bool bWasShown) override;
@@ -434,6 +448,14 @@ private:
 	void Arrival_OnSessionCompleted(EMissionCinematicTakeOverResult Result);
 	// Stops waiting / playing; bReleaseTrain lets a held train go.
 	void Arrival_Clear(const bool bReleaseTrain);
+	// Once per mission, from every way the arrival cinematic can end (not from the clean-up).
+	void Arrival_OnOver();
+	bool bM_ArrivalOverHandled = false;
+
+	// ----- Base reinforcements (BaseReinforcements) -----
+	bool bM_BaseReinforcementsDropped = false;
+	FTimerHandle M_BaseReinforcementsTimer;
+	FVector BaseReinforcements_GetLandingPoint() const;
 
 	// ----- Kill the remaining Soviets -----
 	UPROPERTY()

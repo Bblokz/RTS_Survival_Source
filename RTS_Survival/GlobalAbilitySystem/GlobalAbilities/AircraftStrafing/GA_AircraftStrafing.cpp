@@ -79,7 +79,11 @@ void UGA_AircraftStrafing::RequestSpawnAircraftAtStartLocationsAsync(const FVect
 		++ValidAircraftClassCount;
 		++M_PendingAircraftLoadCount;
 		UGlobalAbilitiesManager* GlobalAbilitiesManager = GetGlobalAbilityManager();
-		const FVector StartLocation = GlobalAbilitiesManager->GetAircraftBombingSpawnLocation(this, TargetLocation);
+		FVector StartLocation = GlobalAbilitiesManager->GetAircraftBombingSpawnLocation(this, TargetLocation);
+		// The manager's spawn height is one world height for the whole map: over raised ground the aircraft would
+		// come in (and dive) far too low, so they come in at least as high above the target as they strafe from.
+		StartLocation.Z = FMath::Max(StartLocation.Z,
+		                             TargetLocation.Z + AircraftStrafeHeights::MinCruiseClearanceAboveTarget);
 		const FVector PostStrafeMoveToLocation = BuildPostStrafeMoveToLocation(TargetLocation);
 		RequestSpawnAircraftAtStartLocationAsync(
 			AircraftClassToLoad,

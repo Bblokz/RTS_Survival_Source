@@ -3,6 +3,8 @@
 #include "Components/ProgressBar.h"
 #include "Components/TextBlock.h"
 #include "InputCoreTypes.h"
+#include "Framework/Application/IInputProcessor.h"
+#include "Framework/Application/SlateApplication.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 
 namespace HoldToSkipInternal
@@ -12,6 +14,57 @@ namespace HoldToSkipInternal
 	constexpr float EmptyProgress = 0.0f;
 	constexpr float BlinkNormalizedMin = 0.0f;
 	constexpr float BlinkNormalizedMax = 1.0f;
+
+	/** Forwards Space down / up to the prompt before focus routing, so the skip never depends on keyboard focus. */
+	class FHoldToSkipInputProcessor final : public IInputProcessor
+	{
+	public:
+		explicit FHoldToSkipInputProcessor(UW_HoldToSkip* InWidget)
+			: M_Widget(InWidget)
+		{
+		}
+
+		virtual void Tick(const float DeltaTime, FSlateApplication& SlateApp, TSharedRef<ICursor> Cursor) override
+		{
+		}
+
+		virtual bool HandleKeyDownEvent(FSlateApplication& SlateApp, const FKeyEvent& InKeyEvent) override
+		{
+			UW_HoldToSkip* const Widget = GetActiveWidget(InKeyEvent);
+			if (Widget == nullptr)
+			{
+				return false;
+			}
+			Widget->StartHold();
+			return true;
+		}
+
+		virtual bool HandleKeyUpEvent(FSlateApplication& SlateApp, const FKeyEvent& InKeyEvent) override
+		{
+			UW_HoldToSkip* const Widget = GetActiveWidget(InKeyEvent);
+			if (Widget == nullptr)
+			{
+				return false;
+			}
+			Widget->StopHold();
+			return true;
+		}
+
+		virtual const TCHAR* GetDebugName() const override { return TEXT("HoldToSkip"); }
+
+	private:
+		TWeakObjectPtr<UW_HoldToSkip> M_Widget;
+
+		UW_HoldToSkip* GetActiveWidget(const FKeyEvent& InKeyEvent) const
+		{
+			if (InKeyEvent.GetKey() != EKeys::SpaceBar)
+			{
+				return nullptr;
+			}
+			UW_HoldToSkip* const Widget = M_Widget.Get();
+			return IsValid(Widget) && Widget->IsInViewport() ? Widget : nullptr;
+		}
+	};
 }
 
 void UW_HoldToSkip::NativeConstruct()
@@ -26,6 +79,36 @@ void UW_HoldToSkip::NativeConstruct()
 	}
 
 	ResetProgress();
+	RegisterInputProcessor();
+}
+
+void UW_HoldToSkip::NativeDestruct()
+{
+	UnregisterInputProcessor();
+	Super::NativeDestruct();
+}
+
+void UW_HoldToSkip::RegisterInputProcessor()
+{
+	if (M_InputProcessor.IsValid() || not FSlateApplication::IsInitialized())
+	{
+		return;
+	}
+	M_InputProcessor = MakeShared<HoldToSkipInternal::FHoldToSkipInputProcessor>(this);
+	FSlateApplication::Get().RegisterInputPreProcessor(M_InputProcessor);
+}
+
+void UW_HoldToSkip::UnregisterInputProcessor()
+{
+	if (not M_InputProcessor.IsValid())
+	{
+		return;
+	}
+	if (FSlateApplication::IsInitialized())
+	{
+		FSlateApplication::Get().UnregisterInputPreProcessor(M_InputProcessor);
+	}
+	M_InputProcessor.Reset();
 }
 
 void UW_HoldToSkip::NativeTick(const FGeometry& MyGeometry, const float InDeltaTime)
@@ -40,6 +123,12 @@ void UW_HoldToSkip::NativeTick(const FGeometry& MyGeometry, const float InDeltaT
 
 	if (M_HoldRuntimeState.bM_HasCompletedInCurrentHold)
 	{
+		return;
+	}
+	// The game window lost focus (alt-tab): the key up will never arrive, so the hold must not finish on its own.
+	if (FSlateApplication::IsInitialized() && not FSlateApplication::Get().IsActive())
+	{
+		StopHold();
 		return;
 	}
 
@@ -72,6 +161,12 @@ FReply UW_HoldToSkip::NativeOnKeyUp(const FGeometry& InGeometry, const FKeyEvent
 void UW_HoldToSkip::NativeOnFocusLost(const FFocusEvent& InFocusEvent)
 {
 	Super::NativeOnFocusLost(InFocusEvent);
+	// Space comes through the input preprocessor, so losing focus to another widget keeps the hold. Only when the
+	// game window itself loses focus (no key up will arrive) does the hold stop.
+	if (FSlateApplication::IsInitialized() && FSlateApplication::Get().IsActive())
+	{
+		return;
+	}
 	StopHold();
 }
 

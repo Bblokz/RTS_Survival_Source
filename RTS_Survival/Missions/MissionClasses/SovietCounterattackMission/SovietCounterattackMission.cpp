@@ -22,6 +22,8 @@
 #include "RTS_Survival/Interfaces/Commands.h"
 #include "RTS_Survival/Missions/MissionClasses/SovietCounterattackMission/SovietCounterattackSettings.h"
 #include "RTS_Survival/Missions/MissionManager/MissionManager.h"
+#include "RTS_Survival/Missions/PlayerAirDrop/PlayerAirDropSubsystem.h"
+#include "RTS_Survival/FactionSystem/Factions/Factions.h"
 #include "RTS_Survival/Missions/MissionProps/SovietCargoTrain/SovietCargoTrain.h"
 #include "RTS_Survival/Missions/MissionWidgets/W_MissionTimer.h"
 #include "RTS_Survival/Player/CPPController.h"
@@ -151,6 +153,7 @@ void USovietCounterattackMission::ClearRuntime(const bool bDestroyPendingActors)
 	if (UWorld* const World = GetWorld())
 	{
 		World->GetTimerManager().ClearTimer(M_IntroVoiceLineTimer);
+		World->GetTimerManager().ClearTimer(M_BaseReinforcementsTimer);
 	}
 	if (UWorld* const World = GetWorld())
 	{
@@ -1799,6 +1802,7 @@ void USovietCounterattackMission::Arrival_Arm(const TArray<FEnemyPlacementUnit>&
 	{
 		// Nothing to film at the landing field (or another batch is still out): no cinematic.
 		M_ArrivalStage = EArrivalStage::Over;
+		Arrival_OnOver();
 		return;
 	}
 	// The first batch flies the queue's first units, one per pad in order: film a pad that brings a vehicle.
@@ -2261,4 +2265,98 @@ void USovietCounterattackMission::Arrival_Clear(const bool bReleaseTrain)
 	{
 		bM_HoldTrainForCinematic = false;
 	}
+	// bReleaseTrain = a real end (finished, skipped, timed out, failed to start); false = the mission is cleaned up.
+	if (bReleaseTrain)
+	{
+		Arrival_OnOver();
+	}
+}
+
+void USovietCounterattackMission::Arrival_OnOver()
+{
+	if (bM_ArrivalOverHandled || M_Phase == EPhase::Done)
+	{
+		return;
+	}
+	bM_ArrivalOverHandled = true;
+	const bool bWasShown = M_ArrivalResult != 0;
+	const bool bWasSkipped = M_ArrivalResult == static_cast<int32>(EMissionCinematicTakeOverResult::Skipped);
+	BP_OnArrivalCinematicOver(bWasShown, bWasSkipped);
+	UWorld* const World = GetWorld();
+	if (World == nullptr || not IsValid(Settings) || not Settings->BaseReinforcements.bEnabled)
+	{
+		return;
+	}
+	const float Delay = Settings->BaseReinforcements.DelayAfterCinematicSeconds;
+	if (Delay <= 0.f)
+	{
+		DropBaseReinforcements();
+		return;
+	}
+	World->GetTimerManager().SetTimer(M_BaseReinforcementsTimer, this,
+	                                  &USovietCounterattackMission::DropBaseReinforcements, Delay, false);
+}
+
+FVector USovietCounterattackMission::BaseReinforcements_GetLandingPoint() const
+{
+	const FSovietCounterattackBaseReinforcementSettings& Reinforcements = Settings->BaseReinforcements;
+	FVector Point = Reinforcements.FallbackLandingPoint;
+	const ACPPController* const PlayerController = FRTS_Statics::GetRTSController(this);
+	ANomadicVehicle* const HQ = IsValid(PlayerController) ? PlayerController->GetPlayerHq() : nullptr;
+	if (RTSFunctionLibrary::RTSIsValid(HQ))
+	{
+		Point = HQ->GetActorLocation() + FVector(Reinforcements.LandingOffsetFromHQ.X,
+		                                         Reinforcements.LandingOffsetFromHQ.Y, 0.f);
+		Point.Z = 0.f;
+	}
+	const FVector Ground = Spawn_GetGroundLocation(Point);
+	// The first aircraft lands on this exact point: keep it on the navmesh (off buildings), like the others.
+	bool bProjected = false;
+	const FVector Projected = RTSFunctionLibrary::GetLocationProjected(GetMissionManagerChecked(), Ground, true,
+	                                                                   bProjected);
+	return bProjected ? Projected : Ground;
+}
+
+void USovietCounterattackMission::DropBaseReinforcements()
+{
+	if (bM_BaseReinforcementsDropped || not IsValid(Settings) || M_Phase == EPhase::Done)
+	{
+		return;
+	}
+	bM_BaseReinforcementsDropped = true;
+	const FSovietCounterattackBaseReinforcementSettings& Reinforcements = Settings->BaseReinforcements;
+	const bool bStrikeDivision = GetPlayerFaction() == ERTSFaction::GerStrikeDivision;
+	FPlayerAirDropPayload Payload;
+	Payload.Vehicles = bStrikeDivision ? Reinforcements.StrikeDivisionVehicles : Reinforcements.BreakthroughVehicles;
+	Payload.Vehicles.Remove(ETankSubtype::Tank_None);
+	Payload.CargoPlaneAbility = Reinforcements.CargoPlaneAbility;
+	if (Reinforcements.VoiceLine != nullptr)
+	{
+		PlayPortrait(Reinforcements.VoiceLinePortrait, Reinforcements.VoiceLine);
+	}
+	if (Payload.GetIsEmpty())
+	{
+		RTSFunctionLibrary::ReportError("Soviet counterattack mission " + GetName() + ": BaseReinforcements has no "
+			"vehicles for the player's faction; nothing is dropped.");
+		return;
+	}
+	UPlayerAirDropSubsystem* const AirDrop = UPlayerAirDropSubsystem::Get(this);
+	if (not IsValid(AirDrop))
+	{
+		RTSFunctionLibrary::ReportError("Soviet counterattack mission " + GetName() + ": no player air drop "
+			"subsystem; the base reinforcements are not dropped.");
+		return;
+	}
+	const FVector LandingPoint = BaseReinforcements_GetLandingPoint();
+	if (not AirDrop->DeliverPlayerUnitsByAir(LandingPoint, Payload))
+	{
+		return;
+	}
+	if (Reinforcements.MiniMapPingSeconds > 0.f)
+	{
+		ShowReinforcementsOnMiniMap(LandingPoint, Reinforcements.MiniMapPingSeconds);
+	}
+	RTSFunctionLibrary::PrintString(FString::Printf(TEXT("Soviet counterattack: %d base reinforcements flying in (%s)"),
+	                                                Payload.Vehicles.Num(),
+	                                                bStrikeDivision ? TEXT("Strike Division") : TEXT("Breakthrough")));
 }
