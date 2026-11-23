@@ -89,6 +89,7 @@ UnrealEditor-Win64-DebugGame-Cmd.exe <uproject> -run=pythonscript -script="<this
 - **Reload a just-created asset first.** A function just created by `create_asset` rejects new nodes until `load_asset` returns it again.
 - **Custom nodes are never shared.** Two identical custom nodes compile to two functions, and any texture fetch that depends on them happens twice. Identical plain math nodes are shared, but across function calls even those weren't, so the detail noise is passed between the functions explicitly.
 - **The shader complexity view counts instructions, not what runs.** Branches that skip work far from fields or crystals don't lower the count; an unrolled loop counts once per iteration. Keep per-iteration work small (precompute on the CPU what you can).
+- **Samplers: use the shared wrap sampler** (`SSM_Wrap_WorldGroupSettings`) for every wrap texture sample. SM5 (ps_5_0) allows 16 samplers and the landscape adds its weightmap samplers per component: until 2026-11-20 DesertPaintable (230 permutations) and DryCastle (14) failed on SM5 and drew the default material on GPUs without SM6. `E:\RR_test\scripts\editor_landscape_shared_samplers.py` (LS_FIX=1) converts a master and the functions it calls; the noise builders now set it too.
 - **Check every permutation, not just the default.** `get_statistics` on a child instance with each switch combination, compared before and after a change, catches a broken permutation. A broken one shows 0 instructions and samplers −1.
 
 ## Shader stats (pixel instructions / texture samples)

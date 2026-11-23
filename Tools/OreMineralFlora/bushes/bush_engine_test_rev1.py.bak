@@ -1,0 +1,498 @@
+"""Throwaway-editor test of the Ore mineral flora bushes: look pictures, colour probes, nav per agent, crush lanes, shells.
+Never on Ger_2ndOreMountains, never in a shared editor. Launch with run_engine_test.sh <logname> [timeout_s].
+The map (/Game/RTS_Survival/Maps/UnitTests/RTS_ToCopySmall, orange desert sand) is never saved; the editor quits at the end.
+Adapted from the Ore crushable rocks test (OreCrushableRocks/rock_engine_test.py).
+
+1. LOOK   all 8 Blueprints in three rows: on the map's own ground, on an IronOxide-coloured swatch, on an Ochre swatch
+          (BasicShape planes tinted to the screen colours measured on Ger_2ndOreMountains), with a parked Pz IV G and
+          BP_OreDeadSpruce_Survivor_9m for scale and colour. Pictures from the RTS angle (55 deg down) and close up;
+          screen positions of every bush, swatch and the spruce crown are logged for the colour sampling (bush_colours.py).
+2. PATHS  per lane piece a 12 m path across it on each agent's navmesh with that agent's RTS_NavFilter_*.
+3. CRUSH  lanes along world Y; each vehicle starts 24 m before its piece and is ordered 24 m past it:
+            A RustHeath (AnyTank)              Luchs (light)  -> crushed (standing plants 1 -> 0)
+            B BrambleThicket (MediumOrHeavy)   Luchs (light)  -> paths round, 6 standing; then teleported onto it: still 6
+            C BrambleThicket (MediumOrHeavy)   Pz IV G        -> drives through, clumps under it crushed
+            D OchreBroom (AnyTank)             Pz IV G        -> crushed
+4. SHELLS line traces on every trace channel and every object type through bushes at 30-120 cm: nothing may hit a bush.
+Results: Saved/OreMountains/flora/bushes/test/result.json and PNGs in Saved/OreMountains/flora/bushes/.
+"""
+import json
+import unreal
+
+ROOT = 'D:/UE5Projects/RTS_Survival/Saved/OreMountains/flora/bushes/'
+OUT = ROOT + 'test/result.json'
+HOME = '/Game/RTS_Survival/Blueprints/Environment/OreMountains/MineralFlora/Bushes/'
+SPRUCE = '/Game/RTS_Survival/Blueprints/Environment/OreMountains/DeadForest/BP_OreDeadSpruce_Survivor_9m'
+V = '/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/'
+VEHICLES = {
+    'PzIV_G(Medium)': V + 'Ger_Medium/PanzerIV/Ger_Vehicle_PanzerIV_G.Ger_Vehicle_PanzerIV_G_C',
+    'Luchs(Light)': V + 'Ger_Light/PanzerII_Luchs/Ger_Vehicle_PanzerII_Luchs.Ger_Vehicle_PanzerII_Luchs_C',
+}
+LANES = {
+    'A_small_light': (-9000, 'RustHeath', 'Luchs(Light)', 'crush'),
+    'B_thicket_light': (-6000, 'BrambleThicket', 'Luchs(Light)', 'detour'),
+    'C_thicket_medium': (-3000, 'BrambleThicket', 'PzIV_G(Medium)', 'crush'),
+    'D_small_medium': (0, 'OchreBroom', 'PzIV_G(Medium)', 'crush'),
+}
+NAMES = ['RustHeath', 'RedDogwood', 'RedBilberryMat', 'RustRowan', 'OchreBroom', 'OchreBracken', 'OchreTussock', 'BrambleThicket']
+LOOK_Y = 6000.0
+ROW_DY = 1000.0                 # rows: map ground, IronOxide swatch, Ochre swatch
+SWATCH = {'iron': (0.32, 0.05, 0.025), 'ochre': (0.30, 0.10, 0.025)}   # BasicShapeMaterial washes colour out: oversaturated on purpose
+START_Y = 2400.0
+MOVE_SECONDS = 100.0
+FILTERS = {a: f'/Game/RTS_Survival/Blueprints/Nav/Filters/RTS_NavFilter_{n}.RTS_NavFilter_{n}_C'
+           for a, n in (('Character', 'Characters'), ('LightTank', 'LightTanks'), ('MediumTank', 'MediumTanks'),
+                        ('HeavyTank', 'HeavyTanks'))}
+S = {'phase': 'wait_load', 't': 0.0, 'mark': 0.0, 'log': [], 'pieces': {}, 'tanks': {}, 'result': {}, 'track': {}}
+
+
+def log(message):
+    S['log'].append(f'{S["t"]:.1f} {message}')
+    unreal.log('BUSHTEST ' + message)
+
+
+def finish():
+    try:
+        json.dump(dict(log=S['log'], result=S['result']), open(OUT, 'w'), indent=1, default=str)
+    finally:
+        unreal.SystemLibrary.quit_editor()
+        S['phase'] = 'done'
+
+
+def game_world():
+    return unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_game_world()
+
+
+def alive(actor):
+    try:
+        return actor is not None and unreal.SystemLibrary.is_valid(actor)
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def nav_building(world):
+    fn = getattr(unreal.NavigationSystemV1, 'is_navigation_being_built', None)
+    try:
+        return bool(fn(world)) if fn else False
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def ground_z(world, x, y):
+    hit = unreal.SystemLibrary.line_trace_single(world, unreal.Vector(x, y, 20000), unreal.Vector(x, y, -20000),
+                                                 unreal.TraceTypeQuery.TRACE_TYPE_QUERY1, False, [],
+                                                 unreal.DrawDebugTrace.NONE, True)
+    return hit.to_tuple()[4].z if hit and hit.to_tuple()[0] else 0.0
+
+
+def set_owner(actor, player):
+    comp = actor.get_component_by_class(unreal.RTSComponent) if actor else None
+    if comp is not None:
+        comp.set_editor_property('owning_player', player)
+    return comp is not None
+
+
+def bp_class(name):
+    return unreal.load_class(None, f'{HOME}BP_OreFlora_{name}.BP_OreFlora_{name}_C')
+
+
+def look_x(i):
+    return -1700.0 + i * 440.0 + (250.0 if i == 7 else 0.0)
+
+
+def place_all():
+    world = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_editor_world()
+    log(f'editor map {world.get_path_name()}')
+    actors = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
+    for key, (x, name, vehicle, _) in LANES.items():
+        actors.spawn_actor_from_class(bp_class(name), unreal.Vector(x, 0, ground_z(world, x, 0)), unreal.Rotator(0, 0, 0))
+        tank = actors.spawn_actor_from_class(unreal.load_class(None, VEHICLES[vehicle]),
+                                             unreal.Vector(x, START_Y, ground_z(world, x, START_Y) + 50),
+                                             unreal.Rotator(0, 0, -90))
+        log(f'{key}: placed {name} at x {x} and {vehicle}, owner set {set_owner(tank, 1)}')
+    plane = unreal.load_asset('/Engine/BasicShapes/Plane')
+    for row, swatch in ((1, 'iron'), (2, 'ochre')):
+        y = LOOK_Y + row * ROW_DY
+        gz = ground_z(world, 300, y)
+        a = actors.spawn_actor_from_class(unreal.StaticMeshActor, unreal.Vector(400, y, gz + 1.5))
+        a.static_mesh_component.set_static_mesh(plane)
+        a.set_actor_scale3d(unreal.Vector(48.0, 7.0, 1.0))
+        a.set_actor_label('SWATCH_' + swatch)
+    for row in range(3):
+        y = LOOK_Y + row * ROW_DY
+        for i, name in enumerate(NAMES):
+            x = look_x(i)
+            z = ground_z(world, x, y)
+            actors.spawn_actor_from_class(bp_class(name), unreal.Vector(x, y, z), unreal.Rotator(0, 0, 37 * i + 11 * row))
+    sx, sy = 2700.0, LOOK_Y - 150
+    actors.spawn_actor_from_class(unreal.load_class(None, SPRUCE + '.BP_OreDeadSpruce_Survivor_9m_C'),
+                                  unreal.Vector(sx, sy, ground_z(world, sx, sy)), unreal.Rotator(0, 0, 0))
+    for vehicle, x, y, yaw in (('PzIV_G(Medium)', -2500, LOOK_Y - 100, 90), ('Luchs(Light)', 3300, LOOK_Y + 1500, 0)):
+        scout = actors.spawn_actor_from_class(unreal.load_class(None, VEHICLES[vehicle]),
+                                              unreal.Vector(x, y, ground_z(world, x, y) + 50), unreal.Rotator(0, 0, yaw))
+        log(f'look scout {vehicle} owner set {set_owner(scout, 1)}')
+    actors.spawn_actor_from_class(unreal.CameraActor, unreal.Vector(0, 9000, 2000))
+
+
+def find_runtime(world):
+    for actor in unreal.GameplayStatics.get_all_actors_of_class(world, unreal.CrushableCropFieldActor):
+        name = actor.get_class().get_name()
+        loc = actor.get_actor_location()
+        for key, (x, bp, _, _) in LANES.items():
+            if name == f'BP_OreFlora_{bp}_C' and abs(loc.x - x) < 200 and abs(loc.y) < 200:
+                S['pieces'][key] = actor
+        if abs(loc.y - LOOK_Y) < 2.5 * ROW_DY:
+            S.setdefault('look', []).append(actor)
+    for tank in unreal.GameplayStatics.get_all_actors_of_class(world, unreal.TankMaster):
+        loc = tank.get_actor_location()
+        for key, (x, _, _, _) in LANES.items():
+            if abs(loc.x - x) < 300 and abs(loc.y - START_Y) < 500:
+                S['tanks'][key] = tank
+    for a in unreal.GameplayStatics.get_all_actors_of_class(world, unreal.StaticMeshActor):
+        label = a.get_name()
+        loc = a.get_actor_location()
+        for row, swatch in ((1, 'iron'), (2, 'ochre')):
+            if abs(loc.y - (LOOK_Y + row * ROW_DY)) < 5 and abs(loc.x - 400) < 5:
+                c = SWATCH[swatch]
+                mid = a.static_mesh_component.create_dynamic_material_instance(0, unreal.load_asset('/Engine/BasicShapes/BasicShapeMaterial'))
+                mid.set_vector_parameter_value('Color', unreal.LinearColor(c[0], c[1], c[2], 1.0))
+                S.setdefault('swatches', {})[swatch] = a
+    for a in unreal.GameplayStatics.get_all_actors_of_class(world, unreal.Actor):
+        if a.get_class().get_name() == 'BP_OreDeadSpruce_Survivor_9m_C':
+            S['spruce'] = a
+    cams = unreal.GameplayStatics.get_all_actors_of_class(world, unreal.CameraActor)
+    S['camera'] = min(cams, key=lambda c: (c.get_actor_location() - unreal.Vector(0, 9000, 2000)).length())
+    log(f'runtime pieces {sorted(S["pieces"])} tanks {sorted(S["tanks"])} look {len(S.get("look", []))} '
+        f'swatches {sorted(S.get("swatches", {}))} spruce {"spruce" in S}')
+
+
+def navmeshes(world):
+    out = {}
+    for nav in unreal.GameplayStatics.get_all_actors_of_class(world, unreal.RecastNavMesh):
+        for agent in ('LightTank', 'MediumTank', 'HeavyTank'):
+            if agent in nav.get_name():
+                out[agent] = nav
+    rest = [n for n in unreal.GameplayStatics.get_all_actors_of_class(world, unreal.RecastNavMesh) if n not in out.values()]
+    if rest:
+        out['Character'] = rest[0]
+    log(f'navmeshes {dict((k, v.get_name()) for k, v in out.items())}')
+    return out
+
+
+def path(world, a, b, nav_data, filter_class):
+    try:
+        p = unreal.NavigationSystemV1.find_path_to_location_synchronously(world, a, b, nav_data, filter_class)
+        pts = list(p.get_editor_property('path_points')) if p else []
+    except Exception as error:  # noqa: BLE001
+        return dict(error=repr(error)[:100])
+    if not pts:
+        return dict(length=None)
+    length = sum((pts[i + 1] - pts[i]).length() for i in range(len(pts) - 1))
+    side = max(abs(pt.x - a.x) for pt in pts)
+    return dict(length=round(length), straight=round((b - a).length()), partial=bool(p.is_partial()),
+                side_cm=round(side), through=bool(side < 30 and not p.is_partial()))
+
+
+def across_paths(world, key):
+    x = S['origins'][key].x
+    z = S['origins'][key].z + 20
+    a, b = unreal.Vector(x, 600, z), unreal.Vector(x, -600, z)
+    return {agent: path(world, a, b, nav, unreal.load_class(None, FILTERS[agent])) for agent, nav in S['nav'].items()}
+
+
+def standing(key):
+    piece = S['pieces'].get(key)
+    return piece.get_num_standing_plants() if alive(piece) else None
+
+
+def setup_report(key):
+    piece = S['pieces'][key]
+    comps = []
+    for c in piece.get_components_by_class(unreal.InstancedStaticMeshComponent):
+        sm = c.get_editor_property('static_mesh')
+        mats = c.get_materials()
+        comps.append(dict(mesh=sm.get_name() if sm else None, instances=c.get_instance_count(),
+                          collision=str(c.get_collision_enabled()).split('.')[-1].split(':')[0],
+                          material=mats[0].get_name() if mats and mats[0] else None, shadow=bool(c.get_editor_property('cast_shadow'))))
+    return dict(cls=piece.get_class().get_name(), plants=piece.get_num_plants(), standing=piece.get_num_standing_plants(),
+                crush=str(piece.get_editor_property('crush_destruction_type')),
+                nav_area=str(piece.get_editor_property('standing_plants_nav_area')), components=comps)
+
+
+def hits_of(res):
+    if res is None:
+        return []
+    if isinstance(res, tuple) and res and isinstance(res[-1], (list, unreal.Array)):
+        return list(res[-1])
+    return list(res)
+
+
+def shell_traces(world):
+    """Every trace channel (TraceTypeQuery1..6) and every object type (ObjectTypeQuery1..16) through lane pieces and look
+    bushes at 30, 70 and 120 cm. Records which actors were hit; a bush must never be among them."""
+    targets = [S['pieces'][k] for k in ('A_small_light', 'B_thicket_light', 'D_small_medium') if alive(S['pieces'].get(k))]
+    targets += [a for a in S.get('look', [])[:8]]
+    out = []
+    obj_types = [getattr(unreal.ObjectTypeQuery, f'OBJECT_TYPE_QUERY{i}') for i in range(1, 17)
+                 if hasattr(unreal.ObjectTypeQuery, f'OBJECT_TYPE_QUERY{i}')]
+    for t in targets:
+        o = t.get_actor_location()
+        for hgt in (30.0, 70.0, 120.0):
+            a, b = o + unreal.Vector(-600, -150, hgt), o + unreal.Vector(600, 150, hgt)
+            hits = set()
+            for i in range(1, 7):
+                ch = getattr(unreal.TraceTypeQuery, f'TRACE_TYPE_QUERY{i}', None)
+                if ch is None:
+                    continue
+                for h in hits_of(unreal.SystemLibrary.line_trace_multi(world, a, b, ch, True, [], unreal.DrawDebugTrace.NONE, True)):
+                    actor = h.to_tuple()[9]
+                    hits.add(actor.get_class().get_name() if actor else 'None')
+            for h in hits_of(unreal.SystemLibrary.line_trace_multi_for_objects(world, a, b, obj_types, True, [], unreal.DrawDebugTrace.NONE, True)):
+                actor = h.to_tuple()[9]
+                hits.add(actor.get_class().get_name() if actor else 'None')
+            out.append(dict(target=t.get_class().get_name(), height=hgt, hits=sorted(hits),
+                            bush_hit=any(h.startswith('BP_OreFlora_') for h in hits)))
+    return out
+
+
+def sample():
+    for key, tank in S['tanks'].items():
+        x = LANES[key][0]
+        track = S['track'].setdefault(key, dict(max_side_near=0.0, cross_side=None, crush=None, last=None))
+        if alive(tank):
+            loc = tank.get_actor_location()
+            track['last'] = (round(loc.x - x), round(loc.y))
+            if abs(loc.y) < 450:
+                track['max_side_near'] = max(track['max_side_near'], abs(loc.x - x))
+            if track['cross_side'] is None and loc.y < 0:
+                track['cross_side'] = round(loc.x - x)
+                track['cross_time'] = round(S['t'] - S['order_time'], 1)
+        st = standing(key)
+        if st is not None and st < S['standing_before'][key] and track['crush'] is None:
+            track['crush'] = dict(time=round(S['t'] - S['order_time'], 1), vehicle_at=track['last'], standing=st)
+            log(f'{key}: crushed {json.dumps(track["crush"])}')
+
+
+def aim(eye, look):
+    camera = S['camera']
+    camera.root_component.set_mobility(unreal.ComponentMobility.MOVABLE)
+    camera.set_actor_location(eye, False, True)
+    camera.set_actor_rotation(unreal.MathLibrary.find_look_at_rotation(eye, look), True)
+    unreal.GameplayStatics.get_player_controller(game_world(), 0).set_view_target_with_blend(camera, 0.0)
+
+
+def probes(name, eye, look):
+    """World points of each bush's upper body, the swatches, plain ground and the spruce crown plus the camera pose;
+    bush_colours.py projects them into the 1600 x 900 picture (CameraActor FOV 90, horizontal)."""
+    pts = {}
+    for a in S.get('look', []):
+        o = a.get_actor_location()
+        row = int(round((o.y - LOOK_Y) / ROW_DY))
+        nm = a.get_class().get_name().replace('BP_OreFlora_', '').replace('_C', '')
+        h = {'RedBilberryMat': 25, 'OchreBracken': 50, 'RustRowan': 190, 'BrambleThicket': 110}.get(nm, 80)
+        pts[f'{nm}@{row}'] = [o.x, o.y, o.z + h]
+    for sw, a in S.get('swatches', {}).items():
+        o = a.get_actor_location()
+        pts[f'swatch_{sw}'] = [o.x + 300, o.y - 250, o.z]
+    pts['ground_map'] = [400, LOOK_Y - 300, S['look_z']]
+    if alive(S.get('spruce')):
+        o = S['spruce'].get_actor_location()
+        pts['spruce_crown'] = [o.x, o.y, o.z + 600]
+    fov = S['camera'].camera_component.get_editor_property('field_of_view')
+    S['result'].setdefault('probes', {})[name] = dict(eye=[eye.x, eye.y, eye.z], look=[look.x, look.y, look.z], fov=fov, points=pts)
+
+
+def shoot(name):
+    S['busy'] = True
+    try:
+        unreal.AutomationLibrary.take_high_res_screenshot(1600, 900, f'{ROOT}{name}.png', camera=S['camera'])
+    finally:
+        S['busy'] = False
+    log(f'picture {name}')
+
+
+def look_shots():
+    gz = S['look_z']
+    mid = LOOK_Y + ROW_DY
+    import math
+    def rts(tx, ty, d):
+        return unreal.Vector(tx, ty - d * math.cos(math.radians(55)), gz + d * math.sin(math.radians(55))), unreal.Vector(tx, ty, gz)
+    shots = [('lineup_game_view',) + rts(900, mid, 3000), ('lineup_game_view_far',) + rts(500, mid, 4200)]
+    shots += [('close_red_pale',) + rts(-1050, LOOK_Y, 1100), ('close_yellow_pale',) + rts(700, LOOK_Y, 1100),
+              ('close_thicket_spruce',) + rts(2300, LOOK_Y, 1300), ('close_red_on_iron',) + rts(-1050, LOOK_Y + ROW_DY, 1100),
+              ('close_yellow_on_ochre',) + rts(700, LOOK_Y + 2 * ROW_DY, 1100),
+              ('close_low_red', unreal.Vector(-1050, LOOK_Y - 900, gz + 350), unreal.Vector(-1050, LOOK_Y, gz + 60)),
+              ('close_low_yellow', unreal.Vector(700, LOOK_Y - 900, gz + 350), unreal.Vector(700, LOOK_Y, gz + 60))]
+    return shots
+
+
+def tick(delta):
+    S['t'] += delta
+    if S['phase'] == 'done' or S.get('busy'):
+        return
+    phase = S['phase']
+    try:
+        if phase == 'wait_load' and S['t'] > 15.0:
+            place_all()
+            editor_world = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_editor_world()
+            unreal.SystemLibrary.execute_console_command(editor_world, 'RebuildNavigation')
+            S['phase'], S['mark'] = 'editor_nav', S['t']
+        elif phase == 'editor_nav' and S['t'] - S['mark'] > 3.0:
+            editor_world = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_editor_world()
+            if nav_building(editor_world) and S['t'] - S['mark'] < 120.0:
+                return
+            log(f'editor navmesh rebuilt in {S["t"] - S["mark"]:.1f} s')
+            unreal.get_editor_subsystem(unreal.LevelEditorSubsystem).editor_request_begin_play()
+            S['phase'], S['mark'] = 'wait_pie', S['t']
+        elif phase == 'wait_pie':
+            world = game_world()
+            if world is not None and S['t'] - S['mark'] > 12.0:
+                unreal.GameplayStatics.set_game_paused(world, False)
+                unreal.SystemLibrary.execute_console_command(world, 'r.TextureStreaming 0')
+                find_runtime(world)
+                S['origins'] = {k: p.get_actor_location() for k, p in S['pieces'].items()}
+                S['standing_before'] = {k: standing(k) for k in S['pieces']}
+                S['look_z'] = ground_z(world, 400, LOOK_Y)
+                S['phase'], S['mark'] = 'registered', S['t']
+            elif S['t'] - S['mark'] > 150.0:
+                log('pie never started')
+                finish()
+        elif phase == 'registered':
+            world = game_world()
+            if (nav_building(world) and S['t'] - S['mark'] < 40.0) or S['t'] - S['mark'] < 4.0:
+                return
+            S['nav'] = navmeshes(world)
+            S['result']['setup'] = {k: setup_report(k) for k in S['pieces']}
+            S['result']['standing_before'] = S['standing_before']
+            S['result']['paths_before'] = {k: across_paths(world, k) for k in S['pieces']}
+            for key in S['pieces']:
+                log(f'{key} setup {json.dumps(S["result"]["setup"][key])}')
+                log(f'{key} paths before {json.dumps(S["result"]["paths_before"][key])}')
+            S['result']['shells'] = shell_traces(world)
+            log(f'shell traces: {sum(1 for s in S["result"]["shells"] if s["bush_hit"])} of {len(S["result"]["shells"])} hit a bush')
+            S['shots'] = look_shots()
+            S['phase'], S['mark'] = 'look', S['t']
+        elif phase == 'look':
+            if not S['shots']:
+                S['phase'] = 'orders'
+                return
+            name, eye, look = S['shots'][0]
+            if S['t'] - S.get('shot_at', -10.0) < 1.5:     # the high-res shot renders a frame later: do not move the camera yet
+                return
+            if S.get('aimed') != name:
+                aim(eye, look)
+                S['aimed'], S['mark'] = name, S['t']
+            elif S['t'] - S['mark'] > 2.5:
+                probes(name, eye, look)
+                shoot(name)
+                S['shot_at'] = S['t']
+                S['shots'].pop(0)
+        elif phase == 'orders':
+            if S['t'] - S.get('shot_at', -10.0) < 1.5:
+                return
+            S['order_time'] = S['t']
+            for key, tank in S['tanks'].items():
+                x = LANES[key][0]
+                target = unreal.Vector(x, -START_Y, S['origins'][key].z + 20)
+                try:
+                    result = tank.move_to_location(target, True, unreal.Rotator(0, 0, -90), False)
+                except Exception as error:  # noqa: BLE001
+                    result = f'failed {error!r}'[:140]
+                log(f'{key}: MoveToLocation {target} -> {result}')
+            aim(unreal.Vector(-4500, -1800, S['origins']['A_small_light'].z + 2600),
+                unreal.Vector(-4500, 0, S['origins']['A_small_light'].z))
+            S['phase'], S['mark'] = 'moving', S['t']
+        elif phase == 'moving':
+            sample()
+            queue = []
+            elapsed = S['t'] - S['mark']
+            arrived = all(isinstance(t.get('last'), tuple) and t['last'][1] < -START_Y + 400
+                          for t in S['track'].values()) and len(S['track']) == len(S['tanks'])
+            if elapsed > MOVE_SECONDS or (arrived and elapsed > 20.0 and not queue):
+                S['phase'], S['mark'] = 'settle', S['t']
+                log(f'movement over after {elapsed:.0f} s, all arrived {arrived}')
+        elif phase == 'settle':
+            sample()
+            if S['t'] - S['mark'] > 3.0:
+                world = game_world()
+                out = {}
+                for key, (x, bp, vehicle, expected) in LANES.items():
+                    track = S['track'].get(key, {})
+                    before, after = S['standing_before'][key], standing(key)
+                    if expected == 'crush':
+                        ok = after is not None and after < before and track.get('cross_side') is not None and abs(track['cross_side']) < 150
+                    else:
+                        ok = after == before and track.get('cross_side') is not None and track.get('max_side_near', 0) > 100
+                    out[key] = dict(piece=bp, vehicle=vehicle, expected=expected, passed=bool(ok), standing_before=before,
+                                    standing_after=after, vehicle_crossed_y0_at_dx=track.get('cross_side'),
+                                    vehicle_max_side_offset_near_piece=round(track.get('max_side_near', 0)),
+                                    vehicle_last=track.get('last'), crush=track.get('crush'))
+                S['result']['lanes'] = out
+                for key, row in out.items():
+                    log(f'{key} verdict {json.dumps(row)}')
+                S['remains'] = ['A_small_light', 'C_thicket_medium', 'D_small_medium']
+                S['phase'], S['mark'] = 'remains', S['t']
+        elif phase == 'remains':
+            if S['t'] - S.get('shot_at', -10.0) < 1.5:
+                return
+            if not S['remains']:
+                S['phase'], S['mark'] = 'nav_after_wait', S['t']
+                return
+            key = S['remains'][0]
+            if S.get('aimed') != key:
+                o = S['origins'][key]
+                eye = o + unreal.Vector(0, -700, 900)
+                S['camera'].set_actor_location(eye, False, True)
+                S['camera'].set_actor_rotation(unreal.MathLibrary.find_look_at_rotation(eye, o + unreal.Vector(0, 0, 10)), True)
+                S['aimed'], S['mark'] = key, S['t']
+            elif S['t'] - S['mark'] > 2.0:
+                shoot('remains_' + key)
+                S['shot_at'] = S['t']
+                S['remains'].pop(0)
+        elif phase == 'nav_after_wait' and S['t'] - S['mark'] > 2.0:
+            world = game_world()
+            S['result']['paths_after'] = {k: across_paths(world, k) for k in LANES}
+            for key in LANES:
+                log(f'{key} paths after {json.dumps(S["result"]["paths_after"][key])}')
+            # teleport the lane-B Luchs onto the intact thicket: the crush gate must still refuse it
+            tank, piece = S['tanks'].get('B_thicket_light'), S['pieces'].get('B_thicket_light')
+            if alive(tank) and alive(piece):
+                S['tp_back'] = tank.get_actor_location()
+                o = piece.get_actor_location()
+                tank.set_actor_location(o + unreal.Vector(0, 0, 60), False, True)
+                S['tp_before'] = piece.get_num_standing_plants()
+                log(f'teleported Luchs onto the thicket, standing {S["tp_before"]}')
+            S['phase'], S['mark'] = 'teleport_wait', S['t']
+        elif phase == 'teleport_wait' and S['t'] - S['mark'] > 2.5:
+            tank, piece = S['tanks'].get('B_thicket_light'), S['pieces'].get('B_thicket_light')
+            res = dict(before=S.get('tp_before'), after=piece.get_num_standing_plants() if alive(piece) else None,
+                       luchs_at=str(tank.get_actor_location()) if alive(tank) else None)
+            res['passed'] = res['before'] is not None and res['before'] == res['after']
+            S['result']['teleport_light_onto_thicket'] = res
+            log(f'teleport check {json.dumps(res)}')
+            o = S['origins']['C_thicket_medium']
+            eye = o + unreal.Vector(0, -900, 1100)
+            S['camera'].set_actor_location(eye, False, True)
+            S['camera'].set_actor_rotation(unreal.MathLibrary.find_look_at_rotation(eye, o), True)
+            S['phase'], S['mark'] = 'final_pic', S['t']
+        elif phase == 'final_pic' and S['t'] - S['mark'] > 1.0:
+            shoot('after_thicket_medium')
+            S['phase'], S['mark'] = 'final_hold', S['t']
+        elif phase == 'final_hold' and S['t'] - S['mark'] > 2.0:
+            lanes_ok = all(r['passed'] for r in S['result']['lanes'].values())
+            tp_ok = S['result'].get('teleport_light_onto_thicket', {}).get('passed', False)
+            shells_ok = not any(s['bush_hit'] for s in S['result'].get('shells', []))
+            S['result']['all_passed'] = bool(lanes_ok and tp_ok and shells_ok)
+            log(f'ALL PASSED {S["result"]["all_passed"]} (lanes {lanes_ok}, teleport {tp_ok}, shells {shells_ok})')
+            finish()
+    except Exception as error:  # noqa: BLE001
+        import traceback
+        log(f'ERROR {phase}: {error!r} {traceback.format_exc()[-600:]}')
+        finish()
+    if S['t'] > 560.0 and S['phase'] != 'done':
+        log('timeout')
+        finish()
+
+
+unreal.register_slate_post_tick_callback(tick)
+log('script loaded')

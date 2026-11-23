@@ -100,7 +100,8 @@ def detail_noise(x, y):
     """The 3.7 m detail noise sample."""
     wpxy = mask(N("WorldPosition", x, y), "", "RG", x + 160, y)
     sample = N("TextureSample", x + 640, y, texture=unreal.load_asset(NOISE),
-               sampler_type=unreal.MaterialSamplerType.SAMPLERTYPE_MASKS)
+               sampler_type=unreal.MaterialSamplerType.SAMPLERTYPE_MASKS,
+              sampler_source=unreal.SamplerSourceMode.SSM_WRAP_WORLD_GROUP_SETTINGS)
     C(rotated_uv(wpxy, x + 320, y), "", sample, "UVs")
     return wpxy, sample
 

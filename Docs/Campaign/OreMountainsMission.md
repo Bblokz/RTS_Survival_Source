@@ -70,6 +70,50 @@ A4 line), which is a natural convoy route west.
 The map has to **contain resources, designed into the layout**: **a quite large Radixite field and metal as well.**
 Tuning (amounts, positions, how far they sit from the base) comes later. **(open)**
 
+### Wismut spoil heaps: metal expansions (decided 2026-11-18)
+
+The real Ore Mountains are dotted with huge grey Wismut spoil heaps (*Halden*). They are the map's **metal nodes**, and
+they are part of the exploration push: this is the first real base-building mission, and it should teach that the
+economy grows by **taking ground**, not by turtling. The supply point mechanic is **not** used here; it is kept for
+Berlin, where it is introduced.
+
+**Model picked: capture station + harvest.**
+1. Each far heap has an old Wismut **ore loading station** beside it (an ore bin or loading chute with a small
+   headframe). **Infantry capture the station.**
+2. Once captured, the station is a **forward drop-off**, so harvesters can work the heap with short trips.
+3. Soviet sites near a station send a response to retake it, so the player has to defend it.
+
+Capture claims the heap, defence holds it, and the harvesters work it. Metal is still gathered by harvesters, as the
+intro mission teaches (one harvester gathers Radixite and metal there), so this adds no second economy model.
+
+**Layout and pacing:**
+- **One easy heap near the ridge** (the bench metal, reached by the narrow mine railway) needs no capture. It is small
+  and runs dry around the middle of the mission.
+- **The rich heaps sit out near the Soviet sites and in the north foothills**, each with a capture station. Only they
+  keep paying after the easy heap is gone, which pushes the player out at the right time.
+- The sketch has 2 near and 3 far metal spots, and the built map already has spoil-heap terrain (RockDesert paint, scree
+  and stones). **(open)** which heaps get a station, and the amounts.
+
+**Extra touches:**
+- **Show the heap emptying:** if the heap mesh can step down as it empties (`ResourceStorageLevel` suggests stages), the
+  player can see it go.
+- **Soviet harvesters already work the far heaps.** A heap near Base B has a Soviet harvester on it (the T-34 Breaker
+  pile-driver harvester exists). That shows the heap is worth taking, and the player can kill it or chase it off.
+- **A voice line when a station is captured,** in the style of the intercepted radio lines.
+
+**Implementation notes (checked in code 2026-11-18, not built):**
+- `ACaptureActor` (`CaptureMechanic/CaptureActor`) already has infantry capture with settings, a progress bar and the
+  Blueprint event `BP_OnCapturedByPlayer(Player)`. Squads call `ICaptureInterface::OnCaptureByPlayer`
+  (`SquadController.cpp`).
+- `UResourceDropOff` has a Blueprint-callable `SetIsDropOffActive(bool)` and `InitResourceDropOff(...)`. A Blueprint child
+  of `ACaptureActor` with a drop-off component that starts inactive and is switched on in `BP_OnCapturedByPlayer` may
+  need **no C++**. **(open)** check this before building:
+  - The drop-off registers with the game state at `BeginPlay` and uses player controller 0. Confirm that harvesters
+    really skip an inactive drop-off, and that the drop-off counts as the player's.
+  - Only player squads call the capture today. Retaking by the Soviets means either AI capture or destroying the station
+    through its optional HealthComponent (and switching the drop-off off again). **(open)** which one.
+  - Whether a heap should be harvestable before its station is captured (long hauls to the base) or blocked until then.
+
 ## The player's base
 
 - The player **starts with a base on the ridge**, built into the old mine tunnels.
@@ -134,6 +178,28 @@ those trucks, and the base grows from the raids.
 - **Hand-off after surrender:** the truck changes owner to the player, and `AConvoy` releases it (it is no longer a
   member, and it does not count as lost or escaped). It then reuses the supply-point truck logic (`USupplyTruckComponent`:
   drive to a target, pay the cargo on arrival), with the mine adit as the target instead of the HQ.
+- **Built in C++ 2026-11-18, made hard to capture / easy to destroy the same day (compiles, not play-tested):**
+  `Enemy/Convoy/SurrenderingCargoTruck/` (`SurrenderingCargoTruck`, derived from `ATrackedTankMaster`, and the
+  countdown widget `W_SurrenderingTruckCountdown`). Rules and defaults:
+  - **Trigger:** the last escort of the convoy dies while the column drives. A convoy that never had an escort starts
+    when a player unit comes within 30 m or a truck is hit (`UnescortedAlertRadius`).
+  - **Scuttle countdown, 12 s** (`CountdownSeconds`): the truck stops (`bStopDuringCountdown`) and shows a
+    screen-facing "SCUTTLING n" plate with a shrinking red bar (pure C++, no asset; hidden by the fog of war like
+    the health bar).
+  - **Only infantry captures** (`Captors = SquadsOnly`; vehicles optional): a player squad within 20 m
+    (`CaptorSearchRadius`) before the countdown ends makes the truck surrender. A truck below 60 % health
+    (`MinHealthFractionToSurrender`) cannot be taken and only scuttles.
+  - **Nobody in time:** the crew blows the truck up through the normal damage path (`BP_OnScuttled`, optional
+    Niagara + sound), so the convoy counts it as destroyed and drops its normal cargo cache. A failed capture is a
+    destroy. A truck shot dead during the countdown is an ordinary destroyed truck.
+  - **Captured:** it stands 3 s, then drives to the nearest actor tagged `CapturedTruckDropOff` (or
+    `SetDropOffTarget`) and pays **2.5x** the convoy's per-truck cargo there (`CapturedCargoMultiplier`; only Radixite,
+    metal and vehicle parts are carried). It pays only on arrival.
+  - Convoy hooks: `AConvoy::ReleaseCapturedTruck`, new outcome `TrucksStopped`, route counts
+    `GetCapturedTruckCount` / `GetStoppedConvoyCount` and `OnConvoyTruckCaptured`. Blueprint hooks:
+    `BP_OnScuttleCountdownStarted`, `BP_OnScuttled`, `BP_OnSurrendered`.
+  - Still to do: the Blueprint child (it does not inherit `RTS_BP_TrackedTankMaster`, so copy its AI controller and
+    setup), the Ore convoy definitions, and the drop-off marker at the adit.
 - **(open)** what exactly triggers the surrender (all escorts of that convoy dead, or no living escort within a set
   distance of the truck), whether a damaged truck can still surrender, whether the Soviets try to destroy or retake a
   captured truck, what shows the surrender (white flag, voice line, minimap icon change), the payout per truck, and the
@@ -206,6 +272,32 @@ Added 2026-11-13, so the map is not all nature. Each has a lore job.
 - **Small Forge survey post** near the Radixite field: sampling stakes with flags, a cryo canister rack and a generator.
   It matches the Forge survey station in Berlin and **foreshadows it**, so the Berlin mission feels earned when the
   special convoy's cargo turns up. **(open)** whether it has a guard, and whether it is a target or only dressing.
+
+### Fire lookout towers (look picked 2026-11-18)
+
+Gameplay idea (approved 2026-11-18, hookup not built): 2 or 3 old lookout towers on high points away from the player's
+base. A unit kept at a tower reveals a wide area of fog and warns earlier of each Soviet convoy, with its cargo type
+(fuel, ammo or parts), so the capture-or-destroy choice can be planned. It gives the player a reason to explore the map.
+
+- **Look: option D "Schachtwarte"**, picked by the owner from six greybox concepts ("Option D ; work it out in
+  blender"). A small pre-war tin-shaft trestle headframe (riveted steel, two sheave wheels) over a concrete-capped
+  collar, with a roofless stone hoist house beside it; a steel grating deck laid round the sheaves at about 12 m is the
+  lookout, reached by a caged ladder on the south face. Top about 14.7 m; the whole site (headframe, struts, hoist
+  house, track) is about 21.5 x 13.8 m, so it needs a fairly broad summit. Lore: Wismut prospectors reopened the
+  shaft in 1947, found nothing worth it and capped it; the timber roof went for firewood; someone made the highest steel
+  on the hill a lookout. It must stay clearly smaller and older than the Wismut headframe at Base B.
+- **Occupy point:** the squad enters the roofless hoist house (doorway on the south); lookouts show on the deck; an
+  orange panel hangs from the deck rail while the tower is held.
+- Concepts, brief and model: `BlenderTanks/CustomMapItems/Environment/OreLookoutTowers/` (`OreLookoutTowers_Brief.md`);
+  sheets also in `Saved/OreMountains/lookout/`.
+- **Blender model v1 (2026-11-18):** `OreLookoutTowers/Model/` (README there). Turned 90 degrees against the concept:
+  the rope line runs east-west with the hoist house east, so the two sheaves face the default camera; door, ladder, held
+  panel and lookouts face south. Main mesh about 9.4k triangles with collision and `cargo_*` / `entrance_01` sockets for
+  the garrison (`UCargo`). Not in Unreal yet. **Owner approved model v1 as built (2026-11-18, "Yes, keep it"),
+  including the 90-degree turn and the added detail (fallen ridge beam, north wall breach, rubble, drum, track and tub).**
+- **(open)** which summits (foothill tops are 4-10 m; the Base B knoll is taken), how many towers, garrison
+  (`AGarrisonableBuilding`) or capture zone (`ACaptureActor`), reveal radius, how much earlier the warning comes and how it
+  shows the cargo, and whether the Soviets contest a held tower.
 
 ## Environment: what happened here
 
@@ -340,6 +432,41 @@ playing. The picks are in `ore_clues.INTERCEPT_PICKS`. To rebuild, run
 `ore_clues.build_intercepts(ore_clues.INTERCEPT_PICKS)`. Play test `ore_intercept_trigger_test.py`: 34/34 pass. The
 UI shots show the Rifleman portrait with the English subtitle; the test presses the map's "Press To Start" first.
 
+## Buried 1945 armour (sand mounds built 2026-11-18)
+
+Exploration rewards on the large map: Wehrmacht vehicles abandoned in spring 1945, half-buried in sand. A squad uses
+the existing scavenging mechanic (the scavengers are consumed, as if taking command) and the vehicle joins the player.
+Only the **sand mounds** are built so far; the vehicle actors and the gameplay hookup come later.
+
+- **Vehicles (all early-mission):** StuG III (`Ger_Vehicle_StugIII`), Wespe (`Ger_Vehicle_Wespe`), Flak-Luchs
+  (`Ger_Vehicle_PanzerII_Luchs_FlakLuchs`), Pz IV infantry carrier (`Ger_Vehicle_PanzerIV_F1_Assault`: the only Pz IV
+  with a cargo component, turret replaced by a troop compartment), Sd.Kfz. 251 mortar (`Ger_ArmoredCar_251_MortarTW`,
+  GrW 34 in the bay).
+- **Actor recipe (later):** the vehicle's own hull/turret static meshes + weapon skeletal meshes + one sand mesh.
+  Tracks and wheels are left out (buried). Sand on the actor root; the parts sit under a `Pose` scene component
+  whose relative transform is `pose_component` in `Source/Tools/BuriedArmour/BuriedArmour_poses.json`, each part
+  keeping its Blueprint relative transform (`BuriedArmour_vehicle_dump.json`) under it.
+- **Style: C3 "Eckversunken"** (user pick 2026-11-18, after option C "overrun" and three pitched refinements): the
+  vehicle sank at the rear right corner, 4 deg nose up and 5 deg onto the right side, sunk 8 cm. A dune came from the
+  rear right and buries that corner to the casemate/turret top edge (about +1 m over the fender line); the front
+  left is the shallowest, with the fender edge just covered. Same rule, scaled to each footprint, on all five.
+- **Rules every mound keeps:** sand at the flanks and ends always over the missing tracks; never a thin film on the
+  hull (sand stays 6 cm under the hull surface or at least 10 cm over it; on the final meshes 2-4 % of hull
+  vertices sit within 4 cm under the sand, all along the contact lines); sand can't climb a wall (no sand poured
+  into open bays); sand always 12 cm under the weapon parts, with a sloped notch (they are separate skeletal parts).
+- **Assets:** `/Game/RTS_Survival/Blueprints/Environment/OreMountains/BuriedArmour/Meshes/SM_BuriedSand_<Vehicle>`
+  (about 30k triangles each, Nanite off, no collision, 4 m vertical skirt so the mound sits on sloped ground) and
+  `Materials/MI_BuriedArmour_Sand` (child of `M_FieldTrench_Bank`: landscape colour from the RVT, paler drift sand
+  up the slopes from vertex colour R, foot blends into the ground from vertex colour G).
+- **Tools:** Blender `CustomMapItems/Environment/BuriedArmour` (brief, concept sheets v01-v02, `Model/build_mounds.py`);
+  Unreal `Source/Tools/BuriedArmour` (`dump_vehicles.py`, `ue_buried_armour_import.py`).
+- Crew meshes and the Wespe's loose ready rounds are left out (they would sit in the buried rear right corner).
+- **Sand colour (decided 2026-11-18):** close to the ground colour, a paler tint only up the mound (vertex R from
+  0.15 m, full at 1.25 m; `FreshTint` 1.32/1.18/0.98). A clearly paler sand was tried and dropped: the user prefers
+  the version that "better blends with the landscape".
+- **(open)** where on the map they go, collision/nav of the mound, and whether the mound stays after the vehicle
+  drives out (under the hull the sand is a flat plateau, not a hollow).
+
 ## Mission structure
 
 **(open)** not yet designed beyond the beats above. Likely: hold the ridge, ambush the first lightly escorted convoys,
@@ -372,3 +499,5 @@ discover and hit the bases, then escalate to the heavy last convoy and the speci
 8. Convoys 4 to 6 (beyond "the last one is heavy").
 9. The radio outpost: location, and what the Berlin crates give the player.
 10. Whether the survey post keeps its cryo rack as unexplained dressing or drops it.
+11. Spoil heaps: which heaps get a capture station, amounts, how the Soviets retake a station, and whether a heap can be
+    harvested before its station is captured.

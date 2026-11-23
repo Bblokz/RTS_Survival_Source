@@ -27,7 +27,8 @@ def noise_sample(wpxy, scale_param, offset, x, y):
     off = N("Constant2Vector", x, y + 80, r=offset[0], g=offset[1])
     uvo = G.op("Add", uv, "", off, "", x + 140, y)
     t = N("TextureSample", x + 280, y, texture=unreal.load_asset(NOISE),
-          sampler_type=unreal.MaterialSamplerType.SAMPLERTYPE_MASKS)
+          sampler_type=unreal.MaterialSamplerType.SAMPLERTYPE_MASKS,
+              sampler_source=unreal.SamplerSourceMode.SSM_WRAP_WORLD_GROUP_SETTINGS)
     C(uvo, "", t, "UVs")
     return t
 

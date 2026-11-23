@@ -205,7 +205,8 @@ bp(DEST + "Airport/BP_Airport_Dest_BarrelStack3", "BaseB_Barrels", kx - 300.0, k
 bp(RUS + "CamoNets/BP_Dest_RusCamoNetRegular", "BaseB_CamoNet", kx - 1500.0, ky - 300.0, 200.0)
 
 # ---- the bench: stores left at the adit mouths ------------------------------------------------------------------------
-for k, (fid, items) in enumerate((("adit_2", ((1300.0, -900.0, "Airport/BP_Airport_Dest_CrateStack01"), (1500.0, 800.0, "Airport/BP_Airport_Dest_BarrelStack3"))),
+# adit 2's stacks stand by the unloading pad, clear of the portal's rubble cones (moved 2026-11-22 with the adit portals)
+for k, (fid, items) in enumerate((("adit_2", ((2581.0, -1452.0, "Airport/BP_Airport_Dest_CrateStack01"), (2737.0, 698.0, "Airport/BP_Airport_Dest_BarrelStack3"))),
                                   ("adit_3", ((1300.0, 700.0, "Airport/BP_Airport_Dest_CrateStack01"),)))):
     ox, oy = at(fid)
     for j, (dx, dy, name) in enumerate(items):

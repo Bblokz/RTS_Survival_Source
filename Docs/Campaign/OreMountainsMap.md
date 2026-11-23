@@ -609,3 +609,30 @@ patch, lichen crust, soot fall-out, rust wash, ore fines, rock-flour fan). Sourc
 - Checked: map instance compiles (343 instructions, as before), `NAV PROBLEMS 0`, views `Saved/OreMountains/critic/min3/`.
 - Open: the three layers are not soft ground for tank trails and not in the ground-surface settings; frame cost of
   11 painted layers not measured; no rock or cliff foot was looked at on red ground.
+
+## Mine adit portals (2026-11-22)
+
+The owner picked concept D Bogenausbau and approved the model. Adits 1 and 2 now have real portals (adit 3 keeps the
+miners' shelter). Kit: `D:/Blender/BlenderProjects/BlenderTanks/CustomMapItems/Environment/OreAditPortals`
+(brief, concept sheets, `Model/README.md`); Unreal assets under
+`/Game/RTS_Survival/Blueprints/Environment/OreMountains/AditPortals`.
+
+- **Placed** by `step_adits()` in `ore_map_build.py` (runner `ore_adits_place.py`: throwaway editor, nav rebuild, nav
+  check, save, shots). Labels `ORE_Adit_*`, folder `OreMountains/AditPortals`. Every mesh sits on its adit's PortalCut
+  transform from `Ore_cliffs.json` (the meshes share the PortalCut pivot and axes).
+  - Adit 2 (main): `ORE_Adit_Main_Tube` (steel-arch tube 8 x 6.5 m, 16 m out of the face, closed for collision),
+    `ORE_Adit_Main_Rubble` (two rubble cones on MI_OreCliff), `ORE_Adit_Main_JibCrane` (on the tube's JibCrane socket),
+    `ORE_Adit_DropOff` (TargetPoint tagged `CapturedTruckDropOff`, pad centre at (-21938, 8196, 1820): captured
+    lorries drive here), `ORE_Adit_Main_LampLight`.
+  - Adit 1: `ORE_Adit_Drift` (2.8 m rail drift on the line of the existing mine railway), `ORE_Adit_Drift_Rubble`,
+    `ORE_Adit_Drift_LampLight`.
+  - The tube, crane and drift do not receive decals (the adit soot / blast decals stay on the rock and rubble).
+- Removed the `ORE_PH_adit_1/2` placeholders and their notes. Moved `ORE_Prop_Adit_Stores_0_0` (crates) and `_0_1`
+  (barrels) out of the cones to the pad (also in `Ore_detail.json` and `ore_detail_gen.py`; the old json is
+  `Ore_detail_before_adits.json`).
+- Checks after the save: the map's nav check 0 problems; lorry routes from both ends of `ramp_main` reach the drop-off
+  for all four nav agents (87 m and 214 m, 0.1 m short of the point); umap 45.9 -> 46.1 MB (navmesh kept). Shots in
+  `Saved/OreMountains/adits/map_shots`. Backup of the umap before the change:
+  `Saved/OreMountains/adits/backup/Ger_2ndOreMountains_before_adits.umap`.
+- Not done: a play session with a real captured lorry (the Blueprint child of `ASurrenderingCargoTruck` and the Ore
+  convoy definitions do not exist yet); the light cost in game; LOD distances judged in game.

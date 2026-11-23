@@ -1392,3 +1392,97 @@ def step_cliff_decals(only_adit=None):
         placed[name] = placed.get(name, 0) + 1
     log("cliff decals: removed %d, placed %d %s" % (removed, len(plan), placed))
     return placed
+
+
+# ---- adit portals (concept D Bogenausbau, OreAditPortals kit) --------------------------------------------------------
+ADIT_MODEL = "D:/Blender/BlenderProjects/BlenderTanks/CustomMapItems/Environment/OreAditPortals/Model/OreAditPortals_model.json"
+ADIT_MESHES = "/Game/RTS_Survival/Blueprints/Environment/OreMountains/AditPortals/Meshes/"
+# store stacks moved out of the rubble cones: adit 2 PortalCut frame (along, out) in metres
+ADIT_STORES = {"ORE_Prop_Adit_Stores_0_0": (-11.0, 22.5), "ORE_Prop_Adit_Stores_0_1": (10.5, 21.0)}
+
+
+def adit_frames():
+    """PortalCut pivots of adit 1 and adit 2 from Ore_cliffs.json: (x, y, z cm, yaw deg)."""
+    with open(CLIFF_FILE, "r") as handle:
+        cuts = [i for i in json.load(handle)["instances"] if i["piece"] == "PortalCut"]
+    return {"adit_1": cuts[0], "adit_2": cuts[1]}
+
+
+def adit_world(frame, along_m, out_m, up_m=0.0):
+    """Piece frame metres (x along the face, y outward, z up) -> world cm (Unreal X outward, Y along, by the yaw)."""
+    yaw = math.radians(frame["yaw"])
+    lx, ly = out_m * 100.0, along_m * 100.0
+    return unreal.Vector(frame["x"] + lx * math.cos(yaw) - ly * math.sin(yaw),
+                         frame["y"] + lx * math.sin(yaw) + ly * math.cos(yaw), frame["z"] + up_m * 100.0)
+
+
+def step_adits():
+    """Mine adit portals on adits 1 and 2 (adit 3 keeps the miners' shelter): tube, rubble and jib crane on adit 2,
+    rail drift and its rubble on adit 1, all on the PortalCut transforms (the meshes share its pivot and axes). Their
+    UCX hulls block units and cut the navmesh. Adds the CapturedTruckDropOff target on the tube's DropOff socket, two
+    warm lamps, removes the adit 1/2 placeholders and moves the adit 2 store stacks out of the rubble.
+    Labels ORE_Adit_*."""
+    require_map()
+    removed = clear_prefix(PREFIX + "Adit_")
+    with open(ADIT_MODEL, "r") as handle:
+        model = json.load(handle)["pieces"]
+    frames = adit_frames()
+    folder = FOLDER + "AditPortals"
+
+    def mesh_actor(label, name, loc, yaw, decals=True):
+        mesh = unreal.load_asset(ADIT_MESHES + name)
+        if mesh is None:
+            raise RuntimeError("missing " + ADIT_MESHES + name)
+        actor = actors_sub().spawn_actor_from_class(unreal.StaticMeshActor, loc, unreal.Rotator(0.0, 0.0, yaw))
+        comp = actor.static_mesh_component
+        comp.set_static_mesh(mesh)
+        comp.set_mobility(unreal.ComponentMobility.STATIC)
+        comp.set_editor_property("receives_decals", decals)      # the cliff's adit soot / blast decals stay on the rock
+        actor.set_actor_label(PREFIX + "Adit_" + label)
+        actor.set_folder_path(folder)
+        return actor
+
+    f1, f2 = frames["adit_1"], frames["adit_2"]
+    p2 = unreal.Vector(f2["x"], f2["y"], f2["z"])
+    p1 = unreal.Vector(f1["x"], f1["y"], f1["z"])
+    mesh_actor("Main_Tube", "SM_OreAdit_MainTube", p2, f2["yaw"], decals=False)
+    mesh_actor("Main_Rubble", "SM_OreAdit_MainRubble", p2, f2["yaw"])
+    crane = model["SM_OreAdit_MainTube"]["sockets"]["JibCrane"]
+    mesh_actor("Main_JibCrane", "SM_OreAdit_JibCrane", adit_world(f2, crane[0], crane[1]), f2["yaw"], decals=False)
+    mesh_actor("Drift", "SM_OreAdit_Drift", p1, f1["yaw"], decals=False)
+    mesh_actor("Drift_Rubble", "SM_OreAdit_DriftRubble", p1, f1["yaw"])
+    # captured convoy lorries drive to the nearest actor tagged CapturedTruckDropOff (ASurrenderingCargoTruck)
+    drop = model["SM_OreAdit_MainTube"]["sockets"]["DropOff"]
+    loc = adit_world(f2, drop[0], drop[1])
+    loc.z = ground_z(loc.x, loc.y) + 20.0
+    target = actors_sub().spawn_actor_from_class(unreal.TargetPoint, loc, unreal.Rotator(0.0, 0.0, f2["yaw"] + 180.0))
+    target.tags = [unreal.Name("CapturedTruckDropOff")]
+    target.set_actor_label(PREFIX + "Adit_DropOff")
+    target.set_folder_path(folder)
+    for label, frame, piece, sock, intensity, radius in (("Main_LampLight", f2, "SM_OreAdit_MainTube", "Light_Mouth", 18.0, 1300.0),
+                                                         ("Drift_LampLight", f1, "SM_OreAdit_Drift", "Light_Drift", 8.0, 700.0)):
+        s = model[piece]["sockets"][sock]
+        light = actors_sub().spawn_actor_from_class(unreal.PointLight, adit_world(frame, s[0], s[1], s[2] - 0.25), unreal.Rotator(0, 0, 0))
+        comp = light.point_light_component
+        comp.set_mobility(unreal.ComponentMobility.MOVABLE)
+        comp.set_intensity(intensity)
+        comp.set_light_color(unreal.LinearColor(1.0, 0.68, 0.35, 1.0))
+        comp.set_attenuation_radius(radius)
+        comp.set_cast_shadows(False)
+        light.set_actor_label(PREFIX + "Adit_" + label)
+        light.set_folder_path(folder)
+    for pid in ("adit_1", "adit_2"):
+        clear_prefix(PREFIX + "PH_" + pid)
+        clear_prefix(PREFIX + "Note_PH_" + pid)
+    labels = by_label()
+    moved = []
+    for label, (along, out) in ADIT_STORES.items():
+        actor = labels.get(label)
+        if actor is None:
+            continue
+        p = adit_world(f2, along, out)
+        p.z = ground_z(p.x, p.y)
+        actor.set_actor_location(p, False, True)
+        moved.append(label)
+    log("adits: removed %d, placed 5 meshes + drop-off + 2 lights at %s, moved %s" % (removed, [round(c) for c in (loc.x, loc.y, loc.z)], moved))
+    return loc

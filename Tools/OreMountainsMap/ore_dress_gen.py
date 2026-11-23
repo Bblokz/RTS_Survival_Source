@@ -141,12 +141,13 @@ for name, count in want:
         placed.append((x, y))
         res.append([name, round(x), round(y), float(rng.uniform(0, 360))])
         done += 1
-metal = ["Metal/Resource_Metal_Barrels", "Metal/Resource_Metal_Rails", "Metal/Resource_Metal_BrokenWaterTank"]
-k = 0
+# Ore Mountains metal resources since 2026-11-22 (Source/Docs/Environment/OreMetalResources.md, placed by ore_metal_place.py):
+# the cast ones by the mine railway on the bench, the grown ones plus a second ingot sled in the west valley.
+ORE_METAL = "Metal/OreMountains/Resource_Metal_Ore_"
+metal = {"metal_bench": ["Blutbarren", "Gelbguss"], "metal_valley_w": ["Glaskopf", "Katzengold", "Blutbarren"]}
 for fid in ("metal_bench", "metal_valley_w"):
-    for x, y in F[fid]["points"]:
-        res.append([metal[k % 3], x, y, float(rng.uniform(0, 360))])
-        k += 1
+    for k, (x, y) in enumerate(F[fid]["points"]):
+        res.append([ORE_METAL + metal[fid][k % len(metal[fid])], x, y, float(rng.uniform(0, 360))])
 
 P = []      # placeholders
 

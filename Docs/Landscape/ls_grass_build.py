@@ -156,7 +156,8 @@ def build_function():
     patch_uv = N("Divide", X0 + 320, Y0 + 400, const_b=FLOWER_PATCH_SCALE)
     C(wpxy, "", patch_uv, "A")
     noise = N("TextureSample", X0 + 480, Y0 + 400, texture=unreal.load_asset(NOISE),
-              sampler_type=unreal.MaterialSamplerType.SAMPLERTYPE_MASKS)
+              sampler_type=unreal.MaterialSamplerType.SAMPLERTYPE_MASKS,
+              sampler_source=unreal.SamplerSourceMode.SSM_WRAP_WORLD_GROUP_SETTINGS)
     C(patch_uv, "", noise, "UVs")
     patches = N("SmoothStep", X0 + 720, Y0 + 400, const_min=FLOWER_PATCH_MIN, const_max=FLOWER_PATCH_MAX)
     C(noise, "G", patches, "Value")
