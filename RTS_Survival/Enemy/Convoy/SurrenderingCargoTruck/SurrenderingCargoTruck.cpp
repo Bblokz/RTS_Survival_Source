@@ -3,8 +3,12 @@
 #include "SurrenderingCargoTruck.h"
 
 #include "EngineUtils.h"
+#include "NiagaraFunctionLibrary.h"
 #include "TimerManager.h"
+#include "Components/WidgetComponent.h"
+#include "Engine/DamageEvents.h"
 #include "Engine/World.h"
+#include "Kismet/GameplayStatics.h"
 #include "RTS_Survival/Enemy/Convoy/Convoy.h"
 #include "RTS_Survival/Enemy/Convoy/ConvoyRoute.h"
 #include "RTS_Survival/Game/GameState/GameUnitManager/GameUnitManager.h"
@@ -15,11 +19,15 @@
 #include "RTS_Survival/Units/Squads/SquadUnit/SquadUnit.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
+#include "RTS_Survival/Weapons/WeaponData/FRTSWeaponHelpers/FRTSWeaponHelpers.h"
 
 namespace SurrenderingCargoTruckConstants
 {
 	// The convoy registers its trucks right after they spawned; a truck not in a convoy by then never joins one.
 	constexpr double ConvoySearchTimeoutSeconds = 60.0;
+	// The blast deals this many times the truck's health so no armour or resistance keeps it alive.
+	constexpr float ScuttleDamageHealthMultiplier = 100.f;
+	constexpr float MinScuttleDamage = 1.f;
 }
 
 ASurrenderingCargoTruck::ASurrenderingCargoTruck(const FObjectInitializer& ObjectInitializer)
@@ -56,6 +64,12 @@ void ASurrenderingCargoTruck::BeginPlay_StartSurrenderChecks()
 void ASurrenderingCargoTruck::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	StopTimers();
+	// Only the timers: the countdown widget and the hold go with the actor.
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(M_ScuttleState.ScuttleTimerHandle);
+		World->GetTimerManager().ClearTimer(M_ScuttleState.RefreshTimerHandle);
+	}
 	// The supply truck component reports a run that ends with the level as lost; that is not a lost captured truck.
 	if (M_SupplyRunEndedHandle.IsValid() and GetIsValidSupplyTruckComponent())
 	{
@@ -63,6 +77,34 @@ void ASurrenderingCargoTruck::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	}
 	M_SupplyRunEndedHandle.Reset();
 	Super::EndPlay(EndPlayReason);
+}
+
+void ASurrenderingCargoTruck::UnitDies(const ERTSDeathType DeathType)
+{
+	// Shot dead before it surrendered (also mid-countdown): an ordinary destroyed convoy truck.
+	const bool bDiesAsConvoyTruck = M_SurrenderState == ESurrenderingTruckState::CanSurrender
+		or M_SurrenderState == ESurrenderingTruckState::NoConvoy
+		or M_SurrenderState == ESurrenderingTruckState::ScuttleCountdown;
+	if (bDiesAsConvoyTruck)
+	{
+		M_SurrenderState = ESurrenderingTruckState::Destroyed;
+	}
+	EndScuttleCountdown();
+	StopTimers();
+	// Broadcasts OnUnitDies: the convoy counts a destroyed truck and drops its cache; a captured run ends as lost.
+	Super::UnitDies(DeathType);
+}
+
+float ASurrenderingCargoTruck::TakeDamage(const float DamageAmount, FDamageEvent const& DamageEvent,
+                                          AController* EventInstigator, AActor* DamageCauser)
+{
+	const float Result = Super::TakeDamage(DamageAmount, DamageEvent, EventInstigator, DamageCauser);
+	if (DamageAmount > 0.f)
+	{
+		// Alerts the crew of a convoy without escort.
+		M_ScuttleState.bWasDamaged = true;
+	}
+	return Result;
 }
 
 void ASurrenderingCargoTruck::StopTimers()
@@ -88,13 +130,28 @@ void ASurrenderingCargoTruck::SetCanSurrender(const bool bNewCanSurrender)
 
 bool ASurrenderingCargoTruck::GetHasSurrendered() const
 {
-	return M_SurrenderState != ESurrenderingTruckState::CanSurrender
-		and M_SurrenderState != ESurrenderingTruckState::NoConvoy;
+	return M_SurrenderState == ESurrenderingTruckState::Surrendered
+		or M_SurrenderState == ESurrenderingTruckState::DrivingToDropOff
+		or M_SurrenderState == ESurrenderingTruckState::Delivered
+		or M_SurrenderState == ESurrenderingTruckState::Lost;
+}
+
+float ASurrenderingCargoTruck::GetScuttleSecondsLeft() const
+{
+	const UWorld* World = GetWorld();
+	if (World == nullptr or M_SurrenderState != ESurrenderingTruckState::ScuttleCountdown)
+	{
+		return -1.f;
+	}
+	return World->GetTimerManager().GetTimerRemaining(M_ScuttleState.ScuttleTimerHandle);
 }
 
 bool ASurrenderingCargoTruck::SurrenderNow()
 {
-	if (GetHasSurrendered() or not GetIsTruckAlive())
+	const bool bCanStillSurrender = M_SurrenderState == ESurrenderingTruckState::CanSurrender
+		or M_SurrenderState == ESurrenderingTruckState::NoConvoy
+		or M_SurrenderState == ESurrenderingTruckState::ScuttleCountdown;
+	if (not bCanStillSurrender or not GetIsTruckAlive())
 	{
 		return false;
 	}
@@ -113,29 +170,62 @@ bool ASurrenderingCargoTruck::GetIsTruckAlive()
 
 void ASurrenderingCargoTruck::CheckSurrender()
 {
-	if (M_SurrenderState != ESurrenderingTruckState::CanSurrender)
+	switch (M_SurrenderState)
 	{
+	case ESurrenderingTruckState::CanSurrender:
+		CheckSurrender_InConvoy();
+		break;
+	case ESurrenderingTruckState::ScuttleCountdown:
+		CheckSurrender_DuringCountdown();
+		break;
+	default:
 		StopTimers();
-		return;
+		break;
 	}
+}
+
+void ASurrenderingCargoTruck::CheckSurrender_InConvoy()
+{
 	if (not SurrenderSettings.bCanSurrender or not GetIsTruckAlive())
 	{
 		return;
 	}
 	const AConvoy* Convoy = GetConvoyOfTruck();
-	if (Convoy == nullptr or not GetIsConvoyReadyForSurrender(*Convoy) or not GetIsSurrenderTriggerMet(*Convoy))
+	if (Convoy == nullptr)
 	{
 		return;
 	}
-	if (not GetIsHealthEnoughToSurrender())
+	M_ScuttleState.MostAliveEscortsSeen = FMath::Max(M_ScuttleState.MostAliveEscortsSeen, Convoy->GetAliveEscortCount());
+	if (not GetIsConvoyReadyForSurrender(*Convoy) or not GetIsSurrenderTriggerMet(*Convoy))
 	{
 		return;
 	}
-	if (SurrenderSettings.bRequireCaptorNearby and not GetIsCaptorNearby())
+	// A dead escort is the alarm; a convoy that never had one needs the captor close or a hit on the truck.
+	if (M_ScuttleState.MostAliveEscortsSeen == 0 and not GetIsUnescortedTruckAlerted())
 	{
 		return;
 	}
-	Surrender();
+	if (GetCanBeCapturedNow())
+	{
+		Surrender();
+		return;
+	}
+	if (ScuttleSettings.bScuttleWhenNotCaptured)
+	{
+		StartScuttleCountdown();
+	}
+}
+
+void ASurrenderingCargoTruck::CheckSurrender_DuringCountdown()
+{
+	if (not SurrenderSettings.bCanSurrender or not GetIsTruckAlive())
+	{
+		return;
+	}
+	if (GetCanBeCapturedNow())
+	{
+		Surrender();
+	}
 }
 
 AConvoy* ASurrenderingCargoTruck::GetConvoyOfTruck()
@@ -193,6 +283,27 @@ bool ASurrenderingCargoTruck::GetIsSurrenderTriggerMet(const AConvoy& Convoy) co
 	}
 }
 
+bool ASurrenderingCargoTruck::GetIsUnescortedTruckAlerted() const
+{
+	constexpr bool bIncludeVehicles = true;
+	return M_ScuttleState.bWasDamaged
+		or GetIsCaptorUnitWithin(ScuttleSettings.UnescortedAlertRadius, bIncludeVehicles);
+}
+
+bool ASurrenderingCargoTruck::GetCanBeCapturedNow() const
+{
+	if (not GetIsHealthEnoughToSurrender())
+	{
+		return false;
+	}
+	if (not SurrenderSettings.bRequireCaptorNearby)
+	{
+		return true;
+	}
+	const bool bVehiclesCapture = SurrenderSettings.Captors == ESurrenderingTruckCaptors::SquadsAndVehicles;
+	return GetIsCaptorUnitWithin(SurrenderSettings.CaptorSearchRadius, bVehiclesCapture);
+}
+
 bool ASurrenderingCargoTruck::GetIsHealthEnoughToSurrender() const
 {
 	if (SurrenderSettings.MinHealthFractionToSurrender <= 0.f)
@@ -207,7 +318,7 @@ bool ASurrenderingCargoTruck::GetIsHealthEnoughToSurrender() const
 	return TruckHealth->GetHealthPercentage() >= SurrenderSettings.MinHealthFractionToSurrender;
 }
 
-bool ASurrenderingCargoTruck::GetIsCaptorNearby() const
+bool ASurrenderingCargoTruck::GetIsCaptorUnitWithin(const float Radius, const bool bIncludeVehicles) const
 {
 	const UGameUnitManager* UnitManager = FRTS_Statics::GetGameUnitManager(this);
 	if (not IsValid(UnitManager))
@@ -216,7 +327,19 @@ bool ASurrenderingCargoTruck::GetIsCaptorNearby() const
 	}
 	const uint8 CaptorMask = FRTSPlayers::GetPlayerBit(SurrenderSettings.CapturingPlayer);
 	const FVector TruckLocation = GetActorLocation();
-	const float RadiusSquared = FMath::Square(SurrenderSettings.CaptorSearchRadius);
+	const float RadiusSquared = FMath::Square(Radius);
+	const TArray<ASquadUnit*> CaptorSoldiers = UnitManager->GetSquadUnitsOfPlayers(CaptorMask);
+	for (const ASquadUnit* Soldier : CaptorSoldiers)
+	{
+		if (IsValid(Soldier) and FVector::DistSquared2D(Soldier->GetActorLocation(), TruckLocation) <= RadiusSquared)
+		{
+			return true;
+		}
+	}
+	if (not bIncludeVehicles)
+	{
+		return false;
+	}
 	const TArray<ATankMaster*> CaptorTanks = UnitManager->GetTanksOfPlayers(CaptorMask);
 	for (const ATankMaster* Tank : CaptorTanks)
 	{
@@ -227,15 +350,188 @@ bool ASurrenderingCargoTruck::GetIsCaptorNearby() const
 			return true;
 		}
 	}
-	const TArray<ASquadUnit*> CaptorSoldiers = UnitManager->GetSquadUnitsOfPlayers(CaptorMask);
-	for (const ASquadUnit* Soldier : CaptorSoldiers)
-	{
-		if (IsValid(Soldier) and FVector::DistSquared2D(Soldier->GetActorLocation(), TruckLocation) <= RadiusSquared)
-		{
-			return true;
-		}
-	}
 	return false;
+}
+
+// ------------------------------------------------------------------
+// Scuttle countdown
+// ------------------------------------------------------------------
+
+void ASurrenderingCargoTruck::StartScuttleCountdown()
+{
+	UWorld* World = GetWorld();
+	if (World == nullptr or M_SurrenderState != ESurrenderingTruckState::CanSurrender)
+	{
+		return;
+	}
+	M_SurrenderState = ESurrenderingTruckState::ScuttleCountdown;
+	const float CountdownSeconds = FMath::Max(ScuttleSettings.CountdownSeconds, KINDA_SMALL_NUMBER);
+	TWeakObjectPtr<ASurrenderingCargoTruck> WeakThis(this);
+	World->GetTimerManager().SetTimer(M_ScuttleState.ScuttleTimerHandle, FTimerDelegate::CreateLambda([WeakThis]()
+	{
+		if (WeakThis.IsValid())
+		{
+			WeakThis->Scuttle();
+		}
+	}), CountdownSeconds, false);
+	if (ScuttleSettings.bStopDuringCountdown)
+	{
+		HoldInPlace();
+	}
+	ShowCountdownWidget();
+	UE_LOG(LogConvoy, Log, TEXT("Surrendering truck %s: escort gone, scuttle countdown %.1f s."), *GetName(),
+	       CountdownSeconds);
+	OnScuttleCountdownStarted.Broadcast(this, CountdownSeconds);
+	BP_OnScuttleCountdownStarted(CountdownSeconds);
+}
+
+void ASurrenderingCargoTruck::HoldInPlace()
+{
+	// The convoy keeps its own restriction and orders; ours (the minimum wins) keeps the truck standing.
+	constexpr float NoTravel = 0.f;
+	constexpr float NoTurning = 0.f;
+	SetMobilityRestriction(this, NoTravel, NoTurning);
+	StopCommand();
+	M_ScuttleState.bIsHeldInPlace = true;
+}
+
+void ASurrenderingCargoTruck::ReleaseHoldInPlace()
+{
+	if (not M_ScuttleState.bIsHeldInPlace)
+	{
+		return;
+	}
+	M_ScuttleState.bIsHeldInPlace = false;
+	ClearMobilityRestriction(this);
+}
+
+void ASurrenderingCargoTruck::ShowCountdownWidget()
+{
+	UClass* WidgetClass = ScuttleSettings.CountdownWidgetClass.Get();
+	if (WidgetClass == nullptr or IsValid(M_ScuttleState.CountdownWidgetComponent))
+	{
+		return;
+	}
+	// Screen space: always faces the camera at a fixed pixel size, and is not drawn while the fog hides the truck.
+	UWidgetComponent* CountdownComponent = NewObject<UWidgetComponent>(this, TEXT("ScuttleCountdownWidget"));
+	CountdownComponent->SetWidgetSpace(EWidgetSpace::Screen);
+	CountdownComponent->SetDrawAtDesiredSize(true);
+	CountdownComponent->SetPivot(FVector2D(0.5f, 1.f));
+	CountdownComponent->SetWidgetClass(WidgetClass);
+	CountdownComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	CountdownComponent->SetGenerateOverlapEvents(false);
+	CountdownComponent->SetupAttachment(GetRootComponent());
+	CountdownComponent->SetRelativeLocation(ScuttleSettings.CountdownWidgetOffset);
+	CountdownComponent->RegisterComponent();
+	M_ScuttleState.CountdownWidgetComponent = CountdownComponent;
+	RefreshCountdownWidget();
+	UWorld* World = GetWorld();
+	if (World == nullptr)
+	{
+		return;
+	}
+	TWeakObjectPtr<ASurrenderingCargoTruck> WeakThis(this);
+	World->GetTimerManager().SetTimer(M_ScuttleState.RefreshTimerHandle, FTimerDelegate::CreateLambda([WeakThis]()
+	{
+		if (WeakThis.IsValid())
+		{
+			WeakThis->RefreshCountdownWidget();
+		}
+	}), FMath::Max(ScuttleSettings.CountdownRefreshSeconds, KINDA_SMALL_NUMBER), true);
+}
+
+void ASurrenderingCargoTruck::RefreshCountdownWidget() const
+{
+	if (not IsValid(M_ScuttleState.CountdownWidgetComponent))
+	{
+		return;
+	}
+	UW_SurrenderingTruckCountdown* CountdownWidget = Cast<UW_SurrenderingTruckCountdown>(
+		M_ScuttleState.CountdownWidgetComponent->GetUserWidgetObject());
+	if (CountdownWidget == nullptr)
+	{
+		return;
+	}
+	const float SecondsLeft = FMath::Max(0.f, GetScuttleSecondsLeft());
+	const float FractionLeft = SecondsLeft / FMath::Max(ScuttleSettings.CountdownSeconds, KINDA_SMALL_NUMBER);
+	CountdownWidget->SetCountdown(SecondsLeft, FractionLeft, ScuttleSettings.CountdownTextFormat);
+}
+
+void ASurrenderingCargoTruck::RemoveCountdownWidget()
+{
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(M_ScuttleState.RefreshTimerHandle);
+	}
+	if (IsValid(M_ScuttleState.CountdownWidgetComponent))
+	{
+		M_ScuttleState.CountdownWidgetComponent->DestroyComponent();
+	}
+	M_ScuttleState.CountdownWidgetComponent = nullptr;
+}
+
+void ASurrenderingCargoTruck::EndScuttleCountdown()
+{
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(M_ScuttleState.ScuttleTimerHandle);
+	}
+	RemoveCountdownWidget();
+	ReleaseHoldInPlace();
+}
+
+void ASurrenderingCargoTruck::Scuttle()
+{
+	using namespace SurrenderingCargoTruckConstants;
+	if (M_SurrenderState != ESurrenderingTruckState::ScuttleCountdown or not GetIsTruckAlive())
+	{
+		return;
+	}
+	// Set first: the death below runs UnitDies, which must not see a countdown any more.
+	M_SurrenderState = ESurrenderingTruckState::Scuttled;
+	EndScuttleCountdown();
+	StopTimers();
+	UE_LOG(LogConvoy, Log, TEXT("Surrendering truck %s: nobody took it, the crew blows it up."), *GetName());
+	OnScuttled.Broadcast(this);
+	BP_OnScuttled();
+	PlayScuttleExplosion();
+	// A listener may already have removed the truck.
+	if (not GetIsTruckAlive())
+	{
+		return;
+	}
+	// The normal damage path: the convoy sees a destroyed truck and drops its cargo cache.
+	const UHealthComponent* TruckHealth = GetHealthComponent();
+	const float CurrentHealth = IsValid(TruckHealth) ? TruckHealth->GetCurrentHealth() : MinScuttleDamage;
+	FDamageEvent ScuttleDamageEvent;
+	ScuttleDamageEvent.DamageTypeClass = FRTSWeaponHelpers::GetDamageTypeClass(ScuttleSettings.ScuttleDamageType);
+	TakeDamage(FMath::Max(CurrentHealth, MinScuttleDamage) * ScuttleDamageHealthMultiplier, ScuttleDamageEvent,
+	           nullptr, nullptr);
+	if (GetIsTruckAlive())
+	{
+		// Nothing should survive the blast; die the normal way all the same.
+		TriggerDestroyActor(FRTSWeaponHelpers::TranslateDamageIntoDeathType(ScuttleSettings.ScuttleDamageType));
+	}
+}
+
+void ASurrenderingCargoTruck::PlayScuttleExplosion() const
+{
+	// What the fog of war hides makes no visible blast either.
+	if (IsHidden())
+	{
+		return;
+	}
+	const FVector BlastLocation = GetActorLocation();
+	if (IsValid(ScuttleSettings.ScuttleExplosionEffect))
+	{
+		UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+			this, ScuttleSettings.ScuttleExplosionEffect, BlastLocation, GetActorRotation(),
+			FVector(ScuttleSettings.ScuttleExplosionEffectScale));
+	}
+	if (IsValid(ScuttleSettings.ScuttleExplosionSound))
+	{
+		UGameplayStatics::PlaySoundAtLocation(this, ScuttleSettings.ScuttleExplosionSound, BlastLocation);
+	}
 }
 
 // ------------------------------------------------------------------
@@ -247,6 +543,8 @@ void ASurrenderingCargoTruck::Surrender()
 	// Set first: everything below may broadcast, and nothing may surrender this truck twice.
 	M_SurrenderState = ESurrenderingTruckState::Surrendered;
 	StopTimers();
+	// Stops a running countdown: no blast, no widget, and the truck may drive again.
+	EndScuttleCountdown();
 	if (not M_Convoy.IsValid())
 	{
 		// SurrenderNow before the first check found the convoy.
