@@ -243,7 +243,9 @@ bool UAircraftTestSubsystem::ShouldCreateSubsystem(UObject* Outer) const
 		|| FParse::Param(FCommandLine::Get(), TEXT("AircraftVtoValidate"))
 		|| FParse::Param(FCommandLine::Get(), TEXT("AircraftStrafeValidate"))
 		|| FParse::Param(FCommandLine::Get(), TEXT("AircraftBaseTakeOffValidate"))
-		|| FParse::Param(FCommandLine::Get(), TEXT("AircraftTerrainFollowValidate"));
+		|| FParse::Param(FCommandLine::Get(), TEXT("AircraftTerrainFollowValidate"))
+		|| FParse::Param(FCommandLine::Get(), TEXT("AircraftFlightValidate"))
+		|| FParse::Param(FCommandLine::Get(), TEXT("AircraftDropValidate"));
 }
 
 TStatId UAircraftTestSubsystem::GetStatId() const
@@ -283,6 +285,12 @@ void UAircraftTestSubsystem::Tick(const float DeltaTime)
 		return;
 	case EAircraftTestPhase::AircraftTerrainFollowRunning:
 		TickAircraftTerrainFollow();
+		return;
+	case EAircraftTestPhase::AircraftFlightRunning:
+		TickAircraftFlight();
+		return;
+	case EAircraftTestPhase::AircraftDropRunning:
+		TickAircraftDrop();
 		return;
 	case EAircraftTestPhase::Inactive:
 	case EAircraftTestPhase::Finished:
@@ -383,6 +391,16 @@ void UAircraftTestSubsystem::TickWaitingForStart()
 	if (FParse::Param(FCommandLine::Get(), TEXT("AircraftTerrainFollowValidate")))
 	{
 		StartAircraftTerrainFollow();
+		return;
+	}
+	if (FParse::Param(FCommandLine::Get(), TEXT("AircraftFlightValidate")))
+	{
+		StartAircraftFlight();
+		return;
+	}
+	if (FParse::Param(FCommandLine::Get(), TEXT("AircraftDropValidate")))
+	{
+		StartAircraftDrop();
 		return;
 	}
 	StartAircraftDeath();

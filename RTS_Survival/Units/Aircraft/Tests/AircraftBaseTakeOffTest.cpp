@@ -11,6 +11,7 @@
 
 #include "Engine/World.h"
 #include "RTS_Survival/RTSCollisionTraceChannels.h"
+#include "RTS_Survival/RTSComponents/HealthComponent.h"
 #include "RTS_Survival/Units/Aircraft/AirBase/AircraftOwnerComp/AircraftOwnerComp.h"
 #include "RTS_Survival/Units/Aircraft/AircraftMaster/AAircraftMaster.h"
 #include "RTS_Survival/Units/Aircraft/AircraftState/AircraftState.h"
@@ -127,6 +128,15 @@ void UAircraftTestSubsystem::TickBaseTakeOffWaitingForAirbase(FAircraftBaseTakeO
 		return;
 	}
 	Check(true, TEXT("base_takeoff_airbase_unpacked"), FString::Printf(TEXT("after=%.1fs"), Waited));
+	// Enemy bombers on the test map can destroy the airbase, which takes a parked aircraft with it: keep it standing.
+	constexpr float AirbaseTestHealth = 1000000.f;
+	if (UHealthComponent* AirbaseHealth = Entry.Airbase.IsValid()
+		                                       ? Entry.Airbase->FindComponentByClass<UHealthComponent>()
+		                                       : nullptr)
+	{
+		AirbaseHealth->SetMaxHealth(AirbaseTestHealth);
+		AirbaseHealth->SetCurrentHealth(AirbaseTestHealth);
+	}
 	Entry.Aircraft = Cast<AAircraftMaster>(SpawnUnitForPlayer(
 		AircraftClassPath, FTransform(Airbase->GetActorRotation(), Airbase->GetActorLocation()), HumanPlayer));
 	Check(Entry.Aircraft.IsValid(), TEXT("base_takeoff_aircraft_spawned"), AircraftClassPath);
@@ -254,10 +264,12 @@ void UAircraftTestSubsystem::TickBaseTakeOffFlyingOut(FAircraftBaseTakeOffUnderT
 	      TEXT("base_takeoff_no_height_jolt_after_take_off"),
 	      FString::Printf(TEXT("largest=%.1f cm/s cap=%.1f"), Entry.LargestZStepPerSecond, Settings.MaxVerticalSpeed));
 	const float HeightAboveGround = GetHeightAboveLandscape(Aircraft);
-	Check(FMath::Abs(HeightAboveGround - Entry.HeightAboveGroundAtAirborne) <= FlatGroundHeightTolerance,
+	// A take-off height below the minimum cruise clearance climbs to it once airborne; otherwise it is kept.
+	const float WantedHeightAboveGround = FMath::Max(Entry.HeightAboveGroundAtAirborne, Settings.MinCruiseClearance);
+	Check(FMath::Abs(HeightAboveGround - WantedHeightAboveGround) <= FlatGroundHeightTolerance,
 	      TEXT("base_takeoff_keeps_clearance_above_ground"),
-	      FString::Printf(TEXT("above_ground now=%.1f at_airborne=%.1f"), HeightAboveGround,
-	                      Entry.HeightAboveGroundAtAirborne));
+	      FString::Printf(TEXT("above_ground now=%.1f at_airborne=%.1f wanted=%.1f"), HeightAboveGround,
+	                      Entry.HeightAboveGroundAtAirborne, WantedHeightAboveGround));
 	const ECommandQueueError Error = Aircraft.ReturnToBase(true);
 	Check(Error == ECommandQueueError::NoError, TEXT("base_takeoff_return_order_accepted"),
 	      FString::Printf(TEXT("error=%d"), static_cast<int32>(Error)));

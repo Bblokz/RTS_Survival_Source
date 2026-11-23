@@ -34,7 +34,94 @@ enum class EAircraftTestPhase : uint8
 	// -AircraftTerrainFollowValidate: an airborne aircraft flies over the bumpiest route from the anchor and keeps its
 	// clearance above the ground; then an attack dive, which terrain following must leave alone.
 	AircraftTerrainFollowRunning,
+	// -AircraftFlightValidate: an airborne aircraft flies sharp turns, an attack, idles and re-acquires a target; its
+	// speed, sideslip, turn smoothness and dive height are measured.
+	AircraftFlightRunning,
 	Finished
+};
+
+UENUM()
+enum class EAircraftFlightTestStep : uint8
+{
+	Settling,
+	// Move orders that force a 90 degree, a 180 degree and a sharp 135 degree turn.
+	TurnRight,
+	TurnBack,
+	TurnSharpLeft,
+	// Attack on an enemy vehicle; it is removed once the first dive is over, so the attack ends.
+	Attacking,
+	// No order: the aircraft goes over into its idle circle.
+	IdleAfterAttack,
+	// A second enemy appears behind the aircraft: the idle aircraft must find it and attack it on its own.
+	Reacquiring,
+	// A third enemy right ahead and close: too close to dive on at once, the aircraft must come back for it.
+	AttackingClose,
+	// A fourth enemy drives across the aircraft's path: the dive must still start aligned on it.
+	AttackingMoving,
+	Done
+};
+
+/** What -AircraftFlightValidate measured over one step of the flight. */
+USTRUCT()
+struct FAircraftFlightStepMetrics
+{
+	GENERATED_BODY()
+
+	int32 Frames = 0;
+	// Speed over the ground divided by the aircraft's cruise speed.
+	float LowestSpeedRatio = BIG_NUMBER;
+	double SpeedRatioSum = 0.0;
+	// Fastest speed so far in the step, and the largest fall below it: what a turn costs in speed.
+	float HighestSpeedRatio = 0.f;
+	float LargestSpeedDrop = 0.f;
+	// Angle between the nose and the flight direction, both flattened (degrees).
+	float LargestSlipDeg = 0.f;
+	// Change of the yaw rate per second (deg/s²): high values are visible snaps in the turn.
+	float LargestYawAccelerationDeg = 0.f;
+	float LargestYawRateDeg = 0.f;
+	float LargestRollRateDeg = 0.f;
+	// Largest bank to the right and to the left: both large in one step means the bank reversed (an S-turn).
+	float LargestRightRollDeg = 0.f;
+	float LargestLeftRollDeg = 0.f;
+	float LowestAboveGround = BIG_NUMBER;
+	// Dives: turn rate when a dive starts and how far the heading swings during it (degrees); a dive that starts
+	// mid-turn fires banked and off its target.
+	int32 DiveCount = 0;
+	// Seconds from the step's start to its first dive (-1 without one).
+	float SecondsToFirstDive = -1.f;
+	float LargestDiveStartYawRateDeg = 0.f;
+	float LargestDiveHeadingSweepDeg = 0.f;
+};
+
+/** The aircraft of -AircraftFlightValidate and what was measured per step. */
+USTRUCT()
+struct FAircraftFlightUnderTest
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	TWeakObjectPtr<AAircraftMaster> Aircraft;
+
+	UPROPERTY()
+	TWeakObjectPtr<AActor> Target;
+
+	EAircraftFlightTestStep Step = EAircraftFlightTestStep::Settling;
+	float StepStartSeconds = 0.f;
+	float MaxMoveSpeed = 0.f;
+	bool bHasLastSample = false;
+	float LastYaw = 0.f;
+	float LastRoll = 0.f;
+	float LastYawRate = 0.f;
+	bool bHasLastYawRate = false;
+	bool bSawDive = false;
+	bool bSawIdle = false;
+	bool bWasDiving = false;
+	float DiveStartYaw = 0.f;
+	float ClosestTargetDistance = BIG_NUMBER;
+	float FarthestTargetDistance = 0.f;
+	TArray<FAircraftFlightStepMetrics> StepMetrics;
+	// One row per frame: written to Saved/AircraftFlightQA/<label>.csv at the end.
+	TArray<FString> CsvRows;
 };
 
 UENUM()
@@ -422,6 +509,30 @@ private:
 	/** @brief Updates the extremes and vertical rate, and logs a sample row now and then. */
 	void RecordTerrainFollowSample(FAircraftTerrainFollowFlightUnderTest& Entry, const TCHAR* StepName);
 	void EnterTerrainFollowStep(FAircraftTerrainFollowFlightUnderTest& Entry, EAircraftTerrainFollowTestStep NewStep);
+
+	// ---------------- Flight smoothness (AircraftFlightSmoothnessTest.cpp) ----------------
+	UPROPERTY()
+	FAircraftFlightUnderTest M_Flight;
+
+	void StartAircraftFlight();
+	void TickAircraftFlight();
+	void TickFlightSettling(FAircraftFlightUnderTest& Entry);
+	/** @brief Orders a move whose target lies at the given yaw offset from the aircraft's flight direction. */
+	void OrderFlightTurn(FAircraftFlightUnderTest& Entry, float YawOffsetDeg, float Distance,
+	                     EAircraftFlightTestStep NextStep);
+	void TickFlightTurning(FAircraftFlightUnderTest& Entry);
+	void TickFlightAttacking(FAircraftFlightUnderTest& Entry);
+	void TickFlightIdle(FAircraftFlightUnderTest& Entry);
+	void TickFlightReacquiring(FAircraftFlightUnderTest& Entry);
+	/** @brief Spawns an enemy ahead that drives across the aircraft's path, and orders the attack on it. */
+	void StartFlightMovingTargetAttack(FAircraftFlightUnderTest& Entry);
+	/** @return An enemy armoured car spawned on the ground at the yaw offset and distance from the aircraft. */
+	AActor* SpawnFlightTarget(const FAircraftFlightUnderTest& Entry, float YawOffsetDeg, float Distance);
+	/** @brief Measures this frame into the current step's metrics and adds a CSV row. */
+	void RecordFlightSample(FAircraftFlightUnderTest& Entry);
+	void EnterFlightStep(FAircraftFlightUnderTest& Entry, EAircraftFlightTestStep NewStep);
+	/** @brief Logs every step's metrics, checks them and writes the CSV. */
+	void FinishAircraftFlight(FAircraftFlightUnderTest& Entry);
 
 	// ---------------- Strafing global ability (AircraftStrafeTest.cpp) ----------------
 	void StartAircraftStrafe();
