@@ -34,6 +34,10 @@ struct FAircraftIdleData
 	/** Minimum steer scale at the start of grace (0..1); ramps to 1 by grace end */
 	UPROPERTY()
 	float GraceMinSteerScale = 0.5f;
+
+	/** Bank-to-turn idle: 1 circles to the right (clockwise seen from above), -1 to the left. */
+	UPROPERTY()
+	float TurnSign = 1.f;
 };
 
 

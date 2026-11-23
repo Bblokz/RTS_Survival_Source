@@ -138,6 +138,12 @@ public:
 	// Map tests and debugging: one line with the movement state, attack path point, strafe and weapon state.
 	FString DescribeFlightForTests() const;
 
+	/** @return Cruise speed of move and attack flights (cm/s), for map tests. */
+	float GetMaxMoveSpeedForTests() const { return M_AircraftMovementSettings.MaxMoveSpeed; }
+
+	/** @return Idle / moving / attacking, for map tests. */
+	EAircraftMovementState GetMovementStateForTests() const { return M_MovementState; }
+
 	/** @return Whether the aircraft flies into or out of an attack dive, where terrain following must not act. */
 	bool GetIsFlyingAttackDive() const
 	{
@@ -468,8 +474,10 @@ private:
 	 * @brief Ability flights spawn at a height chosen for their target, often far off over other ground: keep the
 	 * cruise height's clearance above the target's ground instead of above the spawn point.
 	 * @param TargetLocation XY whose ground the clearance is measured from.
+	 * @param MinClearance Lowest clearance kept; below it the aircraft climbs to it smoothly. 0 uses the terrain
+	 * following's MinGroundClearance.
 	 */
-	void TerrainFollow_CaptureClearanceAboveTarget(const FVector& TargetLocation);
+	void TerrainFollow_CaptureClearanceAboveTarget(const FVector& TargetLocation, const float MinClearance = 0.f);
 
 	/**
 	 * @brief Traces down to the landscape at one XY location; movable things that block the landscape channel (team
@@ -509,6 +517,101 @@ private:
 
 	/** @brief Idle circling (or hover) behavior while airborne with no active command. */
 	void Tick_IdleCircling(float DeltaTime);
+
+	// -------------------------------------------------------------
+	// ----------------------- Bank-to-turn flight -----------------------
+	// -------------------------------------------------------------
+	/** @return Whether move, attack and idle flights use the bank-to-turn flight model (not -AircraftLegacyFlight). */
+	bool GetIsFlightModelActive() const;
+
+	/**
+	 * @brief Bank-to-turn path following: passes the points the aircraft has flown by (issuing the attack actions of
+	 * each new point), then aims a little ahead along the path.
+	 * @param Path Move or attack path.
+	 * @param bIsAttackPath Attack paths issue fire / bomb actions per point and end in OnAttackMoveCompleted.
+	 * @param DeltaTime Frame time.
+	 */
+	void Tick_FlyPath(FAircraftPath& Path, const bool bIsAttackPath, const float DeltaTime);
+
+	/** @return False once the path ended this frame (its completion may already have started a new one). */
+	bool FlyPath_AdvancePassedPoints(FAircraftPath& Path, const bool bIsAttackPath);
+
+	/**
+	 * @brief The frame a path ends still flies: idle circling or the new path that the completion started, so the
+	 * turn never freezes for a frame. Nothing when the aircraft hovers, lands or is destroyed.
+	 */
+	void FlyPath_ContinueAfterPathEnded(const float DeltaTime);
+
+	/** @return How far ahead along the path or idle circle the aircraft aims at its current speed (cm). */
+	float GetFlightLookAheadDistance(const bool bIsDiving = false) const;
+
+	/** @brief One bank-to-turn frame along a path: aim ahead, dive floor and altitude hold outside dives. */
+	void FlyAlongPath(const FAircraftPath& Path, const float DeltaTime);
+
+	/** @return Cruise speed, or less on the way into a hover (return to base, drop point). */
+	float FlyPath_GetWantedSpeed(const FAircraftPath& Path) const;
+
+	/** @return Braking rate into a hover: the comfortable rate, harder when the path left is too short for it. */
+	float FlyPath_GetArrivalDeceleration(const FAircraftPath& Path) const;
+
+	/**
+	 * @brief Raises the dive floor to stay clear of the ground under the aircraft (sampled while diving), not only
+	 * of the target's ground; only limits the descent, so the dive's aim is not changed above the floor.
+	 * @param PathFloorZ The dive segment's own floor.
+	 * @param DeltaTime Frame time, for the sample timer.
+	 * @return The floor to fly this frame.
+	 */
+	TOptional<float> FlyPath_GetDiveFloorAboveGroundBelow(const TOptional<float>& PathFloorZ, const float DeltaTime);
+
+	/** Ground under a diving aircraft, sampled now and then and eased between samples, for the dive floor. */
+	struct FAircraftDiveGroundFloor
+	{
+		// Ground height the floor follows; moves toward the last sample at a capped speed, so the floor never steps.
+		float GroundZ = 0.f;
+		float SampledGroundZ = 0.f;
+		float SecondsToNextSample = 0.f;
+		bool bM_HasGround = false;
+
+		void Reset()
+		{
+			SecondsToNextSample = 0.f;
+			bM_HasGround = false;
+		}
+	};
+
+	FAircraftDiveGroundFloor M_DiveGroundFloor;
+
+	/**
+	 * @brief One bank-to-turn frame toward a point.
+	 * @param AimPoint Where to fly toward.
+	 * @param WantedSpeed Speed to reach and keep (cm/s).
+	 * @param FloorZ Dive floor, when one applies.
+	 * @param bHoldAltitude Cruise and idle: ease to the aim height instead of pointing the nose at the aim point.
+	 * @param DeltaTime Frame time.
+	 * @param bIsArriving Slowing into a hover: brakes at the arrival deceleration.
+	 * @param ArrivalDeceleration Braking rate of the arrival (at least the settings' ArrivalDeceleration).
+	 */
+	void FlyTowardPoint(const FVector& AimPoint, const float WantedSpeed, const TOptional<float>& FloorZ,
+	                    const bool bHoldAltitude, const float DeltaTime, const bool bIsArriving = false,
+	                    const float ArrivalDeceleration = 0.f);
+
+	/** @brief Gives a new move or attack path the turn radius it is planned with and the side already turned to. */
+	void PreparePathPlanning(FAircraftPath& Path);
+
+	// Attack plans since the last dive: after a few the dive checks relax, so the aircraft never circles forever.
+	int32 M_AttackPlansWithoutDive = 0;
+
+	/** @brief PostInitializeComponents: an aircraft spawned in the air starts at idle speed along its nose. */
+	void PostInit_SetAirborneSpawnSpeed() const;
+
+	/** @return Flight heading (velocity, or the nose when nearly still) as a level rotation for path planning. */
+	FRotator GetFlightPlanningRotation() const;
+
+	/** @brief Puts the idle circle beside the flight, tangent to it on the side the aircraft already turns to. */
+	void InitIdleCircleAlongFlight();
+
+	/** @brief Bank-to-turn idle circling: aims a little ahead on the circle at the idle speed. */
+	void Tick_IdleCircling_FlightModel(float DeltaTime);
 
 	struct FIssuedActionsState
 	{

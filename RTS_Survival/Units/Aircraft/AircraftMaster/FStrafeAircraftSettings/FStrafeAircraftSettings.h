@@ -3,6 +3,13 @@
 #include "CoreMinimal.h"
 #include "FStrafeAircraftSettings.generated.h"
 
+namespace AircraftStrafeHeights
+{
+	// Strafing aircraft come in and cruise at least this high above the strafe's ground before they dive, whatever
+	// world height they were spawned at, so the dive has room and the pull-out stays well above the ground (cm).
+	inline constexpr float MinCruiseClearanceAboveTarget = 2600.f;
+}
+
 USTRUCT(BlueprintType)
 struct FStrafeAircraftSettings
 {
