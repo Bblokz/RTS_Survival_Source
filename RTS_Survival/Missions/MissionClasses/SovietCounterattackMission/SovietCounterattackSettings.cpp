@@ -102,6 +102,20 @@ FSovietCounterattackArrivalCinematicSettings::FSovietCounterattackArrivalCinemat
 	// Sequence is set on the data asset (not here) so the cook sees the reference.
 }
 
+FSovietCounterattackBaseReinforcementSettings::FSovietCounterattackBaseReinforcementSettings()
+{
+	// User, 2026-11-23: two Tiger H1 + three Luchs (Breakthrough), two Panther D + two Pz III AA (Strike Division).
+	BreakthroughVehicles = {
+		ETankSubtype::Tank_TigerH1, ETankSubtype::Tank_TigerH1,
+		ETankSubtype::Tank_PzII_Luchs, ETankSubtype::Tank_PzII_Luchs, ETankSubtype::Tank_PzII_Luchs
+	};
+	StrikeDivisionVehicles = {
+		ETankSubtype::Tank_PantherD, ETankSubtype::Tank_PantherD,
+		ETankSubtype::Tank_PzIII_AA, ETankSubtype::Tank_PzIII_AA
+	};
+	// VoiceLine is set on the data asset (not here) so the cook sees the reference.
+}
+
 USovietCounterattackSettings::USovietCounterattackSettings()
 {
 	using namespace SovietCounterattackDefaults;

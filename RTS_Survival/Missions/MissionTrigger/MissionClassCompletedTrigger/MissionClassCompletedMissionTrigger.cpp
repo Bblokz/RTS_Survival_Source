@@ -22,10 +22,27 @@ bool UMissionClassCompletedMissionTrigger::CheckTrigger_Implementation() const
 		return false;
 	}
 
-	if (MissionManager->GetHasCompletedMissionClassExact(MissionClassToWatch))
+	if (GetHasClassEnded(*MissionManager, MissionClassToWatch))
 	{
 		return true;
 	}
-	return bAlsoTriggerWhenFailed && MissionManager->GetHasFailedMissionClassExact(MissionClassToWatch);
+	for (const TSubclassOf<UMissionBase>& AlsoWatchedClass : AlsoWatchMissionClasses)
+	{
+		if (AlsoWatchedClass && GetHasClassEnded(*MissionManager, AlsoWatchedClass))
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
+bool UMissionClassCompletedMissionTrigger::GetHasClassEnded(const AMissionManager& MissionManager,
+                                                            const TSubclassOf<UMissionBase>& MissionClass) const
+{
+	if (MissionManager.GetHasCompletedMissionClassExact(MissionClass))
+	{
+		return true;
+	}
+	return bAlsoTriggerWhenFailed && MissionManager.GetHasFailedMissionClassExact(MissionClass);
 }
 

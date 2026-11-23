@@ -355,6 +355,58 @@ struct FSovietCounterattackArrivalCinematicSettings
 };
 
 /**
+ * Heavy tanks HQ flies into the player's base once the first wave's arrival cinematic is over (also when it was
+ * skipped or never played): an announcer line and one cargo plane per vehicle (CargoPlaneAbility's aircraft) landing
+ * around LandingPoint. The payload depends on the player's faction.
+ */
+USTRUCT(BlueprintType)
+struct FSovietCounterattackBaseReinforcementSettings
+{
+	GENERATED_BODY()
+
+	FSovietCounterattackBaseReinforcementSettings();
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Base Reinforcements")
+	bool bEnabled = true;
+
+	// Seconds after the arrival cinematic ended before the line plays and the aircraft take off.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Base Reinforcements", meta = (ClampMin = "0.0"))
+	float DelayAfterCinematicSeconds = 1.5f;
+
+	// Centre of the drop = the player HQ plus this XY offset (default: the open concrete west of the HQ, away from the
+	// attack). The first aircraft lands there, the others 1000 apart around it; every point is projected onto the
+	// navmesh, so buildings the player put there push the aircraft aside.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Base Reinforcements")
+	FVector LandingOffsetFromHQ = FVector(-1200.f, 0.f, 0.f);
+
+	// Used instead of the HQ when the player has none (z 0 = traced to the ground).
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Base Reinforcements")
+	FVector FallbackLandingPoint = FVector(250.f, 300.f, 0.f);
+
+	// Any German aircraft drop ability: only its aircraft and landing behaviour are used, one aircraft per vehicle.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Base Reinforcements")
+	EGlobalAbility CargoPlaneAbility = EGlobalAbility::GA_GerPzIIIFlak41Drop;
+
+	// Breakthrough Doctrine (and any faction that is not Strike Division).
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Base Reinforcements")
+	TArray<ETankSubtype> BreakthroughVehicles;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Base Reinforcements")
+	TArray<ETankSubtype> StrikeDivisionVehicles;
+
+	// "Kommandant, HQ provides us with more heavy tanks..." Set on the data asset so the cook sees it.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Base Reinforcements")
+	TObjectPtr<USoundBase> VoiceLine = nullptr;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Base Reinforcements")
+	ERTSPortraitTypes VoiceLinePortrait = ERTSPortraitTypes::GermanAnnouncer;
+
+	// The reinforcements ping on the minimap at the landing point for this long.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Base Reinforcements", meta = (ClampMin = "0.0"))
+	float MiniMapPingSeconds = 8.f;
+};
+
+/**
  * @brief Data of USovietCounterattackMission: per difficulty the time until the Soviets arrive, the waves and their
  * unit pool; plus the three spawns, the attack route, the timer and the objective texts.
  */
@@ -455,4 +507,7 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Presentation")
 	FSovietCounterattackArrivalCinematicSettings ArrivalCinematic;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Presentation")
+	FSovietCounterattackBaseReinforcementSettings BaseReinforcements;
 };

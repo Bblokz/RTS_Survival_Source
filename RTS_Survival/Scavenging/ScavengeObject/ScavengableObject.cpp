@@ -164,6 +164,10 @@ bool AScavengeableObject::EnsureRequestingSquadIsActiveScavenger(
 
 void AScavengeableObject::OnScavengingComplete()
 {
+	if (IsValid(M_ScavengingSquad))
+	{
+		OnScavengeCompletedBySquad(*M_ScavengingSquad);
+	}
 	HandleScavengeCompletionForSquad();
 	DisableProgressBarAndTimers();
 
