@@ -49,13 +49,26 @@ namespace AbilityPreviewTargetsPrivate
 		"/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Rus_Medium/T34/Rus_Vehicle_T3485."
 		"Rus_Vehicle_T3485_C");
 
-	FAbilityPreviewTargetSet MakeSet(std::initializer_list<const TCHAR*> ClassPaths)
+	// Machine gun fighters: staggered lanes up to 6.5 m either side. Each pass aims at one target unit; its beaten zone
+	// (1.6 m sigma or more across, clamped at 2.2 sigma, smeared along the pass) reaches the neighbouring squads.
+	const TArray<float> InfantrySpreadSideOffsetsCm = {0.f, 450.f, -450.f, 250.f, -650.f, 650.f, -250.f};
+	// Cannon aircraft: vehicles close to the line as before, squads on the opposite flank, close enough that the
+	// passes at the vehicles also rake the soldiers.
+	const TArray<float> VehiclesAndInfantrySideOffsetsCm = {200.f, -450.f, -200.f, 450.f, 200.f, -450.f};
+	// The preview's strafe lines are about 15 m: too short for 6-7 units to stand apart.
+	constexpr float SpreadSetMinLineLengthCm = 2400.f;
+
+	FAbilityPreviewTargetSet MakeSet(std::initializer_list<const TCHAR*> ClassPaths,
+	                                 const TArray<float>& SideOffsetsCm = TArray<float>(),
+	                                 const float MinLineLengthCm = 0.f)
 	{
 		FAbilityPreviewTargetSet Set;
 		for (const TCHAR* const ClassPath : ClassPaths)
 		{
 			Set.UnitClasses.Add(TSoftClassPtr<AActor>(FSoftObjectPath(ClassPath)));
 		}
+		Set.SideOffsetsCm = SideOffsetsCm;
+		Set.MinLineLengthCm = MinLineLengthCm;
 		return Set;
 	}
 }
@@ -69,13 +82,21 @@ UAbilityPreviewTargetsComponent::UAbilityPreviewTargetsComponent()
 	                 MakeSet({MosinSquad, SvtSquad, MosinSquad, SvtSquad, MosinSquad}));
 	M_TargetSets.Add(EAbilityPreviewTargetKind::LightVehicles, MakeSet({T70, BA11, T26}));
 	M_TargetSets.Add(EAbilityPreviewTargetKind::MediumVehicles, MakeSet({T3476, T3485, T3476}));
+	M_TargetSets.Add(EAbilityPreviewTargetKind::InfantrySpread,
+	                 MakeSet({MosinSquad, SvtSquad, MosinSquad, SvtSquad, MosinSquad, SvtSquad, MosinSquad},
+	                         InfantrySpreadSideOffsetsCm, SpreadSetMinLineLengthCm));
+	M_TargetSets.Add(EAbilityPreviewTargetKind::LightVehiclesAndInfantry,
+	                 MakeSet({T70, MosinSquad, BA11, SvtSquad, T26, MosinSquad}, VehiclesAndInfantrySideOffsetsCm,
+	                         SpreadSetMinLineLengthCm));
 
-	// Machine gun fighters.
+	// Machine gun fighters. The Bf 109 shows the strafe's area damage on soldiers across a wide spread of squads.
 	M_AbilityTargetKinds.Add(EGlobalAbility::GA_2xBf110Strafing, EAbilityPreviewTargetKind::Infantry);
-	M_AbilityTargetKinds.Add(EGlobalAbility::GA_Bf109Strafing, EAbilityPreviewTargetKind::Infantry);
-	// Cannon aircraft.
-	M_AbilityTargetKinds.Add(EGlobalAbility::GA_2xHortentrafing, EAbilityPreviewTargetKind::LightVehicles);
-	M_AbilityTargetKinds.Add(EGlobalAbility::GA_GerJu87GTankBusters, EAbilityPreviewTargetKind::LightVehicles);
+	M_AbilityTargetKinds.Add(EGlobalAbility::GA_Bf109Strafing, EAbilityPreviewTargetKind::InfantrySpread);
+	M_AbilityTargetKinds.Add(EGlobalAbility::GA_3xBf109Strafing, EAbilityPreviewTargetKind::InfantrySpread);
+	// Cannon aircraft: their splash also hits soldiers near the vehicles.
+	M_AbilityTargetKinds.Add(EGlobalAbility::GA_2xHortentrafing, EAbilityPreviewTargetKind::LightVehiclesAndInfantry);
+	M_AbilityTargetKinds.Add(EGlobalAbility::GA_GerJu87GTankBusters,
+	                         EAbilityPreviewTargetKind::LightVehiclesAndInfantry);
 	// Bombers: the Ju 87 and Me 410 strafe and drop bombs. The incendiary Ju 87 is not among them: its canisters are
 	// "deadly to infantry, harmless to tanks", so it gets infantry.
 	M_AbilityTargetKinds.Add(EGlobalAbility::GA_GerIncendiaryJu87, EAbilityPreviewTargetKind::Infantry);
@@ -152,12 +173,15 @@ int32 UAbilityPreviewTargetsComponent::SpawnTargets(const EAbilityPreviewTargetK
 	}
 	FVector LineDirection = LineEnd - LineStart;
 	LineDirection.Z = 0.f;
-	const float LineLength = LineDirection.Size();
+	const float AttackLineLength = LineDirection.Size();
 	LineDirection = LineDirection.GetSafeNormal();
 	if (LineDirection.IsNearlyZero())
 	{
 		LineDirection = FVector::ForwardVector;
 	}
+	// Stretch a short line about its middle; GetGroundPoint puts every unit back on the ground.
+	const float LineLength = FMath::Max(AttackLineLength, TargetSet->MinLineLengthCm);
+	const FVector SpawnLineStart = LineStart - LineDirection * (0.5f * (LineLength - AttackLineLength));
 	const FVector LineSide(-LineDirection.Y, LineDirection.X, 0.f);
 	const float UsableLength = LineLength * (1.f - 2.f * M_LineEndMargin);
 	const int32 UnitCount = TargetSet->UnitClasses.Num();
@@ -174,8 +198,9 @@ int32 UAbilityPreviewTargetsComponent::SpawnTargets(const EAbilityPreviewTargetK
 			continue;
 		}
 		const float AlongLine = LineLength * M_LineEndMargin + UsableLength * (UnitIndex + 0.5f) / UnitCount;
-		const float SideSign = UnitIndex % 2 == 0 ? 1.f : -1.f;
-		const FVector Location = LineStart + LineDirection * AlongLine + LineSide * (SideSign * M_SideOffset);
+		const float SideOffset = GetSideOffset(*TargetSet, UnitIndex);
+		const float SideSign = SideOffset < 0.f ? -1.f : 1.f;
+		const FVector Location = SpawnLineStart + LineDirection * AlongLine + LineSide * SideOffset;
 		const float Yaw = LineYaw + FacingAcrossLineDegrees + SideSign * FacingVariationDegrees;
 		if (AActor* const Target = SpawnTarget(UnitClass, GetGroundPoint(Location), Yaw))
 		{
@@ -193,6 +218,16 @@ int32 UAbilityPreviewTargetsComponent::SpawnTargets(const EAbilityPreviewTargetK
 	       *UEnum::GetValueAsString(Kind), M_Targets.Num(), *LineStart.ToCompactString(),
 	       *LineEnd.ToCompactString());
 	return M_Targets.Num();
+}
+
+float UAbilityPreviewTargetsComponent::GetSideOffset(const FAbilityPreviewTargetSet& TargetSet,
+                                                     const int32 UnitIndex) const
+{
+	if (TargetSet.SideOffsetsCm.IsEmpty())
+	{
+		return UnitIndex % 2 == 0 ? M_SideOffset : -M_SideOffset;
+	}
+	return TargetSet.SideOffsetsCm[UnitIndex % TargetSet.SideOffsetsCm.Num()];
 }
 
 AActor* UAbilityPreviewTargetsComponent::SpawnTarget(UClass* UnitClass, const FVector& GroundLocation,
@@ -362,10 +397,12 @@ FAbilityPreviewTargetHealth UAbilityPreviewTargetsComponent::GetTargetHealth() c
 		}
 		CountUnit(Target);
 	}
+	const int32 DamagedBeforeSoldiers = TargetHealth.Damaged;
 	for (const TWeakObjectPtr<AActor>& Soldier : M_TargetSoldiers)
 	{
 		CountUnit(Soldier);
 	}
+	TargetHealth.SoldiersDamaged = TargetHealth.Damaged - DamagedBeforeSoldiers;
 	return TargetHealth;
 }
 

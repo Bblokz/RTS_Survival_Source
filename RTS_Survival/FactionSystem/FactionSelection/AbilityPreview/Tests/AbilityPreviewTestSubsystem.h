@@ -80,6 +80,7 @@ private:
 	// Most targets seen damaged and destroyed during the case: infantry may heal before the finished sample.
 	int32 M_MaxTargetsDamaged = 0;
 	int32 M_MaxTargetsDestroyed = 0;
+	int32 M_MaxSoldiersDamaged = 0;
 	TArray<FString> M_ResultLines;
 	TArray<TWeakObjectPtr<AActor>> M_CaseSpawns;
 	FDelegateHandle M_SpawnHandle;

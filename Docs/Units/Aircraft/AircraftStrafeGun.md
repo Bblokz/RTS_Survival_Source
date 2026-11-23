@@ -186,7 +186,8 @@ gun sounds are made when the weapon is set up, and the strafe QA spawns every ai
 | Ju 87, Ju 87 (airborne), Ju 87 G | MG 15, 2 sockets | MG, 2-gun loops |
 | Me 410 (all three), Fw 189 | MG 151/20 | Cannon + 20 mm impacts; their BK 5 keeps its own |
 | Ho 229 | MK 108 (30 mm), fired as a strafe gun | 30 mm set ("Hammer") |
-| Il-2, Pe-2, Pe-8, Ju 390 | MG 15 | MG set by the same code; their Blueprints add no weapon at spawn, so the QA could not list them |
+| Il-2 (Sturmovik), Pe-2 (both) | MG 15, 4 sockets | MG, 4-gun loops. Wired 2026-11-22: each Blueprint's `Setup4xMG` macro was never called; it now runs at the end of `BP_BeginplayInitAircraft` and fires from W1-W4 on the frame mesh (Il-2 wing leading edges at 2.5 m and 3 m out, Pe-2 nose) instead of the shared Stuka rig |
+| Pe-8 (all), Ju 390 (all) | MG 15 (unused) | Their `Setup4xMG` macro is still never called: bombers and transports stay gunless on purpose |
 
 | Asset (`/Game/RTS_Survival/Sounds/WeaponSounds/AircraftGuns`) | What |
 | --- | --- |

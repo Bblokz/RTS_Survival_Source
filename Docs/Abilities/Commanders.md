@@ -34,6 +34,21 @@ side panel collapses their slots and nothing can execute them (2026-11-07; befor
 Enemy managers ignore the cap, and abilities fired by mission scripts (`AMissionManager::ExecuteGlobalAbility`) skip
 the requirement checks, so the cap never blocks them.
 
+**Hidden kit and mission grants (2026-11-22).** `AMissionManager::bHideGlobalAbilitiesForPlayer` collapses the side
+panel for the whole mission (the hotkeys check the panel's visibility, so they are off too). A mission can still hand
+the player an ability at a scripted moment with `UGlobalAbilitiesManager::GrantMissionGlobalAbility`
+(`FMissionGrantedGlobalAbility`, in `MissionPlayerGlobalAbilitySettings.h`):
+- `Ability`, `Charges` (0 = unlimited), `CooldownSeconds` (0 = the template's), `bFreeOfCost`, and for strafing
+  abilities `StrafeAircraftCount`, `StrafeSeconds` and `bStrafeStaysOnTarget`.
+- If the panel was hidden, the kit is dropped from the loaded list and the panel comes back with only the granted
+  abilities. Otherwise the grant is added after the kit. The mission's tier cap does not apply to a grant.
+- A charge is taken when the ability finishes executing (`OnAbilityFinishedExecuting` -> `ConsumeMissionCharge`).
+  At 0 the ability leaves the panel (it is kept alive in `M_SpentMissionAbilities` while its strike flies), the panel
+  collapses again when nothing is left, and `UGlobalAbility::IsBlocked` refuses a spent ability.
+- The tooltip adds "Charges left: N" under the description or the cooldown line.
+- Test hooks: `UMissionMapTestLibrary::MapTest_UsePlayerGlobalAbility` (an aimed click) and
+  `MapTest_GetPlayerGlobalAbilityState` (panel, charges, cooldown, cost, strike size).
+
 The costs, building requirements and cooldowns on each template still balance an ability within a mission.
 
 The in-game panel (`W_BP_GlobalAbilityPanel`) has eight 96-unit buttons stacked on the left edge; a kit fills the
