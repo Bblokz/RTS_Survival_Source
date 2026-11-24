@@ -73,4 +73,8 @@ air, and cargo on board + credited must equal what was carried. Pictures: drop `
 - Same as the HQ: tracks do not animate during the guided slide; the crane has no collision and no nav effect.
 - The station pops in once the deploy finishes and vanishes on pack-up; there is no folded transport pose on the
   driving truck.
+- If the path to the overflow point fails or is blocked, the harvester still falls back to the drop-off's backup spot
+  on the building side facing it, which can lie in the bay.
+- The nearest-drop-off search (`UGameResourceManager`) measures to the overflow point, 11 m from the truck nose, so it
+  slightly favours other drop-offs for harvesters on the far side.
 - Only the Strike Division refinery and HQ have cranes.
