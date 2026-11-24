@@ -6,6 +6,7 @@
 #include "RTS_Survival/WorldCampaign/CampaignGeneration/Enums/Enum_MapItemType.h"
 #include "RTS_Survival/WorldCampaign/CampaignGeneration/Enums/Enum_MapMission.h"
 #include "RTS_Survival/WorldCampaign/StrengthTypes/WorldStrengthContribution.h"
+#include "RTS_Survival/Game/RTSGameInstance/WorldMissionContext/WorldMissionEnemyArmy.h"
 #include "RTS_Survival/GlobalAbilitySystem/GlobalAbilityType/EGlobalAbilityTier.h"
 #include "RTS_Survival/TechTree/Technologies/Technologies.h"
 #include "RTS_Survival/WorldCampaign/PlayerProfile/PlayerCardData/PlayerCardData.h"
@@ -53,6 +54,10 @@ struct RTS_SURVIVAL_API FWorldMissionContext
 	// Division or convoy the operation is fought against; invalid for anchor targets.
 	UPROPERTY(BlueprintReadOnly, Category = "World Campaign|Mission Context")
 	FGuid SourceDivisionKey;
+
+	// The attacked division's units; spawned at the enemy start of a handmade field map. Empty for anchor targets.
+	UPROPERTY(BlueprintReadOnly, Category = "World Campaign|Mission Context")
+	FWorldMissionEnemyArmy EnemyArmy;
 
 	// Highest global ability tier the campaign rank allows; the mission's own cap can only lower it further.
 	UPROPERTY(BlueprintReadOnly, Category = "World Campaign|Mission Context")

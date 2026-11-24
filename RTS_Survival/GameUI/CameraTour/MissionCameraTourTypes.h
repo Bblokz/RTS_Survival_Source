@@ -55,6 +55,11 @@ struct FMissionCameraTourShot
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Shot", meta = (ClampMin = "0.0"))
 	float BlendInSeconds = 1.5f;
 
+	// Lifts the fog of war around FocusStart and FocusEnd (cm) from the moment the tour takes the screen until a few
+	// seconds after it ends, so the shot shows what it points at; 0 reveals nothing.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Shot", meta = (ClampMin = "0.0"))
+	float RevealRadius = 0.f;
+
 	// Caption shown bottom centre during the shot; empty shows none.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Caption")
 	FText Title;
@@ -81,7 +86,13 @@ struct FMissionCameraTourSettings
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Presentation", meta = (ClampMin = "0.0"))
 	float ReturnSeconds = 1.75f;
 
-	// Plays once when the tour takes the screen.
+	// Plays once when the tour takes the screen. With a row in DT_CinematicTranscripts its words show in the cinematic
+	// subtitle strip at the top until the line ends (also after a skip).
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Presentation")
 	TObjectPtr<USoundBase> StartSound = nullptr;
+
+	// Shows the hold-Space-to-skip prompt of the cinematics. A skip jumps to the ease back to the player's view;
+	// BP_OnCameraTourFinished still fires (bWasShown true). Voice lines already playing go on in the HUD portrait.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Presentation")
+	bool bAllowSkipping = false;
 };
