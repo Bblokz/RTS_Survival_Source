@@ -19,7 +19,7 @@ import unreal
 
 HOME = "/Game/RTS_Survival/Blueprints/Environment/Berlin/ForgeStation"
 SPLIT = HOME + "/Split"
-DATA = "/Game/RTS_Survival/Blueprints/Missions/GerCampaign/Berlin"
+DATA = "/Game/RTS_Survival/Maps/GerMissions/Berlin/DataAssets"  # Berlin data assets live next to the map (moved 2026-11-24)
 LAYOUT_JSON = ("D:/Blender/BlenderProjects/BlenderTanks/CustomMapItems/Environment/BerlinForgeStation/v3_split/"
                "split_layout.json")
 TERRAIN_JSON = "D:/UE5Projects/RTS_Survival/Saved/Berlin/terrain/Ger_Berlin_layout.json"

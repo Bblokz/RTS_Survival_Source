@@ -6,6 +6,7 @@ Missions[] and its own trigger:
   ('after_or_failed', Stage)    the same, also fires when Stage FAILED (the alarm)
   ('near', (x, y, z), radius)   UPlayerUnitsNearMissionTrigger (a player unit comes within radius)
   ('fleeing', None)             UEnemyFleeingMissionTrigger (the first enemy unit flees)
+  ('time', seconds)             UTimeElapsedMissionTrigger (the game has run that many seconds)
   ('keep', None)                keep the trigger the existing instance has (stages that bring their own trigger)
   None                          no trigger: starts at begin play
 Stages whose Blueprint does not exist yet are skipped. Missions already in the array that are not in STAGES are kept
@@ -18,6 +19,7 @@ wire(), check describe(), then save the level (run_wire_berlin_stages.py does al
 import unreal
 
 STAGE_DIR = '/Game/RTS_Survival/Blueprints/Missions/GerCampaign/Berlin/'
+DATA_DIR = '/Game/RTS_Survival/Maps/GerMissions/Berlin/DataAssets/'  # Berlin data assets live next to the map
 
 STAGES = [
     ('Mission_Berlin_Arrival', None),
@@ -33,12 +35,34 @@ STAGES = [
     ('Mission_Berlin_RaidReichstag', ('near', (8112.0, -15994.0, 0.0), 9000.0)),
     ('Mission_Berlin_DemeterPod', ('near', (-20042.0, 1667.0, 0.0), 2500.0)),
     ('Mission_Berlin_Counterattack', ('after', 'Mission_Berlin_ResponseForce')),
+    ('Mission_Berlin_Patrols', None),
+    ('Mission_Berlin_SupplyPoint', ('time', 140.0)),
 ]
 
 # Per-instance properties (the Intro map showed a data asset equal to the CDO value coming back empty on load).
 INSTANCE_ASSETS = {
-    'Mission_Berlin_Counterattack': {'settings': STAGE_DIR + 'DA_Berlin_ResponseForce'},
+    'Mission_Berlin_Counterattack': {'settings': DATA_DIR + 'DA_Berlin_ResponseForce'},
+    'Mission_Berlin_Arrival': {'ReichstagTraining': DATA_DIR + 'DA_Berlin_ReichstagTraining'},
 }
+
+# Per-instance properties copied from another stage's instance. Python cannot build a map keyed by
+# ERTSGameDifficulty (the struct FRTSGameDifficulty shadows the enum's Python name), and a Blueprint map variable takes
+# no literal default, so the patrols take the Forge station's DA_BerlinForces_* map.
+INSTANCE_COPIES = {
+    'Mission_Berlin_Patrols': {'ForcesPerDifficulty': ('Mission_Berlin_ForgeStation', 'forces_per_difficulty')},
+}
+
+
+def copy_instance_values(name, mission, wired_by_name, changes):
+    for prop, (source_name, source_prop) in INSTANCE_COPIES.get(name, {}).items():
+        source = wired_by_name.get(source_name)
+        if source is None:
+            changes.append(f'{name}.{prop}: no {source_name} to copy from')
+            continue
+        values = source.get_editor_property(source_prop)
+        if len(mission.get_editor_property(prop)) != len(values):
+            mission.set_editor_property(prop, values)
+            changes.append(f'{name}.{prop} = {len(values)} entries from {source_name}')
 
 
 def stage_class(name):
@@ -64,6 +88,9 @@ def trigger_matches(mission, spec, classes):
         return True
     if kind == 'fleeing':
         return isinstance(trigger, unreal.EnemyFleeingMissionTrigger)
+    if kind == 'time':
+        return (isinstance(trigger, unreal.TimeElapsedMissionTrigger)
+                and abs(trigger.get_editor_property('seconds') - spec[1]) < 0.01)
     if kind in ('after', 'after_or_failed'):
         return (isinstance(trigger, unreal.MissionClassCompletedMissionTrigger)
                 and trigger.get_editor_property('mission_class_to_watch') == classes.get(spec[1])
@@ -93,6 +120,10 @@ def make_trigger(mission, spec, classes):
         return trigger
     if kind == 'fleeing':
         return unreal.new_object(unreal.EnemyFleeingMissionTrigger, outer=mission)
+    if kind == 'time':
+        trigger = unreal.new_object(unreal.TimeElapsedMissionTrigger, outer=mission)
+        trigger.set_editor_property('seconds', spec[1])
+        return trigger
     raise ValueError(spec)
 
 
@@ -103,7 +134,7 @@ def wire(world=None):
     manager.modify()
     existing = [m for m in manager.get_editor_property('missions') if m is not None]
     classes = {name: stage_class(name) for name, _ in STAGES}
-    changes, wired = [], []
+    changes, wired, wired_by_name = [], [], {}
     for name, spec in STAGES:
         cls = classes[name]
         if cls is None:
@@ -121,7 +152,9 @@ def wire(world=None):
             if mission.get_editor_property(prop) != asset:
                 mission.set_editor_property(prop, asset)
                 changes.append(f'{name}.{prop} = {asset_path}')
+        copy_instance_values(name, mission, wired_by_name, changes)
         wired.append(mission)
+        wired_by_name[name] = mission
     known = [c for c in classes.values() if c is not None]
     others = [m for m in existing if m.get_class() not in known]
     manager.set_editor_property('missions', wired + others)
@@ -145,6 +178,8 @@ def describe(world=None):
         elif isinstance(trigger, unreal.PlayerUnitsNearMissionTrigger):
             loc = trigger.get_editor_property('centre_location')
             trigger_text = f'near ({loc.x:.0f}, {loc.y:.0f}) r {trigger.get_editor_property("radius"):.0f}'
+        elif isinstance(trigger, unreal.TimeElapsedMissionTrigger):
+            trigger_text = f'after {trigger.get_editor_property("seconds"):.0f} s'
         else:
             trigger_text = trigger.get_class().get_name() if trigger else 'no trigger'
         title = mission.get_editor_property('mission_widget_state').get_editor_property('mission_title')

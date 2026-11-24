@@ -13,7 +13,7 @@ import unreal
 
 HOME = "/Game/RTS_Survival/Blueprints/Environment/Berlin/ForgeStation"
 SOUNDS = HOME + "/Sounds"
-DATA = "/Game/RTS_Survival/Blueprints/Missions/GerCampaign/Berlin"
+DATA = "/Game/RTS_Survival/Maps/GerMissions/Berlin/DataAssets"  # Berlin data assets live next to the map (moved 2026-11-24)
 SOUND_SRC = "D:/UE5Projects/RTS_Survival/Saved/BerlinForge/sounds"
 
 ASSET_TOOLS = unreal.AssetToolsHelpers.get_asset_tools()
