@@ -157,6 +157,19 @@ public:
 	bool GetIsUnitInActiveFormation(const AActor* UnitActor) const;
 
 	/**
+	 * @brief Lets a mission answer an alarm with its patrols: each random patrol formation holding one of these units
+	 * attack-moves to the location and later returns to its patrol loop. A formation already converging is re-targeted.
+	 * @param Units Squad controllers and vehicles; only random patrol formations holding one of them are sent.
+	 * @param ConvergeLocation Where the formations attack-move to.
+	 * @param CombatSecondsBeforeReturn Seconds after a formation first fights before it breaks off and returns.
+	 * @return How many of Units are in a formation that was sent.
+	 */
+	int32 ConvergePatrolFormationsOnLocation(
+		const TArray<AActor*>& Units,
+		const FVector& ConvergeLocation,
+		const float CombatSecondsBeforeReturn);
+
+	/**
 	 * @brief Game modes whose waves must fight whatever they meet on the way (survival) send attack-move formation
 	 * units to their waypoints with unit attack-move orders instead of plain moves. Off by default (campaign).
 	 */
@@ -195,6 +208,7 @@ private:
 	TMap<int32, FFormationData> M_ActiveFormations;
 
 	// See SetUseUnitAttackMoveOrders: attack-move formations then order unit attack moves between waypoints.
+	// A patrol formation converging on an alarm always uses unit attack moves, whatever this flag says.
 	bool bM_UseUnitAttackMoveOrders = false;
 	bool GetShouldUseUnitAttackMove(const int32 FormationID) const;
 
@@ -294,7 +308,36 @@ private:
 		FFormationUnitData& FormationUnit,
 		UNavigationSystemV1* NavSys);
 	void TryAdvanceRandomPatrolFormation(FFormationData& Formation);
+	// Makes PatrolPointIndex the current patrol point (guarding starts over) and moves every unit there.
+	void MoveRandomPatrolFormationToPatrolPoint(FFormationData& Formation, const int32 PatrolPointIndex);
 	int32 GetRandomNextPatrolPointIndex(const FFormationData& Formation) const;
+
+	// ----- Alarm convergence (random patrol formations, see ConvergePatrolFormationsOnLocation) -----
+	int32 GetCountOfFormationUnitsIn(const FFormationData& Formation, const TSet<const AActor*>& Units) const;
+	void StartAlarmConvergeForFormation(
+		FFormationData& Formation,
+		const FVector& ConvergeLocation,
+		const float CombatSecondsBeforeReturn);
+	void HandleAlarmConvergeFormation(FFormationData& Formation);
+
+	/**
+	 * @brief Latches the first combat and the full arrival, so a formation that fought en route or found nobody does
+	 * not stay at the alarm location forever.
+	 * @param Formation A converging formation; its convergence timers are updated.
+	 * @param CurrentTimeSeconds World time of this check.
+	 * @return True when the formation should break off and return to its patrol loop now.
+	 */
+	bool UpdateAlarmConvergeTimers(FFormationData& Formation, const float CurrentTimeSeconds) const;
+	void ReturnAlarmConvergeFormationToPatrol(FFormationData& Formation);
+	bool GetIsAnyFormationUnitInCombat(const FFormationData& Formation) const;
+	int32 GetClosestPatrolPointIndex(const FFormationData& Formation) const;
+	bool GetFormationAverageLocation(const FFormationData& Formation, FVector& OutAverageLocation) const;
+	// Interrupting a unit mid-move: the old idle callback would otherwise also fire next to the new one.
+	void UnbindFormationUnitMovementCallback(FFormationUnitData& FormationUnit) const;
+	void MoveAllFormationUnitsToWaypoint(
+		FFormationData& Formation,
+		const FVector& WaypointLocation,
+		const FRotator& WaypointDirection);
 	FRotator GetRandomPatrolDirectionForPoint(const FFormationData& Formation, const int32 PatrolPointIndex) const;
 	int32 GetInitialPatrolPointIndex(const TArray<FVector>& PatrolPoints, const int32 OverrideFirstPatrolPointIndex,
 	                                 const int32 FormationID) const;

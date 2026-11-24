@@ -9,6 +9,7 @@
 #include "RTS_Survival/Enemy/StrategicAI/Requests/StrategicAIRequests.h"
 #include "RTS_Survival/Enemy/EnemyController/EnemyDirectControlComponent/EnemyDirectControlConstants.h"
 #include "RTS_Survival/Enemy/StrategicAI/BlackboardIdleUnitEntry.h"
+#include "RTS_Survival/Enemy/StrategicAI/StrategicAIHelpers.h"
 #include "RTS_Survival/Interfaces/Commands.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/Units/Enums/Enum_UnitType.h"
@@ -514,6 +515,11 @@ void UEnemyDirectControlComponent::StopDirectControlTickTimer()
 bool UEnemyDirectControlComponent::RegisterDirectControlUnit(AActor* UnitActor)
 {
 	if (not GetIsValidDirectControlUnitActor(UnitActor))
+	{
+		return false;
+	}
+	// Harvesters work for their refinery (USovietRefineryComponent): never direct-controlled or in the damaged roster.
+	if (FStrategicAIHelpers::GetIsExcludedFromEnemyUnitPools(UnitActor))
 	{
 		return false;
 	}

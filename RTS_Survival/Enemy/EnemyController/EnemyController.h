@@ -96,6 +96,14 @@ public:
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void SetAllowDirectControlStochasticDecisionTree(const bool bAllow);
 
+	/**
+	 * @brief Mission training at runtime (e.g. per difficulty from a data asset): units, pace and cap replace the map's
+	 * values in the running AI. The listed units become trainable at any standing barracks / vehicle building.
+	 * @param Override The training to use from now on; the AI's points are set to its TrainingPointsStart.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Strategic AI|Training")
+	void ApplyMissionTraining(const FEnemyMissionTrainingOverride& Override);
+
 	// Assumes the wave supply was already paid for!
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void MoveFormationToLocation(
@@ -416,6 +424,19 @@ public:
 	 */
 	bool RetreatUnitToRallyPoint(AActor* UnitActor, const FVector& RallyLocation);
 
+	/**
+	 * @brief Answers an alarm with patrols: the random patrol formations holding these units attack-move to the
+	 * location, then return to their patrol loop (UEnemyFormationController::ConvergePatrolFormationsOnLocation).
+	 * @param Units Squad controllers and vehicles of this enemy.
+	 * @param ConvergeLocation Where the formations attack-move to.
+	 * @param CombatSecondsBeforeReturn Seconds after a formation first fights before it breaks off and returns.
+	 * @return How many of Units are in a formation that was sent.
+	 */
+	int32 ConvergePatrolFormationsOnLocation(
+		const TArray<AActor*>& Units,
+		const FVector& ConvergeLocation,
+		const float CombatSecondsBeforeReturn);
+
 	// ------------------------------------------------------------
 	// Enemy Resources Management
 	// ------------------------------------------------------------
@@ -441,6 +462,9 @@ public:
 
 	UFUNCTION(BlueprintCallable, BlueprintPure, NotBlueprintable)
 	UEnemyStrategicAIComponent* GetEnemyStrategicAIComponent() const;
+
+	/** @return How many free harvesters each of this AI's Soviet refineries keeps (USovietRefineryComponent). */
+	int32 GetMaxHarvestersPerRefinery() const { return M_EnemyAIMissionSettings.MaxHarvestersPerRefinery; }
 
 	UFUNCTION(BlueprintCallable, BlueprintPure, NotBlueprintable)
 	UEnemyBaseTrenchComponent* GetEnemyBaseTrenchComponent() const;
