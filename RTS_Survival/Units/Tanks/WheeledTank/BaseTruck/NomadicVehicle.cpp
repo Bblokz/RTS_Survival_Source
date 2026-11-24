@@ -21,6 +21,7 @@
 #include "RTS_Survival/Player/ConstructionPreview/MoveUnitsFromConstruction/FMoveUnitsFromConstruction.h"
 #include "RTS_Survival/Player/PlayerBuildRadiusManager/PlayerBuildRadiusManager.h"
 #include "RTS_Survival/Resources/ResourceDropOff/ResourceDropOff.h"
+#include "RTS_Survival/Resources/UnloadStation/ResourceUnloadStation.h"
 #include "RTS_Survival/Resources/ResourceStorageOwner/ResourceStorageLevel.h"
 #include "RTS_Survival/RTSComponents/HealthComponent.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
@@ -2101,9 +2102,39 @@ void ANomadicVehicle::CreateBuildingAttachments()
 		return;
 	}
 	CreateChildActorAttachments();
+	CreateUnloadStation();
 	CreateNiagaraAttachments();
 	CreateSoundAttachments();
 	CreateNavModifierAttachments();
+}
+
+void ANomadicVehicle::CreateUnloadStation()
+{
+	if (not M_UnloadStationClass || not IsValid(M_ResourceDropOff))
+	{
+		return;
+	}
+	UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		return;
+	}
+	const FTransform MeshTransform = BuildingMeshComponent->GetComponentTransform();
+	FActorSpawnParameters SpawnParameters;
+	SpawnParameters.Owner = this;
+	SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	AResourceUnloadStation* Station = World->SpawnActor<AResourceUnloadStation>(
+		M_UnloadStationClass, MeshTransform.GetLocation(), MeshTransform.Rotator(), SpawnParameters);
+	if (not IsValid(Station))
+	{
+		RTSFunctionLibrary::ReportError("Failed to spawn the unload station of nomadic vehicle: " + GetName());
+		return;
+	}
+	// Its frame is the building mesh's frame: rail, bays and bins are authored in building-mesh centimetres.
+	Station->AttachToComponent(BuildingMeshComponent, FAttachmentTransformRules::SnapToTargetNotIncludingScale);
+	Station->InitUnloadStation(M_ResourceDropOff, BuildingMeshComponent);
+	M_ResourceDropOff->SetUnloadStation(Station);
+	M_SpawnedAttachments.Add(Station);
 }
 
 void ANomadicVehicle::CreateChildActorAttachments()

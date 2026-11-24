@@ -16,6 +16,9 @@
 #include "RTS_Survival/Interfaces/Commands.h"
 #include "RTS_Survival/Resources/Harvester/HarvesterInterface/HarvesterInterface.h"
 #include "RTS_Survival/Resources/ResourceComponent/ResourceComponent.h"
+#include "RTS_Survival/Resources/UnloadStation/ResourceUnloadStation.h"
+#include "RTS_Survival/Resources/UnloadStation/UnloadStationTypes.h"
+#include "RTS_Survival/Units/Tanks/TrackedTank/PathFollowingComponent/TrackPathFollowingComponent.h"
 #include "TimerManager.h"
 #include "RTS_Survival/GameUI/Pooled_AnimatedVerticalText/Pooling/AnimatedTextWidgetPoolManager/AnimatedTextWidgetPoolManager.h"
 #include "RTS_Survival/Utils/RTSRichTextConverters/FRTSRichTextConverter.h"
@@ -521,11 +524,19 @@ void UHarvester::TerminateHarvestCommand()
 			M_AIController->StopMovement();
 		}
 		break;
+	case EHarvesterAIAction::MoveToUnloadBayApproach:
+	case EHarvesterAIAction::ReverseIntoUnloadBay:
+		StopUnloadMovement();
+		break;
 	case EHarvesterAIAction::HarvestResource:
 	case EHarvesterAIAction::DropOff:
 	case EHarvesterAIAction::FinishHarvestCommand:
+	case EHarvesterAIAction::CraneUnloading:
 		break;
 	}
+	// A new order mid-unload: the bay is freed; what already landed stays credited, the rest stays on board.
+	ReleaseUnloadBay();
+	bM_SkipUnloadStationThisTrip = false;
 	HarvestDebug("Harvester terminated logic: " + GetStringHarvesterAIStatus(M_HarvestStatus), FColor::Red);
 	ResetHarvesterLocation();
 	M_HarvestStatus = EHarvesterAIAction::NoHarvestingAction;
@@ -584,6 +595,7 @@ void UHarvester::BeginPlay()
 void UHarvester::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	ResetHarvesterLocation();
+	ReleaseUnloadBay();
 	Super::EndPlay(EndPlayReason);
 	if (const UWorld* World = GetWorld())
 	{
@@ -702,6 +714,14 @@ void UHarvester::HarvestAIExecuteAction(const EHarvesterAIAction Action)
 		break;
 	case EHarvesterAIAction::FinishHarvestCommand:
 		FinishHarvestCommand();
+		break;
+	case EHarvesterAIAction::MoveToUnloadBayApproach:
+		HarvestAIAction_MoveToUnloadBayApproach();
+		break;
+	case EHarvesterAIAction::ReverseIntoUnloadBay:
+		HarvestAIAction_ReverseIntoUnloadBay();
+		break;
+	case EHarvesterAIAction::CraneUnloading:
 		break;
 	case EHarvesterAIAction::UnstuckTowardsResource:
 	case EHarvesterAIAction::UnstuckTowardsDropOff:
@@ -975,6 +995,7 @@ void UHarvester::AsyncOnReceiveResource(TArray<TWeakObjectPtr<UResourceComponent
 
 void UHarvester::HarvestAIAction_AsyncGetDropOff()
 {
+	bM_SkipUnloadStationThisTrip = false;
 	if (not IsValid(M_GameResourceManager))
 	{
 		HarvestDebug(
@@ -1053,6 +1074,10 @@ void UHarvester::HarvestAIAction_MoveToDropOff()
 		return;
 	}
 	if (not M_TargetDropOff.IsValid())
+	{
+		return;
+	}
+	if (TryStartUnloadStationRoute())
 	{
 		return;
 	}
@@ -1334,6 +1359,7 @@ bool UHarvester::GetIsValidOwnerHarvesterInterface() const
 
 void UHarvester::OnDroppedOffAllTargetResources()
 {
+	bM_SkipUnloadStationThisTrip = false;
 	OnCargoEmptyRemoveReturnCargoAbility();
 	if (M_TargetResourceTypeAfterDropOff != ERTSResourceType::Resource_None)
 	{
@@ -1628,4 +1654,395 @@ void UHarvester::OnNoDropOffsFound_DisplayMessage()
 void UHarvester::BeginPlay_SetupAnimatedTextWidgetPoolManager()
 {
 	M_AnimatedTextWidgetPoolManager =  FRTS_Statics::GetVerticalAnimatedTextWidgetPoolManager(this);
+}
+
+// ------------------------------------------------------------------------------------------------ crane unload station
+
+namespace HarvesterUnloadPrivate
+{
+	constexpr float ApproachAcceptanceRadius = 150.f;
+	// Close enough to the approach point to start reversing from where the move ended.
+	constexpr float ApproachReachedDistance = 450.f;
+	constexpr float ReverseAcceptanceRadius = 60.f;
+	constexpr float ReverseTimeoutSeconds = 18.f;
+	// The last stretch into the bay is a short guided slide; further than this means the reverse went wrong.
+	constexpr float MaxGuidedSlideDistance = 1300.f;
+	constexpr float GuidedSlideSpeed = 260.f;
+	constexpr float GuidedTurnDegreesPerSecond = 90.f;
+	constexpr float MinGuidedSlideSeconds = 0.35f;
+	constexpr float DockAlignTickSeconds = 0.02f;
+	const FName CargoSocketNames[] = {FName(TEXT("Crystals")), FName(TEXT("Cargo"))};
+}
+
+FVector UHarvester::GetCargoWorldLocation() const
+{
+	const AActor* Owner = GetOwner();
+	if (not IsValid(Owner))
+	{
+		return FVector::ZeroVector;
+	}
+	TArray<UMeshComponent*> Meshes;
+	Owner->GetComponents<UMeshComponent>(Meshes);
+	for (const FName& SocketName : HarvesterUnloadPrivate::CargoSocketNames)
+	{
+		for (const UMeshComponent* Mesh : Meshes)
+		{
+			if (IsValid(Mesh) && Mesh->DoesSocketExist(SocketName))
+			{
+				return Mesh->GetSocketLocation(SocketName);
+			}
+		}
+	}
+	// No cargo socket: the middle of the hull, two metres up.
+	return Owner->GetActorLocation() + FVector(0.f, 0.f, 200.f);
+}
+
+int32 UHarvester::GetCraneCargoAmount() const
+{
+	const FHarvesterCargoSlot* Slot = M_CargoSpace.Find(M_TargetResourceType);
+	return Slot ? Slot->CurrentAmount : 0;
+}
+
+int32 UHarvester::Crane_DeliverChunk(const int32 ChunkAmount, const FVector& TextLocation, bool& bOutStorageFull)
+{
+	bOutStorageFull = false;
+	FHarvesterCargoSlot* Slot = M_CargoSpace.Find(M_TargetResourceType);
+	if (Slot == nullptr || not M_TargetDropOff.IsValid())
+	{
+		bOutStorageFull = true;
+		return 0;
+	}
+	const int32 Load = FMath::Min(ChunkAmount, Slot->CurrentAmount);
+	if (Load <= 0)
+	{
+		return 0;
+	}
+	// One step: the drop-off credits what fits and the cargo loses exactly that, so nothing is lost or doubled.
+	const int32 AmountLeft = M_TargetDropOff->DropOffResourcesFromCrane(M_TargetResourceType, Load, TextLocation);
+	const int32 Delivered = Load - AmountLeft;
+	Slot->CurrentAmount -= Delivered;
+	bOutStorageFull = AmountLeft > 0;
+	if (GetIsValidOwnerHarvesterInterface())
+	{
+		M_IOwnerHarvesterInterface->OnResourceStorageChanged(GetPercentageCapacityFilled(M_TargetResourceType),
+		                                                     M_TargetResourceType);
+	}
+	return Delivered;
+}
+
+void UHarvester::Crane_OnUnloadEnded(const EUnloadEndReason Reason)
+{
+	// The station already freed the bay.
+	M_UnloadStation.Reset();
+	M_UnloadBayIndex = INDEX_NONE;
+	const bool bWasUsingStation = M_HarvestStatus == EHarvesterAIAction::MoveToUnloadBayApproach
+		|| M_HarvestStatus == EHarvesterAIAction::ReverseIntoUnloadBay
+		|| M_HarvestStatus == EHarvesterAIAction::CraneUnloading;
+	if (not bWasUsingStation)
+	{
+		return;
+	}
+	StopUnloadMovement();
+	HarvestDebug("Crane unload ended, reason: " + FString::FromInt(static_cast<int32>(Reason)), FColor::Green);
+	if (Reason == EUnloadEndReason::CargoEmpty)
+	{
+		OnDroppedOffAllTargetResources();
+		return;
+	}
+	HarvestAIExecuteAction(EHarvesterAIAction::AsyncFindDropOff);
+}
+
+void UHarvester::MapTest_SetCargo(const ERTSResourceType ResourceType, const int32 Amount)
+{
+	FHarvesterCargoSlot* Slot = M_CargoSpace.Find(ResourceType);
+	if (Slot == nullptr)
+	{
+		return;
+	}
+	Slot->CurrentAmount = FMath::Clamp(Amount, 0, Slot->MaxCapacity);
+	M_TargetResourceType = ResourceType;
+	if (GetIsValidOwnerHarvesterInterface())
+	{
+		M_IOwnerHarvesterInterface->OnResourceStorageChanged(GetPercentageCapacityFilled(ResourceType), ResourceType);
+	}
+	OnHarvestedAddReturnCargoAbility();
+}
+
+bool UHarvester::TryStartUnloadStationRoute()
+{
+	if (bM_SkipUnloadStationThisTrip || not M_TargetDropOff.IsValid())
+	{
+		return false;
+	}
+	AResourceUnloadStation* Station = M_TargetDropOff->GetUnloadStation();
+	int32 BayIndex = INDEX_NONE;
+	if (not IsValid(Station) || not Station->GetCanUnloadResource(M_TargetResourceType)
+		|| not Station->TryReserveBay(*this, BayIndex))
+	{
+		return false;
+	}
+	M_UnloadStation = Station;
+	M_UnloadBayIndex = BayIndex;
+	HarvestDebug("Reserved unload bay " + FString::FromInt(BayIndex), FColor::Green);
+	HarvestAIExecuteAction(EHarvesterAIAction::MoveToUnloadBayApproach);
+	return true;
+}
+
+void UHarvester::HarvestAIAction_MoveToUnloadBayApproach()
+{
+	using namespace HarvesterUnloadPrivate;
+	if (not GetIsValidAIController() || not GetIsValidUnloadStation())
+	{
+		AbandonUnloadStation(true);
+		return;
+	}
+	const FVector Approach = M_UnloadStation->GetApproachLocation(M_UnloadBayIndex, *this);
+	M_CurrentDropOffMoveGoal = Approach;
+	const EPathFollowingRequestResult::Type MoveResult = M_AIController->MoveToLocation(
+		Approach, ApproachAcceptanceRadius);
+	if (MoveResult == EPathFollowingRequestResult::RequestSuccessful)
+	{
+		if (UPathFollowingComponent* PathFollowingComponent = M_AIController->GetPathFollowingComponent())
+		{
+			PathFollowingComponent->OnRequestFinished.AddUObject(this, &UHarvester::OnMoveToUnloadBayApproachFinished);
+		}
+		return;
+	}
+	if (FVector::Dist2D(GetHarvesterLocation(), Approach) < ApproachReachedDistance)
+	{
+		HarvestAIExecuteAction(EHarvesterAIAction::ReverseIntoUnloadBay);
+		return;
+	}
+	HarvestDebug("No path to the unload bay; use the old drop-off point.", FColor::Orange);
+	AbandonUnloadStation(true);
+}
+
+void UHarvester::OnMoveToUnloadBayApproachFinished(FAIRequestID RequestID, const FPathFollowingResult& Result)
+{
+	if (M_HarvestStatus != EHarvesterAIAction::MoveToUnloadBayApproach)
+	{
+		return;
+	}
+	if (GetIsValidAIController())
+	{
+		if (UPathFollowingComponent* PathFollowingComponent = M_AIController->GetPathFollowingComponent())
+		{
+			PathFollowingComponent->OnRequestFinished.RemoveAll(this);
+		}
+	}
+	if (FVector::Dist2D(GetHarvesterLocation(), M_CurrentDropOffMoveGoal) < HarvesterUnloadPrivate::ApproachReachedDistance)
+	{
+		HarvestAIExecuteAction(EHarvesterAIAction::ReverseIntoUnloadBay);
+		return;
+	}
+	HarvestDebug("Did not reach the unload bay approach; use the old drop-off point.", FColor::Orange);
+	AbandonUnloadStation(true);
+}
+
+void UHarvester::HarvestAIAction_ReverseIntoUnloadBay()
+{
+	using namespace HarvesterUnloadPrivate;
+	FTransform Dock;
+	if (not GetIsValidAIController() || not GetIsValidUnloadStation()
+		|| not M_UnloadStation->GetDockTransform(M_UnloadBayIndex, *this, Dock))
+	{
+		AbandonUnloadStation(true);
+		return;
+	}
+	M_DockAlignTarget = Dock;
+	M_CurrentDropOffMoveGoal = Dock.GetLocation();
+	SetForceReverse(true);
+	const EPathFollowingRequestResult::Type MoveResult = M_AIController->MoveToLocation(
+		Dock.GetLocation(), ReverseAcceptanceRadius);
+	if (MoveResult != EPathFollowingRequestResult::RequestSuccessful)
+	{
+		// Already there or no path into the bay: the guided slide covers the rest.
+		SetForceReverse(false);
+		StartDockAlignment();
+		return;
+	}
+	if (UPathFollowingComponent* PathFollowingComponent = M_AIController->GetPathFollowingComponent())
+	{
+		PathFollowingComponent->OnRequestFinished.AddUObject(this, &UHarvester::OnReverseIntoUnloadBayFinished);
+	}
+	if (const UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().SetTimer(M_ReverseIntoBayTimeout, this, &UHarvester::OnReverseIntoUnloadBayTimedOut,
+		                                  ReverseTimeoutSeconds, false);
+	}
+}
+
+void UHarvester::OnReverseIntoUnloadBayFinished(FAIRequestID RequestID, const FPathFollowingResult& Result)
+{
+	if (M_HarvestStatus != EHarvesterAIAction::ReverseIntoUnloadBay)
+	{
+		return;
+	}
+	StopUnloadMovement();
+	StartDockAlignment();
+}
+
+void UHarvester::OnReverseIntoUnloadBayTimedOut()
+{
+	if (M_HarvestStatus != EHarvesterAIAction::ReverseIntoUnloadBay)
+	{
+		return;
+	}
+	HarvestDebug("Reversing into the unload bay took too long; guide the rest.", FColor::Orange);
+	StopUnloadMovement();
+	StartDockAlignment();
+}
+
+void UHarvester::StartDockAlignment()
+{
+	using namespace HarvesterUnloadPrivate;
+	AActor* Owner = GetOwner();
+	UWorld* World = GetWorld();
+	if (not IsValid(Owner) || not IsValid(World) || not GetIsValidUnloadStation()
+		|| not M_UnloadStation->GetDockTransform(M_UnloadBayIndex, *this, M_DockAlignTarget))
+	{
+		AbandonUnloadStation(true);
+		return;
+	}
+	const float Distance = FVector::Dist2D(Owner->GetActorLocation(), M_DockAlignTarget.GetLocation());
+	if (Distance > MaxGuidedSlideDistance)
+	{
+		HarvestDebug("Ended too far from the unload bay; use the old drop-off point.", FColor::Orange);
+		AbandonUnloadStation(true);
+		return;
+	}
+	M_DockAlignStart = Owner->GetActorTransform();
+	const float YawError = FMath::Abs(FMath::FindDeltaAngleDegrees(M_DockAlignStart.Rotator().Yaw,
+	                                                               M_DockAlignTarget.Rotator().Yaw));
+	M_DockAlignDuration = FMath::Max3(MinGuidedSlideSeconds, Distance / GuidedSlideSpeed,
+	                                  YawError / GuidedTurnDegreesPerSecond);
+	M_DockAlignElapsed = 0.f;
+	World->GetTimerManager().SetTimer(M_DockAlignTimer, this, &UHarvester::TickDockAlignment, DockAlignTickSeconds, true);
+}
+
+void UHarvester::TickDockAlignment()
+{
+	AActor* Owner = GetOwner();
+	if (not IsValid(Owner) || M_HarvestStatus != EHarvesterAIAction::ReverseIntoUnloadBay)
+	{
+		if (const UWorld* World = GetWorld())
+		{
+			World->GetTimerManager().ClearTimer(M_DockAlignTimer);
+		}
+		return;
+	}
+	M_DockAlignElapsed += HarvesterUnloadPrivate::DockAlignTickSeconds;
+	const float Alpha = FMath::SmoothStep(0.f, 1.f, FMath::Clamp(M_DockAlignElapsed / M_DockAlignDuration, 0.f, 1.f));
+	FVector Location = FMath::Lerp(M_DockAlignStart.GetLocation(), M_DockAlignTarget.GetLocation(), Alpha);
+	Location.Z = Owner->GetActorLocation().Z;
+	const float StartYaw = M_DockAlignStart.Rotator().Yaw;
+	const float Yaw = StartYaw + FMath::FindDeltaAngleDegrees(StartYaw, M_DockAlignTarget.Rotator().Yaw) * Alpha;
+	FRotator Rotation = Owner->GetActorRotation();
+	Rotation.Yaw = Yaw;
+	Owner->SetActorLocationAndRotation(Location, Rotation, false, nullptr, ETeleportType::TeleportPhysics);
+	if (UPrimitiveComponent* Root = Cast<UPrimitiveComponent>(Owner->GetRootComponent()))
+	{
+		if (Root->IsSimulatingPhysics())
+		{
+			Root->SetPhysicsLinearVelocity(FVector::ZeroVector);
+			Root->SetPhysicsAngularVelocityInDegrees(FVector::ZeroVector);
+		}
+	}
+	if (Alpha < 1.f)
+	{
+		return;
+	}
+	if (const UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(M_DockAlignTimer);
+	}
+	OnDockedAtUnloadBay();
+}
+
+void UHarvester::OnDockedAtUnloadBay()
+{
+	if (not GetIsValidUnloadStation() || not M_TargetDropOff.IsValid())
+	{
+		AbandonUnloadStation(false);
+		HarvestAIExecuteAction(EHarvesterAIAction::AsyncFindDropOff);
+		return;
+	}
+	M_HarvestStatus = EHarvesterAIAction::CraneUnloading;
+	HarvestDebug("Docked in unload bay " + FString::FromInt(M_UnloadBayIndex), FColor::Green);
+	M_UnloadStation->OnHarvesterDocked(M_UnloadBayIndex, *this, *M_TargetDropOff, M_TargetResourceType,
+	                                   GetCraneCargoAmount());
+}
+
+void UHarvester::SetForceReverse(const bool bReverse)
+{
+	if (not IsValid(M_AIController))
+	{
+		return;
+	}
+	if (UTrackPathFollowingComponent* TrackPathFollowing = Cast<UTrackPathFollowingComponent>(
+		M_AIController->GetPathFollowingComponent()))
+	{
+		TrackPathFollowing->SetReverse(bReverse);
+	}
+}
+
+void UHarvester::StopUnloadMovement()
+{
+	if (const UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(M_ReverseIntoBayTimeout);
+		World->GetTimerManager().ClearTimer(M_DockAlignTimer);
+	}
+	if (not IsValid(M_AIController))
+	{
+		return;
+	}
+	if (UPathFollowingComponent* PathFollowingComponent = M_AIController->GetPathFollowingComponent())
+	{
+		PathFollowingComponent->OnRequestFinished.RemoveAll(this);
+	}
+	M_AIController->StopMovement();
+	SetForceReverse(false);
+}
+
+void UHarvester::AbandonUnloadStation(const bool bUseOldDropOffPoint)
+{
+	StopUnloadMovement();
+	ReleaseUnloadBay();
+	if (not bUseOldDropOffPoint)
+	{
+		return;
+	}
+	bM_SkipUnloadStationThisTrip = true;
+	HarvestAIExecuteAction(EHarvesterAIAction::MoveToDropOff);
+}
+
+void UHarvester::ReleaseUnloadBay()
+{
+	if (M_UnloadBayIndex == INDEX_NONE)
+	{
+		M_UnloadStation.Reset();
+		return;
+	}
+	if (const UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(M_ReverseIntoBayTimeout);
+		World->GetTimerManager().ClearTimer(M_DockAlignTimer);
+	}
+	if (AResourceUnloadStation* Station = M_UnloadStation.Get())
+	{
+		Station->ReleaseBay(M_UnloadBayIndex, this);
+	}
+	M_UnloadStation.Reset();
+	M_UnloadBayIndex = INDEX_NONE;
+}
+
+bool UHarvester::GetIsValidUnloadStation() const
+{
+	if (M_UnloadStation.IsValid() && M_UnloadBayIndex != INDEX_NONE)
+	{
+		return true;
+	}
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(this, "M_UnloadStation", "GetIsValidUnloadStation", this);
+	return false;
 }

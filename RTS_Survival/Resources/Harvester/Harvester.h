@@ -27,6 +27,8 @@ class UGameResourceManager;
 class UResourceComponent;
 class UPlayerResourceManager;
 class UAsyncFindClosestDropOff;
+class AResourceUnloadStation;
+enum class EUnloadEndReason : uint8;
 
 
 /**
@@ -101,6 +103,28 @@ public:
 	void UpgradeHarvestingAnimationPlayRate(float NewHarvestingAnimationPlayRate);
 	
 	float GetHarvestAnimationPlayRate() const;
+
+	/** @return Where the harvester carries its cargo (its hopper): the "Crystals" socket of its meshes. */
+	FVector GetCargoWorldLocation() const;
+
+	/** @return How much of the resource being unloaded is still on board. */
+	int32 GetCraneCargoAmount() const;
+
+	/**
+	 * @brief An unload-station crane dropped one load of this harvester's cargo into a bin: credit it now.
+	 * @param ChunkAmount The load's amount (capped at what is on board).
+	 * @param TextLocation Where the "+ amount" pop-up appears.
+	 * @param bOutStorageFull True when the bin could not take the whole load.
+	 * @return The amount credited.
+	 */
+	int32 Crane_DeliverChunk(int32 ChunkAmount, const FVector& TextLocation, bool& bOutStorageFull);
+
+	/** @brief The unload station ended this harvester's unload; it continues harvesting or finds another drop-off. */
+	void Crane_OnUnloadEnded(EUnloadEndReason Reason);
+
+	/** @brief Test hook: fill one cargo slot without harvesting. */
+	void MapTest_SetCargo(ERTSResourceType ResourceType, int32 Amount);
+	EHarvesterAIAction MapTest_GetHarvestStatus() const { return M_HarvestStatus; }
 
 protected:
 	// Called when the game starts
@@ -455,4 +479,39 @@ private:
 	void BeginPlay_SetupAnimatedTextWidgetPoolManager();
 	UPROPERTY()
 	TWeakObjectPtr<UAnimatedTextWidgetPoolManager> M_AnimatedTextWidgetPoolManager;
+
+	/* ---- Crane unload at an unload station (the HQ's loop crane) ---- */
+
+	// The station whose bay this harvester holds while it lines up, reverses in and is unloaded.
+	UPROPERTY()
+	TWeakObjectPtr<AResourceUnloadStation> M_UnloadStation;
+
+	int32 M_UnloadBayIndex = INDEX_NONE;
+
+	// Set when the bay route failed for this trip; the old drop-off point is used until the cargo is delivered.
+	bool bM_SkipUnloadStationThisTrip = false;
+
+	FTimerHandle M_ReverseIntoBayTimeout;
+	FTimerHandle M_DockAlignTimer;
+	FTransform M_DockAlignStart;
+	FTransform M_DockAlignTarget;
+	float M_DockAlignElapsed = 0.f;
+	float M_DockAlignDuration = 0.f;
+
+	/** @return True when the drop-off has a crane with a free bay and this harvester now heads for it. */
+	bool TryStartUnloadStationRoute();
+	void HarvestAIAction_MoveToUnloadBayApproach();
+	void OnMoveToUnloadBayApproachFinished(FAIRequestID RequestID, const FPathFollowingResult& Result);
+	void HarvestAIAction_ReverseIntoUnloadBay();
+	void OnReverseIntoUnloadBayFinished(FAIRequestID RequestID, const FPathFollowingResult& Result);
+	void OnReverseIntoUnloadBayTimedOut();
+	void StartDockAlignment();
+	void TickDockAlignment();
+	void OnDockedAtUnloadBay();
+	void SetForceReverse(bool bReverse);
+	void StopUnloadMovement();
+	/** @brief Gives the bay back; with bUseOldDropOffPoint the cargo goes to the drop-off point the old way this trip. */
+	void AbandonUnloadStation(bool bUseOldDropOffPoint);
+	void ReleaseUnloadBay();
+	bool GetIsValidUnloadStation() const;
 };

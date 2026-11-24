@@ -27,6 +27,7 @@ class UAircraftOwnerComp;
 class UNomadicDeployAnimationComponent;
 class UNomadicDeployAnimationData;
 class UResourceDropOff;
+class AResourceUnloadStation;
 class UBoxComponent;
 class UBuildRadiusComp;
 class UEnergyComp;
@@ -661,6 +662,14 @@ private:
 
 	// Attaches all the attachments to the building mesh.
 	void CreateBuildingAttachments();
+
+	// Spawns the unload crane (when set) on the building mesh and links it to the resource drop-off.
+	void CreateUnloadStation();
+
+	// Optional crane that unloads harvesters at this building's drop-off (the HQ's loop crane, BP_HQUnloadStation).
+	// Spawned with the other building attachments and removed with them on pack-up.
+	UPROPERTY(EditDefaultsOnly, Category="Resources|Unload Station", meta=(AllowPrivateAccess="true"))
+	TSubclassOf<AResourceUnloadStation> M_UnloadStationClass;
 
 	/**
 	 * @brief Goes through the array of BuildingAttachments and spawns them.
