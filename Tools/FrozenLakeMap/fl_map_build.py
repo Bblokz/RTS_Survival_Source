@@ -1090,6 +1090,7 @@ def step_kits(seed=17):
 TREES_FILE = "D:/UE5Projects/RTS_Survival/Saved/FrozenLake/trees/FL_Trees.json"
 TREE_BP = FL_ROOT + "WinterLarch/BP_FrozenLake_WinterLarch_%s"
 TREE_PREFIX = PREFIX + "Tree_"
+TREE_MAX_X = 30500.0     # north of this the margin is the dry lakebed backdrop (fl_backdrop_gen): no trees there
 
 
 def step_trees():
@@ -1100,6 +1101,8 @@ def step_trees():
     removed = clear_prefix(TREE_PREFIX)
     classes = {v: _bp_class(TREE_BP % v) for v in "ABCDEF"}
     for k, (variant, x, y, yaw, scale) in enumerate(data["trees"]):
+        if x > TREE_MAX_X:
+            continue
         actor = actors_sub().spawn_actor_from_class(classes[variant], unreal.Vector(x, y, ground_z(x, y)),
                                                     unreal.Rotator(0.0, 0.0, yaw))
         actor.set_actor_scale3d(unreal.Vector(scale, scale, scale))
@@ -1200,4 +1203,32 @@ def shot_game(name, target, yaw=-21.0, pitch=-55.0, height=4000.0, fov=50.0, siz
                                               unreal.Rotator(0.0, pitch, yaw))
     comp = cap.capture_component2d
     comp.set_editor_property("fov_angle", fov)
+    _capture(name, comp, rt, cap)
+
+
+TOUR_ARM_PITCH = -70.0    # RTS_BP_CameraPawn spring arm pitch; tour shot pitch is added to it (positive = flatter)
+TOUR_PAWN_Z = 300.0       # about where the camera pawn stands (it keeps its height during a tour)
+
+
+def tour_camera(focus, yaw, pitch, arm):
+    """Where UMissionCameraTourSession::ApplyPose puts the camera for one FMissionCameraTourShot pose: the pawn slides
+    along the view so the focus is mid-screen, and the camera hangs on the arm behind it. Returns (camera, pitch)."""
+    total = pitch + TOUR_ARM_PITCH
+    fx = math.cos(math.radians(total)) * math.cos(math.radians(yaw))
+    fy = math.cos(math.radians(total)) * math.sin(math.radians(yaw))
+    fz = math.sin(math.radians(total))
+    px, py = focus[0], focus[1]
+    if fz < -0.05:
+        px -= fx * (focus[2] - TOUR_PAWN_Z) / fz
+        py -= fy * (focus[2] - TOUR_PAWN_Z) / fz
+    return (px - fx * arm, py - fy * arm, TOUR_PAWN_Z - fz * arm), total
+
+
+def shot_tour(name, focus, yaw, pitch, arm, size=(1920, 1080)):
+    """A capture of a camera tour pose (FOV 90 like the RTS camera; no letterbox, no fog of war)."""
+    cam, total = tour_camera(focus, yaw, pitch, arm)
+    rt = unreal.RenderingLibrary.create_render_target2d(world(), size[0], size[1], unreal.TextureRenderTargetFormat.RTF_RGBA8)
+    cap = actors_sub().spawn_actor_from_class(unreal.SceneCapture2D, unreal.Vector(*cam), unreal.Rotator(0.0, total, yaw))
+    comp = cap.capture_component2d
+    comp.set_editor_property("fov_angle", 90.0)
     _capture(name, comp, rt, cap)
