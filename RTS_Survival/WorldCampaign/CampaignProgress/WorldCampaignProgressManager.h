@@ -117,6 +117,12 @@ public:
 	/** Stores a bought technology; the price is the caller's business (UWorldCampaignTechManager). */
 	void AddResearchedTechnology(ETechnology Technology);
 
+	UFUNCTION(BlueprintPure, Category = "World Campaign|Progress")
+	bool GetIsTechNodeBought(FName TechNodeId) const;
+
+	/** Stores a bought tech wheel node; price and reachability are the caller's business. */
+	void AddBoughtTechNode(FName TechNodeId);
+
 	// --- Buildings ---
 
 	UFUNCTION(BlueprintPure, Category = "World Campaign|Progress")
