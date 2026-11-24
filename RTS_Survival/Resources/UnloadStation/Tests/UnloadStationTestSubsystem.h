@@ -60,6 +60,8 @@ struct FUnloadTestHarvester
 	bool bProgressHiddenAfterUnload = false;
 	float LastProgressFill = 0.f;
 	float MaxProgressFill = 0.f;
+	// The health bar (which holds the progress bar) must be up the whole unload, selected or not.
+	bool bSawHealthBarHiddenWhileUnloading = false;
 	// Last harvester AI status written to the log (EHarvesterAIAction as uint8).
 	uint8 LastLoggedStatus = MAX_uint8;
 };

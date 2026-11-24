@@ -66,6 +66,17 @@ void UHealthComponent::OnHideAllGameUI(const bool bHide)
 	ApplyHealthBarVisibilityPolicy(GetHealthPercentage());
 }
 
+void UHealthComponent::SetHealthBarForcedVisible(const bool bForceVisible)
+{
+	if (bM_IsHealthBarForcedVisible == bForceVisible)
+	{
+		return;
+	}
+	bM_IsHealthBarForcedVisible = bForceVisible;
+	// Same path as a settings change: waits for the widget, respects hidden UI, keeps a selected unit's bar up.
+	UpdateVisibilityAfterSettingsChange();
+}
+
 void UHealthComponent::HideHealthBar()
 {
 	if (Widget_GetIsValidWidgetComponent())
@@ -712,6 +723,10 @@ void UHealthComponent::UpdateVisibilityOnHealthChange(const float NewPercentage)
 
 bool UHealthComponent::ShouldDisplayHealthForPercentage(const float NewPercentage) const
 {
+	if (bM_IsHealthBarForcedVisible)
+	{
+		return true;
+	}
 	if (VisibilitySettings.bAlwaysDisplay)
 	{
 		if constexpr (DeveloperSettings::Debugging::GHealthComponent_Compile_DebugSymbols)

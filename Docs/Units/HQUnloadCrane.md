@@ -58,6 +58,9 @@ Design history: concept sheets and rough models in `_AssetSource/HQUnloadCrane/`
   larger of the cargo already credited and the time since docking against `GetExpectedUnloadSeconds` (the station's last
   measured unload, `ExpectedUnloadSeconds` 37 s before the first). Time alone stops at 97 %, so the bar is full only when
   the last load lands; it never goes down during one unload. Any end (empty, bin full, station gone, bay released) hides it.
+  During the unload the whole health bar is shown even when the harvester is not selected or damaged
+  (`UHealthComponent::SetHealthBarForcedVisible`); hiding all game UI still hides it, and afterwards the unit's normal
+  health bar settings apply again.
 - **End.** Cargo empty: the harvester goes back to harvesting while the empty grab returns. Bin full: it looks for another
   drop-off with what is left. Station gone: same.
 
@@ -89,7 +92,8 @@ dock (drift <= 30 cm), and after the unload the move runs (after the stop, nothi
 adds the first two views as `seq_NNN` frames every 2 s while a bay is docked, to review the rig frame by frame.
 
 Progress bar (all three stations): every docked harvester must show the bar while unloading, its fill never drops and
-reaches at least 0.6, and it is hidden once the harvester is empty (`unload_progress_*` checks).
+reaches at least 0.6, and it is hidden once the harvester is empty (`unload_progress_*` checks); the health bar holding
+it is visible the whole time (`unload_health_bar_shown`).
 
 ## Known limits
 

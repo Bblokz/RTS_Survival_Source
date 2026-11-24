@@ -21,6 +21,7 @@
 #include "RTS_Survival/Resources/ResourceDropOff/ResourceDropOff.h"
 #include "RTS_Survival/Resources/ResourceTypes/ResourceTypes.h"
 #include "RTS_Survival/Resources/UnloadStation/ResourceUnloadStation.h"
+#include "RTS_Survival/RTSComponents/HealthComponent.h"
 #include "RTS_Survival/Units/Tanks/WheeledTank/BaseTruck/NomadicVehicle.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 #include "RTS_Survival/Utils/UnitSpawning/RTSUnitOwnerSpawning.h"
@@ -416,6 +417,14 @@ void UUnloadStationTestSubsystem::TrackHarvester(FUnloadTestHarvester& TestHarve
 			TestHarvester.bProgressWentDown |= Fill + KINDA_SMALL_NUMBER < TestHarvester.LastProgressFill;
 			TestHarvester.LastProgressFill = Fill;
 			TestHarvester.MaxProgressFill = FMath::Max(TestHarvester.MaxProgressFill, Fill);
+			const UHealthComponent* HealthComponent = TestHarvester.Actor.IsValid()
+				                                          ? TestHarvester.Actor->FindComponentByClass<UHealthComponent>()
+				                                          : nullptr;
+			const ESlateVisibility BarVisibility = IsValid(HealthComponent)
+				                                       ? HealthComponent->GetHealthBarVisibility()
+				                                       : ESlateVisibility::Hidden;
+			TestHarvester.bSawHealthBarHiddenWhileUnloading |= BarVisibility == ESlateVisibility::Hidden
+				|| BarVisibility == ESlateVisibility::Collapsed;
 		}
 	}
 	// On a single-bay station the bay-less harvester empties at the overflow point without ever docking.
@@ -836,6 +845,7 @@ void UUnloadStationTestSubsystem::CheckUnloadProgressResults()
 		Check(TestHarvester.MaxProgressFill >= 0.6f, TEXT("unload_progress_filled"),
 		      FString::Printf(TEXT("%s max_fill=%.2f"), *Name, TestHarvester.MaxProgressFill));
 		Check(TestHarvester.bProgressHiddenAfterUnload, TEXT("unload_progress_hidden_after"), Name);
+		Check(not TestHarvester.bSawHealthBarHiddenWhileUnloading, TEXT("unload_health_bar_shown"), Name);
 	}
 }
 

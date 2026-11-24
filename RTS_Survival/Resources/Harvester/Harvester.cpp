@@ -2208,6 +2208,14 @@ void UHarvester::StartUnloadProgressBar()
 	M_UnloadProgress.ExpectedSeconds = M_UnloadStation.IsValid() ? M_UnloadStation->GetExpectedUnloadSeconds() : 0.f;
 	M_UnloadProgress.Fill = 0.f;
 
+	// The player sees how long the unload takes without selecting the harvester; the bar's own settings return after.
+	const AActor* Owner = GetOwner();
+	if (UHealthComponent* HealthComponent = IsValid(Owner) ? Owner->FindComponentByClass<UHealthComponent>() : nullptr)
+	{
+		HealthComponent->SetHealthBarForcedVisible(true);
+		M_UnloadProgress.ForcedHealthComponent = HealthComponent;
+	}
+
 	TWeakObjectPtr<UHarvester> WeakThis(this);
 	FTimerDelegate RefreshDelegate;
 	RefreshDelegate.BindLambda([WeakThis]()
@@ -2229,6 +2237,11 @@ void UHarvester::StopUnloadProgressBar()
 	{
 		World->GetTimerManager().ClearTimer(M_UnloadProgress.RefreshTimer);
 	}
+	if (UHealthComponent* HealthComponent = M_UnloadProgress.ForcedHealthComponent.Get())
+	{
+		HealthComponent->SetHealthBarForcedVisible(false);
+	}
+	M_UnloadProgress.ForcedHealthComponent.Reset();
 	M_UnloadProgress.bIsActive = false;
 	M_UnloadProgress.Fill = 0.f;
 	if (not M_UnloadProgress.bIsShown)

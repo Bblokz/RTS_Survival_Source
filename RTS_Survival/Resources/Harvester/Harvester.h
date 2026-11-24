@@ -29,6 +29,7 @@ class UPlayerResourceManager;
 class UAsyncFindClosestDropOff;
 class AResourceUnloadStation;
 class UW_HealthBar;
+class UHealthComponent;
 enum class EUnloadEndReason : uint8;
 
 /**
@@ -49,6 +50,8 @@ struct FHarvesterUnloadProgressState
 {
 	FTimerHandle RefreshTimer;
 	TWeakObjectPtr<UW_HealthBar> HealthWidget;
+	// The owner's health component, kept visible (SetHealthBarForcedVisible) while the unload runs.
+	TWeakObjectPtr<UHealthComponent> ForcedHealthComponent;
 	int32 InitialCargo = 0;
 	double StartSeconds = 0.0;
 	float ExpectedSeconds = 0.f;
