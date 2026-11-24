@@ -10,6 +10,9 @@
 #include "PerkSystem/PerkMenu/W_WorldPerkMenu.h"
 #include "RTS_Survival/CardSystem/CardUI/CardMenu/W_CardMenu.h"
 #include "RTS_Survival/CardSystem/DeckBuilder/W_DeckBuilderMenu.h"
+#include "RTS_Survival/WorldCampaign/WorldMapUI/CampaignHUD/W_WorldCampaignBar.h"
+#include "RTS_Survival/WorldCampaign/WorldMapUI/CampaignHUD/W_WorldCampaignHUD.h"
+#include "RTS_Survival/WorldCampaign/WorldMapUI/TechWheel/W_WorldTechWheel.h"
 #include "RTS_Survival/WorldCampaign/SaveAndState/WorldStateAndSaveManager/WorldStateAndSaveManager.h"
 #include "RTS_Survival/GameUI/Archive/W_Archive/W_Archive.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
@@ -23,6 +26,11 @@ void UW_WorldMenu::UpdateMenuForNewFocus(const EWorldUIFocusState NewFocus)
 	}
 	M_MenuFocusState = NewFocus;
 	SetAuxiliaryMapItemsWidgetsVisibility(false);
+	if (IsValid(M_CampaignHUD))
+	{
+		// The map widgets only belong on the map; a full-screen page hides them.
+		M_CampaignHUD->SetMapWidgetsVisible(NewFocus == EWorldUIFocusState::World);
+	}
 	
 	switch (NewFocus)
 	{
@@ -46,6 +54,12 @@ void UW_WorldMenu::UpdateMenuForNewFocus(const EWorldUIFocusState NewFocus)
 		UpdateUISwitch(MenuSettings.ArchiveFullUI_Index);
 		break;
 	case EWorldUIFocusState::TechTree:
+		if (IsValid(M_TechWheel) && M_TechWheelSwitcherIndex != INDEX_NONE)
+		{
+			M_TechWheel->RefreshFromCampaign();
+			UpdateUISwitch(M_TechWheelSwitcherIndex);
+			break;
+		}
 		UpdateUISwitch(MenuSettings.TechTreeFullUI_Index);
 		break;
 	}
@@ -68,6 +82,7 @@ void UW_WorldMenu::InitWorldMenu(AWorldPlayerController* WorldPlayerController,
 	InitMenu_InitPerkUI();
 	InitMenu_InitCardMenu();
 	InitMenu_InitDeckBuilder();
+	InitMenu_InitCampaignHUD();
 	UpdateMenuForNewFocus(EWorldUIFocusState::World);
 }
 
@@ -225,6 +240,58 @@ void UW_WorldMenu::InitMenu_InitCardMenu()
 		return;
 	}
 	CardMenu->InitCardMenu(this);
+}
+
+void UW_WorldMenu::InitMenu_InitCampaignHUD()
+{
+	// Above the world menu, so its buttons are not covered by the menu's own full-screen canvas.
+	constexpr int32 CampaignHUDZOrder = 10;
+	if (not bUseCampaignHUD || not GetIsValidPlayerController())
+	{
+		return;
+	}
+
+	M_CampaignHUD = CreateWidget<UW_WorldCampaignHUD>(this, UW_WorldCampaignHUD::StaticClass());
+	if (not IsValid(M_CampaignHUD))
+	{
+		RTSFunctionLibrary::ReportError(TEXT("UW_WorldMenu could not create the campaign HUD."));
+		return;
+	}
+
+	M_CampaignHUD->InitCampaignHUD(M_PlayerController.Get());
+	M_CampaignHUD->AddToViewport(CampaignHUDZOrder);
+	if (UW_WorldCampaignBar* CampaignBar = M_CampaignHUD->GetCampaignBar())
+	{
+		CampaignBar->OnNavigateRequested().AddUObject(this, &UW_WorldMenu::UpdateMenuForNewFocus);
+	}
+
+	// The strip carries turn, resources and the page buttons, so the Blueprint header is no longer shown.
+	if (IsValid(WorldUIHeader))
+	{
+		WorldUIHeader->SetVisibility(ESlateVisibility::Collapsed);
+	}
+
+	if (not FullUISwitcher)
+	{
+		return;
+	}
+
+	M_TechWheel = CreateWidget<UW_WorldTechWheel>(this, UW_WorldTechWheel::StaticClass());
+	if (not IsValid(M_TechWheel))
+	{
+		RTSFunctionLibrary::ReportError(TEXT("UW_WorldMenu could not create the tech wheel."));
+		return;
+	}
+
+	M_TechWheel->InitTechWheel(M_PlayerController.Get(), M_CampaignHUD->GetLook());
+	M_TechWheel->OnCloseRequested().AddUObject(this, &UW_WorldMenu::HandleTechWheelCloseRequested);
+	FullUISwitcher->AddChild(M_TechWheel);
+	M_TechWheelSwitcherIndex = FullUISwitcher->GetChildIndex(M_TechWheel);
+}
+
+void UW_WorldMenu::HandleTechWheelCloseRequested()
+{
+	UpdateMenuForNewFocus(EWorldUIFocusState::World);
 }
 
 void UW_WorldMenu::InitMenu_InitDeckBuilder()
