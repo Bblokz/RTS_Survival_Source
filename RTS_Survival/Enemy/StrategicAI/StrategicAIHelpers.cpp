@@ -5,6 +5,8 @@
 #include "RTS_Survival/Buildings/BuildingExpansion/BuildingExpansionEnums.h"
 #include "RTS_Survival/Player/Abilities.h"
 #include "RTS_Survival/Units/Enums/Enum_UnitType.h"
+#include "RTS_Survival/Resources/Harvester/Harvester.h"
+#include "RTS_Survival/RTSComponents/RTSComponent.h"
 
 namespace StrategicAIHelperConstants
 {
@@ -1836,6 +1838,11 @@ namespace StrategicAIHelperUtilities
 			{
 				continue;
 			}
+			// A damaged harvester keeps harvesting; it is not the strategic AI's to pull back.
+			if (FStrategicAIHelpers::GetIsHarvester(UnitState))
+			{
+				continue;
+			}
 			if (UnitState.HealthRatio > Request.HealthRatioThresholdConsiderUnitToRetreat)
 			{
 				continue;
@@ -2266,6 +2273,42 @@ FResultAlliedTanksToRetreat FStrategicAIHelpers::BuildAlliedTanksToRetreatResult
 	StrategicAIHelperUtilities::RemoveNearZeroStrategicRetreatLocations(Result.Group3);
 
 	return Result;
+}
+
+bool FStrategicAIHelpers::GetIsHarvesterUnit(const EAllUnitType UnitType, const int32 UnitSubtypeRaw)
+{
+	if (UnitType == EAllUnitType::UNType_Harvester)
+	{
+		return true;
+	}
+	if (UnitType != EAllUnitType::UNType_Tank)
+	{
+		return false;
+	}
+	const ETankSubtype TankSubtype = static_cast<ETankSubtype>(UnitSubtypeRaw);
+	return TankSubtype == ETankSubtype::Tank_PzI_Harvester
+		|| TankSubtype == ETankSubtype::Tank_PzIV_Harvester
+		|| TankSubtype == ETankSubtype::Tank_T34_Harvester;
+}
+
+bool FStrategicAIHelpers::GetIsHarvester(const FAsyncDetailedUnitState& UnitState)
+{
+	return GetIsHarvesterUnit(UnitState.UnitType, UnitState.UnitSubtypeRaw);
+}
+
+bool FStrategicAIHelpers::GetIsExcludedFromEnemyUnitPools(const AActor* UnitActor)
+{
+	if (not IsValid(UnitActor))
+	{
+		return false;
+	}
+	if (IsValid(UnitActor->FindComponentByClass<UHarvester>()))
+	{
+		return true;
+	}
+	const URTSComponent* RTSComponent = UnitActor->FindComponentByClass<URTSComponent>();
+	return IsValid(RTSComponent)
+		&& GetIsHarvesterUnit(RTSComponent->GetUnitType(), static_cast<int32>(RTSComponent->GetUnitSubType()));
 }
 
 bool FStrategicAIHelpers::GetIsLightTank(const FAsyncDetailedUnitState& UnitState)

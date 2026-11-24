@@ -221,6 +221,19 @@ public:
 	/** Points of a unit a building trainer dropped before it trained go back to the AI. */
 	void RefundTrainingPoints(const int32 TrainingPoints);
 	/**
+	 * @brief Training points earned outside the per-minute income, e.g. a fuel truck unloaded at one of this AI's
+	 * fuel depots (UFuelDeliveryDepotComponent).
+	 * @param TrainingPoints Added to the pool the AI spends on training; zero or less does nothing.
+	 */
+	void AddBonusTrainingPoints(const int32 TrainingPoints);
+	/**
+	 * @brief Building points for the AI's base building (plan: Docs/EnemyAI/EnemyBaseBuilding_Plan.md section 3).
+	 * Only the pool exists so far: supply deliveries (ASovietAirSupplyPad) fill it and nothing spends it yet.
+	 * @param BuildingPoints Added to the pool; zero or less does nothing.
+	 */
+	void AddBuildingPoints(const int32 BuildingPoints);
+	int32 GetBuildingPoints() const { return M_BuildingPoints; }
+	/**
 	 * @brief A building trainer of this AI's player finished a unit: it joins the fog hidden until seen, joins this
 	 * controller's direct-control pool (blackboard idle) and moves to a base defense position, like every trained
 	 * unit; without a defense position it moves to a stand spot near the exit that blocks no unit of this side.
@@ -230,6 +243,17 @@ public:
 	void OnBuildingTrainerUnitSpawned(const FTrainingOption& TrainingOption, AActor* SpawnedActor,
 	                                  const FVector& TrainingLocation,
 	                                  const UEnemyBuildingTrainerComponent* Trainer = nullptr);
+
+	// A unit trained at one of this AI's buildings got its first orders (stand spot or defense position). A mission
+	// can take it over: deregister it from the direct-control pool, then give its own orders.
+	DECLARE_MULTICAST_DELEGATE_OneParam(FOnBuildingTrainedUnitReady, AActor* /*Unit*/);
+	FOnBuildingTrainedUnitReady OnBuildingTrainedUnitReady;
+
+	/** @return Units trained at this AI's buildings that are still alive (squads with a living man). */
+	int32 GetAliveBuildingTrainedUnitCount();
+
+	/** @return True while FEnemyAIMissionSettings::MaxAliveBuildingTrainedUnits is set and reached. */
+	bool GetIsBuildingTrainedUnitCapReached();
 
 #if RTS_WITH_MAP_TESTS
 	// Routes the units through the building trainers like a paid batch (no points are spent); returns how many
@@ -338,6 +362,9 @@ private:
 	// The starting amount of training points is set when the enemy ai controller propagates the settings.
 	// See void AEnemyController::BeginPlay_MoveAISettingsToStrategicAIBlackboard() const
 	FEnemyStrategicTrainingState M_TrainingState;
+
+	// See AddBuildingPoints: filled by supply deliveries, not spent yet.
+	int32 M_BuildingPoints = 0;
 	// Keeps an unaffordable picked batch active until enough training points have accumulated.
 	FEnemyStrategicAITrainingReservation M_TrainingReservation;
 	// Each paid batch owns its own timer so overlapping training batches do not interrupt each other.
@@ -349,10 +376,16 @@ private:
 	TMap<TWeakObjectPtr<AActor>, FEnemyBuildingTrainedUnitExit> M_BuildingTrainedUnitExits;
 	// Stand spots building-trained units were sent to; one stays taken while its unit walks there or stands on it.
 	TArray<FEnemyStandSpotReservation> M_StandSpotReservations;
+	/** Stand spot by the exit (then a defense position later), or straight to a defense position without one. */
+	void IssueFirstOrdersToBuildingTrainedUnit(AActor* SpawnedActor, ICommands& Commands,
+	                                           const FEnemyBuildingTrainedUnitExit& BuildingExit);
 	/** Sends a building-trained unit to a stand spot near its exit (see EnemyTrainedUnitStandSpots); false if none. */
 	bool Training_MoveToStandSpot(AActor* Unit, ICommands& Commands, const FEnemyBuildingTrainedUnitExit& Exit);
 	// Building-trained units waiting at their stand spot before they go to a base defense position.
 	TArray<FEnemyStandSpotWait> M_StandSpotWaits;
+	// Every unit trained at this AI's buildings; weak, they die. Counted for MaxAliveBuildingTrainedUnits.
+	UPROPERTY()
+	TArray<TWeakObjectPtr<AActor>> M_BuildingTrainedUnits;
 	/** Sends every waiting unit whose time is up, and that is still idle in the AI's pool, to a defense position. */
 	void Training_ReleaseStandSpotWaiters();
 	/** Moves the unit to a random base defense position; false if the AI has none. */

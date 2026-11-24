@@ -31,6 +31,7 @@
 #include "RTS_Survival/FOWSystem/FowComponent/FowComp.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
+#include "RTS_Survival/Enemy/Fallback/EnemyFallbackSubsystem.h"
 
 // Where building-trained units are sent once spawned (AI_TRAIN defense_position).
 DEFINE_LOG_CATEGORY_STATIC(LogEnemyTrainedUnitOrders, Log, All);
@@ -1141,6 +1142,24 @@ void UEnemyStrategicAIComponent::RefundTrainingPoints(const int32 TrainingPoints
 #endif
 }
 
+void UEnemyStrategicAIComponent::AddBonusTrainingPoints(const int32 TrainingPoints)
+{
+	if (TrainingPoints <= 0)
+	{
+		return;
+	}
+	M_TrainingState.TrainingPoints += TrainingPoints;
+}
+
+void UEnemyStrategicAIComponent::AddBuildingPoints(const int32 BuildingPoints)
+{
+	if (BuildingPoints <= 0)
+	{
+		return;
+	}
+	M_BuildingPoints += BuildingPoints;
+}
+
 void UEnemyStrategicAIComponent::OnBuildingTrainerUnitSpawned(
 	const FTrainingOption& TrainingOption,
 	AActor* SpawnedActor,
@@ -1611,6 +1630,7 @@ void UEnemyStrategicAIComponent::IssueOrdersToSpawnedBlackboardUnit(AActor* Spaw
 		bIsBuildingTrained = true;
 		BuildingExit = *FoundExit;
 		M_BuildingTrainedUnitExits.Remove(SpawnedActor);
+		M_BuildingTrainedUnits.Add(SpawnedActor);
 		// Again once loaded: a squad's soldiers may not have existed when it spawned.
 		Training_StartFogNowHiddenUntilSeen(SpawnedActor);
 	}
@@ -1626,27 +1646,61 @@ void UEnemyStrategicAIComponent::IssueOrdersToSpawnedBlackboardUnit(AActor* Spaw
 		return;
 	}
 
-	if (bIsBuildingTrained)
+	if (not bIsBuildingTrained)
 	{
-		// First wait by the building, clear of its exit, then go on to a defense position
-		// (Training_ReleaseStandSpotWaiters). Left at the exit it would block the next unit.
-		if (Training_MoveToStandSpot(SpawnedActor, *Commands, BuildingExit))
-		{
-			using namespace EnemyAISettings::UnitTraining;
-			const UWorld* const World = GetWorld();
-			const float Now = IsValid(World) ? World->GetTimeSeconds() : 0.f;
-			FEnemyStandSpotWait& Wait = M_StandSpotWaits.AddDefaulted_GetRef();
-			Wait.Unit = SpawnedActor;
-			Wait.ReleaseAtSeconds = Now + StandSpotWaitSeconds
-				+ static_cast<float>(GetSeededIndex(StandSpotWaitJitterSeconds + 1));
-			UE_LOG(LogEnemyTrainedUnitOrders, Log, TEXT("AI_TRAIN stand_spot_wait %s t=%.1f release_at=%.1f"),
-			       *SpawnedActor->GetName(), Now, Wait.ReleaseAtSeconds);
-			return;
-		}
+		MoveUnitToRandomDefensePosition(SpawnedActor, *Commands, nullptr, BuildingExit.ExitTransform.GetLocation());
+		return;
 	}
-	MoveUnitToRandomDefensePosition(SpawnedActor, *Commands,
-	                                bIsBuildingTrained ? TEXT("defense_position") : nullptr,
+	IssueFirstOrdersToBuildingTrainedUnit(SpawnedActor, *Commands, BuildingExit);
+	// Last: a listener may take the unit over (deregister it and give its own orders).
+	OnBuildingTrainedUnitReady.Broadcast(SpawnedActor);
+}
+
+void UEnemyStrategicAIComponent::IssueFirstOrdersToBuildingTrainedUnit(AActor* SpawnedActor, ICommands& Commands,
+                                                                      const FEnemyBuildingTrainedUnitExit& BuildingExit)
+{
+	// First wait by the building, clear of its exit, then go on to a defense position
+	// (Training_ReleaseStandSpotWaiters). Left at the exit it would block the next unit.
+	if (Training_MoveToStandSpot(SpawnedActor, Commands, BuildingExit))
+	{
+		using namespace EnemyAISettings::UnitTraining;
+		const UWorld* const World = GetWorld();
+		const float Now = IsValid(World) ? World->GetTimeSeconds() : 0.f;
+		FEnemyStandSpotWait& Wait = M_StandSpotWaits.AddDefaulted_GetRef();
+		Wait.Unit = SpawnedActor;
+		Wait.ReleaseAtSeconds = Now + StandSpotWaitSeconds
+			+ static_cast<float>(GetSeededIndex(StandSpotWaitJitterSeconds + 1));
+		UE_LOG(LogEnemyTrainedUnitOrders, Log, TEXT("AI_TRAIN stand_spot_wait %s t=%.1f release_at=%.1f"),
+		       *SpawnedActor->GetName(), Now, Wait.ReleaseAtSeconds);
+		return;
+	}
+	MoveUnitToRandomDefensePosition(SpawnedActor, Commands, TEXT("defense_position"),
 	                                BuildingExit.ExitTransform.GetLocation());
+}
+
+int32 UEnemyStrategicAIComponent::GetAliveBuildingTrainedUnitCount()
+{
+	int32 AliveCount = 0;
+	for (int32 Index = M_BuildingTrainedUnits.Num() - 1; Index >= 0; --Index)
+	{
+		if (not UEnemyFallbackSubsystem::GetIsUnitActorAlive(M_BuildingTrainedUnits[Index].Get()))
+		{
+			M_BuildingTrainedUnits.RemoveAtSwap(Index);
+			continue;
+		}
+		++AliveCount;
+	}
+	return AliveCount;
+}
+
+bool UEnemyStrategicAIComponent::GetIsBuildingTrainedUnitCapReached()
+{
+	const int32 Cap = M_Blackboard.StrategicAIMissionSettings.MaxAliveBuildingTrainedUnits;
+	if (Cap <= 0)
+	{
+		return false;
+	}
+	return GetAliveBuildingTrainedUnitCount() >= Cap;
 }
 
 bool UEnemyStrategicAIComponent::MoveUnitToRandomDefensePosition(AActor* Unit, ICommands& Commands,
@@ -1866,6 +1920,11 @@ void UEnemyStrategicAIComponent::GetTrainingPoints_ThinkStep()
 		return;
 	}
 
+	// No income while the trained-unit cap is reached: banked points would come out as a burst once units die.
+	if (GetIsBuildingTrainedUnitCapReached())
+	{
+		return;
+	}
 	const float ElapsedSeconds = FMath::Max(
 		0.f,
 		World->GetTimeSeconds() - M_TrainingPointsThinkTimer.LastTimeThought);
@@ -2041,7 +2100,7 @@ void UEnemyStrategicAIComponent::StrategicAiThinkingLoop()
 	{
 		M_StochasticDecisionTree->DecisionTree_ThinkStep(Now, M_Blackboard);
 	}
-	if (GetIsAllowedUnitTraining())
+	if (GetIsAllowedUnitTraining() && not GetIsBuildingTrainedUnitCapReached())
 	{
 		Training_ThinkStep();
 	}
@@ -2624,6 +2683,7 @@ bool UEnemyStrategicAIComponent::IsEnemyLightMediumAirStrikeAbility(const EGloba
 {
 	return AbilityType == EGlobalAbility::GA_2xPE2Strafing
 		|| AbilityType == EGlobalAbility::GA_4xPE2Strafing
+		|| AbilityType == EGlobalAbility::GA_2xIl2Strafing
 		|| AbilityType == EGlobalAbility::GA_SovietReconFlight;
 }
 
@@ -2683,7 +2743,6 @@ TArray<FVector> UEnemyStrategicAIComponent::GetReinforcementAbilityTargetLocatio
 	Locations.Reserve(M_Blackboard.CurrentBaseDefensePositions.Num());
 	for (const FDefensePositions& DefensePosition : M_Blackboard.CurrentBaseDefensePositions)
 	{
-		|| AbilityType == EGlobalAbility::GA_2xIl2Strafing
 		if (not DefensePosition.Location.IsNearlyZero())
 		{
 			Locations.Add(DefensePosition.Location);
