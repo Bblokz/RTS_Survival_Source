@@ -235,6 +235,21 @@ Names are proposals. The owner writes the text; the voice is the `GermanAnnounce
 | `Berlin_ForgeStationIntel` | Last target dies | The readings make no sense: the Forge is freezing, "putting to sleep", the crystals of a crater dead for thirty years. Why? A hint only; nothing about the Phytophage. | in flow section 6 |
 | `Berlin_ReinforcementsInbound` | Drop starts | HQ sends what it can spare, and where it lands. | in flow section 6 |
 
+### Crew radio lines (built 2026-11-24)
+
+The station's hazmat crew talks on intercepted radio: `SovietHazmat` portrait, ElevenLabs "Stanislav" in Russian
+through the "Broken transmitter" chain (`VoiceLines/VoiceChanger/hazmat_lines.py`), English subtitles. Owner's pick:
+three lines, each plays once. They sit in the stage's `CrewLines` (`FBerlinForgeStationCrewLines`, C++ class default
+`SovietHazmat`).
+
+| Line | When | Text (English subtitle) |
+|---|---|---|
+| `Berlin_ForgeCrew_Sighted` | The plate appears (before the advisor's sighted line; skipped when the garrison already fights) | "Command post, this is the rim crew. Stake four, core taken. The crystals are asleep, sedation holds. Next cycle in seventy-five seconds. The counter still crackles by the old shell holes. Logging it." |
+| `Berlin_ForgeCrew_Engaged` | The strongpoint's `OnGarrisonEngaged` (first fight or first loss) | "Contact at the rim! Germans, here, at the crater! Drop the cores, everyone into the bunker! Guards, keep them off the rig!" |
+| `Berlin_ForgeCrew_TargetLost` | The station's `OnTargetDestroyed`, first counted target | "They're hitting the station! Pressure is dropping! If the cold goes, the samples wake up. Command post, do you hear me? Command post!" |
+
+Lore stays a hint: "asleep", "sedation", "the samples wake up"; nothing on why.
+
 The megaphone reuses the existing Directorate line set. **(open)** a small Forge set (Russian, about 6 lines: sample
 counts, "sedation cycle in thirty seconds", cryo pressure) using the existing voice treatment B "Across the yard".
 

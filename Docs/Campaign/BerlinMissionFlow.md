@@ -168,7 +168,8 @@ alarm).
 - The player harvests the start crater and the tram-depot metal field; the power-station wrecks give vehicle parts.
   No plate for these.
 - Mixed patrols near the start (data asset). Their first fights teach the fleeing rule and the "Stop the runners" plate
-  (4.3).
+  (4.3). Built 2026-11-24 as the BONUS "Soviet patrols": three patrols marked on the minimap, the plate counts the
+  units left ([BerlinMissionScripting.md](BerlinMissionScripting.md) section 8).
 - **BONUS: "The cellar people"** (brewery enclave, south-west of the start). Reach the brewery hall and vaults with a
   unit: the Burrowers there show the **patrol routes and detection zones on the minimap** for the rest of the mission.
   Until then the zones are visible only once explored. The Burrower squad is based on the Scavenger squad, with the

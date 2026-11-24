@@ -266,7 +266,8 @@ What the map already gives this (built, see [BerlinMap.md](BerlinMap.md)):
 **(open)** how many patrols and what is in them; whether runners take the shortest lane or scatter; whether the alert is
 immediate on arrival or needs a few seconds at the base (a last chance to shoot them at the portico); whether killing
 runners should be shown to the player as an objective or left to be discovered; what a patrol does if the player kills
-the infantry first. None of this is scripted: the map holds no units, triggers or waypoints.
+the infantry first. **Built 2026-11-24:** three patrols near the start, per-difficulty units in `DA_BerlinForces_*`,
+infantry runs when its tanks die; see [BerlinMissionScripting.md](BerlinMissionScripting.md) section 8.
 
 ## Layout summary
 

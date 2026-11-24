@@ -117,8 +117,8 @@ The **Plate** column gives the objective type (MAJOR or BONUS) and the plate tex
   `PlayPortrait(StayQuiet)` → `RegisterCallbackOnNomadicVehicle(PlayerHQ, bOnBuildingConversion)` →
   `BP_OnCallBackNomadicVehicle` → `OnMissionComplete`.
 - **Functions:**
-  - `SetUpEnemyForces`: load the Berlin forces data asset for the difficulty, start the patrols (wave spawners), start
-    the Reichstag factory training, enable the strongpoints.
+  - `SetUpEnemyForces`: load the Berlin forces data asset for the difficulty, start the Reichstag factory training,
+    enable the strongpoints. (Not built. The patrols got their own stage instead, see section 8.)
   - `StartLocationIntro`: Berlin texts.
   - `GetPlayerHQ`.
 
@@ -311,6 +311,8 @@ them at start.
 - **Arrival:**
   - Flow: location intro → crater line → wait 33 s → Zoo tower camera tour (two shots, the Leitturm line as its
     `StartSound`) → stay-quiet line.
+  - The tour lifts the fog 45 m around both shots (`RevealRadius` 4500), so the tower and the radio bunker show. The
+    announcer's words run in the subtitle strip at the top (2026-11-24). Skippable (hold Space). Nothing is stationed at the Zoo yet.
   - Then it finds the profile-spawned HQ (retrying every second) and completes when the HQ is deployed.
   - Placeholders: "Berlin / Friedrichshain ruins / 1976" and the camera yaws.
   - `SetUpEnemyForces` is not built (no patrol data yet).
@@ -386,15 +388,12 @@ Unrecorded lines are empty slots that play nothing:
 ### 7.5 Still to do (not built)
 
 - **The Reichstag Shield base:**
-  - the factory, barracks and pits (concept B2) placed in the ruin;
-  - the factory tagged `BerlinReichstagFactory`;
+  - ~~the factory, barracks and pits (concept B2) placed in the ruin; the factory tagged `BerlinReichstagFactory`~~:
+    placed 2026-11-24, see section 9;
   - training all mission long (flow 4.6);
   - the Shield waves after the alarm.
-- **Patrols near the start**, from the Berlin forces data asset (`UBerlinMissionForcesData` holds only the Forge
-  station so far). Then:
-  - Arrival's `SetUpEnemyForces`;
-  - the "vehicles dead → infantry run" rule (`ForceUnitToFallBack`);
-  - patrol routes in the cellar reveal.
+- ~~Patrols near the start~~: built 2026-11-24 as their own stage, see section 8 (not in Arrival's
+  `SetUpEnemyForces`). Still open: patrol routes in the cellar reveal.
 - **The player start force:** whether it includes a German HQ truck. Arrival waits for one.
 - **Recording** the voice lines listed in 7.3.
 
@@ -438,3 +437,325 @@ Owner rule: graphs must be human-readable, compact, without large gaps between n
 
 **Editor DLLs:** both the Development (20:06) and DebugGame DLLs include all of this C++. A Development build at 20:4x
 was up to date.
+
+## 8. Early patrols (2026-11-24)
+
+Owner ask: the first minutes felt empty. Patrols near the start, marked on the minimap, so the player can avoid them or
+wipe them out; beaten squads run to the Reichstag.
+
+### 8.1 What the player sees
+
+- At mission start a **BONUS** plate, "Soviet patrols". Three patrols spawn near the start a few seconds in and loop
+  their routes. Each one is a minimap marker that follows the group until its last unit is gone.
+- Once the patrols are out, the plate counts the enemy units left. When none is left, the bonus completes.
+- **Running:**
+  - a patrol whose last tank dies sends its infantry to the Reichstag;
+  - any enemy squad (patrol or garrison) that has fought for 20 s and lost half its men also runs (the fallback watch).
+  - The first runner starts "Stop the runners". A runner that reaches the forecourt raises the alarm, but only once
+    StayUndetected runs (after the HQ deploys).
+- A runner that reaches the Reichstag disappears. That also counts as "gone" for the patrol plate, so the bonus
+  completes even then; the alarm is the price. **(open)** whether escaped runners should fail the bonus instead.
+
+### 8.2 Units per patrol (`DA_BerlinForces_*` → `Patrols`)
+
+Every placed patrol spawns the same list. Tune it in the data asset; the placed spawners' own unit lists are a
+preview only (the stage replaces them with `SetUnits`).
+
+| Difficulty | PTRS squads (`Squad_Rus_Okhotnik`) | Mosin squads | BT-7 | T-34/76 | Units |
+|---|---|---|---|---|---|
+| NewToRTS | 1 | 1 | 2 | 0 | 4 |
+| **Normal** (owner spec) | 2 | 0 | 2 | 1 | 5 |
+| Hard | 2 | 1 | 2 | 1 | 6 |
+| Brutal / Ironman | 2 | 1 | 1 | 2 | 6 |
+
+- The owner asked for "BT-5"; there is no BT-5 in the game, so it is the **BT-7** (`Tank_BT7`).
+- Every list keeps a tank, so the "tanks dead → infantry runs" rule always applies.
+- `Patrols.Fallback` holds the fleeing thresholds and the rally point, the forecourt at (2600, -15994). Its values are
+  the same as StayUndetected's `FallbackSettings`.
+
+### 8.3 Placed spawners on `Ger_Berlin` (outliner folder `Mission/Patrols`)
+
+| SpawnerId | Centre | Patrol loop (world) |
+|---|---|---|
+| `BerlinPatrol_Central` | (11000, 30000), ~150 m from the start | (13500, 30000), (9500, 32200), (9500, 27800) |
+| `BerlinPatrol_North` | (18000, 30000) | (18000, 32500), (20208, 28890), (15800, 28500) |
+| `BerlinPatrol_South` | (-3116, 33915) | (-616, 33915), (-4616, 36115), (-4616, 31715) |
+
+- They are ordinary `AEnemyWaveSpawner` actors:
+  - `PatrolWave`, 2 spawn points, `Timing.bStartOnBeginPlay` off, first wave after 2 s, `Repeat Once`;
+  - `Minimap.bShowOnMinimap` and `PatrolSettings.bInfantryFleesWhenVehiclesLost` on.
+- **Move them freely** in the editor (the actor, and the spawn-point and waypoint diamonds). The points are relative
+  to the actor. Each patrol point was projected onto the default navmesh. Vehicle routing between the points is not
+  checked: if a tank gets stuck, drag that point into a wider street.
+- Placed by `Source/Tools/BerlinMap/mission/berlin_patrols.py` (`configure_forces()`, `place_spawners()`). Re-running
+  `place_spawners()` moves the spawners back to the script's positions.
+
+### 8.4 `Mission_Berlin_Patrols` (Missions[13], no trigger, BONUS)
+
+- **Event graph:**
+  - `BP_OnMissionStart` → `LoadPatrolForces` → (none set: `OnMissionFailed`) →
+    `ScheduleSingleCallback(PatrolStartDelaySeconds = 3)` → `OnPatrolsDue` → `StartPatrols` →
+    `ScheduleRepeatedCallback(PatrolCheckSeconds = 2)` (task id kept).
+  - `OnPatrolCheck` → `RefreshPatrols` → all gone: `CancelScheduledCallback` → `OnMissionComplete`.
+- **Functions:**
+  - `LoadPatrolForces`: `UBerlinMissionForcesData::LoadForDifficulty(ForcesPerDifficulty, difficulty)` into
+    `PatrolForces`.
+  - `StartPatrols`:
+    - `AddToWaveSupply`: units per patrol × number of spawners. Wave units cost enemy wave supply and refund it on
+      death, so once the patrols are dead the enemy has that much more supply (on Normal 20 + 15 = 35).
+    - `StartFallbackWatch(Patrols.Fallback)`. The fleeing watch now runs from mission start.
+    - Per id: `FindEnemyWaveSpawner` → `SetUnits(BaseUnits = Patrols.PatrolUnits)` → `StartSpawner`.
+  - `RefreshPatrols`:
+    - sums `GetLivingSpawnedUnitCount` and `GetSpawnedWaveCount` over the spawners;
+    - sets the plate text with the count;
+    - all gone = at least one wave spawned and no living unit.
+- **Instance values:**
+  - `ForcesPerDifficulty` is set on the map instance, copied from the Forge station's instance by
+    `wire_berlin_stages.py`. Python cannot build a map keyed by `ERTSGameDifficulty` (the struct `FRTSGameDifficulty`
+    shadows its Python name), and a Blueprint map variable takes no literal default.
+  - `PatrolSpawnerIds` is a class default.
+
+### 8.5 Changes elsewhere
+
+- **StayUndetected `StartEnemyFallback`:**
+  - it starts the watch only when none runs (`GetIsWatching`), so the patrols' data asset settings are kept;
+  - it puts the forecourt trigger at the subsystem's `GetRallyLocation`.
+- **C++:**
+  - `FEnemyWaveSpawnerPatrolSettings::bInfantryFleesWhenVehiclesLost`;
+  - `AEnemyWaveSpawner`: `SetUnits`, `GetLivingSpawnedUnitCount`; it hands each spawned patrol to the fallback subsystem.
+  - `UEnemyFallbackSubsystem`:
+    - `WatchVehicleEscortedGroup`: once the group's last vehicle is dead, its living squads `ForceUnitToFallBack`.
+      This is checked on the watch's timer, so it needs a running watch.
+    - static `GetIsUnitActorAlive`: vehicles now count as dead once dying (`IsUnitAlive`), not only once destroyed.
+  - `UBerlinMissionForcesData`: `Patrols` (`FBerlinPatrolForces`: `PatrolUnits`, `Fallback`), static
+    `LoadForDifficulty`, `GetPatrolUnitCount`.
+- **Builds:**
+  - Development builds and links.
+  - DebugGame compiles. Its link was blocked on 2026-11-24, first by another session's unfinished
+    `UFuelDepotTestSubsystem`, then by a running DebugGame process holding the DLL, so that DLL is stale.
+  - Do not open or save these stages or `DA_BerlinForces_*` in a DebugGame editor until it relinks, or the new fields
+    are dropped.
+- **Not play-tested:** the owner tests.
+
+## 9. Reichstag base placed (2026-11-24)
+
+The B2 "Kuppelwerk" layout is on `Ger_Berlin`. The buildings are the existing Soviet Blueprints, in the outliner folder
+`Mission/ReichstagBase`, all tagged `BerlinReichstagBase`, owner player 2. Positions come from
+`Source/Tools/ReichstagRuin/RT_Layout.json`, mapped through `BP_ReichstagRuin_B2`'s transform. The ruin is at
+(8112, -15995), yaw 90, portico south.
+
+| Actor | Blueprint | Where |
+|---|---|---|
+| `RT_Base_Rus_Building_Factory_1` | `Rus_Building_Factory` (tag `BerlinReichstagFactory`) | under the dome, (8231, -16268) |
+| `RT_Base_Rus_Building_Barracks_1` / `_2` | `Rus_Building_Barracks` | north-west courtyard, (7209 / 9009, -18595) |
+| `RT_Base_Rus_BXP_120MortarPit_1`, `RT_Base_Rus_BXP_DShKPit_1` | the pits | the other courtyard, (7112 / 9217, -13330) |
+| `RT_Base_Rus_BXP_BS3Pit_1`, `RT_Base_Rus_BXP_53KPit_1` | the pits | forecourt in front of the portico, (1913, -18396 / -13599) |
+| `RT_Base_Rus_Bxp_Megaphone_Propaganda1_1` | propaganda megaphone | forecourt, (3112, -17195) |
+
+- **Ground:** the landscape under the whole base is a flat pad at z 0. Each actor stands on its pivot, as the game
+  places it: mesh bottoms are 0 to -32 cm, the barracks foundation is the -32. No landscape sculpting was needed.
+  - Checked by sampling the landscape every 1.5 m under each footprint.
+  - Each building's lowest vertex was compared with the ground in 50 cm cells, and every ruin rubble heap was
+    checked the same way: no gaps.
+  - Low-angle editor shots of every building's base confirm it: sandbags and plinths rest on the cobbles.
+- **Clipping:**
+  - Every LOD0 vertex of the ruin's 130 piece instances was tested against each building's oriented boxes, and every
+    building vertex against each piece's box, and the buildings against each other.
+  - Two box hits remained, and the surface checks cleared both. No dome vertex is inside the factory; its top is at
+    12.8 m, and the lowest dome geometry above it at 18.0 m. The DShK pit only overlaps a rubble heap's bounding box,
+    not the heap's surface.
+- **Factory exit (owner pick A):** the factory's gate faces a hall wall 2.3 m away, so its `AITrainingExit` sat 0.8 m
+  outside the wall, off the navmesh for every tank size. On this instance the exit is moved to the open west end of
+  the hall: (6412, -15995), 5.2 m from the factory, facing the portico. It is on all four navmeshes, with a 64 m path
+  to the forecourt. Trained tanks appear there, not out of the gate.
+- **Navigation** (rebuilt with the buildings): all exits reach the forecourt for infantry; both barracks exits and the
+  factory exit for all tank sizes.
+- **Not placed:** the CSD banner on the pediment, because no asset exists.
+- **Not built yet:** what the base trains and how fast (flow 4.6), the patrol refill from it, and the Shield waves.
+  "Raid the Reichstag" now has its target.
+- **Tools:** `Source/Tools/BerlinMap/mission/berlin_reichstag_base.py` (`place()`, `set_factory_exit()`,
+  `clip_report()`, `ground_report()`, and `flatten()` / `seat()` for uneven ground), `shots_reichstag_base.py`,
+  `verify_reichstag_base.py` (read-only, from disk). Map backup:
+  `Saved/BerlinReichstagBase/backup/Ger_Berlin_before_base_2026-11-24.umap`.
+
+## 10. Reichstag base training per difficulty (2026-11-24)
+
+Owner picks (2026-11-24):
+- the unit ladder, option A;
+- a data asset of its own holding the ladder and the pace;
+- pace option A and cap option A;
+- "Some patrol around the Reichstag, some go to the player base after the player base is found". "Found" is read as
+  the alarm. This replaces the flow doc's Shield waves toward the west (flow 4.1 / 4.6).
+
+### 10.1 Data: `DA_Berlin_ReichstagTraining`
+
+The asset is in `/Game/RTS_Survival/Maps/GerMissions/Berlin/DataAssets/` (`UBerlinReichstagTrainingData`). It has one
+block per difficulty; Ironman uses Brutal.
+
+| | NewToRTS | Normal | Hard | Brutal / Ironman |
+|---|---|---|---|---|
+| Squads | Mosin, PTRS (`Squad_Rus_Okhotnik`) | same | same | same |
+| Tanks | none | BT-7 | BT-7, T-34/76 | BT-7, T-34/76, T-34/85 |
+| Training points per minute (start 0) | 2 | 4 | 6 | 9 |
+| Cap of living base-trained units | 6 | 8 | 10 | 12 |
+| Patrol group / most patrols out | 2 / 1 | 2 / 1 | 3 / 2 | 3 / 2 |
+| Attack group / share of groups after the alarm | 2 / 0.5 | 3 / 0.5 | 3 / 0.5 | 4 / 0.6 |
+
+- Unit costs: Mosin 3, PTRS 4, BT-7 10, T-34/76 20, T-34/85 28. One unit per batch.
+- The shared `PatrolSettings` (guarding at each point), `AttackSettings` and formation width are in the same asset.
+- The routing numbers (groups, share) are starting values for the owner to tune.
+
+### 10.2 How it runs
+
+- **Mission_Berlin_Arrival**, first step of its event graph: `SetUpReichstagTraining` →
+  `UBerlinReichstagTrainingSubsystem::StartReichstagTraining(ReichstagTraining, difficulty)`.
+  - `AEnemyController::ApplyMissionTraining` writes the level into the running AI: units, points per minute, start
+    points, batch, cap.
+  - The listed units become trainable at the factory (tanks) and barracks (squads). The map files T-34s under tier 2,
+    which only a research centre unlocks.
+- **Every unit the base trains** first goes to its stand spot, as before (`OnBuildingTrainedUnitReady`).
+  - Before the alarm: once `PatrolGroupSize` units wait and fewer than `MaxReichstagPatrols` patrols are out, they
+    leave as a patrol on an `ABerlinReichstagPatrolRoute`. The routes are used in turn. The rest guard the base.
+- **Mission_Berlin_ResponseForce** (the alarm), second step of its event graph: `StartReichstagAttacks` →
+  `StartAttacksOnPlayerBase(player HQ)`.
+  - From then on the groups alternate by `AttackShareAfterAlarm`: some keep the patrols full, the others attack-move
+    to the HQ. Once the patrols are full, every group attacks.
+  - Attack groups walk in legs of at most 250 m, each projected onto the navmesh. Ger_Berlin path queries over about
+    600 m fail on the node limit.
+- **Cap** (`FEnemyAIMissionSettings::MaxAliveBuildingTrainedUnits`, generic): while that many units trained at the
+  AI's buildings are alive, both training and training-point income pause, so no bank builds up. A unit already
+  queued still finishes, so the count can overshoot by one.
+- **Claimed units** leave the AI's idle pool (`DeregisterDirectControlUnits`) before their patrol or attack order.
+
+### 10.3 Map (`Ger_Berlin`)
+
+- **Patrol routes** (outliner folder `Mission/ReichstagBase`), points projected onto the navmesh. Move them and drag
+  their points freely.
+  - `RT_PatrolRoute_Ring`: 6 points round the ruin.
+  - `RT_PatrolRoute_Gate`: 4 points from the forecourt to the Brandenburg Gate.
+- **The enemy controller:**
+  - It got its own copy of the survival decision tree; without one the AI trains nothing.
+  - It starts with training off until Arrival applies the difficulty.
+  - Direct control stays off, so the tree sends no attacks of its own.
+
+### 10.4 Checked (headless `-game` run, Normal, `smoke_reichstag_training.py`)
+
+- **Trained units:** only the Normal units (BT-7, PTRS, Mosin), at about 4 points a minute (first BT-7 at 168 s).
+  The factory's units come out at the moved exit in the hall's west end.
+- **Patrol:** the first two units left as a patrol on `RT_PatrolRoute_Ring`, and the AI's stand-spot orders let go of
+  them.
+- **After the attack phase:** groups of three attack-moved toward the target via 2-3 waypoints.
+- **Arrival's hook** ran by itself at mission start. It applied Brutal, because a bare `-game` launch loads no
+  difficulty.
+- **Not seen:** the cap actually pausing training. In the run the attack groups died on the way, so fewer than 8 units
+  were alive at any time.
+- **Not play-tested** with a real game start.
+
+### 10.5 Also changed
+
+- **Data folder:** all Berlin data assets now live in `/Game/RTS_Survival/Maps/GerMissions/Berlin/DataAssets/`, next
+  to the map. That is `DA_BerlinForces_*` (4), `DA_Berlin_ResponseForce` and `DA_Berlin_ReichstagTraining`. The old
+  folder's redirectors are fixed up and deleted. Paths are updated in `ForgeStationTestSubsystem.cpp`,
+  `forge_assets_build.py`, `forge_place.py`, `berlin_patrols.py`, `wire_berlin_stages.py` and the Ore session's
+  `make_counterattack_settings.py`.
+- **C++ files:**
+  - `Missions/Berlin/Reichstag/` (`BerlinReichstagTrainingData`, `BerlinReichstagPatrolRoute`,
+    `BerlinReichstagTrainingSubsystem`);
+  - `EnemyAIBehaviour.h` (`FEnemyMissionTrainingOverride`, `MaxAliveBuildingTrainedUnits`);
+  - `EnemyController::ApplyMissionTraining`;
+  - `EnemyStrategicAIComponent` (cap, `OnBuildingTrainedUnitReady`, `GetAliveBuildingTrainedUnitCount`).
+- **Builds:** Development links. The DebugGame DLL is stale, because another session's editor held it: do not save
+  these assets from a DebugGame editor until it relinks.
+- **Tools** in `Source/Tools/BerlinMap/mission/`:
+  - `berlin_reichstag_training.py` (asset, folder move, routes, controller);
+  - `build_reichstag_hooks.py`;
+  - `smoke_reichstag_training.py`;
+  - `probe_berlin_enemy_ai.py`.
+
+## 11. Supply point bonus (2026-11-24)
+
+Owner ask:
+- a bonus objective for the supply point, triggered after 140 s;
+- complete at once if the point is already held;
+- reward: three armoured cars "of the 223 type", delivered inside the base;
+- the introduction is a skippable takeover cinematic in which the announcer explains supply points.
+
+### 11.1 The stage: `Mission_Berlin_SupplyPoint` (Missions[14], BONUS "Take the supply point")
+
+- **Trigger:** the new generic `UTimeElapsedMissionTrigger` (`Seconds` = 140, game time since the map started;
+  `EMissionTriggerType::TimeElapsed`).
+- **Event graph:**
+  - `BP_OnMissionStart` → `FindSupplyPoint` → `IsSupplyPointHeld`.
+  - Already held: `GiveSupplyPointReward` → `OnMissionComplete`.
+  - Not held: `PlaySupplyPointTour` → `ScheduleRepeatedCallback(CaptureCheckSeconds = 1)`.
+  - `OnCaptureCheck` → `IsSupplyPointHeld` → held: `CancelScheduledCallback` → `GiveSupplyPointReward` →
+    `OnMissionComplete`.
+- **Functions:**
+  - `FindSupplyPoint`: the map's first `ASupplyPoint`.
+  - `IsSupplyPointHeld`: `GetOwningPlayer` = 1.
+  - `PlaySupplyPointTour`: `PlayCameraTour` with `bAllowSkipping` and `StartSound` = `IntroLine`. Three shots of
+    9.5 + 9 + 10 s, each with a 35 m fog reveal and a caption: "Supply point", "The supply truck", "Keep the road
+    safe".
+  - `GiveSupplyPointReward`: `UPlayerAirDropSubsystem::DeliverPlayerUnitsByAir` (cargo plane) at the HQ +
+    `RewardLandingOffset` (18 m), plus `ShowReinforcementsOnMiniMap`.
+- **Reward:** `RewardPayload` = three `Tank_Sdkfz_221`. **There is no Sd.Kfz. 223 in the game.** The 221 (20 mm) is
+  the closest: the 223 is the radio version of the same four-wheel chassis. Swap the payload once a 223 exists.
+- **Captured during the tour:** the check runs from the start, so the bonus completes then. Completing the mission
+  cuts the tour short.
+
+### 11.2 The Advisor's line: `Berlin_Cinematic_SupplyPoint` (28.3 s)
+
+> Kommandant, zhis is a supply point. Move any of your units into ze area und hold it until our flag is raised. Zen
+> our HQ sends a supply truck. Ze crane loads it, und vhen ze truck is back at ze HQ, ve receive Radixite, metal und
+> vehicle parts. Ze trucks cannot be commanded, so keep ze road to ze HQ safe. As long as ve hold ze point, ze trucks
+> keep coming. Take it, und I vill send you three armoured cars.
+
+- **Made with:** `elevenlabs_lines.py` (announcer voice, eleven_v4, three takes), then `make_mission_lines.py`
+  (settings.json + AnnouncerFilter, radio bookends).
+- **Take:** take 2 (`Recordings/EL_Berlin_Cinematic_SupplyPoint_2.wav`). Takes 2 and 3 were whisper-exact; take 1
+  said "the supply point". Take 3 is the spare.
+- **Files:** `BlenderTanks/VoiceLines/Announcer/AAAGerMissions/Berlin/`, imported into
+  `.../Anouncer/AAAGerMissions/Berlin/` (`RTS_SClass_CinematicAndTransmissions`, by `ue_import_berlin_lines.py`).
+- **Subtitle:** in `DT_CinematicTranscripts` (`new_voice_lines.py`, English with the accent spellings).
+
+### 11.3 Map
+
+- The supply point is the 2026-11-17 recording's `BP_SupplyPoint_TowerCrane` at (-13555, 39306). It is now labelled
+  `SupplyPoint_Crane`, in the outliner folder `Mission/SupplyPoint`.
+- Its settings are unchanged:
+  - enemy-held at the start; only the player captures;
+  - 12 s to capture; supplies ready 45 s after capture;
+  - 150 Radixite + 100 metal + 25 vehicle parts per truck, repeated while held.
+
+### 11.4 Not tested
+
+The stage and its tour have not run in a game. The time trigger, the tour framing (yaw and focus offsets are first
+guesses), the cargo-plane drop of three vehicles at the HQ and the subtitle timing are for the owner's play test.
+
+## 12. Alarm response: Soviet radio + patrols converge (2026-11-24)
+
+Owner's picks (2026-11-24): one Soviet rifleman line per alarm cause; every patrol goes for the spot where the player was
+found, fights 20 s, then returns to its route. Plus three Forge crew lines (BerlinForgeStation.md section 7).
+
+- **C++ parent:** `Mission_Berlin_StayUndetected` is reparented to `UMission_BerlinStayUndetected`
+  (`Missions/Berlin/Alarm/`). Its graph is unchanged. Natively:
+  - `OnTriggerAreaCallback` records the last alarm candidate before the Blueprint sees it: zone ids 100+ =
+    `Spotted` (the player unit's location), id 1 = `RelayBunker` (the infantry's location), id 2 = `RunnerArrived`
+    (the player unit closest to the runner).
+  - `OnMissionFailed` (the alarm) plays the cause's line on the `SovietMosin` portrait before the stage fails, so it
+    queues ahead of ResponseForce's advisor line, then calls `AEnemyWaveSpawner::ConvergeAllPatrolsOnAlarm(location,
+    PatrolCombatSecondsBeforeReturn = 20)`. Once only.
+- **Lines** (Vlasov, Russian, "Broken transmitter", `mosin_lines.py`; `AlarmLines` on the class default):
+
+  | Line | Cause | English subtitle |
+  |---|---|---|
+  | `Berlin_Alarm_Spotted` | detection zone | "Patrol to all posts! Germans in the ruins, here, in our sector! I see them. All patrols, converge on me!" |
+  | `Berlin_Alarm_RunnerArrived` | runner at the forecourt | "Reichstag, open up! It's us, from the post, the Germans are in the city! Raise the alarm, everyone out!" |
+  | `Berlin_Alarm_RelayBunker` | relay bunker | "Zoo tower, alarm! Germans in the relay bunker! They are at the equipment! All patrols, to the tower!" |
+
+- **Patrols** (`UEnemyFormationController`, generic): every living, non-fleeing unit of every patrol-wave spawner
+  attack-moves to the spot. A group's first combat starts its 20 s; then it breaks off and walks to its nearest patrol
+  point and patrols on. No combat: back 30 s after all arrived, or after 60 s + distance / 2.5 m/s. Checked on the
+  3.25 s formation tick, so "20 s" is 20-23 s.
+- **Edge:** the forecourt raises the alarm after a grace wait; a zone entry in that window makes the line the zone's.
+- **Not tested in a game run.** The Development DLL needs a rebuild before the user editor has the new class.
