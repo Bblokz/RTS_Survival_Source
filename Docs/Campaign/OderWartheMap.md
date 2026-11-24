@@ -51,6 +51,14 @@ Modelled for this map by a subagent (Blender, imported headless): `/Game/RTS_Sur
 Adcock and loop direction-finder stations, Werk mast, two dragon teeth, five dead pines (crushable `BP_OW_DeadPine_*`,
 medium and heavy tanks) and three granite erratics.
 
+**DF stations (2026-11-24):** the five stations are now the capturable `BP_OW_DFStation` (design F, see
+`Source/Tools/OderWartheStations/README.md`), placed by `ow_dress_gen.stations()` as `OW_D_DF_s<N>_Station` with
+the pivot on the capture point and the open yard facing the start. The kit `SM_OW_DFStation_Adcock` / `_Loop`
+placeholders are no longer placed (`DF_STATION_BP` empty brings them back). `ow_terrain_gen.station_pads()` flattens
+the ground under each 18 x 21 m footprint (`STATION_FOOT` + 2 m) to the capture point's height and fades it over 9 m.
+Check: `Saved/OderWarthe/c_station_trace.py` (in-editor landscape traces over each footprint; 2026-11-24: 0 cm on all
+five). After the swap: nav 0 problems, 15/15 wave routes proven, chokes unchanged.
+
 ## Size, heights and water
 
 - Play area 700 m (east-west) x 620 m (north-south); landscape 14 x 14 components (882 m).

@@ -467,7 +467,6 @@ Known rough spots:
 - A thin cyan line runs from the piece south-east of the HQ into open ground in every map picture. Nothing in the
   UI or country look code draws it; its source is not found.
 - The country tag keep-out box around the HQ has a fixed size, so it can be off at other zoom levels.
-- The build site hover of the hex plate is not wired to the build site panel.
 
 ### Polish round (2026-11-24, evening)
 
@@ -484,6 +483,29 @@ Known rough spots:
 - The capture has a ninth picture: freeze bar part filled and the ability button on cooldown.
 - Checked: DebugGame build 18:10, `RTS.WorldCampaign.*` 69 of 69 pass, nine pictures looked at. Still not checked:
   mouse input, a real mission, Development and cooked builds.
+
+### Mission names and build site hover (2026-11-24, night)
+
+- **Mission names.** `WorldCampaignMissionNames` (next to `AWorldMissionObject`) names a mission: its entry in
+  `UWorldCampaignMapContentSettings::MissionNames` (config, `+MissionNames=(Mission=...,DisplayName=NSLOCTEXT(...))`)
+  first, else the `DisplayName` of the pinned place that holds it. A mission with neither keeps the title of its
+  Blueprint.
+- The name shows in two places: as the title of the briefing panel (inside the rich text style of the title it
+  replaces) and on a small dark plate under the mission piece on the map (`UW_WorldMapTags`). The plate is hidden for
+  a mission the fog hides or the player won, and mission names win over country names when two would overlap.
+- Story missions still spawn the stand-in mission Blueprint, so their description, objectives and rewards in the
+  briefing panel are still those of the stand-in. Only the title is right.
+- **Map pieces per mission.** Five concept drawings per hand-made mission are in
+  `Saved/WorldMapUIDesigns/MissionObjects/<Mission>/` (`overview.png`, `pick.md` once picked). A picked piece goes in
+  as a Blueprint child of `AWorldMissionObject` in `UWorldCampaignSettings::MissionObjectClassByType`.
+- **Build site hover.** The site whose cards are open stays lit, and a site behind the cards no longer lights up
+  under the cursor (`AWorldPlayerController::Tick_UpdateHoveredBuildNode`, `UW_WorldCampaignHUD::GetOpenBuildSite`).
+- A country name is lifted above a mission piece and its plate, as it is above the HQ.
+- The capture holds the camera (`SetIsCameraMovementDisabled`): an offscreen run reads the real desktop cursor, and a
+  cursor at a screen edge scrolls the camera off the map.
+- Checked: DebugGame build 21:47, `RTS.WorldCampaign.*` 71 of 71 pass, capture pictures 01 (BERLIN and ORE MOUNTAINS
+  plates, GERMANY above them; the six story missions under fog have no plate) and 02 (open site lit). Not seen in
+  any picture: the briefing panel title, and the cursor on the cards.
 
 ## 13. Country look (2026-11-24)
 

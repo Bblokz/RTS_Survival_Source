@@ -207,8 +207,8 @@ Triggered by the first two-wedge overlap.
 | Unexplored-fog reveal | Exists |
 | Capturable station with a rising flag | `ASupplyPoint` has capture; reuse unchecked |
 | "Build these buildings" objective | **New** (small) |
-| Direction-finding manager: command post pick, stations, bursts, wedges, overlap, fix | **New** (core of the mission) |
-| Wedges and overlap on the minimap and the full map | **New** (the minimap draws lines today, not wedges) |
+| Direction-finding manager: command post pick, stations, bursts, wedges, overlap, fix | **Built 2026-11-24** (`ADirectionFindingManager`, placed in the map; see 10.8) |
+| Wedges and overlap on the minimap and the full map | **Built 2026-11-24** (`FMiniMapDirectionFindingPainter` in `UW_MiniMap`) |
 | Signal needle and Morse feedback | **New** |
 | Hidden command post targets that unlock at the fix | **New** (small) |
 | Station, bunker group and tunnel mouth assets | **New** assets |
@@ -381,6 +381,31 @@ Intercepts are Morse plus a subtitled line; the veteran's voice is the one recur
 ### 10.7 Questions
 
 Answered in the 2026-11-22 questionnaire; see section 11.
+
+### 10.8 Direction finding: built (2026-11-24)
+
+- `ADirectionFindingManager` (`Source/RTS_Survival/Missions/DirectionFinding`) is placed in `Ger_OderWarthe` as
+  `OW_DirectionFindingManager` by `ow_map_build.step_direction_finding()`. It holds the five stations in DF order and
+  the five Werke with their target spots. Overview and API: `Source/Tools/DirectionFinding/README.md`.
+- It does sections 4.1-4.3 except the early reveal at the tunnel mouth: random command post, hidden targets that appear at the fix, wedges of 20 / 22 /
+  25 degrees, routine x0.9 / reply x0.7 / attack order x0.5, 2 degree floor, lost wedges grey, fix at three held
+  wedges with one Werk left, or all five stations held.
+- The mission chain drives it through `NotifyAttackOrder` (wave director), `NotifyPlayerAttackedSite` (outposts and
+  Werke), `SetWerkEliminated`, and listens to `OnStationChanged`, `OnBurstHeard`, `OnFirstOverlap` (M06) and `OnFix`
+  (M08).
+- Verified with `Source/Tools/DirectionFinding/run_df_test.ps1 -Pictures`: 30 checks pass, and the minimap pictures
+  show the wedges, the overlap and the fix.
+- **Design finding:** the bearings find the command post sooner than section 3 assumed. On the built layout, two
+  stations narrowed to the 2 degree floor leave exactly one Werk in 1152 of 1200 sweep runs, and the overlap shows it
+  on the map. At the start width of 20 degrees, two stations already leave one Werk in about half of the station
+  pairs, and one station at 5 degrees in 15 of 25 cases. The fix still needs a third station, so the mission works,
+  but the player can read the answer from the map after two. In both test runs the third station fixed the command post
+  the moment it was taken, before any burst, so on this layout the bursts barely matter for reaching the fix. Knobs: a higher floor (`MinHalfAngle`), weaker burst
+  factors, or a larger centre error.
+- **Owner decision 2026-11-24: keep the tuning as it is.** The fast fix is accepted; the knobs above stay at
+  their section 4 values.
+- Not built yet: the early target reveal when player units reach the command Werk's tunnel mouth (4.1), decoy truck
+  bursts (Hard+), the subtitled intercept snippet per burst, the buried rail gate rule.
 
 ## 11. Decisions (questionnaire, 2026-11-22)
 

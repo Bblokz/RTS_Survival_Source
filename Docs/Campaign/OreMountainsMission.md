@@ -326,8 +326,9 @@ base. A unit kept at a tower reveals a wide area of fog and warns earlier of eac
 - **Decided 2026-11-22: 2 towers, captured like a capture point** (`ACaptureActor`); once taken they stay the
   player's with no garrison needed. (This conflicts with alert tier 2, "retake squads at captured towers"; see
   "Mission structure".)
-- **(open)** which summits (foothill tops are 4-10 m; the Base B knoll is taken), reveal radius, and how much earlier the
-  warning comes and how it shows the cargo.
+- **Summits (owner pick 2026-11-23): T1** (8300, 26700) on the east front above Base A, the first sight of convoys
+  entering, and **T2** (16100, 3900), the central summit over the weighbridge and the ambush corridor (candidates in
+  `Saved/OreMountains/spots/ore_spot_candidates.md`). **(open)** reveal radius and warning lead time (tuning).
 
 ## Environment: what happened here
 
@@ -515,10 +516,11 @@ marked *proposal* was not picked by the owner and still needs a yes.
 
 ### Flow
 
-1. **Opening.** Location intro (Erzgebirge + date), then a camera tour of the valley (weighbridge, road, knoll,
-   battery), then briefing lines 01 to 03 (recorded: `OreMountains_Briefing_01_Weighbridge`, `_02_DiggingIn`,
-   `_03_SpecialConvoy` in `.../AAAGerMissions/OreMountains/Briefing`). Then the faction's start force drives out of
-   the adits. The full building kit is available.
+1. **Opening** (reworked 2026-11-24, see "Opening rework" below). A short panning location intro (Erzgebirge + date,
+   no Advisor, no valley tour). Then cargo planes fly in the HQ truck, three harvesters in front of it, and the Gamma
+   Facility, refinery and barracks trucks; the player deploys them where they like. Once every load is down, briefing
+   lines 01 to 03 (recorded: `OreMountains_Briefing_01_Weighbridge`, `_02_DiggingIn`, `_03_SpecialConvoy` in
+   `.../AAAGerMissions/OreMountains/Briefing`), then the faction's start force. The full building kit is available.
 2. **Convoy 1, the guided fuel run (scripted start).** An ambush hint marker below the ridge. When the escort dies, the
    "Capturing trucks" field-manual takeover explains the 12 s countdown, the 20 m squad rule and the 60 % health rule,
    and the Advisor coaches. Captured trucks drive to the adit and nothing chases them.
@@ -577,7 +579,7 @@ stage always starts.
 
 | # | Stage | Parent class | Plate | Trigger | Completes when | On start / on complete |
 |---|---|---|---|---|---|---|
-| 0 | `Opening` | `UMissionBase` | Major: "Survey the valley" | none (begin play) | the graph completes it after briefing line 03 | **Start:** location intro; camera tour; briefing 01-03 chained with `ScheduleSingleCallback`. **Complete:** the faction start force drives out of the adits. |
+| 0 | `Opening` | `UMissionBase` | Major: "Set up the base" | none (begin play) | the graph completes it after briefing line 03 | **Start:** panning location intro; HQ, 3 harvesters and 3 base trucks flown in; briefing 01-03 once all are down (see "Opening rework"). **Complete:** the faction start force spawns. |
 | 1 | `KeepHQ` | `UDontLoseHQMission` | Major: "Keep the HQ alive" | class completed: Opening | never; **fails = defeat** | |
 | 2 | `Convoy1_FuelRun` | `UMissionBase` | Major: "Ambush the fuel convoy" | class completed: Opening | the convoy has finished (`OnConvoyFinished` of the route) | **Start:** hint marker; Advisor line; start convoy 1 on the route. **First scuttle countdown:** "Capturing trucks" field manual. |
 | 3 | `Convoy2_Weighbridge` | `UMissionBase` | Major: "Strike at the weighbridge" | class completed: Convoy1_FuelRun | the convoy has finished | **Start:** start convoy 2; it stops 60 s at the weighbridge. |
@@ -587,9 +589,9 @@ stage always starts.
 | 7 | `Convoy5_Cases` | `UMissionBase` | Major: "Raid the convoys" | class completed: Convoy4_Hunters | the convoy has finished | **Start:** 240 s, warning ("sealed cargo" if the outpost or a tower has marked it), start convoy 5. **Complete:** note where the cases are (adit, sealed cache, Base B). |
 | 8 | `HeavyCounterattack` | `USovietCounterattackMission` | Major: "Hold the ridge" | class completed: Convoy5_Cases | the attack is beaten | Medium + heavy armour, hazmat engineers. |
 | 9 | `Convoy6_Heavy` | `UMissionBase` | Major: "Stop the heavy column" | class completed: Convoy5_Cases | the convoy has finished | **Start:** 240 s, warning, start convoy 6 toward Base B. |
-| 10 | `RadioOutpost` | `UKillActorsMission` (outpost guards) | Bonus: "Take the radio outpost" | class completed: Opening | the guards are dead | **Complete:** manifest takeover; convoy 5 is marked. |
+| 10 | `RadioOutpost` | `UKillActorsMission` (outpost guards) | Bonus: "Take the radio outpost" | class completed: Convoy1_FuelRun (was Opening until 2026-11-24) | the guards are dead | **Complete:** manifest takeover; convoy 5 is marked. |
 | 11 | `RecoverCases` | `UMissionBase` | Major: "Recover the Berlin cases" | class completed: RadioOutpost (owner pick 2026-11-23: also started with convoy 5 if the outpost is not taken by then) | the cases reach the adit, or their sealed cache is scavenged | A stage has one trigger, so the second path needs a second trigger entry or a start call from `Convoy5_Cases`'s graph. |
-| 12 | `DestroyBaseB` | `UKillActorsMission` (Base B targets) | Major: "Destroy Base B" | class completed: Opening | every target is dead | If the cases escaped, Base B falling drops their sealed cache. |
+| 12 | `DestroyBaseB` | `UKillActorsMission` (Base B targets) | Major: "Destroy Base B" | class completed: Convoy2_Weighbridge (was Opening until 2026-11-24) | every target is dead | If the cases escaped, Base B falling drops their sealed cache. |
 | 13 | `BaseA` | `UKillActorsMission` (Base A targets) | Bonus: "Raid the convoy yard" | class completed: Opening | every target is dead | **Complete:** loot. The route's owning building stays unset. |
 | 14 | `Battery` | `UKillActorsMission` (the pits) | Bonus: "Silence the battery" | class completed: Convoy3_AmmoSplit | every pit is dead | |
 | 15 | `Ending` | `UMissionBase` | none | class completed: DestroyBaseB | the graph ends it | **Start:** if `GetHasMissionClassCompleted(RecoverCases)` is true, play the Advisor Berlin line now; otherwise wait for `BP_OnOtherMissionEnded(RecoverCases)` first. Then victory and debrief. |
@@ -601,11 +603,24 @@ All 16 stages exist and are wired into `Ger_2ndOreMountains`' `BP_MissionManager
 has run in a game** (the owner tests). Where the build differs from the table above:
 
 - **Shared pieces:** `Mission_Ore_Base` (parent of the `UMissionBase` stages) holds `PlayAdvisorLine`,
-  `StartConvoyRoute(RouteId)` and `TrackTaggedTargets(Tag, Prefix)`; `BPML_OreMission` holds the macro
-  `SwitchConvoyEnd` (Outcome -> Stopped / Escaped).
+  `StartConvoyRoute(RouteId)`, `TrackTaggedTargets(Tag, Prefix)`, `GetOreBattery` (`BatteryId` `ORE_Battery`),
+  `GetTruckSubsystem`, `PlayCargoWarning(CargoType)`, the shared `ConvoyRoute` variable and the custom events
+  `ListenToLookoutTowers` / `OnTowerConvoyWarning` (every convoy stage calls `ListenToLookoutTowers` at its start; a
+  held tower's warning for that stage's own route plays `Fuel/Ammo/Parts/ConcreteWarningLine`). `BPML_OreMission`
+  holds the macro `WasConvoyStopped(Outcome) -> bStopped` (every outcome but Escaped); the convoy stages branch on it.
+  (A macro with exec outputs was tried: the UECP tool can only make wildcard macro pins, and the exec wires were
+  dropped on the next editor load, so the macro is data-only.)
 - **Kill stages track tags, not placed lists** (the sites are not in the map yet): `RadioOutpost` tracks actors tagged
-  `ORE_RadioOutpost`, `DestroyBaseB` `ORE_BaseB_Target`, `BaseA` `ORE_BaseA_Target`, `Battery` `ORE_Battery_Pit`.
-  Each tracks on the minimap and, when the last one dies: line, wait, complete. With no tagged actor the plate stays up.
+  `ORE_RadioOutpost`, `DestroyBaseB` `ORE_BaseB_Target`, `BaseA` `ORE_BaseA_Target`. Each tracks on the minimap and,
+  when the last one dies: line, wait, complete. With no tagged actor the plate stays up. **Tag only Base B's core
+  buildings** with `ORE_BaseB_Target`: defences that a `ADormantDefenceSlot` spawns later are not tracked.
+- **Battery** finds `AEnemyArtilleryBattery` `ORE_Battery` and completes on its `OnBatteryDestroyed` (every pit dead or
+  captured). **Convoy 3** forwards the route's `OnBranchTruckArrived` to the battery's `NotifyAmmoTruckArrived`.
+- **DestroyBaseB** also finds the `AConvoyPressureDirector` and forwards `OnEscapedAmmoSeconds` to the battery's
+  `AddSuppliedSeconds`; when Base B falls and the cases escaped, it spawns their sealed cache at
+  `EscapedCasesTransform` (the knoll top) through `USurrenderingTruckSubsystem::SpawnEscapedCasesSealedCache`.
+- **RecoverCases** binds the truck subsystem's `OnCasesDelivered` (case truck reached the adit) and
+  `OnSealedCacheScavenged` (destroyed or escaped cases recovered); either one: line, wait, complete (once).
 - **Bonus triggers:** `BaseA` and `Battery` start when a player unit comes within 90 m of the site (`near`), so their
   plates appear when found; `RadioOutpost` starts after `Opening` until its spot is picked.
 - **Convoy stages** start the route whose `RouteId` is `ORE_Convoy1` .. `ORE_Convoy6` (one `AEnemyConvoyRoute` per
@@ -622,14 +637,225 @@ has run in a game** (the owner tests). Where the build differs from the table ab
   `SpawnPlayerGerMediumTankDestroyer_StugIII_OrMarder`, 1x `SpawnPlayerGerArmoredCar250_251Mortar` (these pick by
   faction). **The start base (HQ, Gamma Facility, refinery, barracks) is not placed and nothing spawns it.**
 - **Slots that wait for content:** `Convoy1.ShowCaptureFieldManual` (the takeover widget is not built; it prints a
-  note), `RecoverCases.WatchCases` (waits for the case truck C++), the manifest takeover, every Advisor line except the
-  briefing (empty `SoundBase` variables play nothing).
+  note), the manifest takeover, every Advisor line except the briefing (empty `SoundBase` variables play nothing).
 - **Second start for RecoverCases (open Q4):** `UMissionClassCompletedMissionTrigger::AlsoWatchMissionClasses` (new,
-  2026-11-23) lets one trigger watch several classes; RecoverCases will watch `RadioOutpost` OR `Convoy4_Hunters`
-  (= the moment the convoy 5 stage begins) once the editor DLL with it is loaded.
+  2026-11-23) lets one trigger watch several classes; RecoverCases watches `RadioOutpost` OR `Convoy4_Hunters`
+  (= the moment the convoy 5 stage begins). Wired in the map.
+- **Checks done:** every stage compiles in the editor and after a fresh load from disk in a separate commandlet
+  (`Source/Tools/OreMountainsMission/compile_stages_fresh.py`); the map's `Missions[]` was read back in the editor after saving (DebugGame and Development fresh loads both clean).
+  The Development and DebugGame DLLs both contain the new C++ (2026-11-23).
 - **Tools:** `Source/Tools/OreMountainsMission/` (`build_ore_stages.py` rebuilds every stage, `tidy_ore_functions.py`,
   `make_counterattack_settings.py`, `run_wire_ore_stages.py` + `wire_ore_stages.py`). Event graphs are hand laid out
   (rows left to right, each scheduled callback right after its Schedule node); functions are tidied (no reroute knots).
+
+### Content placed in the map (2026-11-23, late)
+
+Run by `Source/Tools/OreMountainsMission/run_ore_placement.py` (a throwaway full editor; map saved after a blocking
+RebuildNavigation, size ratio 1.013; backup `Saved/OreMountains/stages/backup/Ger_2ndOreMountains_2026-11-23_pre_placement.umap`):
+- **Soviet sites** (`place_soviet_sites.py`, doc OreMountainsSites.md): Base A, Base B (radio mast `ORE_BaseB_RadioMast`
+  = the routes' radio post), radio outpost at R3 (**taken by destroying its radio hut**, tagged `ORE_RadioOutpost`),
+  checkpoint, 8 battery pits; 28 grey placeholders removed.
+- **Convoy content** (`place_convoy_content.py`, assets `.../OreMountains/Convoys/`): routes `ORE_Convoy1..6` with
+  `DA_Convoy_Ore_1..6` (all drivable; convoy 2 stops 60 s at the weighbridge, convoy 3 branches to the battery, convoy 4
+  hunters dismount at the ambush corridor and attack `ORE_HQ_AttackMarker`, ambush zones on 4-6), truck BPs
+  (`BP_Ore_CargoTruck`, `BP_Ore_FuelTruck`, `BP_Ore_CaseTruck` with `BP_Ore_SealedCases`, white flag), `ORE_Battery`,
+  `ORE_PressureDirector` (tier responses still empty) and 4 dormant defence slots on the knoll.
+- **Exploration + base** (`place_exploration.py`, doc OreMountainsExploration.md): towers T1 + T2 (owner pick), buried
+  armour at the provisional S1 / P1 / V1 / L3 / W1, heap stations `BP_OreHeapStation` (new C++ `AOreHeapStation`) at the
+  provisional HN1 / HB3 (+2 metal nodes on heap 1), pre-built Gamma Facility, refinery and barracks; the HQ comes from
+  the profile's HQ truck (`HQ_MODE='profile'`).
+- **Advisor lines:** 23 lines (`.../AAAGerMissions/OreMountains/Mission/OreMountains_*`, take "a" for now, subtitles in
+  `DT_CinematicTranscripts`) set on every stage; overview to pick takes: `VoiceLines/OreMissionLines/OreMissionLines_Takes.html`.
+- **Takeovers:** Convoy 1 shows `Show Capturing Trucks Takeover` on the first scuttle countdown (new world event
+  `USurrenderingTruckSubsystem::OnScuttleCountdownStarted`); RadioOutpost shows `Show Ore Manifest Takeover`, then its line.
+- **Light counterattack:** one T-70 more when convoy 2 escaped (owner pick Q5), `AddEscapeBonusUnit`.
+
+**Follow-ups 2026-11-24:**
+- Spots confirmed by the owner: outpost R3 (Flak-Luchs L3), heap stations HN1 + HB3, buried S1 / P1 / V1 / W1.
+- **Battery guns are B-4 203 mm howitzer pits** (owner idea): `Pit_B4_A` (14560, 13400) and `Pit_B4_B` (22960, 13400),
+  the BS-3s and the 53-K are gone. Unsupplied a B-4 reaches ~97 m; supplied the battery raises it to `SuppliedRangeCm`
+  50000 (the orange ring; the high arc clears the ridge lip that blocked the direct-fire guns). `MinimumCalibreMm` 100:
+  only the B-4s and the 120 mm mortars barrage; DShK and Ampulomet stay as close guards. `AutoCollectRadiusCm` 4500.
+- Director tier responses placed (`place_director_responses.py`, ConvoyPressureDirector.md "Ore Mountains setup"):
+  tier 1 two patrols, tier 2 targeted attack on the heap stations, tier 3 two raids on the ridge, fuel = light tanks at
+  Base B. Opening raises the enemy wave supply to 40 (`EnemyWaveSupply`).
+- Fixed from the static check: the start force now has two rifle squads (captors for convoy 1), escaped cases spawn on
+  the knoll (the transform was zero), counterattack spawns trace to the ground (Z 0 / 50), four voice lines swapped to
+  clean takes.
+
+- **Site looks picked (owner, 2026-11-24)** from `Saved/OreMountains/sites/v01`: weighbridge **1A Waagehaus**, Base B
+  headframe **2D Erzbunkerschacht**, Base A ore plant **3B Brecher und Silos** (use the silos the project already has),
+  heap station **4A Erzrolle**, radio outpost **5A Funkbude**, border **6A Grenzsteine**. Modelling started the same day.
+
+Still open: final voice-line takes, tuning numbers. Nothing has run in a game.
+
+### Opening rework (2026-11-24)
+
+The owner's first play test: the start was overwhelming (cinematic at once, the valley tour did not lift the fog,
+every bonus and the Base B objective at once), then silent. The owner now tunes the mission step by step, with a play
+test between steps. This step:
+
+- **Opening** (`Mission_Ore_Opening`, plate "Set up the base"):
+  1. `ShowLocationIntro` with `bPanCamera` (25 degree turn and back, `IntroSeconds` 9). The valley tour and its four
+     place variables are gone.
+  2. The base is flown in:
+     - `DeliverHQ` sends the HQ truck by cargo plane to `HQDropLocation`, the old RTS_PLayerStart spot (-17085, 8040).
+       `bBuildHQOnLanding` is false, so the player deploys it.
+     - Then every `DropIntervalSeconds` (4) `DeliverNextDrop` sends one more plane: three `Tank_PzI_Harvester` 22 m in
+       front (north) of the HQ spot, 9 m apart, then the Gamma Facility, refinery and barracks trucks.
+     - Truck spots: (-19300, 4700), (-14400, 10600) and (-17000, 4500); all traced flat and clear on 2026-11-24.
+     - The trucks are only set down; the player deploys them.
+  3. `CountLandedDrop` counts all seven landings, failed deliveries included.
+     - The HQ landing (ID 1) runs `GrantHQStart` once: `ACPPController::MissionOnHqSpawned` with no bonus, so the
+       profile start (game-setting resources, HQ resource cards) still happens.
+     - When all seven are down, or after `DropTimeoutSeconds` (150), `OnAllDropsLanded` runs once. After
+       `DropsSettledSeconds` (4), briefing 01-03 play, then the start force spawns and the stage completes.
+- **Map:**
+  - `RTS_PLayerStart.DoNotLoadProfileUnits` is on, so there are no profile units and no profile HQ truck.
+  - The pre-built `ORE_Explore_Base_*` buildings are deleted, navigation was rebuilt, and the map was saved.
+  - `place_exploration.py` has a new `HQ_MODE = 'airdrop'` that keeps it this way on a re-run.
+- **Convoy 1** (`Mission_Ore_Convoy1_FuelRun`):
+  - The stage starts the route and binds `OnConvoyStarted`. When the column has spawned (once),
+    `PlayConvoyApproachCinematic` plays a skippable two-shot camera tour:
+    - shot 1 follows the column 25 m west along the road;
+    - shot 2 runs from halfway to the ambush spot onto the ambush spot;
+    - each shot lifts the fog in a 45 m radius (`ApproachRevealRadius`).
+  - As the tour starts, the Advisor lines `ConvoyApproachLine1..3` play in order: `OreMountains_Convoy1Approach_01`
+    to `_03` in `.../OreMountains/Mission` (owner's set A; 17.8 s in all; subtitles in `DT_CinematicTranscripts`).
+    "Look east, Kommandant. Ze first convoy is rolling past ze convoy yard." / "Fuel trucks, und only a light escort
+    to watch over zhem." / "Zhey must come down ze valley, right below our ridge. We want zat fuel."
+    `ApproachShot2Seconds` went from 7 to 8.5 so the tour (8 + 8.5 + 1.75 s return) covers the lines.
+  - When the tour ends, the ambush hint appears and the old `StartLine` ("set your ambush below ze ridge, at ze spot I
+    have marked") plays.
+- **Later objectives:**
+  - `RadioOutpost` (bonus) now starts after Convoy 1, `DestroyBaseB` after Convoy 2. Before, both started after the
+    Opening.
+  - The Battery and Base A bonuses already start only when a player unit comes within 90 m.
+- **C++** (Development DLL built; nothing play-tested):
+  - `UMissionBase::DeliverPlayerVehicleByCargoPlane(VehicleSubtype, DropLocation, DropRotation, ID)` and
+    `BP_OnAirDeliveredVehicleLanded`. A rope-slung vehicle (harvester, tank) is set down; this uses the new
+    `FNomadicAirDeliveryOrder::VehicleSubtype` and `UNomadicAirDeliverySubsystem::StartVehicleDelivery`.
+  - Camera tours:
+    - `FMissionCameraTourShot::RevealRadius` lifts the fog along each shot's path, and along the blend into it from
+      the previous shot, with bubbles one radius apart, for the whole tour plus 4 s. This fixes "the tour does not
+      reveal what it points at".
+    - `FMissionCameraTourSettings::bAllowSkipping` shows the cinematics' hold-Space prompt (`UW_HoldToSkip`). A skip
+      jumps to the ease back, and `BP_OnCameraTourFinished` still fires.
+- **Kept:** the start force (two tanks, a StuG/Marder, a 251 mortar, two rifle squads). It is mission-spawned, not a
+  profile unit, and convoy 1 needs its squads to capture trucks.
+
+**Second pass, same day (owner, after the first timeline report, `Source/Docs/Missions/MissionTimeline.md`):**
+- **Start force flown in early.**
+  - The four start vehicles now come by cargo plane right after the HQ. They are the faction picks
+    `GetPlayerLightMediumTank_PZIII_J_Or_PZIV_F1` x2, `GetPlayerGerMediumTankDestroyer_StugIII_OrMarder` and
+    `GetPlayerGerArmored_Transport_251_Or_250`, delivered through the new C++ node
+    `DeliverPlayerTrainingOptionByCargoPlane`.
+  - The two rifle squads arrive with the HQ truck (`SpawnStartForce`, 9 m behind it).
+  - Plane order after the HQ: 4 vehicles, 3 harvesters, 3 trucks, one every 3 s (`DropIntervalSeconds`,
+    `FollowUpDrops` 10, `ExpectedDrops` 11).
+  - `DeliverNextDrop` only picks the helper: `DeliverStartVehicle`, `DeliverHarvester` or `DeliverBaseTruck`.
+  - The briefing no longer spawns anything.
+- **Convoy 1 later:** `ORE_Convoy1` `Timing.FirstConvoyDelay` is 80 s (was 20). `place_convoy_content.py` sets it.
+- **Light counterattack faster:** preparation / wave gap in seconds, before -> after:
+
+  | Difficulty | Before | After |
+  |---|---|---|
+  | New to RTS | 60 / 70 | 35 / 40 |
+  | Normal | 45 / 60 | 25 / 35 |
+  | Hard | 35 / 60 | 20 / 30 |
+  | Brutal and Ironman | 25 / 50 | 15 / 30 |
+
+  The escape-bonus T-70 now comes with the first wave (25 s). Script: `tune_opening_pacing.py`.
+- **Ambush mark earlier:** the convoy 1 stage shows the ambush mark the moment it starts (2:03), not after the
+  cinematic. The "set your ambush at ze spot I have marked" line still plays after the cinematic. The convoy reaches
+  the mark 138 s after it appears (was 40 s).
+- **KV-3 air drop** (owner, same day; new stage `Mission_Ore_KV3Drop`, starts when convoy 3 finishes):
+  - **Data asset:** `DA_Ore_KV3AirDrop` (new C++ class `UEnemyAirDropSettings`, `Enemy/AirDrop/`). It holds:
+    - the delay: 90 s after the stage starts;
+    - the vehicle: KV-3;
+    - the count: 1 / 2 / 3 / 4 for New to RTS / Normal / Hard / Brutal and Ironman.
+  - **Air drop actor:** `ORE_KV3AirDrop` (AirDropId `ORE_KV3Drop`) at the west end of the ridge bench, (-24000,
+    -24000). That's the westernmost flat spot at base height that is at least 45 m inside the map edge and has a
+    navmesh path to the base. The `AEnemyAirDrop` takes its units and delay from the asset (new `SettingsAsset` slot).
+    Landing cargo planes bring the tanks; they can be shot down. The tanks are not handed to the enemy AI: the stage
+    orders them.
+  - **Plate:** "Watch the skies" ("Soviet transport planes have been seen over the border.").
+  - **Each landed KV-3** (new Blueprint event `AEnemyAirDrop::OnUnitLanded`) attack-moves along the bench to the base.
+  - **First landing:** after 3 s, a skippable two-shot camera tour (landing spot, then along the bench, fog lifted)
+    with the Advisor line `KV3Line`, and the plate turns into "Destroy the KV-3s". The stage completes when every
+    landed KV-3 is destroyed. If every plane is shot down, it completes at once with `ShotDownLine`.
+  - **Lines:** `KV3Line` = `OreMountains_KV3Landed` (owner's pick, V2 "alarmed", 9.0 s): "Kommandant! Zhey have
+    landed KV-3 tanks on ze west end of our ridge! Prototypes, heavily armoured, und coming straight for us!". It is
+    set on the stage and on the map instance. `ShotDownLine` and `DoneLine` are still empty.
+  - **Timeline (Normal, passive):** plate 10:57, planes 12:27, 2 KV-3s land 13:02, cinematic 13:05-13:18.
+  - **Scripts:** `place_kv3_drop.py`, the stage in `build_ore_stages.py`.
+- **Data assets of this map** now live next to the level: `/Game/RTS_Survival/Maps/GerMissions/Ger_2ndOreMountains/`
+  (`DA_Convoy_Ore_1..6`, `DA_Ore_Light/HeavyCounterattack`, `DA_Ore_KV3AirDrop`). References are fixed, no
+  redirectors are left, and every tool script loads them from there.
+- **Timeline estimate (Normal, passive):**
+  - squads 0:44, vehicles 0:47-0:56, last truck 1:14, briefing 1:18-2:02;
+  - convoy 1 and its cinematic 3:23, ambush spot reached 4:21;
+  - light counterattack 8:39-10:14, with waves at 9:04 and 9:39.
+
+### Objective intro tours (2026-11-24)
+
+The owner picked these in the decision dialog:
+- **Which objectives:** every major objective without a cinematic gets a short, skippable intro tour. That is 9 stages:
+  convoys 2-6, both counterattacks, Destroy Base B and Recover the cases.
+- **Speakers:** the Advisor on Base B and the cases; an intercepted Soviet radio voice (`SovietMosin`) on the convoys
+  and counterattacks.
+- **Lines:** new, 5 versions each, the owner picks. A separate session writes them. Until they exist the tours show
+  captions only.
+- **8:39:** the starts are staggered, and things should be more spread out in general.
+
+How a tour plays:
+- **Shots:** two shots of 7 s, then a 1.75 s ease back. Fog is lifted along both shots (`IntroRevealRadius` 4500).
+  Captions, focus points, shot lengths and the speaker are instance-editable variables in the `Ore|Intro tour`
+  category of each stage.
+- **Convoy stages:** the tour starts when the column sets off (`OnConvoyStarted`). Shot 1 follows the column and
+  shot 2 shows the place that matters:
+  - convoy 2: the weighbridge;
+  - convoy 3: the battery road;
+  - convoy 4: below the ridge;
+  - convoy 5: the broken viaduct;
+  - convoy 6: the knoll road.
+- **Other stages:** the tour starts with the stage.
+  - Counterattacks: the yard, then the valley road. The Advisor warning now plays after the tour.
+  - Base B: the knoll.
+  - Recover the cases: the valley road, then the adit. The objective line now plays after the tour.
+- **Wait for quiet:** the tour waits (polled every 1 s, at most `IntroVoiceWaitSeconds` 20) until no voice line plays,
+  because a takeover cuts a playing portrait. Its lines (`IntroLine1`/`IntroLine2`, speaker `IntroPortrait`) start
+  once the first shot is on screen. If the tour never shows, they play anyway.
+- **Staggering at 8:39:**
+  - `DestroyBaseB` now starts when `LightCounterattack` completes (was convoy 2).
+  - Route 3's first convoy waits 55 s (was 20 s).
+
+Timeline (Normal, passive, `Saved/MissionTimeline/Ger_2ndOreMountains`):
+
+| Time | Tour |
+|---|---|
+| 5:41 | convoy 2 |
+| 8:53 | light counterattack (after the escaped line and the convoy 3 start line) |
+| 9:34 | ammo convoy |
+| 10:14 | Base B |
+| 13:40 | KV-3 |
+| 15:52 | convoy 4 |
+| 17:30 | Berlin cases |
+| 21:43 | convoy 5 |
+| 23:14 | heavy counterattack |
+| 27:27 | heavy column |
+
+No tour waits for another or cuts a line.
+
+The timeline simulator now models a mission's own tour state (`GetCameraTourShotIndex`, `GetIsCameraTourPlaying`, the
+45 s screen-busy skip) and `GetIsPortraitPlaying`.
+
+Scripts:
+- `INTROS`, `add_intro_tour`, `intro_start_row` and `intro_lines_row` in `build_ore_stages.py`;
+- `wire_ore_stages.py`;
+- `place_convoy_content.py` (`FIRST_CONVOY_DELAY`).
+
+Nothing is play-tested.
 
 ### What has to be built (2026-11-23 check)
 
@@ -638,30 +864,43 @@ has run in a game** (the owner tests). Where the build differs from the table ab
 - the convoy route, including the ammo branch to the battery;
 - Base A, Base B, the battery pits, the radio outpost, the weighbridge guards and the weighbridge collision;
 - the ambush hint marker;
-- the 2 lookout towers (the model is not in Unreal yet);
-- the 2 spoil-heap stations;
-- the 5 buried-armour vehicle actors (only the sand meshes exist).
+- the 2 lookout towers (`BP_OreLookoutTower` is built, see OreLookoutTowers.md);
+- the 2 spoil-heap stations (concept sheet to pick);
+- the 5 buried-armour sites (`BP_BuriedArmour_*` are built, see BuriedArmour.md);
+- an `AEnemyArtilleryBattery` (`BatteryId` ORE_Battery) among the battery pits, and an `AConvoyPressureDirector` with
+  the six routes, tier responses and `ADormantDefenceSlot`s at Base B.
+
+Spots for the towers, the outpost, the heap stations and the buried vehicles: pick from
+`Saved/OreMountains/spots/ore_spot_candidates.png`. Site looks (weighbridge, headframe, ore plant, heap station, radio
+outpost, border): pick from the six sheets in `Saved/OreMountains/sites/v01/` (4 concepts each).
 
 The map already holds an actor tagged `CapturedTruckDropOff`; check that it sits at the main adit on the navmesh.
 
 **Assets:**
 - the Blueprint child of `ASurrenderingCargoTruck`;
 - the armoured case truck;
-- the six Ore convoy definitions;
-- the two counterattack settings assets;
+- the six Ore convoy definitions (and the six `AEnemyConvoyRoute`s `ORE_Convoy1`..`6` in the map: until they exist the
+  chain stops at Convoy 1, because its stage binds a missing route and never completes);
+- the `SealedCacheClass` Blueprint for the case truck;
 - the start force per faction;
 - the "Capturing trucks" field manual and the manifest takeover.
 
-**C++ not found in the code** (searched by name; unverified):
-- a timed convoy stop at a point (convoys only halt behind their escorts today);
-- infantry dismounting from convoy trucks;
-- Base B's radio speeding convoys up;
-- escaped-cargo effects by type (and a concrete cargo type);
-- alert tiers;
-- the battery's supplied state (range up plus the barrage);
-- the case truck's sealed cache and "stored at Base B";
-- a payout mapping for captured fuel and ammo trucks;
-- AI capture of towers (only if tier 2 retakes towers).
+**C++ built 2026-11-23** (DebugGame and Development compile; nothing play-tested):
+- convoy behaviours on `AEnemyConvoyRoute`: timed stop (60 s, floor it when attacked), branch split to the battery,
+  radio-post speed-up in ambush zones, hunter dismount, per-cargo outcome event; held trucks skip stuck checks
+  (Source/Docs/Missions/ConvoyBehaviours.md);
+- captured payout mapping, white flag / minimap / first-surrender line, `ASurrenderingCaseTruck` with sealed caches
+  and `USurrenderingTruckSubsystem` (Source/Docs/Missions/SurrenderingCargoTruck.md);
+- `AEnemyArtilleryBattery` supplied state (Source/Docs/Missions/ArtilleryBattery.md);
+- `AConvoyPressureDirector` alert tiers + escaped-cargo effects + `ADormantDefenceSlot`
+  (Source/Docs/Missions/ConvoyPressureDirector.md);
+- `ALookoutTowerCaptureActor` (Source/Docs/Environment/OreLookoutTowers.md) and `ABuriedVehicleSite`
+  (Source/Docs/Environment/BuriedArmour.md);
+- `EConvoyCargoType::Concrete`, `UMissionClassCompletedMissionTrigger::AlsoWatchMissionClasses`,
+  `USurrenderingTruckSubsystem::GetSurrenderingTruckSubsystem` (Blueprint getter).
+
+Still missing assets: a white flag mesh (`WhiteFlagMesh` is empty; `SM_FlagPole` or `SM_SupplyPoint_Flag` could be
+reskinned) and a `SealedCacheClass` Blueprint for the case truck.
 
 **Voice lines:**
 - Recorded: briefing 01-03.
