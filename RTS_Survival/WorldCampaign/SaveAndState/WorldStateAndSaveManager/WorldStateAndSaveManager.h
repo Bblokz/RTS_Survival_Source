@@ -49,6 +49,21 @@ public:
 	void SetEnemyObjectProceduralMapIndex(int32 NewIndex);
 	int32 AdvanceEnemyObjectProceduralMapIndex(int32 MapCount);
 
+	/** Saved cursor and per-item map memory of the handmade enemy item maps; the world controller picks through it. */
+	FWorldOperationMapPoolState& GetHandmadeEnemyItemMapPool();
+
+	/** Saved cursor and per-division map memory of the handmade field maps. */
+	FWorldOperationMapPoolState& GetHandmadeFieldMapPool();
+
+	void ResetHandmadeOperationMapPools();
+
+	/**
+	 * @brief Copies every operation map cursor so a launch that fails after picking its map can undo the pick.
+	 * @return The procedural index and both handmade pool states as they are now.
+	 */
+	FWorldOperationMapCursorSnapshot CaptureOperationMapCursors() const;
+	void RestoreOperationMapCursors(const FWorldOperationMapCursorSnapshot& Snapshot);
+
 	const FWorldCampaignState& GetCachedWorldCampaignState() const { return M_WorldCampaignState; }
 
 	/**

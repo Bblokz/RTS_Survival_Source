@@ -24,6 +24,10 @@ public:
 	void InitializeForAnchorWithMissionType(AAnchorPoint* AnchorPoint, EMapMission MissionType);
 
 	EMapMission GetMissionType() const { return M_MissionType; }
+
+	/** @return The mission's name on the campaign map; empty for a mission that has none configured. */
+	UFUNCTION(BlueprintPure, Category = "World Campaign|Map Item")
+	FText GetMissionDisplayName() const;
 	FEnemyOrMissionMapItemUIData GetMapItemUIData() const;
 	const FPrimaryReward& GetPrimaryReward() const { return M_PrimaryReward; }
 	const FSecondaryReward& GetSecondaryReward() const { return M_SecondaryReward; }

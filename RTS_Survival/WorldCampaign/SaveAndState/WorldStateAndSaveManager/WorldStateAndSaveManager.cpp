@@ -58,12 +58,12 @@ UWorldStateAndSaveManager::UWorldStateAndSaveManager()
 void UWorldStateAndSaveManager::CacheCurrentWorldState(const AGeneratorWorldCampaign& WorldGenerator)
 {
 	const int32 CachedCurrentTurn = M_WorldCampaignState.CurrentTurn;
-	const int32 CachedEnemyObjectProceduralMapIndex = M_WorldCampaignState.EnemyObjectProceduralMapIndex;
+	const FWorldOperationMapCursorSnapshot CachedOperationMapCursors = CaptureOperationMapCursors();
 	const FWorldCampaignProgressState CachedProgress = M_WorldCampaignState.Progress;
 	M_WorldCampaignState = WorldGenerator.BuildWorldCampaignStateFromCurrentGeneration();
 	M_WorldCampaignState.Progress = CachedProgress;
 	M_WorldCampaignState.CurrentTurn = CachedCurrentTurn;
-	M_WorldCampaignState.EnemyObjectProceduralMapIndex = CachedEnemyObjectProceduralMapIndex;
+	RestoreOperationMapCursors(CachedOperationMapCursors);
 }
 
 void UWorldStateAndSaveManager::CachePlayerProfileSaveData(const FPlayerProfileSaveData& PlayerProfileSaveData)
@@ -170,6 +170,38 @@ int32 UWorldStateAndSaveManager::AdvanceEnemyObjectProceduralMapIndex(const int3
 	}
 
 	return M_WorldCampaignState.EnemyObjectProceduralMapIndex;
+}
+
+FWorldOperationMapPoolState& UWorldStateAndSaveManager::GetHandmadeEnemyItemMapPool()
+{
+	return M_WorldCampaignState.HandmadeEnemyItemMapPool;
+}
+
+FWorldOperationMapPoolState& UWorldStateAndSaveManager::GetHandmadeFieldMapPool()
+{
+	return M_WorldCampaignState.HandmadeFieldMapPool;
+}
+
+void UWorldStateAndSaveManager::ResetHandmadeOperationMapPools()
+{
+	M_WorldCampaignState.HandmadeEnemyItemMapPool = FWorldOperationMapPoolState();
+	M_WorldCampaignState.HandmadeFieldMapPool = FWorldOperationMapPoolState();
+}
+
+FWorldOperationMapCursorSnapshot UWorldStateAndSaveManager::CaptureOperationMapCursors() const
+{
+	FWorldOperationMapCursorSnapshot Snapshot;
+	Snapshot.ProceduralMapIndex = M_WorldCampaignState.EnemyObjectProceduralMapIndex;
+	Snapshot.HandmadeEnemyItemMapPool = M_WorldCampaignState.HandmadeEnemyItemMapPool;
+	Snapshot.HandmadeFieldMapPool = M_WorldCampaignState.HandmadeFieldMapPool;
+	return Snapshot;
+}
+
+void UWorldStateAndSaveManager::RestoreOperationMapCursors(const FWorldOperationMapCursorSnapshot& Snapshot)
+{
+	M_WorldCampaignState.EnemyObjectProceduralMapIndex = Snapshot.ProceduralMapIndex;
+	M_WorldCampaignState.HandmadeEnemyItemMapPool = Snapshot.HandmadeEnemyItemMapPool;
+	M_WorldCampaignState.HandmadeFieldMapPool = Snapshot.HandmadeFieldMapPool;
 }
 
 FWorldCampaignState UWorldStateAndSaveManager::AggregateWorldCampaignState() const
