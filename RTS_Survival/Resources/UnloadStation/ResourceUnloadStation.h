@@ -91,6 +91,12 @@ public:
 	/** @return False when the bay unloads nothing now or its resource has no bin; else the bin floor (world). */
 	bool GetBayBinWorldLocation(int32 BayIndex, FVector& OutBinLocation) const;
 
+	/**
+	 * @return How long one full unload takes from docking: the last measured one, or ExpectedUnloadSeconds before the
+	 * first. Harvesters fill their health bar's progress bar against it.
+	 */
+	float GetExpectedUnloadSeconds() const;
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
@@ -133,6 +139,11 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, Category="Unload Station|Timing", meta=(ClampMin="10"))
 	float TrolleySpeed = 380.f;
+
+	// Seconds from docking to the last credited load, for the harvester's progress bar until the first unload here
+	// is measured (HQ, refinery and depot all measured 37-39 s on 2026-11-24).
+	UPROPERTY(EditDefaultsOnly, Category="Unload Station|Timing", meta=(ClampMin="1"))
+	float ExpectedUnloadSeconds = 37.f;
 
 	// Within this distance of a stop the trolley slows down (ease in/out).
 	UPROPERTY(EditDefaultsOnly, Category="Unload Station|Timing", meta=(ClampMin="1"))
@@ -261,6 +272,9 @@ private:
 	TWeakObjectPtr<UResourceDropOff> M_DropOff;
 	TWeakObjectPtr<UStaticMeshComponent> M_BuildingMesh;
 	bool bM_IsStationReady = false;
+
+	// Duration of the last unload that emptied a harvester; 0 until one did.
+	float M_MeasuredUnloadSeconds = 0.f;
 
 	void BuildRailSpline();
 	void BuildDefaults();

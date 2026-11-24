@@ -18,6 +18,8 @@
 #include "RTS_Survival/Resources/ResourceComponent/ResourceComponent.h"
 #include "RTS_Survival/Resources/UnloadStation/ResourceUnloadStation.h"
 #include "RTS_Survival/Resources/UnloadStation/UnloadStationTypes.h"
+#include "RTS_Survival/RTSComponents/HealthComponent.h"
+#include "RTS_Survival/GameUI/Healthbar/W_HealthBar.h"
 #include "RTS_Survival/Units/Tanks/TrackedTank/PathFollowingComponent/TrackPathFollowingComponent.h"
 #include "TimerManager.h"
 #include "RTS_Survival/GameUI/Pooled_AnimatedVerticalText/Pooling/AnimatedTextWidgetPoolManager/AnimatedTextWidgetPoolManager.h"
@@ -68,7 +70,7 @@ void UHarvester::UpgradeCapacityForResource(const int32 ExtraCapacity, const ERT
 			return;
 		}
 
-		CargoSlot->MaxCapacity += ExtraCapacity;
+		CargoSlot->MaxCapacity += ExtraCapacity * HarvesterYield::CargoCapacityMultiplier;
 		return;
 	}
 }
@@ -619,7 +621,7 @@ void UHarvester::SetupHarvester(
 		{
 			FHarvesterCargoSlot CargoSlot;
 			CargoSlot.ResourceType = ResourceType;
-			CargoSlot.MaxCapacity = MaxCargoPerResource[ResourceType];
+			CargoSlot.MaxCapacity = MaxCargoPerResource[ResourceType] * HarvesterYield::CargoCapacityMultiplier;
 			CargoSlot.CurrentAmount = 0;
 			M_CargoSpace.Add(ResourceType, CargoSlot);
 		}
@@ -1293,7 +1295,8 @@ void UHarvester::HarvestAIAction_HarvestTargetResource()
 		return;
 	}
 
-	const int32 AmountHarvested = TargetResource->HarvestResource(SpaceLeftForTargetResource());
+	const int32 AmountHarvested = TargetResource->HarvestResource(SpaceLeftForTargetResource(),
+	                                                               HarvesterYield::HarvestYieldMultiplier);
 	if (AmountHarvested > 0)
 	{
 		OnHarvestedAddReturnCargoAbility();
@@ -1786,6 +1789,7 @@ int32 UHarvester::Crane_DeliverChunk(const int32 ChunkAmount, const FVector& Tex
 
 void UHarvester::Crane_OnUnloadEnded(const EUnloadEndReason Reason)
 {
+	StopUnloadProgressBar();
 	// The station already freed the bay.
 	M_UnloadStation.Reset();
 	M_UnloadBayIndex = INDEX_NONE;
@@ -2097,6 +2101,8 @@ void UHarvester::OnDockedAtUnloadBay()
 	}
 	M_HarvestStatus = EHarvesterAIAction::CraneUnloading;
 	HarvestDebug("Docked in unload bay " + FString::FromInt(M_UnloadBayIndex), FColor::Green);
+	// Before the station call: a station that cannot take the cargo ends the unload at once, which stops the bar.
+	StartUnloadProgressBar();
 	M_UnloadStation->OnHarvesterDocked(M_UnloadBayIndex, *this, *M_TargetDropOff, M_TargetResourceType,
 	                                   GetCraneCargoAmount());
 }
@@ -2148,6 +2154,7 @@ void UHarvester::AbandonUnloadStation(const bool bUseOldDropOffPoint)
 
 void UHarvester::ReleaseUnloadBay()
 {
+	StopUnloadProgressBar();
 	if (M_UnloadBayIndex == INDEX_NONE)
 	{
 		M_UnloadStation.Reset();
@@ -2175,4 +2182,146 @@ bool UHarvester::GetIsValidUnloadStation() const
 	}
 	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(this, "M_UnloadStation", "GetIsValidUnloadStation", this);
 	return false;
+}
+
+// ===== unload progress bar (health bar ActionProgressBar) =====
+
+namespace HarvesterUnloadProgressBar
+{
+	// Seconds between bar refreshes (the bar is small on screen; 20 Hz reads as smooth).
+	constexpr float RefreshInterval = 0.05f;
+	// The time estimate alone never fills the bar: the last part waits for the last credited load.
+	constexpr float MaxTimeEstimateFill = 0.97f;
+}
+
+void UHarvester::StartUnloadProgressBar()
+{
+	UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		return;
+	}
+	StopUnloadProgressBar();
+	M_UnloadProgress.bIsActive = true;
+	M_UnloadProgress.InitialCargo = GetCraneCargoAmount();
+	M_UnloadProgress.StartSeconds = World->GetTimeSeconds();
+	M_UnloadProgress.ExpectedSeconds = M_UnloadStation.IsValid() ? M_UnloadStation->GetExpectedUnloadSeconds() : 0.f;
+	M_UnloadProgress.Fill = 0.f;
+
+	TWeakObjectPtr<UHarvester> WeakThis(this);
+	FTimerDelegate RefreshDelegate;
+	RefreshDelegate.BindLambda([WeakThis]()
+	{
+		if (not WeakThis.IsValid())
+		{
+			return;
+		}
+		WeakThis->OnUnloadProgressBarRefresh();
+	});
+	World->GetTimerManager().SetTimer(M_UnloadProgress.RefreshTimer, RefreshDelegate,
+	                                  HarvesterUnloadProgressBar::RefreshInterval, /*bLoop=*/true);
+	OnUnloadProgressBarRefresh();
+}
+
+void UHarvester::StopUnloadProgressBar()
+{
+	if (const UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(M_UnloadProgress.RefreshTimer);
+	}
+	M_UnloadProgress.bIsActive = false;
+	M_UnloadProgress.Fill = 0.f;
+	if (not M_UnloadProgress.bIsShown)
+	{
+		return;
+	}
+	M_UnloadProgress.bIsShown = false;
+	if (UW_HealthBar* HealthWidget = M_UnloadProgress.HealthWidget.Get())
+	{
+		HealthWidget->SetActionProgressVisible(false);
+	}
+}
+
+void UHarvester::OnUnloadProgressBarRefresh()
+{
+	if (not M_UnloadProgress.bIsActive)
+	{
+		StopUnloadProgressBar();
+		return;
+	}
+	M_UnloadProgress.Fill = FMath::Max(M_UnloadProgress.Fill, GetUnloadProgressFill());
+
+	// May be null for a while: the health component can create its widget later (e.g. when it first shows).
+	UW_HealthBar* HealthWidget = GetUnloadProgressHealthWidget();
+	if (not IsValid(HealthWidget))
+	{
+		return;
+	}
+	if (not M_UnloadProgress.bIsShown)
+	{
+		M_UnloadProgress.bIsShown = true;
+		HealthWidget->SetActionProgressVisible(true);
+	}
+	HealthWidget->SetActionProgress(M_UnloadProgress.Fill);
+}
+
+float UHarvester::GetUnloadProgressFill() const
+{
+	float CargoFill = 0.f;
+	if (M_UnloadProgress.InitialCargo > 0)
+	{
+		const float CargoLeft = static_cast<float>(GetCraneCargoAmount()) / M_UnloadProgress.InitialCargo;
+		CargoFill = 1.f - FMath::Clamp(CargoLeft, 0.f, 1.f);
+	}
+
+	float TimeFill = 0.f;
+	const UWorld* World = GetWorld();
+	if (IsValid(World) && M_UnloadProgress.ExpectedSeconds > 0.f)
+	{
+		const double Elapsed = World->GetTimeSeconds() - M_UnloadProgress.StartSeconds;
+		TimeFill = FMath::Min(static_cast<float>(Elapsed / M_UnloadProgress.ExpectedSeconds),
+		                      HarvesterUnloadProgressBar::MaxTimeEstimateFill);
+	}
+	return FMath::Clamp(FMath::Max(CargoFill, TimeFill), 0.f, 1.f);
+}
+
+UW_HealthBar* UHarvester::GetUnloadProgressHealthWidget()
+{
+	if (UW_HealthBar* CachedWidget = M_UnloadProgress.HealthWidget.Get())
+	{
+		return CachedWidget;
+	}
+
+	// The cached widget is gone (or never resolved); a new one starts with its bar collapsed.
+	M_UnloadProgress.bIsShown = false;
+	const AActor* Owner = GetOwner();
+	const UHealthComponent* HealthComponent = IsValid(Owner) ? Owner->FindComponentByClass<UHealthComponent>() : nullptr;
+	if (not IsValid(HealthComponent))
+	{
+		return nullptr;
+	}
+	UW_HealthBar* HealthWidget = HealthComponent->GetHealthBarWidget();
+	if (not IsValid(HealthWidget))
+	{
+		return nullptr;
+	}
+	if (not HealthWidget->GetHasActionProgressBar())
+	{
+		if (not M_UnloadProgress.bHasReportedMissingBar)
+		{
+			M_UnloadProgress.bHasReportedMissingBar = true;
+			RTSFunctionLibrary::ReportWarning(TEXT("Harvester: the health widget ") + HealthWidget->GetClass()->GetName()
+				+ TEXT(" has no ActionProgressBar; unload progress is not shown for ") + Owner->GetName()
+				+ TEXT(". Use W_BpHealthBar_Harvester."));
+		}
+		return nullptr;
+	}
+	M_UnloadProgress.HealthWidget = HealthWidget;
+	return HealthWidget;
+}
+
+bool UHarvester::MapTest_GetUnloadProgress(float& OutFill) const
+{
+	OutFill = M_UnloadProgress.Fill;
+	return M_UnloadProgress.bIsShown;
 }

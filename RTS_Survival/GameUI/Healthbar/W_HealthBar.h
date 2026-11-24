@@ -87,6 +87,17 @@ public:
 	/** @brief Fills the conversion progress bar (0..1) towards the next conversion. */
 	void SetConversionProgress(const float NewPercentage) const;
 
+	// ---- Action progress (e.g. a harvester being unloaded); driven by the owner's component ----
+
+	/** @return Whether this widget blueprint has the optional ActionProgressBar. */
+	bool GetHasActionProgressBar() const;
+
+	/** @brief Shows or collapses the action progress bar; no-op when the widget has none. */
+	void SetActionProgressVisible(const bool bVisible) const;
+
+	/** @brief Fills the action progress bar (0..1). */
+	void SetActionProgress(const float NewPercentage) const;
+
 protected:
 	// Hides the rankicon immediatly if set.
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
@@ -123,6 +134,11 @@ protected:
 	// Optional: only health bars of resource converters need it; collapsed until conversion runs.
 	UPROPERTY(meta = (BindWidgetOptional), BlueprintReadOnly)
 	TObjectPtr<UProgressBar> ConversionProgressBar = nullptr;
+
+	// Optional: progress of a timed action the unit cannot leave (harvesters: W_BpHealthBar_Harvester shows the crane
+	// unload). Collapsed by default; only the owner's component shows it.
+	UPROPERTY(meta = (BindWidgetOptional), BlueprintReadOnly)
+	TObjectPtr<UProgressBar> ActionProgressBar = nullptr;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	TObjectPtr<UTextBlock> M_UnitNameText = nullptr;

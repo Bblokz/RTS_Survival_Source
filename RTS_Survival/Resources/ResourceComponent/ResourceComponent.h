@@ -55,8 +55,14 @@ public:
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	inline ERTSResourceType GetResourceType() const { return ResourceType; }
 
-	/** @return The amount of resources harvested. */
-	int32 HarvestResource(const int32 MaxAmountHarvesterCapacity);
+	/**
+	 * @brief One harvest operation (one saw cut): takes AmountPerHarvest x YieldMultiplier, capped by what is left
+	 * in the resource and by the harvester's free cargo space.
+	 * @param MaxAmountHarvesterCapacity The harvester's free cargo space for this resource.
+	 * @param YieldMultiplier Harvester bonus on top of AmountPerHarvest (UHarvester passes HarvesterYield values).
+	 * @return The amount of resources harvested.
+	 */
+	int32 HarvestResource(const int32 MaxAmountHarvesterCapacity, const int32 YieldMultiplier = 1);
 
 	/**
 	 * @brief Gets all currently vacant harvest directions and computes harvest locations for them based on

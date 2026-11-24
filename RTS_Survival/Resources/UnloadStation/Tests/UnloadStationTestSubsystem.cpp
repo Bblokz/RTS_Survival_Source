@@ -407,6 +407,17 @@ void UUnloadStationTestSubsystem::TrackHarvester(FUnloadTestHarvester& TestHarve
 		}
 	}
 	TrackLockedHarvester(TestHarvester, Status);
+	if (Status == EHarvesterAIAction::CraneUnloading)
+	{
+		float Fill = 0.f;
+		if (Harvester->MapTest_GetUnloadProgress(Fill))
+		{
+			TestHarvester.bSawProgressShown = true;
+			TestHarvester.bProgressWentDown |= Fill + KINDA_SMALL_NUMBER < TestHarvester.LastProgressFill;
+			TestHarvester.LastProgressFill = Fill;
+			TestHarvester.MaxProgressFill = FMath::Max(TestHarvester.MaxProgressFill, Fill);
+		}
+	}
 	// On a single-bay station the bay-less harvester empties at the overflow point without ever docking.
 	if ((TestHarvester.bWasDocked || GetIsSingleBay()) && GetCargo(TestHarvester) == 0
 		&& Status != EHarvesterAIAction::CraneUnloading)
@@ -418,6 +429,8 @@ void UUnloadStationTestSubsystem::TrackHarvester(FUnloadTestHarvester& TestHarve
 		UE_LOG(LogRTSUnloadStationTest, Display, TEXT("RTS_UNLOAD_TEST unloaded harvester=%s t=%.1f status=%s"),
 		       *TestHarvester.Actor->GetName(), GetPhaseSeconds(), *GetStringHarvesterAIStatus(Status));
 		OnLockedHarvesterFinished(TestHarvester);
+		float FillAfter = 0.f;
+		TestHarvester.bProgressHiddenAfterUnload = not Harvester->MapTest_GetUnloadProgress(FillAfter);
 	}
 }
 
@@ -482,6 +495,7 @@ void UUnloadStationTestSubsystem::TickBothBaysUnloading()
 	      FString::Printf(TEXT("store_changes=%d"), M_RadixiteStoreChanges));
 	Check(not Station->GetBayHarvester(0) && not Station->GetBayHarvester(1), TEXT("bays_released"));
 	CheckLockResults();
+	CheckUnloadProgressResults();
 	CheckRigGeometryResults();
 	CaptureViews(TEXT("after_unload"));
 
@@ -559,6 +573,7 @@ void UUnloadStationTestSubsystem::TickSingleBayUnloadResults(AResourceUnloadStat
 	      FString::Printf(TEXT("store_changes=%d"), M_RadixiteStoreChanges));
 	Check(not Station.GetBayHarvester(0), TEXT("bay_released"));
 	CheckLockResults();
+	CheckUnloadProgressResults();
 	CheckRigGeometryResults();
 	CaptureViews(TEXT("after_unload"));
 
@@ -803,6 +818,24 @@ void UUnloadStationTestSubsystem::CheckLockResults()
 		Check(TestHarvester.bHeldMoveRanAfterUnload != TestHarvester.bLockOrderIsStop,
 		      TEXT("held_order_ran_after_unload"),
 		      FString::Printf(TEXT("%s move_active=%d"), *Name, TestHarvester.bHeldMoveRanAfterUnload ? 1 : 0));
+	}
+}
+
+void UUnloadStationTestSubsystem::CheckUnloadProgressResults()
+{
+	for (const FUnloadTestHarvester& TestHarvester : M_Harvesters)
+	{
+		if (not TestHarvester.bWasDocked)
+		{
+			continue;
+		}
+		const FString Name = TestHarvester.Actor.IsValid() ? TestHarvester.Actor->GetName() : TEXT("none");
+		Check(TestHarvester.bSawProgressShown, TEXT("unload_progress_shown"), Name);
+		Check(not TestHarvester.bProgressWentDown, TEXT("unload_progress_never_drops"), Name);
+		// Three loads land over ~37 s: two of three credited plus the time estimate reach well past half.
+		Check(TestHarvester.MaxProgressFill >= 0.6f, TEXT("unload_progress_filled"),
+		      FString::Printf(TEXT("%s max_fill=%.2f"), *Name, TestHarvester.MaxProgressFill));
+		Check(TestHarvester.bProgressHiddenAfterUnload, TEXT("unload_progress_hidden_after"), Name);
 	}
 }
 

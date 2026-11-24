@@ -455,6 +455,7 @@ void AResourceUnloadStation::OnHarvesterDocked(const int32 BayIndex, UHarvester&
 	Bay.DropOff = &DropOff;
 	Bay.Resource = Resource;
 	Bay.ChunkAmount = FMath::DivideAndRoundUp(CargoAmount, FMath::Max(1, TripsPerUnload));
+	Bay.DockedWorldSeconds = GetWorld()->GetTimeSeconds();
 	UE_LOG(LogRTSUnloadStation, Log, TEXT("RTS_UNLOAD docked bay=%d resource=%s cargo=%d chunk=%d"), BayIndex,
 	       *Global_GetResourceTypeAsString(Resource), CargoAmount, Bay.ChunkAmount);
 }
@@ -467,6 +468,10 @@ void AResourceUnloadStation::EndBayUnload(const int32 BayIndex, const EUnloadEnd
 	}
 	FUnloadBayState& Bay = M_Bays[BayIndex];
 	UHarvester* Harvester = Bay.Harvester.Get();
+	if (Reason == EUnloadEndReason::CargoEmpty && Bay.bIsDocked)
+	{
+		M_MeasuredUnloadSeconds = static_cast<float>(GetWorld()->GetTimeSeconds() - Bay.DockedWorldSeconds);
+	}
 	// Clear first: the harvester's reaction may release the bay or reserve it again.
 	Bay.Harvester.Reset();
 	Bay.DropOff.Reset();
@@ -477,6 +482,11 @@ void AResourceUnloadStation::EndBayUnload(const int32 BayIndex, const EUnloadEnd
 	{
 		Harvester->Crane_OnUnloadEnded(Reason);
 	}
+}
+
+float AResourceUnloadStation::GetExpectedUnloadSeconds() const
+{
+	return M_MeasuredUnloadSeconds > 0.f ? M_MeasuredUnloadSeconds : ExpectedUnloadSeconds;
 }
 
 bool AResourceUnloadStation::GetIsValidBay(const int32 BayIndex) const

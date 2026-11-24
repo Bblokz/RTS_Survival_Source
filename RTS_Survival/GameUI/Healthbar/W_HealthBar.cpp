@@ -198,6 +198,35 @@ void UW_HealthBar::SetConversionProgress(const float NewPercentage) const
 	ConversionProgressBar->SetPercent(FMath::Clamp(NewPercentage, 0.f, 1.f));
 }
 
+bool UW_HealthBar::GetHasActionProgressBar() const
+{
+	return IsValid(ActionProgressBar);
+}
+
+void UW_HealthBar::SetActionProgressVisible(const bool bVisible) const
+{
+	if (not GetHasActionProgressBar())
+	{
+		return;
+	}
+	if (not bVisible)
+	{
+		ActionProgressBar->SetPercent(0.f);
+	}
+	ActionProgressBar->SetVisibility(bVisible
+		                                 ? ESlateVisibility::HitTestInvisible
+		                                 : ESlateVisibility::Collapsed);
+}
+
+void UW_HealthBar::SetActionProgress(const float NewPercentage) const
+{
+	if (not GetHasActionProgressBar())
+	{
+		return;
+	}
+	ActionProgressBar->SetPercent(FMath::Clamp(NewPercentage, 0.f, 1.f));
+}
+
 void UW_HealthBar::NativeOnInitialized()
 {
 	Super::NativeOnInitialized();
@@ -209,6 +238,8 @@ void UW_HealthBar::NativeOnInitialized()
 
 	// Hidden until a converter reports that conversion runs.
 	SetConversionProgressVisible(false);
+	// Hidden until the owner starts a timed action (a harvester's unload).
+	SetActionProgressVisible(false);
 
 	// Load target type icon from game settings.
 	if (const UTargetTypeIconSettings* Settings = UTargetTypeIconSettings::Get())

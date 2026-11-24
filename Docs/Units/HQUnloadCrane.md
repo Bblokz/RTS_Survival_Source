@@ -53,6 +53,11 @@ Design history: concept sheets and rough models in `_AssetSource/HQUnloadCrane/`
   (`EndCommandForHeldOrder`), and the queue moves on to the order that waited. Shift-queued orders keep their old
   meaning (after the harvest command). System resets (`SetUnitToIdle`: towing, stuns, loading) still interrupt at once.
   Bay-less harvesters at the overflow point are never locked.
+- **Progress bar.** From docking until the unload ends, the harvester fills the `ActionProgressBar` in its health bar
+  (`UW_HealthBar`, optional widget, collapsed by default; the harvesters use `W_BpHealthBar_Harvester`). The fill is the
+  larger of the cargo already credited and the time since docking against `GetExpectedUnloadSeconds` (the station's last
+  measured unload, `ExpectedUnloadSeconds` 37 s before the first). Time alone stops at 97 %, so the bar is full only when
+  the last load lands; it never goes down during one unload. Any end (empty, bin full, station gone, bay released) hides it.
 - **End.** Cargo empty: the harvester goes back to harvesting while the empty grab returns. Bin full: it looks for another
   drop-off with what is left. Station gone: same.
 
@@ -60,7 +65,10 @@ Design history: concept sheets and rough models in `_AssetSource/HQUnloadCrane/`
 
 `TripsPerUnload` 3, `TrolleySpeed` 380 cm/s, `HoistSpeed` 190 cm/s, `GrabSeconds` 0.45, `ReleaseSeconds` 0.35. One trip on
 bay L takes about 9 s, so a full unload adds about 30 s plus docking to a harvest cycle compared with the old instant drop-off.
-Balance is unchanged otherwise; see `Docs/Balance` before touching harvest numbers.
+To make up for that, harvesters carry and cut three times as much since 2026-11-24 (`HarvesterYield` in `Harvester.h`):
+cargo capacity x3 (Blueprint `SetupHarvester` values and tech capacity upgrades) and every harvest operation takes
+`AmountPerHarvest` x3 from the resource (so fields run dry three times as fast in cuts). An unload still takes 3 trips,
+each carrying a third of the larger cargo. See `Docs/Balance` before touching harvest numbers again.
 
 ## Headless test
 
@@ -79,6 +87,9 @@ Unload lock (all three stations): every harvester that docks in the first unload
 HQ the second one gets a move then a stop. Checks: it is locked, the order is held, it keeps unloading, it stays on the
 dock (drift <= 30 cm), and after the unload the move runs (after the stop, nothing does). `-UnloadStationCaptureEvery=2`
 adds the first two views as `seq_NNN` frames every 2 s while a bay is docked, to review the rig frame by frame.
+
+Progress bar (all three stations): every docked harvester must show the bar while unloading, its fill never drops and
+reaches at least 0.6, and it is hidden once the harvester is empty (`unload_progress_*` checks).
 
 ## Known limits
 

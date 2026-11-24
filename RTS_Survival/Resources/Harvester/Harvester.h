@@ -28,7 +28,36 @@ class UResourceComponent;
 class UPlayerResourceManager;
 class UAsyncFindClosestDropOff;
 class AResourceUnloadStation;
+class UW_HealthBar;
 enum class EUnloadEndReason : uint8;
+
+/**
+ * Harvester economy bonus (2026-11-24): the crane unload takes ~37 s, so harvesters carry and cut three times as much.
+ * Applied in code on top of the Blueprint values (SetupHarvester cargo, tech capacity upgrades, the resource's
+ * AmountPerHarvest), so every harvester gets it without data edits.
+ */
+namespace HarvesterYield
+{
+	// Cargo capacity multiplier on SetupHarvester's MaxCargoPerResource and on capacity upgrades.
+	constexpr int32 CargoCapacityMultiplier = 3;
+	// Multiplier on the resource's AmountPerHarvest for every harvest operation (saw cut).
+	constexpr int32 HarvestYieldMultiplier = 3;
+}
+
+/** Unload progress shown in the owner's health bar (UW_HealthBar::ActionProgressBar) while a crane unloads it. */
+struct FHarvesterUnloadProgressState
+{
+	FTimerHandle RefreshTimer;
+	TWeakObjectPtr<UW_HealthBar> HealthWidget;
+	int32 InitialCargo = 0;
+	double StartSeconds = 0.0;
+	float ExpectedSeconds = 0.f;
+	// Never goes down while one unload runs.
+	float Fill = 0.f;
+	bool bIsActive = false;
+	bool bIsShown = false;
+	bool bHasReportedMissingBar = false;
+};
 
 
 /**
@@ -137,6 +166,8 @@ public:
 	 */
 	void HoldNewOrderUntilUnloaded();
 	bool MapTest_GetIsHoldingOrder() const { return bM_EndCommandAfterUnload; }
+	/** @return Whether the unload progress bar shows now; OutFill is its fill (0..1). */
+	bool MapTest_GetUnloadProgress(float& OutFill) const;
 
 	/** @brief Test hook: fill one cargo slot without harvesting. */
 	void MapTest_SetCargo(ERTSResourceType ResourceType, int32 Amount);
@@ -505,6 +536,18 @@ private:
 	TWeakObjectPtr<AResourceUnloadStation> M_UnloadStation;
 
 	int32 M_UnloadBayIndex = INDEX_NONE;
+
+	// Health bar progress while the crane unloads; from docking until the unload ends or the bay is released.
+	FHarvesterUnloadProgressState M_UnloadProgress;
+
+	/** @brief Shows the health bar's ActionProgressBar and refreshes it until StopUnloadProgressBar. */
+	void StartUnloadProgressBar();
+	void StopUnloadProgressBar();
+	void OnUnloadProgressBarRefresh();
+	/** @return The fill from the cargo already credited and the time against the station's expected unload time. */
+	float GetUnloadProgressFill() const;
+	/** @return The owner's health widget when it has an ActionProgressBar; null while it does not exist yet. */
+	UW_HealthBar* GetUnloadProgressHealthWidget();
 
 	// Set when the bay route failed for this trip; the old drop-off point is used until the cargo is delivered.
 	bool bM_SkipUnloadStationThisTrip = false;
