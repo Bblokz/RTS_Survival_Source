@@ -14,6 +14,7 @@ class ATankMaster;
 class UGlobalAbilitiesManager;
 class UNiagaraComponent;
 struct FStreamableHandle;
+struct FTrainingOption;
 
 /** @brief Run state of one delivery between its start and the moment the truck is on the ground. */
 USTRUCT()
@@ -37,14 +38,18 @@ struct FNomadicAirDeliveryRun
 	UPROPERTY()
 	TWeakObjectPtr<AGliderTankDelivery> Glider;
 
-	// The slung truck; watched so a truck lost in flight ends the run (the plane then never releases it).
+	// The slung truck or vehicle; watched so one lost in flight ends the run (the plane then never releases it).
 	UPROPERTY()
-	TWeakObjectPtr<ANomadicVehicle> SlungNomadic;
+	TWeakObjectPtr<ATankMaster> SlungPayload;
 
 	// Keeps the class and beacon loads alive until their callback started the run.
 	TSharedPtr<FStreamableHandle> LoadHandle;
 
+	// Nomadic orders.
 	FOnNomadicAirDeliveryLanded OnLanded;
+
+	// Vehicle orders (Order.VehicleSubtype set).
+	FOnAirDeliveredVehicleLanded OnVehicleLanded;
 };
 
 /**
@@ -70,7 +75,18 @@ public:
 	 */
 	int32 StartDelivery(const FNomadicAirDeliveryOrder& Order, FOnNomadicAirDeliveryLanded OnLanded);
 
+	/**
+	 * @brief Starts one vehicle delivery (Order.VehicleSubtype, cargo plane): the vehicle is set down, not built.
+	 * @param Order What to bring and where; the method must be CargoPlaneRopes.
+	 * @param OnVehicleLanded Called once: with the vehicle once it is down, or with null on failure.
+	 * @return The delivery id, or INDEX_NONE when the order is invalid (OnVehicleLanded is then not called).
+	 */
+	int32 StartVehicleDelivery(const FNomadicAirDeliveryOrder& Order, FOnAirDeliveredVehicleLanded OnVehicleLanded);
+
 	int32 GetActiveDeliveryCount() const { return M_Runs.Num(); }
+
+	// A vehicle order flies VehicleSubtype; every other order flies NomadicSubtype.
+	static bool GetIsVehicleOrder(const FNomadicAirDeliveryOrder& Order);
 
 	// Every finished delivery, also those started by missions: the truck (null on failure) and its order.
 	FOnAnyNomadicAirDeliveryFinished OnAnyDeliveryFinished;
@@ -92,7 +108,11 @@ private:
 
 	int32 M_NextDeliveryId = 1;
 
+	int32 StartRun(const FNomadicAirDeliveryOrder& Order, FOnNomadicAirDeliveryLanded OnLanded,
+	               FOnAirDeliveredVehicleLanded OnVehicleLanded);
 	bool GetIsValidOrder(const FNomadicAirDeliveryOrder& Order) const;
+	static FTrainingOption GetPayloadOption(const FNomadicAirDeliveryOrder& Order);
+	static FString GetPayloadName(const FNomadicAirDeliveryOrder& Order);
 	int32 FindRunIndex(int32 DeliveryId) const;
 	int32 FindRunIndexByCargoPlane(const AAircraftMaster* CargoPlane) const;
 	int32 FindRunIndexByGlider(const AGliderTankDelivery* Glider) const;
@@ -103,24 +123,24 @@ private:
 	void SpawnBeacon(FNomadicAirDeliveryRun& Run) const;
 
 	void StartCargoPlaneRun(int32 DeliveryId);
-	void OnCargoNomadicSpawned(int32 DeliveryId, AActor* SpawnedActor);
+	void OnCargoPayloadSpawned(int32 DeliveryId, AActor* SpawnedActor);
 	void OnCargoPayloadReleased(AAircraftMaster* CargoPlane, ATankMaster* ReleasedTank);
 
 	UFUNCTION()
 	void OnCargoPlaneDestroyed(AActor* DestroyedActor);
 
 	UFUNCTION()
-	void OnSlungNomadicDestroyed(AActor* DestroyedActor);
+	void OnSlungPayloadDestroyed(AActor* DestroyedActor);
 
 	void StartGliderRun(int32 DeliveryId);
 	void OnGliderTankDelivered(AGliderTankDelivery* Glider, ATankMaster* Tank);
 
 	/**
-	 * @brief Ends a run: removes the beacon, tells the requester and orders the truck to build on the spot.
+	 * @brief Ends a run: removes the beacon, tells the requester and orders a nomadic truck to build on the spot.
 	 * @param RunIndex Index of the run in M_Runs; invalid after the call.
-	 * @param Nomadic The delivered truck, or null when the delivery failed.
+	 * @param Payload The delivered truck or vehicle, or null when the delivery failed.
 	 */
-	void FinishRun(int32 RunIndex, ANomadicVehicle* Nomadic);
+	void FinishRun(int32 RunIndex, ATankMaster* Payload);
 	void OrderBuildOnSpot(ANomadicVehicle& Nomadic, const FVector& GroundBuildLocation,
 	                      const FRotator& BuildRotation) const;
 };

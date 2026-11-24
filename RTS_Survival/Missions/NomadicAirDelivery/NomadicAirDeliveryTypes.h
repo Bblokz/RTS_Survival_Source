@@ -9,10 +9,14 @@
 class AAircraftMaster;
 class AGliderTankDelivery;
 class ANomadicVehicle;
+class ATankMaster;
 class UNiagaraSystem;
 
 // Called once per delivery: with the nomadic when it is on the ground and ordered to build, with null when it failed.
 DECLARE_DELEGATE_OneParam(FOnNomadicAirDeliveryLanded, ANomadicVehicle*);
+
+// Called once per vehicle delivery: with the vehicle once it is set down, with null when the delivery failed.
+DECLARE_DELEGATE_OneParam(FOnAirDeliveredVehicleLanded, ATankMaster*);
 
 UENUM(BlueprintType)
 enum class ENomadicAirDeliveryMethod : uint8
@@ -78,6 +82,10 @@ struct FNomadicAirDeliveryOrder
 	ENomadicAirDeliveryMethod Method = ENomadicAirDeliveryMethod::CargoPlaneRopes;
 
 	ENomadicSubtype NomadicSubtype = ENomadicSubtype::Nomadic_None;
+
+	// Set instead of NomadicSubtype to fly in a vehicle (a harvester, a tank) under the cargo plane. It is only set
+	// down on BuildLocation, never built; bBuildOnLanding is ignored. Cargo plane only.
+	ETankSubtype VehicleSubtype = ETankSubtype::Tank_None;
 
 	// Where the building goes; only X and Y count, the ground below is used.
 	FVector BuildLocation = FVector::ZeroVector;
