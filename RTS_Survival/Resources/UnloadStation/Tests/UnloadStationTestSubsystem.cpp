@@ -37,6 +37,9 @@ namespace UnloadStationTestPrivate
 	// not drift off the dock by more than the slack below.
 	constexpr float LockMoveDistanceCm = 1800.f;
 	constexpr float MaxLockDriftCm = 30.f;
+	// Harvesters are ordered home at the start of the phase and dock about 10 s later; the old 18 s reverse timeout
+	// docked them after 24 s.
+	constexpr float MaxDockSeconds = 16.f;
 	// Rig geometry: how far (2D) the grab may hang from the pick point when it grabs and from the bin socket when it
 	// releases. The HQ's bay L drops from the loop's outer leg (Y -335), about 1.05 m from the radixite socket but well
 	// inside the 2.9 m wide bin (Y -426..-135, build_monorail.py).
@@ -392,6 +395,7 @@ void UUnloadStationTestSubsystem::TrackHarvester(FUnloadTestHarvester& TestHarve
 			TestHarvester.DockYawErrorDeg = FMath::Abs(FMath::FindDeltaAngleDegrees(
 				TestHarvester.Actor->GetActorRotation().Yaw, Dock.Rotator().Yaw));
 			TestHarvester.DockedLocation = TestHarvester.Actor->GetActorLocation();
+			TestHarvester.DockedPhaseSeconds = GetPhaseSeconds();
 			UE_LOG(LogRTSUnloadStationTest, Display,
 			       TEXT("RTS_UNLOAD_TEST docked harvester=%s bay=%d dock_error_cm=%.0f yaw_error=%.1f t=%.1f"),
 			       *TestHarvester.Actor->GetName(), BayIndex, TestHarvester.DockErrorCm,
@@ -789,6 +793,8 @@ void UUnloadStationTestSubsystem::CheckLockResults()
 		const FString Name = FString::Printf(TEXT("%s stop=%d"),
 		                                     TestHarvester.Actor.IsValid() ? *TestHarvester.Actor->GetName() : TEXT("none"),
 		                                     TestHarvester.bLockOrderIsStop ? 1 : 0);
+		Check(TestHarvester.DockedPhaseSeconds >= 0.f && TestHarvester.DockedPhaseSeconds <= MaxDockSeconds,
+		      TEXT("docked_without_stall"), FString::Printf(TEXT("%s t=%.1f"), *Name, TestHarvester.DockedPhaseSeconds));
 		Check(TestHarvester.bLockOrderHeld, TEXT("lock_order_held"), Name);
 		Check(TestHarvester.bLockKeptUnloading, TEXT("lock_kept_unloading"), Name);
 		Check(TestHarvester.MaxDockDriftCm <= MaxLockDriftCm, TEXT("lock_stayed_docked"),

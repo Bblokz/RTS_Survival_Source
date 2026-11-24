@@ -516,6 +516,13 @@ private:
 	void EndCommandForHeldOrder();
 
 	FTimerHandle M_ReverseIntoBayTimeout;
+	// Watches the reverse into the bay: when the harvester stands still (sandbags, a unit in the way), the guided slide
+	// takes over at once instead of after the full timeout. Movement, not distance to the dock: the reverse path may
+	// first swing away from the bay.
+	FTimerHandle M_ReverseProgressTimer;
+	FVector M_ReverseLastMovedLocation = FVector::ZeroVector;
+	float M_ReverseLastMovedYaw = 0.f;
+	float M_ReverseSecondsWithoutProgress = 0.f;
 	FTimerHandle M_DockAlignTimer;
 	FTransform M_DockAlignStart;
 	FTransform M_DockAlignTarget;
@@ -529,6 +536,7 @@ private:
 	void HarvestAIAction_ReverseIntoUnloadBay();
 	void OnReverseIntoUnloadBayFinished(FAIRequestID RequestID, const FPathFollowingResult& Result);
 	void OnReverseIntoUnloadBayTimedOut();
+	void CheckReverseIntoUnloadBayProgress();
 	void StartDockAlignment();
 	void TickDockAlignment();
 	void OnDockedAtUnloadBay();

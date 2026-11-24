@@ -84,7 +84,10 @@ adds the first two views as `seq_NNN` frames every 2 s while a bay is docked, to
 
 - During the guided slide the tracks do not animate (the harvester is moved, not driven).
 - Rail and posts have no collision and no nav effect: units drive through the portal feet and the spider post.
-- The portal feet stand in the sandbag row next to the truck nose; one sandbag group at X 690-780 / Y 310-400 stands in
-  bay R.
+- The portal feet stand in the sandbag row next to the truck nose. Bay R is not clear: the nose sandbag pile (X 600-800,
+  Y 130-330) and the arc of a sandbag emplacement (X 780-1080, Y 300-420), up to 75 cm high, stand inside its docked
+  hull footprint (bay L is clear). With the HQ on the ground they stop the reverse; the stall check (the harvester moves
+  < 25 cm and turns < 10 deg for 1.5 s) hands over to the guided slide, so bay R still docks in about 10 s, but the
+  docked hull overlaps those sandbags. A clean bay R needs the sandbags out of the HQ building mesh.
 - Only the Strike Division HQ and refinery have stations (the refinery's knuckle boom: `RefineryUnloadCrane.md`).
   Other drop-offs (harvester hub, other factions) are unchanged.

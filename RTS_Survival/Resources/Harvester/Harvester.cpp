@@ -1689,6 +1689,14 @@ namespace HarvesterUnloadPrivate
 	constexpr float ApproachReachedDistance = 450.f;
 	constexpr float ReverseAcceptanceRadius = 60.f;
 	constexpr float ReverseTimeoutSeconds = 18.f;
+	// Stall check while reversing: the harvester must move at least the step within the stall time, or the guided slide
+	// takes over. A grace period covers starting to roll.
+	constexpr float ReverseProgressCheckSeconds = 0.5f;
+	constexpr float ReverseProgressStepCm = 25.f;
+	// Turning on the spot is progress too (tracks pivot).
+	constexpr float ReverseProgressStepDegrees = 10.f;
+	constexpr float ReverseStallSeconds = 1.5f;
+	constexpr float ReverseStartGraceSeconds = 1.f;
 	// The last stretch into the bay is a short guided slide; further than this means the reverse went wrong.
 	constexpr float MaxGuidedSlideDistance = 1300.f;
 	constexpr float GuidedSlideSpeed = 260.f;
@@ -1950,7 +1958,46 @@ void UHarvester::HarvestAIAction_ReverseIntoUnloadBay()
 	{
 		World->GetTimerManager().SetTimer(M_ReverseIntoBayTimeout, this, &UHarvester::OnReverseIntoUnloadBayTimedOut,
 		                                  ReverseTimeoutSeconds, false);
+		M_ReverseLastMovedLocation = GetOwner() ? GetOwner()->GetActorLocation() : FVector::ZeroVector;
+		M_ReverseLastMovedYaw = GetOwner() ? GetOwner()->GetActorRotation().Yaw : 0.f;
+		// Negative: the grace period counts down before a lack of progress counts as a stall.
+		M_ReverseSecondsWithoutProgress = -ReverseStartGraceSeconds;
+		World->GetTimerManager().SetTimer(M_ReverseProgressTimer, this, &UHarvester::CheckReverseIntoUnloadBayProgress,
+		                                  ReverseProgressCheckSeconds, true);
 	}
+}
+
+void UHarvester::CheckReverseIntoUnloadBayProgress()
+{
+	using namespace HarvesterUnloadPrivate;
+	const AActor* Owner = GetOwner();
+	if (M_HarvestStatus != EHarvesterAIAction::ReverseIntoUnloadBay || not IsValid(Owner))
+	{
+		if (const UWorld* World = GetWorld())
+		{
+			World->GetTimerManager().ClearTimer(M_ReverseProgressTimer);
+		}
+		return;
+	}
+	const FVector Location = Owner->GetActorLocation();
+	const float Yaw = Owner->GetActorRotation().Yaw;
+	const bool bMoved = FVector::Dist2D(Location, M_ReverseLastMovedLocation) >= ReverseProgressStepCm;
+	const bool bTurned = FMath::Abs(FMath::FindDeltaAngleDegrees(M_ReverseLastMovedYaw, Yaw)) >= ReverseProgressStepDegrees;
+	if (bMoved || bTurned)
+	{
+		M_ReverseLastMovedLocation = Location;
+		M_ReverseLastMovedYaw = Yaw;
+		M_ReverseSecondsWithoutProgress = FMath::Min(M_ReverseSecondsWithoutProgress, 0.f);
+		return;
+	}
+	M_ReverseSecondsWithoutProgress += ReverseProgressCheckSeconds;
+	if (M_ReverseSecondsWithoutProgress < ReverseStallSeconds)
+	{
+		return;
+	}
+	HarvestDebug("Reversing into the unload bay stalled; guide the rest.", FColor::Orange);
+	StopUnloadMovement();
+	StartDockAlignment();
 }
 
 void UHarvester::OnReverseIntoUnloadBayFinished(FAIRequestID RequestID, const FPathFollowingResult& Result)
@@ -2072,6 +2119,7 @@ void UHarvester::StopUnloadMovement()
 	if (const UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().ClearTimer(M_ReverseIntoBayTimeout);
+		World->GetTimerManager().ClearTimer(M_ReverseProgressTimer);
 		World->GetTimerManager().ClearTimer(M_DockAlignTimer);
 	}
 	if (not IsValid(M_AIController))
@@ -2108,6 +2156,7 @@ void UHarvester::ReleaseUnloadBay()
 	if (const UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().ClearTimer(M_ReverseIntoBayTimeout);
+		World->GetTimerManager().ClearTimer(M_ReverseProgressTimer);
 		World->GetTimerManager().ClearTimer(M_DockAlignTimer);
 	}
 	if (AResourceUnloadStation* Station = M_UnloadStation.Get())

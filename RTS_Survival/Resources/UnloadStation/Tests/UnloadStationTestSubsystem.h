@@ -41,6 +41,8 @@ struct FUnloadTestHarvester
 	float DockErrorCm = -1.f;
 	float DockYawErrorDeg = -1.f;
 	FVector DockedLocation = FVector::ZeroVector;
+	// Test seconds when it docked; a stalled reverse into the bay shows up as a late dock.
+	float DockedPhaseSeconds = -1.f;
 	// Where it stood when its cargo was gone (the overflow point for a harvester that found no free bay).
 	FVector FinishedLocation = FVector::ZeroVector;
 
