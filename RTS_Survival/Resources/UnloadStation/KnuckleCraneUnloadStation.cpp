@@ -69,8 +69,9 @@ void AKnuckleCraneUnloadStation::BuildRefineryDefaults()
 	bUseOverflowDropOffPoint = true;
 	OverflowDropOffPoint = FVector(1000.f, -1050.f, 0.f);
 
-	// The 10.7 m tip path at 260 cm/s is a ~4.5 s slew each way; one unload takes about as long as at the HQ.
-	TrolleySpeed = 260.f;
+	// The 10.7 m tip path at 460 cm/s is a ~3 s slew each way, so one unload (3 loads) takes about as long as at the
+	// HQ (~37 s from docking); at 260 it took ~50 s.
+	TrolleySpeed = 460.f;
 	TrolleyBrakeDistance = 200.f;
 	HeadTravelBelowRail = 70.f;
 	RopeTopBelowRail = 16.f;

@@ -45,9 +45,10 @@ nose cranes (`build_nose_cranes.py`); option 4, the knuckle loader, was picked o
 
 ## Tuning (BP_RefineryUnloadStation / C++ defaults)
 
-`TrolleySpeed` 260 cm/s along the 10.7 m tip path (a slew of about 4.5 s each way), `HoistSpeed` 190 cm/s, three trips per
-unload, `DropHeadAboveBin` 150. In the headless test a full unload takes about 50 s from docking to the last load (the
-HQ crane takes about 37 s); raise `TrolleySpeed` to shorten it. No balance numbers changed; see `Docs/Balance` before touching harvest numbers.
+`TrolleySpeed` 460 cm/s along the 10.7 m tip path (a slew of about 3 s each way), `HoistSpeed` 190 cm/s, three trips per
+unload, `DropHeadAboveBin` 150. The speed was raised from 260 (about 50 s per unload) on 2026-11-24 so a full unload
+takes about as long as at the HQ (about 37 s from docking to the last load). No balance numbers changed; see
+`Docs/Balance` before touching harvest numbers.
 
 ## Clearances
 
