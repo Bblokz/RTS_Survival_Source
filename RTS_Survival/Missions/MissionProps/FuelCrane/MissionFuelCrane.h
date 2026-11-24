@@ -13,6 +13,9 @@ class USceneComponent;
 class UStaticMesh;
 class UStaticMeshComponent;
 
+/** Fires once a crane in one-shot mode lifted the last reachable cargo piece off the truck. */
+DECLARE_MULTICAST_DELEGATE_OneParam(FOnMissionFuelCraneTruckEmptied, AActor* /*Truck*/);
+
 /** Steps of one unloading cycle; the crane loops SlewToPickup..HoistFromDrop while unloading. */
 enum class EMissionFuelCranePhase : uint8
 {
@@ -97,6 +100,18 @@ public:
 	void StartUnloading(AActor* Truck);
 
 	/** Freezes the crane where it is; a piece on the hook stays on the hook. */
+	/**
+	 * @brief One-shot unload: lifts the truck's own reachable "Cargo*" pieces onto the stack, never puts them back,
+	 * then hoists and goes idle. OnTruckCargoEmptied fires when the last piece lands on the stack.
+	 * No fallback pile: a truck without reachable cargo (parked out of reach, nose-in) is refused.
+	 * @param Truck The parked cargo truck.
+	 * @return False when the truck is invalid or none of its cargo is within reach; the crane then stays idle.
+	 */
+	bool StartUnloadingTruckOnce(AActor* Truck);
+
+	/** One-shot unloads (StartUnloadingTruckOnce) report here when the truck is empty. */
+	FOnMissionFuelCraneTruckEmptied OnTruckCargoEmptied;
+
 	UFUNCTION(BlueprintCallable, Category="FuelCrane")
 	void StopUnloading();
 
@@ -350,6 +365,8 @@ private:
 	bool bM_SourcesAreTruckCargo = false;
 
 	bool bM_IsUnloading = false;
+	// StartUnloadingTruckOnce: emptied sources are not refilled; the crane reports and stops instead.
+	bool bM_IsUnloadingOnce = false;
 	// Set when the truck is lost: finish placing the carried piece, hoist, then halt.
 	bool bM_FinishCycleThenStop = false;
 
@@ -385,6 +402,8 @@ private:
 	int32 ChooseNextSourcePiece();
 	int32 CountVisibleSources() const;
 	void RefillSources();
+	// One-shot mode: the last piece is off the truck. Forgets the truck (its cargo stays hidden) and reports.
+	void OnOneShotTruckEmptied();
 	bool GetIsTruckLost() const;
 	void OnTruckLost();
 

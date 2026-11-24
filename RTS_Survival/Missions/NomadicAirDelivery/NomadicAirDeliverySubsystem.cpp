@@ -55,6 +55,50 @@ void UNomadicAirDeliverySubsystem::Deinitialize()
 int32 UNomadicAirDeliverySubsystem::StartDelivery(const FNomadicAirDeliveryOrder& Order,
                                                   FOnNomadicAirDeliveryLanded OnLanded)
 {
+	if (GetIsVehicleOrder(Order))
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Nomadic air delivery got a vehicle order; use StartVehicleDelivery."));
+		return INDEX_NONE;
+	}
+	return StartRun(Order, MoveTemp(OnLanded), FOnAirDeliveredVehicleLanded());
+}
+
+int32 UNomadicAirDeliverySubsystem::StartVehicleDelivery(const FNomadicAirDeliveryOrder& Order,
+                                                         FOnAirDeliveredVehicleLanded OnVehicleLanded)
+{
+	if (not GetIsVehicleOrder(Order) || Order.Method != ENomadicAirDeliveryMethod::CargoPlaneRopes)
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Vehicle air delivery needs a VehicleSubtype and the cargo plane method."));
+		return INDEX_NONE;
+	}
+	return StartRun(Order, FOnNomadicAirDeliveryLanded(), MoveTemp(OnVehicleLanded));
+}
+
+bool UNomadicAirDeliverySubsystem::GetIsVehicleOrder(const FNomadicAirDeliveryOrder& Order)
+{
+	return Order.VehicleSubtype != ETankSubtype::Tank_None;
+}
+
+FTrainingOption UNomadicAirDeliverySubsystem::GetPayloadOption(const FNomadicAirDeliveryOrder& Order)
+{
+	if (GetIsVehicleOrder(Order))
+	{
+		return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(Order.VehicleSubtype));
+	}
+	return FTrainingOption(EAllUnitType::UNType_Nomadic, static_cast<uint8>(Order.NomadicSubtype));
+}
+
+FString UNomadicAirDeliverySubsystem::GetPayloadName(const FNomadicAirDeliveryOrder& Order)
+{
+	return GetIsVehicleOrder(Order)
+		       ? UEnum::GetValueAsString(Order.VehicleSubtype)
+		       : UEnum::GetValueAsString(Order.NomadicSubtype);
+}
+
+int32 UNomadicAirDeliverySubsystem::StartRun(const FNomadicAirDeliveryOrder& Order,
+                                             FOnNomadicAirDeliveryLanded OnLanded,
+                                             FOnAirDeliveredVehicleLanded OnVehicleLanded)
+{
 	if (not GetIsValidOrder(Order))
 	{
 		return INDEX_NONE;
@@ -65,6 +109,7 @@ int32 UNomadicAirDeliverySubsystem::StartDelivery(const FNomadicAirDeliveryOrder
 	Run.Order = Order;
 	Run.GroundBuildLocation = GetGroundLocation(Order.BuildLocation);
 	Run.OnLanded = MoveTemp(OnLanded);
+	Run.OnVehicleLanded = MoveTemp(OnVehicleLanded);
 
 	TArray<FSoftObjectPath> AssetsToLoad;
 	AssetsToLoad.Add(Order.Method == ENomadicAirDeliveryMethod::MammutGlider
@@ -78,7 +123,7 @@ int32 UNomadicAirDeliverySubsystem::StartDelivery(const FNomadicAirDeliveryOrder
 	const int32 DeliveryId = Run.DeliveryId;
 	M_Runs.Add(MoveTemp(Run));
 	UE_LOG(LogRTSNomadicAirDelivery, Display, TEXT("Nomadic air delivery %d started: %s by %s to %s"),
-	       DeliveryId, *UEnum::GetValueAsString(Order.NomadicSubtype), *UEnum::GetValueAsString(Order.Method),
+	       DeliveryId, *GetPayloadName(Order), *UEnum::GetValueAsString(Order.Method),
 	       *Order.BuildLocation.ToCompactString());
 
 	TWeakObjectPtr<UNomadicAirDeliverySubsystem> WeakThis(this);
@@ -133,9 +178,9 @@ bool UNomadicAirDeliverySubsystem::GetGliderLandingRun(const FNomadicAirDelivery
 
 bool UNomadicAirDeliverySubsystem::GetIsValidOrder(const FNomadicAirDeliveryOrder& Order) const
 {
-	if (Order.NomadicSubtype == ENomadicSubtype::Nomadic_None)
+	if (Order.NomadicSubtype == ENomadicSubtype::Nomadic_None && not GetIsVehicleOrder(Order))
 	{
-		RTSFunctionLibrary::ReportError(TEXT("Nomadic air delivery ordered without a nomadic subtype."));
+		RTSFunctionLibrary::ReportError(TEXT("Nomadic air delivery ordered without a nomadic or vehicle subtype."));
 		return false;
 	}
 	const bool bIsGlider = Order.Method == ENomadicAirDeliveryMethod::MammutGlider;
@@ -241,11 +286,10 @@ void UNomadicAirDeliverySubsystem::StartCargoPlaneRun(const int32 DeliveryId)
 		return;
 	}
 
-	const FTrainingOption NomadicOption(EAllUnitType::UNType_Nomadic,
-	                                    static_cast<uint8>(M_Runs[RunIndex].Order.NomadicSubtype));
+	const FTrainingOption NomadicOption = GetPayloadOption(M_Runs[RunIndex].Order);
 	if (not AsyncSpawner->GetHasClassForTrainingOption(NomadicOption))
 	{
-		RTSFunctionLibrary::ReportError(TEXT("Nomadic cargo plane delivery: the player has no truck for ")
+		RTSFunctionLibrary::ReportError(TEXT("Nomadic cargo plane delivery: the player has no unit for ")
 			+ NomadicOption.GetTrainingName());
 		FinishRun(RunIndex, nullptr);
 		return;
@@ -274,7 +318,7 @@ void UNomadicAirDeliverySubsystem::StartCargoPlaneRun(const int32 DeliveryId)
 	{
 		if (WeakThis.IsValid())
 		{
-			WeakThis->OnCargoNomadicSpawned(DeliveryId, SpawnedActor);
+			WeakThis->OnCargoPayloadSpawned(DeliveryId, SpawnedActor);
 		}
 	};
 	const bool bRequested = AsyncSpawner->AsyncSpawnOptionAtLocation(
@@ -296,13 +340,13 @@ void UNomadicAirDeliverySubsystem::StartCargoPlaneRun(const int32 DeliveryId)
 	}
 }
 
-void UNomadicAirDeliverySubsystem::OnCargoNomadicSpawned(const int32 DeliveryId, AActor* SpawnedActor)
+void UNomadicAirDeliverySubsystem::OnCargoPayloadSpawned(const int32 DeliveryId, AActor* SpawnedActor)
 {
 	const int32 RunIndex = FindRunIndex(DeliveryId);
-	ANomadicVehicle* Nomadic = Cast<ANomadicVehicle>(SpawnedActor);
-	if (not M_Runs.IsValidIndex(RunIndex) || not M_Runs[RunIndex].CargoPlane.IsValid() || not IsValid(Nomadic))
+	ATankMaster* Payload = Cast<ATankMaster>(SpawnedActor);
+	if (not M_Runs.IsValidIndex(RunIndex) || not M_Runs[RunIndex].CargoPlane.IsValid() || not IsValid(Payload))
 	{
-		RTSFunctionLibrary::ReportError(TEXT("Nomadic cargo plane delivery lost its plane or truck before take-off."));
+		RTSFunctionLibrary::ReportError(TEXT("Nomadic cargo plane delivery lost its plane or payload before take-off."));
 		if (IsValid(SpawnedActor))
 		{
 			SpawnedActor->Destroy();
@@ -327,9 +371,9 @@ void UNomadicAirDeliverySubsystem::OnCargoNomadicSpawned(const int32 DeliveryId,
 	DropRequest.TankAttachZOffset = -AircraftRopeSling::DefaultHangDistance;
 	DropRequest.bRopeSlungPayload = true;
 	DropRequest.HowLongStayLanded = M_Runs[RunIndex].Order.Settings.CargoPlaneHoverSeconds;
-	DropRequest.AttachedTank = Nomadic;
-	M_Runs[RunIndex].SlungNomadic = Nomadic;
-	Nomadic->OnDestroyed.AddUniqueDynamic(this, &UNomadicAirDeliverySubsystem::OnSlungNomadicDestroyed);
+	DropRequest.AttachedTank = Payload;
+	M_Runs[RunIndex].SlungPayload = Payload;
+	Payload->OnDestroyed.AddUniqueDynamic(this, &UNomadicAirDeliverySubsystem::OnSlungPayloadDestroyed);
 	CargoPlane->OnAircraftDropPayloadReleased.AddUObject(this, &UNomadicAirDeliverySubsystem::OnCargoPayloadReleased);
 	CargoPlane->OrderAircraftDrop(DropRequest);
 }
@@ -345,7 +389,7 @@ void UNomadicAirDeliverySubsystem::OnCargoPayloadReleased(AAircraftMaster* Cargo
 	{
 		CargoPlane->OnAircraftDropPayloadReleased.RemoveAll(this);
 	}
-	FinishRun(RunIndex, Cast<ANomadicVehicle>(ReleasedTank));
+	FinishRun(RunIndex, ReleasedTank);
 }
 
 void UNomadicAirDeliverySubsystem::OnCargoPlaneDestroyed(AActor* DestroyedActor)
@@ -360,17 +404,17 @@ void UNomadicAirDeliverySubsystem::OnCargoPlaneDestroyed(AActor* DestroyedActor)
 	FinishRun(RunIndex, nullptr);
 }
 
-void UNomadicAirDeliverySubsystem::OnSlungNomadicDestroyed(AActor* DestroyedActor)
+void UNomadicAirDeliverySubsystem::OnSlungPayloadDestroyed(AActor* DestroyedActor)
 {
 	const int32 RunIndex = M_Runs.IndexOfByPredicate([DestroyedActor](const FNomadicAirDeliveryRun& Run)
 	{
-		return Run.SlungNomadic.Get() == DestroyedActor;
+		return Run.SlungPayload.Get() == DestroyedActor;
 	});
 	if (not M_Runs.IsValidIndex(RunIndex))
 	{
 		return;
 	}
-	RTSFunctionLibrary::ReportError(TEXT("Nomadic truck was destroyed while it hung under the cargo plane."));
+	RTSFunctionLibrary::ReportError(TEXT("Air-delivered unit was destroyed while it hung under the cargo plane."));
 	FinishRun(RunIndex, nullptr);
 }
 
@@ -444,15 +488,16 @@ void UNomadicAirDeliverySubsystem::OnGliderTankDelivered(AGliderTankDelivery* Gl
 	{
 		return;
 	}
-	ANomadicVehicle* Nomadic = Cast<ANomadicVehicle>(Tank);
-	if (IsValid(Tank) && not IsValid(Nomadic))
+	if (IsValid(Tank) && not IsValid(Cast<ANomadicVehicle>(Tank)))
 	{
 		RTSFunctionLibrary::ReportError(TEXT("Nomadic glider delivery: the glider delivered a unit that is no nomadic."));
+		FinishRun(RunIndex, nullptr);
+		return;
 	}
-	FinishRun(RunIndex, Nomadic);
+	FinishRun(RunIndex, Tank);
 }
 
-void UNomadicAirDeliverySubsystem::FinishRun(const int32 RunIndex, ANomadicVehicle* Nomadic)
+void UNomadicAirDeliverySubsystem::FinishRun(const int32 RunIndex, ATankMaster* Payload)
 {
 	if (not M_Runs.IsValidIndex(RunIndex))
 	{
@@ -470,13 +515,19 @@ void UNomadicAirDeliverySubsystem::FinishRun(const int32 RunIndex, ANomadicVehic
 		Run.CargoPlane->OnAircraftDropPayloadReleased.RemoveAll(this);
 		Run.CargoPlane->OnDestroyed.RemoveDynamic(this, &UNomadicAirDeliverySubsystem::OnCargoPlaneDestroyed);
 	}
-	if (Run.SlungNomadic.IsValid())
+	if (Run.SlungPayload.IsValid())
 	{
-		Run.SlungNomadic->OnDestroyed.RemoveDynamic(this, &UNomadicAirDeliverySubsystem::OnSlungNomadicDestroyed);
+		Run.SlungPayload->OnDestroyed.RemoveDynamic(this, &UNomadicAirDeliverySubsystem::OnSlungPayloadDestroyed);
 	}
 	UE_LOG(LogRTSNomadicAirDelivery, Display, TEXT("Nomadic air delivery %d %s: %s"), Run.DeliveryId,
-	       IsValid(Nomadic) ? TEXT("landed") : TEXT("failed"), *UEnum::GetValueAsString(Run.Order.NomadicSubtype));
+	       IsValid(Payload) ? TEXT("landed") : TEXT("failed"), *GetPayloadName(Run.Order));
 
+	if (GetIsVehicleOrder(Run.Order))
+	{
+		Run.OnVehicleLanded.ExecuteIfBound(Payload);
+		return;
+	}
+	ANomadicVehicle* Nomadic = Cast<ANomadicVehicle>(Payload);
 	// The requester hears of the truck before it starts to unfold, so a callback on the conversion is not missed.
 	TWeakObjectPtr<ANomadicVehicle> WeakNomadic(Nomadic);
 	Run.OnLanded.ExecuteIfBound(Nomadic);
