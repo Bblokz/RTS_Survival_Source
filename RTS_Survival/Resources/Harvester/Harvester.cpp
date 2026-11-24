@@ -1206,7 +1206,10 @@ void UHarvester::OnMoveToDropOffFinished(FAIRequestID RequestID, const FPathFoll
 		return;
 	}
 
-	if (Result.Code == EPathFollowingResult::Success && GetIsHarvesterCloseEnoughToCurrentDropOffGoal())
+	// A crane's overflow point is open ground: the path follower stops up to the agent radius short of it, outside
+	// the 3D acceptance check, so its success counts as arrived there.
+	if (Result.Code == EPathFollowingResult::Success
+		&& (GetIsHarvesterCloseEnoughToCurrentDropOffGoal() || GetIsTargetDropOffUsingOverflowPoint()))
 	{
 		HarvestDebug("at drop off location; Drop off resources", FColor::Green);
 		HarvestAIExecuteAction(EHarvesterAIAction::DropOff);
@@ -1243,6 +1246,17 @@ bool UHarvester::GetIsHarvesterCloseEnoughToCurrentDropOffGoal() const
 		+ HarvesterBackupDropOffAcceptanceMargin;
 	return FVector::DistSquared2D(GetHarvesterLocation(), DropOffReferenceLocation)
 		<= FMath::Square(BackupAcceptanceRadius);
+}
+
+bool UHarvester::GetIsTargetDropOffUsingOverflowPoint() const
+{
+	if (not M_TargetDropOff.IsValid())
+	{
+		return false;
+	}
+	const AResourceUnloadStation* Station = M_TargetDropOff->GetUnloadStation();
+	FVector OverflowLocation;
+	return IsValid(Station) && Station->GetOverflowDropOffLocation(OverflowLocation);
 }
 
 FVector UHarvester::GetCurrentDropOffReferenceLocation() const

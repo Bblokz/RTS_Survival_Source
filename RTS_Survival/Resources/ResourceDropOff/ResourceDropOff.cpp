@@ -184,6 +184,13 @@ FVector UResourceDropOff::GetDropOffLocationNotThreadSafe() const
 		return FVector::ZeroVector;
 	}
 
+	// A crane whose bay covers the old drop-off point sends bay-less harvesters to its overflow point instead.
+	FVector OverflowLocation;
+	if (M_UnloadStation.IsValid() && M_UnloadStation->GetOverflowDropOffLocation(OverflowLocation))
+	{
+		return OverflowLocation;
+	}
+
 	if (not GetIsValidOwnerMeshComponent())
 	{
 		return Owner->GetActorLocation();

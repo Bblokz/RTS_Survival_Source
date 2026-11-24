@@ -70,4 +70,5 @@ it carried. Logs `RTS_UNLOAD_TEST check=PASS|FAIL` and `RTS_UNLOAD_TEST RESULT`.
 - Rail and posts have no collision and no nav effect: units drive through the portal feet and the spider post.
 - The portal feet stand in the sandbag row next to the truck nose; one sandbag group at X 690-780 / Y 310-400 stands in
   bay R.
-- Only the Strike Division HQ has a station. Other drop-offs (refinery, harvester hub, other factions) are unchanged.
+- Only the Strike Division HQ and refinery have stations (the refinery's knuckle boom: `RefineryUnloadCrane.md`).
+  Other drop-offs (harvester hub, other factions) are unchanged.

@@ -261,6 +261,8 @@ private:
 
 	/** @return Whether the current drop-off destination is within its destination-specific acceptance radius. */
 	bool GetIsHarvesterCloseEnoughToCurrentDropOffGoal() const;
+	/** @return Whether the target drop-off sends bay-less harvesters to its unload station's overflow point. */
+	bool GetIsTargetDropOffUsingOverflowPoint() const;
 
 	/** @return The projected backup point when active; otherwise the current normal drop-off point. */
 	FVector GetCurrentDropOffReferenceLocation() const;

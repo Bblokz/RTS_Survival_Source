@@ -298,6 +298,7 @@ void AResourceUnloadStation::CreateTrolley(const int32 BayIndex)
 		Trolley.Bars.Add(Item);
 	}
 	M_Trolleys.Add(MoveTemp(Trolley));
+	OnTrolleyCreated(M_Trolleys.Last());
 	UpdateTrolleyVisuals(M_Trolleys.Last());
 }
 
@@ -488,6 +489,16 @@ bool AResourceUnloadStation::GetCanUnloadResource(const ERTSResourceType Resourc
 		}
 	}
 	return false;
+}
+
+bool AResourceUnloadStation::GetOverflowDropOffLocation(FVector& OutLocation) const
+{
+	if (not bUseOverflowDropOffPoint)
+	{
+		return false;
+	}
+	OutLocation = FTransform(GetActorRotation(), GetActorLocation()).TransformPosition(OverflowDropOffPoint);
+	return true;
 }
 
 bool AResourceUnloadStation::GetIsBayDocked(const int32 BayIndex) const

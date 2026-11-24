@@ -19,7 +19,8 @@ class UStaticMeshComponent;
  * Harvesters reserve a bay, reverse in, and one trolley per bay carries the cargo chunk by chunk into the bins.
  * Every chunk is credited through the drop-off the moment it lands; the load in the air is only visual.
  * @note Spawned by ANomadicVehicle (M_UnloadStationClass) with the building and attached to the building mesh, so
- * its frame is the building mesh's frame. Defaults are the Strike Division HQ's loop (see Docs/Units/HQUnloadCrane.md).
+ * its frame is the building mesh's frame. Defaults are the Strike Division HQ's loop (see Docs/Units/HQUnloadCrane.md);
+ * the refinery's knuckle-boom crane is AKnuckleCraneUnloadStation.
  */
 UCLASS()
 class RTS_SURVIVAL_API AResourceUnloadStation : public AActor
@@ -70,6 +71,13 @@ public:
 
 	/** @return Whether the station has a bin for this resource; other cargo goes to the drop-off point the old way. */
 	bool GetCanUnloadResource(ERTSResourceType Resource) const;
+
+	/**
+	 * @brief Where harvesters without a free bay unload the old way, when the old drop-off point lies in a bay.
+	 * @param OutLocation The overflow point in world space.
+	 * @return False when the station keeps the drop-off's own point (the HQ).
+	 */
+	bool GetOverflowDropOffLocation(FVector& OutLocation) const;
 
 	int32 GetBayCount() const { return M_Bays.Num(); }
 	bool GetIsBayDocked(int32 BayIndex) const;
@@ -197,6 +205,22 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category="Unload Station|Payload")
 	float BinTextHeight = 260.f;
 
+	// When the drop-off's own point lies inside a bay, harvesters that find no free bay unload here instead, so they
+	// do not drive into the docked harvester (station frame, cm).
+	UPROPERTY(EditDefaultsOnly, Category="Unload Station|Bays")
+	bool bUseOverflowDropOffPoint = false;
+
+	UPROPERTY(EditDefaultsOnly, Category="Unload Station|Bays", meta=(EditCondition="bUseOverflowDropOffPoint"))
+	FVector OverflowDropOffPoint = FVector::ZeroVector;
+
+	/** @brief Hook for stations with more moving parts than the trolley (the refinery's knuckle boom). */
+	virtual void OnTrolleyCreated(FUnloadTrolley& Trolley) {}
+
+	/** @brief Places the trolley (or boom tip), rope, grab and jaws from the trolley state; runs every tick. */
+	virtual void UpdateTrolleyVisuals(const FUnloadTrolley& Trolley) const;
+
+	UStaticMeshComponent* CreatePart(UStaticMesh* Mesh, USceneComponent* Parent, const FName Name);
+
 private:
 	TArray<FUnloadBayState> M_Bays;
 	TArray<FUnloadTrolley> M_Trolleys;
@@ -213,7 +237,6 @@ private:
 	float FindBinOffsetForBay(const FUnloadBayState& Bay, const FUnloadBaySettings& Settings,
 	                          const FVector& BinWorld) const;
 	void CreateTrolley(int32 BayIndex);
-	UStaticMeshComponent* CreatePart(UStaticMesh* Mesh, USceneComponent* Parent, const FName Name);
 
 	float GetRailDistanceForOffset(const FUnloadTrolley& Trolley) const;
 	float WrapRailDistance(float Distance) const;
@@ -232,7 +255,6 @@ private:
 	void ShowLoad(FUnloadTrolley& Trolley, ERTSResourceType Resource, bool bShow) const;
 	void DropLoadItems(FUnloadTrolley& Trolley);
 	void TickFallingItems(float DeltaSeconds);
-	void UpdateTrolleyVisuals(const FUnloadTrolley& Trolley) const;
 	void EndBayUnload(int32 BayIndex, EUnloadEndReason Reason);
 
 	bool GetIsValidBay(int32 BayIndex) const;

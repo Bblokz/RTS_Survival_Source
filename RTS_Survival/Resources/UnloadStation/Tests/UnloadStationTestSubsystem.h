@@ -40,6 +40,8 @@ struct FUnloadTestHarvester
 	float DockErrorCm = -1.f;
 	float DockYawErrorDeg = -1.f;
 	FVector DockedLocation = FVector::ZeroVector;
+	// Where it stood when its cargo was gone (the overflow point for a harvester that found no free bay).
+	FVector FinishedLocation = FVector::ZeroVector;
 };
 
 /**
@@ -48,6 +50,9 @@ struct FUnloadTestHarvester
  * with full cargo; both reverse into their bays at once and are unloaded chunk by chunk; checks docking accuracy,
  * that both trolleys work at the same time, and that exactly the cargo arrived. Then packs the HQ up while a load is
  * in the air and checks that cargo on board + credited stays the same. -UnloadStationCapture=<folder> saves pictures.
+ * -UnloadStationTruck=Refinery runs the same on Ger_Refinery_Truck (AKnuckleCraneUnloadStation, one bay): two radixite
+ * harvesters, one docks and is unloaded by the knuckle boom, the other unloads the old way at the overflow point
+ * without driving into the docked one.
  * Logs RTS_UNLOAD_TEST; not in shipping.
  */
 UCLASS()
@@ -110,4 +115,15 @@ private:
 	int32 M_PackUpStoredBefore = 0;
 
 	FB4HowitzerCaptureRig M_CaptureRig;
+
+	// Refinery run: one bay, both harvesters carry radixite, the bay-less one uses the overflow point.
+	bool bM_IsRefinery = false;
+	int32 M_RadixiteCargoEach = 0;
+	bool bM_SawCraneBusy = false;
+	int32 M_PackUpHarvesterIndex = 0;
+	// The pack-up baseline (cargo on board, stored) is taken when the harvester docks, so harvesting on the way in
+	// does not count.
+	bool bM_HasPackUpBaseline = false;
+
+	void TickRefineryUnloadResults(AResourceUnloadStation& Station);
 };
