@@ -7,7 +7,9 @@ UEnemyAirWarningSettings::UEnemyAirWarningSettings()
 	CategoryName = TEXT("Game");
 	// The Soviet air abilities the enemy AI fires (UEnemyStrategicAIComponent buckets); config can add more.
 	ScoutAircraftLines.Abilities = {EGlobalAbility::GA_SovietReconFlight};
-	AttackAircraftLines.Abilities = {EGlobalAbility::GA_2xPE2Strafing, EGlobalAbility::GA_4xPE2Strafing};
+	AttackAircraftLines.Abilities = {
+		EGlobalAbility::GA_2xPE2Strafing, EGlobalAbility::GA_4xPE2Strafing, EGlobalAbility::GA_2xIl2Strafing
+	};
 	ParatrooperPlaneLines.Abilities = {EGlobalAbility::GA_SovietParatroopers};
 	BomberLines.Abilities = {
 		EGlobalAbility::GA_HeavyCarpet_PE8_500Gr,

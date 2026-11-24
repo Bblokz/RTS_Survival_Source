@@ -229,6 +229,7 @@ void UGA_AircraftStrafing::IssueStrafeOrder(
 		M_AircraftStrafingSettings.TotalStrafeTime,
 		PostStrafeMoveToLocation);
 	StrafeAircraftSettings.bRepeatRunsOverTarget = M_AircraftStrafingSettings.bRepeatRunsOverTarget;
+	StrafeAircraftSettings.bDropBombsAtPullOut = M_AircraftStrafingSettings.bDropBombsAtPullOut;
 	SpawnedAircraft->StrafeLocation(StrafeAircraftSettings, M_AircraftStrafingSettings.AttackMoveSettings);
 }
 

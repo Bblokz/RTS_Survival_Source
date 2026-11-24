@@ -825,6 +825,9 @@ private:
 			bM_IsStrafing = false;
 			bM_IsLerpingStrafePoint = false;
 			bM_IsFirstAttackRun = true;
+		// Off for a guns-only strafe: no bombs at any pull-out for the rest of this aircraft's life (not reset with the
+		// runtime, so the hunting after the strafe stays guns-only too).
+		bool bM_DropBombsAtPullOut = true;
 			StrafeTimerHandle.Invalidate();
 		}
 	};

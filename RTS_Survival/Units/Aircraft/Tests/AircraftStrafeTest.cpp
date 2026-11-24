@@ -84,7 +84,16 @@ namespace AircraftStrafeTestPrivate
 	// Lightly armoured (the MG 15 has 12 mm penetration), owned by the enemy of the strafing player.
 	const TCHAR* const StrafeTargetClassPath = TEXT(
 		"/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Rus_ArmoredCar/BTR152A/Rus_ArmoredCar_BTR152A.Rus_ArmoredCar_BTR152A_C");
-	constexpr uint8 StrafeTargetOwner = 2;
+	// Owner of the strafe targets: the enemy of the strafing player by default. The strafe abilities spawn their aircraft
+	// with the Blueprint's owner, so Soviet aircraft (enemy-owned) need -AircraftStrafeTargetOwner=1.
+	constexpr uint8 DefaultStrafeTargetOwner = 2;
+
+	uint8 GetStrafeTargetOwner()
+	{
+		int32 TargetOwner = DefaultStrafeTargetOwner;
+		FParse::Value(FCommandLine::Get(), TEXT("AircraftStrafeTargetOwner="), TargetOwner);
+		return static_cast<uint8>(TargetOwner);
+	}
 	// Distances along the approach from the strafe target (the run is about 30 m long).
 	constexpr float StrafeTargetDistancesCm[] = {600.f, 1700.f};
 	// -AircraftStrafeTargets=Infantry: basic enemy rifle squads on the same spots, for the near-miss damage.
@@ -352,7 +361,7 @@ void UAircraftTestSubsystem::PlaceStrafeTargets(const FVector& ApproachingAircra
 			SpawnStrafeTargetSquad(FTransform(Broadside, Ground));
 			continue;
 		}
-		AActor* Target = SpawnUnitForPlayer(StrafeTargetClassPath, FTransform(Broadside, Ground), StrafeTargetOwner);
+		AActor* Target = SpawnUnitForPlayer(StrafeTargetClassPath, FTransform(Broadside, Ground), GetStrafeTargetOwner());
 		const UHealthComponent* Health = IsValid(Target) ? Target->FindComponentByClass<UHealthComponent>() : nullptr;
 		if (not IsValid(Health))
 		{
@@ -373,7 +382,7 @@ void UAircraftTestSubsystem::SpawnStrafeTargetSquad(const FTransform& Transform)
 	using namespace AircraftStrafeTestPrivate;
 	UClass* SquadClass = LoadClass<AActor>(nullptr, StrafeInfantryTargetClassPath);
 	AActor* Squad = IsValid(SquadClass)
-		                ? FRTSUnitOwnerSpawning::SpawnUnitForPlayer(*GetWorld(), SquadClass, Transform, StrafeTargetOwner)
+		                ? FRTSUnitOwnerSpawning::SpawnUnitForPlayer(*GetWorld(), SquadClass, Transform, GetStrafeTargetOwner())
 		                : nullptr;
 	Check(IsValid(Squad), TEXT("strafe_infantry_target_spawned"), StrafeInfantryTargetClassPath);
 	M_StrafeTargetSquads.Add(Squad);
@@ -407,7 +416,7 @@ void UAircraftTestSubsystem::RecordStrafeTargetSoldiers()
 		{
 			continue;
 		}
-		FRTSUnitOwnerSpawning::MatchSoldierToSquadOwner(Soldier, StrafeTargetOwner);
+		FRTSUnitOwnerSpawning::MatchSoldierToSquadOwner(Soldier, GetStrafeTargetOwner());
 		M_StrafeTargets.Add(Soldier);
 		M_StrafeTargetStartHealth.Add(Health->GetCurrentHealth());
 		UE_LOG(LogRTSAircraftStrafeTest, Display, TEXT("RTS_AIRCRAFT_TEST STRAFE_TARGET %s at=%s health=%.0f"),

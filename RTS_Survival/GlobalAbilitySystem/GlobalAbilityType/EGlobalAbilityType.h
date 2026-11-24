@@ -109,4 +109,6 @@ enum class EGlobalAbility : uint8
 	GA_GerIronStormParadrop,
 	GA_GerPzGrenIronStormParadrop,
 	GA_GerFelsKriegerDrop,
+	// Enemy: two Il-2 Sturmoviks strafe with their wing MGs (2026-11-24); a light/medium air strike like the Pe-2 strafes.
+	GA_2xIl2Strafing,
 };

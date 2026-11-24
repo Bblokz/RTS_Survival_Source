@@ -34,6 +34,11 @@ struct FAircraftStrafingGlobalAbilitySettings
 	// nearby enemies on their own.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	bool bRepeatRunsOverTarget = false;
+
+	// On: aircraft that carry bombs drop them at every pull-out (the Ju 87 strafes). Off: a guns-only strafe, whatever
+	// the aircraft carries (the enemy's Pe-2 and Il-2 strafes).
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	bool bDropBombsAtPullOut = true;
 };
 
 /**

@@ -2683,6 +2683,7 @@ TArray<FVector> UEnemyStrategicAIComponent::GetReinforcementAbilityTargetLocatio
 	Locations.Reserve(M_Blackboard.CurrentBaseDefensePositions.Num());
 	for (const FDefensePositions& DefensePosition : M_Blackboard.CurrentBaseDefensePositions)
 	{
+		|| AbilityType == EGlobalAbility::GA_2xIl2Strafing
 		if (not DefensePosition.Location.IsNearlyZero())
 		{
 			Locations.Add(DefensePosition.Location);

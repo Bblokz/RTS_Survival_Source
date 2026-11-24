@@ -1729,6 +1729,11 @@ void AAircraftMaster::AttackMove_IssueActionForNewTargetPoint(const FAircraftPat
 		break;
 	case EAirPathPointType::GetOutOfDive:
 		Strafe_OnDiveRecoveryStarted();
+		if (not M_StrafeState.bM_DropBombsAtPullOut)
+		{
+			// Guns-only strafe (UGA_AircraftStrafing setting): the bombs stay on board.
+			break;
+		}
 		if (M_AircraftAttackData.bM_IsAttackGround)
 		{
 			StartBombThrowingAtLocation(M_AircraftAttackData.TargetLocation);
@@ -2731,6 +2736,7 @@ void AAircraftMaster::StrafeLocation(const FStrafeAircraftSettings& StrafeAircra
 	M_StrafeState.bM_IsFirstAttackRun = true;
 	M_StrafeState.bM_IsRetreatingToDestroy = false;
 	M_StrafeState.bM_RepeatRunsOverTarget = StrafeAircraftSettings.bRepeatRunsOverTarget;
+	M_StrafeState.bM_DropBombsAtPullOut = StrafeAircraftSettings.bDropBombsAtPullOut;
 
 	M_AircraftAttackData.TargetActor = nullptr;
 	M_AircraftAttackData.TargetLocation = M_StrafeState.StrafeStartLocation;
