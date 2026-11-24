@@ -6,7 +6,7 @@ engineers. Wave sizes per difficulty are starter values for the owner to tune. U
 """
 import ue
 
-SRC = '/Game/RTS_Survival/Blueprints/Missions/GerCampaign/Berlin/DA_Berlin_ResponseForce'
+SRC = '/Game/RTS_Survival/Maps/GerMissions/Berlin/DataAssets/DA_Berlin_ResponseForce'
 UNITS = {
     'Light': {'tanks': ['BT7', 'T26', 'T70', 'BA12', 'BA14'],
               'squads': ['RUS_MOSIN', 'RUS_OKHOTNIK', 'RUS_MAXIM']},
@@ -17,7 +17,7 @@ CODE = r'''
 import unreal
 src = '%(src)s'
 for kind, units in %(units)r.items():
-    path = '%(base)sDA_Ore_%%sCounterattack' %% kind
+    path = '%(data)sDA_Ore_%%sCounterattack' %% kind
     if not unreal.EditorAssetLibrary.does_asset_exist(path):
         unreal.EditorAssetLibrary.duplicate_asset(src, path)
     d = unreal.load_asset(path)
@@ -26,7 +26,7 @@ for kind, units in %(units)r.items():
     train.set_editor_property('path_points', [])
     d.set_editor_property('train', train)
     spawns = d.get_editor_property('spawns')
-    spawns.set_editor_property('center_spawn_location', unreal.Vector(2010, 22500, 1400))
+    spawns.set_editor_property('center_spawn_location', unreal.Vector(2010, 22500, 0))  # Z 0: the code traces to the ground
     spawns.set_editor_property('landing_pad_centers', [])
     d.set_editor_property('spawns', spawns)
     # Down the valley road from the convoy yard, past the ambush corridor, then attack-move up to the HQ.
@@ -46,7 +46,9 @@ for kind, units in %(units)r.items():
 
 
 def main():
-    print(ue.py(CODE % {'src': SRC, 'units': UNITS, 'base': ue.BASE}).get('output_text'))
+    # The map's data assets live next to the level (owner, 2026-11-24); the stages stay in ue.BASE.
+    data = '/Game/RTS_Survival/Maps/GerMissions/Ger_2ndOreMountains/'
+    print(ue.py(CODE % {'src': SRC, 'units': UNITS, 'base': ue.BASE, 'data': data}).get('output_text'))
     for kind in UNITS:
         path = ue.BASE + f'Mission_Ore_{kind}Counterattack'
         ue.a('compile_blueprint', blueprint_path=path)

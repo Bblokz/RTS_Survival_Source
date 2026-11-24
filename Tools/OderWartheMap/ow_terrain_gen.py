@@ -185,6 +185,11 @@ RAIL_LINE = ow_rail.rail_line()
 
 # station hills: feature id -> (extra height cm, radius cm)
 STATION_HILLS = {"s1": (60.0, 1800.0), "s2": (420.0, 3600.0), "s3": (140.0, 3200.0), "s4": (220.0, 2600.0), "s5": (520.0, 3800.0)}
+# BP_OW_DFStation (design F, 2026-11-24): footprint in the station frame (cm; +X faces the start, UE +Y), from
+# df_station_report.json SM_OW_DFStation_Base with Blender Y negated; the ground is flat under it plus a margin, then fades
+STATION_FOOT = (-1160.0, 660.0, -910.0, 1223.0)           # lx min, lx max, ly min, ly max
+STATION_PAD_MARGIN = 200.0
+STATION_PAD_FADE = 900.0
 
 # corridors: id -> (half width cm, kind). Profiles come from the ground under them (see profile()).
 ROADS = {
@@ -671,8 +676,31 @@ class Gen:
             Z = np.maximum(Z, np.where(np.hypot((wk["lx"] - (PORTAL_CUT[0] + 700.0)) / 1500.0, wk["ly"] / 1050.0) < 1.05,
                                        wk["berm"], -1e9))
             Z = np.minimum(Z, wk["portal_cut"])
+        Z = self.station_pads(Z, guard)
         self.Z = Z
         self.slope = slope_deg(Z)
+
+    def station_pads(self, Z, guard):
+        """9. a flat pad under each DF station Blueprint, at the height of its capture centre (the Blueprint's pivot), so
+        no corner of the 18 x 21 m station floats on the dome; faded out over STATION_PAD_FADE, never over a corridor.
+        The station faces the start, as ow_dress_gen.stations() places it."""
+        X, Y = self.X, self.Y
+        start = self.feature("start").points[0]
+        self.station_pads_z = {}
+        for fid in STATION_HILLS:
+            p = self.feature(fid).points[0]
+            yaw = math.atan2(start[1] - p[1], start[0] - p[0])
+            lx = (X - p[0]) * math.cos(yaw) + (Y - p[1]) * math.sin(yaw)
+            ly = -(X - p[0]) * math.sin(yaw) + (Y - p[1]) * math.cos(yaw)
+            m = STATION_PAD_MARGIN
+            dx = np.maximum(np.maximum(STATION_FOOT[0] - m - lx, lx - STATION_FOOT[1] - m), 0.0)
+            dy = np.maximum(np.maximum(STATION_FOOT[2] - m - ly, ly - STATION_FOOT[3] - m), 0.0)
+            centre = np.unravel_index(np.argmin((X - p[0]) ** 2 + (Y - p[1]) ** 2), Z.shape)
+            z0 = float(Z[centre])
+            w = smoothstep(STATION_PAD_FADE, 0.0, np.hypot(dx, dy)) * guard
+            Z = Z * (1.0 - w) + z0 * w
+            self.station_pads_z[fid] = z0
+        return Z
 
     def corridor_points(self, rid):
         if rid in ("ramp_north", "ramp_prow", "ramp_east"):
