@@ -12,6 +12,7 @@
 class AAnchorPoint;
 class AGeneratorWorldCampaign;
 class AStaticMeshActor;
+class UTexture2D;
 class AWorldPlayerController;
 class UMaterialInstanceDynamic;
 class UMaterialInterface;
@@ -44,6 +45,43 @@ struct FWorldCountryLiberationData
 	/** One dynamic instance per country, parented to the Soviet material; created on first use. */
 	UPROPERTY(Transient)
 	TObjectPtr<UMaterialInstanceDynamic> LiberationMaterial = nullptr;
+
+	/** Staff-map fill of this country; used instead of LiberationMaterial when the staff-map look is on. */
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInstanceDynamic> StaffMapMaterial = nullptr;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInstanceDynamic> BorderMaterial = nullptr;
+
+	/** Outline mesh that frames this country in the level; found once by mesh name. */
+	UPROPERTY(Transient)
+	TWeakObjectPtr<AStaticMeshActor> BorderMeshActor;
+
+	bool bHasSearchedBorderMeshActor = false;
+
+	/** Distance of every point of the country to its edge; the fill material draws the border band from it. */
+	UPROPERTY(Transient)
+	TObjectPtr<UTexture2D> EdgeDistanceTexture = nullptr;
+
+	bool bHasBuiltEdgeDistanceTexture = false;
+
+	// False until the country was drawn once: its saved state appears at once, later clears grow outward.
+	bool bHasShownFrontOnce = false;
+
+	bool bIsFrontGrowing = false;
+
+	// World time at which each cleared anchor's free ground started to spread.
+	TMap<FGuid, double> FrontGrowStartSecondsByAnchorKey;
+};
+
+/**
+ * @brief One cleared target of a country as the fill material draws it: free ground spreading from a point.
+ */
+struct FWorldCountryFrontPoint
+{
+	FGuid AnchorKey;
+	FVector2D MapLocation = FVector2D::ZeroVector;
+	float Radius = 0.f;
 };
 
 /**
@@ -123,6 +161,17 @@ public:
 
 	UPROPERTY(BlueprintAssignable, Category = "World Campaign|Country Occupation")
 	FOnWorldCountryLiberationChanged OnCountryLiberationChanged;
+
+	/** @return Country whose shape contains the map location, or NAME_None over sea and unlisted countries. */
+	UFUNCTION(BlueprintPure, Category = "World Campaign|Country Occupation")
+	FName GetCountryIdAtMapLocation(FVector2D MapLocation) const;
+
+	/**
+	 * @brief Brightens the country under the cursor and its border; the controller calls it every frame.
+	 * @param MapLocation Cursor position on the map plane.
+	 * @param bIsCursorOverMap false clears the highlight (cursor over UI or off the map).
+	 */
+	void SetHoveredCountryAtMapLocation(FVector2D MapLocation, bool bIsCursorOverMap);
 
 protected:
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
@@ -498,6 +547,74 @@ private:
 	TArray<FName> M_LiberationScalarParameterNames = {
 		TEXT("StripeIntensity"), TEXT("StripeSpacing"), TEXT("StripeSpeedWorld"), TEXT("StripeWidth01")
 	};
+
+	/** Off = the old stripe materials are blended; on = hatched staff-map fill, liberation front and state borders. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Country Occupation|Staff Map Look",
+		meta = (AllowPrivateAccess = "true", DisplayName = "Use Staff Map Look"))
+	bool bM_UseStaffMapLook = true;
+
+	/** M_CountryStaffMap: built by Source/Tools/WorldCampaign/create_country_look_materials.py. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Country Occupation|Staff Map Look",
+		meta = (AllowPrivateAccess = "true", DisplayName = "Staff Map Fill Material"))
+	TSoftObjectPtr<UMaterialInterface> M_StaffMapFillMaterial;
+
+	/** M_CountryBorderState: one colour for one owner, two alternating colours while contested. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Country Occupation|Staff Map Look",
+		meta = (AllowPrivateAccess = "true", DisplayName = "Border State Material"))
+	TSoftObjectPtr<UMaterialInterface> M_BorderStateMaterial;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInterface> M_LoadedStaffMapFillMaterial = nullptr;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInterface> M_LoadedBorderStateMaterial = nullptr;
+
+	FTimerHandle M_FrontGrowthTimerHandle;
+
+	// Index into M_CountryLiberationData of the country under the cursor; INDEX_NONE when none.
+	int32 M_HoveredLiberationDataIndex = INDEX_NONE;
+
+	void LoadStaffMapLookMaterials();
+
+	/**
+	 * @brief Draws the country with the staff-map fill and updates its border.
+	 * @return false when the staff-map look is off or its material is missing; the caller then uses the old look.
+	 */
+	bool TryApplyStaffMapLook(FWorldCountryLiberationData& LiberationData);
+
+	/** Sends the cleared targets of the country to its fill material and starts the growth of new ones. */
+	void ApplyCountryFrontPoints(FWorldCountryLiberationData& LiberationData);
+
+	/**
+	 * @brief Collects the cleared targets of a country; each frees ground toward the nearest enemy still standing.
+	 * @param CountryIndex Runtime country index.
+	 * @param OutFrontPoints Receives at most as many points as the fill material can draw, in a stable order.
+	 */
+	void BuildCountryFrontPoints(int32 CountryIndex, TArray<FWorldCountryFrontPoint>& OutFrontPoints) const;
+
+	void StartFrontGrowthTimer();
+	void TickFrontGrowth();
+
+	/** Enemy red, free blue, or cream and red dashes while contested; brighter for the hovered country. */
+	void ApplyCountryBorderState(FWorldCountryLiberationData& LiberationData);
+
+	AStaticMeshActor* FindBorderMeshActorForCountry(int32 CountryIndex) const;
+
+	/**
+	 * @brief Measures the country's edge distances once and hands them to its fill material, which then draws the
+	 * border as a band inside the country. Without triangle data the band stays off and only the outline mesh shows.
+	 */
+	void ApplyCountryEdgeDistance(FWorldCountryLiberationData& LiberationData);
+
+	/** Rectangle around every anchor of the map; parts of a country outside it (overseas land) are not measured. */
+	FBox2D GetCampaignMapRect() const;
+
+	/** Width of the border band inside each country, in map units; 0 turns the band off. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Country Occupation|Staff Map Look",
+		meta = (AllowPrivateAccess = "true", ClampMin = "0.0", ClampMax = "60.0", DisplayName = "Border Band Width"))
+	float M_BorderBandWidth = 14.f;
+	int32 FindLiberationDataIndexAtMapLocation(const FVector2D& MapLocation) const;
+	void ApplyHoverToCountry(int32 LiberationDataIndex, bool bIsHovered);
 
 	/** Off = anchors are matched by bounding box only, as before the shape test existed. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Country Occupation",

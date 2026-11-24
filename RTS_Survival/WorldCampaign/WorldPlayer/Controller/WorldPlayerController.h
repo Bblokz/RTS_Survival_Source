@@ -186,6 +186,15 @@ protected:
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaTime) override;
 
+	/** Tells the country regulator which country lies under the cursor, so it can be highlighted. */
+	void Tick_UpdateHoveredCountry();
+
+	/** Brightens the build site under the cursor and dims the one the cursor left. */
+	void Tick_UpdateHoveredBuildNode(AActor* ActorUnderCursor);
+
+	UPROPERTY()
+	TWeakObjectPtr<AWorldBuildNode> M_HoveredBuildNode;
+
 	/** @brief called on single Primary click */
 	UFUNCTION(BlueprintCallable)
 	void PrimaryClick();

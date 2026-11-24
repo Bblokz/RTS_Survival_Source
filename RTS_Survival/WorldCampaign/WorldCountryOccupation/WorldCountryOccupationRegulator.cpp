@@ -90,6 +90,10 @@ UWorldCountryOccupationRegulator::UWorldCountryOccupationRegulator()
 {
 	PrimaryComponentTick.bCanEverTick = false;
 	M_CountryBoundsPaddingXY = DefaultCountryBoundsPaddingXY;
+	M_StaffMapFillMaterial = TSoftObjectPtr<UMaterialInterface>(FSoftObjectPath(
+		TEXT("/Game/RTS_Survival/WorldCampaign/CountriesShading/M_CountryStaffMap.M_CountryStaffMap")));
+	M_BorderStateMaterial = TSoftObjectPtr<UMaterialInterface>(FSoftObjectPath(
+		TEXT("/Game/RTS_Survival/WorldCampaign/CountriesShading/M_CountryBorderState.M_CountryBorderState")));
 }
 
 void UWorldCountryOccupationRegulator::InitializeCountryOccupation(AGeneratorWorldCampaign* WorldGenerator)
@@ -235,6 +239,8 @@ void UWorldCountryOccupationRegulator::InitializeCountryLiberationData()
 	M_CountryLiberationData.Reset();
 	M_LiberationDataIndexByCountryId.Reset();
 	M_LiberationDataIndexByCountryIndex.Reset();
+	M_HoveredLiberationDataIndex = INDEX_NONE;
+	LoadStaffMapLookMaterials();
 
 	for (const int32 CountryIndex : M_TraceableCountryIndices)
 	{
@@ -395,6 +401,11 @@ void UWorldCountryOccupationRegulator::ReadMaterialParameterSet(
 
 void UWorldCountryOccupationRegulator::ApplyCountryLiberationLook(FWorldCountryLiberationData& LiberationData)
 {
+	if (TryApplyStaffMapLook(LiberationData))
+	{
+		return;
+	}
+
 	if (not bM_CanApplyCountryLook)
 	{
 		return;

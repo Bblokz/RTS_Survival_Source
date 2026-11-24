@@ -18,7 +18,28 @@ namespace WorldBuildNodeVisualConstants
 	const FName DefaultVisualColorParameterName = TEXT("Color");
 	constexpr int32 DefaultVisualMaterialIndex = 0;
 	// The engine cylinder is 100 units wide and tall; a flat wide disc reads as a site on the map.
-	const FVector DefaultVisualScale(3.f, 3.f, 0.4f);
+	const FVector DefaultVisualScale(1.2f, 1.2f, 0.2f);
+	const TCHAR* const HexPlateMeshPath = TEXT("/Engine/BasicShapes/Plane.Plane");
+	const TCHAR* const HexPlateMaterialPath =
+		TEXT("/Game/RTS_Survival/WorldCampaign/BuildSites/M_BuildSiteHexPlate.M_BuildSiteHexPlate");
+	constexpr int32 HexPlateMaterialIndex = 0;
+	// The engine plane is 100 units wide.
+	constexpr float HexPlateMeshWidth = 100.f;
+	// The material draws the plate over this share of the plane; the rest is room for shadow and glow.
+	constexpr float HexPlateShareOfPlane = 0.52f;
+	// Above the country fill and the roads, below the map pieces.
+	constexpr float HexPlateHeightAboveGround = 6.f;
+	// The hidden cylinder is the click target; this makes it as wide as the plate.
+	constexpr float ClickTargetHeightScale = 0.2f;
+	const FName HexPlateStateParameterName = TEXT("State");
+	const FName HexPlateSignParameterName = TEXT("SignIndex");
+	const FName HexPlateHoverParameterName = TEXT("Hover");
+	constexpr float HexPlateSignLock = 0.f;
+	constexpr float HexPlateSignPlus = 1.f;
+	constexpr float HexPlateSignWatchPost = 2.f;
+	constexpr float HexPlateSignSupplyDepot = 3.f;
+	constexpr float HexPlateSignAirfield = 4.f;
+	constexpr float HexPlateSignBattery = 5.f;
 	const FLinearColor LockedColor(0.25f, 0.25f, 0.25f);
 	const FLinearColor UnlockedColor(0.95f, 0.75f, 0.15f);
 	const FLinearColor BuiltColor(0.2f, 0.7f, 0.25f);
@@ -54,6 +75,22 @@ AWorldBuildNode::AWorldBuildNode()
 		M_DefaultVisualMesh->SetMaterial(WorldBuildNodeVisualConstants::DefaultVisualMaterialIndex,
 		                                 DefaultVisualMaterialFinder.Object);
 	}
+
+	M_HexPlateMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("HexPlateMesh"));
+	M_HexPlateMesh->SetupAttachment(M_RootSceneComponent);
+	M_HexPlateMesh->SetRelativeLocation(FVector(0.f, 0.f, WorldBuildNodeVisualConstants::HexPlateHeightAboveGround));
+	M_HexPlateMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	M_HexPlateMesh->SetGenerateOverlapEvents(false);
+	M_HexPlateMesh->SetCastShadow(false);
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> HexPlateMeshFinder(
+		WorldBuildNodeVisualConstants::HexPlateMeshPath);
+	if (HexPlateMeshFinder.Succeeded())
+	{
+		M_HexPlateMesh->SetStaticMesh(HexPlateMeshFinder.Object);
+	}
+
+	M_HexPlateMaterialAsset = TSoftObjectPtr<UMaterialInterface>(
+		FSoftObjectPath(WorldBuildNodeVisualConstants::HexPlateMaterialPath));
 }
 
 void AWorldBuildNode::InitializeFromDefinition(const FWorldBuildNodeDefinition& BuildNodeDefinition)
@@ -72,6 +109,7 @@ void AWorldBuildNode::SetNodeState(const EWorldBuildNodeState NewState)
 
 	M_NodeState = NewState;
 	UpdateDefaultVisual();
+	UpdateHexPlate();
 	BP_OnNodeStateChanged(M_NodeState, M_Building);
 }
 
@@ -85,6 +123,7 @@ void AWorldBuildNode::SetBuilding(const EWorldCampaignBuilding NewBuilding)
 	M_Building = NewBuilding;
 	M_NodeState = EWorldBuildNodeState::Built;
 	UpdateDefaultVisual();
+	UpdateHexPlate();
 	BP_OnNodeStateChanged(M_NodeState, M_Building);
 	BP_OnBuildingBuilt(M_Building);
 }
@@ -105,8 +144,86 @@ void AWorldBuildNode::BeginPlay()
 			WorldBuildNodeVisualConstants::DefaultVisualMaterialIndex);
 	}
 
+	BeginPlay_InitHexPlate();
 	UpdateDefaultVisual();
+	UpdateHexPlate();
 	BP_OnNodeStateChanged(M_NodeState, M_Building);
+}
+
+void AWorldBuildNode::BeginPlay_InitHexPlate()
+{
+	using namespace WorldBuildNodeVisualConstants;
+	if (not GetIsValidHexPlateMesh())
+	{
+		return;
+	}
+
+	UMaterialInterface* HexPlateMaterial = bM_UseDefaultVisual ? M_HexPlateMaterialAsset.LoadSynchronous() : nullptr;
+	if (not IsValid(HexPlateMaterial))
+	{
+		// No plate material (or a Blueprint look): the cylinder, when in use, keeps showing the state.
+		M_HexPlateMesh->SetVisibility(false);
+		return;
+	}
+
+	const float PlaneScale = M_HexPlateWidth / (HexPlateShareOfPlane * HexPlateMeshWidth);
+	M_HexPlateMesh->SetRelativeScale3D(FVector(PlaneScale, PlaneScale, 1.f));
+	M_HexPlateMesh->SetMaterial(HexPlateMaterialIndex, HexPlateMaterial);
+	M_HexPlateMaterial = M_HexPlateMesh->CreateDynamicMaterialInstance(HexPlateMaterialIndex);
+	M_HexPlateMesh->SetVisibility(true);
+
+	// The plate replaces the cylinder's look; the cylinder stays as the click target, as wide as the plate.
+	M_DefaultVisualMesh->SetVisibility(false);
+	const float ClickTargetScale = M_HexPlateWidth / HexPlateMeshWidth;
+	M_DefaultVisualMesh->SetRelativeScale3D(FVector(ClickTargetScale, ClickTargetScale, ClickTargetHeightScale));
+}
+
+void AWorldBuildNode::SetIsHovered(const bool bIsHovered)
+{
+	if (not IsValid(M_HexPlateMaterial))
+	{
+		return;
+	}
+
+	M_HexPlateMaterial->SetScalarParameterValue(WorldBuildNodeVisualConstants::HexPlateHoverParameterName,
+	                                            bIsHovered ? 1.f : 0.f);
+}
+
+void AWorldBuildNode::UpdateHexPlate() const
+{
+	if (not IsValid(M_HexPlateMaterial))
+	{
+		return;
+	}
+
+	M_HexPlateMaterial->SetScalarParameterValue(WorldBuildNodeVisualConstants::HexPlateStateParameterName,
+	                                            static_cast<float>(M_NodeState));
+	M_HexPlateMaterial->SetScalarParameterValue(WorldBuildNodeVisualConstants::HexPlateSignParameterName,
+	                                            GetHexPlateSignIndex());
+}
+
+float AWorldBuildNode::GetHexPlateSignIndex() const
+{
+	using namespace WorldBuildNodeVisualConstants;
+	if (M_NodeState == EWorldBuildNodeState::Locked)
+	{
+		return HexPlateSignLock;
+	}
+
+	switch (M_Building)
+	{
+	case EWorldCampaignBuilding::WatchPost:
+		return HexPlateSignWatchPost;
+	case EWorldCampaignBuilding::SupplyDepot:
+		return HexPlateSignSupplyDepot;
+	case EWorldCampaignBuilding::Airfield:
+		return HexPlateSignAirfield;
+	case EWorldCampaignBuilding::Battery:
+		return HexPlateSignBattery;
+	case EWorldCampaignBuilding::None:
+	default:
+		return HexPlateSignPlus;
+	}
 }
 
 void AWorldBuildNode::UpdateDefaultVisual() const
@@ -132,6 +249,22 @@ FLinearColor AWorldBuildNode::GetDefaultVisualColor() const
 	default:
 		return WorldBuildNodeVisualConstants::LockedColor;
 	}
+}
+
+bool AWorldBuildNode::GetIsValidHexPlateMesh() const
+{
+	if (IsValid(M_HexPlateMesh))
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+		this,
+		TEXT("M_HexPlateMesh"),
+		TEXT("GetIsValidHexPlateMesh"),
+		this
+	);
+	return false;
 }
 
 bool AWorldBuildNode::GetIsValidDefaultVisualMesh() const

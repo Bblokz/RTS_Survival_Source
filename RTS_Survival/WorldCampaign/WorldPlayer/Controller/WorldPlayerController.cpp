@@ -306,6 +306,53 @@ void AWorldPlayerController::Tick(float DeltaTime)
 	const bool bHit = GetHitResultUnderCursor(ECC_Visibility, false, HitResultCursorProjection);
 	AActor* HitActor = bHit ? HitResultCursorProjection.GetActor() : nullptr;
 	M_PlayerWorldOutliner->OnPlayerTick(HitActor, HitResultCursorProjection.Location);
+	Tick_UpdateHoveredCountry();
+	Tick_UpdateHoveredBuildNode(HitActor);
+}
+
+void AWorldPlayerController::Tick_UpdateHoveredBuildNode(AActor* ActorUnderCursor)
+{
+	AWorldBuildNode* BuildNodeUnderCursor = Cast<AWorldBuildNode>(ActorUnderCursor);
+	if (M_HoveredBuildNode.Get() == BuildNodeUnderCursor)
+	{
+		return;
+	}
+
+	if (M_HoveredBuildNode.IsValid())
+	{
+		M_HoveredBuildNode->SetIsHovered(false);
+	}
+
+	M_HoveredBuildNode = BuildNodeUnderCursor;
+	if (IsValid(BuildNodeUnderCursor))
+	{
+		BuildNodeUnderCursor->SetIsHovered(true);
+	}
+}
+
+void AWorldPlayerController::Tick_UpdateHoveredCountry()
+{
+	if (not M_WorldGenerator.IsValid())
+	{
+		return;
+	}
+
+	UWorldCountryOccupationRegulator* CountryRegulator =
+		M_WorldGenerator->FindComponentByClass<UWorldCountryOccupationRegulator>();
+	if (not IsValid(CountryRegulator))
+	{
+		return;
+	}
+
+	// Country meshes have no collision, so the cursor is projected onto the map plane instead of traced.
+	FVector CursorOrigin;
+	FVector CursorDirection;
+	const bool bHasCursorRay = DeprojectMousePositionToWorld(CursorOrigin, CursorDirection)
+		&& not FMath::IsNearlyZero(CursorDirection.Z);
+	const float DistanceToMapPlane = bHasCursorRay ? -CursorOrigin.Z / CursorDirection.Z : -1.f;
+	const bool bIsCursorOverMap = DistanceToMapPlane > 0.f;
+	const FVector MapLocation = CursorOrigin + CursorDirection * FMath::Max(DistanceToMapPlane, 0.f);
+	CountryRegulator->SetHoveredCountryAtMapLocation(FVector2D(MapLocation), bIsCursorOverMap);
 }
 
 void AWorldPlayerController::PrimaryClick()
