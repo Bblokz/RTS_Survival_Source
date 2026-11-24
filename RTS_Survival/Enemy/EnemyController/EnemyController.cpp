@@ -199,6 +199,45 @@ void AEnemyController::SetAllowDirectControlStochasticDecisionTree(const bool bA
 	StrategicAIBlackboard.StrategicAIMissionSettings.bAllowDirectControlStochasticDecisionTree = bAllow;
 }
 
+void AEnemyController::ApplyMissionTraining(const FEnemyMissionTrainingOverride& Override)
+{
+	M_EnemyAIMissionSettings.bAllowUnitTraining = Override.bAllowUnitTraining;
+	M_EnemyAIMissionSettings.RestrictTrainingToSquads = Override.Squads;
+	M_EnemyAIMissionSettings.RestrictTrainingToTanks = Override.Tanks;
+	M_EnemyAIMissionSettings.MinUnitsTrainedPerBatch = FMath::Max(1, Override.MinUnitsTrainedPerBatch);
+	M_EnemyAIMissionSettings.MaxUnitsTrainedPerBatch = FMath::Max(M_EnemyAIMissionSettings.MinUnitsTrainedPerBatch,
+	                                                              Override.MaxUnitsTrainedPerBatch);
+	M_EnemyAIMissionSettings.MaxAliveBuildingTrainedUnits = FMath::Max(0, Override.MaxAliveBuildingTrainedUnits);
+	M_EnemyLevelTraining.TrainingPointsPerMinute = FMath::Max(0.f, Override.TrainingPointsPerMinute);
+	M_EnemyLevelTraining.TrainingPointsStart = FMath::Max(0, Override.TrainingPointsStart);
+	// The mission's units train at the buildings of their kind whatever tech level the map files them under.
+	for (const ESquadSubtype Squad : Override.Squads)
+	{
+		M_EnemyLevelTraining.BasicInfantryOptions.TrainableSquadSubtypes.AddUnique(Squad);
+	}
+	for (const ETankSubtype Tank : Override.Tanks)
+	{
+		M_EnemyLevelTraining.LightTankOptions.TrainableTankSubtypes.AddUnique(Tank);
+	}
+
+	UEnemyStrategicAIComponent* const StrategicAIComponent = GetEnemyStrategicAIComponent();
+	if (not IsValid(StrategicAIComponent))
+	{
+		RTSFunctionLibrary::ReportError("ApplyMissionTraining: invalid strategic AI component; the running AI keeps "
+			"its old training settings.");
+		return;
+	}
+	StrategicAIComponent->GetEditableStrategicAIBlackboard().StrategicAIMissionSettings = M_EnemyAIMissionSettings;
+	FEnemyStrategicTrainingState& TrainingState = StrategicAIComponent->GetEditableEnemyTrainingState();
+	TrainingState.EnemyLevelTraining.TrainingPointsPerMinute = M_EnemyLevelTraining.TrainingPointsPerMinute;
+	TrainingState.EnemyLevelTraining.BasicInfantryOptions.TrainableSquadSubtypes =
+		M_EnemyLevelTraining.BasicInfantryOptions.TrainableSquadSubtypes;
+	TrainingState.EnemyLevelTraining.LightTankOptions.TrainableTankSubtypes =
+		M_EnemyLevelTraining.LightTankOptions.TrainableTankSubtypes;
+	TrainingState.TrainingPoints = M_EnemyLevelTraining.TrainingPointsStart;
+	TrainingState.TrainingPointIncomeRemainder = 0.f;
+}
+
 void AEnemyController::MoveFormationToLocation(const TArray<ASquadController*>& SquadControllers,
                                                const TArray<ATankMaster*>& TankMasters,
                                                const TArray<FVector>& Waypoints,
@@ -773,6 +812,19 @@ bool AEnemyController::RetreatUnitToRallyPoint(AActor* UnitActor, const FVector&
 		NoCounterattackDelaySeconds,
 		NoCounterattackTimeoutSeconds);
 	return true;
+}
+
+int32 AEnemyController::ConvergePatrolFormationsOnLocation(
+	const TArray<AActor*>& Units,
+	const FVector& ConvergeLocation,
+	const float CombatSecondsBeforeReturn)
+{
+	if (not GetIsValidFormationController())
+	{
+		return 0;
+	}
+	return M_FormationController->ConvergePatrolFormationsOnLocation(Units, ConvergeLocation,
+	                                                                 CombatSecondsBeforeReturn);
 }
 
 void AEnemyController::AddToWaveSupply(const int32 AddSupply)

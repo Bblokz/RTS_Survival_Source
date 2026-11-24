@@ -1,4 +1,4 @@
-// Copyright (C) Bas Blokzijl - All rights reserved.
+﻿// Copyright (C) Bas Blokzijl - All rights reserved.
 
 #include "SurrenderingTruckSubsystem.h"
 
@@ -9,6 +9,11 @@
 #include "RTS_Survival/Scavenging/ScavengeObject/ScavengableObject.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/RTSBlueprintFunctionLibrary.h"
+
+USurrenderingTruckSubsystem* USurrenderingTruckSubsystem::GetSurrenderingTruckSubsystem(const UObject* WorldContextObject)
+{
+	return Get(WorldContextObject);
+}
 
 USurrenderingTruckSubsystem* USurrenderingTruckSubsystem::Get(const UObject* WorldContextObject)
 {
@@ -49,6 +54,11 @@ bool USurrenderingTruckSubsystem::TryClaimFirstSurrender()
 void USurrenderingTruckSubsystem::BroadcastFirstTruckSurrendered(ASurrenderingCargoTruck* Truck)
 {
 	OnFirstTruckSurrendered.Broadcast(Truck);
+}
+
+void USurrenderingTruckSubsystem::BroadcastScuttleCountdownStarted(ASurrenderingCargoTruck* Truck)
+{
+	OnScuttleCountdownStarted.Broadcast(Truck);
 }
 
 // ------------------------------------------------------------------

@@ -1,4 +1,4 @@
-// Copyright (C) Bas Blokzijl - All rights reserved.
+﻿// Copyright (C) Bas Blokzijl - All rights reserved.
 
 #pragma once
 
@@ -75,13 +75,18 @@ struct FSealedCacheRecord
  * the mission Blueprint (Get SurrenderingTruckSubsystem) to follow the case truck and its sealed caches, which spawn
  * after the truck is gone. Also keeps the once-per-world surrender line and the "hide all game UI" state.
  */
-UCLASS()
+UCLASS(BlueprintType)
 class RTS_SURVIVAL_API USurrenderingTruckSubsystem : public UWorldSubsystem, public IRTSUIElement
 {
 	GENERATED_BODY()
 
 public:
 	static USurrenderingTruckSubsystem* Get(const UObject* WorldContextObject);
+
+	/** Blueprint access for mission graphs (bind OnCasesDelivered / OnSealedCacheScavenged, query the cases). */
+	UFUNCTION(BlueprintPure, Category = "Surrendering Truck",
+		meta = (WorldContext = "WorldContextObject", DisplayName = "Get Surrendering Truck Subsystem"))
+	static USurrenderingTruckSubsystem* GetSurrenderingTruckSubsystem(const UObject* WorldContextObject);
 
 	virtual void Deinitialize() override;
 
@@ -97,6 +102,7 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Surrendering Truck")
 	bool GetHasAnyTruckSurrendered() const { return bM_HasAnyTruckSurrendered; }
 
+	void BroadcastScuttleCountdownStarted(ASurrenderingCargoTruck* Truck);
 	void BroadcastFirstTruckSurrendered(ASurrenderingCargoTruck* Truck);
 
 	void RegisterCaseTruck(ASurrenderingCaseTruck* CaseTruck);
@@ -149,6 +155,10 @@ public:
 	// The first truck in this world surrendered (the surrender line plays once, on that truck).
 	UPROPERTY(BlueprintAssignable, Category = "Surrendering Truck")
 	FOnSurrenderingTruckWorldEvent OnFirstTruckSurrendered;
+
+	// Any surrendering truck started its scuttle countdown (its escort is gone): missions explain capturing here.
+	UPROPERTY(BlueprintAssignable, Category = "Surrendering Truck")
+	FOnSurrenderingTruckWorldEvent OnScuttleCountdownStarted;
 
 	// A case truck began play (convoys spawn their trucks at runtime).
 	UPROPERTY(BlueprintAssignable, Category = "Surrendering Truck|Cases")
