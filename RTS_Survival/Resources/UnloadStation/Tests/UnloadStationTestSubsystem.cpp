@@ -35,6 +35,8 @@ namespace UnloadStationTestPrivate
 	const TCHAR* const TruckSwitch = TEXT("UnloadStationTruck=");
 	const TCHAR* const RefineryPath =
 		TEXT("/Game/RTS_Survival/Blueprints/GroundVehicles/BaseAndNomadic/ChildBlueprints/GerEco/OpelBlitz_Ref/Ger_Refinery_Truck.Ger_Refinery_Truck_C");
+	const TCHAR* const MetalDepotPath =
+		TEXT("/Game/RTS_Survival/Blueprints/GroundVehicles/BaseAndNomadic/ChildBlueprints/GerEco/Opel_MetalVault/Ger_MetalVault_Truck.Ger_MetalVault_Truck_C");
 	// The bay-less harvester must unload near the overflow point and keep clear of the docked one (hull centres).
 	constexpr float MaxOverflowErrorCm = 550.f;
 	constexpr float MinOverflowClearanceCm = 450.f;
@@ -58,6 +60,8 @@ namespace UnloadStationTestPrivate
 	constexpr float MaxDockErrorCm = 120.f;
 	constexpr float MaxDockYawErrorDeg = 12.f;
 	constexpr int32 FramesToWriteLastCapture = 3;
+	// Seconds into a single-bay unload's busy phase for extra frames (bars on the belt, bars landing in the bin).
+	const TArray<float> MidUnloadCaptureSeconds = {6.f, 14.f, 24.f};
 	const TArray<FB4HowitzerCameraView> Views = {
 		{TEXT("bays"), FVector(2300.f, -1700.f, 1500.f), FVector(500.f, 0.f, 300.f), 50.f},
 		{TEXT("bins"), FVector(600.f, -1500.f, 1100.f), FVector(-150.f, -260.f, 250.f), 50.f},
@@ -67,6 +71,14 @@ namespace UnloadStationTestPrivate
 		{TEXT("crane"), FVector(1500.f, -1250.f, 1050.f), FVector(200.f, 0.f, 330.f), 50.f},
 		{TEXT("side"), FVector(1250.f, 1550.f, 950.f), FVector(150.f, 150.f, 380.f), 50.f},
 		{TEXT("top"), FVector(250.f, -100.f, 3000.f), FVector(250.f, -99.f, 0.f), 60.f}
+	};
+	// The test map's low sun lights the depot's -X side: the "sunlit" and "head" views look from there (apron and belt,
+	// then the head pulley throwing bars into the bin).
+	const TArray<FB4HowitzerCameraView> MetalDepotViews = {
+		{TEXT("sunlit"), FVector(-1300.f, -750.f, 650.f), FVector(-22.f, -280.f, 250.f), 45.f},
+		{TEXT("head"), FVector(-650.f, -260.f, 780.f), FVector(-70.f, -60.f, 300.f), 40.f},
+		{TEXT("side"), FVector(1350.f, -300.f, 420.f), FVector(-20.f, -300.f, 250.f), 50.f},
+		{TEXT("top"), FVector(-20.f, -450.f, 3000.f), FVector(-20.f, -449.f, 0.f), 60.f}
 	};
 }
 
@@ -133,10 +145,18 @@ void UUnloadStationTestSubsystem::TickWaitingForStart()
 		return;
 	}
 	FString Truck;
-	bM_IsRefinery = FParse::Value(FCommandLine::Get(), TruckSwitch, Truck)
-		&& Truck.Equals(TEXT("Refinery"), ESearchCase::IgnoreCase);
+	(void)FParse::Value(FCommandLine::Get(), TruckSwitch, Truck);
+	M_StationKind = Truck.Equals(TEXT("Refinery"), ESearchCase::IgnoreCase)
+		                ? EUnloadTestStation::Refinery
+		                : Truck.Equals(TEXT("MetalDepot"), ESearchCase::IgnoreCase)
+		                ? EUnloadTestStation::MetalDepot
+		                : EUnloadTestStation::HQ;
+	M_TrackedResource = M_StationKind == EUnloadTestStation::MetalDepot
+		                    ? ERTSResourceType::Resource_Metal
+		                    : ERTSResourceType::Resource_Radixite;
 	UE_LOG(LogRTSUnloadStationTest, Display, TEXT("RTS_UNLOAD_TEST truck=%s"),
-	       bM_IsRefinery ? TEXT("Refinery") : TEXT("HQ"));
+	       M_StationKind == EUnloadTestStation::Refinery ? TEXT("Refinery")
+	       : M_StationKind == EUnloadTestStation::MetalDepot ? TEXT("MetalDepot") : TEXT("HQ"));
 	FString Capture;
 	if (FParse::Value(FCommandLine::Get(), CaptureSwitch, Capture))
 	{
@@ -166,7 +186,12 @@ void UUnloadStationTestSubsystem::SpawnHQ()
 			Anchor = FVector2D(FCString::Atof(*X), FCString::Atof(*Y));
 		}
 	}
-	UClass* HQClass = LoadClass<ANomadicVehicle>(nullptr, bM_IsRefinery ? RefineryPath : HQPath);
+	const TCHAR* const TruckPath = M_StationKind == EUnloadTestStation::Refinery
+		                               ? RefineryPath
+		                               : M_StationKind == EUnloadTestStation::MetalDepot
+		                               ? MetalDepotPath
+		                               : HQPath;
+	UClass* HQClass = LoadClass<ANomadicVehicle>(nullptr, TruckPath);
 	FVector Ground;
 	if (not IsValid(World) || not IsValid(HQClass)
 		|| not GlobalAbilityHelpers::TryFindGroundLocation(this, FVector(Anchor, 0.f), Ground))
@@ -174,7 +199,8 @@ void UUnloadStationTestSubsystem::SpawnHQ()
 		return;
 	}
 	M_Anchor = Ground;
-	const FTransform SpawnTransform(FRotator::ZeroRotator, Ground + FVector(0.f, 0.f, 150.f));
+	// On the ground: it starts converted to a building, so it never drops onto the terrain like a driving truck.
+	const FTransform SpawnTransform(FRotator::ZeroRotator, Ground);
 	ANomadicVehicle* HQ = World->SpawnActorDeferred<ANomadicVehicle>(
 		HQClass, SpawnTransform, nullptr, nullptr, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
 	if (not IsValid(HQ))
@@ -214,7 +240,7 @@ void UUnloadStationTestSubsystem::TickWaitingForStation()
 		return;
 	}
 	M_Station = Station;
-	Check(Station->GetBayCount() == (bM_IsRefinery ? 1 : 2), TEXT("station_bay_count"),
+	Check(Station->GetBayCount() == (GetIsSingleBay() ? 1 : 2), TEXT("station_bay_count"),
 	      FString::FromInt(Station->GetBayCount()));
 	const UResourceDropOff* DropOff = M_HQ.IsValid() ? M_HQ->GetResourceDropOff() : nullptr;
 	Check(IsValid(DropOff) && DropOff->GetUnloadStation() == Station, TEXT("dropoff_knows_station"));
@@ -273,17 +299,18 @@ void UUnloadStationTestSubsystem::TickWaitingForHarvesters()
 	}
 	M_StoredRadixiteBefore = GetStored(ERTSResourceType::Resource_Radixite);
 	M_StoredMetalBefore = GetStored(ERTSResourceType::Resource_Metal);
-	M_LastStoredRadixite = M_StoredRadixiteBefore;
-	if (bM_IsRefinery)
+	M_LastStoredRadixite = GetStored(M_TrackedResource);
+	if (GetIsSingleBay())
 	{
-		// Both carry radixite (the refinery has no metal bin); keep the pair within what the store can take.
+		// Both carry the station's one resource; keep the pair within what the store can take.
 		const UResourceDropOff* DropOff = M_HQ.IsValid() ? M_HQ->GetResourceDropOff() : nullptr;
-		const int32 Room = IsValid(DropOff) ? DropOff->GetDropOffCapacity(ERTSResourceType::Resource_Radixite) : 0;
-		M_RadixiteCargoEach = FMath::Min(RadixiteCargo, Room / 2);
-		Check(M_RadixiteCargoEach >= 60, TEXT("refinery_has_room"),
-		      FString::Printf(TEXT("room=%d each=%d"), Room, M_RadixiteCargoEach));
-		OrderReturnCargo(M_Harvesters[0], ERTSResourceType::Resource_Radixite, M_RadixiteCargoEach);
-		OrderReturnCargo(M_Harvesters[1], ERTSResourceType::Resource_Radixite, M_RadixiteCargoEach);
+		const int32 Room = IsValid(DropOff) ? DropOff->GetDropOffCapacity(M_TrackedResource) : 0;
+		const int32 FullCargo = M_TrackedResource == ERTSResourceType::Resource_Metal ? MetalCargo : RadixiteCargo;
+		M_SingleBayCargoEach = FMath::Min(FullCargo, Room / 2);
+		Check(M_SingleBayCargoEach >= 60, TEXT("store_has_room"),
+		      FString::Printf(TEXT("room=%d each=%d"), Room, M_SingleBayCargoEach));
+		OrderReturnCargo(M_Harvesters[0], M_TrackedResource, M_SingleBayCargoEach);
+		OrderReturnCargo(M_Harvesters[1], M_TrackedResource, M_SingleBayCargoEach);
 		EnterPhase(EUnloadStationTestPhase::BothBaysUnloading);
 		return;
 	}
@@ -330,11 +357,16 @@ void UUnloadStationTestSubsystem::TrackHarvester(FUnloadTestHarvester& TestHarve
 			{
 				continue;
 			}
-			const FVector Pick = Station.GetBayPickWorldLocation(BayIndex);
-			TestHarvester.DockErrorCm = FVector::Dist2D(Pick, Harvester->GetCargoWorldLocation());
-			const float BayYaw = M_HQ.IsValid() ? M_HQ->GetActorRotation().Yaw : 0.f;
+			// Against the station's own dock transform: the cargo socket over the pick point on the cranes, the rear
+			// bumper on it at the depot.
+			FTransform Dock;
+			if (not Station.GetDockTransform(BayIndex, *Harvester, Dock))
+			{
+				continue;
+			}
+			TestHarvester.DockErrorCm = FVector::Dist2D(Dock.GetLocation(), TestHarvester.Actor->GetActorLocation());
 			TestHarvester.DockYawErrorDeg = FMath::Abs(FMath::FindDeltaAngleDegrees(
-				TestHarvester.Actor->GetActorRotation().Yaw, BayYaw));
+				TestHarvester.Actor->GetActorRotation().Yaw, Dock.Rotator().Yaw));
 			TestHarvester.DockedLocation = TestHarvester.Actor->GetActorLocation();
 			UE_LOG(LogRTSUnloadStationTest, Display,
 			       TEXT("RTS_UNLOAD_TEST docked harvester=%s bay=%d dock_error_cm=%.0f yaw_error=%.1f t=%.1f"),
@@ -342,8 +374,8 @@ void UUnloadStationTestSubsystem::TrackHarvester(FUnloadTestHarvester& TestHarve
 			       TestHarvester.DockYawErrorDeg, GetPhaseSeconds());
 		}
 	}
-	// On the refinery the bay-less harvester empties at the overflow point without ever docking.
-	if ((TestHarvester.bWasDocked || bM_IsRefinery) && GetCargo(TestHarvester) == 0
+	// On a single-bay station the bay-less harvester empties at the overflow point without ever docking.
+	if ((TestHarvester.bWasDocked || GetIsSingleBay()) && GetCargo(TestHarvester) == 0
 		&& Status != EHarvesterAIAction::CraneUnloading)
 	{
 		TestHarvester.bFinished = true;
@@ -369,9 +401,9 @@ void UUnloadStationTestSubsystem::TickBothBaysUnloading()
 	{
 		TrackHarvester(TestHarvester, *Station);
 	}
-	if (bM_IsRefinery)
+	if (GetIsSingleBay())
 	{
-		TickRefineryUnloadResults(*Station);
+		TickSingleBayUnloadResults(*Station);
 		return;
 	}
 	bM_SawBothDocked |= Station->GetIsBayDocked(0) && Station->GetIsBayDocked(1);
@@ -424,16 +456,12 @@ void UUnloadStationTestSubsystem::TickBothBaysUnloading()
 	EnterPhase(EUnloadStationTestPhase::PackUpMidUnload);
 }
 
-void UUnloadStationTestSubsystem::TickRefineryUnloadResults(AResourceUnloadStation& Station)
+void UUnloadStationTestSubsystem::TickSingleBayUnloadResults(AResourceUnloadStation& Station)
 {
 	using namespace UnloadStationTestPrivate;
 	bM_SawCraneBusy |= Station.GetTrolleyPhase(0) != EUnloadTrolleyPhase::Idle;
-	if (not bM_CapturedBusy && Station.GetTrolleyPhase(0) == EUnloadTrolleyPhase::MovingToBin)
-	{
-		bM_CapturedBusy = true;
-		CaptureViews(TEXT("boom_slewing"));
-	}
-	const int32 StoredRadixite = GetStored(ERTSResourceType::Resource_Radixite);
+	TickSingleBayCaptures(Station);
+	const int32 StoredRadixite = GetStored(M_TrackedResource);
 	if (StoredRadixite != M_LastStoredRadixite)
 	{
 		++M_RadixiteStoreChanges;
@@ -463,11 +491,11 @@ void UUnloadStationTestSubsystem::TickRefineryUnloadResults(AResourceUnloadStati
 		      TEXT("dock_cargo_over_pick_point"),
 		      FString::Printf(TEXT("%s error_cm=%.0f"), *Name, TestHarvester.DockErrorCm));
 		Check(TestHarvester.DockYawErrorDeg >= 0.f && TestHarvester.DockYawErrorDeg <= MaxDockYawErrorDeg,
-		      TEXT("dock_faces_away_from_refinery"),
+		      TEXT("dock_faces_bay_yaw"),
 		      FString::Printf(TEXT("%s yaw_error=%.1f"), *Name, TestHarvester.DockYawErrorDeg));
 	}
 	Check(DockedCount == 1, TEXT("one_harvester_docked"), FString::Printf(TEXT("docked=%d"), DockedCount));
-	Check(bM_SawCraneBusy, TEXT("knuckle_crane_worked"));
+	Check(bM_SawCraneBusy, TEXT("station_rig_worked"));
 	if (DockedCount == 1)
 	{
 		const FUnloadTestHarvester& Docked = M_Harvesters[DockedIndex];
@@ -481,11 +509,15 @@ void UUnloadStationTestSubsystem::TickRefineryUnloadResults(AResourceUnloadStati
 		Check(Clearance >= MinOverflowClearanceCm, TEXT("bayless_harvester_clear_of_bay"),
 		      FString::Printf(TEXT("centre_distance_cm=%.0f"), Clearance));
 	}
-	const int32 RadixiteGain = GetStored(ERTSResourceType::Resource_Radixite) - M_StoredRadixiteBefore;
-	Check(RadixiteGain == 2 * M_RadixiteCargoEach, TEXT("radixite_credited_exactly"),
-	      FString::Printf(TEXT("gain=%d expected=%d"), RadixiteGain, 2 * M_RadixiteCargoEach));
-	// Three crane chunks plus the overflow drop.
-	Check(M_RadixiteStoreChanges >= 4, TEXT("radixite_arrived_in_chunks"),
+	const int32 StoredBefore = M_TrackedResource == ERTSResourceType::Resource_Metal
+		                           ? M_StoredMetalBefore
+		                           : M_StoredRadixiteBefore;
+	const int32 Gain = GetStored(M_TrackedResource) - StoredBefore;
+	Check(Gain == 2 * M_SingleBayCargoEach, TEXT("cargo_credited_exactly"),
+	      FString::Printf(TEXT("%s gain=%d expected=%d"), *Global_GetResourceTypeAsString(M_TrackedResource), Gain,
+	                      2 * M_SingleBayCargoEach));
+	// Three (crane) or four (elevator) chunks plus the overflow drop.
+	Check(M_RadixiteStoreChanges >= 4, TEXT("cargo_arrived_in_chunks"),
 	      FString::Printf(TEXT("store_changes=%d"), M_RadixiteStoreChanges));
 	Check(not Station.GetBayHarvester(0), TEXT("bay_released"));
 	CaptureViews(TEXT("after_unload"));
@@ -497,9 +529,9 @@ void UUnloadStationTestSubsystem::TickRefineryUnloadResults(AResourceUnloadStati
 		Other->Destroy();
 	}
 	EmptyStores();
-	M_PackUpStoredBefore = GetStored(ERTSResourceType::Resource_Radixite);
-	OrderReturnCargo(M_Harvesters[M_PackUpHarvesterIndex], ERTSResourceType::Resource_Radixite,
-	                 FMath::Min(PackUpCargo, M_RadixiteCargoEach));
+	M_PackUpStoredBefore = GetStored(M_TrackedResource);
+	OrderReturnCargo(M_Harvesters[M_PackUpHarvesterIndex], M_TrackedResource,
+	                 FMath::Min(PackUpCargo, M_SingleBayCargoEach));
 	M_PackUpCargoBefore = GetCargo(M_Harvesters[M_PackUpHarvesterIndex]);
 	EnterPhase(EUnloadStationTestPhase::PackUpMidUnload);
 }
@@ -524,12 +556,12 @@ void UUnloadStationTestSubsystem::TickPackUpMidUnload()
 	{
 		bM_HasPackUpBaseline = true;
 		M_PackUpCargoBefore = GetCargo(M_Harvesters[M_PackUpHarvesterIndex]);
-		M_PackUpStoredBefore = GetStored(ERTSResourceType::Resource_Radixite);
+		M_PackUpStoredBefore = GetStored(M_TrackedResource);
 	}
 	// Pack up while the second load hangs in the air, after one load has already landed.
 	const bool bLoadInAir = Bay != INDEX_NONE && Station->GetTrolleyPhase(Bay) == EUnloadTrolleyPhase::MovingToBin;
 	const bool bOneLanded = bM_HasPackUpBaseline
-		&& GetStored(ERTSResourceType::Resource_Radixite) > M_PackUpStoredBefore;
+		&& GetStored(M_TrackedResource) > M_PackUpStoredBefore;
 	if (bLoadInAir && bOneLanded)
 	{
 		CaptureViews(TEXT("pack_up_moment"));
@@ -561,7 +593,7 @@ void UUnloadStationTestSubsystem::TickWaitingForPackUpResult()
 	}
 	const UHarvester* Harvester = M_Harvesters[M_PackUpHarvesterIndex].Harvester.Get();
 	const int32 CargoLeft = GetCargo(M_Harvesters[M_PackUpHarvesterIndex]);
-	const int32 Credited = GetStored(ERTSResourceType::Resource_Radixite) - M_PackUpStoredBefore;
+	const int32 Credited = GetStored(M_TrackedResource) - M_PackUpStoredBefore;
 	Check(true, TEXT("station_removed_on_pack_up"), FString::Printf(TEXT("t=%.1f"), GetPhaseSeconds()));
 	Check(IsValid(Harvester) && Harvester->MapTest_GetHarvestStatus() != EHarvesterAIAction::CraneUnloading,
 	      TEXT("harvester_left_crane_state"));
@@ -623,6 +655,33 @@ void UUnloadStationTestSubsystem::StartGameAndUnpause() const
 	}
 }
 
+void UUnloadStationTestSubsystem::TickSingleBayCaptures(const AResourceUnloadStation& Station)
+{
+	using namespace UnloadStationTestPrivate;
+	const EUnloadTrolleyPhase Phase = Station.GetTrolleyPhase(0);
+	if (not bM_CapturedLowering && Phase == EUnloadTrolleyPhase::LoweringToPick)
+	{
+		bM_CapturedLowering = true;
+		CaptureViews(TEXT("rig_lowering"));
+	}
+	if (not bM_CapturedBusy && Phase == EUnloadTrolleyPhase::MovingToBin)
+	{
+		bM_CapturedBusy = true;
+		M_BusyStartWorldSeconds = GetWorld()->GetTimeSeconds();
+		CaptureViews(TEXT("station_busy"));
+	}
+	if (M_BusyStartWorldSeconds < 0.f || M_MidCapturesTaken >= MidUnloadCaptureSeconds.Num())
+	{
+		return;
+	}
+	const float BusySeconds = GetWorld()->GetTimeSeconds() - M_BusyStartWorldSeconds;
+	if (BusySeconds >= MidUnloadCaptureSeconds[M_MidCapturesTaken])
+	{
+		CaptureViews(FString::Printf(TEXT("mid_unload_%02.0fs"), MidUnloadCaptureSeconds[M_MidCapturesTaken]));
+		++M_MidCapturesTaken;
+	}
+}
+
 void UUnloadStationTestSubsystem::CaptureViews(const FString& Label) const
 {
 	if (not M_CaptureRig.GetIsEnabled() || not M_HQ.IsValid())
@@ -636,9 +695,12 @@ void UUnloadStationTestSubsystem::CaptureViews(const FString& Label) const
 	}
 	FTransform Frame = BuildingMesh->GetComponentTransform();
 	Frame.SetScale3D(FVector::OneVector);
-	M_CaptureRig.CaptureViews(*GetWorld(), Frame,
-	                          bM_IsRefinery ? UnloadStationTestPrivate::RefineryViews : UnloadStationTestPrivate::Views,
-	                          Label);
+	const TArray<FB4HowitzerCameraView>& Views = M_StationKind == EUnloadTestStation::Refinery
+		                                             ? UnloadStationTestPrivate::RefineryViews
+		                                             : M_StationKind == EUnloadTestStation::MetalDepot
+		                                             ? UnloadStationTestPrivate::MetalDepotViews
+		                                             : UnloadStationTestPrivate::Views;
+	M_CaptureRig.CaptureViews(*GetWorld(), Frame, Views, Label);
 }
 
 void UUnloadStationTestSubsystem::EnterPhase(const EUnloadStationTestPhase NewPhase)

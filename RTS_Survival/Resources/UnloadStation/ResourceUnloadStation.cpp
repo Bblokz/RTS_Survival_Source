@@ -172,11 +172,15 @@ void AResourceUnloadStation::InitUnloadStation(UResourceDropOff* DropOff, UStati
 	}
 	SetupBays();
 	M_Trolleys.Reset();
-	for (int32 BayIndex = 0; BayIndex < M_Bays.Num(); ++BayIndex)
+	for (int32 BayIndex = 0; GetUsesTrolleys() && BayIndex < M_Bays.Num(); ++BayIndex)
 	{
 		CreateTrolley(BayIndex);
 	}
 	bM_IsStationReady = M_Bays.Num() > 0;
+	if (bM_IsStationReady)
+	{
+		OnUnloadStationReady();
+	}
 	UE_LOG(LogRTSUnloadStation, Log, TEXT("RTS_UNLOAD ready station=%s bays=%d rail_cm=%.0f"), *GetName(), M_Bays.Num(),
 	       RailSpline->GetSplineLength());
 }
@@ -398,10 +402,9 @@ bool AResourceUnloadStation::GetDockTransform(const int32 BayIndex, const UHarve
 		return false;
 	}
 	const FUnloadBaySettings& Settings = BaySettings[BayIndex];
-	const FVector CargoOffset = HarvesterActor->GetActorTransform().InverseTransformPositionNoScale(
-		Harvester.GetCargoWorldLocation());
+	const FVector2D DockPoint = GetHarvesterDockPoint(Harvester);
 	const FRotator DockRotationLocal(0.f, Settings.DockYaw, 0.f);
-	const FVector DockLocal = Settings.PickPoint - DockRotationLocal.RotateVector(FVector(CargoOffset.X, CargoOffset.Y, 0.f));
+	const FVector DockLocal = Settings.PickPoint - DockRotationLocal.RotateVector(FVector(DockPoint.X, DockPoint.Y, 0.f));
 	const FTransform StationTransform(GetActorRotation(), GetActorLocation());
 	FVector DockWorld = StationTransform.TransformPosition(DockLocal);
 	DockWorld.Z = HarvesterActor->GetActorLocation().Z;
@@ -409,6 +412,18 @@ bool AResourceUnloadStation::GetDockTransform(const int32 BayIndex, const UHarve
 	                                 0.f);
 	OutDock = FTransform(DockRotationWorld, DockWorld);
 	return true;
+}
+
+FVector2D AResourceUnloadStation::GetHarvesterDockPoint(const UHarvester& Harvester) const
+{
+	const AActor* HarvesterActor = Harvester.GetOwner();
+	if (not IsValid(HarvesterActor))
+	{
+		return FVector2D::ZeroVector;
+	}
+	const FVector CargoOffset = HarvesterActor->GetActorTransform().InverseTransformPositionNoScale(
+		Harvester.GetCargoWorldLocation());
+	return FVector2D(CargoOffset.X, CargoOffset.Y);
 }
 
 FVector AResourceUnloadStation::GetApproachLocation(const int32 BayIndex, const UHarvester& Harvester) const
@@ -501,6 +516,11 @@ bool AResourceUnloadStation::GetOverflowDropOffLocation(FVector& OutLocation) co
 	return true;
 }
 
+const FUnloadBayState* AResourceUnloadStation::GetBayState(const int32 BayIndex) const
+{
+	return M_Bays.IsValidIndex(BayIndex) ? &M_Bays[BayIndex] : nullptr;
+}
+
 bool AResourceUnloadStation::GetIsBayDocked(const int32 BayIndex) const
 {
 	return M_Bays.IsValidIndex(BayIndex) && M_Bays[BayIndex].bIsDocked;
@@ -558,6 +578,7 @@ void AResourceUnloadStation::Tick(const float DeltaSeconds)
 		TickTrolley(Trolley, DeltaSeconds);
 		UpdateTrolleyVisuals(Trolley);
 	}
+	TickUnloadStation(DeltaSeconds);
 	TickFallingItems(DeltaSeconds);
 }
 
@@ -699,31 +720,45 @@ void AResourceUnloadStation::StartRunToBin(FUnloadTrolley& Trolley)
 
 void AResourceUnloadStation::ReleaseLoadIntoBin(FUnloadTrolley& Trolley)
 {
-	FUnloadBayState& Bay = M_Bays[Trolley.BayIndex];
+	const FUnloadBayState& Bay = M_Bays[Trolley.BayIndex];
 	DropLoadItems(Trolley);
 	Trolley.bIsCarryingLoad = false;
+	const FVector* BinWorld = Bay.BinWorldLocations.Find(Trolley.LoadResource);
+	const FVector TextLocation = (BinWorld ? *BinWorld : GetActorLocation()) + FVector(0.f, 0.f, BinTextHeight);
+	// On CargoEmpty the harvester can drive off while the empty grab goes back up.
+	DeliverBayChunk(Trolley.BayIndex, TextLocation);
+}
+
+EUnloadChunkResult AResourceUnloadStation::DeliverBayChunk(const int32 BayIndex, const FVector& TextLocation,
+                                                           const bool bDeliverAll)
+{
+	if (not M_Bays.IsValidIndex(BayIndex))
+	{
+		return EUnloadChunkResult::Stopped;
+	}
+	const FUnloadBayState& Bay = M_Bays[BayIndex];
 	UHarvester* Harvester = Bay.Harvester.Get();
 	if (not Bay.bIsDocked || not IsValid(Harvester))
 	{
-		return;
+		return EUnloadChunkResult::Stopped;
 	}
-	const FVector* BinWorld = Bay.BinWorldLocations.Find(Trolley.LoadResource);
-	const FVector TextLocation = (BinWorld ? *BinWorld : GetActorLocation()) + FVector(0.f, 0.f, BinTextHeight);
 	bool bStorageFull = false;
-	const int32 Delivered = Harvester->Crane_DeliverChunk(Bay.ChunkAmount, TextLocation, bStorageFull);
+	const int32 ChunkAmount = bDeliverAll ? TNumericLimits<int32>::Max() : Bay.ChunkAmount;
+	const int32 Delivered = Harvester->Crane_DeliverChunk(ChunkAmount, TextLocation, bStorageFull);
 	const int32 CargoLeft = Harvester->GetCraneCargoAmount();
-	UE_LOG(LogRTSUnloadStation, Log, TEXT("RTS_UNLOAD delivered bay=%d amount=%d left=%d full=%d"), Trolley.BayIndex,
+	UE_LOG(LogRTSUnloadStation, Log, TEXT("RTS_UNLOAD delivered bay=%d amount=%d left=%d full=%d"), BayIndex,
 	       Delivered, CargoLeft, bStorageFull ? 1 : 0);
 	if (bStorageFull)
 	{
-		EndBayUnload(Trolley.BayIndex, EUnloadEndReason::StorageFull);
-		return;
+		EndBayUnload(BayIndex, EUnloadEndReason::StorageFull);
+		return EUnloadChunkResult::Stopped;
 	}
 	if (CargoLeft <= 0)
 	{
-		// The harvester can drive off while the empty grab goes back up.
-		EndBayUnload(Trolley.BayIndex, EUnloadEndReason::CargoEmpty);
+		EndBayUnload(BayIndex, EUnloadEndReason::CargoEmpty);
+		return EUnloadChunkResult::CargoEmpty;
 	}
+	return EUnloadChunkResult::Delivered;
 }
 
 void AResourceUnloadStation::AfterDropHoisted(FUnloadTrolley& Trolley)

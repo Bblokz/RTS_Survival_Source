@@ -24,6 +24,17 @@ enum class EUnloadEndReason : uint8
 	StationGone
 };
 
+/** What crediting one chunk of a docked harvester's cargo led to. */
+enum class EUnloadChunkResult : uint8
+{
+	// Credited; the harvester still carries more.
+	Delivered,
+	// Credited and the harvester is empty; the unload ended (CargoEmpty).
+	CargoEmpty,
+	// Nothing more goes in: the bin was full or no harvester is docked; the unload ended or never ran.
+	Stopped
+};
+
 /** Which way along the rail a bay's trolley runs from the bay to the bins. */
 UENUM()
 enum class EUnloadTrolleyRunDirection : uint8

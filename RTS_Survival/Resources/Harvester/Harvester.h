@@ -107,6 +107,9 @@ public:
 	/** @return Where the harvester carries its cargo (its hopper): the "Crystals" socket of its meshes. */
 	FVector GetCargoWorldLocation() const;
 
+	/** @return The mesh with the cargo socket (the hull), or null when no mesh has one. */
+	const UMeshComponent* GetCargoMeshComponent() const;
+
 	/** @return How much of the resource being unloaded is still on board. */
 	int32 GetCraneCargoAmount() const;
 

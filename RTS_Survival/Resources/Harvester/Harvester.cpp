@@ -1711,6 +1711,28 @@ FVector UHarvester::GetCargoWorldLocation() const
 	return Owner->GetActorLocation() + FVector(0.f, 0.f, 200.f);
 }
 
+const UMeshComponent* UHarvester::GetCargoMeshComponent() const
+{
+	const AActor* Owner = GetOwner();
+	if (not IsValid(Owner))
+	{
+		return nullptr;
+	}
+	TArray<UMeshComponent*> Meshes;
+	Owner->GetComponents<UMeshComponent>(Meshes);
+	for (const FName& SocketName : HarvesterUnloadPrivate::CargoSocketNames)
+	{
+		for (const UMeshComponent* Mesh : Meshes)
+		{
+			if (IsValid(Mesh) && Mesh->DoesSocketExist(SocketName))
+			{
+				return Mesh;
+			}
+		}
+	}
+	return nullptr;
+}
+
 int32 UHarvester::GetCraneCargoAmount() const
 {
 	const FHarvesterCargoSlot* Slot = M_CargoSpace.Find(M_TargetResourceType);

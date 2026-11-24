@@ -4,6 +4,7 @@
 #include "CoreMinimal.h"
 #include "Subsystems/WorldSubsystem.h"
 #include "RTS_Survival/Buildings/BuildingExpansion/B4HowitzerPit/Tests/B4HowitzerCaptureRig.h"
+#include "RTS_Survival/Resources/ResourceTypes/ResourceTypes.h"
 
 #include "UnloadStationTestSubsystem.generated.h"
 
@@ -12,7 +13,6 @@ class ACPPController;
 class ANomadicVehicle;
 class UHarvester;
 class UResourceDropOff;
-enum class ERTSResourceType : uint8;
 
 UENUM()
 enum class EUnloadStationTestPhase : uint8
@@ -55,6 +55,14 @@ struct FUnloadTestHarvester
  * without driving into the docked one.
  * Logs RTS_UNLOAD_TEST; not in shipping.
  */
+/** Which truck's station the run tests (-UnloadStationTruck=HQ|Refinery|MetalDepot). */
+enum class EUnloadTestStation : uint8
+{
+	HQ,
+	Refinery,
+	MetalDepot
+};
+
 UCLASS()
 class RTS_SURVIVAL_API UUnloadStationTestSubsystem : public UTickableWorldSubsystem
 {
@@ -116,14 +124,24 @@ private:
 
 	FB4HowitzerCaptureRig M_CaptureRig;
 
-	// Refinery run: one bay, both harvesters carry radixite, the bay-less one uses the overflow point.
-	bool bM_IsRefinery = false;
-	int32 M_RadixiteCargoEach = 0;
+	// Refinery / metal depot run: one bay, both harvesters carry the station's resource, the bay-less one uses the
+	// overflow point.
+	EUnloadTestStation M_StationKind = EUnloadTestStation::HQ;
+	// Counted in chunks and used for the pack-up trip: radixite on the HQ and the refinery, metal on the depot.
+	ERTSResourceType M_TrackedResource = ERTSResourceType::Resource_Radixite;
+	int32 M_SingleBayCargoEach = 0;
 	bool bM_SawCraneBusy = false;
+	// Single-bay capture moments: the rig lowering (apron swing), then frames a set time into the busy phase, when
+	// the elevator's bars ride the buckets and land in the bin.
+	bool bM_CapturedLowering = false;
+	float M_BusyStartWorldSeconds = -1.f;
+	int32 M_MidCapturesTaken = 0;
 	int32 M_PackUpHarvesterIndex = 0;
 	// The pack-up baseline (cargo on board, stored) is taken when the harvester docks, so harvesting on the way in
 	// does not count.
 	bool bM_HasPackUpBaseline = false;
 
-	void TickRefineryUnloadResults(AResourceUnloadStation& Station);
+	void TickSingleBayUnloadResults(AResourceUnloadStation& Station);
+	void TickSingleBayCaptures(const AResourceUnloadStation& Station);
+	bool GetIsSingleBay() const { return M_StationKind != EUnloadTestStation::HQ; }
 };

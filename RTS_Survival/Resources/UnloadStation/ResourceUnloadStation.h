@@ -20,7 +20,8 @@ class UStaticMeshComponent;
  * Every chunk is credited through the drop-off the moment it lands; the load in the air is only visual.
  * @note Spawned by ANomadicVehicle (M_UnloadStationClass) with the building and attached to the building mesh, so
  * its frame is the building mesh's frame. Defaults are the Strike Division HQ's loop (see Docs/Units/HQUnloadCrane.md);
- * the refinery's knuckle-boom crane is AKnuckleCraneUnloadStation.
+ * the refinery's knuckle-boom crane is AKnuckleCraneUnloadStation, the metal depot's bucket elevator
+ * ABucketElevatorUnloadStation (no trolleys: it drives its bay from TickUnloadStation).
  */
 UCLASS()
 class RTS_SURVIVAL_API AResourceUnloadStation : public AActor
@@ -82,7 +83,8 @@ public:
 	int32 GetBayCount() const { return M_Bays.Num(); }
 	bool GetIsBayDocked(int32 BayIndex) const;
 	const UHarvester* GetBayHarvester(int32 BayIndex) const;
-	EUnloadTrolleyPhase GetTrolleyPhase(int32 BayIndex) const;
+	/** @return The bay's trolley phase; stations without trolleys report their own rig in the same terms. */
+	virtual EUnloadTrolleyPhase GetTrolleyPhase(int32 BayIndex) const;
 	FVector GetTrolleyWorldLocation(int32 BayIndex) const;
 	FVector GetGrabWorldLocation(int32 BayIndex) const;
 	FVector GetBayPickWorldLocation(int32 BayIndex) const;
@@ -218,6 +220,34 @@ protected:
 
 	/** @brief Places the trolley (or boom tip), rope, grab and jaws from the trolley state; runs every tick. */
 	virtual void UpdateTrolleyVisuals(const FUnloadTrolley& Trolley) const;
+
+	/** @return False for stations that move the cargo without trolleys; they drive their bays in TickUnloadStation. */
+	virtual bool GetUsesTrolleys() const { return true; }
+
+	/** @brief The bays and bins are set up (InitUnloadStation); build the parts that need them here. */
+	virtual void OnUnloadStationReady() {}
+
+	/** @brief Runs every tick once the station is ready, after the trolleys. */
+	virtual void TickUnloadStation(float DeltaSeconds) {}
+
+	/**
+	 * @brief The point on the harvester (actor frame, XY) that docks on the bay's PickPoint.
+	 * @return The cargo socket by default, so differently sized harvesters line their cargo up the same.
+	 */
+	virtual FVector2D GetHarvesterDockPoint(const UHarvester& Harvester) const;
+
+	/** @return The bay's runtime state, or null for an invalid bay. */
+	const FUnloadBayState* GetBayState(int32 BayIndex) const;
+
+	/**
+	 * @brief Credits one chunk of the docked harvester's cargo through the drop-off (with the pop-up text).
+	 * Ends the unload when the harvester is empty or the bin is full.
+	 * @param BayIndex The bay whose harvester delivers.
+	 * @param TextLocation Where the pop-up shows (world).
+	 * @param bDeliverAll Credit everything the harvester still carries instead of one chunk (the last load).
+	 * @return Whether the unload goes on, ended empty, or stopped (bin full, no docked harvester).
+	 */
+	EUnloadChunkResult DeliverBayChunk(int32 BayIndex, const FVector& TextLocation, bool bDeliverAll = false);
 
 	UStaticMeshComponent* CreatePart(UStaticMesh* Mesh, USceneComponent* Parent, const FName Name);
 
