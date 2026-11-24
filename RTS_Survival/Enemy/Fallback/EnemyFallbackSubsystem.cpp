@@ -71,6 +71,41 @@ bool UEnemyFallbackSubsystem::ForceUnitToFallBack(AActor* Unit)
 	return SendUnitToRallyPoint(FallbackUnit);
 }
 
+void UEnemyFallbackSubsystem::WatchVehicleEscortedGroup(const TArray<AActor*>& Units)
+{
+	FEnemyFallbackEscortedGroup Group;
+	for (const AActor* Unit : Units)
+	{
+		AActor* FallbackUnit = ResolveFallbackUnit(Unit);
+		if (not IsValid(FallbackUnit))
+		{
+			continue;
+		}
+		TArray<TWeakObjectPtr<AActor>>& Bucket = FallbackUnit->IsA<ASquadController>() ? Group.Squads : Group.Vehicles;
+		Bucket.AddUnique(FallbackUnit);
+	}
+	if (Group.Vehicles.IsEmpty() || Group.Squads.IsEmpty())
+	{
+		return;
+	}
+	M_EscortedGroups.Add(Group);
+}
+
+bool UEnemyFallbackSubsystem::GetIsUnitActorAlive(const AActor* UnitActor)
+{
+	const AActor* FallbackUnit = ResolveFallbackUnit(UnitActor);
+	if (not IsValid(FallbackUnit) || FallbackUnit->IsActorBeingDestroyed())
+	{
+		return false;
+	}
+	if (const ASquadController* Squad = Cast<ASquadController>(FallbackUnit))
+	{
+		return Squad->GetCurrentAliveSquadUnitCountPure() > 0;
+	}
+	// IsUnitAlive is non-const in the engine (it reads the dying flag only).
+	return const_cast<AActor*>(FallbackUnit)->IsUnitAlive();
+}
+
 bool UEnemyFallbackSubsystem::GetIsFleeing(const AActor* Actor) const
 {
 	const AActor* FallbackUnit = ResolveFallbackUnit(Actor);
@@ -111,6 +146,7 @@ void UEnemyFallbackSubsystem::Deinitialize()
 	StopFallbackWatch();
 	M_SquadTracks.Empty();
 	M_FleeingUnits.Empty();
+	M_EscortedGroups.Empty();
 	Super::Deinitialize();
 }
 
@@ -133,6 +169,39 @@ void UEnemyFallbackSubsystem::CheckSquads()
 	{
 		CheckOneSquad(Squad, NowSeconds);
 	}
+	CheckEscortedGroups();
+}
+
+void UEnemyFallbackSubsystem::CheckEscortedGroups()
+{
+	// Reverse with RemoveAtSwap; CheckOneEscortedGroup never adds groups, so the indices stay valid.
+	for (int32 Index = M_EscortedGroups.Num() - 1; Index >= 0; --Index)
+	{
+		const FEnemyFallbackEscortedGroup GroupCopy = M_EscortedGroups[Index];
+		if (CheckOneEscortedGroup(GroupCopy))
+		{
+			M_EscortedGroups.RemoveAtSwap(Index);
+		}
+	}
+}
+
+bool UEnemyFallbackSubsystem::CheckOneEscortedGroup(const FEnemyFallbackEscortedGroup& Group)
+{
+	for (const TWeakObjectPtr<AActor>& Vehicle : Group.Vehicles)
+	{
+		if (GetIsUnitActorAlive(Vehicle.Get()))
+		{
+			return false;
+		}
+	}
+	for (const TWeakObjectPtr<AActor>& Squad : Group.Squads)
+	{
+		if (GetIsUnitActorAlive(Squad.Get()))
+		{
+			ForceUnitToFallBack(Squad.Get());
+		}
+	}
+	return true;
 }
 
 void UEnemyFallbackSubsystem::CheckOneSquad(ASquadController* Squad, const double NowSeconds)
@@ -224,15 +293,7 @@ AEnemyController* UEnemyFallbackSubsystem::GetEnemyControllerForUnit(const AActo
 
 bool UEnemyFallbackSubsystem::GetIsUnitAlive(const AActor* UnitActor) const
 {
-	if (not IsValid(UnitActor) || UnitActor->IsActorBeingDestroyed())
-	{
-		return false;
-	}
-	if (const ASquadController* Squad = Cast<ASquadController>(UnitActor))
-	{
-		return Squad->GetCurrentAliveSquadUnitCountPure() > 0;
-	}
-	return true;
+	return GetIsUnitActorAlive(UnitActor);
 }
 
 void UEnemyFallbackSubsystem::PruneTracks()

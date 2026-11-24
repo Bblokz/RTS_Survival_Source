@@ -51,6 +51,41 @@ public:
 	UFUNCTION(BlueprintPure, NotBlueprintable, Category = "Wave Spawner")
 	FName GetSpawnerId() const { return SpawnerId; }
 
+	/**
+	 * @brief Replaces the units of the following waves, so a mission can feed them from its per-difficulty data asset
+	 * instead of the placed actor's lists. Call it before StartSpawner.
+	 * @param NewUnits The lists to use; difficulty extras still add up on top of BaseUnits.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Wave Spawner")
+	void SetUnits(const FEnemyWaveSpawnerUnits& NewUnits);
+
+	/** @return Units this spawner spawned that are still alive (squads with men left, vehicles not destroyed). */
+	UFUNCTION(BlueprintPure, NotBlueprintable, Category = "Wave Spawner")
+	int32 GetLivingSpawnedUnitCount() const;
+
+	/**
+	 * @brief Patrol waves only: every living group of this spawner, minus units running to the fallback rally point,
+	 * attack-moves to AlarmLocation and returns to its patrol loop CombatSecondsBeforeReturn after its first fight, or
+	 * 30 s after arriving when it met nobody. A second call re-targets: groups go to the new location, timers restart.
+	 * @param AlarmLocation Where the unit that raised the alarm was seen.
+	 * @param CombatSecondsBeforeReturn Seconds after a group first fights before it breaks off.
+	 * @return Units sent; 0 for an attack wave or a spawner without living patrol units.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Wave Spawner")
+	int32 ConvergeOnAlarm(const FVector AlarmLocation, const float CombatSecondsBeforeReturn = 20.f);
+
+	/**
+	 * @brief Sends the patrols of every patrol-wave spawner in the world to an alarm (ConvergeOnAlarm on each).
+	 * @param WorldContextObject Any object in the mission world.
+	 * @param AlarmLocation Where the unit that raised the alarm was seen.
+	 * @param CombatSecondsBeforeReturn Seconds after a group first fights before it breaks off.
+	 * @return Units sent over all patrol spawners.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Wave Spawner",
+		meta = (WorldContext = "WorldContextObject"))
+	static int32 ConvergeAllPatrolsOnAlarm(const UObject* WorldContextObject, const FVector AlarmLocation,
+	                                       const float CombatSecondsBeforeReturn = 20.f);
+
 	// Strongpoints warn when a spawner linked as their reinforcements also starts by itself.
 	bool GetStartsOnBeginPlay() const { return Timing.bStartOnBeginPlay; }
 
@@ -134,6 +169,16 @@ private:
 
 	UPROPERTY()
 	TArray<FEnemyWaveSpawnerMinimapMarker> M_MinimapMarkers;
+
+	// Every unit any wave of this spawner spawned; weak, the units die. Read by GetLivingSpawnedUnitCount.
+	UPROPERTY()
+	TArray<TWeakObjectPtr<AActor>> M_SpawnedUnits;
+
+	// Patrol option bInfantryFleesWhenVehiclesLost: hands the wave to the enemy fallback watch.
+	void WatchPatrolForVehicleLoss(const TArray<AActor*>& SpawnedUnits) const;
+
+	// Spawned units still alive and not running to the fallback rally point; ConvergeOnAlarm sends only these.
+	TArray<AActor*> GetLivingNotFleeingSpawnedUnits() const;
 
 	// Set when the wave launches; the wave lives on this controller's wave controller.
 	UPROPERTY()
