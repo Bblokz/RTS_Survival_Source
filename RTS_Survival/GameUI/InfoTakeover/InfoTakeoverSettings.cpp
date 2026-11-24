@@ -7,6 +7,8 @@
 #include "W_CoverTakeover.h"
 #include "W_NomadicConversionTakeover.h"
 #include "W_BxpPackUpTakeover.h"
+#include "W_CapturingTrucksTakeover.h"
+#include "W_DocumentTakeover.h"
 #include "W_SpacedArmourTakeover.h"
 #include "W_VehicleInfoTakeover.h"
 #include "W_RattleFeedTakeover.h"
@@ -49,4 +51,9 @@ UInfoTakeoverSettings::UInfoTakeoverSettings()
 		"WBP_WallBreachTakeover_C")));
 	AdrenalineShotTakeoverWidgetClass = TSoftClassPtr<UW_AdrenalineShotTakeover>(FSoftObjectPath(TEXT(
 		"/Game/RTS_Survival/Blueprints/GameUI/InfoTakeover/AdrenalineShot/WBP_AdrenalineShotTakeover.WBP_AdrenalineShotTakeover_C")));
+	CapturingTrucksTakeoverWidgetClass = TSoftClassPtr<UW_CapturingTrucksTakeover>(FSoftObjectPath(TEXT(
+		"/Game/RTS_Survival/Blueprints/GameUI/InfoTakeover/CapturingTrucks/WBP_CapturingTrucksTakeover."
+		"WBP_CapturingTrucksTakeover_C")));
+	DocumentTakeoverWidgetClass = TSoftClassPtr<UW_DocumentTakeover>(FSoftObjectPath(TEXT(
+		"/Game/RTS_Survival/Blueprints/GameUI/InfoTakeover/Document/WBP_DocumentTakeover.WBP_DocumentTakeover_C")));
 }

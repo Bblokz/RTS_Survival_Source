@@ -3,6 +3,7 @@
 #include "W_CinematicOverlay.h"
 
 #include "Blueprint/WidgetTree.h"
+#include "Components/AudioComponent.h"
 #include "Components/Border.h"
 #include "Components/CanvasPanel.h"
 #include "Components/CanvasPanelSlot.h"
@@ -14,6 +15,7 @@
 #include "GameFramework/PlayerController.h"
 #include "MovieSceneSequencePlayer.h"
 #include "Sound/SoundBase.h"
+#include "Sound/SoundWave.h"
 #include "Styling/CoreStyle.h"
 #include "UObject/ConstructorHelpers.h"
 #include "RTS_Survival/GameUI/Portrait/PortraitSubtitle/CinematicTranscriptSubsystem.h"
@@ -25,6 +27,10 @@ namespace CinematicOverlayConstants
 {
 	// Above the regular HUD; the hold-to-skip widget uses 0.
 	constexpr int32 ViewportZOrder = 5;
+	// A voice line overlay can run during a mission camera tour (W_MissionCameraTour uses 6): above its cinema bars.
+	constexpr int32 VoiceLineViewportZOrder = 7;
+	// Longer than any voice line: the sound loops or has no known length, so the last word decides when the cue ends.
+	constexpr float MaxVoiceLineSeconds = 600.0f;
 	constexpr int32 SpeakerFontSize = 13;
 	constexpr int32 LineFontSize = 16;
 	constexpr int32 CountdownFontSize = 13;
@@ -66,17 +72,63 @@ UW_CinematicOverlay* UW_CinematicOverlay::ShowForSequence(APlayerController* Own
 		RTSFunctionLibrary::ReportError("UW_CinematicOverlay::ShowForSequence needs a player and a sequence player.");
 		return nullptr;
 	}
+	UW_CinematicOverlay* const Overlay = CreateOverlay(OwningPlayer, OverlayClass,
+	                                                   CinematicOverlayConstants::ViewportZOrder);
+	if (Overlay == nullptr)
+	{
+		return nullptr;
+	}
+	Overlay->StartForSequencePlayer(SequencePlayer);
+	return Overlay;
+}
+
+UW_CinematicOverlay* UW_CinematicOverlay::ShowForVoiceLine(APlayerController* OwningPlayer, UAudioComponent* VoiceLine,
+                                                           TSubclassOf<UW_CinematicOverlay> OverlayClass)
+{
+	if (not IsValid(OwningPlayer) || not IsValid(VoiceLine) || VoiceLine->Sound == nullptr)
+	{
+		RTSFunctionLibrary::ReportError("UW_CinematicOverlay::ShowForVoiceLine needs a player and an audio component "
+			"with a sound.");
+		return nullptr;
+	}
+	const TSubclassOf<UW_CinematicOverlay> ClassToCreate = OverlayClass != nullptr
+		                                                       ? OverlayClass
+		                                                       : TSubclassOf<UW_CinematicOverlay>(StaticClass());
+	UCinematicTranscriptSubsystem* const Transcripts = UCinematicTranscriptSubsystem::Get(OwningPlayer);
+	const UW_CinematicOverlay* const Defaults = ClassToCreate->GetDefaultObject<UW_CinematicOverlay>();
+	const FCinematicTranscriptRow* const Transcript = Transcripts != nullptr && Defaults != nullptr
+		                                                  ? Transcripts->FindTranscript(
+			                                                  Defaults->TranscriptTable, VoiceLine->Sound)
+		                                                  : nullptr;
+	// No transcript: nothing to show (not an error, many lines have none).
+	if (Transcript == nullptr || Transcript->Sentences.IsEmpty() || Transcript->Sentences.Last().Words.IsEmpty())
+	{
+		return nullptr;
+	}
+	UW_CinematicOverlay* const Overlay = CreateOverlay(OwningPlayer, ClassToCreate,
+	                                                   CinematicOverlayConstants::VoiceLineViewportZOrder);
+	if (Overlay == nullptr)
+	{
+		return nullptr;
+	}
+	Overlay->StartForVoiceLine(VoiceLine, *Transcript);
+	return Overlay;
+}
+
+UW_CinematicOverlay* UW_CinematicOverlay::CreateOverlay(APlayerController* OwningPlayer,
+                                                        const TSubclassOf<UW_CinematicOverlay> OverlayClass,
+                                                        const int32 ZOrder)
+{
 	const TSubclassOf<UW_CinematicOverlay> ClassToCreate = OverlayClass != nullptr
 		                                                       ? OverlayClass
 		                                                       : TSubclassOf<UW_CinematicOverlay>(StaticClass());
 	UW_CinematicOverlay* const Overlay = CreateWidget<UW_CinematicOverlay>(OwningPlayer, ClassToCreate);
 	if (not IsValid(Overlay))
 	{
-		RTSFunctionLibrary::ReportError("UW_CinematicOverlay::ShowForSequence could not create the overlay.");
+		RTSFunctionLibrary::ReportError("UW_CinematicOverlay could not create the overlay widget.");
 		return nullptr;
 	}
-	Overlay->AddToViewport(CinematicOverlayConstants::ViewportZOrder);
-	Overlay->StartForSequencePlayer(SequencePlayer);
+	Overlay->AddToViewport(ZOrder);
 	return Overlay;
 }
 
@@ -89,6 +141,7 @@ void UW_CinematicOverlay::NativeOnInitialized()
 void UW_CinematicOverlay::NativeDestruct()
 {
 	UnbindSequencePlayer();
+	UnbindVoiceLine();
 	Super::NativeDestruct();
 }
 
@@ -183,15 +236,86 @@ void UW_CinematicOverlay::StartForSequencePlayer(UMovieSceneSequencePlayer* Sequ
 	UpdateOverlay();
 }
 
+void UW_CinematicOverlay::StartForVoiceLine(UAudioComponent* VoiceLine, const FCinematicTranscriptRow& Transcript)
+{
+	bM_IsVoiceLineMode = true;
+	M_VoiceLineComponent = VoiceLine;
+	M_VoiceLinePlaybackSeconds = 0.0f;
+	VoiceLine->OnAudioPlaybackPercentNative.AddUObject(this, &ThisClass::OnVoiceLinePlaybackPercent);
+	VoiceLine->OnAudioFinishedNative.AddUObject(this, &ThisClass::OnVoiceLineFinished);
+
+	FCinematicSubtitleCue Cue;
+	Cue.Speaker = GetSpeakerForSound(VoiceLine->Sound, Transcript);
+	Cue.Sentences = Transcript.Sentences;
+	const float LastWordEnd = Transcript.Sentences.Last().Words.Last().EndSeconds;
+	const float SoundSeconds = VoiceLine->Sound->GetDuration();
+	Cue.EndSeconds = SoundSeconds > 0.0f && SoundSeconds < CinematicOverlayConstants::MaxVoiceLineSeconds
+		                 ? SoundSeconds
+		                 : LastWordEnd;
+	M_Cues.Reset();
+	M_Cues.Add(Cue);
+	UpdateOverlay();
+}
+
+void UW_CinematicOverlay::OnVoiceLinePlaybackPercent(const UAudioComponent* AudioComponent,
+                                                     const USoundWave* PlayingSoundWave, const float PlaybackPercent)
+{
+	if (PlayingSoundWave == nullptr)
+	{
+		return;
+	}
+	M_VoiceLinePlaybackSeconds = PlaybackPercent * PlayingSoundWave->Duration;
+}
+
+void UW_CinematicOverlay::OnVoiceLineFinished(UAudioComponent* AudioComponent)
+{
+	CloseOverlay();
+}
+
+void UW_CinematicOverlay::UnbindVoiceLine()
+{
+	if (M_VoiceLineComponent == nullptr)
+	{
+		return;
+	}
+	if (IsValid(M_VoiceLineComponent))
+	{
+		M_VoiceLineComponent->OnAudioPlaybackPercentNative.RemoveAll(this);
+		M_VoiceLineComponent->OnAudioFinishedNative.RemoveAll(this);
+	}
+	M_VoiceLineComponent = nullptr;
+}
+
+void UW_CinematicOverlay::UpdateVoiceLineOverlay()
+{
+	// The component goes when the line ends (auto destroy) or the world tears down.
+	if (not IsValid(M_VoiceLineComponent))
+	{
+		CloseOverlay();
+		return;
+	}
+	UpdateSubtitle(M_VoiceLinePlaybackSeconds);
+}
+
 void UW_CinematicOverlay::CloseOverlay()
 {
 	UnbindSequencePlayer();
+	UnbindVoiceLine();
 	M_Cues.Reset();
 	RemoveFromParent();
 }
 
 void UW_CinematicOverlay::UpdateOverlay()
 {
+	if (bM_IsVoiceLineMode)
+	{
+		// Removed from the viewport already; it may still get one last tick.
+		if (IsInViewport())
+		{
+			UpdateVoiceLineOverlay();
+		}
+		return;
+	}
 	// No player once the overlay closed (it may still get one last tick before it leaves the viewport).
 	if (not GetIsValidSequencePlayer(false))
 	{

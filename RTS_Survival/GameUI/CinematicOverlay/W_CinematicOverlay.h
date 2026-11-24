@@ -8,10 +8,12 @@
 
 #include "W_CinematicOverlay.generated.h"
 
+class UAudioComponent;
 class UBorder;
 class UDataTable;
 class UMovieSceneSequencePlayer;
 class USizeBox;
+class USoundWave;
 class UTextBlock;
 
 /** Look of the cinematic overlay (subtitle strip at the top, countdown at the bottom right). */
@@ -74,6 +76,8 @@ struct FCinematicOverlayStyle
  * top (speaker, then the words, revealed in step with the sequence) and a countdown of the time left at the bottom
  * right. The lines are found in the sequence's own audio tracks, so every cinematic gets subtitles without setup.
  * UMissionCinematicTakeOverSession shows it for every takeover; ShowForSequence can be used for other cinematics.
+ * ShowForVoiceLine shows the strip (no countdown) for one voice line on its own audio component, which is how a mission
+ * camera tour's StartSound gets subtitles.
  */
 UCLASS()
 class RTS_SURVIVAL_API UW_CinematicOverlay : public UUserWidget
@@ -94,6 +98,18 @@ public:
 	static UW_CinematicOverlay* ShowForSequence(APlayerController* OwningPlayer,
 	                                            UMovieSceneSequencePlayer* SequencePlayer,
 	                                            TSubclassOf<UW_CinematicOverlay> OverlayClass = nullptr);
+
+	/**
+	 * @brief Creates the overlay for one voice line that is about to play; the strip follows the audio and the overlay
+	 * removes itself when the line ends (it also stays over the HUD when the cinematic that started it ends first).
+	 * Call before VoiceLine->Play(): playback positions only reach delegates bound when the sound starts.
+	 * @param OwningPlayer Player whose screen shows the overlay.
+	 * @param VoiceLine Audio component with the voice line set and not yet playing; the overlay keeps it alive.
+	 * @param OverlayClass Optional Blueprint subclass with a different style; null = this class.
+	 * @return The overlay, or nullptr when the voice line has no transcript (nothing to show) or it could not be made.
+	 */
+	static UW_CinematicOverlay* ShowForVoiceLine(APlayerController* OwningPlayer, UAudioComponent* VoiceLine,
+	                                             TSubclassOf<UW_CinematicOverlay> OverlayClass = nullptr);
 
 	/** Removes the overlay (also done automatically when the sequence finishes or stops). */
 	UFUNCTION(BlueprintCallable, Category = "Cinematics")
@@ -150,6 +166,13 @@ private:
 	UPROPERTY()
 	TWeakObjectPtr<UMovieSceneSequencePlayer> M_SequencePlayer;
 
+	// Voice line mode (ShowForVoiceLine): the clock is this component's playback position instead of a sequence.
+	UPROPERTY()
+	TObjectPtr<UAudioComponent> M_VoiceLineComponent;
+
+	float M_VoiceLinePlaybackSeconds = 0.0f;
+	bool bM_IsVoiceLineMode = false;
+
 	FTimerHandle M_UpdateTimerHandle;
 
 	// Last values written to the widgets, so text blocks are only touched on a change.
@@ -160,6 +183,15 @@ private:
 	void BuildWidgetTree();
 	void ApplyStyle();
 	void StartForSequencePlayer(UMovieSceneSequencePlayer* SequencePlayer);
+
+	void StartForVoiceLine(UAudioComponent* VoiceLine, const FCinematicTranscriptRow& Transcript);
+	void UpdateVoiceLineOverlay();
+	void OnVoiceLinePlaybackPercent(const UAudioComponent* AudioComponent, const USoundWave* PlayingSoundWave,
+	                                const float PlaybackPercent);
+	void OnVoiceLineFinished(UAudioComponent* AudioComponent);
+	void UnbindVoiceLine();
+	static UW_CinematicOverlay* CreateOverlay(APlayerController* OwningPlayer,
+	                                          TSubclassOf<UW_CinematicOverlay> OverlayClass, const int32 ZOrder);
 	void UpdateOverlay();
 	void UpdateSubtitle(const float SequenceSeconds);
 	void UpdateCountdown(const float SequenceSeconds);
