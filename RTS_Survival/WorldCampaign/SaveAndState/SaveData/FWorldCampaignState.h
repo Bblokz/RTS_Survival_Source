@@ -13,6 +13,7 @@
 #include "RTS_Survival/WorldCampaign/CampaignProgress/WorldCampaignProgressState.h"
 #include "RTS_Survival/WorldCampaign/PlayerProfile/FPlayerProfileSaveData.h"
 #include "RTS_Survival/WorldCampaign/StrengthTypes/WorldStrengthTypes.h"
+#include "RTS_Survival/WorldCampaign/WorldPlayer/OperationMaps/WorldOperationMapPool.h"
 #include "RTS_Survival/Units/Enums/Enum_UnitType.h"
 #include "FWorldCampaignState.generated.h"
 
@@ -152,6 +153,14 @@ struct RTS_SURVIVAL_API FWorldCampaignState
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame)
 	int32 EnemyObjectProceduralMapIndex = 0;
+
+	// Cursor and per-item map memory of the handmade enemy item maps (used when the map source is HandmadeMaps).
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame)
+	FWorldOperationMapPoolState HandmadeEnemyItemMapPool;
+
+	// Cursor and per-division map memory of the handmade field maps that divisions and convoys are fought on.
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame)
+	FWorldOperationMapPoolState HandmadeFieldMapPool;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame)
 	ECampaignGenerationStep GenerationStep = ECampaignGenerationStep::Finished;

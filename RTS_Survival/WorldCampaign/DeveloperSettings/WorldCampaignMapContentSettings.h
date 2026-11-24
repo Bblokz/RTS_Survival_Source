@@ -49,6 +49,22 @@ struct RTS_SURVIVAL_API FWorldCampaignPinnedPlace
 };
 
 /**
+ * @brief The name the campaign map shows for one mission. Only needed for a mission that stands on no pinned place,
+ * or that should read differently from its place; a pinned mission is otherwise named after its place.
+ */
+USTRUCT(BlueprintType)
+struct RTS_SURVIVAL_API FWorldMissionNameDefinition
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Mission Name")
+	EMapMission Mission = EMapMission::None;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Mission Name")
+	FText DisplayName;
+};
+
+/**
  * @brief Gives a country mesh on the campaign map a stable id and a readable name.
  */
 USTRUCT(BlueprintType)
@@ -107,6 +123,10 @@ public:
 
 	UPROPERTY(EditAnywhere, Config, Category = "Pinned Places")
 	TArray<FWorldCampaignPinnedPlace> PinnedPlaces;
+
+	/** Mission names that win over the pinned place's name; see WorldCampaignMissionNames. */
+	UPROPERTY(EditAnywhere, Config, Category = "Missions")
+	TArray<FWorldMissionNameDefinition> MissionNames;
 
 	UPROPERTY(EditAnywhere, Config, Category = "Countries")
 	TArray<FWorldCountryDefinition> Countries;
