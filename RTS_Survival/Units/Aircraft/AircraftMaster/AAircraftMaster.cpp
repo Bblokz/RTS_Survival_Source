@@ -3342,6 +3342,7 @@ void AAircraftMaster::AircraftDrop_OnLanded()
 	AircraftDrop_DetachTank();
 	AircraftDrop_SpawnSquads();
 	AircraftDrop_PlayDropOffSound();
+	OnAircraftDropLanded.Broadcast(this);
 
 	UWorld* World = GetWorld();
 	if (not IsValid(World))
@@ -3380,6 +3381,19 @@ void AAircraftMaster::AircraftDrop_OnLanded()
 		},
 		SafeStayLandedTime,
 		false);
+}
+
+void AAircraftMaster::EndAircraftDropStayLanded()
+{
+	if (M_AircraftDropRequest.State != EAircraftDropRequestState::LandedWaiting)
+	{
+		return;
+	}
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(M_AircraftDropStayLandedTimerHandle);
+	}
+	AircraftDrop_OnStayLandedFinished();
 }
 
 void AAircraftMaster::AircraftDrop_OnStayLandedFinished()

@@ -65,6 +65,8 @@ struct FHarvesterUnloadProgressState
 
 /**
  * @brief Component used by harvester units to run harvesting commands and manage their resource cargo.
+ * Works for every player: drop-offs are searched among those of the owner's player (URTSComponent). AI harvesters
+ * run without orders through StartAutonomousHarvest.
  * @note SetupHarvester: call in Blueprint to configure supported resources, cargo capacity, and the owner's mesh.
  */
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent), Blueprintable, BlueprintType)
@@ -175,6 +177,27 @@ public:
 	/** @brief Test hook: fill one cargo slot without harvesting. */
 	void MapTest_SetCargo(ERTSResourceType ResourceType, int32 Amount);
 	EHarvesterAIAction MapTest_GetHarvestStatus() const { return M_HarvestStatus; }
+	UResourceDropOff* MapTest_GetTargetDropOff() const { return M_TargetDropOff.Get(); }
+
+	/**
+	 * @brief Keeps this harvester working with no player order (AI harvesters): finds the nearest non-empty field of
+	 * the type, runs the normal harvest command on it, moves on to the next nearest field when one runs dry, and
+	 * while there is no field (or no drop-off for its cargo) tries again every AutonomousHarvestRetrySeconds.
+	 * Safe to call before BeginPlay. A later player order ends it only for that order: once idle it resumes.
+	 * @param ResourceType The resource to harvest; must be one of the harvester's cargo slots.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="Harvester")
+	void StartAutonomousHarvest(ERTSResourceType ResourceType);
+
+	/** @brief Stops the autonomous loop; the running harvest command (if any) goes on until it ends. */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="Harvester")
+	void StopAutonomousHarvest();
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="Harvester")
+	bool GetIsHarvestingAutonomously() const { return M_AutonomousResourceType != ERTSResourceType::Resource_None; }
+
+	/** @return The owning player of the harvester unit (its RTS component); 1 when it has none. */
+	uint8 GetOwningPlayer() const;
 
 protected:
 	// Called when the game starts
@@ -485,6 +508,35 @@ private:
 	// Will try to find resources of the previously targeted resource type if possible or execute return cargo
 	// if the harvester does have cargo.
 	void CheckHarvesterIdle();
+
+	/* ---- Autonomous harvest (AI harvesters, StartAutonomousHarvest) ---- */
+
+	// The resource the autonomous loop keeps harvesting; Resource_None when the loop is off. Kept apart from
+	// M_TargetResourceType, which the harvest state machine resets and overwrites (return cargo, drop-off order).
+	ERTSResourceType M_AutonomousResourceType = ERTSResourceType::Resource_None;
+
+	// Set by StartAutonomousHarvest: the next attempt starts harvesting even when the unit runs another command.
+	bool bM_AutonomousStartPending = false;
+
+	FTimerHandle M_AutonomousHarvestTimer;
+
+	/* ---- Harvest animation watchdog ---- */
+	// The owner's Blueprint reports the end of the harvest montage (OnHarvestAnimationFinished). If that never comes
+	// (montage interrupted, mesh not ticking), the harvester would stand at the field forever: finish it from here.
+	FTimerHandle M_HarvestAnimationWatchdog;
+	bool bM_HasLoggedHarvestWatchdog = false;
+	void StartHarvestAnimationWatchdog();
+	void StopHarvestAnimationWatchdog();
+	void OnHarvestAnimationWatchdog();
+
+	/** @brief Every retry interval: an idle autonomous harvester returns its cargo or looks for the nearest field. */
+	void TickAutonomousHarvest();
+	void AutonomousHarvest_AsyncFindResource();
+	void AsyncOnReceiveResourceForAutonomous(const TArray<TWeakObjectPtr<UResourceComponent>>& Resources);
+	bool GetIsValidCommandOwner();
+
+	/** @return Whether this harvester belongs to the human (player 1); only then it shows the human's feedback. */
+	bool GetIsOwnedByHumanPlayer() const;
 	bool GetIsHarvesterIdle() const;
 	void IdleHarvester_AsyncFindTargetResource();
 	// If a valid resource was found and the harvester is still idle then we issue a command through the
