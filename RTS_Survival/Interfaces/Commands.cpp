@@ -8,6 +8,7 @@
 #include "RTS_Survival/Enemy/EnemyController/EnemyController.h"
 #include "RTS_Survival/CaptureMechanic/CaptureMechanicHelpers.h"
 #include "RTS_Survival/Enemy/EnemyAISettings/EnemyAISettings.h"
+#include "RTS_Survival/Enemy/StrategicAI/StrategicAIHelpers.h"
 #include "RTS_Survival/GameUI/ActionUI/ActionUIManager/ActionUIManager.h"
 #include "RTS_Survival/PickupItems/Items/ItemsMaster.h"
 #include "RTS_Survival/Player/CPPController.h"
@@ -4143,6 +4144,12 @@ void ICommands::ExecuteRegisterUnitAsBlackboardIdleCommand()
 		return;
 	}
 
+	// Harvesters keep harvesting (UHarvester::StartAutonomousHarvest); they never join the AI's unit pools.
+	if (FStrategicAIHelpers::GetIsExcludedFromEnemyUnitPools(OwnerActor))
+	{
+		DoneExecutingCommand(EAbilityID::IdRegisterUnitAsBlackboardIdle);
+		return;
+	}
 	UEnemyDirectControlComponent* EnemyDirectControlComponent = EnemyController->GetEnemyDirectControlComponent();
 	if (not IsValid(EnemyDirectControlComponent))
 	{

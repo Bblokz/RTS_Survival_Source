@@ -273,6 +273,11 @@ private:
 	                             FSlateWindowElementList& OutDrawElements,
 	                             const int32 LayerId) const;
 
+	// Bearing wedges of the direction-finding hunt (ADirectionFindingManager); drawn over the map, under everything.
+	int32 DrawDirectionFindingWedges(const FGeometry& AllottedGeometry,
+	                                 FSlateWindowElementList& OutDrawElements,
+	                                 const int32 LayerId) const;
+
 	// Ripples where enemies hit player units (URTSCombatPingSubsystem); drawn over the icons, under the glass.
 	int32 DrawCombatPings(const FGeometry& AllottedGeometry,
 	                      FSlateWindowElementList& OutDrawElements,
