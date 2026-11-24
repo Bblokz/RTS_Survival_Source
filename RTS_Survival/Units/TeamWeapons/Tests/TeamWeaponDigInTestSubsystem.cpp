@@ -29,6 +29,8 @@
 #include "Misc/Paths.h"
 #include "NavigationSystem.h"
 #include "RTS_Survival/RTSCollisionTraceChannels.h"
+#include "RTS_Survival/Utils/CollisionSetup/RTSPlayerCollision.h"
+#include "RTS_Survival/Game/Players/RTSPlayers.h"
 #include "RTS_Survival/GameUI/GameDifficultyPicker/W_GameDifficultyPicker.h"
 #include "RTS_Survival/Interfaces/RTSInterface/RTSUnit.h"
 #include "RTS_Survival/Player/CPPController.h"
@@ -856,13 +858,14 @@ void UTeamWeaponDigInTestSubsystem::CheckWallTraces(const FTWDigInTestSubject& S
                                                     const ATeamWeaponDigInWall& Wall)
 {
 	const URTSComponent* RTSComponent = Weapon.FindComponentByClass<URTSComponent>();
-	// The walls block the weapons of the gun's opponent: the channel their shots trace on.
-	const ECollisionChannel OpponentShots = IsValid(RTSComponent) && RTSComponent->GetOwningPlayer() == 1
-		                                        ? COLLISION_TRACE_PLAYER
-		                                        : COLLISION_TRACE_ENEMY;
+	// The walls block the weapons of the gun's opponent: traced like its shots, on its channel with its ignore mask.
+	const int32 OpponentPlayer = IsValid(RTSComponent) && FRTSPlayers::IsHumanPlayer(RTSComponent->GetOwningPlayer())
+		                             ? RTSPlayers::FirstAIPlayer
+		                             : RTSPlayers::HumanPlayer;
+	const ECollisionChannel OpponentShots = FRTSPlayerCollision::GetWeaponTraceChannel(OpponentPlayer);
 	const UStaticMesh* WallMesh = Wall.GetWallMeshComponent()->GetStaticMesh();
-	auto TraceInwardFrom = [this, &Wall, WallMesh, OpponentShots](const FName ProbeName, FHitResult& OutHit,
-	                                                              bool& bOutHit)
+	auto TraceInwardFrom = [this, &Wall, WallMesh, OpponentShots, OpponentPlayer](const FName ProbeName,
+	                                                                              FHitResult& OutHit, bool& bOutHit)
 	{
 		const UStaticMeshSocket* Probe = WallMesh->FindSocket(ProbeName);
 		if (not IsValid(Probe))
@@ -873,6 +876,7 @@ void UTeamWeaponDigInTestSubsystem::CheckWallTraces(const FTWDigInTestSubject& S
 		const FVector End = Wall.GetActorTransform().TransformPosition(
 			FVector(0.f, Probe->RelativeLocation.Y, Probe->RelativeLocation.Z));
 		FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(TWDigInProbe), true);
+		FRTSPlayerCollision::ApplyWeaponIgnoreMask(QueryParams, OpponentPlayer);
 		for (int32 Step = 0; Step < TeamWeaponDigInTestPrivate::MaxTraceStepsThroughScenery; ++Step)
 		{
 			bOutHit = GetWorld()->LineTraceSingleByChannel(OutHit, Start, End, OpponentShots, QueryParams);

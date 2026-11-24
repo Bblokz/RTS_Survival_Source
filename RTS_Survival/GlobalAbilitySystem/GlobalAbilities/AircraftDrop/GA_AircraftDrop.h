@@ -10,6 +10,10 @@
 
 class AAircraftMaster;
 class ATankMaster;
+class UGA_AircraftDrop;
+
+// A vehicle (released on the ground) or a squad (spawned at the landed aircraft) of one of this ability's drops.
+DECLARE_MULTICAST_DELEGATE_TwoParams(FOnAircraftDropUnitReleased, UGA_AircraftDrop* /*Ability*/, AActor* /*Unit*/);
 class USoundAttenuation;
 class USoundBase;
 class USoundConcurrency;
@@ -66,6 +70,11 @@ struct FAircraftDropGlobalAbilitySettings
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0.0"))
 	float BetweenAircraftRectangleOffset = 1000.0f;
 
+	// Vehicles hang on ropes far below the aircraft (AircraftRopeSling::DefaultHangDistance) and are lowered to the
+	// ground while it hovers, instead of riding just under it to a landing. TankAttachZOffset is ignored then.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	bool bRopeSlungTanks = false;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TObjectPtr<USoundBase> DropOffSound = nullptr;
 
@@ -88,7 +97,30 @@ public:
 	virtual void ExecuteAbilityAtLocation(const FVector& TargetLocation) override;
 	virtual void BeginDestroy() override;
 
+	/**
+	 * @brief Replaces what a copy of this ability drops (placed mission air drops); the aircraft, landing times,
+	 * squad spread and sounds stay the template's. Never call it on the data asset template itself.
+	 * @param TankSubtypes One aircraft per vehicle; each uses the attach offset of the template's first tank entry.
+	 * @param SquadSubtypes AmountInfantryPerAircraft squads share one aircraft.
+	 */
+	void SetDropPayload(const TArray<ETankSubtype>& TankSubtypes, const TArray<ESquadSubtype>& SquadSubtypes);
+
+	/** @brief On a copy: vehicles hang on ropes and are lowered while the aircraft hovers (see bRopeSlungTanks). */
+	void SetRopeSlungTanks(const bool bRopeSlung) { M_AircraftDropSettings.bRopeSlungTanks = bRopeSlung; }
+
+	/**
+	 * @brief On a copy: false keeps the dropped units out of the enemy AI's direct control, for a mission that
+	 * orders them itself through OnUnitReleased. Default true.
+	 */
+	void SetHandPayloadToEnemyAI(const bool bHandToEnemyAI) { bM_HandPayloadToEnemyAI = bHandToEnemyAI; }
+
+	// Every vehicle and squad this ability's aircraft deliver, as each is released.
+	FOnAircraftDropUnitReleased OnUnitReleased;
+
 private:
+	bool bM_HandPayloadToEnemyAI = true;
+
+	void BindAircraftReleaseEvents(AAircraftMaster* Aircraft);
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (AllowPrivateAccess = "true"))
 	FAircraftDropGlobalAbilitySettings M_AircraftDropSettings;
 

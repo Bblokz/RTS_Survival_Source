@@ -18,10 +18,15 @@ enum class EAbilityPreviewTargetKind : uint8
 	None,
 	// Machine gun strafing (its 12 mm penetration cannot pierce even the trucks) and incendiary bombs.
 	Infantry,
-	// Cannon aircraft: the Horten 229's cannons, the Ju 87 G's 37 mm pods.
+	// Cannon aircraft; no ability uses it since they got LightVehiclesAndInfantry.
 	LightVehicles,
 	// Bombs: dive bombers, carpet and incendiary bombing.
-	MediumVehicles
+	MediumVehicles,
+	// Machine gun fighters with area damage on soldiers: more squads, staggered wide of the line so the strafe's
+	// beaten zone shows across them.
+	InfantrySpread,
+	// Cannon aircraft with splash: light vehicles on the line and squads on its flanks.
+	LightVehiclesAndInfantry
 };
 
 USTRUCT(BlueprintType)
@@ -32,6 +37,16 @@ struct FAbilityPreviewTargetSet
 	// One unit per entry, spread evenly along the attack line.
 	UPROPERTY(EditAnywhere, Category = "Ability Preview|Targets")
 	TArray<TSoftClassPtr<AActor>> UnitClasses;
+
+	// Signed distance (cm) of each unit from the attack line, matched to UnitClasses by index and repeated when
+	// shorter. Empty: units alternate M_SideOffset to either side.
+	UPROPERTY(EditAnywhere, Category = "Ability Preview|Targets")
+	TArray<float> SideOffsetsCm;
+
+	// A shorter attack line is stretched about its middle to this length (cm) for this set, so many units still
+	// stand apart; 0 keeps the line.
+	UPROPERTY(EditAnywhere, Category = "Ability Preview|Targets", meta = (ClampMin = "0"))
+	float MinLineLengthCm = 0.f;
 };
 
 /** Health of the spawned targets, read by the preview test. */
@@ -43,6 +58,8 @@ struct FAbilityPreviewTargetHealth
 	int32 Damaged = 0;
 	// Units that are gone or at zero health.
 	int32 Destroyed = 0;
+	// Soldiers of the target squads below full health, including dead ones: the strafe's area damage on infantry.
+	int32 SoldiersDamaged = 0;
 };
 
 /**
@@ -69,7 +86,8 @@ public:
 	                                                  const UGlobalAbility& AbilityCopy) const;
 
 	/**
-	 * @brief Spawns the kind's units along the line the aircraft attack, alternating a little to either side of it.
+	 * @brief Spawns the kind's units along the line the aircraft attack, each at its set's side offset (by default
+	 * alternating a little to either side of it).
 	 * @param Kind Which set to spawn.
 	 * @param LineStart Ground point where the attack run starts.
 	 * @param LineEnd Ground point where it ends.
@@ -127,6 +145,7 @@ private:
 	FTimerHandle M_KeepPresentableTimerHandle;
 
 	void PreloadTargetClasses();
+	float GetSideOffset(const FAbilityPreviewTargetSet& TargetSet, const int32 UnitIndex) const;
 	AActor* SpawnTarget(UClass* UnitClass, const FVector& GroundLocation, const float Yaw);
 	FVector GetGroundPoint(const FVector& Location) const;
 

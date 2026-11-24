@@ -1,0 +1,480 @@
+{
+ "key": "F_kabelkran",
+ "title": "F  Kabelkran: cable crane from a timber head tower across the lane",
+ "notes": [
+  "A track cable runs from a timber head tower (left) to a tail mast (right), across the screen, over the stocks and the lane.",
+  "The lane runs front to back (along +y) under the cable. The truck INDEXES forward 1.0 m per load (one gap per stop).",
+  "Middle-load stop: x 3.4, y 3.46, heading 90 deg (stops at y 2.46 / 3.46 / 4.47 put each bed gap under the cable).",
+  "Crane: carriage runs along the track cable (pulled by the winch house at the tower foot) + hoist. Nothing slews.",
+  "Stocks in three steel trays strung under the cable: radixite, metal, parts (nearest the lane).",
+  "Animated: flag rise; carriage runs out, hook drops, lifts, runs over the lane, lowers; tray fill levels step down.",
+  "Lightest silhouette (thin lines) and very distinctive; the cable sag and long travel make the cycle slow to read.",
+  "BP points: approach (3.4, -10.5), park (3.4, 3.46) +y, exit (3.4, 17.5). Flag pole (-4.6, 3.6), 6.0 m travel.",
+  "NEEDS the truck settled to +-0.3 m and 3 stops (as A); with the 1.5-2 m stop error it needs a scripted settle."
+ ],
+ "subtitle": "Opel Blitz (real mesh) + soldier for scale  |  site 16.5 x 10 m with the lane, head tower 8.2 m, tail mast 5.6 m, flag 8 m",
+ "footprint": [
+  17.3,
+  6.2
+ ],
+ "height": 8.6,
+ "mast_height": 8.6,
+ "views": {
+  "rts": {
+   "file": "F_kabelkran_rts.png",
+   "size": [
+    1600,
+    1100
+   ],
+   "px_per_m": 61.81818181818182,
+   "caption": null,
+   "labels": [
+    {
+     "text": "Truck in",
+     "kind": "lane",
+     "xy": [
+      702.9,
+      971.3
+     ]
+    },
+    {
+     "text": "Truck out",
+     "kind": "lane",
+     "xy": [
+      1201.9,
+      600.5
+     ]
+    },
+    {
+     "text": "Opel Blitz parks here (empty bed)",
+     "kind": "truck",
+     "xy": [
+      1117.7,
+      548.3
+     ]
+    },
+    {
+     "text": "Cable carriage + hoist",
+     "kind": "crane",
+     "xy": [
+      993.5,
+      416.6
+     ]
+    },
+    {
+     "text": "Timber head tower + winch",
+     "kind": "crane",
+     "xy": [
+      438.5,
+      175.2
+     ]
+    },
+    {
+     "text": "Radixite stock",
+     "kind": "radixite",
+     "xy": [
+      565.7,
+      602.8
+     ]
+    },
+    {
+     "text": "Metal stock",
+     "kind": "metal",
+     "xy": [
+      693.0,
+      628.6
+     ]
+    },
+    {
+     "text": "Vehicle parts stock",
+     "kind": "parts",
+     "xy": [
+      820.2,
+      654.4
+     ]
+    },
+    {
+     "text": "Capture flag (rises up the pole)",
+     "kind": "flag",
+     "xy": [
+      663.4,
+      119.6
+     ]
+    },
+    {
+     "text": "lowered / neutral",
+     "kind": "flag",
+     "xy": [
+      663.4,
+      485.0
+     ]
+    },
+    {
+     "text": "Progress bar (UI)",
+     "kind": "ui",
+     "xy": [
+      818.1,
+      166.0
+     ]
+    }
+   ]
+  },
+  "rear": {
+   "file": "F_kabelkran_rear.png",
+   "size": [
+    800,
+    550
+   ],
+   "px_per_m": 30.90909090909091,
+   "caption": null,
+   "labels": [
+    {
+     "text": "Truck in",
+     "kind": "lane",
+     "xy": [
+      448.6,
+      221.0
+     ]
+    },
+    {
+     "text": "Truck out",
+     "kind": "lane",
+     "xy": [
+      199.0,
+      406.3
+     ]
+    },
+    {
+     "text": "Opel Blitz parks here (empty bed)",
+     "kind": "truck",
+     "xy": [
+      241.2,
+      317.6
+     ]
+    },
+    {
+     "text": "Cable carriage + hoist",
+     "kind": "crane",
+     "xy": [
+      303.3,
+      182.2
+     ]
+    },
+    {
+     "text": "Timber head tower + winch",
+     "kind": "crane",
+     "xy": [
+      580.7,
+      170.1
+     ]
+    },
+    {
+     "text": "Radixite stock",
+     "kind": "radixite",
+     "xy": [
+      517.1,
+      358.2
+     ]
+    },
+    {
+     "text": "Metal stock",
+     "kind": "metal",
+     "xy": [
+      453.5,
+      345.3
+     ]
+    },
+    {
+     "text": "Vehicle parts stock",
+     "kind": "parts",
+     "xy": [
+      389.9,
+      332.4
+     ]
+    },
+    {
+     "text": "Capture flag (rises up the pole)",
+     "kind": "flag",
+     "xy": [
+      468.3,
+      218.8
+     ]
+    },
+    {
+     "text": "lowered / neutral",
+     "kind": "flag",
+     "xy": [
+      468.3,
+      401.5
+     ]
+    },
+    {
+     "text": "Progress bar (UI)",
+     "kind": "ui",
+     "xy": [
+      391.0,
+      96.4
+     ]
+    }
+   ]
+  },
+  "top": {
+   "file": "F_kabelkran_top.png",
+   "size": [
+    800,
+    800
+   ],
+   "px_per_m": 30.58823529411765,
+   "caption": null,
+   "labels": [
+    {
+     "text": "Truck in",
+     "kind": "lane",
+     "xy": [
+      504.0,
+      626.4
+     ]
+    },
+    {
+     "text": "Truck out",
+     "kind": "lane",
+     "xy": [
+      504.0,
+      204.2
+     ]
+    },
+    {
+     "text": "Opel Blitz parks here (empty bed)",
+     "kind": "truck",
+     "xy": [
+      504.0,
+      275.5
+     ]
+    },
+    {
+     "text": "Cable carriage + hoist",
+     "kind": "crane",
+     "xy": [
+      491.8,
+      363.6
+     ]
+    },
+    {
+     "text": "Timber head tower + winch",
+     "kind": "crane",
+     "xy": [
+      210.4,
+      442.8
+     ]
+    },
+    {
+     "text": "Radixite stock",
+     "kind": "radixite",
+     "xy": [
+      275.3,
+      425.3
+     ]
+    },
+    {
+     "text": "Metal stock",
+     "kind": "metal",
+     "xy": [
+      340.3,
+      407.8
+     ]
+    },
+    {
+     "text": "Vehicle parts stock",
+     "kind": "parts",
+     "xy": [
+      405.3,
+      390.2
+     ]
+    },
+    {
+     "text": "Capture flag (rises up the pole)",
+     "kind": "flag",
+     "xy": [
+      259.3,
+      320.5
+     ]
+    },
+    {
+     "text": "lowered / neutral",
+     "kind": "flag",
+     "xy": [
+      259.3,
+      320.5
+     ]
+    },
+    {
+     "text": "Progress bar (UI)",
+     "kind": "ui",
+     "xy": [
+      400.0,
+      384.7
+     ]
+    }
+   ],
+   "grid": [
+    [
+     -517.6,
+     1348.2,
+     -517.6,
+     -487.1
+    ],
+    [
+     -364.7,
+     1348.2,
+     -364.7,
+     -487.1
+    ],
+    [
+     -211.8,
+     1348.2,
+     -211.8,
+     -487.1
+    ],
+    [
+     -58.8,
+     1348.2,
+     -58.8,
+     -487.1
+    ],
+    [
+     94.1,
+     1348.2,
+     94.1,
+     -487.1
+    ],
+    [
+     247.1,
+     1348.2,
+     247.1,
+     -487.1
+    ],
+    [
+     400.0,
+     1348.2,
+     400.0,
+     -487.1
+    ],
+    [
+     552.9,
+     1348.2,
+     552.9,
+     -487.1
+    ],
+    [
+     705.9,
+     1348.2,
+     705.9,
+     -487.1
+    ],
+    [
+     858.8,
+     1348.2,
+     858.8,
+     -487.1
+    ],
+    [
+     1011.8,
+     1348.2,
+     1011.8,
+     -487.1
+    ],
+    [
+     1164.7,
+     1348.2,
+     1164.7,
+     -487.1
+    ],
+    [
+     1317.6,
+     1348.2,
+     1317.6,
+     -487.1
+    ],
+    [
+     -517.6,
+     1348.2,
+     1317.6,
+     1348.2
+    ],
+    [
+     -517.6,
+     1195.3,
+     1317.6,
+     1195.3
+    ],
+    [
+     -517.6,
+     1042.4,
+     1317.6,
+     1042.4
+    ],
+    [
+     -517.6,
+     889.4,
+     1317.6,
+     889.4
+    ],
+    [
+     -517.6,
+     736.5,
+     1317.6,
+     736.5
+    ],
+    [
+     -517.6,
+     583.5,
+     1317.6,
+     583.5
+    ],
+    [
+     -517.6,
+     430.6,
+     1317.6,
+     430.6
+    ],
+    [
+     -517.6,
+     277.6,
+     1317.6,
+     277.6
+    ],
+    [
+     -517.6,
+     124.7,
+     1317.6,
+     124.7
+    ],
+    [
+     -517.6,
+     -28.2,
+     1317.6,
+     -28.2
+    ],
+    [
+     -517.6,
+     -181.2,
+     1317.6,
+     -181.2
+    ],
+    [
+     -517.6,
+     -334.1,
+     1317.6,
+     -334.1
+    ],
+    [
+     -517.6,
+     -487.1,
+     1317.6,
+     -487.1
+    ]
+   ]
+  }
+ },
+ "main_view": "rts"
+}

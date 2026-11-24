@@ -150,7 +150,8 @@ bool FVariantBatchThreeWeaponKeyStatsTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Drilling MG calibre"), Drilling->WeaponCalibre, 15.f, Tolerance);
 	TestTrue(TEXT("Bunker mortar is HE only"), BunkerMortar->ShellTypes.Num() == 1
 	         && BunkerMortar->ShellType == EWeaponShellType::Shell_HE);
-	TestEqual(TEXT("Bunker mortar has the autocannon range"), BunkerMortar->Range, LightCannonRange, Tolerance);
+	TestEqual(TEXT("Bunker mortar has the autocannon range with the artillery boost"), BunkerMortar->Range,
+	          VariantBatchThreeWeapons::GetBunkerMortarRange(), Tolerance);
 	TestEqual(TEXT("Bunker mortar fired damage"), BunkerMortar->BaseDamage * HE_DamageMlt, 222.f, Tolerance);
 	TestEqual(TEXT("Bunker mortar magazine"), BunkerMortar->MagCapacity, 3);
 	TestEqual(TEXT("Bunker mortar reload"), BunkerMortar->ReloadSpeed, 7.f, Tolerance);

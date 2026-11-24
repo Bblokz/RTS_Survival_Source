@@ -8,6 +8,8 @@
 #include "NiagaraDataInterfaceArrayFunctionLibrary.h"
 #include "NiagaraSystem.h"
 #include "Engine/TextureRenderTarget2D.h"
+#include "Kismet/KismetMaterialLibrary.h"
+#include "Materials/MaterialParameterCollection.h"
 #include "Engine/World.h"
 #include "TimerManager.h"
 #include "RTS_Survival/GameUI/MiniMap/CustomIcons/MinimapIconDataAsset.h"
@@ -47,6 +49,8 @@ AFowManager::AFowManager(const FObjectInitializer& ObjectInitializer)
 	MiniMapColorPlayerBuilding = FLinearColor(0.0f, 1.0f, 0.0f, 1.0f);
 	FowSystem = nullptr;
 	FoWReadBackSystem = nullptr;
+	FogOfWarParameterCollection = TSoftObjectPtr<UMaterialParameterCollection>(FSoftObjectPath(
+		TEXT("/Game/RTS_Survival/Blueprints/FowSystem/Materials/Collections/MPC_FogOfWar.MPC_FogOfWar")));
 	NiagaraDraw = nullptr;
 	NiagaraReadBack = nullptr;
 
@@ -481,6 +485,22 @@ void AFowManager::BeginPlay()
 	Super::BeginPlay();
 	BeginPlay_InitMinimapIconDataAsset();
 	BeginPlay_InitTransferMapExtentToPlayerCamera();
+}
+
+void AFowManager::SetUnexploredFogReveal(const float RevealBrightness)
+{
+	UMaterialParameterCollection* const Collection = FogOfWarParameterCollection.LoadSynchronous();
+	if (not IsValid(Collection))
+	{
+		RTSFunctionLibrary::ReportError(
+			"Fow manager has no valid fog of war material parameter collection; cannot reveal unexplored ground."
+			"\n See function: AFowManager::SetUnexploredFogReveal");
+		return;
+	}
+	// Name must match the scalar in MPC_FogOfWar read by MPP_FogOfWar_01.
+	static const FName UnexploredRevealName(TEXT("UnexploredReveal"));
+	UKismetMaterialLibrary::SetScalarParameterValue(this, Collection, UnexploredRevealName,
+	                                                FMath::Max(RevealBrightness, 0.f));
 }
 
 void AFowManager::BeginPlay_InitTransferMapExtentToPlayerCamera()
@@ -1156,7 +1176,9 @@ void AFowManager::OnReceivedEnemyVisionUpdate(const TArray<FBasicParticleData>& 
 		if (M_CurrentPlayerCompsForEnemyVisionReadBack.IsValidIndex(PlayerIndex))
 		{
 			TWeakObjectPtr<UFowComp> PlayerComp = M_CurrentPlayerCompsForEnemyVisionReadBack[PlayerIndex];
-			if (PlayerComp.IsValid())
+			// A unit that changed owner since the request no longer gives the player vision: this answer is not
+			// about its new behaviour.
+			if (PlayerComp.IsValid() && PlayerComp->GetFowBehaviour() == EFowBehaviour::Fow_Active)
 			{
 				// The Size represents visibility (0.0f for hidden, 1.0f for visible)
 				const float Visibility = ParticleData.Size;
@@ -1293,7 +1315,8 @@ void AFowManager::OnReceivedReadBackUpdate(const TArray<FBasicParticleData>& Dat
 		if (GetValidParticleIndex(EachElm.Velocity, Index))
 		{
 			TWeakObjectPtr<UFowComp> PassiveComp = M_CurrentReadBackPassiveComponents[Index];
-			if (PassiveComp.IsValid())
+			// A unit that changed owner to the player since the request is no longer hidden by the fog.
+			if (PassiveComp.IsValid() && PassiveComp->GetFowBehaviour() != EFowBehaviour::Fow_Active)
 			{
 				PassiveComp->OnFowVisibilityUpdated(EachElm.Size);
 			}

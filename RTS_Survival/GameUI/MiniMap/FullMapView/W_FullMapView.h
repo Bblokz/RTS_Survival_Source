@@ -9,7 +9,10 @@
 
 #include "W_FullMapView.generated.h"
 
+class UBorder;
 class UOverlay;
+class UScrollBox;
+class UTextBlock;
 class UVerticalBox;
 class UWidget;
 class UMainGameUI;
@@ -19,12 +22,15 @@ class UTexture2D;
 class UW_GlassIconButton;
 class UW_MapObjectFilterToggle;
 class UW_MiniMap;
+class UW_TacticalMapMissionCard;
 
 /**
  * @brief Full-screen map (like opening the map in an RPG): a large copy of the minimap with the same terrain, fog
  * of war, icons and camera frame, inside a detailed frame with grid coordinates. UMainGameUI opens it from the
  * minimap's map button and hides itself meanwhile; the close button (or clicking a spot, which also moves the
- * camera there) restores the normal game UI. Builds its own widget tree.
+ * camera there) restores the normal game UI. Map filters sit left of the frame; the active missions (the missions
+ * the HUD's mission widgets show, which are hidden with the HUD) are listed right of it on glass cards.
+ * Builds its own widget tree.
  */
 UCLASS()
 class RTS_SURVIVAL_API UW_FullMapView : public UUserWidget
@@ -41,6 +47,9 @@ public:
 
 	/** Called by UMainGameUI when the view closes, so map object filters shown only here stop their work. */
 	void OnFullMapViewClosed() const;
+
+	/** The cards of the mission panel in use; captures and tests hover them. */
+	void GetShownMissionCards(TArray<UW_TacticalMapMissionCard*>& OutCards) const;
 
 protected:
 	virtual void NativeOnInitialized() override;
@@ -98,6 +107,28 @@ private:
 	UPROPERTY()
 	TArray<TObjectPtr<UW_MapObjectFilterToggle>> M_FilterToggles;
 
+	// Right of the frame; positioned against the frame whenever the viewport size changes.
+	UPROPERTY()
+	TObjectPtr<USizeBox> M_MissionPanel;
+
+	UPROPERTY()
+	TObjectPtr<UTextBlock> M_MissionCountText;
+
+	UPROPERTY()
+	TObjectPtr<UTextBlock> M_NoMissionsText;
+
+	UPROPERTY()
+	TObjectPtr<UScrollBox> M_MissionScrollBox;
+
+	// Pooled: a card per mission shown so far; extra ones are collapsed.
+	UPROPERTY()
+	TArray<TObjectPtr<UW_TacticalMapMissionCard>> M_MissionCards;
+
+	int32 M_ShownMissionCount = 0;
+
+	// Missions start, complete and rewrite their titles while the map is open; polled in real time.
+	float M_SecondsUntilMissionRefresh = 0.f;
+
 	TWeakObjectPtr<UW_MiniMap> M_SmallMiniMap;
 	TWeakObjectPtr<UMainGameUI> M_MainGameUI;
 
@@ -111,6 +142,12 @@ private:
 	void BuildFilterPanel(UOverlay& RootOverlay);
 	void AddFilterToggles(UVerticalBox& PanelBox);
 	void RefreshFilterToggles() const;
+	UBorder* CreatePanelBorder(const FName Name) const;
+	UTextBlock* CreatePanelTitle(const FName Name, const FText& Title) const;
+	void BuildMissionPanel(UOverlay& RootOverlay);
+	void TickMissionPanel(const float DeltaSeconds);
+	void RefreshMissionPanel();
+	UW_TacticalMapMissionCard* GetOrCreateMissionCard(const int32 CardIndex);
 	void SetIsTacticalMapOpenForFilters(const bool bIsOpen) const;
 	FSlateBrush MakeFrameBrush() const;
 

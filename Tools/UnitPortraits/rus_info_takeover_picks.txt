@@ -1,0 +1,7 @@
+# Picked 2026-11-11 from the rus_info_takeover.txt run (crops at --zoom 1.1). <portrait name>=<cropped picture>.
+T_Rus_LightTank_T26=T_Rus_LightTank_T26_FrontRight_shot3_t2.png
+T_Rus_LightTank_BT7=T_Rus_LightTank_BT7_FrontRight_shot2_t2.png
+T_Rus_LightTank_BT7_4=T_Rus_LightTank_BT7_4_FrontRight_shot2_t2.png
+T_Rus_MediumTank_T34_76=T_Rus_MediumTank_T34_76_FrontRight_shot2_t2.png
+T_Rus_MediumTank_T34E=T_Rus_MediumTank_T34E_FrontRight_shot1_t2.png
+T_Rus_HeavyTank_KV1_L11=T_Rus_HeavyTank_KV1_L11_FrontRight_shot2_t2.png

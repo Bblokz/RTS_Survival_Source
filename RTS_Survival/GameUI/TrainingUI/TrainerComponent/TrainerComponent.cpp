@@ -258,7 +258,8 @@ void UTrainerComponent::InitTrainerAsEnemyTrainerComponent(
 	bM_UseTrainingPreview = bUseTrainingPreview;
 	
 	SetTrainingEnabled(TrainerSettings.StartEnabled);
-	const AEnemyController* EnemyController = FRTS_Statics::GetEnemyController(this);
+	// The trainer serves the controller that plays the player of its building.
+	const AEnemyController* EnemyController = FRTS_Statics::GetEnemyControllerOfUnit(GetOwner());
 	if(not EnemyController)
 	{
 		return;

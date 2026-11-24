@@ -521,6 +521,7 @@ private:
 
 	bool GetIsValidCheckHideActionButtonHotkeys() const;
 	bool GetIsValidCheckUnitRangeOnHover() const;
+	bool GetIsValidCheckShowInfoTakeovers() const;
 
 	bool GetIsValidButtonApply() const;
 	bool GetIsValidButtonSetDefaults() const;
@@ -668,6 +669,9 @@ private:
 
 	UFUNCTION()
 	void HandleCheckUnitRangeOnHoverChanged(bool bIsChecked);
+
+	UFUNCTION()
+	void HandleShowInfoTakeoversChanged(bool bIsChecked);
 
 	UFUNCTION()
 	void HandleOverwriteAllPlayerHpBarStratChanged(FString SelectedItem, ESelectInfo::Type SelectionType);
@@ -1419,6 +1423,14 @@ private:
 	 */
 	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<UCheckBox> M_CheckUnitRangeOnHover = nullptr;
+
+	/**
+	 * @brief BindWidget variable must reference a CheckBox named M_CheckShowInfoTakeovers in the Widget Blueprint.
+	 * @note Turns the vehicle, building and squad info takeovers back on after "never show again" was ticked.
+	 * @note The bound widget must exist, keep this name, and remain a CheckBox for logic.
+	 */
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	TObjectPtr<UCheckBox> M_CheckShowInfoTakeovers = nullptr;
 
 	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<UComboBoxString> M_ComboOverwriteAllPlayerHpBarStrat = nullptr;

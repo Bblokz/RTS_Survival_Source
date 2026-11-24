@@ -9,8 +9,8 @@
 class AEnemyController;
 
 /**
- * A World Subsystem that provides global access to the Enemy Controller.
- * Caches the pointer when the controller initializes so other actors can retrieve it.
+ * A World Subsystem that provides global access to the Enemy Controllers: one per AI player.
+ * Caches the pointer when a controller initializes so other actors can retrieve it by the player it plays.
  */
 UCLASS()
 class RTS_SURVIVAL_API UEnemyControllerSubsystem : public UWorldSubsystem
@@ -18,9 +18,20 @@ class RTS_SURVIVAL_API UEnemyControllerSubsystem : public UWorldSubsystem
     GENERATED_BODY()
 
 public:
-    /** Returns the AEnemyController from the world, if valid. */
+    /**
+     * Returns the default AEnemyController from the world, if valid: the one of the first AI player, or the
+     * lowest-numbered registered one when that player has none.
+     */
     UFUNCTION(BlueprintCallable, Category="Enemy Controller")
-    AEnemyController* GetEnemyController() const { return M_EnemyController; }
+    AEnemyController* GetEnemyController() const;
+
+    /** Returns the controller that plays this AI player (2..4), or null when the map has none for it. */
+    UFUNCTION(BlueprintCallable, Category="Enemy Controller")
+    AEnemyController* GetEnemyControllerForPlayer(int32 Player) const;
+
+    /** Returns every registered controller, lowest player number first. */
+    UFUNCTION(BlueprintCallable, Category="Enemy Controller")
+    TArray<AEnemyController*> GetAllEnemyControllers() const;
 
     /** Called when the subsystem is initialized for a given UWorld. */
     virtual void Initialize(FSubsystemCollectionBase& Collection) override;
@@ -28,11 +39,17 @@ public:
     /** Called when the subsystem is de-initialized (e.g., World teardown). */
     virtual void Deinitialize() override;
 
-    /** Called by the controller to register itself. */
+    /**
+     * @brief Called by the controller to register itself under the player it plays.
+     * A second controller for a player that already has a live one is reported and not registered.
+     */
     void SetEnemyController(AEnemyController* NewEnemyController);
 
 private:
-    /** Cached pointer to the one-and-only enemy controller in this world. */
+    // Indexed by player number; a slot is empty until the controller of that player registers. The controllers
+    // belong to the level, so a destroyed or unloaded one simply reads as empty again.
     UPROPERTY()
-    AEnemyController* M_EnemyController = nullptr;
+    TArray<TWeakObjectPtr<AEnemyController>> M_EnemyControllersByPlayer;
+
+    void EnsurePlayerSlots();
 };

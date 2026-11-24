@@ -8,6 +8,7 @@
 #include "RTS_Survival/GameUI/Pooled_AnimatedVerticalText/Pooling/AnimatedTextWidgetPoolManager/AnimatedTextWidgetPoolManager.h"
 #include "RTS_Survival/GameUI/Pooled_AnimatedVerticalIcons/AnimatedIconWidgetPoolManager.h"
 #include "RTS_Survival/GameUI/ActionUI/ActionUIManager/ActionUIManager.h"
+#include "RTS_Survival/Game/Players/RTSPlayers.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
@@ -17,7 +18,6 @@ namespace BehaviourCompConstants
 {
 	constexpr float ComponentTickIntervalSeconds = 2.f;
 	constexpr float DebugDrawHeight = 500.f;
-	constexpr uint8 EnemyPlayerId = 2;
 }
 
 UBehaviourComp::UBehaviourComp()
@@ -732,7 +732,8 @@ void UBehaviourComp::BeginPlay_InitMutations()
 		return;
 	}
 
-	if (RTSComponent->GetOwningPlayer() != BehaviourCompConstants::EnemyPlayerId)
+	// Mutations are for the units of the AI players; neutral and unset owners never had them.
+	if (not FRTSPlayers::IsValidAIPlayer(RTSComponent->GetOwningPlayer()))
 	{
 		return;
 	}

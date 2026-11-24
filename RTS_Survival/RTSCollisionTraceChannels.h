@@ -1,20 +1,31 @@
 ﻿#pragma once
 
 #include "CoreMinimal.h"
-// Trace channel to hit enemy units, should be blocked by collision primitives on enemy objects where
-// we want weapons to be able to hit the enemy's unit.
+// ----------------- Up to four players (1 human, the rest AI) -----------------
+// The channels below only split the human from the AI side: "PLAYER" is player 1, "ENEMY" is every AI player.
+// Which player a weapon can hit is decided on top of them by FRTSPlayerCollision (Utils/CollisionSetup): units carry
+// their owner as a mask filter bit and every weapon query ignores the bits of the shooter and its allies.
+// Do not pick a weapon channel from an owning player here or in gameplay code; ask FRTSPlayerCollision.
+
+// Trace channel of the HUMAN player's weapons (it "hits the enemy"): blocked by collision primitives on AI-owned
+// objects where we want weapons to be able to hit the unit.
 // should be ignored by everything else.
 #define COLLISION_TRACE_ENEMY ECC_GameTraceChannel5
+// Same channel under the name of who fires on it.
+#define COLLISION_TRACE_HUMAN_WEAPONS COLLISION_TRACE_ENEMY
 
 // Collision object channel for hitting enemies 
 // should be blocked by components on enemy's units that allow weapon hits.
 // should be ignored by everything else.
 #define COLLISION_OBJ_ENEMY ECC_GameTraceChannel6
 
-// Trace channel to hit player units, should be blocked by collision primitives on player objects where
-// we want weapons to be able to hit the player's unit.
+// Trace channel of the weapons of ALL AI players (it "hits the player"): blocked by collision primitives on human-
+// owned objects, and on AI-owned objects too so AI players can fight each other; the query's ignore mask keeps an
+// AI shot from hitting its own player and allies.
 // should be ignored by everything else.
 #define COLLISION_TRACE_PLAYER ECC_GameTraceChannel7
+// Same channel under the name of who fires on it.
+#define COLLISION_TRACE_AI_WEAPONS COLLISION_TRACE_PLAYER
 
 // Collision object channel for hitting player 
 // should be blocked by components on player units that allow weapon hits.

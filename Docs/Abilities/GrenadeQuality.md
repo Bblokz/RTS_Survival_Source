@@ -76,10 +76,43 @@ AT damage stays at the designed 300: with the hull distance a stuck grenade deal
 "After" is the range over four full runs; the last one ran without overrides on the saved Blueprints (all 16
 scenarios pass). "Before" is the old code path; the Faust throws only happen at all thanks to the socket fix.
 
+## Vultures AT stick grenade (2026-11-12)
+
+The Hazmat Vultures (`Squad_Ger_HazmatVultures`, the FG-42 squad, `ESquadSubtype::Squad_Ger_Vultures`) carry an AT
+grenade: all four soldiers throw an M24 stick grenade (`SM_M24StickGrenade`) that sticks to vehicles. It uses the
+long-reserved `EGrenadeAbilityType::StickGrenadeVultures` (card key 5), which is anti-armor for the enemy AI
+(`FEnemyAbilityUsageProfiles::GetGrenadeUsage`) and gets the anti-vehicle crosshair
+(`APlayerAimAbility::GetAimTypeFromGrenadeAbility`).
+
+| Component | Range | Radius | Damage | Exp. | Armor pen (full / falloff / max) | Fuse | Sticks | Throwers x each | Cooldown | Card slot |
+|---|---|---|---|---|---|---|---|---|---|---|
+| `ATStickGrenade` | 800 | 125 | 160 | 1.5 | 75 / 5 / 125 | 1.0 s | yes | 4 x 1 | 20 s | 7 (6 is Rapid Fire) |
+
+Balanced per volley rather than per grenade: 4 x 160 = 640 against the Faust pair's 2 x 300 = 600, on a 20 s cooldown
+instead of 10 s, since the Vultures are an elite squad (525 R + 100 M). Sound, effect and armor values are the Faust
+HEAT grenade's. `Damage` is the one knob if the volley proves too strong or weak.
+
+Card: `Throw AT Stick Grenades` / `Cancel AT Stick Grenades` (key 5 of `IdThrowGrenade` / `IdCancelThrowGrenade` in
+`Buttons_DataTableb`), with its own icons `T_AB_ATStickGrenade` / `T_AB_CancelATStickGrenade`: the M24 with its head
+stuck on a riveted armour plate and a faint fuse glow, on the red grenade hex plate.
+Tools: `Source/Tools/GrenadeBench/setup_vultures_at_grenade.py` (component), `add_vultures_grenade_card.py` (card),
+icons: `D:/Blender/BlenderProjects/BlenderTanks/Infantry/Infweapons/VulturesATStick/render_at_stick_icon.py`
+(`Blender5.0.exe -b --factory-startup --python render_at_stick_icon.py`, `-- preview` for a quick render; uses the
+`SM_M24StickGrenade.fbx` and atlas textures in `Saved/GrenadeAtlas`), then
+`python make_vultures_at_icons.py Saved/MolotovWork/refs <render> Saved/VulturesATIcon` and
+`ue_import_vultures_at_icons.py` (UECP `execute_uecp_script`: imports with `T_AB_Molotov`'s texture settings and
+points card key 5 at them).
+
+Benchmark (`AT_Vultures_vs_T34`, `AT_Vultures_vs_T34_Driving`, appended last so the other scenarios keep their spots):
+4/4 stuck, 89 % off a T-34 standing and driving (Faust: 83 %). Spots are handed out by scenario order, and
+`-GrenadeBenchOnly` re-hands them, so a driving scenario can fail setup ("the tank drove into the throw window") on a
+spot where the tank's start is blocked; the failure line now gives the tank's and throwers' offsets to tell that apart.
+On `RTS_ToCopySmall` the 23rd spot is one, so the Vultures driving scenario runs before the standing one.
+
 ## The benchmark
 
 `UGrenadeBenchmarkSubsystem` (`GrenadeComponent/Tests`, not in shipping), `-GrenadeBenchmark`:
-16 scenarios, each on its own navmesh spot: AT grenades (Faust, Hazmat) against light, medium, heavy and a driving
+23 scenarios (16 at first; Soviet grenades and Vultures added since), each on its own navmesh spot: AT grenades (Faust, Hazmat, Vultures) against light, medium, heavy and a driving
 tank and against infantry; stick, small and molotov against a German 5-man squad; anti-infantry grenades against
 tanks for comparison; and the player's own Faust and Jager squads against an enemy T-34 (standing and driving) and
 enemy Soviet riflemen. Every scenario logs fuse, stuck count, rear armor and multiplier, health dealt, soldiers in the

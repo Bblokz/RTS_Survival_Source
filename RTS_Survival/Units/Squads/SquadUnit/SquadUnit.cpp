@@ -53,6 +53,13 @@
 #include "RTS_Survival/Scavenging/ScavengeObject/ScavengableObject.h"
 #include "RTS_Survival/Utils/UnitGroundRecovery/RTSUnitGroundRecovery.h"
 
+namespace SquadUnitSpawnPlacement
+{
+	// A soldier this close to its spawn spot when it shows is placed at once; moving it later, while it can be seen,
+	// reads as a jump.
+	constexpr float PlaceAtOnceDistanceCm = 600.f;
+}
+
 namespace SquadUnitGroundRecovery
 {
 	// A soldier that keeps falling through the world after this many recoveries dies instead.
@@ -452,7 +459,8 @@ bool ASquadUnit::GetCanUseAutomaticCover() const
 	{
 		return false;
 	}
-	return not GetIsValidSquadController() || M_SquadController->GetIsUnitIdle();
+	// Soldiers without a squad (cinematic actors) count as idle; quiet check, the missing squad is expected there.
+	return not GetHasSquadController() || M_SquadController->GetIsUnitIdle();
 }
 
 bool ASquadUnit::GetMayKeepAutomaticCover() const
@@ -2867,9 +2875,29 @@ void ASquadUnit::OnProjectileHit(const bool bBounced)
 	}
 }
 
+void ASquadUnit::BeginPlay_BindToOwningPlayerChanges()
+{
+	if (not IsValid(RTSComponent))
+	{
+		return;
+	}
+	RTSComponent->OnOwningPlayerChanged.AddUObject(this, &ASquadUnit::OnOwningPlayerChanged);
+}
+
+void ASquadUnit::OnOwningPlayerChanged(const uint8 /*OldOwningPlayer*/, const uint8 NewOwningPlayer)
+{
+	OwningPlayer = NewOwningPlayer;
+	FRTS_CollisionSetup::SetupInfantryCapsuleCollision(GetCapsuleComponent(), NewOwningPlayer);
+	if (IsValid(M_InfantryWeapon))
+	{
+		M_InfantryWeapon->SetOwningPlayer(NewOwningPlayer);
+	}
+}
+
 void ASquadUnit::BeginPlay()
 {
 	Super::BeginPlay();
+	BeginPlay_BindToOwningPlayerChanges();
 	// A spawn point set under the terrain (or a squad grid point under a hill) starts the unit inside the landscape,
 	// where it falls through the world: one trace now instead of any check later.
 	// The origin is the capsule centre, so any depth under the surface already means the soldier is inside it.
@@ -2992,6 +3020,8 @@ void ASquadUnit::PostInitializeComponents()
 
 	// Set up capsule collision
 	PostInitializeComp_SetupInfantryCapsuleCollision();
+	// No decals on the soldier's skeletal meshes.
+	PostInitializeComp_DisableDecalsOnSkeletalMeshes();
 
 	// Set up the reference to the M_AISquadUnit.
 	PostInitializeComp_SetupAISquadUnit();
@@ -4142,6 +4172,20 @@ void ASquadUnit::BeginPlay_SetPhysicalMaterials() const
 	MeshComp->SetPhysMaterialOverride(PhysicalMaterialOverride);
 }
 
+void ASquadUnit::PostInitializeComp_DisableDecalsOnSkeletalMeshes()
+{
+	// Soldiers never show ground decals (impact marks, track ruts, blight) projected onto their bodies or gear.
+	TArray<USkeletalMeshComponent*> SkeletalMeshComponents;
+	GetComponents<USkeletalMeshComponent>(SkeletalMeshComponents);
+	for (USkeletalMeshComponent* SkeletalMeshComponent : SkeletalMeshComponents)
+	{
+		if (IsValid(SkeletalMeshComponent))
+		{
+			SkeletalMeshComponent->SetReceivesDecals(false);
+		}
+	}
+}
+
 void ASquadUnit::OnMoveCompleted_Cover(const EPathFollowingResult::Type Result)
 {
 	M_CoverMoveRequestID = FAIRequestID::InvalidRequest;
@@ -4952,11 +4996,27 @@ void ASquadUnit::OnSquadUnitSpawned_SetEnabled(const float TimeNotSelectable, co
 		OnSquadUnitSpawned_TeleportAndSetSelectable(SquadUnitLocation);
 		return;
 	}
+	// Already standing by its spot (a unit spawned where it appears, like the AI's building-trained squads): place it
+	// in the frame it shows and only delay the selection. One elsewhere still moves when the delay ends.
+	const bool bPlaceAtOnce = FVector::Dist2D(GetActorLocation(), SquadUnitLocation)
+		<= SquadUnitSpawnPlacement::PlaceAtOnceDistanceCm;
+	if (bPlaceAtOnce)
+	{
+		SetActorLocation(SquadUnitLocation);
+	}
 	TWeakObjectPtr<ASquadUnit> WeakThis(this);
-	auto TeleportAfterDelay = [WeakThis, SquadUnitLocation]()
+	auto TeleportAfterDelay = [WeakThis, SquadUnitLocation, bPlaceAtOnce]()
 	{
 		if (not WeakThis.IsValid())
 		{
+			return;
+		}
+		if (bPlaceAtOnce)
+		{
+			if (IsValid(WeakThis->SelectionComponent))
+			{
+				WeakThis->SelectionComponent->SetCanBeSelected(true);
+			}
 			return;
 		}
 		WeakThis->OnSquadUnitSpawned_TeleportAndSetSelectable(SquadUnitLocation);

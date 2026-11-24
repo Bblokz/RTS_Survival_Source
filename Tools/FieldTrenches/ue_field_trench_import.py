@@ -19,11 +19,13 @@ import json
 
 import unreal
 
-BLENDER_EXPORTS = 'D:/Blender/BlenderProjects/BlenderTanks/CustomMapItems/GerDefenses/FieldTrenches/Exports'
+# Set BLENDER_EXPORTS / MANIFEST / MESH_DIR / ONLY_PIECES before running to import a prototype elsewhere.
+BLENDER_EXPORTS = globals().get('BLENDER_EXPORTS',
+                                'D:/Blender/BlenderProjects/BlenderTanks/CustomMapItems/GerDefenses/FieldTrenches/Exports')
 # A copy of Exports/field_trench_kit.json: the editor's sandboxed Python only reads project files.
-MANIFEST = 'D:/UE5Projects/RTS_Survival/Source/Tools/FieldTrenches/field_trench_kit.json'
+MANIFEST = globals().get('MANIFEST', 'D:/UE5Projects/RTS_Survival/Source/Tools/FieldTrenches/field_trench_kit.json')
 ROOT = '/Game/RTS_Survival/Blueprints/Environment/Trenches/FieldTrench'
-MESH_DIR = ROOT + '/Meshes'
+MESH_DIR = globals().get('MESH_DIR', ROOT + '/Meshes')
 BLUEPRINT = ROOT + '/BP_FieldTrench'
 PARENT = '/Game/RTS_Survival/Blueprints/Environment/Trenches/BP_TrenchMaster.BP_TrenchMaster_C'
 CARGO_TRENCH = '/Game/RTS_Survival/Blueprints/Environment/Trenches/BP_CargoTrench'
@@ -35,6 +37,8 @@ PIECES = ['SM_FieldTrench_Straight_125', 'SM_FieldTrench_Straight_250_A', 'SM_Fi
 MATERIALS = {
     'GerPit_Atlas': '/Game/RTS_Survival/Blueprints/GroundVehicles/BaseAndNomadic/ChildBlueprints/GerBuildingAtlassing/M_GerCamoConcretePalet_Atlas',
     'GerPit_Sandbag': '/Game/RTS_Survival/Meshes/Props/SandBags/Textures/M_GerSandBagScaffold_Atlas',
+    # 2026-11-12 earth bank: landscape RVT colour, fresh spoil from vertex colour R (ue_field_trench_bank_material.py).
+    'FieldTrench_Bank': ROOT + '/Materials/M_FieldTrench_Bank',
 }
 asset_tools = unreal.AssetToolsHelpers.get_asset_tools()
 eal = unreal.EditorAssetLibrary
@@ -53,6 +57,8 @@ def _static_options():
     data.set_editor_property('auto_generate_collision', False)
     data.set_editor_property('generate_lightmap_u_vs', True)
     data.set_editor_property('normal_import_method', unreal.FBXNormalImportMethod.FBXNIM_IMPORT_NORMALS)
+    # The bank's fresh-spoil mask is vertex colour R.
+    data.set_editor_property('vertex_color_import_option', unreal.VertexColorImportOption.REPLACE)
     return options
 
 
@@ -75,7 +81,7 @@ def fix_sockets(mesh, record):
 def import_meshes():
     with open(MANIFEST) as handle:
         records = {p['name']: p for p in json.load(handle)['pieces']}
-    for name in PIECES:
+    for name in globals().get('ONLY_PIECES') or PIECES:
         task = unreal.AssetImportTask()
         task.filename = f'{BLENDER_EXPORTS}/{name}.fbx'
         task.destination_path = MESH_DIR
@@ -97,6 +103,10 @@ def import_meshes():
         body.set_editor_property('collision_trace_flag', unreal.CollisionTraceFlag.CTF_USE_COMPLEX_AS_SIMPLE)
         mesh.set_editor_property('lod_group', 'LargeProp')
         fix_sockets(mesh, records[name])
+        import sys
+        sys.path.append('D:/UE5Projects/RTS_Survival/Source/Tools/FieldTrenches')
+        import ue_field_trench_ramps
+        ue_field_trench_ramps.disable_bank_collision(mesh)
         unreal.get_editor_subsystem(unreal.StaticMeshEditorSubsystem).set_nanite_settings(
             mesh, unreal.MeshNaniteSettings(enabled=False), apply_changes=True)
         # StaticMesh.Sockets is protected from Python; the uecp action list_mesh_sockets reads them.
@@ -171,9 +181,18 @@ def report():
               'sockets', sockets)
 
 
-_steps = globals().get('STEPS') or ['meshes', 'blueprint', 'report']
+def import_ramps():
+    import sys
+    sys.path.append('D:/UE5Projects/RTS_Survival/Source/Tools/FieldTrenches')
+    import ue_field_trench_ramps
+    ue_field_trench_ramps.import_ramps(BLENDER_EXPORTS, MANIFEST, MESH_DIR, globals().get('ONLY_PIECES'))
+
+
+_steps = globals().get('STEPS') or ['meshes', 'ramps', 'blueprint', 'report']
 if 'meshes' in _steps:
     import_meshes()
+if 'ramps' in _steps:
+    import_ramps()
 if 'blueprint' in _steps:
     make_blueprint()
 if 'report' in _steps:

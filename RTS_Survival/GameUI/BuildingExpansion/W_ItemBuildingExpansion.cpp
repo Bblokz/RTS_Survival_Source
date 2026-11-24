@@ -1,10 +1,19 @@
-// Copyright Bas Blokzijl - All rights reserved.
+﻿// Copyright Bas Blokzijl - All rights reserved.
 #include "W_ItemBuildingExpansion.h"
 
 #include "Components/Button.h"
 #include "Styling/SlateWidgetStyleAsset.h"
 #include "RTS_Survival/GameUI/MainGameUI.h"
+#include "RTS_Survival/GameUI/Hotkey/W_HotKey.h"
+#include "RTS_Survival/Subsystems/HotkeyProviderSubsystem/RTSHotkeyTypes.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
+
+namespace BxpItemHotkeyLabel
+{
+	// Rows in DT_RichText sized for the 100 px bxp tiles.
+	const TCHAR* ModifierStyle = TEXT("Text_BxpHotkeyMod");
+	const TCHAR* KeyStyle = TEXT("Text_BxpHotkeyKey");
+}
 
 void UW_ItemBuildingExpansion::InitW_ItemBuildingExpansion(
 	UMainGameUI* NewMainGameU,
@@ -14,6 +23,13 @@ void UW_ItemBuildingExpansion::InitW_ItemBuildingExpansion(
 	{
 		M_MainGameUI = NewMainGameU;
 		M_WidgetScrollbarIndex = NewIndex;
+		if (IsValid(M_BxpHotkey))
+		{
+			M_BxpHotkey->ShowChordedAction(
+				RTSHotkeyTypes::GetBuildingExpansionActionName(NewIndex),
+				BxpItemHotkeyLabel::ModifierStyle,
+				BxpItemHotkeyLabel::KeyStyle);
+		}
 	}
 	else
 	{
@@ -48,6 +64,18 @@ void UW_ItemBuildingExpansion::EnableDisableItem(const bool bEnabled)
 void UW_ItemBuildingExpansion::SimulatedClickedBxpItem()
 {
 	OnClickedItemBuildingExpansion();
+}
+
+bool UW_ItemBuildingExpansion::TryActivateFromHotkey()
+{
+	// Same gate as a mouse click: unused slots are collapsed and unavailable ones have their button disabled.
+	if (not IsVisible() || not IsValid(M_BxpItemButton) || not M_BxpItemButton->GetIsEnabled())
+	{
+		return false;
+	}
+
+	OnClickedItemBuildingExpansion();
+	return true;
 }
 
 

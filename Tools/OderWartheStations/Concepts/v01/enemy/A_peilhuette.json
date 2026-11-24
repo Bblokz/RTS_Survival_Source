@@ -1,0 +1,356 @@
+{
+ "key": "A_peilhuette",
+ "title": "A  Peilhuette: plank hut with a rotating loop on the roof",
+ "notes": [
+  "The classic small DF post: receiver hut at the back of a gravel yard, loop aerial on a shaft through the roof.",
+  "The loop turns slowly (enemy: steady sweep; player: hunting back and forth). Sense whip on the gable.",
+  "Generator under a lean-to beside the hut, fuel drums; cable on two posts into the hut.",
+  "Flag on a concrete plinth front-left of the yard; holder sign front-right. The yard centre stays open.",
+  "Smallest and cheapest; reads as 'radio hut', but the loop is only 2 m across from the RTS camera."
+ ],
+ "subtitle": "Panzer IV + soldier for scale  |  origin = capture centre (25 m radius)  |  site 13 x 11 m, loop top 6.9 m, flag 7.5 m",
+ "footprint": [
+  12.2,
+  10.1
+ ],
+ "height": 7.1,
+ "mast_height": 8.1,
+ "views": {
+  "rts": {
+   "file": "A_peilhuette_rts.png",
+   "size": [
+    1600,
+    1100
+   ],
+   "px_per_m": 54.54545454545455,
+   "caption": null,
+   "labels": [
+    {
+     "text": "Receiver hut",
+     "kind": "hut",
+     "xy": [
+      940.2,
+      415.6
+     ]
+    },
+    {
+     "text": "Rotating loop aerial",
+     "kind": "aerial",
+     "xy": [
+      940.2,
+      263.6
+     ]
+    },
+    {
+     "text": "Generator (runs while held)",
+     "kind": "gen",
+     "xy": [
+      1146.7,
+      581.5
+     ]
+    },
+    {
+     "text": "Capture flag (rises 5.5 m)",
+     "kind": "flag",
+     "xy": [
+      559.2,
+      289.5
+     ]
+    },
+    {
+     "text": "Holder sign (red star / Balkenkreuz)",
+     "kind": "held",
+     "xy": [
+      819.6,
+      737.6
+     ]
+    },
+    {
+     "text": "Capture bar (UI) 9 m",
+     "kind": "ui",
+     "xy": [
+      800.0,
+      259.9
+     ]
+    }
+   ]
+  },
+  "rear": {
+   "file": "A_peilhuette_rear.png",
+   "size": [
+    800,
+    550
+   ],
+   "px_per_m": 27.272727272727273,
+   "caption": null,
+   "labels": [
+    {
+     "text": "Receiver hut",
+     "kind": "hut",
+     "xy": [
+      329.9,
+      286.9
+     ]
+    },
+    {
+     "text": "Rotating loop aerial",
+     "kind": "aerial",
+     "xy": [
+      329.9,
+      211.0
+     ]
+    },
+    {
+     "text": "Generator (runs while held)",
+     "kind": "gen",
+     "xy": [
+      226.7,
+      268.5
+     ]
+    },
+    {
+     "text": "Capture flag (rises 5.5 m)",
+     "kind": "flag",
+     "xy": [
+      520.4,
+      165.7
+     ]
+    },
+    {
+     "text": "Holder sign (red star / Balkenkreuz)",
+     "kind": "held",
+     "xy": [
+      390.2,
+      213.5
+     ]
+    },
+    {
+     "text": "Capture bar (UI) 9 m",
+     "kind": "ui",
+     "xy": [
+      400.0,
+      129.9
+     ]
+    }
+   ]
+  },
+  "top": {
+   "file": "A_peilhuette_top.png",
+   "size": [
+    800,
+    800
+   ],
+   "px_per_m": 35.29411764705882,
+   "caption": null,
+   "labels": [
+    {
+     "text": "Receiver hut",
+     "kind": "hut",
+     "xy": [
+      417.6,
+      269.4
+     ]
+    },
+    {
+     "text": "Rotating loop aerial",
+     "kind": "aerial",
+     "xy": [
+      417.6,
+      269.4
+     ]
+    },
+    {
+     "text": "Generator (runs while held)",
+     "kind": "gen",
+     "xy": [
+      597.6,
+      290.6
+     ]
+    },
+    {
+     "text": "Capture flag (rises 5.5 m)",
+     "kind": "flag",
+     "xy": [
+      258.8,
+      470.6
+     ]
+    },
+    {
+     "text": "Holder sign (red star / Balkenkreuz)",
+     "kind": "held",
+     "xy": [
+      520.0,
+      544.7
+     ]
+    },
+    {
+     "text": "Capture bar (UI) 9 m",
+     "kind": "ui",
+     "xy": [
+      400.0,
+      400.0
+     ]
+    }
+   ],
+   "grid": [
+    [
+     -658.8,
+     1511.8,
+     -658.8,
+     -605.9
+    ],
+    [
+     -482.4,
+     1511.8,
+     -482.4,
+     -605.9
+    ],
+    [
+     -305.9,
+     1511.8,
+     -305.9,
+     -605.9
+    ],
+    [
+     -129.4,
+     1511.8,
+     -129.4,
+     -605.9
+    ],
+    [
+     47.1,
+     1511.8,
+     47.1,
+     -605.9
+    ],
+    [
+     223.5,
+     1511.8,
+     223.5,
+     -605.9
+    ],
+    [
+     400.0,
+     1511.8,
+     400.0,
+     -605.9
+    ],
+    [
+     576.5,
+     1511.8,
+     576.5,
+     -605.9
+    ],
+    [
+     752.9,
+     1511.8,
+     752.9,
+     -605.9
+    ],
+    [
+     929.4,
+     1511.8,
+     929.4,
+     -605.9
+    ],
+    [
+     1105.9,
+     1511.8,
+     1105.9,
+     -605.9
+    ],
+    [
+     1282.4,
+     1511.8,
+     1282.4,
+     -605.9
+    ],
+    [
+     1458.8,
+     1511.8,
+     1458.8,
+     -605.9
+    ],
+    [
+     -658.8,
+     1511.8,
+     1458.8,
+     1511.8
+    ],
+    [
+     -658.8,
+     1335.3,
+     1458.8,
+     1335.3
+    ],
+    [
+     -658.8,
+     1158.8,
+     1458.8,
+     1158.8
+    ],
+    [
+     -658.8,
+     982.4,
+     1458.8,
+     982.4
+    ],
+    [
+     -658.8,
+     805.9,
+     1458.8,
+     805.9
+    ],
+    [
+     -658.8,
+     629.4,
+     1458.8,
+     629.4
+    ],
+    [
+     -658.8,
+     452.9,
+     1458.8,
+     452.9
+    ],
+    [
+     -658.8,
+     276.5,
+     1458.8,
+     276.5
+    ],
+    [
+     -658.8,
+     100.0,
+     1458.8,
+     100.0
+    ],
+    [
+     -658.8,
+     -76.5,
+     1458.8,
+     -76.5
+    ],
+    [
+     -658.8,
+     -252.9,
+     1458.8,
+     -252.9
+    ],
+    [
+     -658.8,
+     -429.4,
+     1458.8,
+     -429.4
+    ],
+    [
+     -658.8,
+     -605.9,
+     1458.8,
+     -605.9
+    ]
+   ]
+  }
+ },
+ "main_view": "rts"
+}

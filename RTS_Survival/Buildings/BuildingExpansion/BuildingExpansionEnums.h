@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "CoreMinimal.h"
 #include "BXPConstructionRules/BXPConstructionRules.h"
@@ -162,6 +162,25 @@ enum class EBuildingExpansionType : uint8
 	// net; built at the building origin. While it stands, its owner's commander abilities recharge faster
 	// (FBxpData::GlobalAbilityCooldownMlt).
 	BTX_GerCommCipherRoom UMETA(DisplayName = "Ger Comm Cipher Room"),
+	// Strike Division mechanized depot: a Kfz. 17 radio van parked under a camo net beside the fold-out container,
+	// with a 12 m lattice aerial tower on the container's top crate; built at the building origin. Gives the depot a
+	// far larger vision radius than any other expansion (FBxpData::VisionRadius).
+	BTX_GerMechDepotRadioVan UMETA(DisplayName = "Ger Mech Depot Radio Van"),
+	// Strike Division mechanized depot: a lean-to rocket shop along the container where a 251 is fitted with
+	// Wurfrahmen 40 racks; built at the building origin. While it stands, its owner's Panzerwerfers reload faster
+	// (FBxpData::PanzerwerferReloadMlt).
+	BTX_GerMechDepotWurfrahmenShop UMETA(DisplayName = "Ger Mech Depot Wurfrahmen Shop"),
+	// Strike Division barracks: a timber sniper loft with a ghillie canvas and sandbag parapet; a Kar98k sniper on its
+	// deck covers the front half circle (the loft's net poles block the back); built at the building origin.
+	BTX_GerBarracksSniperLoft UMETA(DisplayName = "Ger Barracks Sniper Loft"),
+	BTX_RusTripleCrownBunker UMETA(DisplayName = "Rus Triple Crown Ice Cannon Bunker"),
+	// HQ socket expansion: the Panzer V III laser turret on a camo-painted HQ platform with radixite coil stacks.
+	BTX_GerHQLaser UMETA(DisplayName = "Ger HQ Laser Platform Expansion"),
+	// Breakthrough doctrine concrete bunkers, field defenses of the HQ beside the rail Pak bunker: an 8.8 cm Flak in a
+	// concrete Flakstand, a Flakvierling in an open concrete emplacement and a Pz 38(t) turret on a concrete pillbox.
+	BTX_GerFlak88Bunker UMETA(DisplayName = "Ger Flak 88 Bunker"),
+	BTX_GerFlakvierlingBunker UMETA(DisplayName = "Ger Flakvierling Bunker"),
+	BTX_GerPZ38TBunker UMETA(DisplayName = "Ger Pz 38(t) Turret Bunker"),
 };
 
 static FString Global_GetBxpTypeEnumAsString(EBuildingExpansionType BxpType)
@@ -290,6 +309,20 @@ static FString Global_GetBxpTypeEnumAsString(EBuildingExpansionType BxpType)
 		return FString("BTX_GerCommRequisitionOffice");
 	case EBuildingExpansionType::BTX_GerCommCipherRoom:
 		return FString("BTX_GerCommCipherRoom");
+	case EBuildingExpansionType::BTX_GerMechDepotRadioVan:
+		return FString("BTX_GerMechDepotRadioVan");
+	case EBuildingExpansionType::BTX_GerMechDepotWurfrahmenShop:
+		return FString("BTX_GerMechDepotWurfrahmenShop");
+	case EBuildingExpansionType::BTX_GerBarracksSniperLoft:
+		return FString("BTX_GerBarracksSniperLoft");
+	case EBuildingExpansionType::BTX_GerHQLaser:
+		return FString("BTX_GerHQLaser");
+	case EBuildingExpansionType::BTX_GerFlak88Bunker:
+		return FString("BTX_GerFlak88Bunker");
+	case EBuildingExpansionType::BTX_GerFlakvierlingBunker:
+		return FString("BTX_GerFlakvierlingBunker");
+	case EBuildingExpansionType::BTX_GerPZ38TBunker:
+		return FString("BTX_GerPZ38TBunker");
 	case EBuildingExpansionType::BTX_GerHQRadar:
 		return FString("BTX_GerHQRadar");
 	case EBuildingExpansionType::BTX_GerHQPlatform:
@@ -315,11 +348,13 @@ static FString Global_GetBxpDisplayString(const EBuildingExpansionType BxpType)
 {
 	switch (BxpType)
 	{
+	case EBuildingExpansionType::BTX_RusTripleCrownBunker: return TEXT("Triple Crown Ice Cannon");
 	case EBuildingExpansionType::BTX_GerHQRadar: return TEXT("HQ Radar");
 	case EBuildingExpansionType::BTX_GerHQPlatform: return TEXT("HQ Platform");
 	case EBuildingExpansionType::BTX_GerHQHarvester: return TEXT("HQ Harvester Hub");
 	case EBuildingExpansionType::BTX_GerHQRepairBay: return TEXT("HQ Repair Bay");
 	case EBuildingExpansionType::BTX_GerHQTower: return TEXT("HQ GuardTower");
+	case EBuildingExpansionType::BTX_GerHQLaser: return TEXT("HQ Laser Platform");
 
 	case EBuildingExpansionType::BTX_GerBarracksRadixReactor: return TEXT("Barracks Radix Reactor");
 	case EBuildingExpansionType::BTX_GerBarrackFuelCell: return TEXT("Barracks Fuel Cell");
@@ -361,6 +396,9 @@ static FString Global_GetBxpDisplayString(const EBuildingExpansionType BxpType)
 	case EBuildingExpansionType::BTX_GerPuppchenPit: return TEXT("Puppchen Pit");
 	case EBuildingExpansionType::BTX_GerPanzerschreckPit: return TEXT("Panzerschreck Foxhole");
 	case EBuildingExpansionType::BTX_GerRailPakBunker: return TEXT("Rail Pak Bunker");
+	case EBuildingExpansionType::BTX_GerFlak88Bunker: return TEXT("Flak 88 Bunker");
+	case EBuildingExpansionType::BTX_GerFlakvierlingBunker: return TEXT("Flakvierling Bunker");
+	case EBuildingExpansionType::BTX_GerPZ38TBunker: return TEXT("Pz 38(t) Turret Bunker");
 	case EBuildingExpansionType::BTX_GerFlak88Pit: return TEXT("Flak 88 Emplacement");
 	case EBuildingExpansionType::BTX_GerMortarPit: return TEXT("Mortar Pit");
 	case EBuildingExpansionType::BTX_Rus120MortarPit: return TEXT("120mm Mortar Pit");
@@ -397,6 +435,9 @@ static FString Global_GetBxpDisplayString(const EBuildingExpansionType BxpType)
 	case EBuildingExpansionType::BTX_RefFlakStand: return TEXT("Flak Stand");
 	case EBuildingExpansionType::BTX_GerForgeSchreckFrame: return TEXT("Panzerschreck Frame");
 	case EBuildingExpansionType::BTX_GerMetalVaultSmelter: return TEXT("Smelter");
+	case EBuildingExpansionType::BTX_GerMechDepotRadioVan: return TEXT("Radio Van");
+	case EBuildingExpansionType::BTX_GerMechDepotWurfrahmenShop: return TEXT("Wurfrahmen Shop");
+	case EBuildingExpansionType::BTX_GerBarracksSniperLoft: return TEXT("Sniper Loft");
 
 	default:
 		break;
@@ -451,6 +492,9 @@ static bool Global_GetIsFieldDefenseBxpType(const EBuildingExpansionType BxpType
 	case EBuildingExpansionType::BTX_GerSFH18Pit:
 	case EBuildingExpansionType::BTX_GerFlak88Pit:
 	case EBuildingExpansionType::BTX_GerRailPakBunker:
+	case EBuildingExpansionType::BTX_GerFlak88Bunker:
+	case EBuildingExpansionType::BTX_GerFlakvierlingBunker:
+	case EBuildingExpansionType::BTX_GerPZ38TBunker:
 	case EBuildingExpansionType::BTX_GerFieldTrench:
 		return true;
 	default:

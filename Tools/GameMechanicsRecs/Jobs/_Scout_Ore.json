@@ -1,0 +1,290 @@
+{
+ "JobName": "Scout_Ore",
+ "Category": "_Scout",
+ "Fps": 60,
+ "WarmupSeconds": 5.0,
+ "DurationSeconds": 1.2,
+ "Anchor": {
+  "X": 0.0,
+  "Y": 0.0,
+  "Z": 0.0
+ },
+ "AnchorYaw": 0.0,
+ "ClearUnitsRadius": 0.0,
+ "bKeepVoiceLines": true,
+ "bKeepAnnouncer": false,
+ "bKeepMusic": false,
+ "Events": [
+  {
+   "Time": -1.0,
+   "Type": "Marker",
+   "Tag": "",
+   "Offset": {
+    "X": -22072.0,
+    "Y": 9380.0,
+    "Z": 0.0
+   },
+   "Text": "red",
+   "Value": 250.0,
+   "Settings": {
+    "Height": 900.0
+   }
+  },
+  {
+   "Time": -1.0,
+   "Type": "Marker",
+   "Tag": "",
+   "Offset": {
+    "X": -22342.0,
+    "Y": 12080.0,
+    "Z": 0.0
+   },
+   "Text": "yellow",
+   "Value": 180.0,
+   "Settings": {
+    "Height": 900.0
+   }
+  },
+  {
+   "Time": -1.0,
+   "Type": "Marker",
+   "Tag": "",
+   "Offset": {
+    "X": -23242.0,
+    "Y": 10730.0,
+    "Z": 0.0
+   },
+   "Text": "white",
+   "Value": 150.0,
+   "Settings": {
+    "Height": 2500.0
+   }
+  },
+  {
+   "Time": -1.0,
+   "Type": "Marker",
+   "Tag": "",
+   "Offset": {
+    "X": 185.0,
+    "Y": 1052.0,
+    "Z": 0.0
+   },
+   "Text": "red",
+   "Value": 250.0,
+   "Settings": {
+    "Height": 900.0
+   }
+  },
+  {
+   "Time": -1.0,
+   "Type": "Marker",
+   "Tag": "",
+   "Offset": {
+    "X": -715.0,
+    "Y": 402.0,
+    "Z": 0.0
+   },
+   "Text": "red",
+   "Value": 250.0,
+   "Settings": {
+    "Height": 900.0
+   }
+  },
+  {
+   "Time": -1.0,
+   "Type": "Marker",
+   "Tag": "",
+   "Offset": {
+    "X": -715.0,
+    "Y": 1702.0,
+    "Z": 0.0
+   },
+   "Text": "red",
+   "Value": 250.0,
+   "Settings": {
+    "Height": 900.0
+   }
+  },
+  {
+   "Time": -1.0,
+   "Type": "Marker",
+   "Tag": "",
+   "Offset": {
+    "X": 7185.0,
+    "Y": 1052.0,
+    "Z": 0.0
+   },
+   "Text": "blue",
+   "Value": 250.0,
+   "Settings": {
+    "Height": 900.0
+   }
+  },
+  {
+   "Time": -1.0,
+   "Type": "Marker",
+   "Tag": "",
+   "Offset": {
+    "X": 8085.0,
+    "Y": 1702.0,
+    "Z": 0.0
+   },
+   "Text": "blue",
+   "Value": 250.0,
+   "Settings": {
+    "Height": 900.0
+   }
+  },
+  {
+   "Time": -1.0,
+   "Type": "Marker",
+   "Tag": "",
+   "Offset": {
+    "X": 8085.0,
+    "Y": 402.0,
+    "Z": 0.0
+   },
+   "Text": "blue",
+   "Value": 250.0,
+   "Settings": {
+    "Height": 900.0
+   }
+  },
+  {
+   "Time": -1.0,
+   "Type": "Marker",
+   "Tag": "",
+   "Offset": {
+    "X": 4525.0,
+    "Y": 1052.0,
+    "Z": 0.0
+   },
+   "Text": "yellow",
+   "Value": 180.0,
+   "Settings": {
+    "Height": 900.0
+   }
+  },
+  {
+   "Time": -1.0,
+   "Type": "Marker",
+   "Tag": "",
+   "Offset": {
+    "X": 2845.0,
+    "Y": 1052.0,
+    "Z": 0.0
+   },
+   "Text": "yellow",
+   "Value": 180.0,
+   "Settings": {
+    "Height": 900.0
+   }
+  },
+  {
+   "Time": -1.0,
+   "Type": "Marker",
+   "Tag": "",
+   "Offset": {
+    "X": 3685.0,
+    "Y": 1052.0,
+    "Z": 0.0
+   },
+   "Text": "white",
+   "Value": 150.0,
+   "Settings": {
+    "Height": 2500.0
+   }
+  }
+ ],
+ "Shots": [
+  {
+   "Name": "POI_Ore_MinersShelter",
+   "Start": 0.0,
+   "End": 0.6,
+   "Rig": "Orbit",
+   "Keys": [
+    {
+     "Time": 0.0,
+     "Pivot": "",
+     "Offset": {
+      "X": -23242.0,
+      "Y": 10730.0,
+      "Z": 0.0
+     },
+     "Yaw": 270.0,
+     "Pitch": 84.0,
+     "Distance": 17000.0,
+     "Focal": 24.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     },
+     "VYaw": 0.0,
+     "VPitch": 0.0,
+     "VDistance": 0.0,
+     "VFocal": 0.0,
+     "VLookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     }
+    }
+   ],
+   "Ease": "InOut",
+   "PivotLag": 0.7,
+   "Aperture": 0.0,
+   "Shake": 0.0,
+   "bAvoidOcclusion": false,
+   "MinGroundClearance": 350.0
+  },
+  {
+   "Name": "VB_Ore_Viaduct",
+   "Start": 0.6,
+   "End": 1.2,
+   "Rig": "Orbit",
+   "Keys": [
+    {
+     "Time": 0.0,
+     "Pivot": "",
+     "Offset": {
+      "X": 3685.0,
+      "Y": 1052.0,
+      "Z": 0.0
+     },
+     "Yaw": 180.0,
+     "Pitch": 84.0,
+     "Distance": 17000.0,
+     "Focal": 24.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     },
+     "VYaw": 0.0,
+     "VPitch": 0.0,
+     "VDistance": 0.0,
+     "VFocal": 0.0,
+     "VLookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     }
+    }
+   ],
+   "Ease": "InOut",
+   "PivotLag": 0.7,
+   "Aperture": 0.0,
+   "Shake": 0.0,
+   "bAvoidOcclusion": false,
+   "MinGroundClearance": 350.0
+  }
+ ],
+ "MapPath": "/Game/RTS_Survival/Maps/GerMissions/Ger_2ndOreMountains",
+ "GameModeClassPath": "/Game/RTS_Survival/Blueprints/GameSettings/RTS_BP_GamemodeBase.RTS_BP_GamemodeBase_C",
+ "HideActorPrefixes": [
+  "ORE_PH_"
+ ]
+}

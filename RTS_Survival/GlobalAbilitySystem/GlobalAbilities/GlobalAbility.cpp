@@ -313,7 +313,9 @@ bool UGlobalAbility::EnsureIsValidGlobalAbilityManager() const
 
 bool UGlobalAbility::IsBlocked()
 {
-	if (IsBlockedByRequirements() || IsBlockedByCooldown() || IsBlockedByCosts())
+	// A mission-granted ability whose charges are used up stays blocked even if something still holds it.
+	const bool bHasNoChargesLeft = M_RemainingCharges == 0;
+	if (bHasNoChargesLeft || IsBlockedByRequirements() || IsBlockedByCooldown() || IsBlockedByCosts())
 	{
 		return true;
 	}

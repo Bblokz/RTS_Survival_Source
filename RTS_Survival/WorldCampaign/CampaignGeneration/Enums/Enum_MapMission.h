@@ -39,5 +39,21 @@ enum class EMapMission : uint8
 	/** THis mission unlocks the Maus or E100*/
 	Maus_E100_AssaultMission_Moscow,
 	/** Sturmtiger dam mission where the player unlocks the sturm tiger to blow up a dam. */
-	SturmtigerDam
+	SturmtigerDam,
+	/*
+	 * Story missions for pinned places (WorldMapCampaignDesign.md 5c). APPEND ONLY: adjacency rules store the
+	 * subtype as a raw byte and the placement plan is sorted by enum value, so reordering changes saved campaigns.
+	 * Reused older values for story places: ME410UnlockMission = Pripyat marshes,
+	 * KingTigerMission_SovietWall = the Svarog Line wall, Maus_E100_AssaultMission_Moscow = Moscow.
+	 */
+	/** Story: Ore Mountains on the Czech border, convoy raids. */
+	OreMountains,
+	/** Story: Berlin, the Forge relay at the Zoo tower. */
+	Berlin,
+	/** Story: Oder-Warthe line in west Poland, radio direction finding. */
+	OderWarthe,
+	/** Story: Lake Vygozero in Karelia, the frozen lake northern branch. */
+	FrozenLake,
+	/** Story finale: the freeze engine at the Ural Shield, next to the enemy HQ. */
+	UralShieldFreezeEngine
 };

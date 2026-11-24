@@ -442,6 +442,11 @@ bool URTSMusicManager::EnsureValidAudioComponent() const
     {
         return true;
     }
+    // Without an audio device (no output device, -nosound) SpawnSound2D makes no component: no music, no error.
+    if (not GEngine || not GEngine->GetMainAudioDevice().IsValid())
+    {
+        return false;
+    }
 
     RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
         this, TEXT("M_AudioComponent"), TEXT("EnsureValidAudioComponent"), this

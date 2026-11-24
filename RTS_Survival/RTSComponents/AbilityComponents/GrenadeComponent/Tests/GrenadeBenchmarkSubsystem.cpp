@@ -46,6 +46,7 @@ namespace GrenadeBenchPrivate
 	const TCHAR* const LightBringerSquad = TEXT("/Game/RTS_Survival/Blueprints/Squads/Ger/EliteInfantry/LightBringers/Squad_Ger_LightBringers.Squad_Ger_LightBringers_C");
 	const TCHAR* const MosinSquad = TEXT("/Game/RTS_Survival/Blueprints/Squads/Rus/Rus_Squad_Mosin.Rus_Squad_Mosin_C");
 	const TCHAR* const HazmatSniperSquad = TEXT("/Game/RTS_Survival/Blueprints/Squads/Ger/ArmoryUnlocked/Squad_Ger_HazmatSniperTeam.Squad_Ger_HazmatSniperTeam_C");
+	const TCHAR* const VulturesSquad = TEXT("/Game/RTS_Survival/Blueprints/Squads/Ger/ArmoryUnlocked/Squad_Ger_HazmatVultures.Squad_Ger_HazmatVultures_C");
 	// Soviet WW2 grenades (Docs/Abilities/SovietGrenades.md).
 	const TCHAR* const RedHammerSquad = TEXT("/Game/RTS_Survival/Blueprints/Squads/Rus/T2/Rus_T2Squad_RedHammer.Rus_T2Squad_RedHammer_C");
 	const TCHAR* const RedHammerPTRSSquad = TEXT("/Game/RTS_Survival/Blueprints/Squads/Rus/T2/Rus_T2Squad_RedHammerPTRS.Rus_T2Squad_RedHammerPTRS_C");
@@ -337,6 +338,13 @@ void UGrenadeBenchmarkSubsystem::BuildScenarios()
 	Add(TEXT("PlayerStick_vs_EnemyInfantry"), JagerSquad, EGrenade::GerStickGrenade, ETarget::Infantry,
 	    EnemyInfantryTarget, NotChecked, 3, false);
 	M_Scenarios.Last().ThrowerPlayer = PlayerOwner;
+	// Appended so the scenarios above keep their spots. Four Vulture M24 AT sticks: a 4 x 160 volley, a little above
+	// the Faust pair's 2 x 300.
+	// Driving one first: on RTS_ToCopySmall the driving start at the 23rd spot (index 22) is blocked; the tank never moves.
+	Add(TEXT("AT_Vultures_vs_T34_Driving"), VulturesSquad, EGrenade::StickGrenadeVultures, ETarget::TankMoving,
+	    MediumTank, 40.f, NoSoldierCheck, true);
+	Add(TEXT("AT_Vultures_vs_T34"), VulturesSquad, EGrenade::StickGrenadeVultures, ETarget::TankStill, MediumTank, 40.f,
+	    NoSoldierCheck, true);
 }
 
 void UGrenadeBenchmarkSubsystem::ApplyScenarioFilter()
@@ -620,7 +628,14 @@ void UGrenadeBenchmarkSubsystem::TickWaitingForTankApproach()
 	}
 	if (GetGameSecondsInPhase() > MaxTankApproachSeconds)
 	{
-		Check(false, FString::Printf(TEXT("%s: the tank drove into the throw window"), *Scenario.Name));
+		const FVector ThrowerMedian = ThrowerLocations.IsEmpty() ? Scenario.Spot : GetMedianLocation(ThrowerLocations);
+		const FVector TankLocation = M_TargetActor.IsValid() ? M_TargetActor->GetActorLocation() : Scenario.Spot;
+		Check(false, FString::Printf(
+			      TEXT("%s: the tank drove into the throw window (tank %s from spot, %.0f cm from the throwers; "
+				      "throwers %s from spot, %d alive; window %.0f cm)"), *Scenario.Name,
+			      *(TankLocation - Scenario.Spot).ToCompactString(), FVector::Dist2D(TankLocation, ThrowerMedian),
+			      *(ThrowerMedian - Scenario.Spot).ToCompactString(), ThrowerLocations.Num(),
+			      ThrowRange * MovingTankThrowRangeFraction));
 		StartNextScenario();
 	}
 }

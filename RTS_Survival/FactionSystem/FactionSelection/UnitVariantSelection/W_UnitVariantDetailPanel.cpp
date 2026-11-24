@@ -24,6 +24,7 @@
 #include "UnitVariantProbes.h"
 #include "UnitVariantSelectionWidgetHelpers.h"
 #include "UnitVariantStatComparison.h"
+#include "UnitVariantWeaponWidgets.h"
 
 namespace UnitVariantDetailPanelLayout
 {
@@ -47,18 +48,9 @@ namespace UnitVariantDetailPanelLayout
 	const FMargin RowTextPadding(14.f, 0.f, 0.f, 0.f);
 	const FMargin TitlePadding(0.f, 0.f, 0.f, 4.f);
 	const FMargin ChangeTagPadding(8.f, 3.f, 0.f, 0.f);
-	// Weapon stat bars: a pictogram, then one pip per level.
-	constexpr float StatIconSize = 16.f;
-	const FMargin StatIconPadding(0.f, 0.f, 6.f, 0.f);
-	const FVector2D StatPipSize(9.f, 10.f);
-	constexpr float StatPipGap = 2.f;
-	constexpr float StatBarSpacing = 3.f;
-	const FMargin StatBarsPadding(0.f, 2.f, 0.f, 0.f);
-	const FLinearColor EmptyPipColor(1.f, 1.f, 1.f, 0.12f);
 	const FMargin ChangeArrowsPadding(10.f, 0.f, 0.f, 0.f);
 	// A lost ability or weapon stays readable but clearly secondary to what the variant has.
 	constexpr float RemovedRowOpacity = 0.45f;
-	const TCHAR* const WeaponIconColumn = TEXT("Slate");
 	constexpr int32 LabelFontSize = 12;
 	constexpr int32 LabelLetterSpacing = 100;
 	constexpr int32 VariantNameFontSize = 20;
@@ -377,105 +369,15 @@ void UW_UnitVariantDetailPanel::AddWeaponRow(const FUnitVariantWeaponStats& Weap
                                              const FUnitVariantWeaponStats* BaseWeapon)
 {
 	using namespace UnitVariantDetailPanelLayout;
-	UWidget* Icon = nullptr;
-	if (USlateBrushAsset* const IconBrush = Cast<USlateBrushAsset>(UnitVariantAbilityCards::FindRowObject(
-		M_WeaponCardTable, Weapon.WeaponRowName, WeaponIconColumn)))
-	{
-		// Weapon icons are not all square; the scale box keeps their aspect inside the well.
-		UScaleBox* const IconScale = WidgetTree->ConstructWidget<UScaleBox>(UScaleBox::StaticClass());
-		IconScale->SetStretch(EStretch::ScaleToFit);
-		UImage* const IconImage = WidgetTree->ConstructWidget<UImage>(UImage::StaticClass());
-		IconImage->SetBrushFromAsset(IconBrush);
-		IconScale->SetContent(IconImage);
-		Icon = IconScale;
-	}
-	else
-	{
-		// Not every weapon has a WeaponUI_Data row (the weapon bar shows no icon for those either): the calibre
-		// keeps the well from looking broken until the art exists.
-		UTextBlock* const CalibreText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
-		CalibreText->SetText(FText::Format(NSLOCTEXT("UnitVariantSelection", "CalibreFallback", "{0}\nmm"),
-		                                   FText::AsNumber(FMath::RoundToInt(Weapon.CalibreMm))));
-		CalibreText->SetJustification(ETextJustify::Center);
-		UnitVariantSelectionWidgets::ApplyTextOnMetal(
-			CalibreText, UnitVariantSelectionWidgets::MakeFont(M_Style.HeadingFont, CalibreFallbackFontSize),
-			M_Style.MutedTextColor);
-		UScaleBox* const CalibreScale = WidgetTree->ConstructWidget<UScaleBox>(UScaleBox::StaticClass());
-		CalibreScale->SetStretch(EStretch::ScaleToFit);
-		CalibreScale->SetStretchDirection(EStretchDirection::DownOnly);
-		CalibreScale->SetContent(CalibreText);
-		Icon = CalibreScale;
-	}
-	const FText Title = Weapon.Count > 1
-		                    ? FText::Format(NSLOCTEXT("UnitVariantSelection", "WeaponCount", "{0}\u00D7 {1}"),
-		                                    FText::AsNumber(Weapon.Count), Weapon.DisplayName)
-		                    : Weapon.DisplayName;
-	// Pips turn green or red where the weapon beats or trails the Base weapon it replaces.
-	const auto TrendAgainstBase = [BaseWeapon](const float Value, const float BaseValue, const bool bHigherIsBetter)
-	{
-		return BaseWeapon != nullptr
-			       ? UnitVariantStatComparison::GetTrend(Value, BaseValue, bHigherIsBetter)
-			       : EUnitVariantStatTrend::Same;
-	};
-	const float NoBaseValue = 0.f;
-	UVerticalBox* const StatBars = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass());
-	StatBars->AddChildToVerticalBox(BuildStatBar(
-		M_DamageStatIcon, UnitVariantStatComparison::GetDamageLevel(Weapon.Damage),
-		TrendAgainstBase(Weapon.Damage, BaseWeapon != nullptr ? BaseWeapon->Damage : NoBaseValue, true)))->SetPadding(
-		StatBarsPadding);
-	StatBars->AddChildToVerticalBox(BuildStatBar(
-		M_PenetrationStatIcon, UnitVariantStatComparison::GetPenetrationLevel(Weapon.ArmorPen),
-		TrendAgainstBase(Weapon.ArmorPen, BaseWeapon != nullptr ? BaseWeapon->ArmorPen : NoBaseValue, true)))->
-		SetPadding(FMargin(0.f, StatBarSpacing, 0.f, 0.f));
-	StatBars->AddChildToVerticalBox(BuildStatBar(
-		M_ReloadStatIcon, UnitVariantStatComparison::GetReloadLevel(Weapon.ReloadSeconds),
-		TrendAgainstBase(Weapon.ReloadSeconds, BaseWeapon != nullptr ? BaseWeapon->ReloadSeconds : NoBaseValue,
-		                 false)))->SetPadding(FMargin(0.f, StatBarSpacing, 0.f, 0.f));
-	StatBars->AddChildToVerticalBox(BuildStatBar(
-		M_MagazineStatIcon, UnitVariantStatComparison::GetMagazineLevel(Weapon.MagCapacity),
-		TrendAgainstBase(Weapon.MagCapacity, BaseWeapon != nullptr ? BaseWeapon->MagCapacity : NoBaseValue, true)))->
-		SetPadding(FMargin(0.f, StatBarSpacing, 0.f, 0.f));
-	AddIconRow(Icon, WeaponIconSize, Title, Change, StatBars);
-}
-
-UWidget* UW_UnitVariantDetailPanel::BuildStatBar(UTexture2D* StatIcon, const int32 Level,
-                                                 const EUnitVariantStatTrend Trend)
-{
-	using namespace UnitVariantDetailPanelLayout;
-	UHorizontalBox* const Bar = WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass());
-	USizeBox* const IconBox = WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass());
-	IconBox->SetWidthOverride(StatIconSize);
-	IconBox->SetHeightOverride(StatIconSize);
-	if (IsValid(StatIcon))
-	{
-		UImage* const IconImage = WidgetTree->ConstructWidget<UImage>(UImage::StaticClass());
-		IconImage->SetBrushFromTexture(StatIcon);
-		IconImage->SetColorAndOpacity(M_Style.DescriptionColor.GetSpecifiedColor());
-		IconBox->SetContent(IconImage);
-	}
-	UHorizontalBoxSlot* const IconSlot = Bar->AddChildToHorizontalBox(IconBox);
-	IconSlot->SetVerticalAlignment(VAlign_Center);
-	IconSlot->SetPadding(StatIconPadding);
-	const FSlateColor& FilledPipStyleColor = Trend == EUnitVariantStatTrend::Better
-		                                         ? M_Style.BetterColor
-		                                         : Trend == EUnitVariantStatTrend::Worse
-		                                         ? M_Style.RemovedColor
-		                                         : M_Style.AccentColor;
-	const FLinearColor FilledPipColor = FilledPipStyleColor.GetSpecifiedColor();
-	for (int32 PipIndex = 0; PipIndex < UnitVariantStatComparison::MaxStatLevel; ++PipIndex)
-	{
-		USizeBox* const PipBox = WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass());
-		PipBox->SetWidthOverride(StatPipSize.X);
-		PipBox->SetHeightOverride(StatPipSize.Y);
-		// The default brush is a plain white quad; the tint makes it a filled or an empty pip.
-		UImage* const Pip = WidgetTree->ConstructWidget<UImage>(UImage::StaticClass());
-		Pip->SetColorAndOpacity(PipIndex < Level ? FilledPipColor : EmptyPipColor);
-		PipBox->SetContent(Pip);
-		UHorizontalBoxSlot* const PipSlot = Bar->AddChildToHorizontalBox(PipBox);
-		PipSlot->SetVerticalAlignment(VAlign_Center);
-		PipSlot->SetPadding(FMargin(0.f, 0.f, StatPipGap, 0.f));
-	}
-	return Bar;
+	UnitVariantWeaponWidgets::FStatIcons StatIcons;
+	StatIcons.Damage = M_DamageStatIcon;
+	StatIcons.Penetration = M_PenetrationStatIcon;
+	StatIcons.Reload = M_ReloadStatIcon;
+	StatIcons.Magazine = M_MagazineStatIcon;
+	UWidget* const Icon = UnitVariantWeaponWidgets::BuildWeaponIcon(*WidgetTree, M_Style, M_WeaponCardTable, Weapon);
+	UWidget* const StatBars = UnitVariantWeaponWidgets::BuildStatBars(*WidgetTree, M_Style, StatIcons, Weapon,
+	                                                                  BaseWeapon);
+	AddIconRow(Icon, WeaponIconSize, UnitVariantWeaponWidgets::GetWeaponTitle(Weapon), Change, StatBars);
 }
 
 void UW_UnitVariantDetailPanel::AddStatRow(const FUnitVariantStatRow& StatRow)

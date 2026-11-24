@@ -282,6 +282,9 @@ public:
 	// can be called AFTER SetupProjectileForNewLaunch to accelerate the projetile.
 	void ApplyAccelerationFactor(const float Factor, const bool bUseGravityTArch, const float LowestZValue);
 	void SetupTraceChannel(int NewOwningPlayer);
+
+	// Player that fired this projectile (collision filtering, friendly fire on walls).
+	int32 GetOwningPlayer() const { return M_OwningPlayer; }
 	void HandleTimedExplosion();
 
 	// Forces the projectile back into its dormant pooled state immediately.

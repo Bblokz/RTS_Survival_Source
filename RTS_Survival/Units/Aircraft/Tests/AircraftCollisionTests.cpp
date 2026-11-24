@@ -8,6 +8,8 @@
 #include "Misc/AutomationTest.h"
 #include "RTS_Survival/RTSCollisionTraceChannels.h"
 #include "RTS_Survival/Utils/CollisionSetup/FRTS_CollisionSetup.h"
+#include "RTS_Survival/Utils/CollisionSetup/RTSPlayerCollision.h"
+#include "RTS_Survival/Game/Players/RTSPlayers.h"
 #include "UObject/StrongObjectPtr.h"
 
 namespace AircraftCollisionTestsPrivate
@@ -56,6 +58,29 @@ namespace AircraftCollisionTestsPrivate
 			FHitResult Hit;
 			return World->LineTraceSingleByChannel(Hit, Center - TraceOffset, Center + TraceOffset, TraceChannel);
 		}
+
+		/** A shot of this player: its weapon channel and the ignore mask that lets it pass its own and allied units. */
+		bool WeaponTraceHits(const FVector& Center, const int32 ShootingPlayer) const
+		{
+			const FVector TraceOffset(TraceHalfLength, 0.f, 0.f);
+			FCollisionQueryParams QueryParams;
+			FRTSPlayerCollision::ApplyWeaponIgnoreMask(QueryParams, ShootingPlayer);
+			FHitResult Hit;
+			return World->LineTraceSingleByChannel(Hit, Center - TraceOffset, Center + TraceOffset,
+			                                       FRTSPlayerCollision::GetWeaponTraceChannel(ShootingPlayer),
+			                                       QueryParams);
+		}
+
+		bool WeaponSweepHits(const FVector& Center, const int32 ShootingPlayer) const
+		{
+			const FVector TraceOffset(TraceHalfLength, 0.f, 0.f);
+			FCollisionQueryParams QueryParams;
+			FRTSPlayerCollision::ApplyWeaponIgnoreMask(QueryParams, ShootingPlayer);
+			FHitResult Hit;
+			return World->SweepSingleByChannel(Hit, Center - TraceOffset, Center + TraceOffset, FQuat::Identity,
+			                                   FRTSPlayerCollision::GetWeaponTraceChannel(ShootingPlayer),
+			                                   FCollisionShape::MakeSphere(BoxHalfExtent), QueryParams);
+		}
 	};
 }
 
@@ -79,23 +104,22 @@ bool FAircraftEnemyWeaponCollisionTest::RunTest(const FString& Parameters)
 			return false;
 		}
 		FRTS_CollisionSetup::SetupAircraftComponentCollision(AircraftBox, OwningPlayer, true);
-		const ECollisionChannel EnemyWeaponChannel = OwningPlayer == 1 ? COLLISION_TRACE_PLAYER : COLLISION_TRACE_ENEMY;
-		const ECollisionChannel FriendlyWeaponChannel = OwningPlayer == 1 ? COLLISION_TRACE_ENEMY : COLLISION_TRACE_PLAYER;
-		TestTrue(TEXT("Enemy weapon line trace hits"), Fixture.TraceHits(FVector::ZeroVector, EnemyWeaponChannel));
-		TestFalse(TEXT("Friendly weapon line trace passes through"), Fixture.TraceHits(FVector::ZeroVector, FriendlyWeaponChannel));
+		// Shots are tested the way weapons fire them: on the shooter's channel with its ignore mask.
+		const int32 EnemyPlayer = FRTSPlayers::IsHumanPlayer(OwningPlayer)
+			                          ? RTSPlayers::FirstAIPlayer
+			                          : RTSPlayers::HumanPlayer;
+		TestTrue(TEXT("Enemy weapon line trace hits"), Fixture.WeaponTraceHits(FVector::ZeroVector, EnemyPlayer));
+		TestFalse(TEXT("Friendly weapon line trace passes through"),
+			Fixture.WeaponTraceHits(FVector::ZeroVector, OwningPlayer));
 		TestFalse(TEXT("Shared projectile object channel cannot bypass team filtering"),
 			Fixture.TraceHits(FVector::ZeroVector, COLLISION_OBJ_PROJECTILE));
 		TestTrue(TEXT("Mouse selection still hits"), Fixture.TraceHits(FVector::ZeroVector, ECC_Visibility));
-		FHitResult ProjectileHit;
-		const FVector TraceOffset(TraceHalfLength, 0.f, 0.f);
-		const FCollisionShape ProjectileShape = FCollisionShape::MakeSphere(BoxHalfExtent);
-		TestTrue(TEXT("Enemy projectile sweep hits"), Fixture.World->SweepSingleByChannel(
-			ProjectileHit, -TraceOffset, TraceOffset, FQuat::Identity, EnemyWeaponChannel, ProjectileShape));
-		TestFalse(TEXT("Friendly projectile sweep passes through"), Fixture.World->SweepSingleByChannel(
-			ProjectileHit, -TraceOffset, TraceOffset, FQuat::Identity, FriendlyWeaponChannel, ProjectileShape));
+		TestTrue(TEXT("Enemy projectile sweep hits"), Fixture.WeaponSweepHits(FVector::ZeroVector, EnemyPlayer));
+		TestFalse(TEXT("Friendly projectile sweep passes through"),
+			Fixture.WeaponSweepHits(FVector::ZeroVector, OwningPlayer));
 		FRTS_CollisionSetup::SetupAircraftComponentCollision(AircraftBox, OwningPlayer, false);
 		TestFalse(TEXT("Non-hit primitives cannot intercept enemy weapons"),
-			Fixture.TraceHits(FVector::ZeroVector, EnemyWeaponChannel));
+			Fixture.WeaponTraceHits(FVector::ZeroVector, EnemyPlayer));
 		TestTrue(TEXT("Non-hit selection geometry still works"), Fixture.TraceHits(FVector::ZeroVector, ECC_Visibility));
 		AircraftBox->GetOwner()->Destroy();
 	}

@@ -91,6 +91,9 @@ struct FNomadicAirDeliveryOrder
 
 	int32 OwningPlayer = 1;
 
+	// False leaves the truck standing where it was set down, for the player to deploy it themselves.
+	bool bBuildOnLanding = true;
+
 	FNomadicAirDeliverySettings Settings;
 };
 

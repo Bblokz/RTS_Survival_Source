@@ -38,6 +38,13 @@ public:
 	 *        are items present, the holder becomes visible; otherwise remains collapsed.
 	 * @param bSuppress  true to force-collapse; false to return control to normal visibility rules.
 	 */
+	/**
+	 * @brief Adds the pop-up of a CustomContent archive entry and schedules its auto-removal.
+	 * @param Content The archived entry, for its picture.
+	 * @param NotificationTime Lifetime (seconds) before the notification auto-collapses.
+	 */
+	void AddNewCustomArchiveNotification(const FArchiveCustomContent& Content, const float NotificationTime);
+
 	void SetSuppressAchive(const bool bSuppress);
 
 	void SetMainMenuReference(TObjectPtr<UMainGameUI> MainGameUI);
@@ -68,6 +75,12 @@ private:
 
 	// Validates NotificationScrollBox and reports once in a centralized spot.
 	bool GetIsValidNotificationScrollBox() const;
+
+	/** @return A new notification widget in the scroll box, null when it cannot be created. */
+	UW_ArchivePushNotification* CreateNotification(const float NotificationTime);
+
+	// Removes the notification after NotificationTime and shows the holder.
+	void ScheduleRemovalAndShow(UW_ArchivePushNotification* NewNotification, const float NotificationTime);
 
 	// Shows the holder only if we are not suppressed and there is content to show.
 	void IfNotVisibleSetVisibilityForNewNotification();

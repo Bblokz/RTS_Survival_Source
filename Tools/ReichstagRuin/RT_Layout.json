@@ -1,0 +1,1363 @@
+{
+ "note": "Reichstag ruin B2 assembly in Unreal cm (x south, y west); pieces pivot as in rt_kit.py. Blueprints: put the static mesh bounds centre (XY) on bounds_centre_cm.",
+ "pieces": [
+  {
+   "piece": "SM_RT_Wall_H12_B",
+   "group": "W_out",
+   "location_cm": [
+    -3600.0,
+    3500.0,
+    0.0
+   ],
+   "yaw": 0
+  },
+  {
+   "piece": "SM_RT_Wall_H12_A",
+   "group": "W_out",
+   "location_cm": [
+    -3200.0,
+    3500.0,
+    0.0
+   ],
+   "yaw": 0
+  },
+  {
+   "piece": "SM_RT_Wall_H12_A",
+   "group": "W_out",
+   "location_cm": [
+    -2800.0,
+    3500.0,
+    0.0
+   ],
+   "yaw": 0
+  },
+  {
+   "piece": "SM_RT_Wall_H12_A",
+   "group": "W_out",
+   "location_cm": [
+    -2400.0,
+    3500.0,
+    0.0
+   ],
+   "yaw": 0
+  },
+  {
+   "piece": "SM_RT_Wall_H08_B",
+   "group": "W_out",
+   "location_cm": [
+    -2000.0,
+    3500.0,
+    0.0
+   ],
+   "yaw": 0
+  },
+  {
+   "piece": "SM_RT_Wall_H08_B",
+   "group": "W_out",
+   "location_cm": [
+    -1600.0,
+    3500.0,
+    0.0
+   ],
+   "yaw": 0
+  },
+  {
+   "piece": "SM_RT_Wall_End_R",
+   "group": "W_out",
+   "location_cm": [
+    -1200.0,
+    3500.0,
+    0.0
+   ],
+   "yaw": 0
+  },
+  {
+   "piece": "SM_RT_Wall_End_L",
+   "group": "W_out",
+   "location_cm": [
+    800.0,
+    3500.0,
+    0.0
+   ],
+   "yaw": 0
+  },
+  {
+   "piece": "SM_RT_Wall_H12_A",
+   "group": "W_out",
+   "location_cm": [
+    1200.0,
+    3500.0,
+    0.0
+   ],
+   "yaw": 0
+  },
+  {
+   "piece": "SM_RT_Wall_H12_A",
+   "group": "W_out",
+   "location_cm": [
+    1600.0,
+    3500.0,
+    0.0
+   ],
+   "yaw": 0
+  },
+  {
+   "piece": "SM_RT_Wall_H12_A",
+   "group": "W_out",
+   "location_cm": [
+    2000.0,
+    3500.0,
+    0.0
+   ],
+   "yaw": 0
+  },
+  {
+   "piece": "SM_RT_Wall_H12_A",
+   "group": "W_out",
+   "location_cm": [
+    2400.0,
+    3500.0,
+    0.0
+   ],
+   "yaw": 0
+  },
+  {
+   "piece": "SM_RT_Wall_H12_A",
+   "group": "W_out",
+   "location_cm": [
+    2800.0,
+    3500.0,
+    0.0
+   ],
+   "yaw": 0
+  },
+  {
+   "piece": "SM_RT_Wall_H12_A",
+   "group": "W_out",
+   "location_cm": [
+    3200.0,
+    3500.0,
+    0.0
+   ],
+   "yaw": 0
+  },
+  {
+   "piece": "SM_RT_Wall_H08_A",
+   "group": "W_in",
+   "location_cm": [
+    3800.0,
+    2200.0,
+    0.0
+   ],
+   "yaw": -180
+  },
+  {
+   "piece": "SM_RT_Wall_H08_A",
+   "group": "W_in",
+   "location_cm": [
+    3400.0,
+    2200.0,
+    0.0
+   ],
+   "yaw": -180
+  },
+  {
+   "piece": "SM_RT_Wall_H08_B",
+   "group": "W_in",
+   "location_cm": [
+    3000.0,
+    2200.0,
+    0.0
+   ],
+   "yaw": -180
+  },
+  {
+   "piece": "SM_RT_Wall_H08_A",
+   "group": "W_in",
+   "location_cm": [
+    2600.0,
+    2200.0,
+    0.0
+   ],
+   "yaw": -180
+  },
+  {
+   "piece": "SM_RT_Wall_H08_B",
+   "group": "W_in",
+   "location_cm": [
+    2200.0,
+    2200.0,
+    0.0
+   ],
+   "yaw": -180
+  },
+  {
+   "piece": "SM_RT_Wall_End_R",
+   "group": "W_in",
+   "location_cm": [
+    1800.0,
+    2200.0,
+    0.0
+   ],
+   "yaw": -180
+  },
+  {
+   "piece": "SM_RT_Wall_End_L",
+   "group": "W_in",
+   "location_cm": [
+    -1400.0,
+    2200.0,
+    0.0
+   ],
+   "yaw": -180
+  },
+  {
+   "piece": "SM_RT_Wall_H08_A",
+   "group": "W_in",
+   "location_cm": [
+    -1800.0,
+    2200.0,
+    0.0
+   ],
+   "yaw": -180
+  },
+  {
+   "piece": "SM_RT_Wall_H08_A",
+   "group": "W_in",
+   "location_cm": [
+    -2200.0,
+    2200.0,
+    0.0
+   ],
+   "yaw": -180
+  },
+  {
+   "piece": "SM_RT_Wall_H08_A",
+   "group": "W_in",
+   "location_cm": [
+    -2600.0,
+    2200.0,
+    0.0
+   ],
+   "yaw": -180
+  },
+  {
+   "piece": "SM_RT_Wall_H08_A",
+   "group": "W_in",
+   "location_cm": [
+    -3000.0,
+    2200.0,
+    0.0
+   ],
+   "yaw": -180
+  },
+  {
+   "piece": "SM_RT_Wall_H08_A",
+   "group": "W_in",
+   "location_cm": [
+    -3400.0,
+    2200.0,
+    0.0
+   ],
+   "yaw": -180
+  },
+  {
+   "piece": "SM_RT_Wall_End_L",
+   "group": "E_out",
+   "location_cm": [
+    2000.0,
+    -3500.0,
+    0.0
+   ],
+   "yaw": -180
+  },
+  {
+   "piece": "SM_RT_Wall_H08_B",
+   "group": "E_out",
+   "location_cm": [
+    1600.0,
+    -3500.0,
+    0.0
+   ],
+   "yaw": -180
+  },
+  {
+   "piece": "SM_RT_Wall_H08_B",
+   "group": "E_out",
+   "location_cm": [
+    1200.0,
+    -3500.0,
+    0.0
+   ],
+   "yaw": -180
+  },
+  {
+   "piece": "SM_RT_Wall_H12_A",
+   "group": "E_out",
+   "location_cm": [
+    800.0,
+    -3500.0,
+    0.0
+   ],
+   "yaw": -180
+  },
+  {
+   "piece": "SM_RT_Wall_H12_A",
+   "group": "E_out",
+   "location_cm": [
+    400.0,
+    -3500.0,
+    0.0
+   ],
+   "yaw": -180
+  },
+  {
+   "piece": "SM_RT_Wall_H12_A",
+   "group": "E_out",
+   "location_cm": [
+    0.0,
+    -3500.0,
+    0.0
+   ],
+   "yaw": -180
+  },
+  {
+   "piece": "SM_RT_Wall_H12_A",
+   "group": "E_out",
+   "location_cm": [
+    -400.0,
+    -3500.0,
+    0.0
+   ],
+   "yaw": -180
+  },
+  {
+   "piece": "SM_RT_Wall_H12_A",
+   "group": "E_out",
+   "location_cm": [
+    -800.0,
+    -3500.0,
+    0.0
+   ],
+   "yaw": -180
+  },
+  {
+   "piece": "SM_RT_Wall_H12_B",
+   "group": "E_out",
+   "location_cm": [
+    -1200.0,
+    -3500.0,
+    0.0
+   ],
+   "yaw": -180
+  },
+  {
+   "piece": "SM_RT_Wall_H12_A",
+   "group": "E_out",
+   "location_cm": [
+    -1600.0,
+    -3500.0,
+    0.0
+   ],
+   "yaw": -180
+  },
+  {
+   "piece": "SM_RT_Wall_H16_A",
+   "group": "E_out",
+   "location_cm": [
+    -2000.0,
+    -3500.0,
+    0.0
+   ],
+   "yaw": -180
+  },
+  {
+   "piece": "SM_RT_Wall_H16_B",
+   "group": "E_out",
+   "location_cm": [
+    -2400.0,
+    -3500.0,
+    0.0
+   ],
+   "yaw": -180
+  },
+  {
+   "piece": "SM_RT_Wall_H16_A",
+   "group": "E_out",
+   "location_cm": [
+    -2800.0,
+    -3500.0,
+    0.0
+   ],
+   "yaw": -180
+  },
+  {
+   "piece": "SM_RT_Wall_H16_A",
+   "group": "E_out",
+   "location_cm": [
+    -3200.0,
+    -3500.0,
+    0.0
+   ],
+   "yaw": -180
+  },
+  {
+   "piece": "SM_RT_Wall_H12_A",
+   "group": "E_in",
+   "location_cm": [
+    -3800.0,
+    -2200.0,
+    0.0
+   ],
+   "yaw": 0
+  },
+  {
+   "piece": "SM_RT_Wall_H12_B",
+   "group": "E_in",
+   "location_cm": [
+    -3400.0,
+    -2200.0,
+    0.0
+   ],
+   "yaw": 0
+  },
+  {
+   "piece": "SM_RT_Wall_H12_A",
+   "group": "E_in",
+   "location_cm": [
+    -3000.0,
+    -2200.0,
+    0.0
+   ],
+   "yaw": 0
+  },
+  {
+   "piece": "SM_RT_Wall_H12_A",
+   "group": "E_in",
+   "location_cm": [
+    -2600.0,
+    -2200.0,
+    0.0
+   ],
+   "yaw": 0
+  },
+  {
+   "piece": "SM_RT_Wall_H12_A",
+   "group": "E_in",
+   "location_cm": [
+    -2200.0,
+    -2200.0,
+    0.0
+   ],
+   "yaw": 0
+  },
+  {
+   "piece": "SM_RT_Wall_H12_A",
+   "group": "E_in",
+   "location_cm": [
+    -1800.0,
+    -2200.0,
+    0.0
+   ],
+   "yaw": 0
+  },
+  {
+   "piece": "SM_RT_Wall_H12_A",
+   "group": "E_in",
+   "location_cm": [
+    -1400.0,
+    -2200.0,
+    0.0
+   ],
+   "yaw": 0
+  },
+  {
+   "piece": "SM_RT_Wall_H12_A",
+   "group": "E_in",
+   "location_cm": [
+    -1000.0,
+    -2200.0,
+    0.0
+   ],
+   "yaw": 0
+  },
+  {
+   "piece": "SM_RT_Wall_H12_B",
+   "group": "E_in",
+   "location_cm": [
+    -600.0,
+    -2200.0,
+    0.0
+   ],
+   "yaw": 0
+  },
+  {
+   "piece": "SM_RT_Wall_H12_A",
+   "group": "E_in",
+   "location_cm": [
+    -200.0,
+    -2200.0,
+    0.0
+   ],
+   "yaw": 0
+  },
+  {
+   "piece": "SM_RT_Wall_H12_A",
+   "group": "E_in",
+   "location_cm": [
+    200.0,
+    -2200.0,
+    0.0
+   ],
+   "yaw": 0
+  },
+  {
+   "piece": "SM_RT_Wall_H12_A",
+   "group": "E_in",
+   "location_cm": [
+    600.0,
+    -2200.0,
+    0.0
+   ],
+   "yaw": 0
+  },
+  {
+   "piece": "SM_RT_Wall_End_R",
+   "group": "E_in",
+   "location_cm": [
+    1000.0,
+    -2200.0,
+    0.0
+   ],
+   "yaw": 0
+  },
+  {
+   "piece": "SM_RT_Wall_H16_B",
+   "group": "N_out",
+   "location_cm": [
+    -5100.0,
+    -2000.0,
+    0.0
+   ],
+   "yaw": 90
+  },
+  {
+   "piece": "SM_RT_Wall_H16_A",
+   "group": "N_out",
+   "location_cm": [
+    -5100.0,
+    -1600.0,
+    0.0
+   ],
+   "yaw": 90
+  },
+  {
+   "piece": "SM_RT_Wall_H16_A",
+   "group": "N_out",
+   "location_cm": [
+    -5100.0,
+    -1200.0,
+    0.0
+   ],
+   "yaw": 90
+  },
+  {
+   "piece": "SM_RT_Wall_H16_A",
+   "group": "N_out",
+   "location_cm": [
+    -5100.0,
+    -800.0,
+    0.0
+   ],
+   "yaw": 90
+  },
+  {
+   "piece": "SM_RT_Wall_H16_A",
+   "group": "N_out",
+   "location_cm": [
+    -5100.0,
+    -400.0,
+    0.0
+   ],
+   "yaw": 90
+  },
+  {
+   "piece": "SM_RT_Wall_H16_B",
+   "group": "N_out",
+   "location_cm": [
+    -5100.0,
+    -0.0,
+    0.0
+   ],
+   "yaw": 90
+  },
+  {
+   "piece": "SM_RT_Wall_H16_B",
+   "group": "N_out",
+   "location_cm": [
+    -5100.0,
+    400.0,
+    0.0
+   ],
+   "yaw": 90
+  },
+  {
+   "piece": "SM_RT_Wall_H16_B",
+   "group": "N_out",
+   "location_cm": [
+    -5100.0,
+    800.0,
+    0.0
+   ],
+   "yaw": 90
+  },
+  {
+   "piece": "SM_RT_Wall_H16_B",
+   "group": "N_out",
+   "location_cm": [
+    -5100.0,
+    1200.0,
+    0.0
+   ],
+   "yaw": 90
+  },
+  {
+   "piece": "SM_RT_Wall_H16_A",
+   "group": "N_out",
+   "location_cm": [
+    -5100.0,
+    1600.0,
+    0.0
+   ],
+   "yaw": 90
+  },
+  {
+   "piece": "SM_RT_Wall_H16_A",
+   "group": "N_in",
+   "location_cm": [
+    -3800.0,
+    2200.0,
+    0.0
+   ],
+   "yaw": -90
+  },
+  {
+   "piece": "SM_RT_Wall_H16_B",
+   "group": "N_in",
+   "location_cm": [
+    -3800.0,
+    1800.0,
+    0.0
+   ],
+   "yaw": -90
+  },
+  {
+   "piece": "SM_RT_Wall_H16_A",
+   "group": "N_in",
+   "location_cm": [
+    -3800.0,
+    1400.0,
+    0.0
+   ],
+   "yaw": -90
+  },
+  {
+   "piece": "SM_RT_Wall_H16_A",
+   "group": "N_in",
+   "location_cm": [
+    -3800.0,
+    1000.0,
+    0.0
+   ],
+   "yaw": -90
+  },
+  {
+   "piece": "SM_RT_Wall_H12_A",
+   "group": "N_in",
+   "location_cm": [
+    -3800.0,
+    600.0,
+    0.0
+   ],
+   "yaw": -90
+  },
+  {
+   "piece": "SM_RT_Wall_H12_B",
+   "group": "N_in",
+   "location_cm": [
+    -3800.0,
+    200.0,
+    0.0
+   ],
+   "yaw": -90
+  },
+  {
+   "piece": "SM_RT_Wall_H12_A",
+   "group": "N_in",
+   "location_cm": [
+    -3800.0,
+    -200.0,
+    0.0
+   ],
+   "yaw": -90
+  },
+  {
+   "piece": "SM_RT_Wall_H16_A",
+   "group": "N_in",
+   "location_cm": [
+    -3800.0,
+    -600.0,
+    0.0
+   ],
+   "yaw": -90
+  },
+  {
+   "piece": "SM_RT_Wall_H16_A",
+   "group": "N_in",
+   "location_cm": [
+    -3800.0,
+    -1000.0,
+    0.0
+   ],
+   "yaw": -90
+  },
+  {
+   "piece": "SM_RT_Wall_H16_A",
+   "group": "N_in",
+   "location_cm": [
+    -3800.0,
+    -1400.0,
+    0.0
+   ],
+   "yaw": -90
+  },
+  {
+   "piece": "SM_RT_Wall_H16_A",
+   "group": "N_in",
+   "location_cm": [
+    -3800.0,
+    -1800.0,
+    0.0
+   ],
+   "yaw": -90
+  },
+  {
+   "piece": "SM_RT_Wall_H08_A",
+   "group": "S_out",
+   "location_cm": [
+    5100.0,
+    2000.0,
+    0.0
+   ],
+   "yaw": -90
+  },
+  {
+   "piece": "SM_RT_Wall_H08_A",
+   "group": "S_out",
+   "location_cm": [
+    5100.0,
+    1600.0,
+    0.0
+   ],
+   "yaw": -90
+  },
+  {
+   "piece": "SM_RT_Wall_H12_A",
+   "group": "S_out",
+   "location_cm": [
+    5100.0,
+    1200.0,
+    0.0
+   ],
+   "yaw": -90
+  },
+  {
+   "piece": "SM_RT_Wall_H12_A",
+   "group": "S_out",
+   "location_cm": [
+    5100.0,
+    800.0,
+    0.0
+   ],
+   "yaw": -90
+  },
+  {
+   "piece": "SM_RT_Wall_H12_A",
+   "group": "S_out",
+   "location_cm": [
+    5100.0,
+    400.0,
+    0.0
+   ],
+   "yaw": -90
+  },
+  {
+   "piece": "SM_RT_Wall_H08_A",
+   "group": "S_out",
+   "location_cm": [
+    5100.0,
+    -0.0,
+    0.0
+   ],
+   "yaw": -90
+  },
+  {
+   "piece": "SM_RT_Wall_H08_A",
+   "group": "S_out",
+   "location_cm": [
+    5100.0,
+    -400.0,
+    0.0
+   ],
+   "yaw": -90
+  },
+  {
+   "piece": "SM_RT_Wall_H04_A",
+   "group": "S_out",
+   "location_cm": [
+    5100.0,
+    -800.0,
+    0.0
+   ],
+   "yaw": -90
+  },
+  {
+   "piece": "SM_RT_Wall_H04_A",
+   "group": "S_out",
+   "location_cm": [
+    5100.0,
+    -1200.0,
+    0.0
+   ],
+   "yaw": -90
+  },
+  {
+   "piece": "SM_RT_Wall_H04_A",
+   "group": "S_out",
+   "location_cm": [
+    5100.0,
+    -1600.0,
+    0.0
+   ],
+   "yaw": -90
+  },
+  {
+   "piece": "SM_RT_Wall_H08_B",
+   "group": "S_in",
+   "location_cm": [
+    3800.0,
+    -2200.0,
+    0.0
+   ],
+   "yaw": 90
+  },
+  {
+   "piece": "SM_RT_Wall_H08_B",
+   "group": "S_in",
+   "location_cm": [
+    3800.0,
+    -1800.0,
+    0.0
+   ],
+   "yaw": 90
+  },
+  {
+   "piece": "SM_RT_Wall_H08_B",
+   "group": "S_in",
+   "location_cm": [
+    3800.0,
+    -1400.0,
+    0.0
+   ],
+   "yaw": 90
+  },
+  {
+   "piece": "SM_RT_Wall_H08_A",
+   "group": "S_in",
+   "location_cm": [
+    3800.0,
+    -1000.0,
+    0.0
+   ],
+   "yaw": 90
+  },
+  {
+   "piece": "SM_RT_Wall_H12_A",
+   "group": "S_in",
+   "location_cm": [
+    3800.0,
+    -600.0,
+    0.0
+   ],
+   "yaw": 90
+  },
+  {
+   "piece": "SM_RT_Wall_H12_A",
+   "group": "S_in",
+   "location_cm": [
+    3800.0,
+    -200.0,
+    0.0
+   ],
+   "yaw": 90
+  },
+  {
+   "piece": "SM_RT_Wall_H12_A",
+   "group": "S_in",
+   "location_cm": [
+    3800.0,
+    200.0,
+    0.0
+   ],
+   "yaw": 90
+  },
+  {
+   "piece": "SM_RT_Wall_H08_A",
+   "group": "S_in",
+   "location_cm": [
+    3800.0,
+    600.0,
+    0.0
+   ],
+   "yaw": 90
+  },
+  {
+   "piece": "SM_RT_Wall_H08_A",
+   "group": "S_in",
+   "location_cm": [
+    3800.0,
+    1000.0,
+    0.0
+   ],
+   "yaw": 90
+  },
+  {
+   "piece": "SM_RT_Wall_H08_B",
+   "group": "S_in",
+   "location_cm": [
+    3800.0,
+    1400.0,
+    0.0
+   ],
+   "yaw": 90
+  },
+  {
+   "piece": "SM_RT_Wall_H08_A",
+   "group": "S_in",
+   "location_cm": [
+    3800.0,
+    1800.0,
+    0.0
+   ],
+   "yaw": 90
+  },
+  {
+   "piece": "SM_RT_Wall_H12_A",
+   "group": "H_N",
+   "location_cm": [
+    -1500.0,
+    -2200.0,
+    0.0
+   ],
+   "yaw": 90
+  },
+  {
+   "piece": "SM_RT_Wall_H12_A",
+   "group": "H_N",
+   "location_cm": [
+    -1500.0,
+    -1800.0,
+    0.0
+   ],
+   "yaw": 90
+  },
+  {
+   "piece": "SM_RT_Wall_H12_A",
+   "group": "H_N",
+   "location_cm": [
+    -1500.0,
+    -1400.0,
+    0.0
+   ],
+   "yaw": 90
+  },
+  {
+   "piece": "SM_RT_Wall_H12_A",
+   "group": "H_N",
+   "location_cm": [
+    -1500.0,
+    -1000.0,
+    0.0
+   ],
+   "yaw": 90
+  },
+  {
+   "piece": "SM_RT_Wall_H12_A",
+   "group": "H_N",
+   "location_cm": [
+    -1500.0,
+    -600.0,
+    0.0
+   ],
+   "yaw": 90
+  },
+  {
+   "piece": "SM_RT_Wall_H12_A",
+   "group": "H_N",
+   "location_cm": [
+    -1500.0,
+    -200.0,
+    0.0
+   ],
+   "yaw": 90
+  },
+  {
+   "piece": "SM_RT_Wall_H12_A",
+   "group": "H_N",
+   "location_cm": [
+    -1500.0,
+    200.0,
+    0.0
+   ],
+   "yaw": 90
+  },
+  {
+   "piece": "SM_RT_Wall_H12_A",
+   "group": "H_N",
+   "location_cm": [
+    -1500.0,
+    600.0,
+    0.0
+   ],
+   "yaw": 90
+  },
+  {
+   "piece": "SM_RT_Wall_End_R",
+   "group": "H_N",
+   "location_cm": [
+    -1500.0,
+    1000.0,
+    0.0
+   ],
+   "yaw": 90
+  },
+  {
+   "piece": "SM_RT_Wall_End_L",
+   "group": "H_S",
+   "location_cm": [
+    1500.0,
+    1400.0,
+    0.0
+   ],
+   "yaw": -90
+  },
+  {
+   "piece": "SM_RT_Wall_H08_B",
+   "group": "H_S",
+   "location_cm": [
+    1500.0,
+    1000.0,
+    0.0
+   ],
+   "yaw": -90
+  },
+  {
+   "piece": "SM_RT_Wall_H08_A",
+   "group": "H_S",
+   "location_cm": [
+    1500.0,
+    600.0,
+    0.0
+   ],
+   "yaw": -90
+  },
+  {
+   "piece": "SM_RT_Wall_H08_A",
+   "group": "H_S",
+   "location_cm": [
+    1500.0,
+    200.0,
+    0.0
+   ],
+   "yaw": -90
+  },
+  {
+   "piece": "SM_RT_Wall_H08_A",
+   "group": "H_S",
+   "location_cm": [
+    1500.0,
+    -200.0,
+    0.0
+   ],
+   "yaw": -90
+  },
+  {
+   "piece": "SM_RT_Wall_H04_A",
+   "group": "H_S",
+   "location_cm": [
+    1500.0,
+    -600.0,
+    0.0
+   ],
+   "yaw": -90
+  },
+  {
+   "piece": "SM_RT_Wall_H04_A",
+   "group": "H_S",
+   "location_cm": [
+    1500.0,
+    -1000.0,
+    0.0
+   ],
+   "yaw": -90
+  },
+  {
+   "piece": "SM_RT_Wall_H04_A",
+   "group": "H_S",
+   "location_cm": [
+    1500.0,
+    -1400.0,
+    0.0
+   ],
+   "yaw": -90
+  },
+  {
+   "piece": "SM_RT_Wall_H04_A",
+   "group": "H_S",
+   "location_cm": [
+    1500.0,
+    -1800.0,
+    0.0
+   ],
+   "yaw": -90
+  },
+  {
+   "piece": "SM_RT_Rubble_L",
+   "group": "E_out",
+   "location_cm": [
+    2800.0,
+    -3500.0,
+    0.0
+   ],
+   "yaw": -253.43
+  },
+  {
+   "piece": "SM_RT_Rubble_L",
+   "group": "E_in",
+   "location_cm": [
+    2000.0,
+    -2200.0,
+    0.0
+   ],
+   "yaw": -176.77
+  },
+  {
+   "piece": "SM_RT_Rubble_M",
+   "group": "E_in",
+   "location_cm": [
+    3200.0,
+    -2200.0,
+    0.0
+   ],
+   "yaw": -330.03
+  },
+  {
+   "piece": "SM_RT_Tower_Mid",
+   "group": "tower",
+   "location_cm": [
+    -4350.0,
+    2750.0,
+    0.0
+   ],
+   "yaw": 0
+  },
+  {
+   "piece": "SM_RT_Tower_Tall",
+   "group": "tower",
+   "location_cm": [
+    -4350.0,
+    -2750.0,
+    0.0
+   ],
+   "yaw": 0
+  },
+  {
+   "piece": "SM_RT_Tower_Low",
+   "group": "tower",
+   "location_cm": [
+    4350.0,
+    2750.0,
+    0.0
+   ],
+   "yaw": 0
+  },
+  {
+   "piece": "SM_RT_Portico",
+   "group": "extra",
+   "location_cm": [
+    0,
+    3500,
+    0.0
+   ],
+   "yaw": 0
+  },
+  {
+   "piece": "SM_RT_Dome",
+   "group": "extra",
+   "location_cm": [
+    0,
+    0,
+    0.0
+   ],
+   "yaw": 0
+  },
+  {
+   "piece": "SM_RT_DomeHook",
+   "group": "extra",
+   "location_cm": [
+    0,
+    0,
+    0.0
+   ],
+   "yaw": 0
+  },
+  {
+   "piece": "SM_RT_Rubble_Ramp",
+   "group": "extra",
+   "location_cm": [
+    4350.0,
+    -2750.0,
+    0.0
+   ],
+   "yaw": -20
+  },
+  {
+   "piece": "SM_RT_Rubble_S",
+   "group": "extra",
+   "location_cm": [
+    -4450.0,
+    900,
+    0.0
+   ],
+   "yaw": -30
+  },
+  {
+   "piece": "SM_RT_Rubble_S",
+   "group": "extra",
+   "location_cm": [
+    -4400.0,
+    -1000,
+    0.0
+   ],
+   "yaw": -110
+  },
+  {
+   "piece": "SM_RT_Rubble_S",
+   "group": "extra",
+   "location_cm": [
+    4450.0,
+    600,
+    0.0
+   ],
+   "yaw": -70
+  },
+  {
+   "piece": "SM_RT_Rubble_S",
+   "group": "extra",
+   "location_cm": [
+    -2400,
+    2850.0,
+    0.0
+   ],
+   "yaw": -10
+  },
+  {
+   "piece": "SM_RT_Rubble_S",
+   "group": "extra",
+   "location_cm": [
+    2200,
+    2900,
+    0.0
+   ],
+   "yaw": -140
+  },
+  {
+   "piece": "SM_RT_Rubble_S",
+   "group": "extra",
+   "location_cm": [
+    -2600,
+    -2850.0,
+    0.0
+   ],
+   "yaw": -80
+  },
+  {
+   "piece": "SM_RT_Rubble_M",
+   "group": "extra",
+   "location_cm": [
+    800,
+    -2850.0,
+    0.0
+   ],
+   "yaw": -15
+  }
+ ],
+ "blueprints": [
+  {
+   "blueprint": "Rus_Building_Factory",
+   "bounds_centre_cm": [
+    0,
+    -300
+   ],
+   "yaw": 0
+  },
+  {
+   "blueprint": "Rus_Building_Barracks",
+   "bounds_centre_cm": [
+    -2675.0,
+    900
+   ],
+   "yaw": 0
+  },
+  {
+   "blueprint": "Rus_Building_Barracks",
+   "bounds_centre_cm": [
+    -2675.0,
+    -900
+   ],
+   "yaw": 0
+  },
+  {
+   "blueprint": "Rus_BXP_120MortarPit",
+   "bounds_centre_cm": [
+    2675.0,
+    1000
+   ],
+   "yaw": 0
+  },
+  {
+   "blueprint": "Rus_BXP_DShKPit",
+   "bounds_centre_cm": [
+    2675.0,
+    -1100
+   ],
+   "yaw": 0
+  },
+  {
+   "blueprint": "Rus_BXP_BS3Pit",
+   "bounds_centre_cm": [
+    -2400,
+    6200
+   ],
+   "yaw": 0
+  },
+  {
+   "blueprint": "Rus_BXP_53KPit",
+   "bounds_centre_cm": [
+    2400,
+    6200
+   ],
+   "yaw": 0
+  }
+ ]
+}

@@ -61,6 +61,23 @@ void UGA_AircraftDrop::ExecuteAbilityAtLocation(const FVector& TargetLocation)
 	
 }
 
+void UGA_AircraftDrop::SetDropPayload(const TArray<ETankSubtype>& TankSubtypes,
+                                      const TArray<ESquadSubtype>& SquadSubtypes)
+{
+	// The template's own vehicle was tuned under its aircraft; other vehicles hang at the same height.
+	const FAircraftDropTankWithOffset TemplateTank = M_AircraftDropSettings.TanksWithOffsets.IsEmpty()
+		                                                 ? FAircraftDropTankWithOffset()
+		                                                 : M_AircraftDropSettings.TanksWithOffsets[0];
+	M_AircraftDropSettings.TanksWithOffsets.Reset();
+	for (const ETankSubtype TankSubtype : TankSubtypes)
+	{
+		FAircraftDropTankWithOffset& Entry = M_AircraftDropSettings.TanksWithOffsets.AddDefaulted_GetRef();
+		Entry.TankSubtype = TankSubtype;
+		Entry.TankAttachZOffset = TemplateTank.TankAttachZOffset;
+	}
+	M_AircraftDropSettings.SquadSubtypes = SquadSubtypes;
+}
+
 void UGA_AircraftDrop::BeginDestroy()
 {
 	M_AircraftClassLoadHandles.Reset();
@@ -140,8 +157,17 @@ void UGA_AircraftDrop::SpawnTankDropAircraft(
 		EAircraftDropPayloadType::Tank,
 		AircraftIndex);
 	DropRequest.TankAttachZOffset = TankWithOffset.TankAttachZOffset;
+	FVector SpawnLocation = BuildAircraftSpawnLocation(ExecuteLocation, AircraftIndex);
+	if (M_AircraftDropSettings.bRopeSlungTanks)
+	{
+		DropRequest.TankAttachZOffset = -AircraftRopeSling::DefaultHangDistance;
+		DropRequest.bRopeSlungPayload = true;
+		// The vehicle spawns hanging below the aircraft: start high enough that it is not spawned into the ground.
+		SpawnLocation.Z = FMath::Max(SpawnLocation.Z,
+		                             AircraftRopeSling::GetMinCruiseZ(ExecuteLocation.Z,
+		                                                              AircraftRopeSling::DefaultHangDistance));
+	}
 
-	const FVector SpawnLocation = BuildAircraftSpawnLocation(ExecuteLocation, AircraftIndex);
 	AAircraftMaster* SpawnedAircraft = GlobalAbilityHelpers::SpawnAircraftAtLocation(
 		this,
 		AircraftClass,
@@ -154,6 +180,7 @@ void UGA_AircraftDrop::SpawnTankDropAircraft(
 	++M_ActiveAircraftCount;
 	SpawnedAircraft->OnDestroyed.AddUniqueDynamic(this, &UGA_AircraftDrop::OnSpawnedAircraftDestroyed);
 	SpawnedAircraft->SetUnitSelectable(false);
+	BindAircraftReleaseEvents(SpawnedAircraft);
 
 	ARTSAsyncSpawner* AsyncSpawner = FRTS_Statics::GetAsyncSpawner(this);
 	if (not IsValid(AsyncSpawner))
@@ -167,7 +194,7 @@ void UGA_AircraftDrop::SpawnTankDropAircraft(
 		EAllUnitType::UNType_Tank,
 		static_cast<uint8>(TankWithOffset.TankSubtype));
 	TWeakObjectPtr<AAircraftMaster> WeakAircraft(SpawnedAircraft);
-	const FVector TankSpawnLocation = SpawnLocation + FVector(0.0f, 0.0f, TankWithOffset.TankAttachZOffset);
+	const FVector TankSpawnLocation = SpawnLocation + FVector(0.0f, 0.0f, DropRequest.TankAttachZOffset);
 	const auto OnTankSpawned = [WeakAircraft, DropRequest](const FTrainingOption&, AActor* SpawnedActor, const int32)
 	{
 		if (not WeakAircraft.IsValid())
@@ -236,7 +263,31 @@ void UGA_AircraftDrop::SpawnSquadDropAircraft(
 	++M_ActiveAircraftCount;
 	SpawnedAircraft->OnDestroyed.AddUniqueDynamic(this, &UGA_AircraftDrop::OnSpawnedAircraftDestroyed);
 	SpawnedAircraft->SetUnitSelectable(false);
+	BindAircraftReleaseEvents(SpawnedAircraft);
 	SpawnedAircraft->OrderAircraftDrop(DropRequest);
+}
+
+void UGA_AircraftDrop::BindAircraftReleaseEvents(AAircraftMaster* Aircraft)
+{
+	if (not IsValid(Aircraft))
+	{
+		return;
+	}
+	TWeakObjectPtr<UGA_AircraftDrop> WeakThis(this);
+	Aircraft->OnAircraftDropPayloadReleased.AddLambda([WeakThis](AAircraftMaster*, ATankMaster* ReleasedTank)
+	{
+		if (WeakThis.IsValid() && IsValid(ReleasedTank))
+		{
+			WeakThis->OnUnitReleased.Broadcast(WeakThis.Get(), ReleasedTank);
+		}
+	});
+	Aircraft->OnAircraftDropSquadReleased.AddLambda([WeakThis](AAircraftMaster*, AActor* ReleasedSquad)
+	{
+		if (WeakThis.IsValid() && IsValid(ReleasedSquad))
+		{
+			WeakThis->OnUnitReleased.Broadcast(WeakThis.Get(), ReleasedSquad);
+		}
+	});
 }
 
 FAircraftDropRequest UGA_AircraftDrop::BuildBaseDropRequest(
@@ -256,6 +307,7 @@ FAircraftDropRequest UGA_AircraftDrop::BuildBaseDropRequest(
 		: M_AircraftDropSettings.HowLongStayLanded;
 	DropRequest.RadiusSpawnSquads = M_AircraftDropSettings.RadiusSpawnSquads;
 	DropRequest.bSquadsWalkOutOfCargoDoor = M_AircraftDropSettings.bSquadsWalkOutOfCargoDoor;
+	DropRequest.bHandPayloadToEnemyAI = bM_HandPayloadToEnemyAI;
 	DropRequest.DropOffSound = M_AircraftDropSettings.DropOffSound;
 	DropRequest.DropOffSoundAttenuation = M_AircraftDropSettings.DropOffSoundAttenuation;
 	DropRequest.DropOffSoundConcurrency = M_AircraftDropSettings.DropOffSoundConcurrency;

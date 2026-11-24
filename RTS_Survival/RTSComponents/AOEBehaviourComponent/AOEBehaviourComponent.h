@@ -193,6 +193,14 @@ private:
 
 	ETriggerOverlapLogic GetOverlapLogicForOwner() const;
 
+	/**
+	 * @brief Hostile and allied AI players share one object channel, so the channel alone does not say whether a
+	 * found unit is one this component looks for.
+	 * @return Whether the hit unit is an ally (or, when searching for enemies, hostile) of the owner of this
+	 * component; always true for destructibles and when both are searched for.
+	 */
+	bool GetIsHitInSearchedRelation(const FHitResult& Hit) const;
+
 	UBehaviourComp* GetBehaviourCompOfSquadController(AActor* ValidHitActor) const;
 
 	

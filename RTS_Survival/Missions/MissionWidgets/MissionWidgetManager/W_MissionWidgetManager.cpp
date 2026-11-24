@@ -20,6 +20,18 @@ UW_Mission* UW_MissionWidgetManager::GetFreeMissionWidget()
 	return nullptr;
 }
 
+void UW_MissionWidgetManager::GetMissionWidgetsInUse(TArray<UW_Mission*>& OutMissionWidgets) const
+{
+	OutMissionWidgets.Reset();
+	for (UW_Mission* const EachWidget : M_MissionWidgets)
+	{
+		if (IsValid(EachWidget) && not EachWidget->GetIsFreeWidget())
+		{
+			OutMissionWidgets.Add(EachWidget);
+		}
+	}
+}
+
 void UW_MissionWidgetManager::InitMissionWidgetReferences(const TArray<UW_Mission*> MissionWidgets)
 {
 	M_MissionWidgets = MissionWidgets;

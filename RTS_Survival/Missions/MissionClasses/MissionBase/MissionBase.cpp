@@ -12,6 +12,7 @@
 #include "RTS_Survival/Units/TeamWeapons/TeamWeaponController.h"
 #include "RTS_Survival/RTSCollisionTraceChannels.h"
 #include "RTS_Survival/Enemy/EnemyController/EnemyController.h"
+#include "RTS_Survival/Game/Players/RTSPlayers.h"
 #include "RTS_Survival/Environment/DestructableEnvActor/DestructableEnvActor.h"
 #include "RTS_Survival/FOWSystem/FowManager/FowManager.h"
 #include "RTS_Survival/Audio/Settings/RTSAudioDeveloperSettings.h"
@@ -20,6 +21,7 @@
 #include "RTS_Survival/GameUI/MiniMap/CombatPings/RTSCombatPingSubsystem.h"
 #include "RTS_Survival/Game/UserSettings/RTSGameUserSettings.h"
 #include "RTS_Survival/Missions/MissionClasses/MissionBase/MissionCinematicTakeOverSession.h"
+#include "RTS_Survival/Missions/MissionClasses/MissionBase/MissionLocationIntroSession.h"
 #include "RTS_Survival/Missions/MissionManager/MissionManager.h"
 #include "RTS_Survival/Missions/TriggerAreas/TriggerArea.h"
 #include "RTS_Survival/Missions/MissionTrigger/MissionTrigger.h"
@@ -38,6 +40,7 @@
 #include "RTS_Survival/Utils/RTSRichTextConverters/FRTSRichTextConverter.h"
 #include "RTS_Survival/Utils/RTSBlueprintFunctionLibrary.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
+#include "RTS_Survival/GameUI/InfoTakeover/InfoTakeoverSubsystem.h"
 
 namespace
 {
@@ -105,6 +108,7 @@ void UMissionBase::OnMissionComplete()
 	Tracking_ClearState();
 	EnemyInBuilding_ClearTracking();
 	TeamWeaponSquadTracking_Clear();
+	UnitGroupMarkers_Clear();
 	DebugMission("Completed mission " + GetName());
 	if (GetMissionManagerChecked())
 	{
@@ -140,6 +144,9 @@ void UMissionBase::ActivateNextMissionIfConfigured()
 void UMissionBase::OnMissionFailed()
 {
 	MissionState.bIsMissionComplete = true;
+	// End the intro now, so it does not hand the HUD back later over the defeat screen.
+	CancelActiveLocationIntro();
+	CancelActiveCameraTour();
 	if (UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().ClearTimer(M_AbilityCooldownPollingTimerHandle);
@@ -148,6 +155,7 @@ void UMissionBase::OnMissionFailed()
 	Tracking_ClearState();
 	EnemyInBuilding_ClearTracking();
 	TeamWeaponSquadTracking_Clear();
+	UnitGroupMarkers_Clear();
 	DebugMission("Failed mission " + GetName());
 	if (GetMissionManagerChecked())
 	{
@@ -157,6 +165,42 @@ void UMissionBase::OnMissionFailed()
 	RemoveAllTriggerAreas();
 	MarkWidgetAsFree();
 	BP_OnMissionFailed();
+}
+
+void UMissionBase::OnOtherMissionEnded(const UMissionBase* EndedMission, const bool bCompleted)
+{
+	if (not IsValid(EndedMission))
+	{
+		return;
+	}
+	// Before the trigger fired the stage's graph has not started (no BP_OnMissionStart yet), so it has nothing to react.
+	if (MissionState.bIsMissionComplete || not MissionState.bIsMissionStarted || not MissionState.bIsTriggered)
+	{
+		return;
+	}
+	const TSubclassOf<UMissionBase> EndedMissionClass = EndedMission->GetClass();
+	OnOtherMissionEndedNative(EndedMissionClass, bCompleted);
+	BP_OnOtherMissionEnded(EndedMissionClass, bCompleted);
+}
+
+bool UMissionBase::GetHasMissionClassCompleted(TSubclassOf<UMissionBase> MissionClass) const
+{
+	const AMissionManager* MissionManager = GetMissionManagerChecked();
+	if (not IsValid(MissionManager))
+	{
+		return false;
+	}
+	return MissionManager->GetHasCompletedMissionClassExact(MissionClass);
+}
+
+bool UMissionBase::GetHasMissionClassFailed(TSubclassOf<UMissionBase> MissionClass) const
+{
+	const AMissionManager* MissionManager = GetMissionManagerChecked();
+	if (not IsValid(MissionManager))
+	{
+		return false;
+	}
+	return MissionManager->GetHasFailedMissionClassExact(MissionClass);
 }
 
 void UMissionBase::StartNextMissionIgnoringTrigger()
@@ -608,10 +652,13 @@ void UMissionBase::OnCleanUpMission()
 	{
 		M_ActiveCinematicTakeOverSession->RequestCancel();
 	}
+	CancelActiveLocationIntro();
+	CancelActiveCameraTour();
 
 	Tracking_ClearState();
 	EnemyInBuilding_ClearTracking();
 	TeamWeaponSquadTracking_Clear();
+	UnitGroupMarkers_Clear();
 	M_AbilityCooldownCommands = nullptr;
 	if (GetIsValidMissionManager())
 	{
@@ -632,6 +679,7 @@ void UMissionBase::OnCleanUpMission()
 	GetWorld()->GetTimerManager().ClearTimer(M_TextOnlyDurationHandle);
 	GetWorld()->GetTimerManager().ClearTimer(M_TrackingValidityTimerHandle);
 	GetWorld()->GetTimerManager().ClearTimer(M_AbilityCooldownPollingTimerHandle);
+	AirDelivery_ClearHQExitPoll();
 	CleanUp_TimerHandles(GetWorld());
 	BP_OnMissionCleanUp();
 }
@@ -642,6 +690,8 @@ void UMissionBase::BeginDestroy()
 	{
 		M_ActiveCinematicTakeOverSession->RequestCancel();
 	}
+	CancelActiveLocationIntro();
+	CancelActiveCameraTour();
 
 	Tracking_ClearState();
 	EnemyInBuilding_ClearTracking();
@@ -653,6 +703,7 @@ void UMissionBase::BeginDestroy()
 		GetWorld()->GetTimerManager().ClearTimer(M_LoadToStartTimerHandle);
 		GetWorld()->GetTimerManager().ClearTimer(M_TrackingValidityTimerHandle);
 		GetWorld()->GetTimerManager().ClearTimer(M_AbilityCooldownPollingTimerHandle);
+		GetWorld()->GetTimerManager().ClearTimer(M_HQLeavingGliderPollHandle);
 	}
 }
 
@@ -990,8 +1041,60 @@ void UMissionBase::PlayPlayerAnnouncerLine(const EAnnouncerVoiceLineType Announc
 	PlayerAudioController->PlayAnnouncerVoiceLine(AnnouncerLineType, true, true);
 }
 
+bool UMissionBase::ShowVehicleInfoTakeover(ATankMaster* Vehicle, const FName LibraryEntry)
+{
+	UInfoTakeoverSubsystem* const InfoTakeovers = GetInfoTakeoverSubsystem();
+	return InfoTakeovers != nullptr && InfoTakeovers->QueueVehicleTakeoverFromLibrary(Vehicle, LibraryEntry);
+}
+
+bool UMissionBase::ShowCustomVehicleInfoTakeover(ATankMaster* Vehicle, const FVehicleInfoTakeoverEntry& Info)
+{
+	UInfoTakeoverSubsystem* const InfoTakeovers = GetInfoTakeoverSubsystem();
+	return InfoTakeovers != nullptr && InfoTakeovers->QueueVehicleTakeover(Vehicle, Info);
+}
+
+TArray<FName> UMissionBase::GetVehicleInfoTakeoverNames()
+{
+	return UInfoTakeoverSubsystem::GetVehicleLibraryEntryNames();
+}
+
+bool UMissionBase::ShowSquadInfoTakeover(AActor* Squad, const FName LibraryEntry)
+{
+	UInfoTakeoverSubsystem* const InfoTakeovers = GetInfoTakeoverSubsystem();
+	return InfoTakeovers != nullptr && InfoTakeovers->QueueSquadTakeoverFromLibrary(Squad, LibraryEntry);
+}
+
+bool UMissionBase::ShowCustomSquadInfoTakeover(AActor* Squad, const FSquadInfoTakeoverEntry& Info)
+{
+	UInfoTakeoverSubsystem* const InfoTakeovers = GetInfoTakeoverSubsystem();
+	return InfoTakeovers != nullptr && InfoTakeovers->QueueSquadTakeover(Squad, Info);
+}
+
+TArray<FName> UMissionBase::GetSquadInfoTakeoverNames()
+{
+	return UInfoTakeoverSubsystem::GetSquadLibraryEntryNames();
+}
+
+UInfoTakeoverSubsystem* UMissionBase::GetInfoTakeoverSubsystem() const
+{
+	if (not GetIsValidMissionManager())
+	{
+		return nullptr;
+	}
+	UWorld* const World = M_MissionManager->GetWorld();
+	return World != nullptr ? World->GetSubsystem<UInfoTakeoverSubsystem>() : nullptr;
+}
+
 bool UMissionBase::OnCinematicTakeOverFromMission(const bool bCinematicStarted) const
 {
+	// A showing location intro would hand the screen back in the middle of the cinematic, so it gives way; a waiting
+	// one shows after the cinematic. The session clears M_ActiveLocationIntroSession through
+	// OnLocationIntroSessionEnded.
+	if (bCinematicStarted && M_ActiveLocationIntroSession != nullptr
+		&& M_ActiveLocationIntroSession->GetIsHoldingScreen())
+	{
+		M_ActiveLocationIntroSession->RequestCancel();
+	}
 	if (not GetIsValidMissionManager())
 	{
 		RTSFunctionLibrary::ReportError("Mission cinematic take over failed!");
@@ -1253,6 +1356,23 @@ void UMissionBase::AddArchiveItem(const ERTSArchiveItem ItemType, const FTrainin
 		return;
 	}
 	MainGameUI->AddNewArchiveItem(ItemType, OptionalUnit, SortingPriority, NotificationTime);
+}
+
+void UMissionBase::AddCustomArchiveItem(const FArchiveCustomContent& Content, const int32 SortingPriority,
+                                        const float NotificationTime) const
+{
+	if (not GetIsValidMissionManager())
+	{
+		return;
+	}
+	UMainGameUI* MainGameUI = FRTS_Statics::GetMainGameUI(M_MissionManager.Get());
+	if (not MainGameUI)
+	{
+		RTSFunctionLibrary::ReportError("Mission failed to add a custom archive item as the main game UI is null."
+			"\nAt UMissionBase::AddCustomArchiveItem()");
+		return;
+	}
+	MainGameUI->AddNewCustomArchiveItem(Content, SortingPriority, NotificationTime);
 }
 
 AActor* UMissionBase::FindActorInRange(
@@ -1721,8 +1841,8 @@ bool UMissionBase::EnemyInBuilding_GetIsEnemySquad(const ASquadController* Enter
 		return false;
 	}
 
-	constexpr uint8 EnemyPlayerIndex = 2;
-	return RTSComponent->GetOwningPlayer() == EnemyPlayerIndex;
+	// A mission's "enemy" is any AI player; unset and neutral owners never counted and still do not.
+	return FRTSPlayers::IsValidAIPlayer(RTSComponent->GetOwningPlayer());
 }
 
 void UMissionBase::EnemyInBuilding_ClearTracking()
@@ -2203,6 +2323,13 @@ void UMissionBase::Tracking_OnReachedMaxCount()
 		return;
 	}
 
+	OnTrackingReachedMaxCountNative();
+	BP_OnTrackingReachedMaxCount();
+	// The event may already have ended the mission (e.g. a graph that completes or fails at once).
+	if (not bCompleteMissionWhenTrackingDone || MissionState.bIsMissionComplete)
+	{
+		return;
+	}
 	OnMissionComplete();
 }
 
@@ -3604,6 +3731,7 @@ void UMissionBase::CompleteMissionStartSetUIAndNotifyMgr()
 		M_MissionWidget->InitMissionWidget(MissionWidgetState, this,
 		                                   bIsTextOnlyMission, bStartAsCollapsedWidget);
 	}
+	OnMissionStartedNative();
 	BP_OnMissionStart();
 }
 

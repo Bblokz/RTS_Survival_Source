@@ -13,6 +13,7 @@
 class UPlayerResourceManager;
 class IResourceStorageOwner;
 class UMeshComponent;
+class AResourceUnloadStation;
 
 
 /**
@@ -35,6 +36,19 @@ public:
 	 * @return The amount left in the harvester after dropping off as much as possible.
 	 */
 	int32 DropOffResources(ERTSResourceType ResourceType, int32 Amount);
+
+	/**
+	 * @brief Credits one crane load the moment it lands in a bin; the pop-up shows over that bin.
+	 * @param ResourceType What resource landed.
+	 * @param Amount The load's amount.
+	 * @param TextLocation Where the "+ amount" pop-up appears (above the bin).
+	 * @return The amount that did not fit (stays on the harvester).
+	 */
+	int32 DropOffResourcesFromCrane(ERTSResourceType ResourceType, int32 Amount, const FVector& TextLocation);
+
+	/** @brief The crane that unloads harvesters here (the HQ's loop crane); harvesters without a free bay use the old path. */
+	void SetUnloadStation(AResourceUnloadStation* Station);
+	AResourceUnloadStation* GetUnloadStation() const;
 
 	/** @brief Provide the type and amount of the resource to add, this will add the amount to the
 	 * currently stored resources.
@@ -151,6 +165,13 @@ private:
 	void UpdateDropOffVisuals(const ERTSResourceType ResourceTypeChanged);
 
 	void CreateTextOfDropOff(const ERTSResourceType ResourceType, const int32 Amount) const;
+	void CreateTextOfDropOffAt(const ERTSResourceType ResourceType, const int32 Amount, const FVector& Location) const;
+
+	/** @return The amount left after adding to the capacity and the player's totals; updates the stored visuals. */
+	int32 AddDroppedOffResources(ERTSResourceType ResourceType, int32 Amount);
+
+	UPROPERTY()
+	TWeakObjectPtr<AResourceUnloadStation> M_UnloadStation;
 
 	bool GetIsValidPlayerResourceManager() const;
 	bool GetIsValidOwnerMeshComponent() const;

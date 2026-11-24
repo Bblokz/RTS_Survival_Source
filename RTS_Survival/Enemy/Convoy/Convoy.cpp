@@ -2,6 +2,7 @@
 
 #include "Convoy.h"
 
+#include "EngineUtils.h"
 #include "Engine/World.h"
 #include "TimerManager.h"
 #include "RTS_Survival/Enemy/Convoy/ConvoyDefinition.h"
@@ -151,6 +152,7 @@ void AConvoy::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	}
 	RemoveAllMinimapIcons();
 	OnConvoyEventNative.Clear();
+	OnBehaviourEventNative.Clear();
 	Super::EndPlay(EndPlayReason);
 }
 
@@ -184,6 +186,15 @@ void AConvoy::Broadcast(const EConvoyEventType Type, const FConvoyMember* Member
 	Event.Location = Member != nullptr and Location.IsZero() ? Member->Location : Location;
 	Event.Detail = Detail;
 	Event.WorldSeconds = GetNow();
+	// The fate of a truck is decided where these two events are sent; the cargo outcome counts them.
+	if (Member != nullptr and Type == EConvoyEventType::TruckDestroyed)
+	{
+		MarkTruckFate(Member->MemberId, EConvoyTruckFate::Destroyed);
+	}
+	if (Member != nullptr and Type == EConvoyEventType::TruckCaptured)
+	{
+		MarkTruckFate(Member->MemberId, EConvoyTruckFate::Captured);
+	}
 	UE_LOG(LogConvoy, Log, TEXT("CONVOY %d t=%.2f %s member=%d %s"), M_ConvoyId, Event.WorldSeconds,
 	       *ConvoyNames::GetEventName(Type), Event.MemberId, *Detail);
 	OnConvoyEventNative.Broadcast(Event);
@@ -212,7 +223,8 @@ FVector AConvoy::GetColumnCentre() const
 	int32 Count = 0;
 	for (const FConvoyMember& Member : M_Members)
 	{
-		if (Member.Role == EConvoyUnitRole::Truck and Member.GetIsAlive())
+		// Branch trucks drive elsewhere; the centre (escort leash, ambush zones) is the column's.
+		if (Member.GetIsColumnTruck())
 		{
 			Sum += Member.Location;
 			++Count;
@@ -256,6 +268,7 @@ void AConvoy::GetMemberSnapshots(TArray<FConvoyMemberSnapshot>& OutSnapshots) co
 		Snapshot.WantedSpeed = Member.WantedSpeed;
 		Snapshot.bIsStuck = Member.bIsStuck;
 		Snapshot.bHasPartialPath = Member.bHasPartialPath;
+		Snapshot.CargoType = Member.CargoType;
 	}
 }
 
@@ -270,6 +283,68 @@ TArray<AActor*> AConvoy::GetAliveUnits() const
 		}
 	}
 	return Units;
+}
+
+int32 AConvoy::GetAliveEscortCount() const
+{
+	int32 Count = 0;
+	for (const FConvoyMember& Member : M_Members)
+	{
+		Count += Member.Role != EConvoyUnitRole::Truck and Member.GetIsAlive() ? 1 : 0;
+	}
+	return Count;
+}
+
+bool AConvoy::GetIsAnyEscortAliveNear(const FVector& Location, const float Radius) const
+{
+	const float RadiusSquared = FMath::Square(Radius);
+	for (const FConvoyMember& Member : M_Members)
+	{
+		if (Member.Role == EConvoyUnitRole::Truck or not Member.GetIsAlive())
+		{
+			continue;
+		}
+		if (FVector::DistSquared2D(Member.Location, Location) <= RadiusSquared)
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
+bool AConvoy::GetIsActiveMember(const AActor* Unit) const
+{
+	return FindActiveMemberByActor(Unit) != nullptr;
+}
+
+AConvoy* AConvoy::FindConvoyOfActiveMember(const AActor* Unit)
+{
+	UWorld* World = IsValid(Unit) ? Unit->GetWorld() : nullptr;
+	if (World == nullptr)
+	{
+		return nullptr;
+	}
+	for (TActorIterator<AConvoy> It(World); It; ++It)
+	{
+		AConvoy* Convoy = *It;
+		if (IsValid(Convoy) and Convoy->GetIsColumnActive() and Convoy->GetIsActiveMember(Unit))
+		{
+			return Convoy;
+		}
+	}
+	return nullptr;
+}
+
+const FConvoyMember* AConvoy::FindActiveMemberByActor(const AActor* Unit) const
+{
+	if (Unit == nullptr)
+	{
+		return nullptr;
+	}
+	return M_Members.FindByPredicate([Unit](const FConvoyMember& Member)
+	{
+		return Member.Actor.Get() == Unit and Member.GetIsAlive();
+	});
 }
 
 FConvoyMember* AConvoy::FindMember(const int32 MemberId)

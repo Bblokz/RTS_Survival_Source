@@ -435,7 +435,16 @@ component are untouched (user requirement). Agent brief: `Tools/WallChunks/PIT_A
     pit mesh up, that blocks projectiles. A hit on it lies above the mesh bounds; `ApplyHit` clamps it to the bounds
     top, so on the large pits such a hole would sit over the gun in the air. Not seen in the real-fire test (flat tank
     fire at the rim aim points hit the ring), but arcing or high fire could hit it. A fix would trace along the shot
-    onto the pit mesh (complex) and skip the hole when nothing is hit.
+    onto the pit mesh (complex) and skip the hole when nothing is hit. **Fixed 2026-11-12** by the hole guard (see
+    "Remaining weapon pits").
+  - **Cursor (2026-11-12):** the collider also blocks `ECC_Visibility`. The crew and gun meshes have no collision, so
+    before this the cursor passed through the gun to the ground. Hovering a pit's gun showed no attack marker, and only
+    the sandbags did (seen on the 53K pits).
+    - Hovering or clicking the gun now resolves to the pit.
+    - Check (DebugGame, `Tools/WallChunks/Pits2/lead_gun_hover_test.py`): 6/6 cursor-angle traces at the gun hit the
+      pit on 53K, 53K Sector, Ger Pak40 and B4.
+    - Side effects: a cursor location over a pit's gun is now the top of the box, not the pit floor. A Visibility
+      ground trace from above (impact decals) stops on the box.
   - Pack-up / unpack restore the cached materials; the holes come back on the next hit (the swap is re-checked per hole).
 
 ## Barracks and cooling towers (A + B, 2026-11-10)
@@ -558,6 +567,615 @@ paint) keeps its material and gets no holes. One agent per Blueprint (`Tools/Wal
   - Refinery1, 2 and 4 keep the C++ default aim points (around the centre, 1 m up); proposed points are in the agents'
     reports. Refinery4: when all 6 slots are used, a merged hole can sit between posts and make a severed post whole.
 
+## PostApo ruins (A + B, deaths kept, 2026-11-11)
+
+Seven `ADestructableEnvActor` ruins in `DestructableEnvActor/PostApo/`: `BP_Dest_PostApo_Nuclear`, `_Construction`,
+`_HighRise1`, `_HighRise2`, `_DestroyedChimney`, `_Crane` and `_Crane2_Damaged`. Hits arrive through
+`ADestructableEnvActor::TakeDamage`; no C++ change. Agent brief for the modelling work:
+`Tools/WallChunks/POSTAPO_AGENT_BRIEF.md`.
+
+- **Component** `WallHoleDamage` on each Blueprint (no shared parent): `StaticMesh`, `NoGrid`, `AreaPerDebrisPiece`
+  3600 / max 5, `bCollapseIntoChunksOnDeath = false`, collapse cue / attenuation / concurrency as the PostApo fences.
+  - Concrete ruins (Nuclear, Construction, HighRise1/2, Chimney): 1.1 cm per mm (the tower value; these are 10-20 m
+    tall), max 220 cm, outset 0.
+  - `Crane`: 0.5 cm per mm, max 60 cm, outset 0. The mast is a 40 cm lattice, so a hit cuts it through and the part
+    above hangs in the air. Shallow near-face bites (outset 0.5, max 40) were tried and barely showed; the user chose
+    cutting through.
+  - `Crane2_Damaged`: 0.85 cm per mm; holes on the scorch slot and the container slot, glass (slot 2) untouched.
+- **Materials** in `PostApo/Holes/`, NoGrid and two-sided, so one instance serves every mesh:
+  `MI_PostApo_ScorchAtlas_WallHoles` on the existing `M_ScorchAtlas_WallHoles` (PS 421 vs 303) and
+  `MI_PostApo_ContainerBlue_WallHoles` on `M_container_blue_WallHoles` (423 vs 304).
+- **Death:** each `BP_OnUnitDies` now starts with `CollapseIntoPieces(false)`, then runs its own `VerticalDestruction`,
+  explosions and smoke unchanged. What is left of the surface flies off while the ruin sinks.
+- **Aim points** were the C++ default cluster 1 m up at the centre, so every shell hit the base. Each construction script
+  now sets them right after the parent construction script. They come from `Saved/PostApoHoles/aim.py`: the middle of
+  complex-trace entry hits at 1.5 / 3.5 / 6 / 9 m, plus two side points on the wide ruins. Example: HighRise1 (47,0,150),
+  (47,0,400), (2,0,700), (±200,0,300).
+- **Collision.** Shells trace simple collision, and most of these meshes had one auto convex hull wrapped round the
+  whole ruin. Measured with `Saved/PostApoHoles/gap.py` (horizontal rays, simple vs complex hit), share within 30 cm of
+  the visible surface, 1 hull -> 64 auto hulls (`set_convex_decomposition_collisions(mesh, 64, 32, 1000000)`):
+  Nuclear 10 -> 96 %, Chimney 43 -> 96 %, Crane 81 -> 95 %, HighRise1 84 -> 94 %, HighRise2 78 -> 86 %,
+  Construction 36 -> 42 %, `SM_Scorch_Crane_Destroyed` 30 -> 70 %. Those two now use agent-fitted boxes, built in
+  Blender from the render triangles and applied with `Saved/PostApoHoles/apply_collision.py`:
+  - Construction: 35 axis-aligned boxes, one per slab, column and cross wall. 100 % within 30 cm, no rays blocked
+    on air.
+  - Scorch crane: 58 oriented boxes. 98 % on the gap.py rays, and 87 % on a denser sample the fit never saw. The
+    cables and the flat plates on the ground have no collision.
+  Units now also collide closer to the visible ruins; maps with a baked navmesh around them may want a rebuild.
+- **Debris:** 8 pieces per ruin in `PostApo/Holes/Debris/`, cut in Blender from each mesh's own geometry by two agents
+  (`D:/Blender/BlenderProjects/BlenderTanks/PostApoDebris/build_concrete_debris.py` and `build_crane_debris.py`).
+  Imported at scale 1 with `Saved/PostApoHoles/debris_import.py`, using the hole instances (they carry the Niagara flag).
+  - Concrete: facade, slab and shell chunks, 20-84 tris each; two pieces per set have a re-bar stub. Cut faces use
+    the atlas rubble tile at at least 0.12 UV/m, because the buildings' own density smeared to grey.
+  - Highrise crane: lattice chords, X straps, a cab shard.
+  - Scorch crane: boom chords, joints and a track chunk, plus 2 container shards that use the container instance.
+- **Headless check** (`Tools/WallChunks/PostApo/postapo_headless_test.py`, throwaway DebugGame editor on
+  `RTS_ToCopySmall`): collision-hit debug shots at every aim point cut 3-5 holes per ruin and swapped the slots. A forced
+  death of HighRise2 threw the pieces while it sank. Pictures are in `Saved/WallChunks/PostApo/`. Test notes: the map has
+  no owner to reveal the ruins, so the script runs `ShowFlag.PostProcessMaterial 0` (fog of war). Shoot and view from +Y,
+  the sunlit side. Frames taken more than about 40 s into PIE went black on this map.
+
+## Garrison PostApo highrises (A + B, death kept, 2026-11-11)
+
+`Garrison_PostApo_HighriseLarge1` / `_HighriseLarge2` / `_LargeHorizontal` (`GarrisonableBuildings/PostApoNuclear/`).
+Hits arrive through `AGarrisonableBuilding::ForwardDamageToWallHoles` (see "A + B on the garrison bunkers"); no C++.
+
+| Blueprint | Mesh (`Meshes/Civilian/AbandonnedNuclear/`) | BP mesh scale | Debris |
+|---|---|---|---|
+| HighriseLarge1 | `SM_DestroyedHighrise_Large_2` | 1.4 | `SM_GarrisonHighrise_Debris_0..7` |
+| HighriseLarge2 | `SM_DestroyedHighrise_Large_1` | 1.4 | same |
+| LargeHorizontal | `SM_DestroyedHighrise_HorizontalLarge_1` | 2.5 | `SM_GarrisonHorizontal_Debris_0..7` |
+
+- **Mesh scale.** Every hole length and area setting is in mesh units, so a uniformly scaled `StaticMesh` makes holes
+  and debris S times bigger in the world. Settings are the world targets divided by S (areas by S²). World targets:
+  1.2 cm radius per mm calibre (75 mm -> 90 cm), max 3 m, min 15 cm, 5.5 per sqrt damage, one piece per 0.36 m², at
+  most 5. So `HoleRadiusPerCalibreMm` 0.857 / 0.48, `MaxHoleRadius` 214 / 120, `AreaPerDebrisPiece` 1837 / 576.
+  Level instances scaled further get bigger holes too.
+- **Component** `WallHoleDamage`: `StaticMesh`, `NoGrid`, `HoleCentreOutsetShare` 0, `bCollapseIntoChunksOnDeath`
+  false; the death stays the Blueprint's `VerticalDestruction` sink. No graph removals were needed (no geometry
+  collection, mesh or material swaps).
+- **Material:** one slot, `M_ScorchAtlas`. `PostApoNuclear/Holes/MI_GarrisonPostApo_ScorchAtlas_WallHoles` on the
+  existing `M_ScorchAtlas_WallHoles`, NoGrid, two-sided (the ruins are open shells). PS 421 vs 303.
+- **Collision.** Shells trace simple collision, and each mesh had one convex hull standing 0.7-3 m in front of most
+  facades (balconies, wings, open floors), so holes would have centred in air. Now 64 auto hulls
+  (`set_convex_decomposition_collisions(mesh, 64, 32, 1000000)`); rays landing within 30 mesh-cm of the render surface:
+  Large_2 59 -> 77 %, Large_1 28 -> 68 %, Horizontal 43 -> 77 % (`Saved/PostApoGarrisonHoles/gap.py`; 128 hulls
+  only added ~5 points). The concave hulls can change the navmesh around placed instances: rebuild nav on maps that
+  use them.
+- **Debris:** cut in Blender from the meshes' own facades (window corners, slabs, slab edges with re-bar, corner
+  chunks), original UVs on outer faces, broken concrete from the atlas on cut faces. Scripts:
+  `D:/Blender/BlenderProjects/BlenderTanks/PostApoGarrisonDebris/build_setA_garrison_highrise_debris.py` and
+  `build_setB_horizontal_debris.py`; FBX in `Saved/PostApoGarrisonHoles/debris_out/`, imported at scale 1 with the
+  holes MI. The horizontal block is a thin open shell (8 cm facade), so its pieces were thickened to 9-15 cm.
+- **Aim points** (construction script, after the parent call): highrises (0,0,200), (200,-150,600), (-200,150,1000),
+  (0,0,1400); horizontal (0,0,250), (-1200,0,500), (1200,0,750), (0,0,1000). The C++ default of 1 m put every shell on
+  the ground floor of a 23 m block.
+- **Scripts:** `Saved/PostApoGarrisonHoles/` (`add_components.py`, `aim_points.py`, `import_debris.py`, `gap.py`).
+- **Not tested in PIE** yet (the user tests).
+
+## Remaining weapon pits (A + B, 2026-11-12)
+
+The last ten pit expansions got the procedural holes, so every weapon pit now has them. There are 22 in all: the 8 German
+and 4 Soviet pits done earlier, plus these 10. Agent brief: `Tools/WallChunks/PIT2_AGENT_BRIEF.md`; scripts: `Tools/WallChunks/Pits2/`.
+No C++ change.
+
+- **Shared:** `/Game/SandBagPack/Materials/Holes/MI_RusPit_SandBag_01_WallHoles`, a NoGrid two-sided copy of the 53K
+  instance on `MM_Rus_SandBag_01_WallHoles`, serves every Soviet sandbag slot. Note: `Content/.gitignore` ignores
+  `SandBagPack`, the same as the master and `MI_Rus_SandBag_01`. TwinMG42 uses the German `GerPits/Meshes/Holes` set.
+- **Settings:** NoGrid, 0.85 cm per mm, max 220.
+  - Soviet pits: debris `SM_Rus_SandBag_Debris_0..7`, `AreaPerDebrisPiece` 4500 / max 12.
+  - TwinMG42: debris `SM_GerPit_Debris_0..7`, 3600 / 5.
+  - `bCollapseIntoChunksOnDeath`: false on TwinMG42, BS3 and the mortar pit (they sink); true on the six B4/ML20 pits
+    since 2026-11-12, when their wreck death was fixed (see "Pit deaths" below). Captured B4 inherits true.
+- **Single-mesh pits:** the component is on `BuildingMeshComponent`.
+
+  | Blueprint | Mesh | DamagedMaterials | Collision |
+  |---|---|---|---|
+  | `Ger_BXP_GerPit_TwinMG42` | `SM_GerPit_TwinMG42_Sandbags` | Ger sandbag, Ger ammo | trimesh (unchanged) |
+  | `Rus_BXP_BS3Pit` | `SM_BS3Pit` | RusPit | **7 hulls → complex-as-simple** |
+  | `Rus_BXP_120MortarPit` | `SM_Rus120MortarPit` | RusPit | trimesh (unchanged) |
+  | `Rus_BXP_B4HowitzerSteppedSquarePit` | `SM_B4Pit_SteppedSquare` | RusPit | trimesh (unchanged) |
+  | `Rus_BXP_ML20TwinShouldersPit` | `SM_ML20Pit_TwinShoulders` | RusPit | 13 hulls kept |
+
+  - **BS3 collision:** 43 % of rays hit within 30 cm of the bags, and 76 rays were blocked above them. V-HACD gave
+    no better hulls. Backup: `Saved/WallChunks/Pits2/agentA_SM_BS3Pit_collision_backup.txt`.
+  - **ML20 Twin Shoulders:** 98 % within 30 cm.
+- **Two-mesh pits:** `Rus_BXP_B4HowitzerPit` and its child `Ger_BXP_CapturedB4Pit`, `Rus_BXP_ML20Pit`,
+  `Rus_BXP_B4HowitzerConcretePit` and `Rus_BXP_ML20ConcretePit` keep their bags in a separate `Sandbags` component (same
+  transform) next to the concrete/earth emplacement.
+  - **Component:** `WallMeshComponentName = Sandbags`, `DamagedMaterials = [RusPit]`. The emplacement gets no holes.
+  - **Collision on `Sandbags`:** it was `NoCollision`. It is now QueryOnly, ignores every channel and doesn't affect
+    navigation.
+  - **Trace responses:** a BeginPlay arm after `BP_InitBuildingExp` copies the owner-dependent `TraceEnemy` /
+    `TracePlayer` responses from `BuildingMeshComponent`, so only enemy fire hits the bags. That is the same moment C++
+    sets up the main mesh, so pits built in game are covered too.
+  - **Collision on the meshes:** `SM_B4Pit_Sandbags` went from 1 default hull to complex-as-simple. Backup:
+    `Saved/WallChunks/Pits2/SM_B4Pit_Sandbags_collision_backup.txt`. The mesh is shared with ML20Pit and
+    `BP_Obstacle_B4Pit_Destroyed`, whose Sandbags stay NoCollision. `SM_B4ConcretePit_Sandbags` was already trimesh.
+  - **CapturedB4Pit:** it had its own Sandbags override on NoCollision; it is fixed. It also has two PitDefense
+    components.
+- **Aim points** were the class defaults in the pit centre. Each construction script now sets 3-4 points on the bag
+  ring at wall height, for example:
+  - TwinMG42: (110,0,55), (-180,0,45), (190,±420,45);
+  - B4/ML20 standard: (±480,±480,175), on the 47 cm bag band (r 630-716, z 147-195) on top of the concrete ring;
+  - concrete pits: (750,0,50), (0,750,50), (300,-750,50), (-750,450,50).
+- **Checks** (throwaway Development editor, `UT_VehicleObstacle`, enemy-owned pits, real tank fire):
+  - **Debug hits:** 37-105 mm hits cut holes and swapped the material on all ten.
+  - **Pictures:** `Saved/WallChunks/Pits2/<pit>/`, for example `BS3/agentA_debug_close.png`,
+    `Mortar120/agentA_realfire_4.png` and `B4HowitzerPit/run4/real_fire_4_crop.png`.
+  - **Own gun:** the B4/ML20 concrete pits fired 28 shells without hitting their own bags. The shells leave at z 520+;
+    the bags top out at 87.
+  - **Real fire, B4 standard:** 110 hits, 35 on or near the bags, 14 visible holes.
+  - **Real fire, B4 concrete:** 33 hits, 26 near, 19 visible holes.
+  - **Real fire, ML20 concrete:** 110 hits, 4 visible holes, because almost all fire was 30 mm flak at about 0.2 HP,
+    which leaves the health-based hole budget empty.
+- **Phantom holes (fixed 2026-11-12, C++ guard):** `FWeaponTargetingData` cycles through all four aim points
+  whatever side the shooter is on, so about half the shells aim across the pit. They burst on the gun, the crew or
+  `PitWeaponHitCollider` in the middle.
+  - `ApplyHit` clamps the hit to the target mesh's bounds, and a big pit's bounds include its interior. Such a burst
+    used to take a hole slot and throw debris in mid-pit without cutting any bags. In the B4 standard run 57 of 110
+    hits were of this kind.
+  - **The guard:** `ApplyHit` now asks `GetDoesHoleTouchWallMesh` first. It overlap-tests the hole sphere against the
+    wall mesh's body: simple shapes, then complex.
+    - A sphere clear of the mesh cuts nothing, throws no debris and takes no slot. The damage still applies, and
+      `RTS_WALL_HOLES skip` is logged at Verbose.
+    - A mesh without query collision keeps the old behaviour.
+    - Applies to every `UWallHoleDamageComponent` user, not only pits.
+  - **Checked** (throwaway DebugGame editor):
+    - B4 standard: 4 debug hits on the bags cut holes; 4 mid-pit 30 mm bursts were skipped (holes stayed at 4); under
+      real fire 20 hits were skipped and the near ring still breached (`Pits2/B4HowitzerPit/guard/real_fire_2.png`).
+    - All 20 surface debug hits still cut on `Rus_Wall_Concrete_Long_Holes`, `Rus_BXP_GuardTower`,
+      `BP_Scorch_Dest_DeadTree`, `Rus_BXP_53KPit` and `Ger_BXP_GerPit_Pak40` (`Tools/WallChunks/Pits2/lead_guard_walls_test.py`).
+  - **Still open:** the aim-point choice ignores the shooter's side, so half the shells on big pits still spend their
+    hit on the gun instead of the near wall.
+- **Bugs found here, fixed the same day:** see "Pit deaths (fixed 2026-11-12)".
+
+## Pit deaths (fixed 2026-11-12)
+
+Two bugs from the pit rollout above. The user picked the behaviour.
+
+- **Rule (C++, `ABuildingExpansion::UnitDies`):** for a pit with `UPitDefenseComponent`, the Blueprint decides.
+  - **Implements `BP_OnUnitDies`** (`GetHasBlueprintDeath`, i.e. `IsFunctionImplementedInScript`): the wreck replaces
+    the sink. `UPitDefenseComponent::HandlePitDeathWithoutSink` plays the crew deaths, sandbag explosion and scorch
+    decals and disables the weapon-hit collider. Then `BP_OnUnitDies` runs `DestroyAndSpawnActors`: the wreck obstacle
+    and destroyed gun appear and the pit is destroyed after 1 s.
+  - **Doesn't implement it:** the `HandlePitDeath` sink, as before.
+  - **Why not sink, then wreck:** `FRTS_Collapse` spawns at the owner's current location, so after the 3.5 m sink the
+    wreck would land underground. A pit with no `PitDefense` still just calls `BP_OnUnitDies`.
+- **Wreck pits:** B4 standard, Stepped Square and Concrete, ML20 standard, Concrete and Twin Shoulders, and Captured B4
+  (it inherits the B4 standard graph).
+  - `WallHoleDamage.bCollapseIntoChunksOnDeath = true` on all six; Captured inherits it. The bags now fly as chunks,
+    as on the 53K pits.
+  - Captured B4 had a duplicate `PitDefense1` with the same defaults as the inherited `PitDefense`. It is removed:
+    `FindComponentByClass` only ever handled one, and the second collider survived the death.
+- **Sink pits:**
+  - **Dead graphs removed:** 53K, 53K Sector, Ampulomet, DShK, BS3 and Assembly Yard had `BP_OnUnitDies` graphs that
+    spawned nothing (an explosion and a destroy at 1 s). The graphs never ran. They are deleted, so "implements
+    `BP_OnUnitDies`" means "has a wreck to spawn", and these pits keep sinking.
+  - **Unchanged:** the German pits (no graph).
+- **Mortar pit:** `Rus_BXP_120MortarPit` got a `PitDefense` component, the sink. Its crew has `GunPitCrewComponent`,
+  so the crew death montages play. It also gets the weapon-hit collider over the crew. `bCollapseIntoChunksOnDeath`
+  stays false.
+- **Test:** `Tools/WallChunks/Pits2/pitdeath_test.py` (run with `pitdeath_run_headless.sh`, throwaway DebugGame editor)
+  kills all 23 PitDefense pits in PIE on `UT_VehicleObstacle` (yaw 30°) and checks the outcome per pit (21 before the
+  German Flak88/Mortar fix below).
+  - **Result:** 21/21 PASS in each of the last three runs (logs `Saved/WallChunks/Pits2/pitdeath_run4..6.log`).
+  - **Verdicts fail on:** a pit still alive at 12 s; a sink pit that never sank; a wreck pit that sank; wrong wreck
+    classes; a wreck offset from the pit's XY, Z or yaw; a collider not NoCollision while the dead pit is still there.
+  - **Sink pits:** they sink about 100 cm in 0.5 s, are gone after the sink and spawn no wreck.
+  - **Wreck pits:** they don't sink. Both wreck actors sit at the pit's XY, Z and yaw (offset 0); the pit is gone by
+    2-4.5 s. The bags throw 20-71 chunks (`RTS_WALL_HOLES collapse ... threw=`).
+  - **Overlap:** the wreck spawns once its class has loaded, and the pit is destroyed 1 s after that. For about 1 s
+    the pit mesh (bags already thrown) and the wreck overlap, under the explosion.
+- **Weapon-hit collider fix:**
+  - **Bug:** on the old code the collider read QueryOnly again 0.5 s after death in 2 of 3 runs, on sink and wreck
+    pits alike, although `HandlePitDeath` had switched it off.
+  - **Fix:** `RefreshWeaponHitCollider` now returns once the death has started. In 3 of 3 runs the collider reads
+    NoCollision at every check.
+  - **Cause, likely but unconfirmed:** the only code that sets QueryOnly is `RefreshWeaponHitCollider`, reached from
+    BeginPlay and `OnBxpConstructed` (`OnFinishedExpansionConstruction`). The test pits die 12 s into PIE, perhaps
+    before their construction timer ends. If so, a pit that dies while still under construction also gets
+    `OnFinishedExpansionConstruction` (turrets re-engage, mesh swap); that is not fixed.
+- **`Ger_BXP_GerPit_Flak88` and `Ger_BXP_GerPit_Mortar`:** they never died. Like the Soviet mortar pit, they had no
+  PitDefense and no `BP_OnUnitDies`, and at 0 HP they stayed. Both now have a `PitDefense` component and sink; their
+  turrets have `GunPitCrewComponent`. The test checks them as sink pits: 23/23 PASS (`pitdeath_run7.log`).
+- **Shared editor:** its Development DLL predates this C++ change, so PIE there still sinks the wreck pits until it is
+  rebuilt.
+
+## Brandenburg Gate ruin (A + B, 2026-11-12)
+
+`Environment/Landmarks/BrandenburgGate/BP_BrandenburgGateRuin` is the war-damaged gate as a destructible environment actor.
+The user asked for: the procedural damage shader, 10 000 health, 20 damage reduction, and on death a vertical
+destruction with a lot of smoke. It is a copy of `BP_Dest_PostApo_HighRise1`, so it keeps that Blueprint's parent calls,
+`SetupComponentCollisions` and `CollapseIntoPieces(false)`; the rest is new. Scripts:
+`Tools/Landmarks/ue_brandenburg_gate_destructible.py` (materials, debris, the Blueprint copy and its components) and
+`Tools/Landmarks/gate_headless_test.py`. The graphs were edited through UECP and are described here.
+
+- **Materials.** `M_BG_Sandstone_Procedural_WallHoles` is the masked copy of the gate's sandstone master, which is itself
+  a copy of the Breakthrough concrete master. The two-sided NoGrid instances are `Holes/MI_BG_Sandstone_WallHoles` and
+  `MI_BG_SandstoneBroken_WallHoles`, child of the first; both keep the intact instances' overrides and switches. PS 712
+  against 593 intact. The master uses no custom primitive data of its own, so slots 8-34 are free for the holes.
+  - Bronze (slot 2) and rebar (slot 3) get no holes.
+- **Debris.** The 8 wall chunk pieces are copied as `Debris/SM_BG_Gate_Debris_0..7` in `MI_BG_SandstoneDebris_WallHoles`.
+  That instance has the curvature map, baked fields and rebar off, because the chunks have no gate LightMapUV.
+- **Component** `WallHoleDamage` on `StaticMesh`, as the PostApo ruins: NoGrid, outset 0, 1.1 cm per mm, max 260 cm,
+  `AreaPerDebrisPiece` 3600 / max 6 per hit, up to 160 collapse pieces, `bCollapseIntoChunksOnDeath = false`.
+- **Health.** The construction script sets `Health` 10 000 and `DamageReduction` 20; the class defaults match. The
+  reduction is flat per hit (`ADestructableEnvActor::TakeDamage`), so hits of 20 or less do nothing.
+- **Aim points** (mesh space, front +Y): (-369,0,700) and (±800,0,600) on the piers, (±1475,0,500) on the outer
+  columns, (0,0,1600) and (1000,0,1500) on the entablature, (±2500,0,400) on the gate houses. A point in the open centre
+  arch, (0,0,700), let shots pass through and was moved.
+- **Death** (`BP_OnUnitDies`):
+  1. `CollapseIntoPieces(false)` throws the surface pieces.
+  2. `VerticalDestruction`: sinks 2800 cm over 12 s, yaw 0-3 degrees, pitch/roll 1.5-4 degrees, and destroys the actor
+     at the end, so the nav modifier and the collision go with it. CollapseFX: `NS_RTSDebrisExplosion_Huge`
+     (`SetScaleColorLifetime`: size 3, lifetime 2.5, particles 8, ground offset 300, dust colour (0.85,0.78,0.68)) at
+     scale (2.5,2.5,3), with `Cue_LargeBuilding_Collapse`.
+  3. Three `NS_DestructionSmoke_Large` (one at the centre, x2.5; two at x ±2000, x2) and six `NS_DestructionSmoke`
+     around the footprint.
+  4. Three `Huge_Debris` explosions, at the centre and at x ±2200, 0.5, 2.5 and 4 s after death.
+  5. `SpawnSmokeWave` at death and after 3, 6 and 9 s. Each wave puts three `NS_RTSDebrisExplosion_Huge` along the
+     gate (x -2200 / 0 / 2200) with ground smoke on, size 1.8, lifetime 3, particles 6 and the dust colour. They are
+     placed from `DeathTransform`, the transform stored at death, so they stay on the ground while the mesh sinks.
+     Without the waves the smoke was gone by 6 s, halfway through the sink.
+- **Headless check** (RTS_ToCopySmall, `Saved/BG_Gate_Check/destructible/`):
+  - Health and reduction: runtime health 10 000 and reduction 20. A 15-damage hit changed nothing; a 100-damage hit
+    took 80.
+  - Holes: all 9 aim points hit the collision, 6 holes were open after the test hits, and the frieze holes show.
+  - Death: the gate sank 7.6 m at 3 s and 22.6 m at 9 s, and was gone after 14 s. The dust cloud covers the footprint
+    from 0.6 s to 11.5 s.
+- **Collision gap.** The 16 UCX boxes sit up to 2.2 m in front of the stone in places (between columns, on the gate
+  house fronts). Hits there make a hole sphere that may not reach the surface, so those hits show debris but no hole.
+  Fitted boxes per column and wall, as on the PostApo Construction ruin, would fix it.
+- **Six holes at a time.** With NoGrid, older holes merge into their nearest neighbour, capped at 260 cm. On a 65 m gate
+  that means old holes far from new ones disappear.
+- In Ger_Berlin the gate is still the static mesh `POI_BrandenburgGateRuin` (step_poi of the Berlin map build).
+
+## Berlin ruin kit (A + B, 2026-11-12)
+
+The 22 kit pieces for `Ger_Berlin` (`BP_BerlinRuin_*`, children of the graph-less `BP_BerlinRuin_Base`):
+- NoGrid holes on slot 0 only;
+- death by `bCollapseIntoChunksOnDeath`;
+- navigation blocked by `NavArea_Null` dynamic-obstacle boxes fitted to the UCX hulls.
+
+They are built by `Tools/BerlinMap/ruinkit/ruin_blueprints_build.py`. See `BerlinRuinKit.md` for the settings, the real
+tank fire test and the weak spots.
+
+## Rus factory A2 (A + B, no damage meshes, 2026-11-15)
+
+`Rus_Building_Factory` (`BuildingExpansions/RusBuildings/`; A2 crane remodel applied IN PLACE on 2026-11-15 after testing
+on the copy `Rus_Building_Factory_A2`, same scripts with `RUSA2_TARGET_BP`; backup of the old asset in
+`Saved/Backup_RusFactory_2026-11-15`) shows damage only through procedural holes, as the user asked: no
+At66 / At33 / destroyed meshes. Script: `Tools/RusFactoryA2/ue_rusfactory_a2_holes.py` (execute_uecp_script,
+`allow_destructive`).
+
+- **Component** `WallHoleDamage`: `BuildingMeshComponent`, holes on slot 0 (`MI_concrete2` slot =
+  `MI_Rus_BunkerConcrete_05`) only; metal, camo nets, sandbags and the atlas trim get `None`. Grid, hole and collapse
+  settings copied from `Rus_Building_Barracks` (NoGrid, outset 0, 0.85 cm per mm, 3600 / max 5,
+  `bCollapseIntoChunksOnDeath = true`).
+- **Material:** `FactoryA2/Holes/MI_SM_Rus_WarFactory_A2_MI_Rus_BunkerConcrete_05_WallHoles` (two-sided, NoGrid) on the
+  shared `M_RusBunker_Concrete_WallHoles`, PS 438 vs 319; debris `SM_Rus_WarFactory_A2_Debris_0..7`.
+- **Graph:** the 100 / 66 / 33 % `SetStaticMesh` swaps removed; `ExplosionsAt66` / `At33` run straight from the
+  health switch. The unused `GeometryCollection` (GC_Rus_Bunker05) and its unconnected `CollapseMesh` removed. Death
+  unchanged (`DestroyAndSpawnActors`, barrels, explosion, destroy after 1 s), plus the hole pieces flying and the crane
+  machinery hiding.
+- **Collision:** the original `SM_Collision_RusWarFactory` (83 tris, complex as simple). Measured in Blender against the
+  visible concrete: front 70 %, back 100 %, right 90 % of rays within 30 cm (collision a few cm behind the face); the
+  gate side and its corner are poor (25 % / 15 %: the collision skips the wing walls), so holes there can sit inside.
+  The new crane tower has no collision.
+- **Headless check** (`Tools/RusFactoryA2/rusfactory_a2_holes_headless_test.py`, throwaway DebugGame editor,
+  RTS_ToCopySmall): 8 debug hits on the front, east, back and roof all struck the collision and cut holes (6 slots
+  full, then merging); slot 0 swapped to the holes instance, other slots unchanged; at 60 % and 30 % health the mesh
+  stays SM_Rus_WarFactory_A2 with the holes. Pictures `Saved/RusFactoryA2/Holes/` (east face holes + debris clear; the
+  front face is in shadow on that map; the 30 % shot is grey, probably the At33 explosion smoke over the camera).
+- **Open:** aim points still the class default; a front hit at the bastion's corner (mesh x -600) struck the
+  collision ~1.5 m behind the face (no visible hole).
+
+## Field holes and tank breaches on the Rus concrete walls (2026-11-16)
+
+The 9 Rus concrete walls (`Rus_Wall_Concrete_Corner`, `_CornerNoFlag` (+`_Soviet`), `_Long` (+`_Soviet`, `_Holes`),
+`_LongSandBags` (+`_Soviet`), `_LongSandBagsNoFlag`) no longer use the 6-slot custom-primitive-data mask. With 6 slots,
+a wall shot many times merged its oldest holes (no grid) or baked them into 1.5 m cells (grid), which read as big odd
+shapes. All other users of `UWallHoleDamageComponent` keep the slot mode unchanged.
+
+### Field mode (`MaskStorage = FieldTexture`)
+
+- `FWallHoleField` (`WallHoleField.h`) keeps the wall face, unrolled along its centre line (`FieldSettings.
+  WallPathPoints`, 2 or 3 points; empty = long axis of the bounds), as a small CPU-written BGRA8 texture, 6 cm per
+  texel: R front face, G back face, B tank breach. Each texel stores `f = 1 - distance / radius` (f > 0 = gone), as the
+  maximum over all holes, so there are no slots and nothing merges. 
+- A shell hole is a circle on the struck face. It reaches the other face as `sqrt(R² - thickness²)` when it is wider
+  than the wall is thick (20 cm concrete: almost always; 112 cm sandbag wall: only big shells).
+- A hit inside an existing opening is a shell through the hole (collision has no holes): deep inside, it widens that
+  hole by a quarter of its own radius (aimed fire keeps biting at its aim points); near the rim it bites its own
+  circle out of the edge. A cluster of hits leaves a ragged, lobed opening, not one inflated round hole.
+  Over `FieldSettings.MaxHoles` (160) the nearest hole grows instead.
+- The first damage creates the texture (transient, `NAME_None`: a name unique in the component collided in the
+  transient package and two walls shared one texture) and a dynamic instance per damaged slot; full repair puts the
+  opaque materials back. Repair closes holes, then breaches, newest first, and rebuilds the field.
+- Removed area, the health cap and the collapse sampling read the field, so overlaps are not counted twice.
+- Materials: `Tools/WallChunks/make_wall_field_holes_material.py` builds `M_RusBunker_Concrete_WallHolesField` and
+  `MM_Rus_SandBag_01_WallHolesField` from the opaque masters, and `<WallHoles MI>Field` instances (two-sided, darkened
+  back faces, `WallFieldRebar` 1 on concrete, 0 on sandbags). One texture sample + two noise samples: PS 424 / 413
+  instructions against 438 / 427 for the slot masters.
+
+### Tank breaches (`UWallTankBreachComponent`)
+
+- **Who breaks what:** only the human player's (player 1) medium and heavy tanks break walls, and only walls of the AI
+  side (the Soviet walls). A Soviet tank never breaks, damages or plans through its own wall; a missing RTS component
+  means no breach. The breachable Rus walls also ignore all damage from their own side (`AWallActor::TakeDamage`:
+  shells, splash, bombs, abilities; the attacker is the projectile's shooter, else the causer's or instigator's RTS
+  component), and a point hit inside a fallen breach does nothing (the shell flies through the gap).
+- **Nav:** at setup the wall's own blockers (actor nav modifier, nav-blocker child actors) switch off and boxes along the
+  wall's centre line (1.8 m half depth) take over in `UNavArea_BreachableWallEnemyOwned` (`..._PlayerOwned` on a
+  player wall: nobody plans through it). `URTSWallGateNavQueryFilter` builds the filter per querier: player medium and
+  heavy tanks get the area at cost 1 plus a 3 m entering cost (a gap or gate right beside them wins); everyone else
+  excludes it. Unfiltered queries (convoy routes, survival planners) see an obstacle's cost. The 4 `RTS_NavFilter_*`
+  Blueprints were reparented onto that filter (2026-11-16); without it the walls block every unit (`NavArea_Null`).
+  Fallen breaches are left open for everyone (30 cm inset per side).
+- **The break:** the hull's footprint (width from the tank's nav radius, length from its colliding bounds) is clipped
+  against the centre line every 0.05 s; the breach is the union of what it covered plus 25 cm per side, from the ground
+  (a ragged 18 cm stub stays) to the hull's height. A step that cuts nothing new is skipped; a tank through an existing
+  gap breaks nothing, plays nothing and is not slowed.
+- **The fall:** 0.45 s after the first break the slab over the hull drops and the edges crumble out to a V
+  (0.45 cm per cm of height) over 0.3 s. A stretch between the V and a free wall end narrower than 0.6 x the wall height
+  falls too. Dust rises, rubble (22 pieces of the wall's debris meshes, 0.7-1.7 m, no collision) lands at the gap
+  edges, mostly on the exit side, a rubble decal stays, and flags or poles on that stretch of the wall topple along the
+  tank's travel and drop to the ground (0.7 s), where they stay.
+  Broken rebar (one mat, bars of random length into the gap) stays in the edge band; the rim is pale fresh fracture.
+  Under fog of war only the dust and sound are left out.
+- Debris only comes from wall that was standing and outside the hull, falls along the tank's travel (push 0.45, fall
+  0.2 speed). The wall loses `removed share x max health` (applied after the update loop, it can kill the wall); a
+  wall without health collapses as from a kinetic hit. Breaches do not use up the shell hole budget.
+- While its hull pushes through, a medium tank is held to 40 % travel speed (heavy 60 %), half turn rate and
+  acceleration (`ATankMaster::SetMobilityRestriction`, source = the breach component), released once it is clear.
+- Setup: `RTS.WallBreach.ConfigureRusWall` (`WallTankBreachAuthoring.cpp`) via `Tools/WallChunks/Breach/
+  wall_breach_setup.py`. Child walls only get their own damaged materials; field mode, breach and nav are inherited.
+- Test: `sh Tools/WallChunks/Breach/run_breach_test.sh <run>` (throwaway DebugGame editor on `RTS_ToCopySmall`;
+  walls owned by player 2): player Pz IV through the long wall and the corner, player Tiger through the sandbag wall,
+  player Luchs round, a Soviet Pz IV against (and teleported onto) its own wall, friendly fire and a shot into a breach,
+  all 9 Blueprints, 45 + 28 debug hits, per-querier paths before and after, lethal damage after a breach. Pictures come
+  from a scene capture in the PIE world. Results in `Saved/WallChunks/Breach/<run>`.
+- Mission replay (2026-11-16, run `mission2`): `BREACH_SCRIPT=mission_wall_replay.py BREACH_MAP=/Game/RTS_Survival/Maps/
+  GerMissions/Ger_IntroMission sh run_breach_test.sh <run>` opens the map in a throwaway editor (never saved), lists
+  every Rus wall's runtime setup (all 11 there: owner 2, breach component, breachable nav area) and sends a player
+  Tiger, placed before play, through a Soviet wall with open ground on both sides: it broke through
+  `Rus_Wall_Concrete_LongSandBagsNoFlag` (21 % of the face removed) and came out 14 m behind it.
+- Collision gap: once a breach has fallen, the mesh stops blocking projectiles, weapon traces and visibility; query-only
+  boxes along the standing stretches (the mesh's own responses, no tank channels) block them instead, rebuilt per breach
+  and switched off when the wall dies. Shells and sight lines pass the gap; the mesh keeps the tank overlap.
+- Not done: sandbag walls are cut like concrete (their rubble is sandbag pieces, but no slumped bag pile); rubble has no
+  collision (it lies at the gap edges and would otherwise snag units the nav does not know about).
+
+### Berlin ruin walls: heavy tanks only (2026-11-16)
+
+Owner's request: "on the berlin map we have many ruins walls; not full ruin buildings. only for those walls make sure
+they are damageable by heavy tanks like we just implemented that for the soviet walls", then "make sure the heavy
+vehicles can drive through those walls; right now they avoid them".
+
+- **Which pieces:** the wall pieces `BP_BerlinRuin_B1_Facade1St_A/B`, `B2_Facade2St_A/B`, `B3_Facade4St`,
+  `B4_Firewall`, `B5_CornerL`, `B6_Stub_A/B`. Not the E-series building shells, the B7 wall cores or the B8 debris beds.
+  Setup: `Tools/WallChunks/Breach/berlin_ruin_breach_setup.py` (`run_berlin_breach_setup.sh`); the kit builder
+  `ruin_blueprints_build.run()` calls it at its end, so a kit rebuild keeps it.
+- **Settings:** `bHeavyTanksOnly`, `bBreachUnownedWall` (the ruins have no RTS component), 75 cm side margin (Rus 25),
+  250 cm nav half depth, 60 cm thick wall line at mesh x = 0 (B5: the two legs of the L). Material
+  `MI_BerlinRuin_Wall_HolesField` on `M_BerlinRuin_WallHolesField` (no rebar, brick-brown inner tint, two-sided).
+- **Why heavies avoided them:** every piece has hidden `NavBlock_NN` boxes (dynamic obstacles, `NavArea_Null`). At play
+  the breach component sets them to `UNavArea_BreachableWallHeavyOnly`; the filter opens that area for player heavies
+  with **no entering cost** (a ruin is a wall box plus heap boxes, each entered separately: the 3 m Rus cost added up
+  to a detour). Two engine traps on the way: `UShapeComponent::SetAreaClassOverride` only stores the area, so the box
+  is pushed with `FNavigationSystem::UpdateComponentData`; and the nav setup must not run on a ruin that already died.
+- **Tall or short pieces come down whole:** B3 and B4 (`bKillWhenTopFalls`) clear their whole run when the top falls,
+  then die. Any wall whose fallen breach leaves 95 % of the face removed (the free-end rule takes B1, B2 and B5 whole)
+  dies too, so the kit's own death (debris, dust, sink) plays instead of an invisible live wall.
+- **Remnants keep the gap:** when a breached ruin dies, the kit's boxes stay off, the centre-line nav blocks stay at
+  ground level (exact world box, no longer rebuilt from the owner when the remnant sinks:
+  `URTSNavCollisionEnvObstacle::SetKeepExactBoxWhenOwnerMoves`) in `NavArea_Null`, the weapon blocks ride on the
+  sinking mesh, and death heaps that would land on the open breach are dropped from `DeathHeapsSmall/Large`. A dead
+  remnant is never breached again; a ruin killed before any tank came keeps the kit's full nav.
+- **Test:** `BREACH_SCRIPT=berlin_ruin_breach_test.py sh run_breach_test.sh <run>`: Tigers through B1, B2, B3, B5,
+  B6 (paths through before: heavy only), a Pz IV round B2, a Tiger round a dead B4, then B6 killed after its breach
+  (paths through for all four agent types). Passed in run `berlin6`; the Rus wall test passed again after (`r20`).
+- **Maps:** the B pieces on Ger_Berlin need no map change (the mesh never carved the navmesh; the boxes switch at play).
+
+### Wire fence: every vehicle breaks it (2026-11-18)
+
+Owner's request: `BP_Industrial_Dest_FenceWire` should react to vehicles like the Soviet concrete (take damage from
+the crossing, not die outright), crushable and damageable by all vehicles, light ones too.
+
+- **Mode:** `FWallTankBreachSettings::bAnyVehicleBreaks`: light, medium and heavy vehicles of every player break it,
+  whoever owns it (the fence has no RTS component); infantry go round. The mesh overlaps `COLLISION_OBJ_ENEMY` too, so
+  AI vehicles raise the overlap. Push speed shares: light 0.75, medium 0.85, heavy 0.9 (`LightTankPushSpeedShare` new).
+- **Nav:** `UNavArea_BreachableAnyVehicle`: plain ground for unfiltered queries and planners
+  (`URTSClosedBreachableWallsQueryFilter` leaves it open), as the old `BlockCharLight` area was. `URTSWallGateNavQueryFilter` opens it for any Light/Medium/Heavy querier of a known side (cost 1,
+  entering cost 100: fences stand in chained runs) and excludes it for characters. The BP's own
+  `RTSNavCollisionEnvObstacle` (`RTS_NavArea_BlockCharLight`) is switched off at play like the Rus wall modifiers.
+- **Old crush replaced:** the BP still calls `SetupCrushDestructionOverlap` (instant kill by medium/heavy);
+  `ADestructableEnvActor::SetupCrushDestructionOverlap` now returns early on any actor with a
+  `UWallTankBreachComponent`, so the breach decides (no Berlin ruin or Rus wall calls it).
+- **Holes:** field mode, `M_Fence_WallHolesField` (field master of the masked `M_Fence`, chain-link alpha kept) and
+  `MI_SM_RTS_Fence_Wire_1_Fence_WallHolesField` (no rebar, two-sided). Wall line mesh x = -8 from y -7 to 358
+  (chain-link plane; posts lean to -80), thickness 10. VSlope 0.15, EdgeBand 30, stub 4 cm, 8 rubble pieces of the
+  fence debris, no decal, small dust, the fence's metal destruction cue, top falls after 0.15 s.
+- **Health:** the BP sets its health to 125 at BeginPlay. A Luchs (262 cm hull) tears ~92 % of a 3.6 m panel (10 HP
+  left, one post stub stands); a Pz IV or Tiger takes 99.6 % and the 95 % rule kills it into the BP's own destroyed
+  mesh (with `MI_Fence`). A chained neighbour is held up (free-end rule) and only clipped by wide hulls (Tiger).
+- **Setup:** `Tools/WallChunks/Breach/fence_breach_setup.py` (`run_fence_breach_setup.sh`); new authoring args
+  `AnyVehicle=1 NoDecal=1 LightShare= MediumShare= HeavyShare= StubHeight= EdgeBand= DustScale= HealthScale=
+  TopDelay= TopDuration= RubblePieces=`.
+- **Test:** `BREACH_SCRIPT=fence_breach_test.py sh run_breach_test.sh <run>` (applies the setup in memory first):
+  rows of 5 chained fences; player Luchs, Pz IV, Tiger, Puma, Kettenkrad and an enemy (player 2) Luchs each cross the
+  middle one (`FENCE_FROM_DISK=1` tests the saved Blueprint without the in-memory setup). Run `fence2` (2026-11-18,
+  ALL PASSED): all six breached, crossed straight (|dx| <= 25 cm), fence damaged; before: all vehicle
+  paths through the row, infantry round; after: the gap open for everyone. Shell hits: a 75 mm test hit cuts a hole;
+  a 20 mm test hit 40 cm in front cut none (test geometry, see below); on the face it cuts a hole.
+- **Saved and checked (2026-11-18):** Blueprint saved after the Development rebuild; run `fence3_disk`
+  (`FENCE_FROM_DISK=1 BREACH_EXE=UnrealEditor.exe`, the saved asset on the Development editor): ALL PASSED.
+
+### All destructible fences (2026-11-18)
+
+Owner's follow-up: "there are more fences in the game; find them and implement this the same way: procedural damage +
+damage when driven into". `Tools/WallChunks/Breach/fence_breach_setup.py` now configures every destructible fence from
+one table (wall line, thickness, field materials per slot, settings):
+
+| Blueprint | Who breaks it | Field material(s) | Line (mesh space) |
+|---|---|---|---|
+| `Industrial/BP_Industrial_Dest_FenceWire` | any vehicle, any side | `MI_SM_RTS_Fence_Wire_1_Fence_WallHolesField` | x -8, y -7..358 |
+| `Airport/BP_Airport_Dest_FenceWire` | any vehicle, any side | `Airport/Holes/MI_Fence_02_M_Inst_WallHolesField` | y 0, x -3..373 |
+| `Military/ConcreteWall/BP_Dest_Military_ConcreteFence_1` / `_2` (X x3) | medium + heavy, any side | `MI_SM_Scorch_MilitaryWalls1_ScorchAtlas_WallHolesField` + `MI_M_Barbed_1_WallHolesField` (barbed wire slot) | y 0, x -326..326, 92 cm |
+| `BP_Dest_PostApo_ConcreteFence` / `Long` (Y x3) | medium + heavy, any side | `MI_SM_Scorch_Fence_Concrete_ScorchAtlas_WallHolesField` | x 0, y -170..170, 20 cm |
+| `BP_Dest_PostApo_ConcreteFenceCorner` | medium + heavy, any side | `..._Corner_ScorchAtlas_WallHolesField` | L: x 0 y -170..0, y 0 x 0..175 |
+| `BP_Dest_PostApo_ConcreteFenceGate` | medium + heavy, any side | `MI_SM_Container_FenceGate_ContainerBlue_WallHolesField` | x -5, y -3..338, 10 cm |
+
+- **New mode** `FWallTankBreachSettings::bAnySideBreaks` (concrete): medium and heavy vehicles of every player, whoever
+  owns the fence; nav area `UNavArea_BreachableAnySideMediumHeavy` (filter opens it for medium/heavy of a known side,
+  entering cost 300; plain ground for planners), the same classes the old `BlockCharLight` area and MediumOrHeavy crush
+  allowed. Concrete keeps the Rus wall break (V 0.45, rubble decal, `Collapse_Cue`), the gate a lighter metal one.
+- **Airport fence** had no holes: the authoring command adds a `WallHoleDamage` (`AddHoles=StaticMesh Debris=...
+  OwnDeath=1`, the Industrial fence's chain-link debris). `OwnDeath`: the BP keeps its destroyed-mesh swap;
+  `UWallHoleDamageComponent` now restores the intact materials when an owner that keeps its own death dies
+  (`OnDestructibleOwnerDied_KeepOwnDeath`, before the BP death runs), so the swapped mesh never shows the hole material.
+- **Health** (set by the BPs at BeginPlay): wire 125, Military 250 / 166, PostApo and gate 150. A Pz IV takes ~74 % of a
+  Military panel (65 HP left); PostApo panels and the gate go whole and die into their own death.
+- **Not changed:** `Obstacles/Industrial/BP_Industrial_WireFence_VehiclePartsSquare` (indestructible obstacle, not a
+  destructible actor), `BP_Prx_Airfield_Fences` (procedural proxy), the spline fences and walls
+  (`BP_DestSpline_*`, incl. the farm fence: instanced segments with their own per-segment crush, no hole component),
+  the marketplace sample BPs, barbed wire and hedgehogs (barricades).
+- **Authoring** `NoSave=1`: compile in memory only (tests); the test passes it unless `FENCE_FROM_DISK=1`.
+- **Test** `fence_breach_test.py`, run `fences3` (2026-11-18, in memory): ALL PASSED, 11 lanes: Luchs through both wire
+  fences, enemy Pz IV through the airport fence (dies into `SM_RTS_Fence_WireBlack_Destroyed_*` with `Fence_02_M_Inst`),
+  Pz IV / Tiger through Military 1/2, PostApo, gate and a corner flanked by long fences, enemy Tiger through PostApo Long;
+  Luchs into Military 1 and PostApo: no breach, no damage, drives round. Paths per agent before/after; 20 mm and 75 mm
+  test hits cut holes in a wire and a concrete fence. Test pitfalls: a debug hit is a splash point (a 17 cm hole must sit
+  on the face; 40 cm in front cuts nothing), and a short row (8.5 m) is rightly driven round (entering cost 300).
+- The earlier note on the 20 mm miss (`MinHoleRadius`) was wrong: it was that splash-distance test geometry.
+- **Saved** 2026-11-18 20:35: all 8 Blueprints saved by `run_fence_breach_setup.sh` after a Development rebuild
+  (the airport fence got its `WallHoleDamage` component). Run `fences_disk` (`FENCE_FROM_DISK=1`, Development
+  `UnrealEditor.exe`, the saved Blueprints): ALL PASSED, same 11 lanes and both test hits.
+
+### Adversarial reviews after completion (2026-11-16)
+
+Two read-only reviews of the finished work (code, logs, pictures). What changed:
+
+- **Free ends:** the free-standing minimum is capped at `MaxFreeStandingWidth` (250 cm), and an end touching another
+  wall piece (`ADestructableEnvActor` within 40 cm beyond the path end) counts as held up: a breach 3.5 m from the joint
+  of two chained long walls stops short of the joint and leaves the neighbour untouched (test lane `H_chain_medium`).
+- **Tall walls:** the top's fall lasts `TopCollapseDuration` per 2 m of wall over the hull. Berlin ruins use `VSlope`
+  0.15 (setup arg; brick over a ragged hole holds nearer vertical): B2 now keeps both ends (46 % removed instead of
+  98 %); B1 (7 m) and B5's legs still come down whole and die (any fallen breach over 95 % of the face kills the wall).
+- **Lanes:** each crossing records the stretch its hull cut (`M_TankLanes`). Kit nav boxes switch off only in a lane
+  (heaps beside it keep blocking), and death heaps are dropped only over a lane. Rubble grows with the fallen run (up to
+  3x `RubblePieces`).
+- **Nav gap:** `NavGapInset` is -25 (blocks stop 25 cm short of the jagged edge). The engine grows every block by the
+  agent radius, so the old +30 left a Pz IV gap (310 cm) narrower than a medium agent (320): a Soviet medium now paths
+  through a gap a Pz IV broke (checked on lanes A, D, H).
+- **Ruin cost:** player heavies pay 1.05 per cm in the ruin area (the area grown by the agent radius on both sides).
+  1.15 already made B5 (a corner with a 6 m rubble core) a detour, which the owner asked against.
+- **Weapon blocks** follow the fallen V in 50 cm columns (tops merged within 20 cm); shells and sight lines pass over
+  its shoulders. Shell holes still block (as before the breach).
+- **Back-face holes** count as removed area (front or back channel), so a shell on the far face of a thick sandbag wall
+  swaps the material, writes the mask and counts against the health cap (test `back_face`).
+- **Hanging wall:** after each hit and every field rebuild, `FWallHoleField::FindUnsupportedIslands` flood-fills from
+  the two foot rows; wall held only by bridges inside 20 % of a hole radius beyond its edge, or by nothing, is removed
+  on both faces and thrown as debris (pieces over 400 cm²).
+- **Re-entrancy:** a new crossing only arms the update timer; overlaps raised during the update loop are queued.
+- **Tests:** all passed on the finished state: `r23` (Rus walls, incl. back face, chained walls, pier, Soviet medium
+  through a gap), `berlin12` (Berlin), `mission10` (Ger_IntroMission: a player Tiger through a Soviet sandbag wall).
+- **Hole edges in cm:** shell holes store `f = (radius - distance) / 40 cm` (`HoleEdgeScale`) instead of
+  `1 - distance / radius`. The shader is unchanged, but its edge noise (about +-15 cm) and scorch ring (about 12 cm) are
+  now the same on every hole; before they scaled with the radius, so big holes wobbled by most of a metre and wore a
+  metre of soot (the melted look). No material asset changed. The support test for hanging wall uses 14 cm.
+- **Piers:** when a breach's top starts and again when it finishes falling, a stretch between it and a breach that has
+  already fallen, narrower than the free-standing minimum, falls with it (test lane `J_pier_medium`: two Pz IVs 5.6 m
+  apart; a sight line through the middle of the pier passes afterwards).
+- **Unfiltered planners:** the strategic AI waypoints (`StochasticHelpers`), convoy routes, survival POI/base/start
+  checks and wanderers query with `URTSClosedBreachableWallsQueryFilter` (every breachable wall area excluded, all else
+  the navmesh's defaults), so they never route through an intact wall. A cost threshold was tried first and dropped:
+  `NavArea_Obstacle` (scorched city) has the same 1e6 cost.
+
+### Post-completion review rounds (2026-11-16, on the finished build)
+
+Round 1 (on `r23`/`berlin12`/`mission10`), acted on:
+- **Hole shapes:** shell holes are jittered 7-corner polygons (corner radius +-24 %, rotation and jitter seeded by the
+  hole's spot, so a field rebuild draws the same shape) instead of circles: straight fracture edges and corners.
+- **Slivers:** a solid texel with broken-through texels within 2 texels on two opposite sides (under about 18 cm) falls
+  with the hole even while still joined (no debris for slivers).
+- **V start:** the V starts at the lower of 0.8 x hull height and half the wall's height, so a wall barely taller than
+  the hull no longer gets a straight-sided doorway.
+- **Hull height:** clamped to the tank's nav agent height (the colliding bounds include gun, antennas and hatches:
+  Pz IV 375 cm, now 250; Tiger 300).
+- **Chained walls:** only a living wall piece with a hole component holds an end up (not a dead one, a crate, a fence).
+- **Ruin death heaps:** a missing `DeathHeapsSmall/Large` array is reported (`ReportError`) instead of skipped quietly.
+- **Planners:** the cost threshold replaced by `URTSClosedBreachableWallsQueryFilter` (see above).
+- **Mission replay:** the broken route read and the nav-build probe (it fired an engine ensure from Python) are gone;
+  a player Luchs 8 m along the wall is the negative control (it must not drive straight through; at 3 m vehicle
+  avoidance pushed the Tiger aside). Ger_IntroMission `mission12`: Tiger through within 183 cm of its line, 24 % of the
+  sandbag wall removed, the Luchs never crossed.
+- **Ger_Berlin replay** (`berlin_map1`: `BREACH_MAP=/Game/RTS_Survival/Maps/GerMissions/Ger_Berlin
+  BREACH_WALL_PREFIX=BP_BerlinRuin_B BREACH_ACROSS=forward`, never saved): a player Tiger ordered 30 m across a ruin
+  block drove through `BP_BerlinRuin_B1_Facade1St_A` and the B1 piece chained to it (the chained ends kept both gaps
+  partial: 39 % and 58 % removed) and then through a B2 (63 %), crossing after 6 s; the Luchs went round (43 m off its
+  line). The replay's verdict is now "crossed and the picked wall breached"; the drift off the straight line (5.7 m
+  here, round the city's rubble) is kept as information.
+Round 2 (on `r24`/`berlin13`/`mission12`/`berlin_map1`), acted on; then `r25` and `berlin14` passed (one run each):
+- **Splash:** weapon blocks are `ECC_WorldDynamic`, not the mesh's destructible type: area damage queries that type
+  and hits every component, so a breached wall took splash once per block. Shells and sight find blocks by channel.
+- **Late widening:** a hull that keeps cutting after the top fell (oblique crossings) widens its lane; when it leaves
+  the wall the free ends are checked again and nav, weapon blocks and flags catch up (`RefreshAfterLateWidening`).
+  Flags never start a second fall.
+- **Breach islands:** breach steps run the hanging-wall/sliver pass too (before, the next shell anywhere on the wall
+  dropped them).
+- **Memory:** a field's texels are allocated on its first write; until then every reader sees intact wall (hundreds
+  of Berlin pieces are never damaged).
+- **Infantry at walls:** nav blocks reach the wall's half thickness + 40 cm (at most `NavBlockHalfDepth`); the engine
+  grows them by each agent's radius. Infantry now path 0.8-1.1 m from a Rus wall's centre (was over 2 m).
+- **Own breach:** the pier check skips its own breach by index, not by float equality.
+- **Rubble instanced** (owner's request, 2026-11-16): each wall keeps one `UInstancedStaticMeshComponent` per debris
+  mesh (no collision, no nav, world-space instances, not attached, so a sinking remnant leaves them); a breach adds
+  instances instead of up to 66 components (`r26`: wall A's rubble is 7 instanced components). `r26` and `berlin15`
+  passed.
+- Larger follow-up, not done: put the heavy-only area on the ruin kit's `NavBlock` boxes at authoring time instead
+  of switching 426 pieces when Ger_Berlin starts (measure first).
+Final-state reviews A and B (2026-11-16, read-only, on the `r26`/`berlin15` build; nothing changed after them). Open
+pointers, for the owner to pick:
+- Look: shader edge noise (+-15 cm) is not in the CPU field, so the island/sliver pass misses the lacy threads the
+  shader draws; move the noise to the CPU write, keep about +-3 cm in the shader (medium). Rebar draws 20 cm cell
+  outlines: draw bars across the edge only (small; the field masters are dedicated copies, so editing them is safe).
+  First contact cuts the whole hull outline at once: grow the cut with the push (medium).
+- Correctness: islands that fall during a breach are written as shell holes (R/G, not B): they count against the
+  shell budget and weapon blocks treat them as standing (small). A chained neighbour holds an end up even where it has
+  a fallen breach at the joint (small). Rubble is sized from `M_TankLanes.Last()` instead of the crossing's lane (small).
+  Dead Rus walls keep their nav blocks for 4.5 s while invisible (small). Cover finder still offers cover across a
+  fallen gap (the mesh stays `ECC_Destructible` with full collision) (medium).
+- Persistence and performance: rubble and toppled flags vanish with the wall actor (world subsystem, medium). Walls
+  overlap Soviet units for nothing (overlap player objects only, small). Breach steps re-scan and re-upload the whole
+  field every 0.05 s (dirty regions, medium). Ger_Berlin sets up 423 ruins' nav in one frame (measure; baking the area
+  into the kit needs `CollectKitObstacleBoxes` to keep Null as the kit's own area).
+- Design and authoring: no per-instance "unbreachable" switch for mission walls (small). Setup re-runs replace the
+  whole settings struct (tuned Blueprint values lost), save Blueprints with a missing material, resave unconditionally,
+  and the Berlin setup execs an absolute path (small). The Rus 3 m entering cost understates the slowdown (small).
+- Checks: Lumen/distance fields may still darken the gap (check in the Lumen view). AGENTS.md: a few raw `IsValid` on
+  members, a const function that edits the owner by reflection, two functions over 60 lines, one-line lambdas.
+- Tests: `real_fire` is not part of `all_passed`; captures are too dark to judge the look.
+Owner-picked fixes from the final-state reviews (2026-11-16; `r28` and `berlin16` passed):
+- **Wall falling with a breach is breach:** an island or sliver next to breach texels is removed on all three channels
+  (R, G and B), so it no longer uses up the shell hole budget and weapon blocks treat it as open air.
+- **Chained ends:** a neighbour only holds an end up where its own field is not in a breach at the probe point.
+- **Rubble per crossing:** rubble is sized from the crossing's own lane (`LaneIndex`), not the last lane added.
+- **Dead Rus walls:** their nav blocks are destroyed at death (the wall is hidden at once; the actor lives 4.5 s);
+  ruins keep the remnant handling.
+- **Overlap events:** the wall overlaps the human player's objects only; an AI-side overlap response becomes ignore.
+- Verification: `r27` did not finish (PIE at about 4 s per frame while a game and the intro cinematic render ran on
+  the machine); re-run once the machine was free: `r28` (Rus walls) and `berlin16` (Berlin pieces) passed.
+- Not taken: making ruin breaches costlier (the owner asked for heavies to drive through); spall-coloured rim, rebar
+  in shell holes and one-sided breach noise (shader asset changes on shared masters); rubble as ISM and in the wall's
+  colour; fog-of-war and 160-hole stress runs. The Python nav-build probe in the RTS_ToCopySmall tests still fires one
+  handled engine ensure per run (a static Blueprint call on the class default object), harness only.
+- **Mission replay:** Python's synchronous path queries return nothing on Ger_IntroMission (even 6 m from any wall),
+  and the tank's own path following does not expose its route to Python. The replay therefore judges the drive: a
+  tank only drives where its route goes, so the Tiger must cross the wall line within 3 m of the straight line front
+  -> back (run `mission10`: crossed after 10 s, 196 cm off the line at most, 21 % of the sandbag wall removed).
+
 ## Open points
 
 - The collapse reads as a blast, not a falling wall. Tune `CollapseSettings.DeathSpeedScale`, or add a slumping
@@ -569,6 +1187,8 @@ paint) keeps its material and gets no holes. One agent per Blueprint (`Tools/Wal
 - Other walls: `SM_Wall_13` (corner, two slabs) needs its own run of the script (two slabs, its own outline). The
   sandbag wall and the refinery walls need a different cut.
 - Save/load does not restore holes. Environment walls do not heal.
+- Rus walls (fixed 2026-11-16): the original nav blockers stopped about 1.8 m short of the wall's end at the actor
+  origin, so infantry and light vehicles pathed through there. The breach component's boxes now cover the full length.
 - **Debris sizing (fixed 2026-11-09).** `BuildLayoutFromMesh` compared a chunk's triangle area, which counts every
   surface the chunk spans, with a debris piece's one-sided bounds area. So nearly every chunk got the largest piece,
   at up to 2×.

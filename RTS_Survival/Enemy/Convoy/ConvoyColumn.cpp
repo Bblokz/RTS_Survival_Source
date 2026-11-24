@@ -8,6 +8,7 @@
 #include "NavigationData.h"
 #include "Navigation/PathFollowingComponent.h"
 #include "RTS_Survival/Enemy/Convoy/ConvoyDefinition.h"
+#include "RTS_Survival/Enemy/Convoy/SurrenderingCargoTruck/SurrenderingCargoTruck.h"
 #include "RTS_Survival/GameUI/MiniMap/CustomIcons/MinimapIconTypes.h"
 #include "RTS_Survival/Interfaces/Commands.h"
 #include "RTS_Survival/Player/Abilities.h"
@@ -62,6 +63,11 @@ void AConvoy::TickConvoy()
 		}
 		return;
 	}
+	UpdateBehavioursAnyState(Now);
+	if (M_Outcome != EConvoyOutcome::None)
+	{
+		return;
+	}
 	if (M_State == EConvoyState::TrucksLost)
 	{
 		UpdateTrucksLost(Now);
@@ -72,6 +78,12 @@ void AConvoy::TickConvoy()
 		SetState(EConvoyState::Cruise, TEXT("formed"));
 	}
 	UpdateCombat(Now);
+	UpdateBehaviours(Now);
+	if (M_Outcome != EConvoyOutcome::None)
+	{
+		// A behaviour event listener ended the convoy.
+		return;
+	}
 	UpdateColumnReference();
 	UpdateTruckSpeeds();
 	UpdateEscortSpeeds();
@@ -99,7 +111,9 @@ void AConvoy::UpdateMemberSamples(const double Now)
 		}
 		Member.PreviousLocation = Member.Location;
 		Member.PreviousSampleTime = Now;
-		Member.RouteDistance = M_Polyline.ProjectLocation(Member.Location, Member.RouteDistance,
+		// A branch truck leaves the road: project it onto the whole route so its wreck's cache lands near it.
+		const float ProjectionHint = Member.GetIsOnBranch() ? -1.f : Member.RouteDistance;
+		Member.RouteDistance = M_Polyline.ProjectLocation(Member.Location, ProjectionHint,
 		                                                  ProjectionSearchWindow, Member.LateralOffset);
 		UpdatePathState(Member);
 	}
@@ -107,7 +121,7 @@ void AConvoy::UpdateMemberSamples(const double Now)
 
 bool AConvoy::GetIsTruckHoldingColumn(const FConvoyMember& Member, const double Now) const
 {
-	if (Member.Role != EConvoyUnitRole::Truck or not Member.GetIsAlive())
+	if (not Member.GetIsColumnTruck())
 	{
 		return false;
 	}
@@ -139,6 +153,11 @@ void AConvoy::UpdateColumnReference()
 	}
 	if (HoldingCount == 0)
 	{
+		if (GetAliveColumnTruckCount() == 0)
+		{
+			// Only branch trucks are left: the escorts wait where the column was instead of driving on.
+			M_MeasuredTruckSpeed = 0.f;
+		}
 		return;
 	}
 	if (M_State != EConvoyState::Forming)
@@ -163,22 +182,47 @@ void AConvoy::UpdateColumnReference()
 void AConvoy::UpdateTruckSpeeds()
 {
 	const FConvoySpeedSettings& Speed = M_Definition->Speed;
-	const bool bHalt = M_State == EConvoyState::Forming
-		or (M_State == EConvoyState::UnderAttack
-			and M_Definition->Combat.TruckBehaviour == EConvoyTruckCombatBehaviour::HaltBehindEscorts);
+	const bool bHalt = GetShouldTrucksHalt(GetNow());
+	// Flooring it after a spoiled stop, or a radio-boosted ambush zone; the restriction still caps at top speed.
+	const float SpeedMultiplier = GetTruckSpeedMultiplier();
 	for (FConvoyMember& Member : M_Members)
 	{
-		if (Member.Role != EConvoyUnitRole::Truck or not Member.GetIsAlive())
+		if (not Member.GetIsColumnTruck())
 		{
 			continue;
 		}
-		const float Cap = Member.CalibratedSpeed * Speed.TruckSpeedFraction;
-		const float Max = Member.CalibratedSpeed * (Speed.TruckSpeedFraction + Speed.TruckCatchUpFraction);
+		const float PaceFraction = Speed.TruckSpeedFraction * SpeedMultiplier;
+		const float Cap = Member.CalibratedSpeed * PaceFraction;
+		const float Max = Member.CalibratedSpeed * (PaceFraction + Speed.TruckCatchUpFraction);
 		// Zero for the truck that sets the column reference, negative for trucks ahead of their slot.
 		const float SlotError = M_ColumnReference + Member.SlotAlongOffset - Member.RouteDistance;
-		Member.WantedSpeed = bHalt ? 0.f : FMath::Clamp(Cap + Speed.SlotSpeedGain * SlotError, 0.f, Max);
+		const float Wanted = bHalt ? 0.f : FMath::Clamp(Cap + Speed.SlotSpeedGain * SlotError, 0.f, Max);
+		Member.WantedSpeed = GetStopLimitedSpeed(Member, Wanted);
 		ApplyWantedSpeed(Member);
 	}
+}
+
+bool AConvoy::GetIsMemberHeldInPlace(const FConvoyMember& Member) const
+{
+	if (Member.Role != EConvoyUnitRole::Truck)
+	{
+		return false;
+	}
+	const ASurrenderingCargoTruck* SurrenderingTruck = Cast<ASurrenderingCargoTruck>(Member.Actor.Get());
+	return SurrenderingTruck != nullptr and SurrenderingTruck->GetIsHeldInPlace();
+}
+
+bool AConvoy::GetShouldTrucksHalt(const double Now) const
+{
+	// Forming, unloading hunters, or standing at the exit while branch trucks still drive.
+	if (M_State == EConvoyState::Forming or GetIsDismountHaltActive(Now) or M_BehaviourRuntime.ExitReachedTime >= 0.0)
+	{
+		return true;
+	}
+	const bool bHaltForFight = M_State == EConvoyState::UnderAttack
+		and M_Definition->Combat.TruckBehaviour == EConvoyTruckCombatBehaviour::HaltBehindEscorts;
+	const bool bFloorItOverridesHalt = GetIsFloorItActive() and M_BehaviourPlan.Stop.bFloorItIgnoresHalt;
+	return bHaltForFight and not bFloorItOverridesHalt;
 }
 
 void AConvoy::UpdateEscortSpeeds()
@@ -297,7 +341,7 @@ void AConvoy::UpdateOrders(const double Now)
 void AConvoy::UpdateStationOrder(FConvoyMember& Member, const double Now)
 {
 	ICommands* Commands = Member.GetCommands();
-	if (Commands == nullptr)
+	if (Commands == nullptr or GetIsMemberHeldInPlace(Member))
 	{
 		return;
 	}
@@ -398,7 +442,7 @@ void AConvoy::UpdateStuck(const double Now)
 	{
 		const bool bShouldMove = Member.GetIsAlive() and Member.WantedSpeed > MinWantedSpeedToCheckStuck
 			and (Member.State == EConvoyMemberState::Station or Member.State == EConvoyMemberState::Returning)
-			and M_State != EConvoyState::UnderAttack;
+			and M_State != EConvoyState::UnderAttack and not GetIsMemberHeldInPlace(Member);
 		if (not bShouldMove)
 		{
 			Member.StuckWindowStart = -1.0;
@@ -463,7 +507,7 @@ void AConvoy::UpdateMinimapIcon()
 	float FrontDistance = -TNumericLimits<float>::Max();
 	for (const FConvoyMember& Member : M_Members)
 	{
-		if (Member.Role == EConvoyUnitRole::Truck and Member.GetIsAlive() and Member.RouteDistance > FrontDistance)
+		if (Member.GetIsColumnTruck() and Member.RouteDistance > FrontDistance)
 		{
 			FrontDistance = Member.RouteDistance;
 			Front = Member.Actor.Get();
@@ -509,6 +553,20 @@ void AConvoy::CheckForExit()
 	{
 		return;
 	}
-	Broadcast(EConvoyEventType::ReachedExit, nullptr, FString::Printf(TEXT("trucks=%d"), HoldingTrucks), RouteEnd);
+	if (M_BehaviourRuntime.ExitReachedTime < 0.0)
+	{
+		M_BehaviourRuntime.ExitReachedTime = Now;
+		Broadcast(EConvoyEventType::ReachedExit, nullptr, FString::Printf(TEXT("trucks=%d branch_trucks=%d"),
+		                                                                  HoldingTrucks, GetActiveBranchTruckCount()),
+		          RouteEnd);
+	}
+	// The convoy is done only when its branch part is done too; the column stands at the exit meanwhile.
+	const bool bWaitForBranch = GetActiveBranchTruckCount() > 0
+		and Now - M_BehaviourRuntime.ExitReachedTime < M_BehaviourPlan.Branch.MaxWaitAtExitSeconds;
+	if (bWaitForBranch)
+	{
+		return;
+	}
+	MarkAliveTrucksEscaped();
 	FinishConvoy(EConvoyOutcome::Escaped, true);
 }

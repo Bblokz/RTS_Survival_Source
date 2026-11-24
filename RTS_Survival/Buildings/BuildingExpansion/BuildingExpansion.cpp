@@ -2,6 +2,7 @@
 
 
 #include "BuildingExpansion.h"
+#include "RTS_Survival/Environment/DestructableEnvActor/WallChunkDamage/WallHoleDamageComponent.h"
 
 #include "BuildingExpansionEnums.h"
 #include "NiagaraComponent.h"
@@ -10,6 +11,7 @@
 #include "Interface/BuildingExpansionOwner.h"
 #include "Kismet/KismetMathLibrary.h"
 #include "RTS_Survival/RTSCollisionTraceChannels.h"
+#include "RTS_Survival/Collapse/DestroySpawnActorsParameters.h"
 #include "RTS_Survival/Behaviours/BehaviourComp.h"
 #include "RTS_Survival/Buildings/EnergyComponent/BuildingExpansionEnergyComponent.h"
 #include "RTS_Survival/Buildings/BuildingExpansion/PitDefense/PitDefenseComponent.h"
@@ -18,6 +20,7 @@
 #include "RTS_Survival/Collapse/FRTS_Collapse/FRTS_Collapse.h"
 #include "RTS_Survival/Collapse/VerticalCollapse/FRTS_VerticalCollapse.h"
 #include "RTS_Survival/FOWSystem/FowComponent/FowComp.h"
+#include "RTS_Survival/Game/Players/RTSPlayers.h"
 #include "RTS_Survival/GlobalAbilitySystem/GlobalAbilitiesManager/GlobalAbilitiesManager.h"
 #include "RTS_Survival/Player/CPPController.h"
 #include "RTS_Survival/Resources/ResourceDropOff/ResourceDropOff.h"
@@ -27,14 +30,18 @@
 #include "RTS_Survival/RTSComponents/TimeProgressBarWidget.h"
 #include "RTS_Survival/RTSComponents/CargoMechanic/Cargo/Cargo.h"
 #include "RTS_Survival/UnitData/BuildingExpansionData.h"
+#include "RTS_Survival/Units/Tanks/WheeledTank/BaseTruck/NomadicDeployAnimation/NomadicDeployAnimationComponent.h"
+#include "RTS_Survival/Units/Tanks/WheeledTank/BaseTruck/NomadicDeployAnimation/NomadicDeployAnimationData.h"
 #include "RTS_Survival/Utils/RTSBlueprintFunctionLibrary.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/CollisionSetup/FRTS_CollisionSetup.h"
+#include "RTS_Survival/Utils/CollisionSetup/RTSPlayerCollision.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 #include "RTS_Survival/Weapons/HullWeaponComponent/HullWeaponComponent.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/AttachedWeaponAbilityComponent/AttachedWeaponAbilityComponent.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/TurretSwapComponent/TurretSwapComp.h"
 #include "RTS_Survival/Weapons/Turret/CPPTurretsMaster.h"
+#include "RTS_Survival/Buildings/BuildingExpansion/BxpBonuses/PanzerwerferReloadBonus/PanzerwerferReloadBonusSubsystem.h"
 
 ABuildingExpansion::ABuildingExpansion(FObjectInitializer const& ObjectInitializer) :
 	Super(ObjectInitializer),
@@ -148,6 +155,13 @@ void ABuildingExpansion::StartExpansionConstructionAtLocation(
 	// Set the construction mesh on the building expansion.
 	BuildingMeshComponent->SetStaticMesh(M_ConstructionMesh);
 
+	if (GetUsesDeployAnimation())
+	{
+		constexpr float NewConstructionProgress = 0.f;
+		StartDeployAnimationConstruction(NewConstructionProgress);
+		BP_OnStartBxpConstruction();
+		return;
+	}
 	// Caches the original materials and applies the construction materials to all slots.
 	// Starts the progress bar and timer to reapply the original materials.
 	StartConstructionAnimation(M_BuildingTime);
@@ -245,6 +259,11 @@ void ABuildingExpansion::RevealCachedMaterialsUpTo(const int32 MaterialCount)
 
 void ABuildingExpansion::StartPackUpBuildingExpansion(const float TotalTime)
 {
+	if (GetUsesDeployAnimation())
+	{
+		StartDeployAnimationPackUp(TotalTime);
+		return;
+	}
 	DestroyBuildingAttachments();
 	SetAllTurretsDisabled();
 	SetMeshToConstructionMesh();
@@ -285,6 +304,11 @@ void ABuildingExpansion::CancelPackUpBuildingExpansion()
 	{
 		return;
 	}
+	if (GetUsesDeployAnimation())
+	{
+		CancelDeployAnimationPackUp();
+		return;
+	}
 	SpawnBuildingAttachments();
 	SetMeshToBuildingMesh();
 	World->GetTimerManager().ClearTimer(MaterialReapplyTimerHandle);
@@ -319,6 +343,7 @@ void ABuildingExpansion::FinishPackUpExpansion()
 	RemoveExtraResourceStorage();
 	RemoveFieldDefenseDiscount();
 	RemoveGlobalAbilityCooldownBonus();
+	RemovePanzerwerferReloadBonus();
 	SetStatusAndPropagateToOwner(EBuildingExpansionStatus::BXS_PackedUp);
 	BP_OnFinishedPackupBxp();
 	Destroy();
@@ -394,6 +419,11 @@ void ABuildingExpansion::AddAdditionalHealth(const float AddedHp, const float Ad
 
 void ABuildingExpansion::SetupCollisionHitByEnemy(TArray<UPrimitiveComponent*> Primitives)
 {
+	// Hit by the players hostile to the owner. Blueprints may call this before the RTS component is cached, and an
+	// expansion without a player as owner keeps the human side this call was written for.
+	const int32 OwnerOfActor = FRTSPlayers::GetOwningPlayerOfActor(this);
+	const int32 OwningPlayer = FRTSPlayers::IsValidPlayer(OwnerOfActor) ? OwnerOfActor : RTSPlayers::HumanPlayer;
+	const ECollisionChannel OwnerObjectChannel = FRTSPlayerCollision::GetOwnerObjectChannel(OwningPlayer);
 	for (auto EachPrimitive : Primitives)
 	{
 		if (not IsValid(EachPrimitive))
@@ -401,9 +431,9 @@ void ABuildingExpansion::SetupCollisionHitByEnemy(TArray<UPrimitiveComponent*> P
 			continue;
 		}
 		EachPrimitive->SetCollisionResponseToAllChannels(ECR_Ignore);
-		EachPrimitive->SetCollisionResponseToChannel(COLLISION_TRACE_PLAYER, ECR_Block);
+		FRTSPlayerCollision::SetWeaponHitResponses(EachPrimitive, OwningPlayer);
 		EachPrimitive->SetCollisionResponseToChannel(COLLISION_TRACE_LANDSCAPE, ECR_Overlap);
-		EachPrimitive->SetCollisionObjectType(COLLISION_OBJ_PLAYER);
+		EachPrimitive->SetCollisionObjectType(OwnerObjectChannel);
 	}
 }
 
@@ -434,7 +464,7 @@ void ABuildingExpansion::VerticalDestruction(const FRTSVerticalCollapseSettings&
 	FRTS_VerticalCollapse::StartVerticalCollapse(
 		this,
 		CollapseSettings,
-		CollapseFX,
+		GetCollapseFXWithDeathVfxLifetime(CollapseFX),
 		OnFinished);
 }
 
@@ -494,6 +524,7 @@ void ABuildingExpansion::PostInitializeComponents()
 {
 	Super::PostInitializeComponents();
 	PostInit_GetCargoComponent();
+	PostInit_CreateDeployAnimation();
 
 	UBehaviourComp* BehaviourComp = FindComponentByClass<UBehaviourComp>();
 	BehaviourComponent = BehaviourComp;
@@ -508,6 +539,10 @@ void ABuildingExpansion::PostInitializeComponents()
 
 void ABuildingExpansion::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	if (const UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(M_PackUpAttachmentRemovalTimerHandle);
+	}
 	Super::EndPlay(EndPlayReason);
 	if (EndPlayReason == EEndPlayReason::Destroyed)
 	{
@@ -515,6 +550,7 @@ void ABuildingExpansion::EndPlay(const EEndPlayReason::Type EndPlayReason)
 		RemoveExtraResourceStorage();
 		RemoveFieldDefenseDiscount();
 		RemoveGlobalAbilityCooldownBonus();
+		RemovePanzerwerferReloadBonus();
 	}
 
 	if (M_StatusBuildingExpansion == EBuildingExpansionStatus::BXS_PackedUp)
@@ -531,6 +567,39 @@ void ABuildingExpansion::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	}
 }
 
+void ABuildingExpansion::OnHealthChanged(const EHealthLevel PercentageLeft, const bool bIsHealing)
+{
+	if (not IsValid(BuildingMeshComponent) || not IsValid(FindComponentByClass<UWallHoleDamageComponent>()))
+	{
+		Super::OnHealthChanged(PercentageLeft, bIsHealing);
+		return;
+	}
+	// Procedural holes live in the building mesh's slot materials (hole instances) and its bounds; the legacy
+	// handler's mesh or material swaps would wipe them, so both are put back while its explosions still play.
+	UStaticMesh* const MeshBeforeHandler = BuildingMeshComponent->GetStaticMesh();
+	TArray<UMaterialInterface*> MaterialsBeforeHandler;
+	for (int32 Slot = 0; Slot < BuildingMeshComponent->GetNumMaterials(); ++Slot)
+	{
+		MaterialsBeforeHandler.Add(BuildingMeshComponent->GetMaterial(Slot));
+	}
+	Super::OnHealthChanged(PercentageLeft, bIsHealing);
+	if (not IsValid(BuildingMeshComponent))
+	{
+		return;
+	}
+	if (IsValid(MeshBeforeHandler) && BuildingMeshComponent->GetStaticMesh() != MeshBeforeHandler)
+	{
+		BuildingMeshComponent->SetStaticMesh(MeshBeforeHandler);
+	}
+	for (int32 Slot = 0; Slot < MaterialsBeforeHandler.Num(); ++Slot)
+	{
+		if (BuildingMeshComponent->GetMaterial(Slot) != MaterialsBeforeHandler[Slot])
+		{
+			BuildingMeshComponent->SetMaterial(Slot, MaterialsBeforeHandler[Slot]);
+		}
+	}
+}
+
 void ABuildingExpansion::UnitDies(const ERTSDeathType DeathType)
 {
 	// do not call super as it will instantly destroy the actor.
@@ -542,22 +611,51 @@ void ABuildingExpansion::UnitDies(const ERTSDeathType DeathType)
 	RemoveExtraResourceStorage();
 	RemoveFieldDefenseDiscount();
 	RemoveGlobalAbilityCooldownBonus();
+	RemovePanzerwerferReloadBonus();
 
 	SetUnitDying();
+	StopDeployAnimationForDeath();
 	// Before bp event as the bp event may destroy the actor immediately.
 	OnUnitDies.Broadcast();
-	if (UPitDefenseComponent* PitDefenseComponent = FindComponentByClass<UPitDefenseComponent>())
+	UPitDefenseComponent* PitDefenseComponent = FindComponentByClass<UPitDefenseComponent>();
+	if (not IsValid(PitDefenseComponent))
 	{
-		DisableAllWeapons();
+		BP_OnUnitDies();
+		return;
+	}
+	DisableAllWeapons();
+	// A pit with its own Blueprint death swaps itself for a wreck there; sinking would bury the pit the wreck replaces.
+	if (not GetHasBlueprintDeath())
+	{
 		PitDefenseComponent->HandlePitDeath();
 		return;
 	}
+	PitDefenseComponent->HandlePitDeathWithoutSink();
 	BP_OnUnitDies();
+}
+
+bool ABuildingExpansion::GetHasBlueprintDeath() const
+{
+	return GetClass()->IsFunctionImplementedInScript(GET_FUNCTION_NAME_CHECKED(ABuildingExpansion, BP_OnUnitDies));
 }
 
 void ABuildingExpansion::DestroyAndSpawnActors(const FDestroySpawnActorsParameters& SpawnParams, FCollapseFX CollapseFX)
 {
-	Super::DestroyAndSpawnActors(SpawnParams, CollapseFX);
+	CollapseFX = GetCollapseFXWithDeathVfxLifetime(CollapseFX);
+	if (DeathSpawnClassesToSkip.IsEmpty())
+	{
+		Super::DestroyAndSpawnActors(SpawnParams, CollapseFX);
+		return;
+	}
+	FDestroySpawnActorsParameters FilteredParams = SpawnParams;
+	FilteredParams.ActorsToSpawn.RemoveAll([this](const FDestroySpawnActor& Entry)
+	{
+		return DeathSpawnClassesToSkip.ContainsByPredicate([&Entry](const TSoftClassPtr<AActor>& Skip)
+		{
+			return not Skip.IsNull() && Skip.ToSoftObjectPath() == Entry.ActorToSpawn.ToSoftObjectPath();
+		});
+	});
+	Super::DestroyAndSpawnActors(FilteredParams, CollapseFX);
 }
 
 void ABuildingExpansion::SetTurretsToAutoEngage()
@@ -800,7 +898,7 @@ FBxpData ABuildingExpansion::GetBxpData(const EBuildingExpansionType BxpSubType,
 	}
 	if (ACPPGameState* RTSGameState = FRTS_Statics::GetGameState(this))
 	{
-		const bool bOwnedByPlayer = RTSComponent->GetOwningPlayer() == 1;
+		const bool bOwnedByPlayer = FRTSPlayers::IsHumanPlayer(RTSComponent->GetOwningPlayer());
 		BxpData = bOwnedByPlayer
 			          ? RTSGameState->GetPlayerBxpData(BxpSubType, BxpRequesting)
 			          : RTSGameState->GetEnemyBxpData(BxpSubType, BxpRequesting);
@@ -878,7 +976,17 @@ void ABuildingExpansion::CollapseMesh(UGeometryCollectionComponent* GeoCollapseC
                                       FCollapseFX CollapseFX)
 {
 	FRTS_Collapse::CollapseMesh(this, GeoCollapseComp, GeoCollection, MeshToCollapse, CollapseDuration, CollapseForce,
-	                            CollapseFX);
+	                            GetCollapseFXWithDeathVfxLifetime(CollapseFX));
+}
+
+FCollapseFX ABuildingExpansion::GetCollapseFXWithDeathVfxLifetime(const FCollapseFX& CollapseFX) const
+{
+	FCollapseFX LimitedFX = CollapseFX;
+	if (DeathVfxLifetime > 0.f)
+	{
+		LimitedFX.VfxLifetime = DeathVfxLifetime;
+	}
+	return LimitedFX;
 }
 
 void ABuildingExpansion::CollapseMeshWithSwapping(
@@ -954,6 +1062,7 @@ void ABuildingExpansion::InitBuildingExpansion(
 	M_ExtraResourceStorage = MyData.ExtraResourceStorage;
 	M_FieldDefenseCostMlt = MyData.FieldDefenseCostMlt;
 	M_GlobalAbilityCooldownMlt = MyData.GlobalAbilityCooldownMlt;
+	M_PanzerwerferReloadMlt = MyData.PanzerwerferReloadMlt;
 	OnInitBuildingExpansion_SetupCollision(bLetBuildingMeshAffectNavMesh);
 	if (GetIsValidHealthComponent())
 	{
@@ -1056,6 +1165,7 @@ void ABuildingExpansion::OnFinishedExpansionConstruction()
 	ApplyExtraResourceStorage();
 	ApplyFieldDefenseDiscount();
 	ApplyGlobalAbilityCooldownBonus();
+	ApplyPanzerwerferReloadBonus();
 	OnBxpConstructed.Broadcast();
 	BP_OnFinishedExpansionConstruction();
 }
@@ -1106,7 +1216,7 @@ void ABuildingExpansion::ApplyFieldDefenseDiscount()
 		return;
 	}
 	// Only the player's prices change: an enemy's office makes nothing cheaper.
-	if (not GetIsValidRTSComponent() || RTSComponent->GetOwningPlayer() != 1)
+	if (not GetIsValidRTSComponent() || not FRTSPlayers::IsHumanPlayer(RTSComponent->GetOwningPlayer()))
 	{
 		return;
 	}
@@ -1146,7 +1256,7 @@ void ABuildingExpansion::ApplyGlobalAbilityCooldownBonus()
 		return;
 	}
 	// Only the player's abilities: an enemy's cipher room speeds up nothing (as the office's discount).
-	if (not GetIsValidRTSComponent() || RTSComponent->GetOwningPlayer() != 1)
+	if (not GetIsValidRTSComponent() || not FRTSPlayers::IsHumanPlayer(RTSComponent->GetOwningPlayer()))
 	{
 		return;
 	}
@@ -1177,6 +1287,52 @@ void ABuildingExpansion::RemoveGlobalAbilityCooldownBonus()
 		return;
 	}
 	GlobalAbilitiesManager->UnregisterCooldownMlt(this);
+}
+
+void ABuildingExpansion::ApplyPanzerwerferReloadBonus()
+{
+	// Already registered (an unpacked or rebuilt expansion), or this expansion grants no bonus.
+	if (bM_IsPanzerwerferReloadBonusRegistered || M_PanzerwerferReloadMlt >= 1.f)
+	{
+		return;
+	}
+	if (not GetIsValidRTSComponent())
+	{
+		return;
+	}
+	UWorld* World = GetWorld();
+	UPanzerwerferReloadBonusSubsystem* BonusSubsystem = IsValid(World)
+		                                                    ? World->GetSubsystem<UPanzerwerferReloadBonusSubsystem>()
+		                                                    : nullptr;
+	if (not IsValid(BonusSubsystem))
+	{
+		RTSFunctionLibrary::ReportError("Expansion grants a Panzerwerfer reload bonus but there is no bonus subsystem."
+			"\n Expansion: " + GetName() +
+			"\n At function ABuildingExpansion::ApplyPanzerwerferReloadBonus");
+		return;
+	}
+	// Any owner: an enemy's shop speeds up the enemy's own Panzerwerfers.
+	BonusSubsystem->RegisterBonusSource(this, RTSComponent->GetOwningPlayer());
+	bM_IsPanzerwerferReloadBonusRegistered = true;
+}
+
+void ABuildingExpansion::RemovePanzerwerferReloadBonus()
+{
+	if (not bM_IsPanzerwerferReloadBonusRegistered)
+	{
+		return;
+	}
+	bM_IsPanzerwerferReloadBonusRegistered = false;
+	UWorld* World = GetWorld();
+	UPanzerwerferReloadBonusSubsystem* BonusSubsystem = IsValid(World)
+		                                                    ? World->GetSubsystem<UPanzerwerferReloadBonusSubsystem>()
+		                                                    : nullptr;
+	if (not IsValid(BonusSubsystem))
+	{
+		// The world is tearing down: its Panzerwerfers go with it.
+		return;
+	}
+	BonusSubsystem->UnregisterBonusSource(this);
 }
 
 UGlobalAbilitiesManager* ABuildingExpansion::GetPlayerGlobalAbilitiesManager() const
@@ -1266,6 +1422,23 @@ void ABuildingExpansion::DestroyBuildingAttachments()
 	}
 }
 
+
+bool ABuildingExpansion::GetIsStanding() const
+{
+	switch (M_StatusBuildingExpansion)
+	{
+	case EBuildingExpansionStatus::BXS_LookingForPlacement:
+	case EBuildingExpansionStatus::BXS_BeingBuild:
+	case EBuildingExpansionStatus::BXS_PackedUp:
+	case EBuildingExpansionStatus::BXS_LookingForUnpackingLocation:
+	case EBuildingExpansionStatus::BXS_BeingUnpacked:
+		return false;
+	default:
+		// Built, being packed up (still works until packed), or never constructed through an owner:
+		// expansions placed in a level or spawned finished keep their initial status.
+		return true;
+	}
+}
 
 void ABuildingExpansion::SetStatusAndPropagateToOwner(const EBuildingExpansionStatus NewStatus)
 {
@@ -1765,7 +1938,7 @@ void ABuildingExpansion::PostInit_SetupAbilities()
 		// built) learn it in InitBuildingExpansion, which sets the abilities from the same data.
 		return;
 	}
-	if (RTSComp->GetOwningPlayer() == 1)
+	if (FRTSPlayers::IsHumanPlayer(RTSComp->GetOwningPlayer()))
 	{
 		const FBxpData BxpData = FRTS_Statics::BP_GetPlayerBxpData(MyBxpType,
 		                                                           this, bIsValidData);
@@ -1852,4 +2025,194 @@ void ABuildingExpansion::AttemptAttachSpawnSystem(const FSwapToDestroyedMesh& Co
 	                                    FAttachmentTransformRules::KeepRelativeTransform);
 	// Start system
 	NiagaraComponent->Activate();
+}
+
+void ABuildingExpansion::PostInit_CreateDeployAnimation()
+{
+	const UWorld* World = GetWorld();
+	if (not IsValid(DeployAnimationData) || not IsValid(World) || not World->IsGameWorld())
+	{
+		return;
+	}
+	if (not GetIsValidBuildingMeshComponent())
+	{
+		return;
+	}
+	M_DeployMeshComponent = NewObject<UStaticMeshComponent>(this, TEXT("DeployAnimationMesh"), RF_Transient);
+	M_DeployMeshComponent->SetupAttachment(BuildingMeshComponent);
+	M_DeployMeshComponent->RegisterComponent();
+	M_DeployAnimationComponent = NewObject<UNomadicDeployAnimationComponent>(this, TEXT("DeployAnimation"),
+	                                                                         RF_Transient);
+	M_DeployAnimationComponent->RegisterComponent();
+	M_DeployAnimationComponent->InitDeployAnimation(BuildingMeshComponent, M_DeployMeshComponent,
+	                                                DeployAnimationData);
+}
+
+bool ABuildingExpansion::GetUsesDeployAnimation() const
+{
+	return not bM_IsFieldDefense && IsValid(M_DeployAnimationComponent) &&
+		M_DeployAnimationComponent->GetHasDeployAnimation();
+}
+
+void ABuildingExpansion::StartDeployAnimationConstruction(const float StartProgress)
+{
+	if (not GetIsValidBuildingMeshComponent())
+	{
+		return;
+	}
+	bM_DeployPackUpInterruptedConstruction = false;
+	if (GetIsValidProgressBarWidget())
+	{
+		M_ProgressBarWidget->SyncProgressBar(M_BuildingTime, StartProgress * M_BuildingTime, false);
+	}
+	// The building mesh keeps its collision but is not drawn while the deploy mesh animates.
+	BuildingMeshComponent->SetVisibility(false);
+	constexpr bool bTowardBuilt = true;
+	M_DeployAnimationComponent->PlayFromProgress(
+		StartProgress, bTowardBuilt, M_BuildingTime,
+		FOnNomadicDeployAnimationFinished::CreateUObject(this,
+		                                                 &ABuildingExpansion::OnDeployAnimationConstructionFinished));
+}
+
+void ABuildingExpansion::StartDeployAnimationPackUp(const float TotalTime)
+{
+	if (not GetIsValidBuildingMeshComponent())
+	{
+		return;
+	}
+	SetAllTurretsDisabled();
+	float StartProgress = 1.f;
+	if (M_StatusBuildingExpansion == EBuildingExpansionStatus::BXS_Built)
+	{
+		ScheduleAttachmentRemovalForPackUp(TotalTime);
+	}
+	else
+	{
+		// Packed during its construction: the deploy reverses from where it is and a cancelled pack-up resumes it.
+		bM_DeployPackUpInterruptedConstruction = true;
+		StartProgress = M_DeployAnimationComponent->GetProgress();
+		if (GetIsValidProgressBarWidget())
+		{
+			M_ProgressBarWidget->StopProgressBar();
+		}
+	}
+	SetMeshToConstructionMesh();
+	BuildingMeshComponent->SetVisibility(false);
+	SetStatusAndPropagateToOwner(EBuildingExpansionStatus::BXS_BeingPackedUp);
+	constexpr bool bTowardBuilt = false;
+	M_DeployAnimationComponent->PlayFromProgress(
+		StartProgress, bTowardBuilt, TotalTime,
+		FOnNomadicDeployAnimationFinished::CreateUObject(this, &ABuildingExpansion::OnDeployAnimationPackUpFinished));
+	OnBxpPackingUp.Broadcast();
+	if (bM_DeployPackUpInterruptedConstruction)
+	{
+		// Nothing the blueprint shows at the end of construction stands yet.
+		BP_OnStartPackUpBxp();
+	}
+}
+
+void ABuildingExpansion::CancelDeployAnimationPackUp()
+{
+	if (bM_DeployPackUpInterruptedConstruction)
+	{
+		// This bxp was packed while being built: continue the construction from the progress the pack-up left.
+		SetStatusAndPropagateToOwner(EBuildingExpansionStatus::BXS_BeingBuild);
+		StartDeployAnimationConstruction(M_DeployAnimationComponent->GetProgress());
+		OnBxpCancelPackingUp.Broadcast();
+		// Not the cancelled-pack-up event: blueprints show their turrets / extra meshes there, which must stay hidden
+		// until the resumed construction finishes.
+		BP_OnStartBxpConstruction();
+		return;
+	}
+	const bool bAttachmentsStillStand = CancelPendingAttachmentRemoval();
+	M_DeployAnimationComponent->StopAndHide();
+	SetMeshToBuildingMesh();
+	if (GetIsValidBuildingMeshComponent())
+	{
+		BuildingMeshComponent->SetVisibility(true);
+	}
+	if (not bAttachmentsStillStand)
+	{
+		SpawnBuildingAttachments();
+	}
+	SetStatusAndPropagateToOwner(EBuildingExpansionStatus::BXS_Built);
+	OnBxpCancelPackingUp.Broadcast();
+	BP_OnCancelledPackUpBxp();
+	SetTurretsToAutoEngage();
+}
+
+void ABuildingExpansion::OnDeployAnimationConstructionFinished()
+{
+	if (M_StatusBuildingExpansion != EBuildingExpansionStatus::BXS_BeingBuild &&
+		M_StatusBuildingExpansion != EBuildingExpansionStatus::BXS_BeingUnpacked)
+	{
+		return;
+	}
+	OnFinishedExpansionConstruction();
+	if (GetIsValidBuildingMeshComponent())
+	{
+		BuildingMeshComponent->SetVisibility(true);
+	}
+}
+
+void ABuildingExpansion::OnDeployAnimationPackUpFinished()
+{
+	// The deploy mesh hides itself at the end; the owner destroys this bxp in FinishPackUpExpansion.
+	bM_DeployPackUpInterruptedConstruction = false;
+}
+
+void ABuildingExpansion::StopDeployAnimationForDeath()
+{
+	if (not IsValid(M_DeployAnimationComponent))
+	{
+		return;
+	}
+	if (const UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(M_PackUpAttachmentRemovalTimerHandle);
+	}
+	M_DeployAnimationComponent->StopAndHide();
+	if (IsValid(BuildingMeshComponent))
+	{
+		BuildingMeshComponent->SetVisibility(true);
+	}
+}
+
+void ABuildingExpansion::ScheduleAttachmentRemovalForPackUp(const float TotalTime)
+{
+	// As on the nomadic buildings: the deploy's cover smoke at progress 1 fires when the pack-up starts and needs a
+	// moment to build up; only then do the attachments go and the blueprint hides its turrets / extra meshes.
+	constexpr float AttachmentRemovalPackUpFraction = 0.03f;
+	constexpr float MinCoverSmokeBuildUpSeconds = 0.35f;
+	constexpr float MaxPackUpFractionForRemoval = 0.5f;
+	UWorld* World = GetWorld();
+	const float RemovalDelaySeconds = FMath::Min(
+		FMath::Max(TotalTime * AttachmentRemovalPackUpFraction, MinCoverSmokeBuildUpSeconds),
+		TotalTime * MaxPackUpFractionForRemoval);
+	if (not IsValid(World) || RemovalDelaySeconds <= 0.f)
+	{
+		OnPackUpCoverSmokeStands();
+		return;
+	}
+	World->GetTimerManager().SetTimer(M_PackUpAttachmentRemovalTimerHandle, this,
+	                                  &ABuildingExpansion::OnPackUpCoverSmokeStands, RemovalDelaySeconds, false);
+}
+
+void ABuildingExpansion::OnPackUpCoverSmokeStands()
+{
+	DestroyBuildingAttachments();
+	BP_OnStartPackUpBxp();
+}
+
+bool ABuildingExpansion::CancelPendingAttachmentRemoval()
+{
+	const UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		return false;
+	}
+	FTimerManager& TimerManager = World->GetTimerManager();
+	const bool bWasPending = TimerManager.IsTimerActive(M_PackUpAttachmentRemovalTimerHandle);
+	TimerManager.ClearTimer(M_PackUpAttachmentRemovalTimerHandle);
+	return bWasPending;
 }

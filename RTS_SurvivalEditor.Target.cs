@@ -15,5 +15,8 @@ public class RTS_SurvivalEditorTarget : TargetRules
 		// Player economy simulation (Source/RTS_EconomySim): editor builds only and never loaded by itself;
 		// Source/Tools/EconomySim/run_economy_sim.ps1 loads it with -ExecCmds="Module Load RTS_EconomySim".
 		ExtraModuleNames.Add("RTS_EconomySim");
+		// Game mechanics recorder (Source/RTS_GameMechanicsRecs): editor builds only and never loaded by itself;
+		// the headless render process loads it with -ExecCmds="Module Load RTS_GameMechanicsRecs".
+		ExtraModuleNames.Add("RTS_GameMechanicsRecs");
 	}
 }

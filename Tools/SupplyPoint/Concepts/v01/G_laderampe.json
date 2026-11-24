@@ -1,0 +1,455 @@
+{
+ "key": "G_laderampe",
+ "title": "G  Laderampe: loading dock at bed height with a pillar jib crane",
+ "notes": [
+  "A sleeper-crib loading dock at bed height (1.2 m) along the back; stocks stand ON the dock in three bays.",
+  "Truck runs along the dock face (+x, in left, out right), parks at x 1.25, y -1.1, heading 0 deg (one stop, 0.45 m clear).",
+  "Crane: pillar jib crane on the dock edge at x 0, y 1.3. Slew (about 270 deg) + trolley along the 5.2 m jib + hoist.",
+  "Short, flat lifts: bays and bed are at the same height, so the hook barely drops; reach 2.5-4.7 m.",
+  "Shown: first lift of a cycle, radixite skip coming out of its bay; the bed is still empty.",
+  "Animated: flag rise on the dock corner; jib slew + trolley + hoist; bay fill levels step down.",
+  "Most compact (lowest crane, 7 m), and the dock shows \"loading point\" at a glance; dock faces need flat-ish ground.",
+  "BP points: approach (-13, -1.1), park (1.25, -1.1) +x, exit (15, -1.1). Flag on the dock (-5.75, 1.35), 4.85 m travel."
+ ],
+ "subtitle": "Opel Blitz (real mesh) + soldier for scale  |  dock 12.4 x 4.2 m at 1.2 m, site 17 x 7.5 m with the lane, jib 6 m, flag 8 m",
+ "footprint": [
+  14.1,
+  4.6
+ ],
+ "height": 7.4,
+ "mast_height": 8.5,
+ "views": {
+  "rts": {
+   "file": "G_laderampe_rts.png",
+   "size": [
+    1600,
+    1100
+   ],
+   "px_per_m": 61.81818181818182,
+   "caption": null,
+   "labels": [
+    {
+     "text": "Truck in",
+     "kind": "lane",
+     "xy": [
+      373.1,
+      585.6
+     ]
+    },
+    {
+     "text": "Truck out",
+     "kind": "lane",
+     "xy": [
+      1085.1,
+      860.8
+     ]
+    },
+    {
+     "text": "Opel Blitz parks here (empty bed)",
+     "kind": "truck",
+     "xy": [
+      867.0,
+      661.6
+     ]
+    },
+    {
+     "text": "Pillar jib: slew + trolley + hoist",
+     "kind": "crane",
+     "xy": [
+      669.1,
+      156.8
+     ]
+    },
+    {
+     "text": "Radixite stock",
+     "kind": "radixite",
+     "xy": [
+      683.0,
+      420.4
+     ]
+    },
+    {
+     "text": "Metal stock",
+     "kind": "metal",
+     "xy": [
+      888.6,
+      499.8
+     ]
+    },
+    {
+     "text": "Vehicle parts stock",
+     "kind": "parts",
+     "xy": [
+      1094.2,
+      579.3
+     ]
+    },
+    {
+     "text": "Capture flag (rises up the pole)",
+     "kind": "flag",
+     "xy": [
+      524.4,
+      116.0
+     ]
+    },
+    {
+     "text": "lowered / neutral",
+     "kind": "flag",
+     "xy": [
+      524.4,
+      418.7
+     ]
+    },
+    {
+     "text": "Progress bar (UI)",
+     "kind": "ui",
+     "xy": [
+      836.2,
+      163.0
+     ]
+    }
+   ]
+  },
+  "rear": {
+   "file": "G_laderampe_rear.png",
+   "size": [
+    800,
+    550
+   ],
+   "px_per_m": 30.90909090909091,
+   "caption": null,
+   "labels": [
+    {
+     "text": "Truck in",
+     "kind": "lane",
+     "xy": [
+      613.5,
+      372.0
+     ]
+    },
+    {
+     "text": "Truck out",
+     "kind": "lane",
+     "xy": [
+      257.5,
+      234.5
+     ]
+    },
+    {
+     "text": "Opel Blitz parks here (empty bed)",
+     "kind": "truck",
+     "xy": [
+      366.5,
+      219.2
+     ]
+    },
+    {
+     "text": "Pillar jib: slew + trolley + hoist",
+     "kind": "crane",
+     "xy": [
+      465.5,
+      241.9
+     ]
+    },
+    {
+     "text": "Radixite stock",
+     "kind": "radixite",
+     "xy": [
+      458.5,
+      355.5
+     ]
+    },
+    {
+     "text": "Metal stock",
+     "kind": "metal",
+     "xy": [
+      355.7,
+      315.7
+     ]
+    },
+    {
+     "text": "Vehicle parts stock",
+     "kind": "parts",
+     "xy": [
+      252.9,
+      276.0
+     ]
+    },
+    {
+     "text": "Capture flag (rises up the pole)",
+     "kind": "flag",
+     "xy": [
+      537.8,
+      178.8
+     ]
+    },
+    {
+     "text": "lowered / neutral",
+     "kind": "flag",
+     "xy": [
+      537.8,
+      330.2
+     ]
+    },
+    {
+     "text": "Progress bar (UI)",
+     "kind": "ui",
+     "xy": [
+      381.9,
+      108.4
+     ]
+    }
+   ]
+  },
+  "top": {
+   "file": "G_laderampe_top.png",
+   "size": [
+    800,
+    800
+   ],
+   "px_per_m": 30.58823529411765,
+   "caption": null,
+   "labels": [
+    {
+     "text": "Truck in",
+     "kind": "lane",
+     "xy": [
+      185.9,
+      464.2
+     ]
+    },
+    {
+     "text": "Truck out",
+     "kind": "lane",
+     "xy": [
+      620.2,
+      464.2
+     ]
+    },
+    {
+     "text": "Opel Blitz parks here (empty bed)",
+     "kind": "truck",
+     "xy": [
+      487.2,
+      464.2
+     ]
+    },
+    {
+     "text": "Pillar jib: slew + trolley + hoist",
+     "kind": "crane",
+     "xy": [
+      259.1,
+      315.4
+     ]
+    },
+    {
+     "text": "Radixite stock",
+     "kind": "radixite",
+     "xy": [
+      274.6,
+      325.1
+     ]
+    },
+    {
+     "text": "Metal stock",
+     "kind": "metal",
+     "xy": [
+      400.0,
+      325.1
+     ]
+    },
+    {
+     "text": "Vehicle parts stock",
+     "kind": "parts",
+     "xy": [
+      525.4,
+      325.1
+     ]
+    },
+    {
+     "text": "Capture flag (rises up the pole)",
+     "kind": "flag",
+     "xy": [
+      224.1,
+      389.3
+     ]
+    },
+    {
+     "text": "lowered / neutral",
+     "kind": "flag",
+     "xy": [
+      224.1,
+      389.3
+     ]
+    },
+    {
+     "text": "Progress bar (UI)",
+     "kind": "ui",
+     "xy": [
+      400.0,
+      369.4
+     ]
+    }
+   ],
+   "grid": [
+    [
+     -517.6,
+     1348.2,
+     -517.6,
+     -487.1
+    ],
+    [
+     -364.7,
+     1348.2,
+     -364.7,
+     -487.1
+    ],
+    [
+     -211.8,
+     1348.2,
+     -211.8,
+     -487.1
+    ],
+    [
+     -58.8,
+     1348.2,
+     -58.8,
+     -487.1
+    ],
+    [
+     94.1,
+     1348.2,
+     94.1,
+     -487.1
+    ],
+    [
+     247.1,
+     1348.2,
+     247.1,
+     -487.1
+    ],
+    [
+     400.0,
+     1348.2,
+     400.0,
+     -487.1
+    ],
+    [
+     552.9,
+     1348.2,
+     552.9,
+     -487.1
+    ],
+    [
+     705.9,
+     1348.2,
+     705.9,
+     -487.1
+    ],
+    [
+     858.8,
+     1348.2,
+     858.8,
+     -487.1
+    ],
+    [
+     1011.8,
+     1348.2,
+     1011.8,
+     -487.1
+    ],
+    [
+     1164.7,
+     1348.2,
+     1164.7,
+     -487.1
+    ],
+    [
+     1317.6,
+     1348.2,
+     1317.6,
+     -487.1
+    ],
+    [
+     -517.6,
+     1348.2,
+     1317.6,
+     1348.2
+    ],
+    [
+     -517.6,
+     1195.3,
+     1317.6,
+     1195.3
+    ],
+    [
+     -517.6,
+     1042.4,
+     1317.6,
+     1042.4
+    ],
+    [
+     -517.6,
+     889.4,
+     1317.6,
+     889.4
+    ],
+    [
+     -517.6,
+     736.5,
+     1317.6,
+     736.5
+    ],
+    [
+     -517.6,
+     583.5,
+     1317.6,
+     583.5
+    ],
+    [
+     -517.6,
+     430.6,
+     1317.6,
+     430.6
+    ],
+    [
+     -517.6,
+     277.6,
+     1317.6,
+     277.6
+    ],
+    [
+     -517.6,
+     124.7,
+     1317.6,
+     124.7
+    ],
+    [
+     -517.6,
+     -28.2,
+     1317.6,
+     -28.2
+    ],
+    [
+     -517.6,
+     -181.2,
+     1317.6,
+     -181.2
+    ],
+    [
+     -517.6,
+     -334.1,
+     1317.6,
+     -334.1
+    ],
+    [
+     -517.6,
+     -487.1,
+     1317.6,
+     -487.1
+    ]
+   ]
+  }
+ },
+ "main_view": "rts"
+}

@@ -486,6 +486,9 @@ public:
 	 */
 	TObjectPtr<ASquadController> GetSquadControllerChecked() const;
 
+	// Quiet: a soldier has no squad controller yet while its squad is still spawning it (SpawnActor runs first).
+	bool GetHasSquadController() const { return IsValid(M_SquadController); }
+
 	/** 
 	 * @return The AI controller class of this unit, if valid; otherwise, attempts to repair it.
 	 * Returns nullptr if repairs fail.
@@ -645,6 +648,9 @@ protected:
 	void PostInitializeComp_InitSecondaryWeapon();
 	/** @brief Sets the collision for the infantry capsule component. */
 	void PostInitializeComp_SetupInfantryCapsuleCollision() const;
+
+	// Turns off receive decals on every skeletal mesh component of this unit (body, head, gear).
+	void PostInitializeComp_DisableDecalsOnSkeletalMeshes();
 	/** @brief Sets the M_AISquadUnit reference, may spawn a controller if none is found. */
 	void PostInitializeComp_SetupAISquadUnit();
 	/** @brief Initializes the ANimBP_SquadUnit reference. If a valid one is found we set the reference to our mesh on it. */
@@ -895,6 +901,10 @@ private:
 	int32 OwningPlayer;
 
 	void SetOwningPlayerAndStartFow(const int32 NewOwningPlayer, const float NewVisionRange);
+
+	// A soldier handed to another player at runtime: its capsule and weapon must fight for the new player.
+	void BeginPlay_BindToOwningPlayerChanges();
+	void OnOwningPlayerChanged(uint8 OldOwningPlayer, uint8 NewOwningPlayer);
 
 
 	/** The AI controller for this squad unit. */

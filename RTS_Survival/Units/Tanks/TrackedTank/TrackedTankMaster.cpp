@@ -296,13 +296,9 @@ void ATrackedTankMaster::SetupChassisMeshCollision()
 		{
 			FRTS_CollisionSetup::SetupHarvesterMovementMeshCollision(ChassisMesh, RTSComponent->GetOwningPlayer());
 		}
-		else if (RTSComponent->GetOwningPlayer() == 1)
-		{
-			FRTS_CollisionSetup::SetupPlayerVehicleMovementMeshCollision(ChassisMesh);
-		}
 		else
 		{
-			FRTS_CollisionSetup::SetupEnemyVehicleMovementMeshCollision(ChassisMesh);
+			FRTS_CollisionSetup::SetupVehicleMovementMeshCollision(ChassisMesh, RTSComponent->GetOwningPlayer());
 		}
 	}
 	SetupHullBlocker();

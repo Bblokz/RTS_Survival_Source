@@ -18,6 +18,7 @@
 #include "RTS_Survival/Units/Squads/Tests/SquadMarchTestScenario.h"
 #include "RTS_Survival/Units/Tanks/Tests/VehicleAvoidanceScenario.h"
 #include "RTS_Survival/Units/Tanks/Tests/AlliedVehiclePassageScenario.h"
+#include "RTS_Survival/Buildings/FieldTrench/Tests/TrenchRampCrossingScenario.h"
 #include "RTS_Survival/Weapons/SmallArmsProjectileManager/Tests/TraceImpactVfxPerfScenario.h"
 #include "RTS_Survival/Buildings/BuildingExpansion/B4HowitzerPit/Tests/B4HowitzerTestScenario.h"
 #include "RTS_Survival/Buildings/BuildingExpansion/GunPit/Tests/GunPitTestScenario.h"
@@ -179,6 +180,20 @@ struct FCoverFinderPerformanceAccumulator
 	void Reset(double StartSeconds);
 };
 
+/** A strip one player's soldiers never take cover in, like the exit of a building where that player's units appear. */
+struct FRTSCoverKeepOutZone
+{
+	int32 ZoneId = 0;
+	int32 OwningPlayer = 0;
+	FVector2D Start = FVector2D::ZeroVector;
+	// Flat and normalised.
+	FVector2D Forward = FVector2D(1.f, 0.f);
+	// How far the strip reaches back from Start (against Forward) and ahead of it.
+	float BehindLength = 0.f;
+	float AheadLength = 0.f;
+	float HalfWidth = 0.f;
+};
+
 /**
  * @brief Scans Character navigation incrementally and publishes directional infantry cover found by a worker thread.
  * Callers query immutable snapshots; world collision and navigation never leave the game thread.
@@ -193,6 +208,19 @@ class RTS_SURVIVAL_API URTSCoverFinderWorldSubsystem : public UTickableWorldSubs
 #endif
 
 public:
+	/**
+	 * @brief Keeps one player's soldiers from taking cover in a strip: an AI building's exit, where that player's
+	 * trained units appear (UEnemyBuildingTrainerComponent). Only cover taken without a target (idle, automatic) is
+	 * limited; combat and stress-retreat cover still use every point.
+	 * @return The zone's id for UpdateCoverKeepOutZone and RemoveCoverKeepOutZone.
+	 */
+	int32 AddCoverKeepOutZone(const FRTSCoverKeepOutZone& Zone);
+	/** Moves or resizes a zone (the building moved or changed owner); false when there is no zone with this id. */
+	bool UpdateCoverKeepOutZone(const FRTSCoverKeepOutZone& Zone);
+	void RemoveCoverKeepOutZone(const int32 ZoneId);
+	/** Whether a point lies in a keep-out zone of this player. */
+	bool GetIsInCoverKeepOutZone(const FVector& Location, const int32 OwningPlayer) const;
+
 	virtual bool ShouldCreateSubsystem(UObject* Outer) const override;
 	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
 	virtual void Deinitialize() override;
@@ -495,6 +523,7 @@ private:
 	FSquadMarchTestScenario M_SquadMarchScenario;
 	FVehicleAvoidanceScenario M_VehicleAvoidanceScenario;
 	FAlliedVehiclePassageScenario M_AlliedVehiclePassageScenario;
+	FTrenchRampCrossingScenario M_TrenchRampCrossingScenario;
 	FTraceImpactVfxPerfScenario M_TraceImpactVfxPerfScenario;
 	FB4HowitzerTestScenario M_B4HowitzerScenario;
 	FGunPitTestScenario M_GunPitScenario;
@@ -1024,6 +1053,9 @@ private:
 
 	// Free, reachable, not just given up by this unit, and its cover object still exists.
 	bool GetIsCoverPointAvailableToUnit(const FRTSCoverPoint& CoverPoint, const ASquadUnit& SquadUnit) const;
+
+	TArray<FRTSCoverKeepOutZone> M_CoverKeepOutZones;
+	int32 M_NextCoverKeepOutZoneId = 1;
 
 	/**
 	 * @brief The cheap checks a point must pass before it is scored as combat cover for this unit.

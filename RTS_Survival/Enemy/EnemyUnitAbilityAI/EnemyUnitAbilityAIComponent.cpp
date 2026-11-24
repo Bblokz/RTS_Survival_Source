@@ -34,8 +34,6 @@
 
 namespace EnemyUnitAbilityAIConstants
 {
-	constexpr uint8 HumanPlayerIndex = 1;
-	constexpr uint8 EnemyPlayerIndex = 2;
 	// The aim point is moved to the middle of the soldiers within this many blast radii of the target.
 	constexpr float InfantryClusterSearchRadiusMultiplier = 2.f;
 	constexpr float DebugTextDuration = 3.f;
@@ -78,6 +76,16 @@ void UEnemyUnitAbilityAIComponent::BeginPlay_StartEvaluationTimer()
 		&UEnemyUnitAbilityAIComponent::EvaluationTick,
 		Settings->EvaluationInterval,
 		true);
+}
+
+int32 UEnemyUnitAbilityAIComponent::GetControlledPlayer() const
+{
+	const AEnemyController* EnemyController = Cast<AEnemyController>(GetOwner());
+	if (not IsValid(EnemyController))
+	{
+		return RTSPlayers::FirstAIPlayer;
+	}
+	return EnemyController->GetControlledPlayer();
 }
 
 bool UEnemyUnitAbilityAIComponent::GetIsValidEnemyController() const
@@ -221,8 +229,9 @@ void UEnemyUnitAbilityAIComponent::AddEnemyUnitToRoster(AActor* UnitActor, const
 	{
 		return;
 	}
+	// Only the units of the player this controller plays: another AI player's controller evaluates its own.
 	const URTSComponent* RTSComponent = UnitActor->FindComponentByClass<URTSComponent>();
-	if (not IsValid(RTSComponent) || RTSComponent->GetOwningPlayer() != EnemyUnitAbilityAIConstants::EnemyPlayerIndex)
+	if (not IsValid(RTSComponent) || RTSComponent->GetOwningPlayer() != GetControlledPlayer())
 	{
 		return;
 	}
@@ -673,7 +682,9 @@ void UEnemyUnitAbilityAIComponent::GatherPlayerSoldierLocations()
 	{
 		return;
 	}
-	for (const ASquadUnit* Soldier : GameUnitManager->GetSquadUnitsOfPlayer(EnemyUnitAbilityAIConstants::HumanPlayerIndex))
+	// The soldiers of every player this controller's player fights; game thread, so the relations can be read.
+	const uint8 HostilePlayersMask = FRTSPlayers::GetHostileMask(GetControlledPlayer());
+	for (const ASquadUnit* Soldier : GameUnitManager->GetSquadUnitsOfPlayers(HostilePlayersMask))
 	{
 		if (IsValid(Soldier))
 		{

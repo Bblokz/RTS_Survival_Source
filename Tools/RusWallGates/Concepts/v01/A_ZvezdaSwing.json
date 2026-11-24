@@ -1,0 +1,275 @@
+{
+ "key": "A_ZvezdaSwing",
+ "title": "A  Zvezda swing gate: twin green leaves with red stars",
+ "notes": [
+  "The classic Soviet base gate (KPP): two square concrete pillars with caps, two steel leaves with a star roundel each.",
+  "Leaves swing inward (dashed arcs). Each is about 3.45 x 4.4 m; nothing spans the top, so tall units always fit.",
+  "Holes: pillars get the wall hole material + concrete debris (own instance). Leaves are steel plate: steel hole material + debris, one component per leaf.",
+  "Reads as a gate at once from the RTS camera: pillars stand 1.6 m above the wall line, stars face the enemy.",
+  "Cheapest to build: one pillar mesh + one leaf mesh, both mirrored. Leaf hinge = component pivot."
+ ],
+ "subtitle": "Gate module 9.2 m  |  clear opening 7.0 m, open top  |  pillars 6.6 m  |  wall stubs = SM_Wall_14 (5 m tall, 0.2 m)  |  Pz IV for scale",
+ "footprint": [
+  27.2,
+  4.4
+ ],
+ "height": 6.6,
+ "mast_height": 6.6,
+ "views": {
+  "rts": {
+   "file": "A_ZvezdaSwing_rts.png",
+   "size": [
+    1600,
+    1100
+   ],
+   "px_per_m": 47.27272727272727,
+   "caption": null,
+   "labels": [
+    {
+     "text": "Concrete pillar 6.6 m",
+     "kind": "gate",
+     "xy": [
+      628.1,
+      342.7
+     ]
+    },
+    {
+     "text": "Steel leaf, star roundel",
+     "kind": "gate",
+     "xy": [
+      863.5,
+      508.9
+     ]
+    },
+    {
+     "text": "Leaves swing inward (left one shown ajar)",
+     "kind": "gate",
+     "xy": [
+      822.5,
+      414.1
+     ]
+    },
+    {
+     "text": "Clear opening 7.0 m",
+     "kind": "gate",
+     "xy": [
+      791.7,
+      648.0
+     ]
+    }
+   ]
+  },
+  "rear": {
+   "file": "A_ZvezdaSwing_rear.png",
+   "size": [
+    800,
+    550
+   ],
+   "px_per_m": 29.09090909090909,
+   "caption": "Front elevation (enemy side)",
+   "labels": []
+  },
+  "top": {
+   "file": "A_ZvezdaSwing_top.png",
+   "size": [
+    800,
+    800
+   ],
+   "px_per_m": 30.58823529411765,
+   "caption": null,
+   "labels": [
+    {
+     "text": "Concrete pillar 6.6 m",
+     "kind": "gate",
+     "xy": [
+      276.1,
+      418.4
+     ]
+    },
+    {
+     "text": "Steel leaf, star roundel",
+     "kind": "gate",
+     "xy": [
+      455.1,
+      406.1
+     ]
+    },
+    {
+     "text": "Leaves swing inward (left one shown ajar)",
+     "kind": "gate",
+     "xy": [
+      369.4,
+      332.7
+     ]
+    },
+    {
+     "text": "Clear opening 7.0 m",
+     "kind": "gate",
+     "xy": [
+      400.0,
+      409.2
+     ]
+    }
+   ],
+   "grid": [
+    [
+     -517.6,
+     1317.6,
+     -517.6,
+     -517.6
+    ],
+    [
+     -364.7,
+     1317.6,
+     -364.7,
+     -517.6
+    ],
+    [
+     -211.8,
+     1317.6,
+     -211.8,
+     -517.6
+    ],
+    [
+     -58.8,
+     1317.6,
+     -58.8,
+     -517.6
+    ],
+    [
+     94.1,
+     1317.6,
+     94.1,
+     -517.6
+    ],
+    [
+     247.1,
+     1317.6,
+     247.1,
+     -517.6
+    ],
+    [
+     400.0,
+     1317.6,
+     400.0,
+     -517.6
+    ],
+    [
+     552.9,
+     1317.6,
+     552.9,
+     -517.6
+    ],
+    [
+     705.9,
+     1317.6,
+     705.9,
+     -517.6
+    ],
+    [
+     858.8,
+     1317.6,
+     858.8,
+     -517.6
+    ],
+    [
+     1011.8,
+     1317.6,
+     1011.8,
+     -517.6
+    ],
+    [
+     1164.7,
+     1317.6,
+     1164.7,
+     -517.6
+    ],
+    [
+     1317.6,
+     1317.6,
+     1317.6,
+     -517.6
+    ],
+    [
+     -517.6,
+     1317.6,
+     1317.6,
+     1317.6
+    ],
+    [
+     -517.6,
+     1164.7,
+     1317.6,
+     1164.7
+    ],
+    [
+     -517.6,
+     1011.8,
+     1317.6,
+     1011.8
+    ],
+    [
+     -517.6,
+     858.8,
+     1317.6,
+     858.8
+    ],
+    [
+     -517.6,
+     705.9,
+     1317.6,
+     705.9
+    ],
+    [
+     -517.6,
+     552.9,
+     1317.6,
+     552.9
+    ],
+    [
+     -517.6,
+     400.0,
+     1317.6,
+     400.0
+    ],
+    [
+     -517.6,
+     247.1,
+     1317.6,
+     247.1
+    ],
+    [
+     -517.6,
+     94.1,
+     1317.6,
+     94.1
+    ],
+    [
+     -517.6,
+     -58.8,
+     1317.6,
+     -58.8
+    ],
+    [
+     -517.6,
+     -211.8,
+     1317.6,
+     -211.8
+    ],
+    [
+     -517.6,
+     -364.7,
+     1317.6,
+     -364.7
+    ],
+    [
+     -517.6,
+     -517.6,
+     1317.6,
+     -517.6
+    ]
+   ]
+  }
+ },
+ "main_view": "rts"
+}

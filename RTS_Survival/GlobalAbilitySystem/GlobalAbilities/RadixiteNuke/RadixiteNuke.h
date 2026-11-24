@@ -16,6 +16,7 @@ class UPointLightComponent;
 class USoundBase;
 class UStaticMesh;
 class UStaticMeshComponent;
+struct FAoeInstigator;
 
 UENUM()
 enum class ERadixiteNukePhase : uint8
@@ -95,7 +96,8 @@ struct FRadixiteNukeSettings
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0"))
 	float RadiationSeconds = 30.f;
 
-	// Whose units the blast and the radiation hurt; a nuke does not ask.
+	// Whose units the blast and the radiation hurt; a nuke does not ask. Seen from the firing player: Player = its own
+	// and allied units, Enemy = the units of its hostile players.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	ETriggerOverlapLogic AffectedUnits = ETriggerOverlapLogic::OverlapBoth;
 };
@@ -276,4 +278,7 @@ private:
 	void TickBlastVisuals() const;
 
 	AActor* GetDamageCauser() const;
+
+	// The authored AffectedUnits read from the firing player's point of view.
+	FAoeInstigator GetAffectedUnits() const;
 };

@@ -8,6 +8,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "NiagaraComponent.h"
 #include "NiagaraSystem.h"
+#include "RTS_Survival/Game/Players/RTSPlayers.h"
 #include "RTS_Survival/FOWSystem/FowComponent/FowComp.h"
 #include "RTS_Survival/FOWSystem/FowComponent/FowType.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
@@ -381,7 +382,7 @@ void AFlareProjectile::StartFowVision()
 		return;
 	}
 	// Like the units: the player's flares light up the fog, the AI's flares give the AI vision.
-	const EFowBehaviour FowBehaviour = M_OwningPlayer == 1
+	const EFowBehaviour FowBehaviour = FRTSPlayers::IsHumanPlayer(M_OwningPlayer)
 		                                   ? EFowBehaviour::Fow_Active
 		                                   : EFowBehaviour::Fow_PassiveEnemyVision;
 	M_FowComponent->SetVisionRadius(M_Settings.VisionRadius);

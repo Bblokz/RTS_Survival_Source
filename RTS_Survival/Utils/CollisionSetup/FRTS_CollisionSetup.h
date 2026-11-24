@@ -21,10 +21,12 @@ public:
 	// ----------------- Collision Setup Vehicles -----------------
 
 	/**
-	 * @brief Init the collision settings for a movement mesh component on vehicles for the player.
+	 * @brief Init the collision settings for the movement mesh (chassis) of a vehicle: blocks the vehicles of the
+	 * other side of the human / AI split and marks the mesh as owned, so area queries know whose it is.
 	 * @param MovementMesh The mesh component to set collision for.
+	 * @param OwningPlayer Owner of the vehicle.
 	 */
-	static void SetupPlayerVehicleMovementMeshCollision(UMeshComponent* MovementMesh);
+	static void SetupVehicleMovementMeshCollision(UMeshComponent* MovementMesh, int32 OwningPlayer);
 
 	/**
 	 * @brief Makes a box around a vehicle hull solid for the hull boxes of other vehicles and nothing else.
@@ -44,34 +46,24 @@ public:
 	 */
 	static void SetupHarvesterMovementMeshCollision(UMeshComponent* MovementMesh, uint8 OwningPlayer);
 
-	// Differs from player vehicle movement mesh collision as it ignores collision with building placements.
-	static void SetupNomadicMvtPlayer(UMeshComponent* MovementMesh);
-
-	static void SetupNomadicMvtEnemy(UMeshComponent* MovementMesh);
+	// Differs from the vehicle movement mesh collision as it ignores collision with building placements.
+	static void SetupNomadicMovementMeshCollision(UMeshComponent* MovementMesh, int32 OwningPlayer);
 
 	/** Configure an InstancedStaticMesh grid overlay for building placement preview. */
 	static void SetupBuildingPlacementGridOverlay(UInstancedStaticMeshComponent* GridISM);
 
-
-	/**
-	 * @brief Init the collision settings for a movement mesh component on vehicles for the enemy.
-	 * @param MovementMesh The mesh component to set collision for.
-	 */
-	static void SetupEnemyVehicleMovementMeshCollision(UMeshComponent* MovementMesh);
-
 	// ----------------- Collision Setup Tanks -----------------
-	static void SetupPlayerArmorMeshCollision(UBoxComponent* ArmorMesh);
-
-	static void SetupEnemyArmorMeshCollision(UBoxComponent* ArmorMesh);
+	/** Armor box of a unit: on the object channel of its owner's side and hit by the weapons of hostile players. */
+	static void SetupArmorMeshCollision(UBoxComponent* ArmorMesh, int32 OwningPlayer);
 
 	static void SetupArmorCalculationMeshCollision(UMeshComponent* ArmorMesh,
 	                                               const uint8 OwningPlayer,
 	                                               const bool bAffectNavMesh);
 
 	/**
-	 * @brief Restricts an active shield to the single weapon trace channel that can damage its owner.
+	 * @brief Restricts an active shield to the weapons that can damage its owner: those of hostile players.
 	 * @param ShieldMesh Runtime sphere mesh used by the shield component.
-	 * @param OwningPlayer Owner used to select the player/enemy weapon trace channel.
+	 * @param OwningPlayer Owner of the shield; its own weapons and those of its allies pass through.
 	 */
 	static void SetupShieldCollision(UStaticMeshComponent* ShieldMesh, int32 OwningPlayer);
 
@@ -85,16 +77,16 @@ public:
 	static void SetupAircraftComponentCollision(UPrimitiveComponent* AircraftComponent, int32 OwningPlayer,
 	                                           bool bReceivesWeaponHits);
 
-	static void SetupCollisionForMeshAttachedToTracks(UMeshComponent* MeshComponent, bool bIsPlayer1);
+	static void SetupTrackAttachedMeshCollision(UMeshComponent* MeshComponent, int32 OwningPlayer);
 
 	/**
 	 * @brief Applies train collision in batch while keeping train meshes query-only and non-overlapping.
 	 * @param MeshComponents Meshes that should receive train collision setup.
-	 * @param bIsPlayer1 Whether collision channels should be configured for player 1 ownership.
+	 * @param OwningPlayer Owner of the train; decides the object channel and whose weapons hit it.
 	 */
-	static void SetupCollisionForTrainMeshes(const TArray<UMeshComponent*>& MeshComponents, bool bIsPlayer1);
+	static void SetupTrainMeshesCollision(const TArray<UMeshComponent*>& MeshComponents, int32 OwningPlayer);
 
-	static void SetupCollisionForNomadicMount(UMeshComponent* MeshComponent, const bool bOwnedByPlayer1);
+	static void SetupNomadicMountCollision(UMeshComponent* MeshComponent, int32 OwningPlayer);
 
 	static void SetupCollisionForHullMountedWeapon(UMeshComponent* MeshComponent);
 
@@ -117,7 +109,12 @@ public:
 	 */
 	static void SetupTriggerOverlapCollision(UPrimitiveComponent* TriggerComponent, ETriggerOverlapLogic TriggerLogic);
 
-	static void SetupFieldMineTriggerCollision(USphereComponent* TriggerSphere, int32 OwningPlayer);
+	/**
+	 * @brief Overlap-only trigger of a mine. It overlaps the units of every player: hostile and allied AI players
+	 * share one object channel and relations can change while the mine lies there, so the mine's overlap handler
+	 * decides who sets it off.
+	 */
+	static void SetupFieldMineTriggerCollision(USphereComponent* TriggerSphere);
 
 	// ----------------- Collision setup static objects -----------------
 	// if bnNoCollision is true, the object will have no except for player mouse interactions.
@@ -143,9 +140,16 @@ public:
 
 	static void SetupSplineNoCollision(UMeshComponent* SplineMesh);
 
+	/**
+	 * @brief Invisible ramp that vehicle chassis drive over (field trench earth banks): physics only, so traces and
+	 * infantry capsules (query-only, ignoring its object type) never see it.
+	 */
+	static void SetupVehicleRampCollision(UPrimitiveComponent* RampComponent);
+
 	static void SetupPickupCollision(UBoxComponent* PickupBox, UMeshComponent* PickupMesh);
 
-	// Will dynamically be allied or not with this player by blocking or ignoring the trace channel used to hit the enemies of that player.
+	// Will dynamically be allied or not with this player: while allied the mesh carries the owner bit of that player,
+	// so the weapon queries of that player and its allies skip it and everyone else still hits it.
 	static void UpdateGarrisonCollisionForNewOwner(const int32 NewOwningPlayer, const bool bIsAllied,
 	                                               UMeshComponent* MeshToChangeCollisionOn);
 
@@ -165,6 +169,12 @@ public:
 		const bool bRecurseAttachedActors);
 
 private:
+	// The four below only know the human / AI split of the physics channels; the owner-taking functions call them.
+	static void SetupPlayerVehicleMovementMeshCollision(UMeshComponent* MovementMesh);
+	static void SetupEnemyVehicleMovementMeshCollision(UMeshComponent* MovementMesh);
+	static void SetupNomadicMvtPlayer(UMeshComponent* MovementMesh);
+	static void SetupNomadicMvtEnemy(UMeshComponent* MovementMesh);
+
 	static void SetupCollisionWithBuildingPreview_ForOwningPlayer(UPrimitiveComponent* Component,
 	                                                              const int32 OwningPlayer);
 };

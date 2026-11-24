@@ -48,12 +48,15 @@ struct FRTSCorpseSlot
 {
 	int32 BatchIndex = 0;
 	int32 InstanceIndex = 0;
+	// World time the corpse was laid down; it is removed once CorpseLifetimeSeconds have passed.
+	double AddedTimeSeconds = 0.0;
 };
 
 /**
  * @brief Keeps settled infantry and crew ragdolls on the battlefield as instances of baked poses, one library per
  * soldier mesh found in the corpse folder, up to the player's Battlefield Corpses setting (rts.Corpses); the oldest
- * corpse makes way for a new one. Soldiers and the crew pool hand it each body as it freezes.
+ * corpse makes way for a new one, and each is removed after CorpseLifetimeSeconds (Project Settings > Ragdolls).
+ * Soldiers and the crew pool hand it each body as it freezes.
  */
 UCLASS()
 class RTS_SURVIVAL_API URTSCorpseSubsystem : public UWorldSubsystem
@@ -119,6 +122,9 @@ private:
 	int32 FindOrCreateBatch(int32 LibraryIndex, int32 PoseIndex, const TArray<UMaterialInterface*>& Materials);
 	bool EnsureHolder();
 	void RemoveOldestCorpse();
+	/** Runs once a second: removes corpses past their lifetime, then any beyond a lowered cap. */
+	void TrimCorpses();
+	void RemoveExpiredCorpses();
 	void TrimToCap();
 	void CompactBatches();
 	void CompactBatch(int32 BatchIndex);
@@ -139,6 +145,6 @@ private:
 	// Oldest first.
 	TArray<FRTSCorpseSlot> M_Corpses;
 
-	// Lowering the setting mid-game removes the oldest corpses on the next check.
+	// Expired corpses, and the oldest ones after the setting was lowered mid-game, go on the next check.
 	FTimerHandle M_TrimTimer;
 };

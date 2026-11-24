@@ -133,6 +133,19 @@ namespace BxpHelpers
 					EBuildingExpansionType::BTX_GerRailPakBunker, GerRailPakBunker_Radixite, GerRailPakBunker_Metal,
 					1.8f, GerRailPakBunkerBuildTime
 				},
+				// The breakthrough doctrine's other concrete bunkers; the Flak 88 Flakstand is the heaviest.
+				{
+					EBuildingExpansionType::BTX_GerFlak88Bunker, GerFlak88Bunker_Radixite, GerFlak88Bunker_Metal,
+					2.0f, GerConcreteBunkerBuildTime
+				},
+				{
+					EBuildingExpansionType::BTX_GerFlakvierlingBunker, GerFlakvierlingBunker_Radixite,
+					GerFlakvierlingBunker_Metal, 1.6f, GerConcreteBunkerBuildTime
+				},
+				{
+					EBuildingExpansionType::BTX_GerPZ38TBunker, GerPZ38TBunker_Radixite, GerPZ38TBunker_Metal,
+					1.5f, GerConcreteBunkerBuildTime
+				},
 				// A heavy gun behind thick, high bag walls: tougher than the open gun pits.
 				{EBuildingExpansionType::BTX_GerFlak88Pit, GerFlak88Pit_Radixite, GerFlak88Pit_Metal, 1.3f},
 				// The mortar is protected by a compact square sandbag wall, but remains a light emplacement.
@@ -267,6 +280,66 @@ namespace BxpHelpers
 			InPlayerDataMap.Add(EBuildingExpansionType::BTX_GerMetalVaultSmelter, SmelterData);
 		}
 
+		/**
+		 * @brief The Strike Division mechanized depot's origin expansions: the radio van (vision) and the Wurfrahmen
+		 * shop (Panzerwerfer reload). Each its own struct, so no field leaks from one entry to the next.
+		 * @param InPlayerDataMap Player bxp data; the enemy map is copied from it afterwards.
+		 */
+		static void InitGerMechDepotBxpData(TMap<EBuildingExpansionType, FBxpData>& InPlayerDataMap)
+		{
+			using namespace BxpHelpers;
+			using namespace DeveloperSettings::GameBalance::TrainingTime;
+			using namespace DeveloperSettings::GameBalance::UnitCosts::Bxps;
+			using namespace DeveloperSettings::GameBalance::VisionRadii::BxpVision;
+			using namespace DeveloperSettings::GameBalance::UnitHealth;
+
+			// ----------------------- SD Mechanized Depot radio van origin expansion -----------------------
+			// The depot's eyes: a Kfz. 17 radio van and a 12 m aerial tower; no gun, but the widest sight of any expansion.
+			FBxpData RadioVanData;
+			RadioVanData.ConstructionTime = GerMechDepotRadioVanBuildTime;
+			RadioVanData.Health = RoundToNearestMultipleOfFive(T1BxpHealth * 1.5);
+			RadioVanData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIBasicBuildingArmorResistances(
+				RadioVanData.Health);
+			RadioVanData.VisionRadius = GerMechDepotRadioVanVisionRadius;
+			RadioVanData.Cost = FUnitCost({
+				{
+					ERTSResourceType::Resource_Radixite,
+					GerMechDepotRadioVan_Radixite
+				},
+				{
+					ERTSResourceType::Resource_Metal,
+					GerMechDepotRadioVan_Metal
+				},
+			});
+			// The radio sets draw power like the cipher room's.
+			RadioVanData.EnergySupply = -10;
+			RadioVanData.Abilities = NotArmedBxpAbilities;
+			InPlayerDataMap.Add(EBuildingExpansionType::BTX_GerMechDepotRadioVan, RadioVanData);
+
+			// ----------------------- SD Mechanized Depot Wurfrahmen shop origin expansion -----------------------
+			// A lean-to where a 251 gets its rocket racks; while it stands the player's Panzerwerfers reload faster.
+			FBxpData WurfrahmenShopData;
+			WurfrahmenShopData.ConstructionTime = GerMechDepotWurfrahmenShopBuildTime;
+			WurfrahmenShopData.Health = RoundToNearestMultipleOfFive(T1BxpHealth * 2);
+			WurfrahmenShopData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIBasicBuildingArmorResistances(
+				WurfrahmenShopData.Health);
+			WurfrahmenShopData.VisionRadius = T1BxpVisionRadius;
+			WurfrahmenShopData.Cost = FUnitCost({
+				{
+					ERTSResourceType::Resource_Radixite,
+					GerMechDepotWurfrahmenShop_Radixite
+				},
+				{
+					ERTSResourceType::Resource_Metal,
+					GerMechDepotWurfrahmenShop_Metal
+				},
+			});
+			WurfrahmenShopData.EnergySupply = -5;
+			WurfrahmenShopData.Abilities = NotArmedBxpAbilities;
+			WurfrahmenShopData.PanzerwerferReloadMlt = GerMechDepotWurfrahmenShopPanzerwerferReloadMlt;
+			InPlayerDataMap.Add(EBuildingExpansionType::BTX_GerMechDepotWurfrahmenShop, WurfrahmenShopData);
+		}
+
 		static void InitGerBarracksBxpData(TMap<EBuildingExpansionType, FBxpData>& InPlayerDataMap)
 		{
 			using namespace BxpHelpers;
@@ -312,6 +385,29 @@ namespace BxpHelpers
 			BxpData.EnergySupply = 5;
 			BxpData.Abilities = NotArmedBxpAbilities;
 			InPlayerDataMap.Add(EBuildingExpansionType::BTX_GerBarrackFuelCell, BxpData);
+
+			// ----------------------- GER Barracks Sniper Loft Origin Expansion -----------------------
+			// A timber loft with one Kar98k sniper on its deck; a light post, so tougher than the Panzerschreck foxhole
+			// but softer than the Schreck frame's steel deck. Own struct: the shared BxpData above carries no new fields.
+			FBxpData SniperLoftData;
+			SniperLoftData.ConstructionTime = GerBarracksSniperLoftBuildTime;
+			SniperLoftData.Health = RoundToNearestMultipleOfFive(T1BxpHealth * 1.5);
+			SniperLoftData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIBasicBuildingArmorResistances(
+				SniperLoftData.Health);
+			SniperLoftData.VisionRadius = GerBarracksSniperLoftVisionRadius;
+			SniperLoftData.Cost = FUnitCost({
+				{
+					ERTSResourceType::Resource_Radixite,
+					GerBarracksSniperLoft_Radixite
+				},
+				{
+					ERTSResourceType::Resource_Metal,
+					GerBarracksSniperLoft_Metal
+				},
+			});
+			SniperLoftData.EnergySupply = 0;
+			SniperLoftData.Abilities = ArmedBxpAbilities;
+			InPlayerDataMap.Add(EBuildingExpansionType::BTX_GerBarracksSniperLoft, SniperLoftData);
 		}
 
 		static void InitGerHQBxpData(TMap<EBuildingExpansionType, FBxpData>& InPlayerDataMap)
@@ -404,6 +500,27 @@ namespace BxpHelpers
 			BxpData.EnergySupply = -8;
 			BxpData.Abilities = ArmedBxpAbilities;
 			InPlayerDataMap.Add(EBuildingExpansionType::BTX_GerHQTower, BxpData);
+
+			// ----------------------- GER HQ Laser Platform Socket Expansion -----------------------
+			// The Panzer V III laser turret on an HQ socket: about three Flak Platforms in cost and power draw.
+			BxpData.ConstructionTime = RoundToNearestMultipleOfFive(30);
+			BxpData.Health = RoundToNearestMultipleOfFive(T1BxpHealth * 1.5);
+			BxpData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIBasicBuildingArmorResistances(
+				BxpData.Health);
+			BxpData.VisionRadius = T1BxpVisionRadius;
+			BxpData.Cost = FUnitCost({
+				{
+					ERTSResourceType::Resource_Radixite,
+					GerHQLaser_Radixite
+				},
+				{
+					ERTSResourceType::Resource_Metal,
+					GerHQLaser_Metal
+				},
+			});
+			BxpData.EnergySupply = -15;
+			BxpData.Abilities = ArmedBxpAbilities;
+			InPlayerDataMap.Add(EBuildingExpansionType::BTX_GerHQLaser, BxpData);
 
 			// ----------------------- GER HQ Repair Bay Free Expansion -----------------------
 			BxpData.ConstructionTime = RoundToNearestMultipleOfFive(25);
@@ -586,54 +703,49 @@ namespace BxpHelpers
 		struct FRusIndustrialBxpDefinition
 		{
 			EBuildingExpansionType Type;
-			float Bunker05HealthMultiplier;
+			// Medium tank shots that destroy it; see DeveloperSettings::GameBalance::SovietBuildingShotHealth.
+			int32 MediumTankShotsToKill;
 			float ConstructionTime;
 			float VisionRadius;
 			EResistancePresetType ResistancePreset;
 		};
 
-		inline constexpr float Bunker05AdditionalHealth = 250.f;
-		inline constexpr float AquirfierVerticalHealthMultiplier = 1.5f;
-		inline constexpr float AquirfierHealthMultiplier = 2.f;
-		inline constexpr float WarehouseHealthMultiplier = 0.8f;
-		inline constexpr float ChemicalPlantHealthMultiplier = 3.f;
-		inline constexpr float AntennaHealthMultiplier = 0.65f;
 		inline constexpr float AntennaVisionRadiusMultiplier = 2.f;
 
-		// Health multipliers keep these structures scaled to the Bunker 05 shown beside them.
+		// Health comes from medium tank shots, in line with the other Soviet base buildings.
 		inline constexpr FRusIndustrialBxpDefinition IndustrialBxpDefinitions[] =
 		{
 			{
 				EBuildingExpansionType::BTX_RusAquirfierVertical,
-				AquirfierVerticalHealthMultiplier,
+				DeveloperSettings::GameBalance::SovietBuildingShotHealth::AquirfierVerticalShots,
 				DeveloperSettings::GameBalance::TrainingTime::BxpT2BuildTime,
 				DeveloperSettings::GameBalance::VisionRadii::BxpVision::T2BxpVisionRadius,
 				EResistancePresetType::ReinforcedBuildingArmor
 			},
 			{
 				EBuildingExpansionType::BTX_RusAquirfier,
-				AquirfierHealthMultiplier,
+				DeveloperSettings::GameBalance::SovietBuildingShotHealth::AquirfierShots,
 				DeveloperSettings::GameBalance::TrainingTime::BxpT2BuildTime,
 				DeveloperSettings::GameBalance::VisionRadii::BxpVision::T2BxpVisionRadius,
 				EResistancePresetType::ReinforcedBuildingArmor
 			},
 			{
 				EBuildingExpansionType::BTX_RusWarehouse,
-				WarehouseHealthMultiplier,
+				DeveloperSettings::GameBalance::SovietBuildingShotHealth::WarehouseShots,
 				DeveloperSettings::GameBalance::TrainingTime::T1BxpBuildTime,
 				DeveloperSettings::GameBalance::VisionRadii::BxpVision::T1BxpVisionRadius,
 				EResistancePresetType::BasicBuildingArmor
 			},
 			{
 				EBuildingExpansionType::BTX_RusChemicalPlant,
-				ChemicalPlantHealthMultiplier,
+				DeveloperSettings::GameBalance::SovietBuildingShotHealth::ChemicalPlantShots,
 				DeveloperSettings::GameBalance::TrainingTime::BxpT2BuildTime,
 				DeveloperSettings::GameBalance::VisionRadii::BxpVision::T2BxpVisionRadius,
 				EResistancePresetType::ReinforcedBuildingArmor
 			},
 			{
 				EBuildingExpansionType::BTX_RusAntenna,
-				AntennaHealthMultiplier,
+				DeveloperSettings::GameBalance::SovietBuildingShotHealth::AntennaShots,
 				DeveloperSettings::GameBalance::TrainingTime::T1BxpBuildTime,
 				DeveloperSettings::GameBalance::VisionRadii::BxpVision::T2BxpVisionRadius
 				* AntennaVisionRadiusMultiplier,
@@ -644,17 +756,15 @@ namespace BxpHelpers
 		static void InitRusIndustrialBxpData(TMap<EBuildingExpansionType, FBxpData>& InPlayerDataMap)
 		{
 			using namespace BxpHelpers;
-			using namespace DeveloperSettings::GameBalance::UnitHealth;
-
-			const float Bunker05Health = RoundToNearestMultipleOfFive(
-				BxpHeavyBunkerHealth + Bunker05AdditionalHealth);
+			using namespace DeveloperSettings::GameBalance::SovietBuildingShotHealth;
 
 			for (const FRusIndustrialBxpDefinition& Definition : IndustrialBxpDefinitions)
 			{
 				FBxpData BxpData;
 				BxpData.ConstructionTime = Definition.ConstructionTime;
-				BxpData.Health = RoundToNearestMultipleOfFive(
-					Bunker05Health * Definition.Bunker05HealthMultiplier);
+				BxpData.Health = Definition.ResistancePreset == EResistancePresetType::ReinforcedBuildingArmor
+					                 ? ReinforcedHealthForShots(Definition.MediumTankShotsToKill)
+					                 : BasicHealthForShots(Definition.MediumTankShotsToKill);
 				BxpData.VisionRadius = Definition.VisionRadius;
 				BxpData.Cost = FUnitCost();
 				BxpData.EnergySupply = 0;

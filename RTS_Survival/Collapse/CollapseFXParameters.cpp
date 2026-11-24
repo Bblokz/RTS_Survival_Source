@@ -3,6 +3,8 @@
 #include "NiagaraComponent.h"
 #include "NiagaraFunctionLibrary.h"
 #include "Kismet/GameplayStatics.h"
+#include "Engine/World.h"
+#include "TimerManager.h"
 
 
 namespace COllapseVFXNiagaraParams
@@ -17,6 +19,32 @@ namespace COllapseVFXNiagaraParams
 	const FName SandBagSpawnCountName = "Spawn Count";
 	
 	FName ColorName = "MuzzleColor";
+}
+
+namespace CollapseVfxLifetime
+{
+	// Once VfxLifetime ends the system stops spawning; particles still alive get this long to fade before removal.
+	constexpr float FadeOutSeconds = 2.f;
+
+	void StopSpawning(const TWeakObjectPtr<UNiagaraComponent> WeakNiagara)
+	{
+		UNiagaraComponent* Niagara = WeakNiagara.Get();
+		if (not IsValid(Niagara))
+		{
+			return;
+		}
+		Niagara->Deactivate();
+	}
+
+	void Remove(const TWeakObjectPtr<UNiagaraComponent> WeakNiagara)
+	{
+		UNiagaraComponent* Niagara = WeakNiagara.Get();
+		if (not IsValid(Niagara))
+		{
+			return;
+		}
+		Niagara->DestroyComponent();
+	}
 }
 
 
@@ -63,6 +91,7 @@ void FCollapseFX::PlaySfxAtLocation(const UObject* WorldContext, const FVector& 
 
 void FCollapseFX::AdjustFX(UNiagaraComponent* NiagaraComp) const
 {
+	LimitVfxLifetime(NiagaraComp);
 	if(not NiagaraComp ||CollapseNiagaraParameters.VFXAdjustParams == ECollapseVFXAdjustNiagaraParams::Not)
 	{
 		return;
@@ -78,6 +107,33 @@ void FCollapseFX::AdjustFX(UNiagaraComponent* NiagaraComp) const
 		break;
 	}
 	
+}
+
+void FCollapseFX::LimitVfxLifetime(UNiagaraComponent* NiagaraComp) const
+{
+	if (VfxLifetime <= 0.f || not IsValid(NiagaraComp))
+	{
+		return;
+	}
+	UWorld* World = NiagaraComp->GetWorld();
+	if (not IsValid(World))
+	{
+		return;
+	}
+	// Timers live on the world: the actor that spawned the system is usually destroyed long before they fire.
+	const TWeakObjectPtr<UNiagaraComponent> WeakNiagara(NiagaraComp);
+	FTimerHandle StopSpawningHandle;
+	World->GetTimerManager().SetTimer(
+		StopSpawningHandle,
+		FTimerDelegate::CreateStatic(&CollapseVfxLifetime::StopSpawning, WeakNiagara),
+		VfxLifetime,
+		false);
+	FTimerHandle RemoveHandle;
+	World->GetTimerManager().SetTimer(
+		RemoveHandle,
+		FTimerDelegate::CreateStatic(&CollapseVfxLifetime::Remove, WeakNiagara),
+		VfxLifetime + CollapseVfxLifetime::FadeOutSeconds,
+		false);
 }
 
 void FCollapseFX::AdjustFxForSetScaleColorLifetime(UNiagaraComponent* NiagaraComp) const

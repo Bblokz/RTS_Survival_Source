@@ -278,7 +278,9 @@ void USurvivalStrategicAICoordinator::UpdateFromProfile()
 	const float PointsPerMinute = USurvivalWaveSettings::EvaluateCurveAtMinute(
 		Profile->StrategicTrainingPointsPerMinute, Minute, 0.f);
 	FEnemyStrategicTrainingState& TrainingState = StrategicAI->GetEditableEnemyTrainingState();
-	TrainingState.EnemyLevelTraining.TrainingPointsPerMinute = FMath::Max(0, FMath::RoundToInt(PointsPerMinute));
+	// Rounded to whole points to keep the survival pace as it was tuned.
+	TrainingState.EnemyLevelTraining.TrainingPointsPerMinute =
+		static_cast<float>(FMath::Max(0, FMath::RoundToInt(PointsPerMinute)));
 }
 
 const FSurvivalWaveDifficultyProfile* USurvivalStrategicAICoordinator::GetProfile() const

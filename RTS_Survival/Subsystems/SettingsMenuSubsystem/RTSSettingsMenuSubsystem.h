@@ -188,6 +188,10 @@ struct FRTSGameplaySettings
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Gameplay")
 	bool bM_CheckUnitRangeOnHover = true;
 
+	// Vehicle, building and squad info takeovers that pause the game to introduce a unit.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Gameplay")
+	bool bM_ShowInfoTakeovers = true;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Gameplay")
 	ERTSPlayerHealthBarVisibilityStrategy M_OverwriteAllPlayerHpBarStrat = ERTSPlayerHealthBarVisibilityStrategy::AwaysVisible;
 
@@ -338,6 +342,16 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category="Settings")
 	void SetPendingCheckUnitRangeOnHover(bool bNewCheckUnitRangeOnHover);
+
+	UFUNCTION(BlueprintCallable, Category="Settings")
+	void SetPendingShowInfoTakeovers(bool bNewShowInfoTakeovers);
+
+	/**
+	 * @brief Saves the info takeover switch at once, outside the menu's pending/apply flow: the takeover's "never
+	 * show again" box must stick without an Apply, and a later Apply in the menu must not revert it.
+	 * @param bNewShowInfoTakeovers False hides every later unit info takeover; game-mechanic field manuals still show.
+	 */
+	void SetShowInfoTakeoversImmediately(const bool bNewShowInfoTakeovers);
 
 	UFUNCTION(BlueprintCallable, Category="Settings")
 	void SetPendingOverwriteAllPlayerHpBarStrat(ERTSPlayerHealthBarVisibilityStrategy NewStrategy);

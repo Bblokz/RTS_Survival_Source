@@ -67,6 +67,14 @@ instruments keep moving on a paused game.
   instance, `SetIsLit` and a `Tick` that fades `Power` in and out.
 - **Capture:** `-UISnapshotLampsOn` (non-shipping) forces every lamp lit and steady (no blink) for offscreen UI
   captures.
+- **Halo (2026-11-16):** each idle lamp also throws light on the HUD around it. `FIndicatorLamp::BuildHalo` adds an
+  image under the lamp (same overlay slot, scaled up by a render transform so the layout never moves) drawing
+  `M_UI_IndicatorLampHalo` (AlphaComposite: soft bezel shadow + additive light in the lamp's colour). It copies the
+  lamp instance's `TimeOffset`, `BlinkMode`, `BlinkHz`, `BlinkPhase`, `Duty`, `MinOn` and `LampColor`, so it pulses
+  in step with the jewel. Settings: `IdleLampHaloMaterial`, `IdleLampHaloScale` (3.5). Built by
+  `Source/Tools/InfoTakeover/Style/build_page_lamps.sh` together with the info takeover page lamps
+  (`Source/Docs/UI/InfoTakeovers.md`, "Page lamp shader"). `_Shared/AnalogGauges` is always cooked, since these
+  materials are referenced only from the ini.
 
 ## Energy meter (in the HUD: the glass tube)
 

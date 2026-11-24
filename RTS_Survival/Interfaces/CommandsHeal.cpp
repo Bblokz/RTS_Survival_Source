@@ -28,7 +28,7 @@ ECommandQueueError ICommands::HealTarget(AActor* TargetActor, const bool bSetUni
 	}
 	if (bSetUnitToIdle)
 	{
-		SetUnitToIdle();
+		SetUnitToIdleForNewOrder();
 	}
 	return UnitCommandData->AddAbilityToTCommands(EAbilityID::IdHeal, FVector::ZeroVector, TargetActor,
 	                                              FRotator::ZeroRotator);

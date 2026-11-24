@@ -8,8 +8,6 @@
 
 namespace StrategicAIHelperConstants
 {
-	constexpr int32 PlayerOwningId = 1;
-	constexpr int32 EnemyOwningId = 2;
 	constexpr int32 MaxRetreatGroups = 3;
 	constexpr float FlankLeftYawOffset = -90.f;
 	constexpr float FlankRightYawOffset = 90.f;
@@ -29,6 +27,29 @@ namespace StrategicAIHelperConstants
 
 namespace StrategicAIHelperUtilities
 {
+	// The owner tests of every helper. They run on the async thread, so they compare the snapshot's owner with the
+	// requester's copied player and masks only: no player relation lookups, and no normalizing, so neutral and
+	// unset owners belong to nobody here, as they never matched player 1 or player 2 either.
+
+	/** Units the requesting controller commands or builds from: owned by exactly the requesting player. */
+	bool GetIsOwnedByRequester(const FAsyncDetailedUnitState& UnitState, const FStrategicAIRequester& Requester)
+	{
+		return UnitState.OwningPlayer == Requester.RequestingPlayer;
+	}
+
+	/** The "player" units of the requests and results: owned by a player the requester fights. */
+	bool GetIsHostileToRequester(const FAsyncDetailedUnitState& UnitState, const FStrategicAIRequester& Requester)
+	{
+		return FRTSPlayers::IsPlayerInMask(UnitState.OwningPlayer, Requester.HostileMask);
+	}
+
+	/** Own and allied units: only for keeping generated positions clear of them. */
+	bool GetIsFriendlyToRequester(const FAsyncDetailedUnitState& UnitState, const FStrategicAIRequester& Requester)
+	{
+		return GetIsOwnedByRequester(UnitState, Requester)
+			|| FRTSPlayers::IsPlayerInMask(UnitState.OwningPlayer, Requester.FriendlyMask);
+	}
+
 	bool GetIsNearZeroStrategicLocation(const FVector& Location)
 	{
 		return Location.IsNearlyZero();
@@ -105,6 +126,7 @@ namespace StrategicAIHelperUtilities
 	void GatherEnemyBaseRequestPoints(
 		const FFindEnemyBaseClusters& Request,
 		const TArray<FAsyncDetailedUnitState>& DetailedUnitStates,
+		const FStrategicAIRequester& Requester,
 		TArray<FEnemyCoreBuildingClusterPoint>& OutCorePoints,
 		TArray<FVector2D>& OutSatellitePoints,
 		TArray<FVector>& OutAlliedUnitLocations)
@@ -113,12 +135,17 @@ namespace StrategicAIHelperUtilities
 		const TSet<EBuildingExpansionType> SatelliteTypes(Request.SatelliteBuildingTypes);
 		for (const FAsyncDetailedUnitState& UnitState : DetailedUnitStates)
 		{
-			if (UnitState.OwningPlayer != StrategicAIHelperConstants::EnemyOwningId)
+			if (not GetIsFriendlyToRequester(UnitState, Requester))
 			{
 				continue;
 			}
 
+			// Defense positions stay clear of allied units too; the bases themselves are the requester's own.
 			OutAlliedUnitLocations.Add(UnitState.UnitLocation);
+			if (not GetIsOwnedByRequester(UnitState, Requester))
+			{
+				continue;
+			}
 			if (UnitState.UnitType != EAllUnitType::UNType_BuildingExpansion)
 			{
 				continue;
@@ -1171,6 +1198,14 @@ FResultEnemyBaseClusters FStrategicAIHelpers::BuildEnemyBaseClustersResult(
 	const FFindEnemyBaseClusters& Request,
 	const TArray<FAsyncDetailedUnitState>& DetailedUnitStates)
 {
+	return BuildEnemyBaseClustersResult(Request, DetailedUnitStates, FStrategicAIRequester());
+}
+
+FResultEnemyBaseClusters FStrategicAIHelpers::BuildEnemyBaseClustersResult(
+	const FFindEnemyBaseClusters& Request,
+	const TArray<FAsyncDetailedUnitState>& DetailedUnitStates,
+	const FStrategicAIRequester& Requester)
+{
 	FResultEnemyBaseClusters Result;
 	Result.RequestID = Request.RequestID;
 	if (Request.CoreBuildingTypes.IsEmpty())
@@ -1184,6 +1219,7 @@ FResultEnemyBaseClusters FStrategicAIHelpers::BuildEnemyBaseClustersResult(
 	StrategicAIHelperUtilities::GatherEnemyBaseRequestPoints(
 		Request,
 		DetailedUnitStates,
+		Requester,
 		CorePoints,
 		SatellitePoints,
 		AlliedUnitLocations);
@@ -1295,12 +1331,13 @@ namespace StrategicAIHelperUtilities
 
 	TArray<FPlayerBulkCandidate> GatherPlayerBulkCandidates(
 		const FFindPlayerUnitBulkLocations& Request,
-		const TArray<FAsyncDetailedUnitState>& DetailedUnitStates)
+		const TArray<FAsyncDetailedUnitState>& DetailedUnitStates,
+		const FStrategicAIRequester& Requester)
 	{
 		TArray<FPlayerBulkCandidate> Candidates;
 		for (const FAsyncDetailedUnitState& UnitState : DetailedUnitStates)
 		{
-			if (UnitState.OwningPlayer != StrategicAIHelperConstants::PlayerOwningId)
+			if (not GetIsHostileToRequester(UnitState, Requester))
 			{
 				continue;
 			}
@@ -1439,6 +1476,39 @@ namespace StrategicAIHelperUtilities
 		{
 			Result.PlayerHeavyTanks++;
 		}
+	}
+
+	/**
+	 * @brief Counts one hostile nomadic unit and keeps the single HQ location of the result meaningful when the
+	 * requester fights several players: the HQ of the lowest-numbered hostile player wins, so the human's HQ
+	 * whenever the human is hostile. Among the HQs of one player the last one found counts, as before.
+	 * @param Result Counts and locations being built.
+	 * @param UnitState Nomadic unit of a player hostile to the requester.
+	 * @param InOutHQOwningPlayer Owner of the HQ stored in the result; INDEX_NONE while none was found.
+	 */
+	void AddPlayerNomadicUnitStateCount(
+		FResultPlayerUnitCounts& Result,
+		const FAsyncDetailedUnitState& UnitState,
+		int32& InOutHQOwningPlayer)
+	{
+		if (FStrategicAIHelpers::GetIsNomadicResourceBuilding(UnitState)
+			&& not FStrategicAIHelpers::GetIsNomadicHQ(UnitState))
+		{
+			Result.PlayerResourceBuildings.Add(UnitState.UnitLocation);
+			return;
+		}
+		if (not FStrategicAIHelpers::GetIsNomadicHQ(UnitState))
+		{
+			Result.PlayerNomadicVehicles++;
+			return;
+		}
+		const bool bIsHQToKeep = InOutHQOwningPlayer == INDEX_NONE || UnitState.OwningPlayer <= InOutHQOwningPlayer;
+		if (not bIsHQToKeep)
+		{
+			return;
+		}
+		Result.PlayerHQLocation = UnitState.UnitLocation;
+		InOutHQOwningPlayer = UnitState.OwningPlayer;
 	}
 
 	void AddUnitTypeToBulkCounts(const FAsyncDetailedUnitState& UnitState, FPlayerUnitBulkLocation& BulkLocation)
@@ -1751,12 +1821,14 @@ namespace StrategicAIHelperUtilities
 
 	TArray<const FAsyncDetailedUnitState*> GatherDamagedTanks(
 		const FFindAlliedTanksToRetreat& Request,
-		const TArray<FAsyncDetailedUnitState>& DetailedUnitStates)
+		const TArray<FAsyncDetailedUnitState>& DetailedUnitStates,
+		const FStrategicAIRequester& Requester)
 	{
 		TArray<const FAsyncDetailedUnitState*> DamagedTanks;
 		for (const FAsyncDetailedUnitState& UnitState : DetailedUnitStates)
 		{
-			if (UnitState.OwningPlayer != StrategicAIHelperConstants::EnemyOwningId)
+			// Own units only, never an ally's: the requesting controller orders these tanks to retreat.
+			if (not GetIsOwnedByRequester(UnitState, Requester))
 			{
 				continue;
 			}
@@ -1786,12 +1858,14 @@ namespace StrategicAIHelperUtilities
 
 	TArray<const FAsyncDetailedUnitState*> GatherIdleHazmats(
 		const FFindAlliedTanksToRetreat& Request,
-		const TArray<FAsyncDetailedUnitState>& DetailedUnitStates)
+		const TArray<FAsyncDetailedUnitState>& DetailedUnitStates,
+		const FStrategicAIRequester& Requester)
 	{
 		TArray<const FAsyncDetailedUnitState*> IdleHazmats;
 		for (const FAsyncDetailedUnitState& UnitState : DetailedUnitStates)
 		{
-			if (UnitState.OwningPlayer != StrategicAIHelperConstants::EnemyOwningId)
+			// Own units only, never an ally's: the requesting controller sends these hazmats to the retreat.
+			if (not GetIsOwnedByRequester(UnitState, Requester))
 			{
 				continue;
 			}
@@ -1910,6 +1984,14 @@ FResultLocationsUnderPlayerAttack FStrategicAIHelpers::BuildLocationsUnderPlayer
 	const FFindLocationsUnderPlayerAttack& Request,
 	const TArray<FAsyncDetailedUnitState>& DetailedUnitStates)
 {
+	return BuildLocationsUnderPlayerAttackResult(Request, DetailedUnitStates, FStrategicAIRequester());
+}
+
+FResultLocationsUnderPlayerAttack FStrategicAIHelpers::BuildLocationsUnderPlayerAttackResult(
+	const FFindLocationsUnderPlayerAttack& Request,
+	const TArray<FAsyncDetailedUnitState>& DetailedUnitStates,
+	const FStrategicAIRequester& Requester)
+{
 	FResultLocationsUnderPlayerAttack Result;
 	Result.RequestID = Request.RequestID;
 
@@ -1940,7 +2022,7 @@ FResultLocationsUnderPlayerAttack FStrategicAIHelpers::BuildLocationsUnderPlayer
 
 		for (const FAsyncDetailedUnitState& UnitState : DetailedUnitStates)
 		{
-			if (UnitState.OwningPlayer != StrategicAIHelperConstants::PlayerOwningId)
+			if (not StrategicAIHelperUtilities::GetIsHostileToRequester(UnitState, Requester))
 			{
 				continue;
 			}
@@ -2003,11 +2085,19 @@ FResultPlayerUnitBulkLocations FStrategicAIHelpers::BuildPlayerUnitBulkLocations
 	const FFindPlayerUnitBulkLocations& Request,
 	const TArray<FAsyncDetailedUnitState>& DetailedUnitStates)
 {
+	return BuildPlayerUnitBulkLocationsResult(Request, DetailedUnitStates, FStrategicAIRequester());
+}
+
+FResultPlayerUnitBulkLocations FStrategicAIHelpers::BuildPlayerUnitBulkLocationsResult(
+	const FFindPlayerUnitBulkLocations& Request,
+	const TArray<FAsyncDetailedUnitState>& DetailedUnitStates,
+	const FStrategicAIRequester& Requester)
+{
 	FResultPlayerUnitBulkLocations Result;
 	Result.RequestID = Request.RequestID;
 
 	const TArray<StrategicAIHelperUtilities::FPlayerBulkCandidate> Candidates =
-		StrategicAIHelperUtilities::GatherPlayerBulkCandidates(Request, DetailedUnitStates);
+		StrategicAIHelperUtilities::GatherPlayerBulkCandidates(Request, DetailedUnitStates, Requester);
 	const TArray<StrategicAIHelperUtilities::FPlayerBulkClusterBuilder> Clusters =
 		StrategicAIHelperUtilities::BuildPlayerBulkClusters(Candidates, Request.ClusterRadiusXY);
 
@@ -2052,13 +2142,21 @@ FResultClosestFlankableEnemyHeavy FStrategicAIHelpers::BuildClosestFlankableEnem
 	const FFindClosestFlankableEnemyHeavy& Request,
 	const TArray<FAsyncDetailedUnitState>& DetailedUnitStates)
 {
+	return BuildClosestFlankableEnemyHeavyResult(Request, DetailedUnitStates, FStrategicAIRequester());
+}
+
+FResultClosestFlankableEnemyHeavy FStrategicAIHelpers::BuildClosestFlankableEnemyHeavyResult(
+	const FFindClosestFlankableEnemyHeavy& Request,
+	const TArray<FAsyncDetailedUnitState>& DetailedUnitStates,
+	const FStrategicAIRequester& Requester)
+{
 	FResultClosestFlankableEnemyHeavy Result;
 	Result.RequestID = Request.RequestID;
 	Result.FlankLocationsAroundHeavyTank.Reserve(DetailedUnitStates.Num());
 
 	for (const FAsyncDetailedUnitState& UnitState : DetailedUnitStates)
 	{
-		if (UnitState.OwningPlayer != StrategicAIHelperConstants::PlayerOwningId)
+		if (not StrategicAIHelperUtilities::GetIsHostileToRequester(UnitState, Requester))
 		{
 			continue;
 		}
@@ -2086,12 +2184,21 @@ FResultPlayerUnitCounts FStrategicAIHelpers::BuildPlayerUnitCountsResult(
 	const FGetPlayerUnitCountsAndBase& Request,
 	const TArray<FAsyncDetailedUnitState>& DetailedUnitStates)
 {
+	return BuildPlayerUnitCountsResult(Request, DetailedUnitStates, FStrategicAIRequester());
+}
+
+FResultPlayerUnitCounts FStrategicAIHelpers::BuildPlayerUnitCountsResult(
+	const FGetPlayerUnitCountsAndBase& Request,
+	const TArray<FAsyncDetailedUnitState>& DetailedUnitStates,
+	const FStrategicAIRequester& Requester)
+{
 	FResultPlayerUnitCounts Result;
 	Result.RequestID = Request.RequestID;
+	int32 HQOwningPlayer = INDEX_NONE;
 
 	for (const FAsyncDetailedUnitState& UnitState : DetailedUnitStates)
 	{
-		if (UnitState.OwningPlayer != StrategicAIHelperConstants::PlayerOwningId)
+		if (not StrategicAIHelperUtilities::GetIsHostileToRequester(UnitState, Requester))
 		{
 			continue;
 		}
@@ -2105,18 +2212,7 @@ FResultPlayerUnitCounts FStrategicAIHelpers::BuildPlayerUnitCountsResult(
 			Result.PlayerSquads++;
 			break;
 		case EAllUnitType::UNType_Nomadic:
-			if (FStrategicAIHelpers::GetIsNomadicHQ(UnitState))
-			{
-				Result.PlayerHQLocation = UnitState.UnitLocation;
-			}
-			else if (FStrategicAIHelpers::GetIsNomadicResourceBuilding(UnitState))
-			{
-				Result.PlayerResourceBuildings.Add(UnitState.UnitLocation);
-			}
-			else
-			{
-				Result.PlayerNomadicVehicles++;
-			}
+			StrategicAIHelperUtilities::AddPlayerNomadicUnitStateCount(Result, UnitState, HQOwningPlayer);
 			break;
 		default:
 			break;
@@ -2132,15 +2228,23 @@ FResultAlliedTanksToRetreat FStrategicAIHelpers::BuildAlliedTanksToRetreatResult
 	const FFindAlliedTanksToRetreat& Request,
 	const TArray<FAsyncDetailedUnitState>& DetailedUnitStates)
 {
+	return BuildAlliedTanksToRetreatResult(Request, DetailedUnitStates, FStrategicAIRequester());
+}
+
+FResultAlliedTanksToRetreat FStrategicAIHelpers::BuildAlliedTanksToRetreatResult(
+	const FFindAlliedTanksToRetreat& Request,
+	const TArray<FAsyncDetailedUnitState>& DetailedUnitStates,
+	const FStrategicAIRequester& Requester)
+{
 	FResultAlliedTanksToRetreat Result;
 	Result.RequestID = Request.RequestID;
 
 	const TArray<const FAsyncDetailedUnitState*> DamagedTanks =
-		StrategicAIHelperUtilities::GatherDamagedTanks(Request, DetailedUnitStates);
+		StrategicAIHelperUtilities::GatherDamagedTanks(Request, DetailedUnitStates, Requester);
 	TArray<StrategicAIHelperUtilities::FDamagedTankGroupBuilder> Groups =
 		StrategicAIHelperUtilities::BuildDamagedTankGroups(DamagedTanks, Request);
 	const TArray<const FAsyncDetailedUnitState*> IdleHazmats =
-		StrategicAIHelperUtilities::GatherIdleHazmats(Request, DetailedUnitStates);
+		StrategicAIHelperUtilities::GatherIdleHazmats(Request, DetailedUnitStates, Requester);
 
 	StrategicAIHelperUtilities::AppendHazmatsToGroups(Groups, IdleHazmats, Request);
 

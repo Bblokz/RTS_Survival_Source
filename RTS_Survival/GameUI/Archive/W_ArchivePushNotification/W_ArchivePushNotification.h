@@ -22,6 +22,13 @@ public:
 
 	void SetNotificationHolder(UW_ArchiveNotificationHolder* NotificationHolder);
 
+	/**
+	 * @brief The pop-up of a CustomContent archive entry: puts its picture on the designer's ArchiveButton the way
+	 * the Blueprint's AdjustButtonWithImage does for DT_ArchiveItem rows.
+	 * @param Content The archived entry.
+	 */
+	void SetupCustomNotification(const FArchiveCustomContent& Content);
+
 protected:
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void OnClickedNotification();

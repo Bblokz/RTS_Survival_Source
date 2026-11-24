@@ -19,6 +19,7 @@
 #include "RTS_Survival/Weapons/Projectile/Projectile.h"
 #include "Engine/OverlapResult.h"
 #include "RTS_Survival/RTSCollisionTraceChannels.h"
+#include "RTS_Survival/Utils/CollisionSetup/RTSPlayerCollision.h"
 #include "RTS_Survival/Units/Tanks/TankMaster.h"
 #include "RTS_Survival/Weapons/HullWeaponComponent/HullWeaponComponent.h"
 #include "RTS_Survival/Weapons/Turret/CPPTurretsMaster.h"
@@ -847,13 +848,11 @@ AActor* UAttachedRockets::FindHomingTarget_ClosestEnemyInCone() const
 		return nullptr;
 	}
 
-	// Player 1 targets the enemy object channel, every other player targets the player's units.
-	constexpr int32 PlayerOneIndex = 1;
-	const ECollisionChannel EnemyObjectChannel = M_OwningPlayer == PlayerOneIndex
-		                                             ? COLLISION_OBJ_ENEMY
-		                                             : COLLISION_OBJ_PLAYER;
+	// The object channels hostile units can be on; allied AI units share one with hostile ones, so every
+	// candidate is checked against its owner below.
 	FCollisionObjectQueryParams ObjectQueryParams;
-	ObjectQueryParams.AddObjectTypesToQuery(EnemyObjectChannel);
+	FRTSPlayerCollision::AddObjectTypesForOverlapLogic(
+		ObjectQueryParams, FRTSPlayerCollision::GetOverlapLogicForHostilesOf(M_OwningPlayer));
 	FCollisionQueryParams QueryParams(TEXT("AttachedRocketsHomingTarget"), false, OwnerActor);
 	TArray<FOverlapResult> Overlaps;
 	const FVector OwnerLocation = OwnerActor->GetActorLocation();
@@ -866,6 +865,10 @@ AActor* UAttachedRockets::FindHomingTarget_ClosestEnemyInCone() const
 	{
 		AActor* Candidate = Overlap.GetActor();
 		if (not GetIsValidHomingTargetCandidate(Candidate))
+		{
+			continue;
+		}
+		if (not FRTSPlayerCollision::IsHitDamageableByPlayer(Candidate, Overlap.GetComponent(), M_OwningPlayer))
 		{
 			continue;
 		}

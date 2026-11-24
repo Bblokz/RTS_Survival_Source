@@ -13,6 +13,7 @@
 #include "W_HealthBar.generated.h"
 
 enum class EWeaponShellType : uint8;
+class UProgressBar;
 class UTextBlock;
 class UImage;
 class UHealthComponent;
@@ -75,6 +76,17 @@ public:
 	/** @brief Drops cached icon images on widget replacement or owner EndPlay. */
 	void ReleaseModuleIconImages();
 
+	// ---- Resource conversion progress; driven by the owner's UResourceConverterComponent ----
+
+	/** @return Whether this widget blueprint has the optional ConversionProgressBar. */
+	bool GetHasConversionProgressBar() const;
+
+	/** @brief Shows or collapses the conversion progress bar; no-op when the widget has none. */
+	void SetConversionProgressVisible(const bool bVisible) const;
+
+	/** @brief Fills the conversion progress bar (0..1) towards the next conversion. */
+	void SetConversionProgress(const float NewPercentage) const;
+
 protected:
 	// Hides the rankicon immediatly if set.
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
@@ -107,6 +119,10 @@ protected:
 	
 	UPROPERTY(meta = (BindWidget), BlueprintReadOnly)
 	TObjectPtr<UImage> M_FireThresholdBarImage = nullptr;
+
+	// Optional: only health bars of resource converters need it; collapsed until conversion runs.
+	UPROPERTY(meta = (BindWidgetOptional), BlueprintReadOnly)
+	TObjectPtr<UProgressBar> ConversionProgressBar = nullptr;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	TObjectPtr<UTextBlock> M_UnitNameText = nullptr;

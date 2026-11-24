@@ -11,6 +11,7 @@
 #include "RTS_Survival/Player/CPPController.h"
 #include "RTS_Survival/Player/PlayerResourceManager/PlayerResourceManager.h"
 #include "RTS_Survival/Resources/ResourceStorageOwner/ResourceStorageOwner.h"
+#include "RTS_Survival/Resources/UnloadStation/ResourceUnloadStation.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/RTSBlueprintFunctionLibrary.h"
@@ -32,21 +33,51 @@ int32 UResourceDropOff::DropOffResources(const ERTSResourceType ResourceType, co
 		DebugDroppingOff(ResourceType, Amount);
 	}
 
-	if (M_ResourceDropOffCapacity.Contains(ResourceType))
+	if (not M_ResourceDropOffCapacity.Contains(ResourceType))
 	{
-		const int32 AmountLeft = M_ResourceDropOffCapacity[ResourceType].AddResource(Amount);
-		if (GetIsValidPlayerResourceManager())
-		{
-			// Update player resource system without affecting the DropOffs as we will store the resources locally.
-			M_PlayerResourceManager->DropOffNoVisualUpdate_AddResource(ResourceType, Amount - AmountLeft);
-		}
-		UpdateDropOffVisuals(ResourceType);
-		CreateTextOfDropOff(ResourceType, Amount - AmountLeft);
-		return AmountLeft;
+		RTSFunctionLibrary::ReportError("Resource type not found in drop off capacity!"
+			"\n ResourceDropOff: " + GetName());
+		return Amount;
 	}
-	RTSFunctionLibrary::ReportError("Resource type not found in drop off capacity!"
-		"\n ResourceDropOff: " + GetName());
-	return Amount;
+	const int32 AmountLeft = AddDroppedOffResources(ResourceType, Amount);
+	CreateTextOfDropOff(ResourceType, Amount - AmountLeft);
+	return AmountLeft;
+}
+
+int32 UResourceDropOff::DropOffResourcesFromCrane(const ERTSResourceType ResourceType, const int32 Amount,
+                                                  const FVector& TextLocation)
+{
+	if (not M_ResourceDropOffCapacity.Contains(ResourceType))
+	{
+		RTSFunctionLibrary::ReportError("Crane load of a resource the drop off does not store!"
+			"\n ResourceDropOff: " + GetName());
+		return Amount;
+	}
+	const int32 AmountLeft = AddDroppedOffResources(ResourceType, Amount);
+	CreateTextOfDropOffAt(ResourceType, Amount - AmountLeft, TextLocation);
+	return AmountLeft;
+}
+
+int32 UResourceDropOff::AddDroppedOffResources(const ERTSResourceType ResourceType, const int32 Amount)
+{
+	const int32 AmountLeft = M_ResourceDropOffCapacity[ResourceType].AddResource(Amount);
+	if (GetIsValidPlayerResourceManager())
+	{
+		// Update player resource system without affecting the DropOffs as we will store the resources locally.
+		M_PlayerResourceManager->DropOffNoVisualUpdate_AddResource(ResourceType, Amount - AmountLeft);
+	}
+	UpdateDropOffVisuals(ResourceType);
+	return AmountLeft;
+}
+
+void UResourceDropOff::SetUnloadStation(AResourceUnloadStation* Station)
+{
+	M_UnloadStation = Station;
+}
+
+AResourceUnloadStation* UResourceDropOff::GetUnloadStation() const
+{
+	return M_UnloadStation.Get();
 }
 
 void UResourceDropOff::AddResourcesNotHarvested(const ERTSResourceType ResourceType, const int32 Amount)
@@ -151,6 +182,13 @@ FVector UResourceDropOff::GetDropOffLocationNotThreadSafe() const
 		RTSFunctionLibrary::ReportError("Owner is not valid on resource dropoff!"
 			"\n ResourceDropOff: " + GetName());
 		return FVector::ZeroVector;
+	}
+
+	// A crane whose bay covers the old drop-off point sends bay-less harvesters to its overflow point instead.
+	FVector OverflowLocation;
+	if (M_UnloadStation.IsValid() && M_UnloadStation->GetOverflowDropOffLocation(OverflowLocation))
+	{
+		return OverflowLocation;
 	}
 
 	if (not GetIsValidOwnerMeshComponent())
@@ -464,6 +502,16 @@ void UResourceDropOff::CreateTextOfDropOff(const ERTSResourceType ResourceType, 
 	{
 		return;
 	}
+	CreateTextOfDropOffAt(ResourceType, Amount, GetDropOffLocationNotThreadSafe() + FVector(0, 0, M_DropOffTextZOffset));
+}
+
+void UResourceDropOff::CreateTextOfDropOffAt(const ERTSResourceType ResourceType, const int32 Amount,
+                                             const FVector& Location) const
+{
+	if (Amount <= 0)
+	{
+		return;
+	}
 	FRTSVerticalAnimTextSettings Settings;
 	Settings.DeltaZ = 150.f;
 	Settings.VisibleDuration = 5.f;
@@ -473,10 +521,9 @@ void UResourceDropOff::CreateTextOfDropOff(const ERTSResourceType ResourceType, 
 
 	BaseText = FRTSRichTextConverter::MakeRTSRich(
 		BaseText, FRTSRichTextConverter::ConvertResourceToRTSRichText(ResourceType));
-	FVector LocationOfDropOff = GetDropOffLocationNotThreadSafe() + FVector(0, 0, M_DropOffTextZOffset);
 	const TEnumAsByte<ETextJustify::Type> Justify = ETextJustify::Center;
 	URTSBlueprintFunctionLibrary::RTSSpawnVerticalAnimatedTextAtLocation(this,
-	                                                                     BaseText, LocationOfDropOff, false, 0.f,
+	                                                                     BaseText, Location, false, 0.f,
 	                                                                     Justify,
 	                                                                     Settings);
 }

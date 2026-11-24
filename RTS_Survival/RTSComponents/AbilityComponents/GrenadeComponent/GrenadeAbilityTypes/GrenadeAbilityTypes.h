@@ -12,6 +12,7 @@ enum class EGrenadeAbilityType : uint8
 	GerStickGrenade,
 	SmallGrenade,
 	BundleSturmKommando,
+	// Hazmat Vultures (FG-42): all four soldiers throw an M24 stick grenade that sticks to vehicles (anti-armor).
 	StickGrenadeVultures,
 	// Soviet molotov cocktail: burning rag in hand and a fire area that keeps burning after impact.
 	RusMolotov,

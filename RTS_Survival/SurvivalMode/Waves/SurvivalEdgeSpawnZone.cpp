@@ -29,6 +29,8 @@ namespace SurvivalEdgeSpawnZoneConstants
 	constexpr float RepeatPointOffsetFraction = 0.35f;
 	constexpr float DegreesPerCompassSector = 45.f;
 	constexpr int32 CompassSectorCount = 8;
+	// Horizontal projection extent for a runtime (slid) spawn centre.
+	constexpr float RuntimeCenterProjectionExtent = 1500.f;
 }
 
 ASurvivalEdgeSpawnZone::ASurvivalEdgeSpawnZone()
@@ -82,11 +84,34 @@ FVector ASurvivalEdgeSpawnZone::GetInwardDirection() const
 
 FVector ASurvivalEdgeSpawnZone::GetSpawnCenter() const
 {
+	if (bM_HasRuntimeSpawnCenter)
+	{
+		return M_RuntimeSpawnCenter;
+	}
+	return GetPlacedSpawnCenter();
+}
+
+FVector ASurvivalEdgeSpawnZone::GetPlacedSpawnCenter() const
+{
 	if (not GetIsValidSpawnArea())
 	{
 		return GetActorLocation();
 	}
 	return SpawnArea->GetComponentLocation();
+}
+
+bool ASurvivalEdgeSpawnZone::TrySetRuntimeSpawnCenter(const FVector& DesiredCenter)
+{
+	using namespace SurvivalEdgeSpawnZoneConstants;
+	const FVector Candidate(DesiredCenter.X, DesiredCenter.Y, GetPlacedSpawnCenter().Z);
+	FVector ProjectedCenter;
+	if (not TryProjectWithInwardRetries(Candidate, RuntimeCenterProjectionExtent, ProjectedCenter))
+	{
+		return false;
+	}
+	M_RuntimeSpawnCenter = ProjectedCenter;
+	bM_HasRuntimeSpawnCenter = true;
+	return true;
 }
 
 float ASurvivalEdgeSpawnZone::GetEdgeLength() const

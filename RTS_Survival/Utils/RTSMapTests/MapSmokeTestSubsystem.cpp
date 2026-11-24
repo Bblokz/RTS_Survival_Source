@@ -3,6 +3,7 @@
 #include "MapSmokeTestSubsystem.h"
 
 #include "RTS_Survival/Utils/RTSMapTests/RTSMapTests.h"
+#include "RTS_Survival/Utils/RTSMapTests/GarrisonBarSnapshot.h"
 
 #if RTS_WITH_MAP_TESTS
 #include "EngineUtils.h"
@@ -22,7 +23,7 @@
 #include "RTS_Survival/GameUI/GameDifficultyPicker/W_GameDifficultyPicker.h"
 #include "RTS_Survival/GameUI/TutorialOvertakeWidget/W_TutorialOvertake.h"
 #include "RTS_Survival/Missions/MissionManager/MissionManager.h"
-#include "RTS_Survival/Missions/Victory/W_Victory.h"
+#include "RTS_Survival/Missions/MissionDebrief/W_MissionEnd.h"
 #include "RTS_Survival/Player/CPPController.h"
 #include "RTS_Survival/Player/PauseGame/PauseGameOptions.h"
 #include "RTS_Survival/FactionSystem/FactionSelection/FactionPlayerController.h"
@@ -52,6 +53,9 @@ namespace MapSmokeTestPrivate
 	constexpr float CampaignSettleSeconds = 20.f;
 	constexpr float MissionLaunchRetrySeconds = 5.f;
 	const TCHAR* const RunSecondsSwitch = TEXT("RTSMapSmokeTestSeconds=");
+	// -RTSGarrisonBarSnapshot=<dir>: renders a transport's and a tank's health bar with module icons once.
+	const TCHAR* const GarrisonBarSnapshotSwitch = TEXT("RTSGarrisonBarSnapshot=");
+	constexpr float GarrisonBarSnapshotGameSeconds = 10.f;
 	constexpr float DefaultRunSeconds = 180.f;
 	constexpr float HeartbeatIntervalSeconds = 30.f;
 	// A run whose game time stays below this fraction of the run while this many runs of real time pass is stalled.
@@ -67,7 +71,6 @@ namespace MapSmokeTestPrivate
 	// The game instance outlives the worlds; the settings are applied for the first world only.
 	bool bGHasAppliedPIESettings = false;
 	// The victory widget's Continue button.
-	const FName VictoryContinueButtonName(TEXT("M_Continue"));
 	constexpr float VictoryWidgetDelaySeconds = 3.f;
 	constexpr float VictoryTravelTimeoutSeconds = 60.f;
 	constexpr float VictoryArrivalSettleSeconds = 10.f;
@@ -275,6 +278,12 @@ void UMapSmokeTestSubsystem::Tick(const float DeltaTime)
 	ContinueTutorialOvertakes();
 	KeepGameUnpaused();
 	const float SecondsRun = World->GetTimeSeconds() - M_GameSecondsAtStart;
+	TickGarrisonBarSnapshot(SecondsRun);
+	if (not bM_HasLoggedLandscapeComponents && FParse::Param(FCommandLine::Get(), TEXT("RTSLogLandscapeComponents")))
+	{
+		bM_HasLoggedLandscapeComponents = true;
+		RTSGarrisonBarSnapshot::LogLandscapeComponents(GetWorld());
+	}
 	// The heartbeat runs on real time so a world whose game time stands still still reports why.
 	const float RealSecondsRun = World->GetRealTimeSeconds() - M_RealSecondsAtStart;
 	if (RealSecondsRun >= M_NextHeartbeatSeconds)
@@ -296,6 +305,19 @@ void UMapSmokeTestSubsystem::Tick(const float DeltaTime)
 		LogResult(TEXT("smoke"), false, FString::Printf(
 			          TEXT("game time stalled: %.0fs of game time in %.0fs real time"), SecondsRun, RealSecondsRun));
 	}
+}
+
+void UMapSmokeTestSubsystem::TickGarrisonBarSnapshot(const float SecondsRun)
+{
+	FString OutputDirectory;
+	if (bM_HasTakenGarrisonBarSnapshot || SecondsRun < MapSmokeTestPrivate::GarrisonBarSnapshotGameSeconds
+		|| not FParse::Value(FCommandLine::Get(), MapSmokeTestPrivate::GarrisonBarSnapshotSwitch, OutputDirectory))
+	{
+		return;
+	}
+	bM_HasTakenGarrisonBarSnapshot = true;
+	const int32 Written = RTSGarrisonBarSnapshot::WriteSnapshots(GetWorld(), OutputDirectory);
+	UE_LOG(LogRTSMapSmokeTest, Display, TEXT("RTS_MAP_SMOKE_TEST garrison_bar_snapshots=%d"), Written);
 }
 
 TStatId UMapSmokeTestSubsystem::GetStatId() const
@@ -453,7 +475,16 @@ bool UMapSmokeTestSubsystem::TryStartGame()
 	ACPPController* Controller = GetController();
 	if (not IsValid(Controller))
 	{
-		return false;
+		// Maps played without the RTS controller (campaign world map, cinematics) have no start widget: the run
+		// starts once their own player controller exists and is timed like any other map.
+		const APlayerController* OtherController = GetWorld()->GetFirstPlayerController();
+		if (not IsValid(OtherController))
+		{
+			return false;
+		}
+		UE_LOG(LogRTSMapSmokeTest, Display, TEXT("RTS_MAP_SMOKE_TEST game_started controller=%s"),
+		       *OtherController->GetClass()->GetName());
+		return true;
 	}
 	// The map boots paused behind the start-game widget; start it as the player's "Press To Start" does.
 	UPlayerStartGameControl* StartGameControl = Controller->FindComponentByClass<UPlayerStartGameControl>();
@@ -534,6 +565,23 @@ bool UMapSmokeTestSubsystem::TickStuckPause(const float RealSecondsRun)
 	{
 		return false;
 	}
+	// The mission end screen pauses the game by design: the map was played to its end (the mission chain audit
+	// completes every mission), so the run ends there and reports the outcome instead of a stuck pause.
+	TArray<UUserWidget*> MissionEndWidgets;
+	UWidgetBlueprintLibrary::GetAllWidgetsOfClass(GetWorld(), MissionEndWidgets, UW_MissionEnd::StaticClass(), false);
+	for (const UUserWidget* const Widget : MissionEndWidgets)
+	{
+		const UW_MissionEnd* const MissionEnd = Cast<UW_MissionEnd>(Widget);
+		if (not IsValid(MissionEnd) || not MissionEnd->IsInViewport())
+		{
+			continue;
+		}
+		const bool bIsVictory = MissionEnd->GetOutcome() == EMissionDebriefOutcome::Victory;
+		LogResult(TEXT("smoke"), true, FString::Printf(
+			          TEXT("mission_ended outcome=%s at %.0fs game"), bIsVictory ? TEXT("victory") : TEXT("defeat"),
+			          GetWorld()->GetTimeSeconds() - M_GameSecondsAtStart));
+		return true;
+	}
 	TArray<UUserWidget*> TopLevelWidgets;
 	UWidgetBlueprintLibrary::GetAllWidgetsOfClass(GetWorld(), TopLevelWidgets, UUserWidget::StaticClass(), true);
 	FString WidgetNames;
@@ -585,14 +633,15 @@ void UMapSmokeTestSubsystem::TickVictoryRoundTrip(const float WorldSeconds)
 		{
 			return;
 		}
-		TArray<UUserWidget*> VictoryWidgets;
-		UWidgetBlueprintLibrary::GetAllWidgetsOfClass(GetWorld(), VictoryWidgets, UW_Victory::StaticClass(), false);
+		TArray<UUserWidget*> EndWidgets;
+		UWidgetBlueprintLibrary::GetAllWidgetsOfClass(GetWorld(), EndWidgets, UW_MissionEnd::StaticClass(), false);
 		UButton* ContinueButton = nullptr;
-		for (UUserWidget* const VictoryWidget : VictoryWidgets)
+		for (UUserWidget* const EndWidget : EndWidgets)
 		{
-			if (IsValid(VictoryWidget) && IsValid(VictoryWidget->WidgetTree))
+			const UW_MissionEnd* const MissionEnd = Cast<UW_MissionEnd>(EndWidget);
+			if (IsValid(MissionEnd))
 			{
-				ContinueButton = Cast<UButton>(VictoryWidget->WidgetTree->FindWidget(VictoryContinueButtonName));
+				ContinueButton = MissionEnd->GetPrimaryButton();
 			}
 		}
 		if (not IsValid(ContinueButton))
@@ -771,6 +820,10 @@ void UMapSmokeTestSubsystem::Deinitialize()
 }
 
 void UMapSmokeTestSubsystem::Tick(const float DeltaTime)
+{
+}
+
+void UMapSmokeTestSubsystem::TickGarrisonBarSnapshot(const float SecondsRun)
 {
 }
 

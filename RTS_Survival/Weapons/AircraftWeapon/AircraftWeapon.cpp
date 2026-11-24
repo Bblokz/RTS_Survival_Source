@@ -4,6 +4,10 @@
 #include "AircraftWeapon.h"
 
 #include "Kismet/KismetMathLibrary.h"
+#include "AircraftStrafeGun/WeaponStateAircraftStrafeGun.h"
+#include "RTS_Survival/Audio/AircraftGuns/AircraftGunAudioPlayer.h"
+#include "RTS_Survival/Game/Players/RTSPlayers.h"
+#include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 #include "RTS_Survival/Weapons/FlameThrowerWeapon/UWeaponStateFlameThrower.h"
 #include "RTS_Survival/Weapons/SmallArmsProjectileManager/SmallArmsProjectileManager.h"
@@ -12,6 +16,7 @@
 #include "RTS_Survival/Weapons/WeaponData/WeaponData.h"
 #include "RTS_Survival/Weapons/WeaponData/FRTSWeaponHelpers/FRTSWeaponHelpers.h"
 #include "RTS_Survival/Weapons/WeaponData/MultiTraceWeapon/WeaponStateMultiTrace.h"
+#include "RTS_Survival/Weapons/WeaponData/MultiProjectileWeapon/UWeaponStateMultiProjectile.h"
 
 UAircraftWeapon::UAircraftWeapon()
 	: M_OwningPlayer(0)
@@ -46,22 +51,40 @@ void UAircraftWeapon::InitAircraftWeaponComponent(AAircraftMaster* AircraftOwner
 
 void UAircraftWeapon::SetOwningPlayer(const int32 PlayerIndex)
 {
-	// Update any already-built weapon states.
+	// Weapon setup passes the owner of its init struct, which several aircraft Blueprints leave at 0: the weapon
+	// then fights for the player of the aircraft, not for the neutral owner (who fights nobody).
+	const int32 ResolvedPlayer = FRTSWeaponHelpers::ResolveWeaponOwningPlayer(PlayerIndex, GetOwner());
+	// Update any already-built weapon states. An owner that is still no player (the aircraft's own is not known yet)
+	// is not handed on: the states keep the player they resolved themselves.
+	const bool bIsResolvedToPlayer = FRTSPlayers::IsValidPlayer(ResolvedPlayer);
 	for (UWeaponState* WS : M_TWeapons)
 	{
-		if (IsValid(WS))
+		if (bIsResolvedToPlayer && IsValid(WS) && WS->GetOwningPlayer() != ResolvedPlayer)
 		{
-			WS->ChangeOwningPlayer(PlayerIndex);
+			WS->ChangeOwningPlayer(ResolvedPlayer);
 		}
 	}
-	M_OwningPlayer = PlayerIndex;
+	M_OwningPlayer = ResolvedPlayer;
 	M_TargetingData.InitTargetStruct(M_OwningPlayer);
+}
+
+void UAircraftWeapon::OnAircraftChangedPlayer(const uint8 /*OldOwningPlayer*/, const uint8 NewOwningPlayer)
+{
+	SetOwningPlayer(NewOwningPlayer);
 }
 
 void UAircraftWeapon::BeginPlay()
 {
 	Super::BeginPlay();
 	BeginPlay_SetupCallbackToProjectileManager();
+	const AActor* AircraftActor = GetOwner();
+	URTSComponent* AircraftRTSComponent = IsValid(AircraftActor)
+		                                      ? AircraftActor->FindComponentByClass<URTSComponent>()
+		                                      : nullptr;
+	if (IsValid(AircraftRTSComponent))
+	{
+		AircraftRTSComponent->OnOwningPlayerChanged.AddUObject(this, &UAircraftWeapon::OnAircraftChangedPlayer);
+	}
 }
 
 void UAircraftWeapon::OnWeaponAdded(const int32 WeaponIndex, UWeaponState* Weapon)
@@ -502,7 +525,11 @@ void UAircraftWeapon::SetupMultiTraceWeapon(FInitWeaponStateMultiTrace MultiTrac
 
 	const int32 WeaponIndex = M_TWeapons.Num();
 
-	UWeaponStateMultiTrace* MultiTrace = NewObject<UWeaponStateMultiTrace>(this);
+	// Every multi-socket aircraft MG is a strafe gun: fire along the nose into a walking beaten zone, impacts timed
+	// to the tracers. -AircraftStrafeLegacyGuns brings back the plain multi-trace weapon for comparisons.
+	UWeaponStateMultiTrace* MultiTrace = UWeaponStateAircraftStrafeGun::GetIsLegacyAircraftGunsRequested()
+		                                     ? NewObject<UWeaponStateMultiTrace>(this)
+		                                     : NewObject<UWeaponStateAircraftStrafeGun>(this);
 	MultiTrace->InitMultiTraceWeapon(
 		MultiTraceWeaponParameters.OwningPlayer,
 		WeaponIndex,
@@ -522,6 +549,10 @@ void UAircraftWeapon::SetupMultiTraceWeapon(FInitWeaponStateMultiTrace MultiTrac
 		MultiTraceWeaponParameters.TraceProjectileType);
 	M_TWeapons.Add(MultiTrace);
 	MultiTrace->SetIsAircraftWeapon(true);
+	if (UWeaponStateAircraftStrafeGun* const StrafeGun = Cast<UWeaponStateAircraftStrafeGun>(MultiTrace))
+	{
+		StrafeGun->InitGunAudio();
+	}
 	UpdateRangeBasedOnWeapons();
 	M_WeaponIndexToSocket.Add(WeaponIndex, MultiTraceWeaponParameters.FireSocketNames[0]);
 	// Ensures valid projectile manager. If not valid yet, it will be set by callback and retrospectively set
@@ -618,6 +649,21 @@ void UAircraftWeapon::SetupMultiProjectileWeapon(FInitWeaponStateMultiProjectile
 {
 	SetOwningPlayer(MultiProjectileState.OwningPlayer);
 
+	// Strafe cannons (the Ho 229's MK 108): set up in the Blueprint as projectile guns, fired as strafe guns like the
+	// MGs (beaten zone, timed impacts, fire loop + impact churn). -AircraftStrafeLegacyGuns keeps the projectiles.
+	if (UWeaponStateAircraftStrafeGun::GetIsStrafeCannon(MultiProjectileState.GetWeaponNameEnum())
+		&& not UWeaponStateAircraftStrafeGun::GetIsLegacyAircraftGunsRequested())
+	{
+		FInitWeaponStateMultiTrace StrafeCannonState;
+		static_cast<FInitWeaponStateDirectHit&>(StrafeCannonState) =
+			static_cast<const FInitWeaponStateDirectHit&>(MultiProjectileState);
+		StrafeCannonState.FireSocketNames = MultiProjectileState.FireSocketNames;
+		StrafeCannonState.bUseOwnerFireDirection = true;
+		StrafeCannonState.TraceProjectileType = UWeaponStateAircraftStrafeGun::StrafeCannonTracerType;
+		SetupMultiTraceWeapon(StrafeCannonState);
+		return;
+	}
+
 	const int32 WeaponIndex = M_TWeapons.Num();
 	UWorld* World = GetWorld();
 	if (!World)
@@ -644,6 +690,7 @@ void UAircraftWeapon::SetupMultiProjectileWeapon(FInitWeaponStateMultiProjectile
 		MultiProjectileState.CreateShellCasingOnEveryRandomBurst);
 	M_TWeapons.Add(MultiProjectile);
 	MultiProjectile->SetIsAircraftWeapon(true);
+	SetupAircraftCannonAudio(*MultiProjectile, MultiProjectileState.MeshComponent);
 	UpdateRangeBasedOnWeapons();
 	M_WeaponIndexToSocket.Add(WeaponIndex, MultiProjectileState.FireSocketNames[0]);
 	// Ensures valid projectile manager. If not valid yet, it will be set by callback and retrospectively set
@@ -652,6 +699,20 @@ void UAircraftWeapon::SetupMultiProjectileWeapon(FInitWeaponStateMultiProjectile
 	{
 		MultiProjectile->SetupProjectileManager(M_ProjectileManager.Get());
 	}
+}
+
+void UAircraftWeapon::SetupAircraftCannonAudio(UWeaponStateMultiProjectile& Cannon, UMeshComponent* MeshComponent)
+{
+	// 15-25 mm aircraft cannons (the MG 151/20) get the cannon fire loop and a 20 mm ground impact per projectile; other
+	// projectile weapons (bombs, the MK 108, the BK 5) keep their Blueprint sounds.
+	const UAircraftGunAudioDataAsset* const Data = UAircraftGunAudioDataAsset::Get();
+	if (Data == nullptr || not Data->GetIsCannonCalibre(Cannon.GetRawWeaponData().WeaponCalibre))
+	{
+		return;
+	}
+	Cannon.SetAircraftGunAudio(UAircraftGunAudioPlayer::Create(
+		&Cannon, EAircraftGunAudioKind::Cannon, MeshComponent, Cannon.GetProjectileCount(),
+		GetNameSafe(GetOwner()) + TEXT(".") + Cannon.GetName()));
 }
 
 void UAircraftWeapon::ForceInstantReloadAllWeapons()

@@ -7,6 +7,7 @@
 #include "RTS_Survival/Game/GameState/CPPGameState.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
+#include "RTS_Survival/Weapons/WeaponData/FRTSWeaponHelpers/FRTSWeaponHelpers.h"
 
 
 UBombComponent::UBombComponent()
@@ -53,7 +54,10 @@ void UBombComponent::ForceReloadAllBombsInstantly()
 void UBombComponent::InitBombComponent(UMeshComponent* MeshComponent, const int8 OwningPlayer)
 {
 	const bool bIsMeshCompValid = IsValid(MeshComponent);
-	const bool bIsOwningPlayerValid = OwningPlayer > 0;
+	// An owner that is no player (an owner pin left at 0) means the player of the aircraft the bombs hang on.
+	const int8 ResolvedOwningPlayer = static_cast<int8>(
+		FRTSWeaponHelpers::ResolveWeaponOwningPlayer(OwningPlayer, GetOwner()));
+	const bool bIsOwningPlayerValid = ResolvedOwningPlayer > 0;
 	if (not bIsOwningPlayerValid || not bIsMeshCompValid)
 	{
 		const FString OwnerName = GetOwner() ? GetOwner()->GetName() : TEXT("NULL OWNER");
@@ -70,7 +74,7 @@ void UBombComponent::InitBombComponent(UMeshComponent* MeshComponent, const int8
 		return;
 	}
 	M_OwnerMeshComponent = MeshComponent;
-	BombBayData.OwningPlayer = OwningPlayer;
+	BombBayData.OwningPlayer = ResolvedOwningPlayer;
 	OnInit_InitWeaponData();
 
 	// Create instancer and all instances accoording to the amount of entries set in the defaults.

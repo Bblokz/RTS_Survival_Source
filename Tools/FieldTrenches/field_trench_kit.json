@@ -5,7 +5,8 @@
  "ground": 0.0,
  "materials": [
   "GerPit_Atlas",
-  "GerPit_Sandbag"
+  "GerPit_Sandbag",
+  "FieldTrench_Bank"
  ],
  "conventions": {
   "half_width_inner": 82.5,
@@ -18,6 +19,14 @@
   "bag_pitch": 62.5,
   "bend_radius": 250.0,
   "socket_name_part": "cargo",
+  "bank": {
+   "inner": 95.05,
+   "crest_z": 74.4,
+   "crest_outer": 172.5,
+   "foot": 422.5,
+   "extent": 523.31,
+   "first_visible_course": 4
+  },
   "port_rule": "join two pieces where a port of each coincides with opposite yaws; ports point out of the piece; straights and bends may be entered from either port"
  },
  "pieces": [
@@ -25,19 +34,20 @@
    "name": "SM_FieldTrench_Straight_125",
    "kind": "straight",
    "fbx": "SM_FieldTrench_Straight_125.fbx",
-   "triangles": 2150,
+   "triangles": 1156,
    "triangles_by_material": {
     "GerPit_Atlas": 304,
-    "GerPit_Sandbag": 1846
+    "GerPit_Sandbag": 622,
+    "FieldTrench_Bank": 230
    },
    "bounds_min": [
     -1.31,
-    -198.79,
-    -11.8
+    -473.31,
+    -400.0
    ],
    "bounds_max": [
     126.95,
-    199.88,
+    476.69,
     129.23
    ],
    "ports": [
@@ -81,25 +91,34 @@
     }
    ],
    "length": 125.0,
-   "triangles_before_cull": 2928
+   "triangles_before_cull": 3160,
+   "buried_bag_triangles": 34,
+   "ramp": {
+    "fbx": "SM_FieldTrench_Straight_125_Ramp.fbx",
+    "hulls": 1,
+    "lid_z": 131.9,
+    "lid_half_width": 134.5,
+    "foot": 422.5
+   }
   },
   {
    "name": "SM_FieldTrench_Straight_250_A",
    "kind": "straight",
    "fbx": "SM_FieldTrench_Straight_250_A.fbx",
-   "triangles": 4053,
+   "triangles": 2227,
    "triangles_by_material": {
     "GerPit_Atlas": 606,
-    "GerPit_Sandbag": 3447
+    "GerPit_Sandbag": 1297,
+    "FieldTrench_Bank": 324
    },
    "bounds_min": [
     -1.56,
-    -198.68,
-    -12.74
+    -473.31,
+    -400.0
    ],
    "bounds_max": [
-    251.5,
-    200.21,
+    251.3,
+    476.69,
     147.66
    ],
    "ports": [
@@ -161,25 +180,34 @@
     }
    ],
    "length": 250.0,
-   "triangles_before_cull": 6056
+   "triangles_before_cull": 6384,
+   "buried_bag_triangles": 43,
+   "ramp": {
+    "fbx": "SM_FieldTrench_Straight_250_A_Ramp.fbx",
+    "hulls": 1,
+    "lid_z": 131.9,
+    "lid_half_width": 134.5,
+    "foot": 422.5
+   }
   },
   {
    "name": "SM_FieldTrench_Straight_250_B",
    "kind": "straight",
    "fbx": "SM_FieldTrench_Straight_250_B.fbx",
-   "triangles": 4077,
+   "triangles": 2241,
    "triangles_by_material": {
     "GerPit_Atlas": 606,
-    "GerPit_Sandbag": 3471
+    "GerPit_Sandbag": 1308,
+    "FieldTrench_Bank": 327
    },
    "bounds_min": [
     -2.28,
-    -198.65,
-    -11.44
+    -473.31,
+    -400.0
    ],
    "bounds_max": [
-    251.64,
-    200.25,
+    251.47,
+    476.69,
     146.62
    ],
    "ports": [
@@ -241,25 +269,34 @@
     }
    ],
    "length": 250.0,
-   "triangles_before_cull": 6134
+   "triangles_before_cull": 6462,
+   "buried_bag_triangles": 61,
+   "ramp": {
+    "fbx": "SM_FieldTrench_Straight_250_B_Ramp.fbx",
+    "hulls": 1,
+    "lid_z": 131.9,
+    "lid_half_width": 134.5,
+    "foot": 422.5
+   }
   },
   {
    "name": "SM_FieldTrench_Straight_250_C",
    "kind": "straight",
    "fbx": "SM_FieldTrench_Straight_250_C.fbx",
-   "triangles": 4003,
+   "triangles": 2200,
    "triangles_by_material": {
     "GerPit_Atlas": 606,
-    "GerPit_Sandbag": 3397
+    "GerPit_Sandbag": 1272,
+    "FieldTrench_Bank": 322
    },
    "bounds_min": [
     -1.75,
-    -200.01,
-    -10.07
+    -473.31,
+    -400.0
    ],
    "bounds_max": [
     252.2,
-    198.64,
+    476.69,
     147.16
    ],
    "ports": [
@@ -321,25 +358,34 @@
     }
    ],
    "length": 250.0,
-   "triangles_before_cull": 6010
+   "triangles_before_cull": 6338,
+   "buried_bag_triangles": 36,
+   "ramp": {
+    "fbx": "SM_FieldTrench_Straight_250_C_Ramp.fbx",
+    "hulls": 1,
+    "lid_z": 131.9,
+    "lid_half_width": 134.5,
+    "foot": 422.5
+   }
   },
   {
    "name": "SM_FieldTrench_Straight_500_A",
    "kind": "straight",
    "fbx": "SM_FieldTrench_Straight_500_A.fbx",
-   "triangles": 7885,
+   "triangles": 4341,
    "triangles_by_material": {
     "GerPit_Atlas": 1210,
-    "GerPit_Sandbag": 6675
+    "GerPit_Sandbag": 2570,
+    "FieldTrench_Bank": 561
    },
    "bounds_min": [
     -1.57,
-    -200.7,
-    -11.24
+    -473.31,
+    -400.0
    ],
    "bounds_max": [
     502.11,
-    200.08,
+    476.69,
     145.87
    ],
    "ports": [
@@ -437,25 +483,34 @@
     }
    ],
    "length": 500.0,
-   "triangles_before_cull": 12260
+   "triangles_before_cull": 12828,
+   "buried_bag_triangles": 61,
+   "ramp": {
+    "fbx": "SM_FieldTrench_Straight_500_A_Ramp.fbx",
+    "hulls": 1,
+    "lid_z": 131.9,
+    "lid_half_width": 134.5,
+    "foot": 422.5
+   }
   },
   {
    "name": "SM_FieldTrench_Straight_500_B",
    "kind": "straight",
    "fbx": "SM_FieldTrench_Straight_500_B.fbx",
-   "triangles": 7915,
+   "triangles": 4373,
    "triangles_by_material": {
     "GerPit_Atlas": 1210,
-    "GerPit_Sandbag": 6705
+    "GerPit_Sandbag": 2606,
+    "FieldTrench_Bank": 557
    },
    "bounds_min": [
     -1.84,
-    -199.33,
-    -10.64
+    -473.31,
+    -400.0
    ],
    "bounds_max": [
     501.76,
-    198.4,
+    476.69,
     147.6
    ],
    "ports": [
@@ -553,25 +608,34 @@
     }
    ],
    "length": 500.0,
-   "triangles_before_cull": 12272
+   "triangles_before_cull": 12840,
+   "buried_bag_triangles": 76,
+   "ramp": {
+    "fbx": "SM_FieldTrench_Straight_500_B_Ramp.fbx",
+    "hulls": 1,
+    "lid_z": 131.9,
+    "lid_half_width": 134.5,
+    "foot": 422.5
+   }
   },
   {
    "name": "SM_FieldTrench_Bend_15",
    "kind": "bend",
    "fbx": "SM_FieldTrench_Bend_15.fbx",
-   "triangles": 1671,
+   "triangles": 938,
    "triangles_by_material": {
     "GerPit_Atlas": 281,
-    "GerPit_Sandbag": 1390
+    "GerPit_Sandbag": 590,
+    "FieldTrench_Bank": 67
    },
    "bounds_min": [
     -4.88,
-    -195.39,
-    -9.69
+    -422.5,
+    -400.0
    ],
    "bounds_max": [
-    108.07,
-    201.16,
+    174.06,
+    250.0,
     128.49
    ],
    "ports": [
@@ -618,25 +682,34 @@
    "radius": 250.0,
    "arc_length": 65.45,
    "tangent_length": 32.913,
-   "triangles_before_cull": 2026
+   "triangles_before_cull": 2093,
+   "buried_bag_triangles": 122,
+   "ramp": {
+    "fbx": "SM_FieldTrench_Bend_15_Ramp.fbx",
+    "hulls": 1,
+    "lid_z": 131.9,
+    "lid_half_width": 134.5,
+    "foot": 422.5
+   }
   },
   {
    "name": "SM_FieldTrench_Bend_30",
    "kind": "bend",
    "fbx": "SM_FieldTrench_Bend_30.fbx",
-   "triangles": 2330,
+   "triangles": 1324,
    "triangles_by_material": {
     "GerPit_Atlas": 435,
-    "GerPit_Sandbag": 1895
+    "GerPit_Sandbag": 779,
+    "FieldTrench_Bank": 110
    },
    "bounds_min": [
     -4.91,
-    -200.06,
-    -12.14
+    -422.5,
+    -400.0
    ],
    "bounds_max": [
-    210.97,
-    196.57,
+    336.25,
+    250.0,
     129.7
    ],
    "ports": [
@@ -683,25 +756,34 @@
    "radius": 250.0,
    "arc_length": 130.9,
    "tangent_length": 66.987,
-   "triangles_before_cull": 3138
+   "triangles_before_cull": 3248,
+   "buried_bag_triangles": 96,
+   "ramp": {
+    "fbx": "SM_FieldTrench_Bend_30_Ramp.fbx",
+    "hulls": 2,
+    "lid_z": 131.9,
+    "lid_half_width": 134.5,
+    "foot": 422.5
+   }
   },
   {
    "name": "SM_FieldTrench_Bend_45",
    "kind": "bend",
    "fbx": "SM_FieldTrench_Bend_45.fbx",
-   "triangles": 3734,
+   "triangles": 2047,
    "triangles_by_material": {
     "GerPit_Atlas": 717,
-    "GerPit_Sandbag": 3017
+    "GerPit_Sandbag": 1180,
+    "FieldTrench_Bank": 150
    },
    "bounds_min": [
     -7.62,
-    -196.76,
-    -13.24
+    -422.5,
+    -400.0
    ],
    "bounds_max": [
-    301.73,
-    206.22,
+    475.53,
+    250.0,
     128.94
    ],
    "ports": [
@@ -766,24 +848,33 @@
    "radius": 250.0,
    "arc_length": 196.35,
    "tangent_length": 103.553,
-   "triangles_before_cull": 5356
+   "triangles_before_cull": 5507,
+   "buried_bag_triangles": 75,
+   "ramp": {
+    "fbx": "SM_FieldTrench_Bend_45_Ramp.fbx",
+    "hulls": 3,
+    "lid_z": 131.9,
+    "lid_half_width": 134.5,
+    "foot": 422.5
+   }
   },
   {
    "name": "SM_FieldTrench_Corner_90",
    "kind": "corner",
    "fbx": "SM_FieldTrench_Corner_90.fbx",
-   "triangles": 7105,
+   "triangles": 4457,
    "triangles_by_material": {
     "GerPit_Atlas": 1384,
-    "GerPit_Sandbag": 5721
+    "GerPit_Sandbag": 2297,
+    "FieldTrench_Bank": 776
    },
    "bounds_min": [
     -1.17,
-    -200.35,
-    -12.46
+    -473.31,
+    -400.0
    ],
    "bounds_max": [
-    416.8,
+    700.0,
     221.13,
     130.17
    ],
@@ -856,21 +947,30 @@
    ],
    "turn_degrees": 90.0,
    "tangent_length": 218.75,
-   "triangles_before_cull": 11642
+   "triangles_before_cull": 12432,
+   "buried_bag_triangles": 55,
+   "ramp": {
+    "fbx": "SM_FieldTrench_Corner_90_Ramp.fbx",
+    "hulls": 3,
+    "lid_z": 131.9,
+    "lid_half_width": 134.5,
+    "foot": 422.5
+   }
   },
   {
    "name": "SM_FieldTrench_Tee",
    "kind": "tee",
    "fbx": "SM_FieldTrench_Tee.fbx",
-   "triangles": 7198,
+   "triangles": 4317,
    "triangles_by_material": {
     "GerPit_Atlas": 1774,
-    "GerPit_Sandbag": 5424
+    "GerPit_Sandbag": 2119,
+    "FieldTrench_Bank": 424
    },
    "bounds_min": [
     -1.79,
-    -199.17,
-    -9.93
+    -473.31,
+    -400.0
    ],
    "bounds_max": [
     440.03,
@@ -982,21 +1082,30 @@
    ],
    "length": 437.5,
    "branch_length": 250.0,
-   "triangles_before_cull": 10958
+   "triangles_before_cull": 11390,
+   "buried_bag_triangles": 105,
+   "ramp": {
+    "fbx": "SM_FieldTrench_Tee_Ramp.fbx",
+    "hulls": 2,
+    "lid_z": 131.9,
+    "lid_half_width": 134.5,
+    "foot": 422.5
+   }
   },
   {
    "name": "SM_FieldTrench_Cross",
    "kind": "cross",
    "fbx": "SM_FieldTrench_Cross.fbx",
-   "triangles": 7317,
+   "triangles": 4759,
    "triangles_by_material": {
     "GerPit_Atlas": 2362,
-    "GerPit_Sandbag": 4955
+    "GerPit_Sandbag": 2180,
+    "FieldTrench_Bank": 217
    },
    "bounds_min": [
     -1.79,
     -251.5,
-    -10.67
+    -400.0
    ],
    "bounds_max": [
     439.01,
@@ -1117,25 +1226,34 @@
    ],
    "length": 437.5,
    "branch_length": 250.0,
-   "triangles_before_cull": 11172
+   "triangles_before_cull": 11404,
+   "buried_bag_triangles": 95,
+   "ramp": {
+    "fbx": "SM_FieldTrench_Cross_Ramp.fbx",
+    "hulls": 3,
+    "lid_z": 131.9,
+    "lid_half_width": 134.5,
+    "foot": 422.5
+   }
   },
   {
    "name": "SM_FieldTrench_End",
    "kind": "end",
    "fbx": "SM_FieldTrench_End.fbx",
-   "triangles": 3233,
+   "triangles": 1761,
    "triangles_by_material": {
-    "GerPit_Atlas": 397,
-    "GerPit_Sandbag": 2836
+    "GerPit_Atlas": 394,
+    "GerPit_Sandbag": 971,
+    "FieldTrench_Bank": 396
    },
    "bounds_min": [
-    -195.88,
-    -194.9,
-    -13.52
+    -422.5,
+    -422.5,
+    -400.0
    ],
    "bounds_max": [
     3.55,
-    196.78,
+    422.5,
     129.89
    ],
    "ports": [
@@ -1161,7 +1279,15 @@
     }
    ],
    "depth": 197.5,
-   "triangles_before_cull": 5173
+   "triangles_before_cull": 5569,
+   "buried_bag_triangles": 29,
+   "ramp": {
+    "fbx": "SM_FieldTrench_End_Ramp.fbx",
+    "hulls": 1,
+    "lid_z": 131.9,
+    "lid_half_width": 134.5,
+    "foot": 422.5
+   }
   }
  ]
 }

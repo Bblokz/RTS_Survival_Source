@@ -6,6 +6,7 @@
 #include "GameFramework/Actor.h"
 #include "RTS_Survival/Subsystems/RadiusSubsystem/ERTSRadiusType.h"
 #include "RTS_Survival/WorldCampaign/SaveAndState/SaveData/FWorldCampaignState.h"
+#include "RTS_Survival/WorldCampaign/StrengthTypes/WorldStrengthContribution.h"
 #include "RTS_Survival/WorldCampaign/StrengthTypes/WorldStrengthTypes.h"
 #include "WorldDivisionBase.generated.h"
 
@@ -129,6 +130,25 @@ public:
 	ERTSRadiusType GetHoverRadiusType() const { return M_HoverRadiusType; }
 	UWorldDivisionMovementComponent* GetWorldDivisionMovementComponent() const { return M_MovementComponent; }
 	FWorldDivisionStrengthChangedDelegate& OnDivisionStrengthChanged() { return M_OnDivisionStrengthChanged; }
+
+	/**
+	 * @brief Roster entries (tanks, squads, trucks) left, so the manager can remove a piece that was wiped out.
+	 * @return Entries left, or INDEX_NONE when this class keeps no roster.
+	 */
+	virtual int32 GetRemainingEntryCount() const;
+
+	/** @brief Convoys are consumed when they arrive; divisions stay and keep strengthening targets in range. */
+	UFUNCTION(BlueprintPure, Category="World Campaign|World Divisions")
+	bool GetIsSupplyConvoy() const { return M_DivisionType == EWorldFieldDivisions::SovietSupplyConvoy; }
+
+	/**
+	 * @brief This piece's own strength as an operation ledger entry, for when the player attacks it directly.
+	 * @return FieldDivisions contribution keyed by this division; zero strength when the piece has none.
+	 */
+	FWorldStrengthContribution BuildOwnStrengthContribution() const;
+
+	/** @brief Stops turn movement now; the movement-finished callback still fires so waiting turn passes end. */
+	void StopTurnMovement();
 
 protected:
 	/**

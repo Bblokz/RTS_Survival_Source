@@ -88,7 +88,7 @@ public:
 	bool StopFireByHandle(int32 FireHandle);
 
 	/**
-	 * @brief Burn the ground at a location: pooled GroundFire flames plus fire damage to the other side each second.
+	 * @brief Burn the ground at a location: pooled GroundFire flames plus fire damage to hostile units each second.
 	 * Overlapping fires of the same player merge and the number of fires is capped (see URTSFirePoolSettings).
 	 * @param Settings Radius, duration and damage per second of the burn; nothing happens when not enabled.
 	 * @param GroundLocation Centre of the burning area on the ground.

@@ -5,6 +5,7 @@
 #include "NavigationSystem.h"
 #include "Engine/World.h"
 #include "GameFramework/Actor.h"
+#include "LandscapeProxy.h"
 #include "RTS_Survival/RTSCollisionTraceChannels.h"
 
 namespace RTSUnitGroundRecoveryStatics
@@ -17,15 +18,32 @@ namespace RTSUnitGroundRecoveryStatics
 	bool TryTraceLandscape(const UWorld& World, const AActor& Unit, const FVector& Start, const FVector& End,
 	                       FVector& OutSurface, FString& OutHitName)
 	{
+		// Rocks, cliff meshes, team weapons and other meshes also block the landscape channel. Taking the first hit
+		// lifted soldiers that stood on the ground under a cliff mesh 26 m up onto it (RTS_GameStartTutorial), where
+		// they could not move for the whole map: skip everything that is not the landscape itself.
+		constexpr int32 MaxSkippedHits = 16;
 		FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(RTSUnitGroundRecovery), false, &Unit);
-		FHitResult LandscapeHit;
-		if (not World.LineTraceSingleByChannel(LandscapeHit, Start, End, COLLISION_TRACE_LANDSCAPE, QueryParams))
+		for (int32 SkippedHits = 0; SkippedHits <= MaxSkippedHits; ++SkippedHits)
 		{
-			return false;
+			FHitResult Hit;
+			if (not World.LineTraceSingleByChannel(Hit, Start, End, COLLISION_TRACE_LANDSCAPE, QueryParams))
+			{
+				return false;
+			}
+			const AActor* HitActor = Hit.GetActor();
+			if (IsValid(HitActor) && HitActor->IsA<ALandscapeProxy>())
+			{
+				OutSurface = Hit.ImpactPoint;
+				OutHitName = GetNameSafe(HitActor) + TEXT(".") + GetNameSafe(Hit.GetComponent());
+				return true;
+			}
+			if (IsValid(HitActor))
+			{
+				QueryParams.AddIgnoredActor(HitActor);
+			}
+			QueryParams.AddIgnoredComponent(Hit.GetComponent());
 		}
-		OutSurface = LandscapeHit.ImpactPoint;
-		OutHitName = GetNameSafe(LandscapeHit.GetActor()) + TEXT(".") + GetNameSafe(LandscapeHit.GetComponent());
-		return true;
+		return false;
 	}
 
 	void PlaceAt(AActor& Unit, const FVector& Ground, const float OriginAboveGround)

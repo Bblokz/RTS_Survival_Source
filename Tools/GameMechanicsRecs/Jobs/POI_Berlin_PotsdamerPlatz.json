@@ -1,0 +1,263 @@
+{
+ "JobName": "POI_Berlin_PotsdamerPlatz",
+ "Category": "POI",
+ "Fps": 60,
+ "WarmupSeconds": 6.0,
+ "DurationSeconds": 22.0,
+ "Anchor": {
+  "X": -11375.0,
+  "Y": -11111.0,
+  "Z": 0.0
+ },
+ "AnchorYaw": 0.0,
+ "ClearUnitsRadius": 7800,
+ "bKeepVoiceLines": true,
+ "bKeepAnnouncer": false,
+ "bKeepMusic": false,
+ "Events": [
+  {
+   "Time": -1.5,
+   "Type": "Spawn",
+   "Tag": "Patrol",
+   "ClassPath": "/Game/RTS_Survival/Blueprints/Squads/Ger/Barracks_Infantry/Scavengers/Squad_Ger_Scavengers",
+   "Player": 1,
+   "Offset": {
+    "X": -3900.0,
+    "Y": -3380.0,
+    "Z": 0.0
+   },
+   "Yaw": 0.0,
+   "Count": 1,
+   "Columns": 0,
+   "Spacing": 1200.0
+  },
+  {
+   "Time": 0.4,
+   "Type": "Move",
+   "Tag": "Patrol",
+   "TargetOffset": {
+    "X": 3900.0,
+    "Y": -2600.0,
+    "Z": 0.0
+   },
+   "TargetYaw": 0
+  }
+ ],
+ "Shots": [
+  {
+   "Name": "Establish",
+   "Start": 0.0,
+   "End": 9.0,
+   "Rig": "Orbit",
+   "Keys": [
+    {
+     "Time": 0.0,
+     "Pivot": "",
+     "Offset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": -0.0
+     },
+     "Yaw": 200.0,
+     "Pitch": 16.0,
+     "Distance": 8320.0,
+     "Focal": 26.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 500.0
+     },
+     "VYaw": 0.0,
+     "VPitch": 20.0,
+     "VDistance": 8736.0,
+     "VFocal": 20.0,
+     "VLookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     }
+    },
+    {
+     "Time": 9.0,
+     "Pivot": "",
+     "Offset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": -0.0
+     },
+     "Yaw": 155.0,
+     "Pitch": 20.0,
+     "Distance": 7800.0,
+     "Focal": 26.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 500.0
+     },
+     "VYaw": 0.0,
+     "VPitch": 24.0,
+     "VDistance": 8190.0,
+     "VFocal": 20.0,
+     "VLookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     }
+    }
+   ],
+   "Ease": "InOut",
+   "PivotLag": 0.7,
+   "Aperture": 0.0,
+   "Shake": 0.0,
+   "bAvoidOcclusion": true,
+   "MinGroundClearance": 350.0
+  },
+  {
+   "Name": "Scale",
+   "Start": 9.0,
+   "End": 15.0,
+   "Rig": "Fixed",
+   "Keys": [
+    {
+     "Time": 0.0,
+     "Pivot": "tag:Patrol",
+     "Offset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     },
+     "Yaw": 90.0,
+     "Pitch": 16.0,
+     "Distance": 3000.0,
+     "Focal": 24.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 150.0
+     },
+     "VYaw": 0.0,
+     "VPitch": 20.0,
+     "VDistance": 0.0,
+     "VFocal": 18.0,
+     "VLookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     }
+    },
+    {
+     "Time": 6.0,
+     "Pivot": "",
+     "Offset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 500.0
+     },
+     "Yaw": 90.0,
+     "Pitch": 16.0,
+     "Distance": 3000.0,
+     "Focal": 24.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 150.0
+     },
+     "VYaw": 0.0,
+     "VPitch": 20.0,
+     "VDistance": 0.0,
+     "VFocal": 18.0,
+     "VLookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     }
+    }
+   ],
+   "Ease": "InOut",
+   "PivotLag": 0.7,
+   "Aperture": 0.0,
+   "Shake": 0.0,
+   "bAvoidOcclusion": true,
+   "MinGroundClearance": 350.0
+  },
+  {
+   "Name": "Reveal",
+   "Start": 15.0,
+   "End": 22.0,
+   "Rig": "Orbit",
+   "Keys": [
+    {
+     "Time": 0.0,
+     "Pivot": "",
+     "Offset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": -0.0
+     },
+     "Yaw": 130.0,
+     "Pitch": 16.0,
+     "Distance": 7279.999999999999,
+     "Focal": 30.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 500.0
+     },
+     "VYaw": 0.0,
+     "VPitch": 20.0,
+     "VDistance": 6240.0,
+     "VFocal": 0.0,
+     "VLookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     }
+    },
+    {
+     "Time": 7.0,
+     "Pivot": "",
+     "Offset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": -0.0
+     },
+     "Yaw": 90.0,
+     "Pitch": 40.0,
+     "Distance": 10400.0,
+     "Focal": 24.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 500.0
+     },
+     "VYaw": 0.0,
+     "VPitch": 46.0,
+     "VDistance": 11440.000000000002,
+     "VFocal": 0.0,
+     "VLookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     }
+    }
+   ],
+   "Ease": "InOut",
+   "PivotLag": 0.7,
+   "Aperture": 0.0,
+   "Shake": 0.0,
+   "bAvoidOcclusion": true,
+   "MinGroundClearance": 350.0
+  }
+ ],
+ "MapPath": "/Game/RTS_Survival/Maps/GerMissions/Ger_Berlin",
+ "GameModeClassPath": "/Game/RTS_Survival/Blueprints/GameSettings/RTS_BP_GamemodeBase.RTS_BP_GamemodeBase_C",
+ "HideActorPrefixes": [],
+ "SkyMaterial": "/Game/SkyboxPack_X/Materials/Instances/M_Flowmap_Inst_01.M_Flowmap_Inst_01",
+ "Batch": "berlin_poi"
+}

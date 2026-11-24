@@ -224,7 +224,9 @@ FTrainingLayoutBuilding UTrainingLayoutDataAsset::MakeDefaultHeadquartersLayout(
 		Slot::FieldDefense(EBuildingExpansionType::BTX_GerPanzerschreckPit),
 		Slot::FieldDefense(EBuildingExpansionType::BTX_GerFlak88Pit)
 	};
-	FieldDefenses.Append(DoctrineFieldDefenses);
+	// A sub section shows nine slots: the shared pits fill Field Defenses, a doctrine's own works go to Barriers.
+	TArray<FTrainingLayoutSlot> Barriers = {Slot::FieldDefense(EBuildingExpansionType::BTX_GerFieldTrench)};
+	Barriers.Append(DoctrineFieldDefenses);
 
 	return MakeBuilding({
 		                    MakeSubSection(LOCTEXT("Economy", "Economy"), {
@@ -254,9 +256,7 @@ FTrainingLayoutBuilding UTrainingLayoutDataAsset::MakeDefaultHeadquartersLayout(
 			                                   Slot::Empty()
 		                                   }),
 		                    // Procedural defenses the player drags out, see UFieldTrenchPlacementComponent.
-		                    MakeSubSection(LOCTEXT("Barriers", "Barriers"), {
-			                                   Slot::FieldDefense(EBuildingExpansionType::BTX_GerFieldTrench)
-		                                   })
+		                    MakeSubSection(LOCTEXT("Barriers", "Barriers"), Barriers)
 	                    }, bRequiresUnitCards);
 }
 
@@ -329,7 +329,7 @@ void UTrainingLayoutDataAsset::InitDefaultStrikeDivisionLayout()
 			                             Slot::Tank(ETankSubtype::Tank_Sdkfz_221),
 			                             Slot::Tank(ETankSubtype::Tank_Sdkfz251_Mortar),
 			                             Slot::Tank(ETankSubtype::Tank_Sdkfz251_22),
-			                             Slot::Empty()
+			                             Slot::Tank(ETankSubtype::Tank_Panzerwerfer)
 		                             }),
 		              MakeSubSection(LOCTEXT("SupportWeapons", "Support Weapons"), {
 			                             Slot::Empty(),
@@ -397,9 +397,12 @@ void UTrainingLayoutDataAsset::InitDefaultBreakthroughLayout()
 	TMap<ENomadicSubtype, FTrainingLayoutBuilding>& Buildings =
 		FactionLayouts.FindOrAdd(ERTSFaction::GerBreakthroughDoctrine).Buildings;
 
-	// The rail Pak bunker is the breakthrough doctrine's own field defense.
+	// The breakthrough doctrine's own field defenses: the rail Pak bunker and the three concrete flak/turret bunkers.
 	Buildings.Add(ENomadicSubtype::Nomadic_GerHq, MakeDefaultHeadquartersLayout({
-		              Slot::FieldDefense(EBuildingExpansionType::BTX_GerRailPakBunker)
+		              Slot::FieldDefense(EBuildingExpansionType::BTX_GerRailPakBunker),
+		              Slot::FieldDefense(EBuildingExpansionType::BTX_GerFlak88Bunker),
+		              Slot::FieldDefense(EBuildingExpansionType::BTX_GerFlakvierlingBunker),
+		              Slot::FieldDefense(EBuildingExpansionType::BTX_GerPZ38TBunker)
 	              }));
 	Buildings.Add(ENomadicSubtype::Nomadic_GerAirbase, MakeDefaultAirbaseLayout());
 

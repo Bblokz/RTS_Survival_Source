@@ -22,12 +22,14 @@ void UDontLoseHQMission::OnMissionStart()
 		return;
 	}
 
+	// The HQ is found in OnMissionStartedNative, which also runs when a trigger starts this mission later; binding
+	// only here skipped every DontLoseHQ mission that waits on a trigger (Ger_Berlin's KeepHQ).
 	Super::OnMissionStart();
-	if (not MissionState.bIsTriggered)
-	{
-		return;
-	}
+}
 
+void UDontLoseHQMission::OnMissionStartedNative()
+{
+	Super::OnMissionStartedNative();
 	M_HQFindAttempts = 0;
 	bM_HasTriggeredHQLossFlow = false;
 	M_PlayerHQ = nullptr;

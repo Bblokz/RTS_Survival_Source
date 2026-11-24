@@ -1,0 +1,38 @@
+{
+ "TurretHook": {
+  "bone": "load",
+  "bone_world_cm": [
+   521.3,
+   40.0,
+   800.0
+  ],
+  "location": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "rotation_pyr": [
+   0.0,
+   -180.0,
+   90.0
+  ]
+ },
+ "TurretLorry": {
+  "bone": "lorry_load",
+  "bone_world_cm": [
+   1160.0,
+   -1340.0,
+   132.0
+  ],
+  "location": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "rotation_pyr": [
+   -90.0,
+   128.3033,
+   141.6967
+  ]
+ }
+}

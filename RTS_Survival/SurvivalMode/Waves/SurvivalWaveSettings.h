@@ -9,6 +9,7 @@
 
 #include "SurvivalWaveSettings.generated.h"
 
+class AAircraftMaster;
 class UStochasticDecisionTree;
 
 // Set to 1 once AEnemyController::OverrideStrategicDecisionTree (see Docs/40_WavesAndAI.md, Integration requests)
@@ -114,6 +115,101 @@ struct FSurvivalRoundSettings
 	// How long after launch a group's units can still appear (the warning lead plus async spawning).
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Rounds", meta = (ClampMin = "1.0"))
 	float AttributionWindowSeconds = 45.f;
+};
+
+/**
+ * @brief The edge zone across the map from the player's start sends no ground waves; instead Soviet transports fly
+ * a few heavy tanks to the map centre, which attack-move to the base from there (short paths, fewer units).
+ */
+USTRUCT(BlueprintType)
+struct FSurvivalHeavyAirliftSettings
+{
+	GENERATED_BODY()
+
+	FSurvivalHeavyAirliftSettings();
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Airlift")
+	bool bEnabled = true;
+
+	// One transport carries one tank (the aircraft the Soviet heavy tank drop ability flies).
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Airlift")
+	TSoftClassPtr<AAircraftMaster> AircraftClass;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Airlift", meta = (Units = "cm"))
+	float TankAttachZOffset = -250.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Airlift", meta = (ClampMin = "500.0", Units = "cm"))
+	float FlightHeight = 3500.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Airlift", meta = (ClampMin = "0.0", Units = "s"))
+	float HowLongStayLandedSeconds = 2.f;
+
+	// Tanks per airlift by survival minute (rounded); grows slowly so the far side stays a small, heavy threat.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Airlift")
+	FRuntimeFloatCurve TanksPerAirlift;
+
+	// Only pool entries with these roles are flown in; before any of them is unlocked the far side stays quiet.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Airlift")
+	TArray<ESurvivalWaveUnitRole> AirliftRoles;
+
+	// An airlift goes with a wave group at most this often.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Airlift", meta = (ClampMin = "5.0", Units = "s"))
+	float MinSecondsBetweenAirlifts = 60.f;
+
+	// Distance between the landing spots of one airlift's tanks.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Airlift", meta = (ClampMin = "300.0", Units = "cm"))
+	float DropSpacing = 1600.f;
+
+	// Lateral distance between the transports of one airlift.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Airlift", meta = (ClampMin = "300.0", Units = "cm"))
+	float AircraftLateralSpacing = 1500.f;
+
+	// When the map centre has no vehicle path to the base, drop centres are tried on rings this far apart.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Airlift", meta = (ClampMin = "500.0", Units = "cm"))
+	float DropSearchRingStep = 3000.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Airlift", meta = (ClampMin = "0"))
+	int32 DropSearchRings = 4;
+
+	// Once the last tank touched down the group waits this long (tanks settle) before it attack-moves.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Airlift", meta = (ClampMin = "0.0", Units = "s"))
+	float FormationDelaySeconds = 3.f;
+
+	// Tanks that already landed leave this long after the first one, even if a transport is still missing.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Airlift", meta = (ClampMin = "1.0", Units = "s"))
+	float MaxWaitAfterFirstDropSeconds = 25.f;
+
+	// An airlift that never formed (shot down, spawn failures) is forgotten after this long.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Airlift", meta = (ClampMin = "30.0", Units = "s"))
+	float RunTimeoutSeconds = 180.f;
+};
+
+/**
+ * @brief Rim zones are slid along their rim toward the player's start, so waves do not walk in from a far corner.
+ */
+USTRUCT(BlueprintType)
+struct FSurvivalEdgeSlideSettings
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Edge Slide")
+	bool bEnabled = true;
+
+	// Fraction of the way along its rim a zone moves toward the start's coordinate on that rim.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Edge Slide", meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	float SlideFraction = 0.6f;
+
+	// A slid zone stays this far beyond another start's build area (a Soviet base stands there).
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Edge Slide", meta = (ClampMin = "0.0", Units = "cm"))
+	float OtherStartClearance = 6000.f;
+
+	// A slid zone stays this far beyond the outer edge of the player's own start content.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Edge Slide", meta = (ClampMin = "0.0", Units = "cm"))
+	float OwnStartContentClearance = 4000.f;
+
+	// When a slid spot does not fit, the fraction is reduced step by step this many times.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Edge Slide", meta = (ClampMin = "1"))
+	int32 SlideAttempts = 4;
 };
 
 /**
@@ -256,11 +352,23 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Waves|Edges", meta = (ClampMin = "0.0"))
 	float StagingDistance = 2500.f;
 
+	// Rim zones move along their rim toward the player's start once it is chosen.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Waves|Edges")
+	FSurvivalEdgeSlideSettings EdgeSlide;
+
+	// The zone across the map from the start sends heavy tanks by air to the map centre instead of ground waves.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Waves|Edges")
+	FSurvivalHeavyAirliftSettings OppositeAirlift;
+
 	// ---------------------------------------------------------------- Movement
 
 	// Larger edge groups are split into several formations of at most this many units.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Waves|Movement", meta = (ClampMin = "1"))
 	int32 MaxUnitsPerFormation = 12;
+
+	// Wave units attack-move between their waypoints: they fight what they meet instead of walking past it.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Waves|Movement")
+	bool bWavesUseUnitAttackMove = true;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Waves|Movement", meta = (ClampMin = "1"))
 	int32 MinFormationWidth = 2;
@@ -315,6 +423,11 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Waves|Retarget", meta = (ClampMin = "0.0"))
 	float RetargetCooldownSeconds = 12.f;
+
+	// A group whose formation reached no new waypoint for this long continues without the units holding it back
+	// (they go to the strategic AI); a formation otherwise waits for every unit, so one stuck tank parks it.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Waves|Retarget", meta = (ClampMin = "10.0"))
+	float StalledGroupSeconds = 90.f;
 
 	// A launched group whose formation never appeared within this time is dropped from tracking.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Waves|Retarget", meta = (ClampMin = "10.0"))

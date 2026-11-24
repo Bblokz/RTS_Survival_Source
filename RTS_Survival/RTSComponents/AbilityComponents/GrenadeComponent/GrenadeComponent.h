@@ -257,7 +257,8 @@ private:
 		float ArmorPenFallOff = 0.f;
 		float MaxArmorPen = 0.f;
 		ERTSDamageType DamageType = ERTSDamageType::Fire;
-		ETriggerOverlapLogic OverlapLogic = ETriggerOverlapLogic::OverlapEnemy;
+		// Player that threw the grenade; each burn tick damages whoever is hostile to it at that moment.
+		int32 OwningPlayer = INDEX_NONE;
 		FTimerHandle BurnTickTimerHandle;
 	};
 
@@ -335,7 +336,6 @@ private:
 	void DestroyIfReleased();
 	// Returns the spawned impact effect so a burn area can stop it when the fire ends.
 	UNiagaraComponent* PlayExplosionFX(const FVector& ExplosionLocation) const;
-	static ETriggerOverlapLogic GetOverlapLogicForOwningPlayer(const int32 OwningPlayer);
 
 	/**
 	 * @brief Keeps damaging the impact area for the burn duration (molotov fire); no-op when the burn is disabled.

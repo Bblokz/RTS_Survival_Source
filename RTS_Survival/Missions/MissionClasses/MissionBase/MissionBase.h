@@ -21,6 +21,9 @@
 #include "RTS_Survival/Game/Difficulty/GameDifficulty.h"
 #include "RTS_Survival/Game/UserSettings/RTSGameUserSettings.h"
 #include "RTS_Survival/Missions/NomadicAirDelivery/NomadicAirDeliveryTypes.h"
+#include "RTS_Survival/GameUI/InfoTakeover/InfoTakeoverTypes.h"
+#include "RTS_Survival/GameUI/LocationIntro/LocationIntroTypes.h"
+#include "RTS_Survival/GameUI/CameraTour/MissionCameraTourTypes.h"
 #include "MissionBase.generated.h"
 
 enum class ERTSFaction : uint8;
@@ -43,6 +46,11 @@ struct FTrainingOption;
 class ARTSAsyncSpawner;
 class UMissionTrigger;
 class UMissionCinematicTakeOverSession;
+class UMissionLocationIntroSession;
+enum class ELocationIntroSessionEnd : uint8;
+class UMissionCameraTourSession;
+enum class EMissionCameraTourEnd : uint8;
+class UInfoTakeoverSubsystem;
 class UMovieSceneSequencePlayer;
 class UW_Mission;
 class UW_MissionTimer;
@@ -179,6 +187,29 @@ struct FMissionTrackingMiniMapRuntimeState
 	TArray<FName> M_TextIds;
 };
 
+/** One unit group a mission shows on the minimap with the survival wave chevron and badge. */
+USTRUCT()
+struct FMissionUnitGroupMarker
+{
+	GENERATED_BODY()
+
+	// Mission-chosen ID; BP_OnUnitGroupDefeated reports it.
+	FName GroupId = NAME_None;
+
+	// Base ID of the chevron and badge icons.
+	FName IconId = NAME_None;
+
+	FVector Location = FVector::ZeroVector;
+
+	// Where the heading was last measured from; the heading follows the group's progress, not its jitter.
+	FVector HeadingAnchor = FVector::ZeroVector;
+
+	float HeadingYaw = 0.f;
+
+	UPROPERTY()
+	TArray<TWeakObjectPtr<AActor>> Units;
+};
+
 USTRUCT()
 struct FMissionCinematicAudioRuntimeState
 {
@@ -234,6 +265,10 @@ class RTS_SURVIVAL_API UMissionBase : public UObject
 	// to call on spawn complete for bp.
 	friend struct FMissionSpawnCommandQueueState;
 	friend class UMissionCinematicTakeOverSession;
+	friend class UMissionLocationIntroSession;
+	friend class UMissionCameraTourSession;
+	// Headless tests start a location intro on a throwaway mission.
+	friend class UMissionMapTestLibrary;
 
 
 public:
@@ -421,9 +456,44 @@ public:
 	virtual void BeginDestroy() override;
 
 	virtual void OnTriggerAreaCallback(AActor* OverlappingActor, const int32 TriggerID, ATriggerArea* TriggerVolume);
-	
+
+	/**
+	 * @brief Called by the mission manager when another mission completed or failed. Only started missions (trigger
+	 * fired) that are not complete pass it on to OnOtherMissionEndedNative and BP_OnOtherMissionEnded.
+	 * @param EndedMission The mission that ended.
+	 * @param bCompleted True when it completed, false when it failed.
+	 */
+	void OnOtherMissionEnded(const UMissionBase* EndedMission, const bool bCompleted);
 
 protected:
+	/** @return Whether a mission of exactly this class has completed on this map; use the Blueprint class, not a parent. */
+	UFUNCTION(BlueprintPure, Category = "Mission|OtherMissions")
+	bool GetHasMissionClassCompleted(TSubclassOf<UMissionBase> MissionClass) const;
+
+	/** @return Whether a mission of exactly this class has failed on this map; use the Blueprint class, not a parent. */
+	UFUNCTION(BlueprintPure, Category = "Mission|OtherMissions")
+	bool GetHasMissionClassFailed(TSubclassOf<UMissionBase> MissionClass) const;
+
+	// When true (default) the mission completes itself once TrackingFunction / TrackActorsWithMiniMapProgress counts
+	// every tracked actor. Turn it off for a stage whose graph plays lines and waits before calling OnMissionComplete.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mission|Tracking")
+	bool bCompleteMissionWhenTrackingDone = true;
+
+	// Native twin of BP_OnTrackingReachedMaxCount for C++ mission classes; runs right before it.
+	virtual void OnTrackingReachedMaxCountNative() {}
+
+	// Every tracked actor is counted. Fires whether or not bCompleteMissionWhenTrackingDone completes the mission next.
+	UFUNCTION(BlueprintImplementableEvent, Category = "Mission|Tracking")
+	void BP_OnTrackingReachedMaxCount();
+
+	// Native twin of BP_OnOtherMissionEnded for C++ mission classes; runs right before it.
+	virtual void OnOtherMissionEndedNative(TSubclassOf<UMissionBase> EndedMissionClass, const bool bCompleted) {}
+
+	// Another mission completed or failed (e.g. the alarm stage failing), so this stage can react in its own event
+	// graph without polling. Not sent to the mission that ended, nor before this mission's trigger fired.
+	UFUNCTION(BlueprintImplementableEvent, Category = "Mission|OtherMissions")
+	void BP_OnOtherMissionEnded(TSubclassOf<UMissionBase> EndedMissionClass, const bool bCompleted);
+
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	AMissionManager* GetMissionManagerChecked() const;
 	
@@ -538,6 +608,43 @@ protected:
 	int32 DoesPlayerHaveAnyAircraftMastersOfType(const TArray<EAircraftSubtype>& AircraftTypes) const;
 
 	/**
+	 * @brief Tutorials: from now on the player can only train these options; every other option shows as locked by
+	 * the mission until AllowPlayerTrainingOptions adds it or ClearPlayerTrainingRestriction ends the restriction.
+	 * @param AllowedOptions Options that stay trainable (also field defenses, they train from the same menu).
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|Training")
+	void RestrictPlayerTrainingTo(const TArray<FTrainingOption>& AllowedOptions);
+
+	// Adds options to an active restriction (RestrictPlayerTrainingTo); does nothing without one.
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|Training")
+	void AllowPlayerTrainingOptions(const TArray<FTrainingOption>& OptionsToAllow);
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|Training")
+	void ClearPlayerTrainingRestriction();
+
+	/**
+	 * @brief Multi-step missions (tutorials) change their objective while they run: sets the widget title and
+	 * description and refreshes the mission widget when it is shown.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|Widget")
+	void SetMissionObjectiveText(const FText& Title, const FText& Description);
+
+	/** @return The player's nomadics of this subtype, trucks and buildings alike (trained ones included). */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|Units")
+	TArray<ANomadicVehicle*> GetPlayerNomadicsOfType(const ENomadicSubtype NomadicSubtype) const;
+
+	/** @return True once the nomadic stands as a finished building (not a truck, not still unfolding). */
+	UFUNCTION(BlueprintPure, NotBlueprintable, Category = "Mission|Units")
+	bool GetIsNomadicDeployedAsBuilding(const ANomadicVehicle* NomadicVehicle) const;
+
+	/**
+	 * @return Player building expansions of these types that are fully built; unlike
+	 * DoesPlayerHaveAnyBuildingExpansionsOfType it skips ones still being placed or constructed.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|Units")
+	int32 GetPlayerBuiltBuildingExpansionCountOfTypes(const TArray<EBuildingExpansionType>& BuildingExpansionTypes) const;
+
+	/**
 	 * @brief Uses the mission manager as world context so mission blueprints can register fixed minimap icons safely.
 	 * @param IconId Stable ID used to remove or swap this icon later.
 	 * @param IconType Data asset key deciding which custom texture and size to draw.
@@ -632,6 +739,56 @@ protected:
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Sounds")
 	void PlayPlayerAnnouncerLine(EAnnouncerVoiceLineType AnnouncerLineType) const;
 
+	/**
+	 * @brief Pauses the game with the vehicle info takeover of a prefab from the vehicle library
+	 * (GameUI/InfoTakeover/DT_VehicleInfoTakeovers), so one write-up can be reused in any mission.
+	 * @param Vehicle The vehicle to introduce; its weapons and armour are read off it.
+	 * @param LibraryEntry Row of the library to show.
+	 * @return False when the player turned info takeovers off or the vehicle or row is missing. Waits in a queue
+	 * while another takeover or a cinematic holds the screen.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|Info Takeover")
+	bool ShowVehicleInfoTakeover(ATankMaster* Vehicle,
+	                             UPARAM(meta = (GetOptions = "GetVehicleInfoTakeoverNames")) FName LibraryEntry);
+
+	/**
+	 * @brief As ShowVehicleInfoTakeover with the text written on the node instead of in the library.
+	 * @param Vehicle The vehicle to introduce; its weapons and armour are read off it.
+	 * @param Info Description, production year ("????" when fictional), and optional name and picture.
+	 * @return False when the player turned info takeovers off or the vehicle is missing.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|Info Takeover")
+	bool ShowCustomVehicleInfoTakeover(ATankMaster* Vehicle, const FVehicleInfoTakeoverEntry& Info);
+
+	// Options of the LibraryEntry dropdown of ShowVehicleInfoTakeover; static so a graph pin can call it without a mission.
+	UFUNCTION()
+	static TArray<FName> GetVehicleInfoTakeoverNames();
+
+	/**
+	 * @brief Pauses the game with the squad info takeover of a prefab from the squad library
+	 * (GameUI/InfoTakeover/DT_SquadInfoTakeovers), so one write-up can be reused in any mission.
+	 * @param Squad A squad controller or a solo infantry unit; its soldiers, health and weapons are read off it.
+	 * @param LibraryEntry Row of the library to show.
+	 * @return False when the player turned info takeovers off or the squad or row is missing. Waits in a queue
+	 * while another takeover or a cinematic holds the screen.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|Info Takeover")
+	bool ShowSquadInfoTakeover(AActor* Squad,
+	                           UPARAM(meta = (GetOptions = "GetSquadInfoTakeoverNames")) FName LibraryEntry);
+
+	/**
+	 * @brief As ShowSquadInfoTakeover with the text written on the node instead of in the library.
+	 * @param Squad A squad controller or a solo infantry unit; its soldiers, health and weapons are read off it.
+	 * @param Info Description, service year ("????" when fictional), and optional name and picture.
+	 * @return False when the player turned info takeovers off or the squad is missing.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|Info Takeover")
+	bool ShowCustomSquadInfoTakeover(AActor* Squad, const FSquadInfoTakeoverEntry& Info);
+
+	// Options of the LibraryEntry dropdown of ShowSquadInfoTakeover; static so a graph pin can call it without a mission.
+	UFUNCTION()
+	static TArray<FName> GetSquadInfoTakeoverNames();
+
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Cinematics")
 	bool OnCinematicTakeOverFromMission(const bool bCinematicStarted) const;
@@ -660,6 +817,20 @@ protected:
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void AddArchiveItem(const ERTSArchiveItem ItemType, const FTrainingOption OptionalUnit = FTrainingOption(),
 	                    const int32 SortingPriority = 0, const float NotificationTime = 20) const;
+
+	/**
+	 * @brief Adds an archive entry with its own title, text and image (lore found in a mission, e.g. the Demeter pod),
+	 * where AddArchiveItem only takes the fixed DT_ArchiveItem rows.
+	 * @param Content Title, rich-text description, optional image and archive tab (SortType).
+	 * @param SortingPriority Higher sorts first in its tab.
+	 * @param NotificationTime Seconds the "new archive entry" notification shows.
+	 */
+	// BlueprintPure=false: a const BlueprintCallable is otherwise a pure node, which never runs without an output.
+	UFUNCTION(BlueprintCallable, BlueprintPure = false, NotBlueprintable, Category = "Mission|Archive",
+		meta = (AutoCreateRefTerm = "Content"))
+	void AddCustomArchiveItem(const FArchiveCustomContent& Content, const int32 SortingPriority = 0,
+	                          const float NotificationTime = 20) const;
+
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="FindUnits")
 	AActor* FindActorInRange(
 		const FVector Location,
@@ -711,6 +882,32 @@ protected:
 	                                    const ERTSRichText RichCountType,
 	                                    const float MiniMapTextSizePixels = 14.0f,
 	                                    const FLinearColor MiniMapTextColor = FLinearColor::White);
+
+	/**
+	 * @brief Shows the units on the minimap as one group, like a survival wave: a chevron along the group's heading
+	 * plus a badge at the centroid of its living units. When the last unit is gone the icons go and
+	 * BP_OnUnitGroupDefeated fires with GroupId, so a mission can complete on it without any objective text.
+	 * @param GroupId Mission-chosen ID of the group; tracking the same ID again replaces that group.
+	 * @param Units The group's units (invalid entries are skipped; with none valid the group is defeated at once).
+	 * @param HeadingTarget Where the group heads; its first heading points there until it has moved.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|MiniMap")
+	void TrackUnitGroupOnMiniMap(const FName GroupId, const TArray<AActor*>& Units, const FVector HeadingTarget);
+
+	/** @return How many unit groups (TrackUnitGroupOnMiniMap) still have living units. */
+	UFUNCTION(BlueprintPure, NotBlueprintable, Category = "Mission|MiniMap")
+	int32 GetTrackedUnitGroupCount() const { return M_UnitGroupMarkers.Num(); }
+
+	/**
+	 * @return The group's minimap marker location (the centroid of its living units); ZeroVector when the group is
+	 * not tracked (never was, or its last unit is gone).
+	 */
+	UFUNCTION(BlueprintPure, NotBlueprintable, Category = "Mission|MiniMap")
+	FVector GetUnitGroupMarkerLocation(const FName GroupId) const;
+
+	// The last unit of a group from TrackUnitGroupOnMiniMap is gone; its minimap marker was removed.
+	UFUNCTION(BlueprintImplementableEvent, Category = "Mission|MiniMap")
+	void BP_OnUnitGroupDefeated(const FName GroupId);
 
 	UFUNCTION(BlueprintImplementableEvent)
 	void BP_OnCallBackDestructibleCollapse(ADestructableEnvActor* ActorCollapsed);
@@ -872,6 +1069,13 @@ protected:
 	UFUNCTION(BlueprintImplementableEvent)
 	void BP_OnMissionStart();
 
+	// Native twin of BP_OnMissionStart for C++ mission classes: runs right before it, once the mission really starts
+	// (after its trigger, with the mission widget set up).
+	virtual void OnMissionStartedNative() {}
+
+	// Native twin of BP_OnCameraTourFinished for C++ mission classes; runs right before it.
+	virtual void OnCameraTourFinishedNative(const int32 ID, const bool bWasShown) {}
+
 	// Called by cpp function in base do NOT CALL DIRECTLY.
 	UFUNCTION(BlueprintImplementableEvent)
 	void BP_OnMissionComplete();
@@ -1023,10 +1227,12 @@ protected:
 	 * @param BuildLocation Where the building goes; the ground below it is used. Pick open, flat ground.
 	 * @param BuildRotation Only the yaw is used.
 	 * @param ID Handed back in BP_OnAirDeliveredNomadicLanded.
+	 * @param bBuildOnLanding False only sets the truck down there, so the player deploys it (tutorials).
 	 */
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|AirDelivery")
 	void DeliverPlayerNomadicByCargoPlane(const ENomadicSubtype NomadicSubtype, const FVector BuildLocation,
-	                                      const FRotator BuildRotation, const int32 ID = 0);
+	                                      const FRotator BuildRotation, const int32 ID = 0,
+	                                      const bool bBuildOnLanding = true);
 
 	/**
 	 * @brief Brings the player HQ in by the Mammut glider of the super heavy drops: it lands, the HQ drives out to
@@ -1035,19 +1241,116 @@ protected:
 	 * @param BuildRotation Only the yaw is used.
 	 * @param GliderTouchdownLocation Where the glider touches down; it skids toward BuildLocation, so leave a long
 	 * flat run between them. Zero: it comes in from the aircraft spawn side.
-	 * @param ID Handed back in BP_OnAirDeliveredNomadicLanded.
+	 * @param ID Handed back in BP_OnAirDeliveredNomadicLanded and BP_OnAirDeliveredHQOutOfGlider.
+	 * @param bBuildOnLanding False leaves the HQ truck where it drove out of the glider, so the player converts it
+	 * (tutorials); BP_OnAirDeliveredHQOutOfGlider then fires once it stands there.
+	 * @note Either way the HQ is registered as the player HQ the moment the glider releases it.
 	 */
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|AirDelivery")
 	void DeliverPlayerHQByMammutGlider(const FVector BuildLocation, const FRotator BuildRotation,
-	                                   const FVector GliderTouchdownLocation, const int32 ID = 0);
+	                                   const FVector GliderTouchdownLocation, const int32 ID = 0,
+	                                   const bool bBuildOnLanding = true);
 
-	// The truck is on the ground and has just been ordered to build; null when the delivery failed.
+	// The truck is on the ground and has just been ordered to build (unless bBuildOnLanding was false); null when
+	// the delivery failed. A glider HQ is still in the glider's nose at this point.
 	UFUNCTION(BlueprintImplementableEvent, Category = "Mission|AirDelivery")
 	void BP_OnAirDeliveredNomadicLanded(ANomadicVehicle* NomadicVehicle, const ENomadicSubtype NomadicSubtype,
 	                                    const int32 ID);
 
+	// Glider HQ delivered with bBuildOnLanding false: the truck has driven out of the glider and stands idle (at most
+	// 30 s after the release). Not fired when the HQ died on the way out.
+	UFUNCTION(BlueprintImplementableEvent, Category = "Mission|AirDelivery")
+	void BP_OnAirDeliveredHQOutOfGlider(ANomadicVehicle* NomadicVehicle, const int32 ID);
+
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void MoveCamera(FMovePlayerCamera CameraMove);
+
+	/**
+	 * @brief Cinematic introduction of a place: the HUD hides, the player camera drifts (and optionally turns) while
+	 * the location appears top centre and the date types out bottom left; then the HUD comes back.
+	 * When a cinematic, info takeover, tech tree or archive holds the screen, or a MoveCamera move is still under way,
+	 * the intro waits until that is over.
+	 * Stops a playing portrait and mutes regular voice lines for its length, like a cinematic takeover.
+	 * @param Location Large, top centre, in capitals (e.g. "Berlin").
+	 * @param Date Typed bottom left (e.g. "21 April 1945").
+	 * @param DriftAxis World axis the camera moves along.
+	 * @param DriftDistance Units moved along DriftAxis over the whole intro; negative moves the other way. The move
+	 * stops early at a camera boundary.
+	 * @param DurationSeconds Real seconds the intro takes; the texts fade out at its end. Zero or less uses 7; it is
+	 * lengthened when the texts would not have time to type out before the fade.
+	 * @param bPanCamera Also turn the camera (PanSettings), an orbit around the point it looks at.
+	 * @param PanSettings Turn angles and whether the camera turns back before the intro ends.
+	 * @param ID Handed back in BP_OnLocationIntroFinished.
+	 * @param LocationSubtitle Optional smaller line under the location.
+	 * @param TimeOfDay Optional line typed under the date (e.g. "05:40 hrs").
+	 * @param Presentation Cinema bars, fade from black, timings and sounds; the defaults are the tuned look.
+	 * @return False when this mission already runs an intro (or the player camera is missing); BP_OnLocationIntroFinished
+	 * then still fires next frame with bWasShown false, so a chain on it never stalls.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|Camera",
+		meta = (AdvancedDisplay = "ID,LocationSubtitle,TimeOfDay,Presentation", AutoCreateRefTerm =
+			"Location,Date,PanSettings,LocationSubtitle,TimeOfDay,Presentation", CPP_Default_DriftAxis = "WorldX",
+			CPP_Default_DriftDistance = "1500.000000", CPP_Default_DurationSeconds = "7.000000"))
+	bool ShowLocationIntro(const FText& Location,
+	                       const FText& Date,
+	                       const ELocationIntroDriftAxis DriftAxis,
+	                       const float DriftDistance,
+	                       const float DurationSeconds,
+	                       const bool bPanCamera,
+	                       const FLocationIntroPanSettings& PanSettings,
+	                       const int32 ID,
+	                       const FText& LocationSubtitle,
+	                       const FText& TimeOfDay,
+	                       const FLocationIntroPresentation& Presentation);
+
+	/** @return True from ShowLocationIntro until BP_OnLocationIntroFinished (waiting for the screen included). */
+	UFUNCTION(BlueprintPure, NotBlueprintable, Category = "Mission|Camera")
+	bool GetIsLocationIntroPlaying() const;
+
+	// The location intro of ShowLocationIntro ended and the HUD is back. bWasShown is false when it never showed (the
+	// screen stayed busy for 45 s, or another intro of this mission ran). Not fired when the intro is cut short by
+	// the mission failing or by a cinematic started over it.
+	UFUNCTION(BlueprintImplementableEvent, Category = "Mission|Camera")
+	void BP_OnLocationIntroFinished(const int32 ID, const bool bWasShown);
+
+	/**
+	 * @brief Plays a short in-map camera tour: the HUD hides, cinema bars slide in and the RTS camera moves through
+	 * the shots (each one eases from its start to its end pose, with an optional caption bottom centre), then eases
+	 * back to the player's own view and zoom and the HUD returns. Waits like ShowLocationIntro while the screen is
+	 * busy (skipped after 45 s). Like any cinematic takeover it stops a playing portrait and mutes voice lines.
+	 * @param Shots The shots in order; empty is refused.
+	 * @param Settings Bars, the ease back to the player's view and an optional start sound.
+	 * @param ID Handed back in BP_OnCameraTourFinished.
+	 * @return False when the tour cannot run (no shots, no camera, a tour of this mission already runs);
+	 * BP_OnCameraTourFinished then still fires next frame with bWasShown false.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|Camera",
+		meta = (AdvancedDisplay = "ID", AutoCreateRefTerm = "Settings"))
+	bool PlayCameraTour(const TArray<FMissionCameraTourShot>& Shots, const FMissionCameraTourSettings& Settings,
+	                    const int32 ID = 0);
+
+	/** @return True from PlayCameraTour until BP_OnCameraTourFinished (waiting for the screen included). */
+	UFUNCTION(BlueprintPure, NotBlueprintable, Category = "Mission|Camera")
+	bool GetIsCameraTourPlaying() const;
+
+	/** @return Index of the tour shot on screen, or -1 when no tour shot shows. */
+	UFUNCTION(BlueprintPure, NotBlueprintable, Category = "Mission|Camera")
+	int32 GetCameraTourShotIndex() const;
+
+	// The camera tour of PlayCameraTour ended and the HUD is back. bWasShown is false when it never showed.
+	// Not fired when the tour is cut short by the mission failing or being cleaned up.
+	UFUNCTION(BlueprintImplementableEvent, Category = "Mission|Camera")
+	void BP_OnCameraTourFinished(const int32 ID, const bool bWasShown);
+
+	/**
+	 * @brief Lifts the fog of war for the player over a circle for a while, like a recon flight's vision bubble.
+	 * @param Location Centre of the revealed circle (ground height is fine).
+	 * @param Radius Radius in cm.
+	 * @param Seconds How long the area stays revealed.
+	 * @return The bubble actor (gone after Seconds), or nullptr when it could not spawn.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|FogOfWar")
+	AActor* RevealAreaForSeconds(const FVector Location, const float Radius, const float Seconds);
 
 	/**
 	 * @brief Registers an additional camera blocking boundary through mission blueprint logic.
@@ -1249,6 +1552,7 @@ private:
 	void PruneInactiveScheduledTaskIDs();
 	int32 GetNextAsyncSpawnId();
 	void ClearActiveCinematicTakeOverSession(const UMissionCinematicTakeOverSession* CinematicSession);
+	UInfoTakeoverSubsystem* GetInfoTakeoverSubsystem() const;
 
 	UPROPERTY()
 	FTimerHandle M_TextOnlyDurationHandle;
@@ -1266,6 +1570,28 @@ private:
 	// Keeps the returned cinematic handle alive until it broadcasts completion or gets cancelled.
 	UPROPERTY()
 	TObjectPtr<UMissionCinematicTakeOverSession> M_ActiveCinematicTakeOverSession = nullptr;
+
+	// The running ShowLocationIntro; it hides the HUD, so every way out of the mission must cancel it.
+	UPROPERTY()
+	TObjectPtr<UMissionLocationIntroSession> M_ActiveLocationIntroSession = nullptr;
+
+	// Ends a running location intro early (HUD back, camera input back) without firing BP_OnLocationIntroFinished.
+	void CancelActiveLocationIntro();
+	// Called by the session once it handed the screen back.
+	void OnLocationIntroSessionEnded(const UMissionLocationIntroSession* Session, const int32 ID,
+	                                 const ELocationIntroSessionEnd EndReason);
+	void LocationIntro_ReportSkippedNextFrame(const int32 ID);
+
+	// The running PlayCameraTour; it hides the HUD, so every way out of the mission must cancel it.
+	UPROPERTY()
+	TObjectPtr<UMissionCameraTourSession> M_ActiveCameraTourSession = nullptr;
+
+	// Ends a running camera tour early (view, HUD and camera input back) without firing BP_OnCameraTourFinished.
+	void CancelActiveCameraTour();
+	// Called by the session once it handed the screen back.
+	void OnCameraTourSessionEnded(const UMissionCameraTourSession* Session, const int32 ID,
+	                              const EMissionCameraTourEnd EndReason);
+	void CameraTour_ReportFinishedNextFrame(const int32 ID, const bool bWasShown);
 
 	// Tracks actor validity transitions so each tracked element increments at most once.
 	UPROPERTY()
@@ -1416,5 +1742,29 @@ private:
 	void ActivateNextMissionIfConfigured();
 	void AirDelivery_Start(const FNomadicAirDeliveryOrder& Order, const int32 ID);
 	void AirDelivery_OnLanded(ANomadicVehicle* NomadicVehicle, const ENomadicSubtype NomadicSubtype,
-	                          const bool bIsHQDelivery, const int32 ID);
+	                          const bool bIsHQDelivery, const bool bWaitForGliderExit, const int32 ID);
+	void AirDelivery_RegisterPlayerHQ(ANomadicVehicle* NomadicVehicle) const;
+	void AirDelivery_StartHQExitPoll(ANomadicVehicle* NomadicVehicle, const int32 ID);
+	void AirDelivery_PollHQExit();
+	void AirDelivery_ClearHQExitPoll();
+
+	// Glider HQ (bBuildOnLanding false) that is still driving out of the glider; BP_OnAirDeliveredHQOutOfGlider
+	// fires once it is idle.
+	TWeakObjectPtr<ANomadicVehicle> M_HQLeavingGlider;
+	int32 M_HQLeavingGliderID = 0;
+	float M_HQLeavingGliderSeconds = 0.f;
+	FTimerHandle M_HQLeavingGliderPollHandle;
+
+	// Unit groups shown on the minimap (TrackUnitGroupOnMiniMap) until their last unit is gone.
+	UPROPERTY()
+	TArray<FMissionUnitGroupMarker> M_UnitGroupMarkers;
+
+	FTimerHandle M_UnitGroupMarkerTimerHandle;
+	int32 M_NextUnitGroupMarkerIndex = 0;
+
+	void UnitGroupMarkers_EnsureUpdateTimer();
+	void UnitGroupMarkers_Update();
+	void UnitGroupMarkers_RemoveGroup(const FName GroupId);
+	// Removes every group's icons without reporting defeats (mission end or clean-up).
+	void UnitGroupMarkers_Clear();
 };

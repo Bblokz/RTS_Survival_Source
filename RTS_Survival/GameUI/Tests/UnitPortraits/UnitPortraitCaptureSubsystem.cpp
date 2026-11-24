@@ -21,6 +21,7 @@
 #include "Engine/PostProcessVolume.h"
 #include "Engine/SceneCapture2D.h"
 #include "Engine/SkyLight.h"
+#include "Engine/StaticMeshActor.h"
 #include "Engine/TextureCube.h"
 #include "Engine/TextureRenderTarget2D.h"
 #include "Engine/Engine.h"
@@ -79,6 +80,8 @@ namespace UnitPortraitConstants
 	const TCHAR* const SwapOption = TEXT("Swap=");
 	const TCHAR* const SwapTargetSeparator = TEXT(">");
 	const TCHAR* const TeamColorOption = TEXT("TeamColor=");
+	const TCHAR* const BackdropOption = TEXT("Backdrop=");
+	const TCHAR* const ViewYawOption = TEXT("ViewYaw=");
 	// Custom primitive data 0 holds the faction flag atlas index (FRTS_FactionFlags); team colour uses 4-7 (RGBA).
 	constexpr int32 TeamColorPrimitiveDataIndex = 4;
 	constexpr int32 MinTeamColorComponents = 3;
@@ -282,6 +285,7 @@ void UUnitPortraitCaptureSubsystem::TickSpawningUnit()
 	}
 	M_ShotState = FUnitPortraitShotState();
 	M_UnitSpawnLocation = M_Unit->GetActorLocation();
+	SpawnBackdrop(Entry);
 	const int32 SwappedSlots = ApplyLookOverride();
 	if (Entry.LookOverride.bHasTeamColor || not Entry.LookOverride.SwapToMaterialPath.IsEmpty())
 	{
@@ -762,6 +766,34 @@ AActor* UUnitPortraitCaptureSubsystem::SpawnUnit(const FUnitPortraitEntry& Entry
 	return Unit;
 }
 
+void UUnitPortraitCaptureSubsystem::SpawnBackdrop(const FUnitPortraitEntry& Entry)
+{
+	if (Entry.LookOverride.BackdropMeshPath.IsEmpty() || not M_Unit.IsValid())
+	{
+		return;
+	}
+	UStaticMesh* BackdropMesh = LoadObject<UStaticMesh>(nullptr, *Entry.LookOverride.BackdropMeshPath);
+	if (not IsValid(BackdropMesh))
+	{
+		UE_LOG(LogRTSUnitPortrait, Error, TEXT("RTS_PORTRAIT %s backdrop mesh %s not found"), *Entry.Name,
+		       *Entry.LookOverride.BackdropMeshPath);
+		return;
+	}
+	FActorSpawnParameters SpawnParameters;
+	SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	AStaticMeshActor* Backdrop = GetWorld()->SpawnActor<AStaticMeshActor>(
+		AStaticMeshActor::StaticClass(), M_Unit->GetActorTransform(), SpawnParameters);
+	if (not IsValid(Backdrop))
+	{
+		return;
+	}
+	Backdrop->SetMobility(EComponentMobility::Movable);
+	Backdrop->GetStaticMeshComponent()->SetStaticMesh(BackdropMesh);
+	Backdrop->GetStaticMeshComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	M_Backdrop = Backdrop;
+	UE_LOG(LogRTSUnitPortrait, Display, TEXT("RTS_PORTRAIT %s backdrop %s"), *Entry.Name, *BackdropMesh->GetName());
+}
+
 void UUnitPortraitCaptureSubsystem::ParseLookOverride(const FString& OptionsText,
                                                       FUnitPortraitLookOverride& OutLookOverride)
 {
@@ -776,6 +808,16 @@ void UUnitPortraitCaptureSubsystem::ParseLookOverride(const FString& OptionsText
 			Option.RightChop(FCString::Strlen(SwapOption)).Split(SwapTargetSeparator,
 			                                                     &OutLookOverride.SwapFromMaterialPath,
 			                                                     &OutLookOverride.SwapToMaterialPath);
+			continue;
+		}
+		if (Option.StartsWith(ViewYawOption))
+		{
+			OutLookOverride.ViewYawOffset = FCString::Atof(*Option.RightChop(FCString::Strlen(ViewYawOption)));
+			continue;
+		}
+		if (Option.StartsWith(BackdropOption))
+		{
+			OutLookOverride.BackdropMeshPath = Option.RightChop(FCString::Strlen(BackdropOption));
 			continue;
 		}
 		if (not Option.StartsWith(TeamColorOption))
@@ -894,7 +936,10 @@ void UUnitPortraitCaptureSubsystem::AimCamerasAtUnit() const
 	FParse::Value(FCommandLine::Get(), FramingSwitch, Framing);
 	const float Radius = Bounds.GetExtent().Size();
 	const float Distance = Framing * Radius / FMath::Tan(FMath::DegreesToRadians(FieldOfView * 0.5f));
-	const float UnitYaw = M_Unit->GetActorRotation().Yaw;
+	const float ViewYawOffset = M_Entries.IsValidIndex(M_EntryIndex)
+		                            ? M_Entries[M_EntryIndex].LookOverride.ViewYawOffset
+		                            : 0.f;
+	const float UnitYaw = M_Unit->GetActorRotation().Yaw + ViewYawOffset;
 	for (const FUnitPortraitCamera& Camera : M_Cameras)
 	{
 		if (not Camera.Capture.IsValid())
@@ -1112,6 +1157,11 @@ FString UUnitPortraitCaptureSubsystem::GetCurrentEntryName() const
 
 void UUnitPortraitCaptureSubsystem::DestroyUnit()
 {
+	if (M_Backdrop.IsValid())
+	{
+		M_Backdrop->Destroy();
+	}
+	M_Backdrop.Reset();
 	TArray<AActor*> UnitActors;
 	M_Unit->GetAttachedActors(UnitActors, true, true);
 	const APawn* UnitPawn = Cast<APawn>(M_Unit.Get());

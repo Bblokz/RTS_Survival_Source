@@ -846,7 +846,9 @@ void UEnemyFormationController::UpdateFormationUnitStuckState(
 	const float DistanceMovedSquared = FVector::DistSquared(UnitLocation, FormationUnit.M_LastKnownLocation);
 	FormationUnit.M_LastKnownLocation = UnitLocation;
 
-	if (GetIsFormationUnitInCombat(FormationUnit))
+	// An attack-move engagement stands still between shots without always counting as combat; it is not stuck.
+	if (GetIsFormationUnitInCombat(FormationUnit)
+		or FormationUnit.Unit->GetActiveCommandID() == EAbilityID::IdAttack)
 	{
 		DebugFormationUnitStillMoving(FormationUnit, WaypointLocation, WaypointDirection, DistanceMovedSquared);
 		return;
@@ -1856,6 +1858,16 @@ bool UEnemyFormationController::EnsureFormationRequestIsValid(
 	return true;
 }
 
+bool UEnemyFormationController::GetShouldUseUnitAttackMove(const int32 FormationID) const
+{
+	if (not bM_UseUnitAttackMoveOrders)
+	{
+		return false;
+	}
+	const FFormationData* Formation = M_ActiveFormations.Find(FormationID);
+	return Formation != nullptr and Formation->bIsAttackMoveFormation;
+}
+
 void UEnemyFormationController::MoveUnitToWayPoint(FFormationUnitData& FormationUnit, const FVector& WaypointLocation,
                                                    const FRotator& WaypointDirection, const int32 FormationID)
 {
@@ -1874,9 +1886,12 @@ void UEnemyFormationController::MoveUnitToWayPoint(FFormationUnitData& Formation
 	// A running grenade or aim ability finishes first; the move then follows it in the queue.
 	bool bResetOrderQueue = true;
 	FEnemyOrderQueueHelpers::PrepareOrderBehindRunningAbility(FormationUnit.Unit.Get(), bResetOrderQueue);
-	// Move the unit to the projected location.
-	const ECommandQueueError Error = FormationUnit.Unit->MoveToLocation(LocationToProject, bResetOrderQueue,
-	                                                                   WaypointDirection);
+	// Move the unit to the projected location; an attack move engages what it meets on the way and then resumes.
+	const ECommandQueueError Error = GetShouldUseUnitAttackMove(FormationID)
+		                                 ? FormationUnit.Unit->AttackMoveToLocation(
+			                                 LocationToProject, bResetOrderQueue, WaypointDirection)
+		                                 : FormationUnit.Unit->MoveToLocation(
+			                                 LocationToProject, bResetOrderQueue, WaypointDirection);
 	if (Error != ECommandQueueError::NoError)
 	{
 		OnUnitMovementError(FormationUnit.Unit, Error);

@@ -26,6 +26,7 @@
 #include "NavigationSystem.h"
 #include "PhysicsEngine/BodyInstance.h"
 #include "RTS_Survival/DeveloperSettings.h"
+#include "RTS_Survival/Game/Players/RTSPlayers.h"
 #include "RTS_Survival/Navigation/CoverFinder/CoverFinderDeveloperSettings.h"
 #include "RTS_Survival/Navigation/CoverFinder/CoverFinderWorker.h"
 #include "RTS_Survival/Navigation/CoverFinder/CoverSocketSource.h"
@@ -34,6 +35,7 @@
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/RTSCollisionTraceChannels.h"
 #include "RTS_Survival/Units/Squads/SquadUnit/SquadUnit.h"
+#include "RTS_Survival/Utils/CollisionSetup/RTSPlayerCollision.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "ShowFlags.h"
 #include "UnrealClient.h"
@@ -254,23 +256,6 @@ namespace CoverFinderWorldSubsystemPrivate
 		return IsValid(Cast<ACharacter>(Actor)) ||
 			IsValid(Cast<ACharacter>(Actor->GetAttachParentActor())) ||
 			IsValid(Cast<ACharacter>(Actor->GetOwner()));
-	}
-
-	/** @return Owning player of the actor or of the unit that owns it; INDEX_NONE for map geometry. */
-	int32 FindOwningPlayer(const AActor* Actor)
-	{
-		constexpr int32 MaximumOwnerDepth = 4;
-		const AActor* OwnershipActor = Actor;
-		for (int32 OwnerDepth = 0; OwnerDepth < MaximumOwnerDepth && IsValid(OwnershipActor); ++OwnerDepth)
-		{
-			const URTSComponent* RTSComponent = OwnershipActor->FindComponentByClass<URTSComponent>();
-			if (IsValid(RTSComponent))
-			{
-				return RTSComponent->GetOwningPlayer();
-			}
-			OwnershipActor = OwnershipActor->GetOwner();
-		}
-		return INDEX_NONE;
 	}
 
 	bool GetIsLandscapeComponent(const UPrimitiveComponent* PrimitiveComponent)
@@ -697,6 +682,10 @@ void URTSCoverFinderWorldSubsystem::StartCommandLineMapTests()
 	{
 		M_AlliedVehiclePassageScenario.Start();
 	}
+	if (FParse::Param(FCommandLine::Get(), TEXT("TrenchRampValidate")))
+	{
+		M_TrenchRampCrossingScenario.Start();
+	}
 	if (FParse::Param(FCommandLine::Get(), TEXT("TraceImpactVfxMeasure")))
 	{
 		M_TraceImpactVfxPerfScenario.Start();
@@ -747,6 +736,7 @@ void URTSCoverFinderWorldSubsystem::TickMapTests(const float DeltaTime)
 	M_SquadMarchScenario.Tick(*this);
 	M_VehicleAvoidanceScenario.Tick(*this, DeltaTime);
 	M_AlliedVehiclePassageScenario.Tick(*this, DeltaTime);
+	M_TrenchRampCrossingScenario.Tick(*this, DeltaTime);
 	M_TraceImpactVfxPerfScenario.Tick(*this);
 	M_B4HowitzerScenario.Tick(*this);
 	M_GunPitScenario.Tick(*this);
@@ -1407,14 +1397,14 @@ void URTSCoverFinderWorldSubsystem::UnregisterSquadUnit(ASquadUnit* SquadUnit)
 
 float URTSCoverFinderWorldSubsystem::GetAutomaticCoverSearchRadius(const ASquadUnit& SquadUnit) const
 {
-	constexpr int32 EnemyOwningPlayer = 2;
 	constexpr float MinimumSearchRadius = 100.0f;
 	const URTSCoverFinderDeveloperSettings* CoverSettings = GetCoverFinderSettings();
 	if (not IsValid(CoverSettings))
 	{
 		return MinimumSearchRadius;
 	}
-	const float SearchRadius = SquadUnit.GetOwningPlayer() == EnemyOwningPlayer
+	// Every AI player's soldiers use the AI's radius; unset owners keep the default one, as before.
+	const float SearchRadius = FRTSPlayers::IsValidAIPlayer(SquadUnit.GetOwningPlayer())
 		? CoverSettings->M_EnemyAutomaticCoverSearchRadius
 		: CoverSettings->M_AutomaticCoverSearchRadius;
 	return FMath::Max(MinimumSearchRadius, SearchRadius);
@@ -1487,6 +1477,49 @@ FRTSCombatCoverSettings URTSCoverFinderWorldSubsystem::BuildCombatCoverSettings(
 		0.9f);
 	CombatSettings.MaximumAdvanceTowardTarget = FMath::Max(0.0f, CoverSettings->M_CombatCoverMaximumAdvanceDistance);
 	return CombatSettings;
+}
+
+int32 URTSCoverFinderWorldSubsystem::AddCoverKeepOutZone(const FRTSCoverKeepOutZone& Zone)
+{
+	FRTSCoverKeepOutZone& Added = M_CoverKeepOutZones.Add_GetRef(Zone);
+	Added.ZoneId = M_NextCoverKeepOutZoneId++;
+	return Added.ZoneId;
+}
+
+bool URTSCoverFinderWorldSubsystem::UpdateCoverKeepOutZone(const FRTSCoverKeepOutZone& Zone)
+{
+	FRTSCoverKeepOutZone* const Existing = M_CoverKeepOutZones.FindByPredicate(
+		[&Zone](const FRTSCoverKeepOutZone& Candidate) { return Candidate.ZoneId == Zone.ZoneId; });
+	if (Existing == nullptr)
+	{
+		return false;
+	}
+	*Existing = Zone;
+	return true;
+}
+
+void URTSCoverFinderWorldSubsystem::RemoveCoverKeepOutZone(const int32 ZoneId)
+{
+	M_CoverKeepOutZones.RemoveAll([ZoneId](const FRTSCoverKeepOutZone& Zone) { return Zone.ZoneId == ZoneId; });
+}
+
+bool URTSCoverFinderWorldSubsystem::GetIsInCoverKeepOutZone(const FVector& Location, const int32 OwningPlayer) const
+{
+	for (const FRTSCoverKeepOutZone& Zone : M_CoverKeepOutZones)
+	{
+		if (Zone.OwningPlayer != OwningPlayer)
+		{
+			continue;
+		}
+		const FVector2D Offset = FVector2D(Location.X, Location.Y) - Zone.Start;
+		const float Along = FVector2D::DotProduct(Offset, Zone.Forward);
+		const float Across = FMath::Abs(FVector2D::CrossProduct(Zone.Forward, Offset));
+		if (Along >= -Zone.BehindLength && Along <= Zone.AheadLength && Across <= Zone.HalfWidth)
+		{
+			return true;
+		}
+	}
+	return false;
 }
 
 bool URTSCoverFinderWorldSubsystem::GetIsCoverPointAvailableToUnit(
@@ -1798,8 +1831,15 @@ TArray<FRTSCoverPoint> URTSCoverFinderWorldSubsystem::GatherBestTacticalCoverCan
 	M_TacticalPerformanceSnapshot.CandidateChecksLastFrame += BestCandidates.Num();
 	const bool bLimitTargetDistance = IsValid(TargetActor) && MaximumDistanceToTarget > 0.0f;
 	const float MaximumDistanceToTargetSquared = FMath::Square(MaximumDistanceToTarget);
+	// Keep-out zones only hold for cover taken without a target: under fire a soldier still uses every cover.
+	const bool bApplyKeepOutZones = not IsValid(TargetActor) && not M_CoverKeepOutZones.IsEmpty();
+	const int32 OwningPlayer = SquadUnit.GetOwningPlayer();
 	BestCandidates.RemoveAll([&](const FRTSCoverPoint& CoverPoint)
 	{
+		if (bApplyKeepOutZones && GetIsInCoverKeepOutZone(CoverPoint.Location, OwningPlayer))
+		{
+			return true;
+		}
 		if (bLimitTargetDistance &&
 			FVector::DistSquared(CoverPoint.Location, TargetLocation) > MaximumDistanceToTargetSquared)
 		{
@@ -1965,11 +2005,12 @@ bool URTSCoverFinderWorldSubsystem::GetHasTargetSpecificFiringLane(
 	{
 		return false;
 	}
-	const ECollisionChannel TargetTraceChannel = SquadUnit.GetOwningPlayer() == 1
-		? COLLISION_TRACE_ENEMY
-		: COLLISION_TRACE_PLAYER;
+	// The lane is traced like the soldier's own shot: on its weapon channel, passing through its own and allied units.
+	const int32 SquadOwningPlayer = SquadUnit.GetOwningPlayer();
+	const ECollisionChannel TargetTraceChannel = FRTSPlayerCollision::GetWeaponTraceChannel(SquadOwningPlayer);
 	FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(RTSCoverFiringLane), true);
 	QueryParams.AddIgnoredActor(&SquadUnit);
+	FRTSPlayerCollision::ApplyWeaponIgnoreMask(QueryParams, SquadOwningPlayer);
 	FHitResult HitResult;
 	++M_TacticalPerformanceSnapshot.FiringLaneTracesLastFrame;
 	const FVector LaneStart = BuildFiringLaneStart(SquadUnit, CoverPoint);
@@ -1981,12 +2022,12 @@ bool URTSCoverFinderWorldSubsystem::GetHasTargetSpecificFiringLane(
 		QueryParams);
 	const AActor* HitActor = HitResult.GetActor();
 	// Another enemy standing in front of the target is still something this unit may shoot, so the lane stays open.
-	constexpr int32 PlayerOwnedTeam = 1;
 	const int32 HitOwningPlayer = bBlockingHit
-		? CoverFinderWorldSubsystemPrivate::FindOwningPlayer(HitActor)
+		? FRTSPlayerCollision::GetOwningPlayerOfHit(HitActor, HitResult.GetComponent())
 		: INDEX_NONE;
-	const bool bHitOtherEnemy = HitOwningPlayer > 0 &&
-		(HitOwningPlayer == PlayerOwnedTeam) != (SquadUnit.GetOwningPlayer() == PlayerOwnedTeam);
+	// INDEX_NONE (map geometry) and neutral owners must not count: AreHostile reads any odd owner as the first AI
+	// player.
+	const bool bHitOtherEnemy = HitOwningPlayer > 0 && FRTSPlayers::AreHostile(SquadOwningPlayer, HitOwningPlayer);
 	const bool bHitTarget = bBlockingHit && (HitActor == &TargetActor || bHitOtherEnemy ||
 		(IsValid(HitActor) && HitActor->IsOwnedBy(&TargetActor)) ||
 		(IsValid(HitActor) && TargetActor.IsOwnedBy(HitActor)));

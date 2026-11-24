@@ -186,6 +186,10 @@ private:
 
 	void BeginPlay_InitTurretOwner(AActor* NewTurretOwner);
 
+	// The hull weapon fires for the player of the unit it is mounted on; follows that unit when it changes owner.
+	void BeginPlay_BindToOwningPlayerChanges();
+	void OnOwnerChangedPlayer(uint8 OldOwningPlayer, uint8 NewOwningPlayer);
+
 	bool GetIsValidWeapon(const UWeaponState* Weapon) const;
 	void AllWeaponsStopFire(const bool bStopReload, const bool bStopCoolDown);
 	void AllWeaponsFire();

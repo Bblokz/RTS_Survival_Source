@@ -12,6 +12,7 @@
 #include "NiagaraFunctionLibrary.h"
 #include "NiagaraSystem.h"
 #include "RTS_Survival/Enemy/EnemyController/EnemyController.h"
+#include "RTS_Survival/Game/Players/RTSPlayers.h"
 #include "RTS_Survival/Player/CPPController.h"
 #include "RTS_Survival/RTSComponents/ShieldComponent/ShieldTypes.h"
 #include "RTS_Survival/Subsystems/CameraShakeSubsystem/RTSCameraShakeSubsystem.h"
@@ -22,7 +23,6 @@
 
 namespace RadixiteNukeConstants
 {
-	constexpr uint8 HumanPlayer = 1;
 	// /Engine/BasicShapes/Plane is 100 x 100 cm.
 	constexpr float PlaneSizeCm = 100.f;
 	constexpr float PlanePaddingCm = 300.f;
@@ -338,6 +338,7 @@ void ARadixiteNuke::Detonate()
 void ARadixiteNuke::DealBlastDamage() const
 {
 	AActor* DamageCauser = GetDamageCauser();
+	const FAoeInstigator AffectedUnits = GetAffectedUnits();
 	FRTS_AOE::DealDamageInRadiusAsync(
 		DamageCauser,
 		M_GroundZero,
@@ -345,7 +346,7 @@ void ARadixiteNuke::DealBlastDamage() const
 		M_Settings.CoreDamage,
 		M_Settings.BlastFalloffExponent,
 		ERTSDamageType::Kinetic,
-		M_Settings.AffectedUnits,
+		AffectedUnits,
 		EShieldDamageSource::AreaOfEffect);
 	FRTS_AOE::DealDamageVsRearArmorInRadiusAsync(
 		DamageCauser,
@@ -357,7 +358,7 @@ void ARadixiteNuke::DealBlastDamage() const
 		M_Settings.BlastArmorFalloff,
 		M_Settings.BlastMaxArmor,
 		ERTSDamageType::Kinetic,
-		M_Settings.AffectedUnits,
+		AffectedUnits,
 		EShieldDamageSource::AreaOfEffect,
 		TArray<TWeakObjectPtr<AActor>>(),
 		EVehicleModuleSplashPolicy::DamageExternalModules,
@@ -437,7 +438,7 @@ void ARadixiteNuke::DealRadiationPulse() const
 		M_Settings.RadiationDamagePerPulse,
 		M_Settings.BlastFalloffExponent,
 		ERTSDamageType::Radiation,
-		M_Settings.AffectedUnits,
+		GetAffectedUnits(),
 		EShieldDamageSource::AreaOfEffect);
 }
 
@@ -453,9 +454,17 @@ void ARadixiteNuke::EndRadiation()
 
 AActor* ARadixiteNuke::GetDamageCauser() const
 {
-	if (M_OwningPlayer == RadixiteNukeConstants::HumanPlayer)
+	if (FRTSPlayers::IsHumanPlayer(M_OwningPlayer))
 	{
 		return FRTS_Statics::GetRTSController(this);
 	}
-	return FRTS_Statics::GetEnemyController(this);
+	// The controller of the AI player that fired; a map without one for that player keeps the default controller.
+	AEnemyController* OwnController = FRTS_Statics::GetEnemyControllerForPlayer(this, M_OwningPlayer);
+	return IsValid(OwnController) ? OwnController : FRTS_Statics::GetEnemyController(this);
+}
+
+FAoeInstigator ARadixiteNuke::GetAffectedUnits() const
+{
+	// Authored from the firing player's point of view: Player = its own and allied units, Enemy = its hostiles.
+	return FAoeInstigator::FromOwnerRelativeLogic(M_OwningPlayer, M_Settings.AffectedUnits);
 }

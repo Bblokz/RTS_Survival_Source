@@ -134,7 +134,8 @@ private:
 
 	bool DoesNavAgentTriggerMine(const AActor& OtherActor) const;
 	bool ShouldTriggerForNavAgent(const IRTSNavAgentInterface& NavAgentInterface) const;
-	ETriggerOverlapLogic GetOverlapLogicForMineOwner() const;
+	/** @return Owner of the mine: decides who triggers it and whom it damages. The human player without an owner. */
+	int32 GetMineOwningPlayer() const;
 
 	float PlayTriggerSound() const;
 	float CalculateMineDamage() const;

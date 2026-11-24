@@ -78,11 +78,18 @@ are tracked spawns (cleaned up with the rest) and are listed per ability in `M_A
 
 | Kind | Units | Abilities |
 |---|---|---|
-| Infantry | 5 squads (Mosin, SVT) | Bf 110 x2, Bf 109 (machine guns), incendiary Ju 87 ("deadly to infantry, harmless to tanks") |
-| Light vehicles | T-70, BA-11, T-26 | Horten 229 (cannons), Ju 87 G (37 mm pods) |
+| Infantry | 5 squads (Mosin, SVT) | Bf 110 x2 (machine guns), incendiary Ju 87 ("deadly to infantry, harmless to tanks") |
+| Infantry spread | 7 squads (Mosin, SVT) in lanes 0 to 6.5 m either side, line at least 24 m | Bf 109, Bf 109 x3 (machine guns) |
+| Light vehicles + infantry | T-70, BA-11, T-26 at 2 m, 3 squads at 4.5 m on the opposite flank, line at least 24 m | Horten 229 (cannons), Ju 87 G (37 mm pods + MGs) |
+| Light vehicles | T-70, BA-11, T-26 | (none listed; kept for edits) |
 | Medium vehicles | T-34/76, T-34/85, T-34/76 | Ju 87, Ju 87 x3, Me 410 (bombs), Ju 390 carpet |
 
 Unlisted abilities fall back by class: carpet bombing gets medium vehicles, strafing and incendiary get infantry.
+Since the strafe gun's area damage (2026-11-22: MG near misses hit soldiers, cannon rounds with TNT splash), the
+Bf 109, Horten and Ju 87 G previews spread soldiers wide of the line so the area of the strafe shows. Each set's
+`SideOffsetsCm` places its units across the line (by index, repeated); an empty list alternates `M_SideOffset`.
+`MinLineLengthCm` stretches the attack line about its middle (the preview's strafe lines are about 15 m, which
+bunched 7 squads into one blob).
 
 - Placement: strafing runs all start at the target (later runs head wherever the aircraft comes from), so the
   ability executes at the centre and the targets stand from 0.2 run before it to 0.55 run along the first run.
@@ -98,10 +105,10 @@ Unlisted abilities fall back by class: carpet bombing gets medium vehicles, stra
   pond's rocks for cover.
 - Avoided units: the ZIS-5 truck (convoy prop with no unit subtype, logs errors) and the large mixed squad (more
   soldiers than its spawn grid).
-- Machine gun strafing barely hurts infantry, in missions too: the MG 15's traces are about 32 m long and the
-  fighters fire a burst at the start of each dive, about 30 m out and 25 m up, so most traces end in the air. The
-  test logs hits for the two machine-gun-only abilities but doesn't require them.
-- Test: `targets_match_ability`, `targets_spawned`, and `targets_hit` (the most damage seen during the case).
+- Before the strafe gun (2026-11-17) machine gun strafing barely hurt infantry: most 32 m traces ended in the air.
+  The test still only logs the Bf 110's hits; the Bf 109 must hit.
+- Test: `targets_match_ability`, `targets_spawned`, `targets_hit` (the most damage seen during the case) and, for
+  the infantry spread and vehicles + infantry sets, `soldiers_hit` (at least one soldier damaged).
   `-AbilityPreviewTestBurst` takes a screenshot every 0.4 s.
 
 ## Ability endings

@@ -17,8 +17,11 @@
 #include "RTS_Survival/Utils/AOE/FRTS_AOE.h"
 #include "RTS_Survival/RTSComponents/ArmorCalculationComponent/ArmorCalculation.h"
 #include "RTS_Survival/RTSComponents/ArmorCalculationComponent/VehicleModules/VehicleModuleDamageEvent.h"
+#include "RTS_Survival/Game/Players/RTSPlayers.h"
 #include "RTS_Survival/Utils/CollisionSetup/FRTS_CollisionSetup.h"
+#include "RTS_Survival/Utils/CollisionSetup/RTSPlayerCollision.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
+#include "RTS_Survival/Utils/RTSMapTests/DamageHooks/DamageMapTestHooks.h"
 #include "RTS_Survival/Weapons/WeaponData/FRTSWeaponHelpers/FRTSWeaponHelpers.h"
 #include "TimerManager.h"
 #include "RTS_Survival/Navigation/RTSNavAgents/IRTSNavAgent/IRTSNavAgent.h"
@@ -51,14 +54,15 @@ void AFieldMine::BeginPlay()
 	{
 		return;
 	}
-	if (M_RTSComponent->GetOwningPlayer() == 1)
+	const int32 OwningPlayer = M_RTSComponent->GetOwningPlayer();
+	if (FRTSPlayers::IsHumanPlayer(OwningPlayer))
 	{
 		M_DamageCauserController = FRTS_Statics::GetRTSController(this);
+		return;
 	}
-	else
-	{
-		M_DamageCauserController = FRTS_Statics::GetEnemyController(this);
-	}
+	// The controller of the AI player that laid the mine; an unset owner keeps using the first AI player's.
+	const int32 ControllerPlayer = FRTSPlayers::IsValidAIPlayer(OwningPlayer) ? OwningPlayer : RTSPlayers::FirstAIPlayer;
+	M_DamageCauserController = FRTS_Statics::GetEnemyControllerForPlayer(this, ControllerPlayer);
 }
 
 void AFieldMine::PostInitializeComponents()
@@ -134,13 +138,12 @@ void AFieldMine::BeginPlay_SetupTriggerSphere()
 		return;
 	}
 
-	const int32 OwningPlayer = M_RTSComponent->GetOwningPlayer();
-	FRTS_CollisionSetup::SetupFieldMineTriggerCollision(M_TriggerSphere, OwningPlayer);
+	FRTS_CollisionSetup::SetupFieldMineTriggerCollision(M_TriggerSphere);
 	M_TriggerSphere->OnComponentBeginOverlap.AddDynamic(this, &AFieldMine::OnMineTriggerOverlap);
 }
 
 void AFieldMine::OnMineTriggerOverlap(UPrimitiveComponent* /*OverlappedComponent*/, AActor* OtherActor,
-                                      UPrimitiveComponent* /*OtherComp*/, int32 /*OtherBodyIndex*/, bool /*bFromSweep*/,
+                                      UPrimitiveComponent* OtherComp, int32 /*OtherBodyIndex*/, bool /*bFromSweep*/,
                                       const FHitResult& /*SweepResult*/)
 {
 	if (bM_HasTriggered)
@@ -154,6 +157,12 @@ void AFieldMine::OnMineTriggerOverlap(UPrimitiveComponent* /*OverlappedComponent
 	}
 
 	if (OtherActor == this)
+	{
+		return;
+	}
+
+	// The trigger sees the units of every player; only those the mine's owner fights right now set it off.
+	if (not FRTSPlayerCollision::IsHitDamageableByPlayer(OtherActor, OtherComp, GetMineOwningPlayer()))
 	{
 		return;
 	}
@@ -237,16 +246,15 @@ bool AFieldMine::ShouldTriggerForNavAgent(const IRTSNavAgentInterface& NavAgentI
 	return MineSettings.TriggeringNavAgents.Contains(NavAgentType);
 }
 
-ETriggerOverlapLogic AFieldMine::GetOverlapLogicForMineOwner() const
+int32 AFieldMine::GetMineOwningPlayer() const
 {
 	if (not GetIsValidRTSComponent())
 	{
-		return ETriggerOverlapLogic::OverlapEnemy;
+		// As before four players: a mine without an owner hurts what the human's mines hurt.
+		return RTSPlayers::HumanPlayer;
 	}
 
-	return M_RTSComponent->GetOwningPlayer() == 1
-		       ? ETriggerOverlapLogic::OverlapEnemy
-		       : ETriggerOverlapLogic::OverlapPlayer;
+	return M_RTSComponent->GetOwningPlayer();
 }
 
 float AFieldMine::PlayTriggerSound() const
@@ -288,6 +296,7 @@ void AFieldMine::ApplyDirectDamage(AActor& TargetActor)
 
 	FDamageEvent BasicDamageEvent = FRTSWeaponHelpers::MakeBasicDamageEvent(ERTSDamageType::Kinetic);
 	UArmorCalculation* TargetArmor = TargetActor.FindComponentByClass<UArmorCalculation>();
+	RTS_MAPTEST_DAMAGE_ATTACKER_SCOPE(GetMineOwningPlayer());
 	if (not IsValid(TargetArmor))
 	{
 		TargetActor.TakeDamage(M_CachedDamage, BasicDamageEvent, GetInstigatorController(), this);
@@ -325,7 +334,7 @@ void AFieldMine::ApplyAoeDamage(const FVector& Epicenter)
 		MineSettings.ArmorPenFallOff,
 		MineSettings.MaxArmorPen,
 		ERTSDamageType::Kinetic,
-		GetOverlapLogicForMineOwner(),
+		FAoeInstigator::HostilesOf(GetMineOwningPlayer()),
 		EShieldDamageSource::Mine,
 		ActorsToIgnore,
 		// The mine splash is opt-in; the directly triggered victim is excluded from the AOE.

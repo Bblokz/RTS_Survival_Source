@@ -55,6 +55,44 @@ public:
 	 * @param LayerFiles One raw uint8 weight file per layer in the same grid; weights sum to 255 per vertex.
 	 * @return The landscape, or nullptr (logged) outside the editor or when a file does not match the grid.
 	 */
+	/**
+	 * @brief Reads a rectangle of an existing landscape so a map script can reshape part of it offline.
+	 * Vertex coordinates are landscape grid indices (the same space as GetLandscapeExtent). Vertices of missing
+	 * components read as 0.
+	 * @param HeightFile Written as raw uint16, (MaxX - MinX + 1) x (MaxY - MinY + 1), row by row along X.
+	 * @param Layers Paint layers to read; one raw uint8 file per layer in LayerFiles, same grid.
+	 * @return True when every file was written.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Shorts|Editor")
+	static bool ExportLandscapeRegion(AActor* LandscapeActor, int32 MinX, int32 MinY, int32 MaxX, int32 MaxY,
+	                                  const FString& HeightFile, const TArray<ULandscapeLayerInfoObject*>& Layers,
+	                                  const TArray<FString>& LayerFiles);
+
+	/**
+	 * @brief Writes a rectangle of heights and paint weights back (files laid out as ExportLandscapeRegion writes
+	 * them). Pass an empty HeightFile to keep the heights. Every listed layer is written as-is (no renormalising), so
+	 * pass all painted layers with weights that sum to 255. Requires a landscape without edit layers.
+	 * @return True when the files matched the rectangle and the landscape was updated.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Shorts|Editor")
+	static bool ImportLandscapeRegion(AActor* LandscapeActor, int32 MinX, int32 MinY, int32 MaxX, int32 MaxY,
+	                                  const FString& HeightFile, const TArray<ULandscapeLayerInfoObject*>& Layers,
+	                                  const TArray<FString>& LayerFiles);
+
+	/**
+	 * @brief Adds the missing components in a component-index rectangle (the landscape editor's Add Component tool,
+	 * without a viewport). New components start flat at height 0 (landscape z -256 m): write their heights and
+	 * weights with ImportLandscapeRegion right after.
+	 * @return Number of components added, or -1 on error.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Shorts|Editor")
+	static int32 AddLandscapeComponents(AActor* LandscapeActor, int32 MinComponentX, int32 MinComponentY,
+	                                    int32 MaxComponentX, int32 MaxComponentY);
+
+	/** @return "MinX MinY MaxX MaxY ComponentSizeQuads" of the landscape grid, or an empty string. */
+	UFUNCTION(BlueprintCallable, Category = "Shorts|Editor")
+	static FString GetLandscapeGridInfo(AActor* LandscapeActor);
+
 	UFUNCTION(BlueprintCallable, Category = "Shorts|Editor", meta = (WorldContext = "WorldContextObject"))
 	static AActor* CreatePaintedLandscape(UObject* WorldContextObject, FVector Location, FVector Scale,
 	                                      int32 ComponentsX, int32 ComponentsY, int32 QuadsPerSection,

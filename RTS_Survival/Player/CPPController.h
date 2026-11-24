@@ -67,6 +67,8 @@ enum class EGlobalAbility : uint8;
 struct FGlobalAbilitySoundSettings;
 struct FGlobalAbilityAimSettings;
 class UGlobalAbilitiesManager;
+struct FInputActionInstance;
+class UEnhancedInputComponent;
 class UW_BuildingUI_ItemPanel;
 class UTowedActorComponent;
 class AAircraftMaster;
@@ -323,6 +325,8 @@ class RTS_SURVIVAL_API ACPPController : public APlayerController
 	friend struct FAllGlobalAbilitiesTestAccess;
 	// Map test that selects an apartment and presses its Exit Cargo button the way a click would.
 	friend class UApartmentDestructionTestSubsystem;
+	// -SupplyPointValidate checks that a supply truck cannot be click-selected.
+	friend class FSupplyPointMapTest;
 	// For calling StartGameAtLocation with the picked location by the Start Location UI / Mngr.
 	friend class RTS_SURVIVAL_API UPlayerStartLocationManager;
 	// Survival mode starts the game at the picked start location and registers the air-dropped HQ.
@@ -401,6 +405,13 @@ public:
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void PauseAndLockGame(const bool bLock);
 
+	/**
+	 * @brief Info takeovers wait on this before PauseAndLockGame: a cinematic blocks the pause, and the tech tree,
+	 * archive or another locked takeover already own the screen.
+	 * @return True when a new pause-and-lock takeover can start now.
+	 */
+	bool GetCanStartScreenTakeover() const;
+
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "EscapeMenu")
 	void OpenEscapeMenu();
 
@@ -449,6 +460,9 @@ public:
 	void OnNomadicExpansionShortCut();
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Input")
 	void OnBxpShortCut(int32 BxpIndex);
+	/** Fires the global ability in this zero-based sidebar slot as if its button was clicked. */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Input")
+	void OnGlobalAbilityShortCut(int32 GlobalAbilitySlotIndex);
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	UPlayerPortraitManager* GetPlayerPortraitManager() const;
@@ -515,6 +529,14 @@ public:
 	// Called for custom missions to init the player profile.
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void MissionOnHqSpawned(const FUnitCost BonusPerResource);
+
+	/**
+	 * @brief Makes this nomadic the player HQ: the HQ truck then converts without a build radius and harvesters
+	 * use its drop-off. Grants no resources; MissionOnHqSpawned still does that.
+	 * @param PlayerHQ The player's HQ, in truck or building mode.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission")
+	void RegisterPlayerHQ(ANomadicVehicle* PlayerHQ);
 
 	/**
 	 * @brief Spawns a batch of reinforcement units and directs them to a projected formation point.
@@ -779,6 +801,17 @@ public:
 	 * @return Whether laying out the trench is over.
 	 */
 	bool MapTest_ClickFieldTrenchAt(const FVector& Location);
+
+	/**
+	 * @brief Map tests: the player converts a nomadic truck: selects it, presses the convert button on its command
+	 * card and clicks the preview at this spot, which stands in for the cursor.
+	 * @param NomadicTruck A player nomadic in truck mode.
+	 * @param Location Ground location of the placement click.
+	 * @param bOutNeededBuildRadius Whether the preview demanded a build radius (false for the player HQ).
+	 * @return 1 ordered, 2 not a truck, 3 no nomadic preview started, 4 the spot was rejected (slope, overlap or
+	 * radius), 5 the click was not taken, 0 invalid input.
+	 */
+	int32 MapTest_ConvertNomadicAt(ANomadicVehicle* NomadicTruck, const FVector& Location, bool& bOutNeededBuildRadius);
 #endif
 
 #if RTS_WITH_SHIPPING_MAP_TESTS
@@ -2048,6 +2081,22 @@ private:
 	void NotifyHotkeyProviderSingleActionChanged(UInputAction* Action) const;
 	void NotifyHotkeyProviderChordedActionChanged(UInputAction* Action) const;
 	void RequestEnhancedInputMappingsRebuild() const;
+	// Binds the chorded IA_GlobalAbility1..8 and IA_BuildingExpansion1..10 actions in C++ (no Blueprint input events).
+	void SetupInput_BindChordedSlotHotkeys();
+	/**
+	 * @brief Binds one numbered range of chorded slot actions to a single handler that reads the slot from the action.
+	 * @param EnhancedInputComponent The controller's input component.
+	 * @param SlotCount Number of slots in the range.
+	 * @param GetSlotActionName Maps a zero-based slot to its action name (IA_<Prefix><Slot + 1>).
+	 * @param OnSlotHotkeyStarted Handler bound on ETriggerEvent::Started.
+	 */
+	void BindChordedSlotHotkeys(
+		UEnhancedInputComponent* EnhancedInputComponent,
+		const int32 SlotCount,
+		FName (*GetSlotActionName)(int32),
+		void (ACPPController::*OnSlotHotkeyStarted)(const FInputActionInstance&));
+	void OnGlobalAbilityHotkeyStarted(const FInputActionInstance& ActionInstance);
+	void OnBuildingExpansionHotkeyStarted(const FInputActionInstance& ActionInstance);
 
 	void InitFowManager();
 

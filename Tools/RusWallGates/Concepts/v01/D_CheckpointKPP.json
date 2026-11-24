@@ -1,0 +1,275 @@
+{
+ "key": "D_CheckpointKPP",
+ "title": "D  Checkpoint (KPP): boom, hedgehogs and a guard booth",
+ "notes": [
+  "No heavy leaf: the wall turns inward on both sides (3.5 m returns) into a throat, closed by a striped boom and hedgehogs.",
+  "Closed (shown): boom down, three hedgehogs dragged across the throat. Open: boom up, hedgehogs pushed to the sides.",
+  "Holes: returns (new 3.5 m slab, not a scaled SM_Wall_14) and booth are flat concrete: wall hole material + debris. Boom/hedgehogs just break.",
+  "Most lived-in: sentry booth with searchlight and sandbags in front (could garrison 1-2 riflemen later).",
+  "Weakest physical barrier of the five; reads as an entrance rather than a fortress gate."
+ ],
+ "subtitle": "Gap 9.0 m between wall returns  |  open top  |  booth 3.2 m  |  returns = new short slabs in the wall material  |  Pz IV for scale",
+ "footprint": [
+  29.0,
+  9.0
+ ],
+ "height": 6.0,
+ "mast_height": 6.0,
+ "views": {
+  "rts": {
+   "file": "D_CheckpointKPP_rts.png",
+   "size": [
+    1600,
+    1100
+   ],
+   "px_per_m": 47.27272727272727,
+   "caption": null,
+   "labels": [
+    {
+     "text": "Wall returns 3.5 m",
+     "kind": "gate",
+     "xy": [
+      1062.7,
+      445.6
+     ]
+    },
+    {
+     "text": "Striped boom",
+     "kind": "gate",
+     "xy": [
+      722.9,
+      615.8
+     ]
+    },
+    {
+     "text": "Hedgehogs close the throat",
+     "kind": "gate",
+     "xy": [
+      849.8,
+      545.0
+     ]
+    },
+    {
+     "text": "Guard booth + searchlight",
+     "kind": "gate",
+     "xy": [
+      993.1,
+      682.4
+     ]
+    }
+   ]
+  },
+  "rear": {
+   "file": "D_CheckpointKPP_rear.png",
+   "size": [
+    800,
+    550
+   ],
+   "px_per_m": 29.09090909090909,
+   "caption": "Front elevation (enemy side)",
+   "labels": []
+  },
+  "top": {
+   "file": "D_CheckpointKPP_top.png",
+   "size": [
+    800,
+    800
+   ],
+   "px_per_m": 30.58823529411765,
+   "caption": null,
+   "labels": [
+    {
+     "text": "Wall returns 3.5 m",
+     "kind": "gate",
+     "xy": [
+      534.6,
+      296.0
+     ]
+    },
+    {
+     "text": "Striped boom",
+     "kind": "gate",
+     "xy": [
+      369.4,
+      442.8
+     ]
+    },
+    {
+     "text": "Hedgehogs close the throat",
+     "kind": "gate",
+     "xy": [
+      400.0,
+      344.9
+     ]
+    },
+    {
+     "text": "Guard booth + searchlight",
+     "kind": "gate",
+     "xy": [
+      620.2,
+      491.8
+     ]
+    }
+   ],
+   "grid": [
+    [
+     -517.6,
+     1317.6,
+     -517.6,
+     -517.6
+    ],
+    [
+     -364.7,
+     1317.6,
+     -364.7,
+     -517.6
+    ],
+    [
+     -211.8,
+     1317.6,
+     -211.8,
+     -517.6
+    ],
+    [
+     -58.8,
+     1317.6,
+     -58.8,
+     -517.6
+    ],
+    [
+     94.1,
+     1317.6,
+     94.1,
+     -517.6
+    ],
+    [
+     247.1,
+     1317.6,
+     247.1,
+     -517.6
+    ],
+    [
+     400.0,
+     1317.6,
+     400.0,
+     -517.6
+    ],
+    [
+     552.9,
+     1317.6,
+     552.9,
+     -517.6
+    ],
+    [
+     705.9,
+     1317.6,
+     705.9,
+     -517.6
+    ],
+    [
+     858.8,
+     1317.6,
+     858.8,
+     -517.6
+    ],
+    [
+     1011.8,
+     1317.6,
+     1011.8,
+     -517.6
+    ],
+    [
+     1164.7,
+     1317.6,
+     1164.7,
+     -517.6
+    ],
+    [
+     1317.6,
+     1317.6,
+     1317.6,
+     -517.6
+    ],
+    [
+     -517.6,
+     1317.6,
+     1317.6,
+     1317.6
+    ],
+    [
+     -517.6,
+     1164.7,
+     1317.6,
+     1164.7
+    ],
+    [
+     -517.6,
+     1011.8,
+     1317.6,
+     1011.8
+    ],
+    [
+     -517.6,
+     858.8,
+     1317.6,
+     858.8
+    ],
+    [
+     -517.6,
+     705.9,
+     1317.6,
+     705.9
+    ],
+    [
+     -517.6,
+     552.9,
+     1317.6,
+     552.9
+    ],
+    [
+     -517.6,
+     400.0,
+     1317.6,
+     400.0
+    ],
+    [
+     -517.6,
+     247.1,
+     1317.6,
+     247.1
+    ],
+    [
+     -517.6,
+     94.1,
+     1317.6,
+     94.1
+    ],
+    [
+     -517.6,
+     -58.8,
+     1317.6,
+     -58.8
+    ],
+    [
+     -517.6,
+     -211.8,
+     1317.6,
+     -211.8
+    ],
+    [
+     -517.6,
+     -364.7,
+     1317.6,
+     -364.7
+    ],
+    [
+     -517.6,
+     -517.6,
+     1317.6,
+     -517.6
+    ]
+   ]
+  }
+ },
+ "main_view": "rts"
+}

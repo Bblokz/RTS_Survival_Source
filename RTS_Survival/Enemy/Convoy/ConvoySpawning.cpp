@@ -14,6 +14,7 @@
 #include "RTS_Survival/Units/Tanks/TankMaster.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
+#include "RTS_Survival/Utils/UnitSpawning/RTSUnitOwnerSpawning.h"
 
 namespace ConvoySpawningConstants
 {
@@ -53,6 +54,7 @@ void AConvoy::BuildMembersFromDefinition()
 	for (const FConvoyTruckSpec& Truck : TruckColumn)
 	{
 		AddMember(EConvoyUnitRole::Truck, EConvoyStation::Lead, Truck.TrainingOption.GetDisplayName());
+		M_Members.Last().CargoType = Truck.bOverrideCargoType ? Truck.CargoTypeOverride : M_Definition->Cargo.CargoType;
 	}
 	const FConvoyGuardTier* Tier = M_Definition->GetGuardTier(M_Params.GuardTierIndex);
 	if (Tier == nullptr)
@@ -78,6 +80,7 @@ void AConvoy::AddMember(const EConvoyUnitRole MemberRole, const EConvoyStation S
 	Member.Role = MemberRole;
 	Member.Station = Station;
 	Member.UnitName = UnitName;
+	Member.CargoType = M_Definition->Cargo.CargoType;
 }
 
 float AConvoy::GetTruckColumnLength() const
@@ -85,7 +88,8 @@ float AConvoy::GetTruckColumnLength() const
 	int32 TruckCount = 0;
 	for (const FConvoyMember& Member : M_Members)
 	{
-		const bool bCounts = Member.Role == EConvoyUnitRole::Truck
+		// Branch trucks left the column; they no longer stretch it.
+		const bool bCounts = Member.Role == EConvoyUnitRole::Truck and not Member.GetIsOnBranch()
 			and (Member.State == EConvoyMemberState::Spawning or Member.GetIsAlive());
 		TruckCount += bCounts ? 1 : 0;
 	}
@@ -100,7 +104,7 @@ void AConvoy::AssignSlots()
 	for (FConvoyMember& Member : M_Members)
 	{
 		const bool bActive = Member.State == EConvoyMemberState::Spawning or Member.GetIsAlive();
-		if (Member.Role == EConvoyUnitRole::Truck and bActive)
+		if (Member.Role == EConvoyUnitRole::Truck and bActive and not Member.GetIsOnBranch())
 		{
 			Trucks.Add(&Member);
 		}
@@ -205,14 +209,17 @@ void AConvoy::SpawnMember(const int32 MemberIndex, const FTrainingOption& Option
 			WeakThis->OnMemberSpawned(MemberId, SpawnedActor);
 		}
 	};
+	// A convoy of a later AI player gets its units spawned for that player; the human's and the first AI player's
+	// keep the owner of their Blueprint (a mismatch is logged in SetupSpawnedMember).
+	const int32 OwningPlayerOverride = FRTSUnitOwnerSpawning::GetOwnerOverrideForAIPlayer(M_Params.OwningPlayer);
 	bool bRequested = false;
 	if (IsValid(Spawner))
 	{
 		bRequested = ExactClass.IsNull()
 			             ? Spawner->AsyncSpawnOptionAtLocation(Option, SpawnLocation, this, MemberId, OnSpawned,
-			                                                   SpawnRotation)
+			                                                   SpawnRotation, OwningPlayerOverride)
 			             : Spawner->AsyncSpawnClassAtLocation(ExactClass, Option, SpawnLocation, this, MemberId,
-			                                                  OnSpawned, SpawnRotation);
+			                                                  OnSpawned, SpawnRotation, OwningPlayerOverride);
 	}
 	if (not bRequested)
 	{

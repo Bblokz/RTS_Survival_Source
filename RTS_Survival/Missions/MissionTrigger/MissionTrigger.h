@@ -14,7 +14,11 @@ enum class EMissionTriggerType : uint8
 {
     None        UMETA(DisplayName = "None"),
     KillActors  UMETA(DisplayName = "Kill Actors"),
-    MissionClassCompleted UMETA(DisplayName = "Mission Class Completed")
+    MissionClassCompleted UMETA(DisplayName = "Mission Class Completed"),
+    // A player unit came near a place (e.g. UForgeStationSightedTrigger).
+    PlayerUnitsNear UMETA(DisplayName = "Player Units Near"),
+    // An enemy unit started to flee to its rally point (UEnemyFleeingMissionTrigger, UEnemyFallbackSubsystem).
+    EnemyFleeing UMETA(DisplayName = "Enemy Fleeing")
 };
 
 UCLASS(Abstract, Blueprintable, EditInlineNew)

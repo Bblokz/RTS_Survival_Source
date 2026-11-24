@@ -42,6 +42,14 @@ class UW_Archive: public UUserWidget
 
 public:
 	void AddArchiveItem(const ERTSArchiveItem NewItem, const FTrainingOption OptionalUnit = FTrainingOption(), const int32 SortingPriority = 0);
+
+	/**
+	 * @brief Adds an entry that brings its own text and picture (ERTSArchiveItem::CustomContent).
+	 * @param Content The entry; ignored when an entry with the same Key is already in the archive.
+	 * @param SortingPriority Higher sorts first within its category.
+	 * @return False when it was already in the archive or could not be created.
+	 */
+	bool AddCustomArchiveItem(const FArchiveCustomContent& Content, const int32 SortingPriority = 0);
 	void SetMainGameUIReference(UMainGameUI* MainGameUI);
 	void SetWorldMenuUIReference(UW_WorldMenu* WorldMenu);
 	void OnOpenArchive();
@@ -99,6 +107,12 @@ private:
 
 	bool IsArchiveItemAlreadyInList(
 		ERTSArchiveItem Item);
+
+	bool IsCustomArchiveItemAlreadyInList(const FName CustomContentKey) const;
+
+	// Adds a set up item widget to the scroll box and the sorted list.
+	void AddSetupItemToScrollBox(UW_ArchiveItem* ArchiveItemWidget, const ERTSArchiveType SortingType,
+	                             const int32 SortingPriority);
 
 	void OnItemAlreadyInList() const;
 	void OnItemInvalid()const;

@@ -8,7 +8,9 @@
 #include "Components/StaticMeshComponent.h"
 #include "GeometryCollection/GeometryCollectionComponent.h"
 #include "RTS_Survival/DeveloperSettings.h"
+#include "RTS_Survival/Game/Players/RTSPlayers.h"
 #include "RTS_Survival/RTSCollisionTraceChannels.h"
+#include "RTS_Survival/Utils/CollisionSetup/RTSPlayerCollision.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 
 
@@ -31,9 +33,7 @@ void FRTS_CollisionSetup::SetupShieldCollision(UStaticMeshComponent* ShieldMesh,
 	ShieldMesh->SetCollisionObjectType(ECC_WorldDynamic);
 	ShieldMesh->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
 	ShieldMesh->SetCollisionResponseToAllChannels(ECR_Ignore);
-	ShieldMesh->SetCollisionResponseToChannel(
-		OwningPlayer == 1 ? COLLISION_TRACE_PLAYER : COLLISION_TRACE_ENEMY,
-		ECR_Block);
+	FRTSPlayerCollision::SetWeaponHitResponses(ShieldMesh, OwningPlayer);
 	ShieldMesh->SetGenerateOverlapEvents(false);
 	ShieldMesh->SetCanEverAffectNavigation(false);
 	ShieldMesh->SetSimulatePhysics(false);
@@ -64,11 +64,9 @@ void FRTS_CollisionSetup::SetupAircraftComponentCollision(UPrimitiveComponent* A
 	{
 		return;
 	}
-	const bool bIsPlayerAircraft = OwningPlayer == 1;
-	AircraftComponent->SetCollisionObjectType(bIsPlayerAircraft ? COLLISION_OBJ_PLAYER : COLLISION_OBJ_ENEMY);
-	// Traces and projectiles of the other side hit the aircraft; those of its own side fly through it.
-	AircraftComponent->SetCollisionResponseToChannel(bIsPlayerAircraft ? COLLISION_TRACE_PLAYER : COLLISION_TRACE_ENEMY,
-	                                                 ECR_Block);
+	AircraftComponent->SetCollisionObjectType(FRTSPlayerCollision::GetOwnerObjectChannel(OwningPlayer));
+	// Traces and projectiles of hostile players hit the aircraft; those of its own player and allies fly through it.
+	FRTSPlayerCollision::SetWeaponHitResponses(AircraftComponent, OwningPlayer);
 }
 
 void FRTS_CollisionSetup::ForceBuildingPlacementResponseOnActor(
@@ -78,6 +76,33 @@ void FRTS_CollisionSetup::ForceBuildingPlacementResponseOnActor(
 {
 	TSet<const AActor*> Visited;
 	ForceBuildingPlacementResponse_Internal(Actor, Response, Visited, bRecurseAttachedActors);
+}
+
+void FRTS_CollisionSetup::SetupVehicleMovementMeshCollision(UMeshComponent* MovementMesh, const int32 OwningPlayer)
+{
+	if (FRTSPlayers::IsHumanPlayer(OwningPlayer))
+	{
+		SetupPlayerVehicleMovementMeshCollision(MovementMesh);
+	}
+	else
+	{
+		SetupEnemyVehicleMovementMeshCollision(MovementMesh);
+	}
+	// Weapons do not hit the chassis but area queries do; the owner bit tells them whose vehicle it is.
+	FRTSPlayerCollision::SetOwnerMaskFilter(MovementMesh, OwningPlayer);
+}
+
+void FRTS_CollisionSetup::SetupNomadicMovementMeshCollision(UMeshComponent* MovementMesh, const int32 OwningPlayer)
+{
+	if (FRTSPlayers::IsHumanPlayer(OwningPlayer))
+	{
+		SetupNomadicMvtPlayer(MovementMesh);
+	}
+	else
+	{
+		SetupNomadicMvtEnemy(MovementMesh);
+	}
+	FRTSPlayerCollision::SetOwnerMaskFilter(MovementMesh, OwningPlayer);
 }
 
 void FRTS_CollisionSetup::SetupPlayerVehicleMovementMeshCollision(UMeshComponent* MovementMesh)
@@ -127,7 +152,7 @@ void FRTS_CollisionSetup::SetupVehicleHullBlockerCollision(UBoxComponent* HullBl
 		return;
 	}
 
-	const bool bIsPlayerVehicle = OwningPlayer == 1;
+	const bool bIsPlayerVehicle = FRTSPlayers::IsHumanPlayer(OwningPlayer);
 	const ECollisionChannel OwnSideHullChannel = bIsPlayerVehicle ? ECC_Vehicle : COLLISION_OBJ_ENEMY_HULL;
 	const ECollisionChannel OtherSideHullChannel = bIsPlayerVehicle ? COLLISION_OBJ_ENEMY_HULL : ECC_Vehicle;
 	HullBlocker->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
@@ -152,21 +177,13 @@ void FRTS_CollisionSetup::SetupHarvesterMovementMeshCollision(UMeshComponent* Mo
 			"\n see FRTS_CollisionSetup::SetupHarvesterMovementMeshCollision");
 		return;
 	}
-	const bool bIsPlayerHarvester = OwningPlayer == 1;
-	if (bIsPlayerHarvester)
-	{
-		SetupPlayerVehicleMovementMeshCollision(MovementMesh);
-	}
-	else
-	{
-		SetupEnemyVehicleMovementMeshCollision(MovementMesh);
-	}
+	SetupVehicleMovementMeshCollision(MovementMesh, OwningPlayer);
 	// Allied chassis and soldiers are on the object channel of the own side. Overlap instead of block: the chassis
 	// drive through each other while soldiers keep getting the overlap that makes them step aside.
 	constexpr ECollisionResponse ResponseToAlliedVehicle =
 		DeveloperSettings::GamePlay::Formation::LetHarvestersCollideWithAllies ? ECR_Block : ECR_Overlap;
 	MovementMesh->SetCollisionResponseToChannel(
-		bIsPlayerHarvester ? COLLISION_OBJ_PLAYER : COLLISION_OBJ_ENEMY,
+		FRTSPlayerCollision::GetOwnerObjectChannel(OwningPlayer),
 		ResponseToAlliedVehicle);
 }
 
@@ -314,55 +331,30 @@ void FRTS_CollisionSetup::SetupEnemyVehicleMovementMeshCollision(UMeshComponent*
 		"\n see RTSFunctionLibrary::SetupEnemyVehicleMovementMeshCollision");
 }
 
-void FRTS_CollisionSetup::SetupPlayerArmorMeshCollision(UBoxComponent* ArmorMesh)
+void FRTS_CollisionSetup::SetupArmorMeshCollision(UBoxComponent* ArmorMesh, const int32 OwningPlayer)
 {
-	if (IsValid(ArmorMesh))
+	if (not IsValid(ArmorMesh))
 	{
-		ArmorMesh->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
-		ArmorMesh->SetCollisionObjectType(COLLISION_OBJ_PLAYER);
-		ArmorMesh->SetCollisionResponseToAllChannels(ECR_Ignore);
-
-		ArmorMesh->SetReceivesDecals(false);
-
-		ArmorMesh->SetGenerateOverlapEvents(true);
-		// Set block on armor and overlap on projectile.
-		// like here: https://dev.epicgames.com/documentation/en-us/unreal-engine/collision-in-unreal-engine---overview?application_version=5.3
-		ArmorMesh->SetCollisionResponseToChannel(COLLISION_OBJ_PROJECTILE, ECR_Block);
-
-		// Make sure traces can hit this armor.
-		ArmorMesh->SetCollisionResponseToChannel(COLLISION_TRACE_PLAYER, ECR_Block);
-
-		// For general traces.
-		ArmorMesh->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
+		RTSFunctionLibrary::ReportError("Invalid Armor Mesh for Armor Collision Setup."
+			"\n see FRTS_CollisionSetup::SetupArmorMeshCollision");
 		return;
 	}
-	RTSFunctionLibrary::ReportError("Invalid Armor Mesh for Player Armor Collision Setup."
-		"\n see RTSFunctionLibrary::SetupPlayerArmorMeshCollision");
-}
+	ArmorMesh->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+	ArmorMesh->SetCollisionObjectType(FRTSPlayerCollision::GetOwnerObjectChannel(OwningPlayer));
+	ArmorMesh->SetCollisionResponseToAllChannels(ECR_Ignore);
 
-void FRTS_CollisionSetup::SetupEnemyArmorMeshCollision(UBoxComponent* ArmorMesh)
-{
-	if (IsValid(ArmorMesh))
-	{
-		ArmorMesh->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
-		ArmorMesh->SetCollisionObjectType(COLLISION_OBJ_ENEMY);
-		ArmorMesh->SetCollisionResponseToAllChannels(ECR_Ignore);
-		ArmorMesh->SetReceivesDecals(false);
-		// Make sure this mesh does not interact with weapons.
-		ArmorMesh->SetGenerateOverlapEvents(true);
-		// Set block on armor and overlap on projectile.
-		// like here: https://dev.epicgames.com/documentation/en-us/unreal-engine/collision-in-unreal-engine---overview?application_version=5.3
-		ArmorMesh->SetCollisionResponseToChannel(COLLISION_OBJ_PROJECTILE, ECR_Block);
+	ArmorMesh->SetReceivesDecals(false);
 
-		// Make sure traces can hit this armor.
-		ArmorMesh->SetCollisionResponseToChannel(COLLISION_TRACE_ENEMY, ECR_Block);
+	ArmorMesh->SetGenerateOverlapEvents(true);
+	// Set block on armor and overlap on projectile.
+	// like here: https://dev.epicgames.com/documentation/en-us/unreal-engine/collision-in-unreal-engine---overview?application_version=5.3
+	ArmorMesh->SetCollisionResponseToChannel(COLLISION_OBJ_PROJECTILE, ECR_Block);
 
-		// For general traces.
-		ArmorMesh->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
-		return;
-	}
-	RTSFunctionLibrary::ReportError("Invalid Armor Mesh for Enemy Armor Collision Setup."
-		"\n see RTSFunctionLibrary::SetupEnemyArmorMeshCollision");
+	// Make sure the traces of hostile players can hit this armor.
+	FRTSPlayerCollision::SetWeaponHitResponses(ArmorMesh, OwningPlayer);
+
+	// For general traces.
+	ArmorMesh->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
 }
 
 void FRTS_CollisionSetup::SetupArmorCalculationMeshCollision(UMeshComponent* ArmorMesh, const uint8 OwningPlayer,
@@ -374,33 +366,26 @@ void FRTS_CollisionSetup::SetupArmorCalculationMeshCollision(UMeshComponent* Arm
 		return;
 	}
 	ArmorMesh->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
-	ArmorMesh->SetCollisionObjectType(OwningPlayer == 1 ? COLLISION_OBJ_PLAYER : COLLISION_OBJ_ENEMY);
+	ArmorMesh->SetCollisionObjectType(FRTSPlayerCollision::GetOwnerObjectChannel(OwningPlayer));
 	ArmorMesh->SetCollisionResponseToAllChannels(ECR_Ignore);
 	ArmorMesh->SetReceivesDecals(false);
 
 	// Make sure we can query with visibility.
 	ArmorMesh->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
 
-	// if this is owned by player 1 make sure Player traces hit otherwise enemy traces will be set to hit.
-	if (OwningPlayer == 1)
-	{
-		ArmorMesh->SetCollisionResponseToChannel(COLLISION_TRACE_PLAYER, ECR_Block);
-	}
-	else
-	{
-		ArmorMesh->SetCollisionResponseToChannel(COLLISION_TRACE_ENEMY, ECR_Block);
-	}
+	// The traces of players hostile to the owner hit the armor; its own and allied traces pass through.
+	FRTSPlayerCollision::SetWeaponHitResponses(ArmorMesh, OwningPlayer);
 
 	// Overlap with building previews.
 	const ECollisionResponse ResponseToBuildingPlacement =
-		OwningPlayer == 1 ? ECR_Ignore : ECR_Overlap;
+		FRTSPlayers::IsHumanPlayer(OwningPlayer) ? ECR_Ignore : ECR_Overlap;
 	ArmorMesh->SetCollisionResponseToChannel(COLLISION_OBJ_BUILDING_PLACEMENT, ResponseToBuildingPlacement);
 	// Overlap with triggers.
 	ArmorMesh->SetCollisionResponseToChannel(ECC_WorldDynamic, ECR_Overlap);
 	ArmorMesh->SetCanEverAffectNavigation(bAffectNavMesh);
 }
 
-void FRTS_CollisionSetup::SetupCollisionForMeshAttachedToTracks(UMeshComponent* MeshComponent, bool bIsPlayer1)
+void FRTS_CollisionSetup::SetupTrackAttachedMeshCollision(UMeshComponent* MeshComponent, const int32 OwningPlayer)
 {
 	if (IsValid(MeshComponent))
 	{
@@ -408,24 +393,26 @@ void FRTS_CollisionSetup::SetupCollisionForMeshAttachedToTracks(UMeshComponent* 
 		MeshComponent->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
 		MeshComponent->SetReceivesDecals(false);
 		MeshComponent->SetGenerateOverlapEvents(true);
-		const ECollisionChannel MyCollisionChannel = bIsPlayer1 ? COLLISION_OBJ_PLAYER : COLLISION_OBJ_ENEMY;
-		MeshComponent->SetCollisionObjectType(MyCollisionChannel);
+		MeshComponent->SetCollisionObjectType(FRTSPlayerCollision::GetOwnerObjectChannel(OwningPlayer));
 		MeshComponent->SetCollisionResponseToAllChannels(ECR_Ignore);
 		// Only react to visibility traces.
 		MeshComponent->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
-		SetupCollisionWithBuildingPreview_ForOwningPlayer(MeshComponent, bIsPlayer1);
+		SetupCollisionWithBuildingPreview_ForOwningPlayer(MeshComponent, OwningPlayer);
 
 		//  Do not block destructible actors; overlap them to drive crush logic
 		MeshComponent->SetCollisionResponseToChannel(ECC_Destructible, ECR_Overlap);
+		// Weapons pass through but area queries find the mesh on its object channel; the bit tells them whose it is.
+		FRTSPlayerCollision::SetOwnerMaskFilter(MeshComponent, OwningPlayer);
 		return;
 	}
 	RTSFunctionLibrary::ReportError("Invalid Mesh Component for Track Collision Setup."
-		"\n see RTSFunctionLibrary::SetupCollisionForMeshAttachedToTracks");
+		"\n see FRTS_CollisionSetup::SetupTrackAttachedMeshCollision");
 }
 
-void FRTS_CollisionSetup::SetupCollisionForTrainMeshes(const TArray<UMeshComponent*>& MeshComponents, bool bIsPlayer1)
+void FRTS_CollisionSetup::SetupTrainMeshesCollision(const TArray<UMeshComponent*>& MeshComponents,
+                                                    const int32 OwningPlayer)
 {
-	const ECollisionChannel MyCollisionChannel = bIsPlayer1 ? COLLISION_OBJ_PLAYER : COLLISION_OBJ_ENEMY;
+	const ECollisionChannel MyCollisionChannel = FRTSPlayerCollision::GetOwnerObjectChannel(OwningPlayer);
 	for (UMeshComponent* MeshComponent : MeshComponents)
 	{
 		if (not IsValid(MeshComponent))
@@ -433,31 +420,24 @@ void FRTS_CollisionSetup::SetupCollisionForTrainMeshes(const TArray<UMeshCompone
 			continue;
 		}
 
-		
+
 		MeshComponent->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
 		MeshComponent->SetReceivesDecals(false);
 		MeshComponent->SetGenerateOverlapEvents(false);
 		MeshComponent->SetCollisionObjectType(MyCollisionChannel);
 		MeshComponent->SetCollisionResponseToAllChannels(ECR_Ignore);
 		MeshComponent->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
-		SetupCollisionWithBuildingPreview_ForOwningPlayer(MeshComponent, bIsPlayer1);
+		SetupCollisionWithBuildingPreview_ForOwningPlayer(MeshComponent, OwningPlayer);
 		MeshComponent->SetCollisionResponseToChannel(ECC_Destructible, ECR_Overlap);
-		if (bIsPlayer1 == 1)
-		{
-			MeshComponent->SetCollisionResponseToChannel(COLLISION_TRACE_PLAYER, ECR_Block);
-		}
-		else
-		{
-			MeshComponent->SetCollisionResponseToChannel(COLLISION_TRACE_ENEMY, ECR_Block);
-		}
+		FRTSPlayerCollision::SetWeaponHitResponses(MeshComponent, OwningPlayer);
 	}
 }
 
-void FRTS_CollisionSetup::SetupCollisionForNomadicMount(UMeshComponent* MeshComponent, const bool bOwnedByPlayer1)
+void FRTS_CollisionSetup::SetupNomadicMountCollision(UMeshComponent* MeshComponent, const int32 OwningPlayer)
 {
 	if (!IsValid(MeshComponent))
 	{
-		RTSFunctionLibrary::ReportError("Meshcomponent is not valid: SetupCollisionForNomadicMount");
+		RTSFunctionLibrary::ReportError("Meshcomponent is not valid: SetupNomadicMountCollision");
 		return;
 	}
 
@@ -469,23 +449,22 @@ void FRTS_CollisionSetup::SetupCollisionForNomadicMount(UMeshComponent* MeshComp
 	MeshComponent->SetGenerateOverlapEvents(true);
 	MeshComponent->SetCanEverAffectNavigation(false);
 
-	const ECollisionChannel Obj = bOwnedByPlayer1 ? COLLISION_OBJ_PLAYER : COLLISION_OBJ_ENEMY;
-	MeshComponent->SetCollisionObjectType(Obj);
+	const bool bOwnedByHuman = FRTSPlayers::IsHumanPlayer(OwningPlayer);
+	const ECollisionChannel OwnSideObjectChannel = FRTSPlayerCollision::GetOwnerObjectChannel(OwningPlayer);
+	MeshComponent->SetCollisionObjectType(OwnSideObjectChannel);
 
 	MeshComponent->SetCollisionResponseToAllChannels(ECR_Ignore);
 
-	// Block enemy vehicles.
+	// Block the vehicles of the other side.
 	MeshComponent->SetCollisionResponseToChannel(
-		bOwnedByPlayer1 ? COLLISION_OBJ_ENEMY : COLLISION_OBJ_PLAYER, ECR_Block);
-	// Overlap allied vehicles.
-	const ECollisionChannel AllyObj = bOwnedByPlayer1 ? COLLISION_OBJ_PLAYER : COLLISION_OBJ_ENEMY;
-	MeshComponent->SetCollisionResponseToChannel(AllyObj, ECR_Overlap);
+		bOwnedByHuman ? COLLISION_OBJ_ENEMY : COLLISION_OBJ_PLAYER, ECR_Block);
+	// Overlap the vehicles of the own side.
+	MeshComponent->SetCollisionResponseToChannel(OwnSideObjectChannel, ECR_Overlap);
 
 	MeshComponent->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
 
-	// BlockWeapons. 
-	MeshComponent->SetCollisionResponseToChannel(
-		bOwnedByPlayer1 ? COLLISION_TRACE_PLAYER : COLLISION_TRACE_ENEMY, ECR_Block);
+	// BlockWeapons.
+	FRTSPlayerCollision::SetWeaponHitResponses(MeshComponent, OwningPlayer);
 
 	//  Do not block destructible actors; overlap them to drive crush logic
 	MeshComponent->SetCollisionResponseToChannel(ECC_Destructible, ECR_Overlap);
@@ -527,9 +506,7 @@ void FRTS_CollisionSetup::SetupCollisionForTeamWeaponMeshes(const TArray<UMeshCo
 		WeaponMesh->SetCollisionResponseToChannel(COLLISION_OBJ_BUILDING_PLACEMENT, ECR_Overlap);
 		WeaponMesh->SetCollisionResponseToChannel(ECC_Camera, ECR_Block);
 
-		const ECollisionChannel CollisionChannelToBlock =
-			OwningPlayer != 1 ? COLLISION_TRACE_ENEMY : COLLISION_TRACE_PLAYER;
-		WeaponMesh->SetCollisionResponseToChannel(CollisionChannelToBlock, ECR_Block);
+		FRTSPlayerCollision::SetWeaponHitResponses(WeaponMesh, OwningPlayer);
 	}
 }
 
@@ -543,6 +520,7 @@ void FRTS_CollisionSetup::SetupInfantryWeaponCollision(UStaticMeshComponent* Wea
 		// no overlap and do not affect navigation.
 		WeaponMesh->SetGenerateOverlapEvents(false);
 		WeaponMesh->SetCanEverAffectNavigation(false);
+		WeaponMesh->SetReceivesDecals(false);
 		return;
 	}
 	RTSFunctionLibrary::ReportError("Invalid Weapon Mesh for Infantry Weapon Collision Setup."
@@ -554,24 +532,17 @@ void FRTS_CollisionSetup::SetupInfantryCapsuleCollision(UCapsuleComponent* Capsu
 	if (IsValid(CapsuleComponent))
 	{
 		CapsuleComponent->SetCollisionEnabled(ECollisionEnabled::Type::QueryOnly);
-		CapsuleComponent->SetCollisionObjectType(OwningPlayer == 1 ? COLLISION_OBJ_PLAYER : COLLISION_OBJ_ENEMY);
+		const ECollisionChannel OwnSideObjectChannel = FRTSPlayerCollision::GetOwnerObjectChannel(OwningPlayer);
+		CapsuleComponent->SetCollisionObjectType(OwnSideObjectChannel);
 		CapsuleComponent->SetCollisionResponseToAllChannels(ECR_Ignore);
 		// Generate events for triggers and evasion.
 		CapsuleComponent->SetGenerateOverlapEvents(true);
 		// Make sure traces can hit this capsule.
 		CapsuleComponent->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
 		// overlap player or enemy Objects depending on owner.
-		if (OwningPlayer == 1)
-		{
-			CapsuleComponent->SetCollisionResponseToChannel(COLLISION_OBJ_PLAYER, ECR_Overlap);
-		}
-		else
-		{
-			CapsuleComponent->SetCollisionResponseToChannel(COLLISION_OBJ_ENEMY, ECR_Overlap);
-		}
-		// Block the enemy weapons.
-		CapsuleComponent->SetCollisionResponseToChannel(
-			OwningPlayer == 1 ? COLLISION_TRACE_PLAYER : COLLISION_TRACE_ENEMY, ECR_Block);
+		CapsuleComponent->SetCollisionResponseToChannel(OwnSideObjectChannel, ECR_Overlap);
+		// Block the weapons of hostile players.
+		FRTSPlayerCollision::SetWeaponHitResponses(CapsuleComponent, OwningPlayer);
 		// // block world  static to not fall through floor.
 		CapsuleComponent->SetCollisionResponseToChannel(ECC_WorldStatic, ECR_Block);
 		// overlap with pickup items.
@@ -612,7 +583,7 @@ void FRTS_CollisionSetup::SetupTriggerOverlapCollision(UPrimitiveComponent* Trig
 		"\nFRTS_CollisionSetup::SetupTriggerOverlapCollision");
 }
 
-void FRTS_CollisionSetup::SetupFieldMineTriggerCollision(USphereComponent* TriggerSphere, const int32 OwningPlayer)
+void FRTS_CollisionSetup::SetupFieldMineTriggerCollision(USphereComponent* TriggerSphere)
 {
 	if (not IsValid(TriggerSphere))
 	{
@@ -626,10 +597,9 @@ void FRTS_CollisionSetup::SetupFieldMineTriggerCollision(USphereComponent* Trigg
 	TriggerSphere->SetGenerateOverlapEvents(true);
 	TriggerSphere->SetCanEverAffectNavigation(false);
 
-	const bool bOwnedByPlayerOne = OwningPlayer == 1;
-	TriggerSphere->SetCollisionResponseToChannel(
-		bOwnedByPlayerOne ? COLLISION_OBJ_ENEMY : COLLISION_OBJ_PLAYER,
-		ECR_Overlap);
+	// Both sides: the mine's overlap handler lets only units hostile to its owner set it off.
+	TriggerSphere->SetCollisionResponseToChannel(COLLISION_OBJ_PLAYER, ECR_Overlap);
+	TriggerSphere->SetCollisionResponseToChannel(COLLISION_OBJ_ENEMY, ECR_Overlap);
 }
 
 void FRTS_CollisionSetup::SetupScavengeableObjectCollision(UStaticMeshComponent* ScavengeableObjectMesh)
@@ -649,8 +619,7 @@ void FRTS_CollisionSetup::SetupScavengeableObjectCollision(UStaticMeshComponent*
 		// overlap building placement.
 		ScavengeableObjectMesh->SetCollisionResponseToChannel(COLLISION_OBJ_BUILDING_PLACEMENT, ECR_Overlap);
 		// Get hit by player and enemy traces.
-		ScavengeableObjectMesh->SetCollisionResponseToChannel(COLLISION_TRACE_PLAYER, ECR_Block);
-		ScavengeableObjectMesh->SetCollisionResponseToChannel(COLLISION_TRACE_ENEMY, ECR_Block);
+		FRTSPlayerCollision::SetWeaponHitResponsesForAllPlayers(ScavengeableObjectMesh);
 		return;
 	}
 	RTSFunctionLibrary::ReportError("Invalid Scavengeable Object Mesh for Scavengeable Object Collision Setup."
@@ -676,8 +645,7 @@ void FRTS_CollisionSetup::SetupResourceMeshCollision(UMeshComponent* ResourceMes
 	ResourceMesh->SetCollisionResponseToChannel(COLLISION_OBJ_BUILDING_PLACEMENT, ECR_Overlap);
 	ResourceMesh->SetGenerateOverlapEvents(true);
 	// Make sure it can be hit by weapons:
-	ResourceMesh->SetCollisionResponseToChannel(COLLISION_TRACE_PLAYER, ECR_Block);
-	ResourceMesh->SetCollisionResponseToChannel(COLLISION_TRACE_ENEMY, ECR_Block);
+	FRTSPlayerCollision::SetWeaponHitResponsesForAllPlayers(ResourceMesh);
 }
 
 void FRTS_CollisionSetup::SetupResourceGeometryComponentCollision(UGeometryCollectionComponent* GeometryComponent)
@@ -714,8 +682,7 @@ void FRTS_CollisionSetup::SetupDestructibleEnvActorMeshCollision(UMeshComponent*
 	DestructibleEnvActorMesh->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
 	// Block weapons.
 	DestructibleEnvActorMesh->SetCollisionResponseToChannel(COLLISION_OBJ_PROJECTILE, ECR_Block);
-	DestructibleEnvActorMesh->SetCollisionResponseToChannel(COLLISION_TRACE_ENEMY, ECR_Block);
-	DestructibleEnvActorMesh->SetCollisionResponseToChannel(COLLISION_TRACE_PLAYER, ECR_Block);
+	FRTSPlayerCollision::SetWeaponHitResponsesForAllPlayers(DestructibleEnvActorMesh);
 	if (bOverlapTanks)
 	{
 		DestructibleEnvActorMesh->SetCollisionResponseToChannel(COLLISION_OBJ_PLAYER, ECR_Overlap);
@@ -742,9 +709,8 @@ void FRTS_CollisionSetup::SetupWallActorMeshCollision(UMeshComponent* WallMesh, 
 	WallMesh->SetCollisionResponseToChannel(COLLISION_OBJ_BUILDING_PLACEMENT, ECR_Overlap);
 	// Block visibility for identifying this destructible when clicked by the player.
 	WallMesh->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
-	// Block weapons of opposite player.
-	WallMesh->SetCollisionResponseToChannel(OwningPlayer == 1 ? COLLISION_TRACE_PLAYER : COLLISION_TRACE_ENEMY,
-	                                        ECR_Block);
+	// Block the weapons of hostile players.
+	FRTSPlayerCollision::SetWeaponHitResponses(WallMesh, OwningPlayer);
 }
 
 void FRTS_CollisionSetup::SetupDestructibleEnvActorGeometryComponentCollision(
@@ -779,16 +745,15 @@ void FRTS_CollisionSetup::SetupFieldConstructionMeshCollision(UMeshComponent* Fi
 	FieldConstructionMesh->SetCollisionResponseToChannel(COLLISION_OBJ_BUILDING_PLACEMENT, ECR_Overlap);
 	// Block visibility for identifying this destructible when clicked by the player.
 	FieldConstructionMesh->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
-	// Block weapons of opposite player.
-	FieldConstructionMesh->SetCollisionResponseToChannel(
-		OwningPlayer == 1 ? COLLISION_TRACE_PLAYER : COLLISION_TRACE_ENEMY,
-		ECR_Block);
 	if (bAlliedProjectilesHitObject)
 	{
 		// Also block allied projectiles.
-		FieldConstructionMesh->SetCollisionResponseToChannel(
-			OwningPlayer == 1 ? COLLISION_TRACE_ENEMY : COLLISION_TRACE_PLAYER,
-			ECR_Block);
+		FRTSPlayerCollision::SetWeaponHitResponsesForAllPlayers(FieldConstructionMesh);
+	}
+	else
+	{
+		// Block the weapons of hostile players.
+		FRTSPlayerCollision::SetWeaponHitResponses(FieldConstructionMesh, OwningPlayer);
 	}
 	if (bOverlapTanks)
 	{
@@ -811,8 +776,7 @@ void FRTS_CollisionSetup::SetupObstacleCollision(UMeshComponent* ObstacleMesh, c
 	// Overlap with buildings.
 	ObstacleMesh->SetCollisionResponseToChannel(COLLISION_OBJ_BUILDING_PLACEMENT, ECR_Overlap);
 	const ECollisionResponse ResponseToWeaponTraces = bBlockWeapons ? ECR_Block : ECR_Ignore;
-	ObstacleMesh->SetCollisionResponseToChannel(COLLISION_TRACE_ENEMY, ResponseToWeaponTraces);
-	ObstacleMesh->SetCollisionResponseToChannel(COLLISION_TRACE_PLAYER, ResponseToWeaponTraces);
+	FRTSPlayerCollision::SetWeaponHitResponsesForAllPlayers(ObstacleMesh, ResponseToWeaponTraces);
 }
 
 void FRTS_CollisionSetup::SetupGroundEnvActorCollision(UMeshComponent* GroundEnvActorMesh, const bool bAllowBuilding,
@@ -840,6 +804,31 @@ void FRTS_CollisionSetup::SetupSplineNoCollision(UMeshComponent* SplineMesh)
 	SplineMesh->SetCollisionEnabled(ECollisionEnabled::Type::NoCollision);
 	// ignore everything.
 	SplineMesh->SetCollisionResponseToAllChannels(ECR_Ignore);
+}
+
+void FRTS_CollisionSetup::SetupVehicleRampCollision(UPrimitiveComponent* RampComponent)
+{
+	if (not IsValid(RampComponent))
+	{
+		RTSFunctionLibrary::ReportError("Invalid ramp component for vehicle ramp collision setup.");
+		return;
+	}
+	// Physics only: no trace, click or sweep ever hits the ramp, so infantry movement (sweeps), weapons and the
+	// landscape traces keep seeing the trench itself.
+	RampComponent->SetCollisionEnabled(ECollisionEnabled::PhysicsOnly);
+	// PhysicsBody: vehicle chassis block every object type but a few, infantry capsules ignore this one. Not
+	// WorldDynamic, which player chassis only overlap (triggers).
+	RampComponent->SetCollisionObjectType(ECC_PhysicsBody);
+	RampComponent->SetCollisionResponseToAllChannels(ECR_Ignore);
+	// The chassis of both sides. Chaos files an enemy chassis with its welded hull box under the hull channel (see
+	// COLLISION_OBJ_ENEMY_HULL), so that one must block too or enemy vehicles drop through the ramp.
+	RampComponent->SetCollisionResponseToChannel(COLLISION_OBJ_PLAYER, ECR_Block);
+	RampComponent->SetCollisionResponseToChannel(COLLISION_OBJ_ENEMY, ECR_Block);
+	RampComponent->SetCollisionResponseToChannel(COLLISION_OBJ_ENEMY_HULL, ECR_Block);
+	RampComponent->SetCollisionResponseToChannel(ECC_Vehicle, ECR_Block);
+	RampComponent->SetGenerateOverlapEvents(false);
+	RampComponent->SetCanEverAffectNavigation(false);
+	RampComponent->SetReceivesDecals(false);
 }
 
 void FRTS_CollisionSetup::SetupPickupCollision(UBoxComponent* PickupBox, UMeshComponent* PickupMesh)
@@ -882,11 +871,14 @@ void FRTS_CollisionSetup::UpdateGarrisonCollisionForNewOwner(const int32 NewOwni
 	{
 		return;
 	}
-	// If allied with player one then make sure to ignore traces that hit enemy as otherwise player units can hit this object.
-	const ECollisionChannel NewCollisionChannel = NewOwningPlayer == 1 ? COLLISION_TRACE_ENEMY : COLLISION_TRACE_PLAYER;
-	// Set response.
-	const ECollisionResponse ResponseToThisPlayer = bIsAllied ? ECR_Ignore : ECR_Block;
-	MeshToChangeCollisionOn->SetCollisionResponseToChannel(NewCollisionChannel, ResponseToThisPlayer);
+	// The mesh keeps blocking both weapon channels. While it is allied with a player it carries that player's owner
+	// bit, so the weapon queries of that player and its allies skip it and every other player still hits it.
+	if (bIsAllied)
+	{
+		FRTSPlayerCollision::SetOwnerMaskFilter(MeshToChangeCollisionOn, NewOwningPlayer);
+		return;
+	}
+	FRTSPlayerCollision::ClearOwnerMaskFilter(MeshToChangeCollisionOn);
 }
 
 void FRTS_CollisionSetup::SetupStaticBuildingPreviewCollision(UStaticMeshComponent* BuildingPreviewMesh,
@@ -919,10 +911,7 @@ void FRTS_CollisionSetup::SetupBuildingCollision(UStaticMeshComponent* BuildingM
 {
 	if (IsValid(BuildingMesh))
 	{
-		const ECollisionChannel BuildingCollisionChannel = OwningPlayer == 1
-			                                                   ? COLLISION_OBJ_PLAYER
-			                                                   : COLLISION_OBJ_ENEMY;
-		BuildingMesh->SetCollisionObjectType(BuildingCollisionChannel);
+		BuildingMesh->SetCollisionObjectType(FRTSPlayerCollision::GetOwnerObjectChannel(OwningPlayer));
 		BuildingMesh->SetGenerateOverlapEvents(true);
 		BuildingMesh->SetCollisionResponseToAllChannels(ECR_Ignore);
 		// Block visbility. 
@@ -931,16 +920,8 @@ void FRTS_CollisionSetup::SetupBuildingCollision(UStaticMeshComponent* BuildingM
 		BuildingMesh->SetCollisionResponseToChannel(ECC_Destructible, ECR_Block);
 		// overlap building placement.
 		BuildingMesh->SetCollisionResponseToChannel(COLLISION_OBJ_BUILDING_PLACEMENT, ECR_Overlap);
-		if (OwningPlayer == 1)
-		{
-			// block projectiles that hit player objects.
-			BuildingMesh->SetCollisionResponseToChannel(COLLISION_TRACE_PLAYER, ECR_Block);
-		}
-		else
-		{
-			// block projectiles that hit enemy objects.
-			BuildingMesh->SetCollisionResponseToChannel(COLLISION_TRACE_ENEMY, ECR_Block);
-		}
+		// block the projectiles of hostile players.
+		FRTSPlayerCollision::SetWeaponHitResponses(BuildingMesh, OwningPlayer);
 		BuildingMesh->SetReceivesDecals(false);
 		return;
 	}
@@ -966,8 +947,7 @@ void FRTS_CollisionSetup::SetupBuildingExpansionCollision(
 	BxpMesh->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
 	// Overlap with building placement to not allow building on top of other buildings.
 	BxpMesh->SetCollisionResponseToChannel(COLLISION_OBJ_BUILDING_PLACEMENT, ECR_Overlap);
-	const ECollisionChannel TraceChannelAllowHits = OwningPlayer == 1 ? COLLISION_TRACE_PLAYER : COLLISION_TRACE_ENEMY;
-	BxpMesh->SetCollisionResponseToChannel(TraceChannelAllowHits, ECR_Block);
+	FRTSPlayerCollision::SetWeaponHitResponses(BxpMesh, OwningPlayer);
 	BxpMesh->SetCanEverAffectNavigation(bAffectNavmesh);
 	BxpMesh->SetReceivesDecals(true);
 }
@@ -1022,6 +1002,7 @@ void FRTS_CollisionSetup::SetupCollisionWithBuildingPreview_ForOwningPlayer(UPri
 	{
 		return;
 	}
-	const ECollisionResponse ResponseToBuildingPlacement = OwningPlayer == 1 ? ECR_Ignore : ECR_Overlap;
+	const ECollisionResponse ResponseToBuildingPlacement =
+		FRTSPlayers::IsHumanPlayer(OwningPlayer) ? ECR_Ignore : ECR_Overlap;
 	Component->SetCollisionResponseToChannel(COLLISION_OBJ_BUILDING_PLACEMENT, ResponseToBuildingPlacement);
 }

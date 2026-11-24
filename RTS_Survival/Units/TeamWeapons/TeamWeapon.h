@@ -222,6 +222,13 @@ private:
 	TWeakObjectPtr<UDecalComponent> M_TeamWeaponDecalComponent;
 };
 
+// The RTS component of the crew (team weapon controller) the gun follows for owner changes; kept to unbind on hand-over.
+struct FTeamWeaponCrewOwnerListener
+{
+	TWeakObjectPtr<URTSComponent> CrewRTSComponent;
+	FDelegateHandle OwnerChangedHandle;
+};
+
 /**
  * @brief Team weapon actor used by team-weapon squads to manage turret weapons, health, and crew sockets.
  * @note is derived from embeddedturret for which InitEmbeddedTurret DO NOT CALL IN BP this is done in cpp internally (using settings struct).
@@ -433,6 +440,17 @@ private:
 	void BeginPlay_InitAnimInstance();
 	void BeginPlay_InitTeamWeaponCollision();
 	void BeginPlay_ForceStartPackedState();
+
+	/**
+	 * @brief The gun fights for the player of its crew: its own RTS component and mesh collision take over the
+	 * crew's owner now and whenever it changes. The turret base already moves the weapon states along.
+	 * @param NewTurretOwner Team weapon controller that now crews the gun.
+	 */
+	void FollowOwningPlayerOfCrew(const AActor& NewTurretOwner);
+	void OnCrewChangedOwningPlayer(uint8 OldOwningPlayer, uint8 NewOwningPlayer);
+	void MatchOwningPlayerOfCrew(uint8 CrewOwningPlayer);
+
+	FTeamWeaponCrewOwnerListener M_CrewOwnerListener;
 
 	UPROPERTY()
 	TWeakObjectPtr<UTeamWeaponAnimationInstance> M_AnimInstance = nullptr;

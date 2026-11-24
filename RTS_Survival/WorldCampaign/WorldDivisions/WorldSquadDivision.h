@@ -30,6 +30,7 @@ public:
 	 */
 	void SetSquadSubtypes(const TArray<ESquadSubtype>& SquadSubtypes);
 	const TArray<ESquadSubtype>& GetSquadSubtypes() const { return M_SquadSubtypes; }
+	virtual int32 GetRemainingEntryCount() const override { return M_SquadSubtypes.Num(); }
 
 protected:
 	/**

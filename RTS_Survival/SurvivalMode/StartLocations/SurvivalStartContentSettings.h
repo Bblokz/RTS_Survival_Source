@@ -25,7 +25,9 @@ enum class ESurvivalStartContentCategory : uint8
 	// The start's special: hangar, capture vehicles and stores, or its wreck cluster.
 	Special,
 	// Ground detail decals (tracks, stains, cracks) and scrap-yard props: decoration, not part of the reach checks.
-	Detail
+	Detail,
+	// Destructible cacti and cactus cover bushes in clusters round the start: decoration, not part of the reach checks.
+	Cactus
 };
 
 /**
@@ -242,6 +244,45 @@ struct FSurvivalClutterSettings
 };
 
 /**
+ * @brief Cactus clusters (destructible cacti and cactus cover bushes) in a band round the build area, so every start
+ * reads as desert. Decoration: counts are fixed and never scaled by difficulty.
+ */
+USTRUCT(BlueprintType)
+struct FSurvivalCactusSettings
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Cacti", meta = (ClampMin = "0"))
+	int32 ClusterCount = 12;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Cacti", meta = (ClampMin = "0"))
+	int32 MinCactiPerCluster = 2;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Cacti", meta = (ClampMin = "0"))
+	int32 MaxCactiPerCluster = 5;
+
+	// The cacti of one cluster stand within this radius of the cluster centre.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Cacti", meta = (ClampMin = "0.0", Units = "cm"))
+	float ClusterRadius = 1000.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Distance", meta = (ClampMin = "0.0", Units = "cm"))
+	float MinDistanceFromBuildEdge = 500.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Distance", meta = (ClampMin = "0.0", Units = "cm"))
+	float MaxDistanceFromBuildEdge = 9000.f;
+
+	// Minimum centre-to-centre distance between two cacti (also kept from all other planned content).
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Distance", meta = (ClampMin = "0.0", Units = "cm"))
+	float MinSpacing = 450.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Terrain", meta = (ClampMin = "0.0", ClampMax = "89.0", Units = "deg"))
+	float MaxGroundSlopeDegrees = 25.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Actors")
+	TArray<FSurvivalWeightedActorClass> CactusActors;
+};
+
+/**
  * @brief Single resource nodes very close to the drop-off, in a ring just outside the landing ring of the HQ,
  * harvesters and scavengers. Counts are fixed (no difficulty scaling) so the start location picker can show them.
  */
@@ -430,8 +471,8 @@ struct FSurvivalStartContentDifficultyScale
 
 /**
  * @brief What is generated around the start location the player picked: radixite and metal fields close by for
- * the harvesters, vehicle wrecks to scavenge a bit further out, capturable pits on the defense points and light
- * craters/foliage. Referenced by USurvivalModeSettings::StartContent; read by ASurvivalStartLocation.
+ * the harvesters, vehicle wrecks to scavenge a bit further out, capturable pits on the defense points, cactus clusters
+ * and light craters/foliage. Referenced by USurvivalModeSettings::StartContent; read by ASurvivalStartLocation.
  * @note The constructor fills verified project Blueprints, so a freshly created asset works out of the box.
  */
 UCLASS(BlueprintType)
@@ -472,6 +513,10 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Clutter")
 	FSurvivalClutterSettings Clutter;
+
+	// Cactus clusters round every start (decoration, no difficulty scaling).
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Cacti")
+	FSurvivalCactusSettings Cacti;
 
 	// Single resource nodes right by the drop-off (every start).
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Close Resources")
@@ -514,6 +559,7 @@ private:
 	void InitDefaultWreckGroups();
 	void InitDefaultPits();
 	void InitDefaultClutter();
+	void InitDefaultCacti();
 	void InitDefaultDifficultyScaling();
 	void InitDefaultCloseResources();
 	void InitDefaultSpecials();

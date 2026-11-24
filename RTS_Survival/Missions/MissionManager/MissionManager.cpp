@@ -11,6 +11,8 @@
 #include "NiagaraFunctionLibrary.h"
 #include "NiagaraSystem.h"
 #include "RTS_Survival/Enemy/EnemyController/EnemyController.h"
+#include "RTS_Survival/Game/Players/RTSPlayers.h"
+#include "RTS_Survival/FOWSystem/FowManager/FowManager.h"
 #include "RTS_Survival/Game/RTSGameInstance/RTSGameInstance.h"
 #include "RTS_Survival/Missions/MissionClasses/DontLoseCommanderMission/DontLoseCommanderMission.h"
 #include "RTS_Survival/Missions/MissionClasses/MissionBase/MissionBase.h"
@@ -20,8 +22,8 @@
 #include "RTS_Survival/Missions/MissionWidgets/W_Mission.h"
 #include "RTS_Survival/Missions/MissionWidgets/W_MissionTimer.h"
 #include "RTS_Survival/Missions/MissionWidgets/MissionWidgetManager/W_MissionWidgetManager.h"
-#include "RTS_Survival/Missions/Defeat/W_Defeat.h"
-#include "RTS_Survival/Missions/Victory/W_Victory.h"
+#include "RTS_Survival/Missions/MissionDebrief/MissionDebriefStage.h"
+#include "RTS_Survival/Missions/MissionDebrief/W_MissionEnd.h"
 #include "RTS_Survival/Music/RTSMusicManager/RTSMusicManager.h"
 #include "RTS_Survival/GameUI/GameDifficultyPicker/W_GameDifficultyPicker.h"
 #include "RTS_Survival/Player/AsyncRTSAssetsSpawner/RTSAsyncSpawner.h"
@@ -231,6 +233,8 @@ AMissionManager::AMissionManager()
 	PrimaryActorTick.bCanEverTick = true;
 	M_MissionTriggerVolumesManager = CreateDefaultSubobject<UMissionTriggerVolumesManager>(
 		TEXT("MissionTriggerVolumesManager"));
+	M_MissionEndWidgetClass = UW_MissionEnd::StaticClass();
+	M_DebriefStageClass = AMissionDebriefStage::StaticClass();
 }
 
 void AMissionManager::OnAnyMissionCompleted(UMissionBase* CompletedMission, const bool bPlaySound)
@@ -254,6 +258,7 @@ void AMissionManager::OnAnyMissionCompleted(UMissionBase* CompletedMission, cons
 	{
 		PlayMissionSound(EMissionSoundType::MissionCompleted);
 	}
+	NotifyActiveMissionsOfEndedMission(CompletedMission, true);
 }
 
 void AMissionManager::OnAnyMissionStarted(UMissionBase* LoadedMission)
@@ -263,9 +268,37 @@ void AMissionManager::OnAnyMissionStarted(UMissionBase* LoadedMission)
 
 void AMissionManager::OnAnyMissionFailed(UMissionBase* FailedMission)
 {
+	if (EnsureMissionIsValid(FailedMission) && IsValid(FailedMission->GetClass()))
+	{
+		M_FailedMissionClassPaths.Add(FailedMission->GetClass()->GetClassPathName());
+	}
 	RemoveAllMissionTriggerAreasForMission(FailedMission);
 	RemoveActiveMission(FailedMission);
 	PlayMissionSound(EMissionSoundType::MissionFailed);
+	NotifyActiveMissionsOfEndedMission(FailedMission, false);
+}
+
+void AMissionManager::NotifyActiveMissionsOfEndedMission(const UMissionBase* EndedMission, const bool bCompleted)
+{
+	if (not IsValid(EndedMission))
+	{
+		return;
+	}
+	// A stage may complete, fail or activate missions from its event, which changes M_ActiveMissions: use a snapshot.
+	TArray<TWeakObjectPtr<UMissionBase>> MissionsToNotify;
+	MissionsToNotify.Reserve(M_ActiveMissions.Num());
+	for (UMissionBase* ActiveMission : M_ActiveMissions)
+	{
+		MissionsToNotify.Add(ActiveMission);
+	}
+	for (const TWeakObjectPtr<UMissionBase>& MissionToNotify : MissionsToNotify)
+	{
+		if (not MissionToNotify.IsValid() || MissionToNotify.Get() == EndedMission)
+		{
+			continue;
+		}
+		MissionToNotify->OnOtherMissionEnded(EndedMission, bCompleted);
+	}
 }
 
 void AMissionManager::SetMissionDifficulty(const int32 NewDifficultyPercentage, const ERTSGameDifficulty GameDifficulty)
@@ -416,7 +449,8 @@ void AMissionManager::ExecuteGlobalAbility(UGlobalAbility* GlobalAbility, const 
 	}
 	UGlobalAbilitiesManager* AbilitiesManager = nullptr;
 	ACPPController* PlayerController = FRTS_Statics::GetRTSController(this);
-	AEnemyController* EnemyController = FRTS_Statics::GetEnemyController(this);
+	// The manager of the AI player the ability is executed for; any other owner gets the default controller's.
+	AEnemyController* EnemyController = FRTS_Statics::GetEnemyControllerForPlayer(this, OwningPlayer);
 	if (OwningPlayer == 1 && IsValid(PlayerController))
 	{
 		AbilitiesManager = PlayerController->GetGlobalAbilitiesManager();
@@ -791,6 +825,22 @@ bool AMissionManager::GetHasCompletedMissionClassExact(TSubclassOf<UMissionBase>
 	return M_CompletedMissionClassPaths.Contains(MissionClassRaw->GetClassPathName());
 }
 
+bool AMissionManager::GetHasFailedMissionClassExact(TSubclassOf<UMissionBase> MissionClass) const
+{
+	if (not MissionClass)
+	{
+		return false;
+	}
+
+	const UClass* MissionClassRaw = MissionClass.Get();
+	if (not IsValid(MissionClassRaw))
+	{
+		return false;
+	}
+
+	return M_FailedMissionClassPaths.Contains(MissionClassRaw->GetClassPathName());
+}
+
 void AMissionManager::RemoveDontLoseCommanderMission(
 	const ERemoveDontLoseCommanderPost PostRemovalAction,
 	const TSubclassOf<UMissionBase> MissionClassToActivate)
@@ -1093,10 +1143,29 @@ void AMissionManager::BeginPlay()
 {
 	Super::BeginPlay();
 	M_CompletedMissionClassPaths.Empty();
+	M_FailedMissionClassPaths.Empty();
 	BeginPlay_InitPlayerController();
 	BeginPlay_InitMissionScheduler();
 	BeginPlay_InitMissionTriggerVolumesManager();
 	BeginPlay_CheckForDifficultyOverrideWithWidget();
+	BeginPlay_InitUnexploredFogReveal();
+}
+
+void AMissionManager::BeginPlay_InitUnexploredFogReveal() const
+{
+	if (not bRevealUnexploredFog)
+	{
+		return;
+	}
+	AFowManager* const FowManager = FRTS_Statics::GetFowManager(this);
+	if (not IsValid(FowManager))
+	{
+		RTSFunctionLibrary::ReportError(
+			"Mission manager wants to reveal unexplored fog but there is no fow manager on this map."
+			"\n See function: AMissionManager::BeginPlay_InitUnexploredFogReveal");
+		return;
+	}
+	FowManager->SetUnexploredFogReveal(UnexploredFogReveal);
 }
 
 void AMissionManager::PostInitializeComponents()
@@ -1140,6 +1209,11 @@ void AMissionManager::PostInit_CheckOverrideCommander() const
 	{
 		return;
 	}
+	// The backup is for launching the map directly; a campaign operation keeps the campaign's commander.
+	if (GameInstance->GetIsCampaignOperation())
+	{
+		return;
+	}
 	GameInstance->SetPlayerCommander(PlayerFactionBackupData.PlayerCommander);
 }
 
@@ -1171,6 +1245,7 @@ void AMissionManager::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	M_TrackedEnemyActorRefCounts.Empty();
 	M_EnemyUnitDestroyedCallbacks.Empty();
 	M_CompletedMissionClassPaths.Empty();
+	M_FailedMissionClassPaths.Empty();
 
 	for (UMissionBase* Mission : M_ActiveMissions)
 	{
@@ -2151,7 +2226,7 @@ bool AMissionManager::EnsureValidSpawnCommandQueueAsyncSpawner(ARTSAsyncSpawner*
 	return false;
 }
 
-bool AMissionManager::EnsureEnemyControllerIsValid(AEnemyController* EnemyController) const
+bool AMissionManager::EnsureEnemyControllerIsValid(const AEnemyController* EnemyController) const
 {
 	if (IsValid(EnemyController))
 	{
@@ -2165,27 +2240,32 @@ bool AMissionManager::EnsureEnemyControllerIsValid(AEnemyController* EnemyContro
 TArray<AActor*> AMissionManager::GetEnemyActorsForQueryType(const EEnemyUnitQueryType EnemyUnitQueryType) const
 {
 	TArray<AActor*> EnemyActors;
-	AEnemyController* EnemyController = FRTS_Statics::GetEnemyController(this);
-	if (not EnsureEnemyControllerIsValid(EnemyController))
+	const TArray<AEnemyController*> EnemyControllers = FRTS_Statics::GetAllEnemyControllers(this);
+	if (EnemyControllers.IsEmpty())
 	{
+		(void)EnsureEnemyControllerIsValid(nullptr);
 		return EnemyActors;
 	}
 
-	if (EnemyUnitQueryType == EEnemyUnitQueryType::TrackTanks)
+	const bool bTrackTanks = EnemyUnitQueryType == EEnemyUnitQueryType::TrackTanks
+		|| EnemyUnitQueryType == EEnemyUnitQueryType::TrackTanksAndSquads;
+	const bool bTrackSquads = EnemyUnitQueryType == EEnemyUnitQueryType::TrackSquads
+		|| EnemyUnitQueryType == EEnemyUnitQueryType::TrackTanksAndSquads;
+	for (const AEnemyController* EnemyController : EnemyControllers)
 	{
-		return EnemyController->GetAllTankActorsInFormations();
-	}
-
-	if (EnemyUnitQueryType == EEnemyUnitQueryType::TrackSquads)
-	{
-		return EnemyController->GetAllSquadControllerActorsInFormations();
-	}
-
-	if (EnemyUnitQueryType == EEnemyUnitQueryType::TrackTanksAndSquads)
-	{
-		EnemyActors = EnemyController->GetAllTankActorsInFormations();
-		EnemyActors.Append(EnemyController->GetAllSquadControllerActorsInFormations());
-		return EnemyActors;
+		// The mission's enemies are the AI players the human fights; an AI player allied to the human is not tracked.
+		if (not IsValid(EnemyController) || not FRTSPlayers::IsHostileToHuman(EnemyController->GetControlledPlayer()))
+		{
+			continue;
+		}
+		if (bTrackTanks)
+		{
+			EnemyActors.Append(EnemyController->GetAllTankActorsInFormations());
+		}
+		if (bTrackSquads)
+		{
+			EnemyActors.Append(EnemyController->GetAllSquadControllerActorsInFormations());
+		}
 	}
 
 	return EnemyActors;
@@ -2636,7 +2716,23 @@ void AMissionManager::SetGameCampaignGenerationSettingsWithBackupSettingsFromPIE
 
 void AMissionManager::PropagateGameDifficultyToEnemyStrategicAI(const FRTSGameDifficulty& GameDifficulty) const
 {
-	AEnemyController* EnemyAIController = FRTS_Statics::GetEnemyController(this);
+	// Every AI player's controller plays at the mission's difficulty.
+	const TArray<AEnemyController*> EnemyAIControllers = FRTS_Statics::GetAllEnemyControllers(this);
+	if (EnemyAIControllers.IsEmpty())
+	{
+		(void)EnsureEnemyControllerIsValid(nullptr);
+		return;
+	}
+	for (const AEnemyController* EnemyAIController : EnemyAIControllers)
+	{
+		PropagateGameDifficultyToEnemyController(EnemyAIController, GameDifficulty);
+	}
+}
+
+void AMissionManager::PropagateGameDifficultyToEnemyController(
+	const AEnemyController* EnemyAIController,
+	const FRTSGameDifficulty& GameDifficulty) const
+{
 	if (not EnsureEnemyControllerIsValid(EnemyAIController))
 	{
 		return;
@@ -2656,13 +2752,20 @@ void AMissionManager::PropagateGameDifficultyToEnemyStrategicAI(const FRTSGameDi
 
 void AMissionManager::StartEnemyStrategicAIThinkingFromMission() const
 {
-	AEnemyController* EnemyAIController = FRTS_Statics::GetEnemyController(this);
-	if (not EnsureEnemyControllerIsValid(EnemyAIController))
+	// Every AI player's controller that waits for the mission trigger starts thinking.
+	const TArray<AEnemyController*> EnemyAIControllers = FRTS_Statics::GetAllEnemyControllers(this);
+	if (EnemyAIControllers.IsEmpty())
 	{
+		(void)EnsureEnemyControllerIsValid(nullptr);
 		return;
 	}
-
-	EnemyAIController->StartStrategicAIThinkingFromMission();
+	for (AEnemyController* EnemyAIController : EnemyAIControllers)
+	{
+		if (IsValid(EnemyAIController))
+		{
+			EnemyAIController->StartStrategicAIThinkingFromMission();
+		}
+	}
 }
 
 
@@ -2673,156 +2776,153 @@ void AMissionManager::TriggerDefeat(const ERTSDefeatType DefeatType)
 		RTSFunctionLibrary::ReportError("Mission manager received TriggerDefeat with Uninitialized defeat type.");
 		return;
 	}
-
-	PlayEndStateMusic(ERTSMusicType::Defeat);
-	TriggerDefeat_LockPauseAndShowWidget();
-}
-
-void AMissionManager::TriggerDefeat_LockPauseAndShowWidget()
-{
 	if (not EnsureValidPlayerController())
 	{
 		return;
 	}
-
 	PlayEndStateMusic(ERTSMusicType::Defeat);
 	M_PlayerController->PauseAndLockGame(true);
-	TriggerDefeat_ShowDefeatWidget();
-}
-
-void AMissionManager::TriggerDefeat_ShowDefeatWidget()
-{
-	if (not EnsureValidPlayerController())
-	{
-		return;
-	}
-
-	if (not M_DefeatWidget)
-	{
-		if (not GetIsValidDefeatWidgetClass())
-		{
-			return;
-		}
-
-		UW_Defeat* CreatedDefeatWidget = CreateWidget<UW_Defeat>(M_PlayerController.Get(), M_DefeatWidgetClass);
-		if (not IsValid(CreatedDefeatWidget))
-		{
-			RTSFunctionLibrary::ReportError("Mission manager failed to create defeat widget from M_DefeatWidgetClass.");
-			return;
-		}
-
-		M_DefeatWidget = CreatedDefeatWidget;
-	}
-
-	if (M_DefeatWidget->IsInViewport())
-	{
-		return;
-	}
-
-	constexpr int32 DefeatWidgetZOrder = 300;
-	M_DefeatWidget->AddToViewport(DefeatWidgetZOrder);
-}
-
-bool AMissionManager::GetIsValidDefeatWidgetClass() const
-{
-	if (M_DefeatWidgetClass)
-	{
-		return true;
-	}
-
-	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
-		this,
-		"M_DefeatWidgetClass",
-		"GetIsValidDefeatWidgetClass",
-		this
-	);
-	return false;
+	ShowMissionEnd(EMissionDebriefOutcome::Defeat, GetDefeatReasonText(DefeatType), false);
 }
 
 void AMissionManager::TriggerVictory(const bool bShowBackToMenu)
 {
-	TriggerVictory_LockPausePlayMusicAndShowWidget(bShowBackToMenu);
-}
-
-void AMissionManager::TriggerVictory_LockPausePlayMusicAndShowWidget(const bool bShowBackToMenu)
-{
 	if (not EnsureValidPlayerController())
 	{
 		return;
 	}
-
 	PlayEndStateMusic(ERTSMusicType::Victory);
-	if (not M_VictoryWidget && not GetIsValidVictoryWidgetClass())
+	if (URTSGameInstance* CampaignGameInstance = Cast<URTSGameInstance>(GetGameInstance()))
 	{
-		// Without a victory widget a paused and locked game would leave the player stuck: continue at once instead.
+		// No effect outside a campaign operation. A defeat is only reported when the player gives the mission up.
+		CampaignGameInstance->ReportWorldMissionResult(EWorldMissionOutcome::Victory);
+	}
+	if (not M_MissionEndWidget && M_MissionEndWidgetClass.LoadSynchronous() == nullptr)
+	{
+		// Without the end screen a paused and locked game would leave the player stuck: continue at once instead.
+		RTSFunctionLibrary::ReportError("Mission manager has no mission end widget class; continuing without an end screen.");
 		UGameplayStatics::OpenLevelBySoftObjectPtr(this, GetVictoryContinueLevel(), true, FString());
 		return;
 	}
 	M_PlayerController->PauseAndLockGame(true);
-	TriggerVictory_ShowVictoryWidget(bShowBackToMenu);
-}
-
-void AMissionManager::TriggerVictory_ShowVictoryWidget(const bool bShowBackToMenu)
-{
-	if (not EnsureValidPlayerController())
-	{
-		return;
-	}
-
-	// The game is already paused and locked here, so a missing level must not stop the victory widget: the player
-	// would be stuck. A missing level is still reported, and the widget falls back to the main menu map.
-	const TSoftObjectPtr<UWorld> ContinueLevel = GetVictoryContinueLevel();
 	if (bShowBackToMenu)
 	{
 		(void)GetIsValidMenuLevelToLoadOnVictory();
 	}
-	const TSoftObjectPtr<UWorld> MenuLevel = GetVictoryMenuLevelOrDefaultMap();
+	ShowMissionEnd(EMissionDebriefOutcome::Victory,
+	               NSLOCTEXT("MissionEnd", "VictoryReason", "All objectives secured"), bShowBackToMenu);
+}
 
-	if (not M_VictoryWidget)
+void AMissionManager::ShowMissionEnd(const EMissionDebriefOutcome Outcome, const FText& ReasonText,
+                                     const bool bShowBackToMenu)
+{
+	if (IsValid(M_MissionEndWidget) && M_MissionEndWidget->IsInViewport())
 	{
-		if (not GetIsValidVictoryWidgetClass())
-		{
-			return;
-		}
-
-		UW_Victory* CreatedVictoryWidget = CreateWidget<UW_Victory>(M_PlayerController.Get(), M_VictoryWidgetClass);
-		if (not IsValid(CreatedVictoryWidget))
-		{
-			RTSFunctionLibrary::ReportError("Mission manager failed to create victory widget from M_VictoryWidgetClass.");
-			return;
-		}
-
-		M_VictoryWidget = CreatedVictoryWidget;
+		// The mission already ended; a second victory or defeat call changes nothing.
+		return;
 	}
-
-	M_VictoryWidget->TriggerVictory(ContinueLevel, MenuLevel, bShowBackToMenu);
-	if (M_VictoryWidget->IsInViewport())
+	// The end screen owns the whole screen: the HUD and the mission list go away as in a cinematic.
+	M_PlayerController->OnCinematicTakeOver(true);
+	SetMissionWidgetManagerVisibility(false);
+	UW_MissionEnd* const EndWidget = ShowMissionEnd_CreateWidget(Outcome, ReasonText, bShowBackToMenu);
+	if (not IsValid(EndWidget))
 	{
 		return;
 	}
-
-	constexpr int32 VictoryWidgetZOrder = 300;
-	M_VictoryWidget->AddToViewport(VictoryWidgetZOrder);
+	if (not ShowMissionEnd_StartStage(Outcome))
+	{
+		EndWidget->SkipFadeIn();
+		EndWidget->RevealButtons();
+	}
 }
 
-bool AMissionManager::GetIsValidVictoryWidgetClass() const
+UW_MissionEnd* AMissionManager::ShowMissionEnd_CreateWidget(const EMissionDebriefOutcome Outcome,
+                                                            const FText& ReasonText, const bool bShowBackToMenu)
 {
-	if (M_VictoryWidgetClass)
+	if (not M_MissionEndWidget)
+	{
+		const TSubclassOf<UW_MissionEnd> WidgetClass = M_MissionEndWidgetClass.LoadSynchronous();
+		if (WidgetClass == nullptr)
+		{
+			RTSFunctionLibrary::ReportError("Mission manager could not load the mission end widget class.");
+			return nullptr;
+		}
+		M_MissionEndWidget = CreateWidget<UW_MissionEnd>(M_PlayerController.Get(), WidgetClass);
+		if (not IsValid(M_MissionEndWidget))
+		{
+			RTSFunctionLibrary::ReportError("Mission manager failed to create the mission end widget.");
+			return nullptr;
+		}
+	}
+	// The game is already paused and locked here, so a missing level must not stop the end screen: the player
+	// would be stuck. A missing level is still reported, and the widget falls back to the main menu map.
+	M_MissionEndWidget->SetupEndScreen(Outcome, ReasonText, GetVictoryContinueLevel(),
+	                                   GetVictoryMenuLevelOrDefaultMap(), bShowBackToMenu);
+	constexpr int32 MissionEndWidgetZOrder = 300;
+	M_MissionEndWidget->AddToViewport(MissionEndWidgetZOrder);
+	return M_MissionEndWidget;
+}
+
+bool AMissionManager::ShowMissionEnd_StartStage(const EMissionDebriefOutcome Outcome)
+{
+	UWorld* const World = GetWorld();
+	if (M_DebriefStageClass == nullptr || World == nullptr)
+	{
+		return false;
+	}
+	// High above any map: the stage is a closed room, so neither the level nor its fog reach into it.
+	const FVector StageLocation(0.0, 0.0, 250000.0);
+	FActorSpawnParameters SpawnParameters;
+	SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	M_DebriefStage = World->SpawnActor<AMissionDebriefStage>(M_DebriefStageClass, StageLocation, FRotator::ZeroRotator,
+	                                                        SpawnParameters);
+	if (not IsValid(M_DebriefStage))
+	{
+		RTSFunctionLibrary::ReportError("Mission manager could not spawn the mission debrief stage.");
+		return false;
+	}
+	M_DebriefStage->OnButtonsDue.BindUObject(this, &AMissionManager::HandleDebriefButtonsDue);
+	if (M_DebriefStage->StartDebrief(Outcome, M_PlayerController.Get()))
 	{
 		return true;
 	}
-
-	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
-		this,
-		"M_VictoryWidgetClass",
-		"GetIsValidVictoryWidgetClass",
-		this
-	);
+	M_DebriefStage->Destroy();
+	M_DebriefStage = nullptr;
 	return false;
+}
+
+void AMissionManager::HandleDebriefButtonsDue()
+{
+	if (not IsValid(M_MissionEndWidget))
+	{
+		return;
+	}
+	M_MissionEndWidget->RevealButtons();
+}
+
+FText AMissionManager::GetDefeatReasonText(const ERTSDefeatType DefeatType)
+{
+	switch (DefeatType)
+	{
+	case ERTSDefeatType::LostHQ:
+		return NSLOCTEXT("MissionEnd", "LostHQ", "Headquarters destroyed");
+	case ERTSDefeatType::LostCommandVehicle:
+		return NSLOCTEXT("MissionEnd", "LostCommandVehicle", "Command vehicle lost");
+	case ERTSDefeatType::LostMainObjective:
+		return NSLOCTEXT("MissionEnd", "LostMainObjective", "Main objective failed");
+	default:
+		return NSLOCTEXT("MissionEnd", "Defeated", "The mission was lost");
+	}
 }
 
 TSoftObjectPtr<UWorld> AMissionManager::GetVictoryContinueLevel() const
 {
+	// A campaign operation always returns to the world map, whatever this map was set up to continue to.
+	const URTSGameInstance* CampaignGameInstance = Cast<URTSGameInstance>(GetGameInstance());
+	if (IsValid(CampaignGameInstance) && CampaignGameInstance->GetIsCampaignOperation())
+	{
+		return URTSGameInstance::GetWorldCampaignMap();
+	}
 	return GetIsValidMapToLoadOnContinueVictory() ? M_MapToLoadOnContinueVictory : GetVictoryMenuLevelOrDefaultMap();
 }
 

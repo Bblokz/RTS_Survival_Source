@@ -11,7 +11,6 @@
 
 class UW_ItemBuildingExpansion;
 class UW_HotKey;
-class URTSHotkeyProviderSubsystem;
 enum class EActionUINomadicButton : uint8;
 class UW_BottomCenterUI;
 class ACPPController;
@@ -50,6 +49,13 @@ public:
 	
 	void SimulateClickNomadicExpandButton();
 	void SimulateClickBuildingExpansion(const int32 Index);
+
+	/**
+	 * @brief Hotkey entry point: clicks the bxp item only when the player could click it with the mouse.
+	 * @param Index Zero-based bxp item slot (IA_BuildingExpansion1 = 0).
+	 * @return True when the item was clicked.
+	 */
+	bool TryActivateBuildingExpansionFromHotkey(const int32 Index) const;
 
 
 	TArray<UW_ItemBuildingExpansion*> GetBxpItems() const;
@@ -93,7 +99,6 @@ protected:
 	void OnClickedCancelVehicleConversionButton();
 
 	virtual void NativeConstruct() override;
-	virtual void NativeDestruct() override;
 
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
 	TObjectPtr<UW_HotKey> M_Hotkey_NomadicExpansion = nullptr;
@@ -104,20 +109,9 @@ private:
 	bool GetIsValidConvertToVehicleButton() const;
 	bool GetIsValidCancelVehicleConversionButton() const;
 	bool GetIsValidNomadicExpansionHotkey() const;
-	bool GetIsValidHotkeyProviderSubsystem() const;
-	void CacheHotkeyProviderSubsystem();
-	void BindHotkeyUpdateDelegate();
-	void UnbindHotkeyUpdateDelegate();
-	void UpdateNomadicExpansionHotkey();
-	void HandleChordedActionHotkeyUpdated(const FName ActionName, const FText& HotkeyText);
 
 	UPROPERTY()
 	TArray<UW_ItemBuildingExpansion*> M_BxpItems;
-
-	UPROPERTY()
-	TWeakObjectPtr<URTSHotkeyProviderSubsystem> M_HotkeyProviderSubsystem;
 	
 	EActionUINomadicButton M_LastBuildingButtonState;
-
-	FDelegateHandle M_ChordedActionHotkeyHandle;
 };

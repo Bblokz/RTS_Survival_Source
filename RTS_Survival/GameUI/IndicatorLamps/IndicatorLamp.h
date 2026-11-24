@@ -31,6 +31,17 @@ struct FIndicatorLamp
 	UImage* Build(UWidgetTree& WidgetTree, UMaterialInterface* LampMaterial, const float LampSize,
 	              const bool bHideWhenOff);
 
+	/**
+	 * @brief Builds the halo that lights the panel around the lamp: an M_UI_IndicatorLampHalo instance that copies the
+	 * lamp's colour and blink, so it pulses in step. Place it under the lamp, in the same slot alignment and padding;
+	 * a render transform scales it up, so it never moves the layout. Call after Build.
+	 * @param WidgetTree Tree of the widget that holds the lamp.
+	 * @param HaloMaterial M_UI_IndicatorLampHalo (or an instance of it).
+	 * @param HaloScale Edge of the halo over the edge of the lamp.
+	 * @return The halo image to place, or nullptr when the lamp or the halo material is missing.
+	 */
+	UImage* BuildHalo(UWidgetTree& WidgetTree, UMaterialInterface* HaloMaterial, const float HaloScale);
+
 	void SetIsLit(const bool bIsLit);
 
 	/** Ramps the lamp's power towards lit or dark. */
@@ -43,11 +54,18 @@ private:
 	UPROPERTY()
 	TObjectPtr<UMaterialInstanceDynamic> M_Material;
 
+	UPROPERTY()
+	TObjectPtr<UImage> M_HaloImage;
+
+	UPROPERTY()
+	TObjectPtr<UMaterialInstanceDynamic> M_HaloMaterial;
+
 	float M_Power = 0.f;
 	bool bM_IsLit = false;
 	bool bM_HideWhenOff = false;
 
 	void ApplyPower() const;
+	void CopyLampLookToHalo() const;
 
 	// Silent on purpose: a lamp with no material configured is simply not built, which is not an error.
 	bool GetIsBuilt() const;

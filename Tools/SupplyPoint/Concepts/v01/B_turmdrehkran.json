@@ -1,0 +1,456 @@
+{
+ "key": "B_turmdrehkran",
+ "title": "B  Turmdrehkran: tower crane over a fan of three bays",
+ "notes": [
+  "Shallow V pull-through in front: in from the back-left, straight past the crane, out to the back-right. No reversing.",
+  "Truck parks at x 1.25, y -3.3, heading 0 deg (one stop for all three loads).",
+  "Crane: hammerhead tower crane at x 0, y 2.2. Slew (360 deg) + trolley along the jib (2.5-6.6 m) + hoist.",
+  "All three bed gaps are 5.5-5.6 m from the tower: slew picks the slot, the trolley stays nearly at one radius.",
+  "Stocks in a fan of three timber bays opening toward the tower: radixite left, metal behind, parts right.",
+  "Animated: flag rise; slew to a bay, trolley in, hook down, lift, slew to the bed, lower; bay fill levels step down.",
+  "Most readable \"crane\" silhouette; it is also the tallest (8.4 m head) under the progress bar.",
+  "BP points: approach (-11, 1.5), park (1.25, -3.3) +x, exit (13.5, 1.5). Flag pole (-5.6, 7.4), 6.0 m travel.",
+  "Aims at the real bed: slew + trolley absorb a 2 m stop error if the jib grows to about 7.5 m. Bar offset 10.5 m."
+ ],
+ "subtitle": "Opel Blitz (real mesh) + soldier for scale  |  site 15 x 14 m, tower head 8.4 m, flag 8 m",
+ "footprint": [
+  12.1,
+  13.1
+ ],
+ "height": 8.4,
+ "mast_height": 8.5,
+ "views": {
+  "rts": {
+   "file": "B_turmdrehkran_rts.png",
+   "size": [
+    1600,
+    1100
+   ],
+   "px_per_m": 61.81818181818182,
+   "caption": null,
+   "labels": [
+    {
+     "text": "Truck in",
+     "kind": "lane",
+     "xy": [
+      396.8,
+      632.4
+     ]
+    },
+    {
+     "text": "Truck out",
+     "kind": "lane",
+     "xy": [
+      1058.6,
+      888.2
+     ]
+    },
+    {
+     "text": "Opel Blitz parks here (empty bed)",
+     "kind": "truck",
+     "xy": [
+      787.4,
+      762.5
+     ]
+    },
+    {
+     "text": "Tower crane: slew + trolley + hoist",
+     "kind": "crane",
+     "xy": [
+      637.5,
+      397.1
+     ]
+    },
+    {
+     "text": "Radixite stock",
+     "kind": "radixite",
+     "xy": [
+      687.0,
+      508.3
+     ]
+    },
+    {
+     "text": "Metal stock",
+     "kind": "metal",
+     "xy": [
+      1006.1,
+      510.7
+     ]
+    },
+    {
+     "text": "Vehicle parts stock",
+     "kind": "parts",
+     "xy": [
+      1111.1,
+      672.1
+     ]
+    },
+    {
+     "text": "Capture flag (rises up the pole)",
+     "kind": "flag",
+     "xy": [
+      750.7,
+      -1.9
+     ]
+    },
+    {
+     "text": "lowered / neutral",
+     "kind": "flag",
+     "xy": [
+      750.7,
+      363.5
+     ]
+    },
+    {
+     "text": "Progress bar (UI)",
+     "kind": "ui",
+     "xy": [
+      818.1,
+      176.4
+     ]
+    }
+   ]
+  },
+  "rear": {
+   "file": "B_turmdrehkran_rear.png",
+   "size": [
+    800,
+    550
+   ],
+   "px_per_m": 30.90909090909091,
+   "caption": null,
+   "labels": [
+    {
+     "text": "Truck in",
+     "kind": "lane",
+     "xy": [
+      601.6,
+      390.4
+     ]
+    },
+    {
+     "text": "Truck out",
+     "kind": "lane",
+     "xy": [
+      270.7,
+      262.5
+     ]
+    },
+    {
+     "text": "Opel Blitz parks here (empty bed)",
+     "kind": "truck",
+     "xy": [
+      406.3,
+      210.5
+     ]
+    },
+    {
+     "text": "Tower crane: slew + trolley + hoist",
+     "kind": "crane",
+     "xy": [
+      481.2,
+      106.1
+     ]
+    },
+    {
+     "text": "Radixite stock",
+     "kind": "radixite",
+     "xy": [
+      456.5,
+      409.7
+     ]
+    },
+    {
+     "text": "Metal stock",
+     "kind": "metal",
+     "xy": [
+      296.9,
+      408.5
+     ]
+    },
+    {
+     "text": "Vehicle parts stock",
+     "kind": "parts",
+     "xy": [
+      244.5,
+      327.7
+     ]
+    },
+    {
+     "text": "Capture flag (rises up the pole)",
+     "kind": "flag",
+     "xy": [
+      424.7,
+      279.5
+     ]
+    },
+    {
+     "text": "lowered / neutral",
+     "kind": "flag",
+     "xy": [
+      424.7,
+      462.2
+     ]
+    },
+    {
+     "text": "Progress bar (UI)",
+     "kind": "ui",
+     "xy": [
+      391.0,
+      101.6
+     ]
+    }
+   ]
+  },
+  "top": {
+   "file": "B_turmdrehkran_top.png",
+   "size": [
+    800,
+    800
+   ],
+   "px_per_m": 30.58823529411765,
+   "caption": null,
+   "labels": [
+    {
+     "text": "Truck in",
+     "kind": "lane",
+     "xy": [
+      198.1,
+      461.2
+     ]
+    },
+    {
+     "text": "Truck out",
+     "kind": "lane",
+     "xy": [
+      601.9,
+      461.2
+     ]
+    },
+    {
+     "text": "Opel Blitz parks here (empty bed)",
+     "kind": "truck",
+     "xy": [
+      487.2,
+      531.5
+     ]
+    },
+    {
+     "text": "Tower crane: slew + trolley + hoist",
+     "kind": "crane",
+     "xy": [
+      384.7,
+      516.2
+     ]
+    },
+    {
+     "text": "Radixite stock",
+     "kind": "radixite",
+     "xy": [
+      270.7,
+      316.2
+     ]
+    },
+    {
+     "text": "Metal stock",
+     "kind": "metal",
+     "xy": [
+      400.0,
+      225.6
+     ]
+    },
+    {
+     "text": "Vehicle parts stock",
+     "kind": "parts",
+     "xy": [
+      529.3,
+      316.2
+     ]
+    },
+    {
+     "text": "Capture flag (rises up the pole)",
+     "kind": "flag",
+     "xy": [
+      228.7,
+      204.2
+     ]
+    },
+    {
+     "text": "lowered / neutral",
+     "kind": "flag",
+     "xy": [
+      228.7,
+      204.2
+     ]
+    },
+    {
+     "text": "Progress bar (UI)",
+     "kind": "ui",
+     "xy": [
+      400.0,
+      384.7
+     ]
+    }
+   ],
+   "grid": [
+    [
+     -517.6,
+     1348.2,
+     -517.6,
+     -487.1
+    ],
+    [
+     -364.7,
+     1348.2,
+     -364.7,
+     -487.1
+    ],
+    [
+     -211.8,
+     1348.2,
+     -211.8,
+     -487.1
+    ],
+    [
+     -58.8,
+     1348.2,
+     -58.8,
+     -487.1
+    ],
+    [
+     94.1,
+     1348.2,
+     94.1,
+     -487.1
+    ],
+    [
+     247.1,
+     1348.2,
+     247.1,
+     -487.1
+    ],
+    [
+     400.0,
+     1348.2,
+     400.0,
+     -487.1
+    ],
+    [
+     552.9,
+     1348.2,
+     552.9,
+     -487.1
+    ],
+    [
+     705.9,
+     1348.2,
+     705.9,
+     -487.1
+    ],
+    [
+     858.8,
+     1348.2,
+     858.8,
+     -487.1
+    ],
+    [
+     1011.8,
+     1348.2,
+     1011.8,
+     -487.1
+    ],
+    [
+     1164.7,
+     1348.2,
+     1164.7,
+     -487.1
+    ],
+    [
+     1317.6,
+     1348.2,
+     1317.6,
+     -487.1
+    ],
+    [
+     -517.6,
+     1348.2,
+     1317.6,
+     1348.2
+    ],
+    [
+     -517.6,
+     1195.3,
+     1317.6,
+     1195.3
+    ],
+    [
+     -517.6,
+     1042.4,
+     1317.6,
+     1042.4
+    ],
+    [
+     -517.6,
+     889.4,
+     1317.6,
+     889.4
+    ],
+    [
+     -517.6,
+     736.5,
+     1317.6,
+     736.5
+    ],
+    [
+     -517.6,
+     583.5,
+     1317.6,
+     583.5
+    ],
+    [
+     -517.6,
+     430.6,
+     1317.6,
+     430.6
+    ],
+    [
+     -517.6,
+     277.6,
+     1317.6,
+     277.6
+    ],
+    [
+     -517.6,
+     124.7,
+     1317.6,
+     124.7
+    ],
+    [
+     -517.6,
+     -28.2,
+     1317.6,
+     -28.2
+    ],
+    [
+     -517.6,
+     -181.2,
+     1317.6,
+     -181.2
+    ],
+    [
+     -517.6,
+     -334.1,
+     1317.6,
+     -334.1
+    ],
+    [
+     -517.6,
+     -487.1,
+     1317.6,
+     -487.1
+    ]
+   ]
+  }
+ },
+ "main_view": "rts"
+}

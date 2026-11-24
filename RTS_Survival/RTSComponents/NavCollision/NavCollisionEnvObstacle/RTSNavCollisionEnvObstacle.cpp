@@ -124,12 +124,33 @@ void URTSNavCollisionEnvObstacle::SetUpNavModifierVolume(
 	Bounds = FBox::BuildAABB(FVector::ZeroVector, LocalExtent)
 		.TransformBy(FTransform(WorldRotation, WorldCenter));
 	FailsafeExtent = LocalExtent;
+	bM_HasExactBox = true;
+	M_ExactBoxInRotationFrame = BoxInRotationFrame;
+	M_ExactBoxRotation = WorldRotation;
+	M_ExactWorldBounds = Bounds;
 	RefreshNavigationModifiers();
+}
+
+void URTSNavCollisionEnvObstacle::SetKeepExactBoxWhenOwnerMoves(const bool bKeep)
+{
+	bM_KeepExactBoxWhenOwnerMoves = bKeep;
 }
 
 void URTSNavCollisionEnvObstacle::BeginPlay()
 {
 	Super::BeginPlay();
+}
+
+void URTSNavCollisionEnvObstacle::CalculateBounds() const
+{
+	if (not bM_HasExactBox || not bM_KeepExactBoxWhenOwnerMoves)
+	{
+		Super::CalculateBounds();
+		return;
+	}
+	ComponentBounds.Reset(1);
+	ComponentBounds.Add(FRotatedBox(M_ExactBoxInRotationFrame, M_ExactBoxRotation));
+	Bounds = M_ExactWorldBounds;
 }
 
 void URTSNavCollisionEnvObstacle::ScaleCurrentExtent(const float Scale)

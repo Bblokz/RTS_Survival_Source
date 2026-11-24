@@ -117,12 +117,19 @@ namespace AbilityPreviewTestPrivate
 	constexpr double ShotAfterFinishedSeconds = 1.5;
 
 	/**
-	 * Machine gun only strafing: its 8 mm traces (about 32 m long) start at the dive from about 25 m up, so most end in
-	 * the air, in missions too. The targets must be there and attacked; hits are logged, not required.
+	 * The Bf 110's machine gun strafing: hits are logged, not required (from before the strafe gun's area damage, when
+	 * most of its traces ended in the air). The Bf 109 must hit since its targets were spread for the area damage.
 	 */
 	bool GetIsTargetHitRequired(const EGlobalAbility Ability)
 	{
-		return Ability != EGlobalAbility::GA_2xBf110Strafing && Ability != EGlobalAbility::GA_Bf109Strafing;
+		return Ability != EGlobalAbility::GA_2xBf110Strafing;
+	}
+
+	/** Target sets spread soldiers to show the strafe's area damage: at least one soldier must be hit. */
+	bool GetIsSoldierHitRequired(const EAbilityPreviewTargetKind Kind)
+	{
+		return Kind == EAbilityPreviewTargetKind::InfantrySpread
+			|| Kind == EAbilityPreviewTargetKind::LightVehiclesAndInfantry;
 	}
 
 	/** The targets the user asked for per aircraft ability; abilities not listed must spawn none or any kind. */
@@ -131,12 +138,13 @@ namespace AbilityPreviewTestPrivate
 		switch (Ability)
 		{
 		case EGlobalAbility::GA_2xBf110Strafing:
-		case EGlobalAbility::GA_Bf109Strafing:
 		case EGlobalAbility::GA_GerIncendiaryJu87:
 			return EAbilityPreviewTargetKind::Infantry;
+		case EGlobalAbility::GA_Bf109Strafing:
+			return EAbilityPreviewTargetKind::InfantrySpread;
 		case EGlobalAbility::GA_2xHortentrafing:
 		case EGlobalAbility::GA_GerJu87GTankBusters:
-			return EAbilityPreviewTargetKind::LightVehicles;
+			return EAbilityPreviewTargetKind::LightVehiclesAndInfantry;
 		case EGlobalAbility::GA_Ju87Strafing:
 		case EGlobalAbility::GA_3xJu87Strafing:
 		case EGlobalAbility::GA_Me410Airstrike:
@@ -444,6 +452,7 @@ void UAbilityPreviewTestSubsystem::StartCase(const double Now)
 	M_TargetSummary = TEXT("none");
 	M_MaxTargetsDamaged = 0;
 	M_MaxTargetsDestroyed = 0;
+	M_MaxSoldiersDamaged = 0;
 	M_NextBurstShotTime = 0.0;
 	M_FinishedTime = -1.0;
 	const int32 FailedBefore = M_Failed;
@@ -684,13 +693,17 @@ void UAbilityPreviewTestSubsystem::RecordTargetHealth()
 	}
 	TrackTargetHealth();
 	const FAbilityPreviewTargetHealth Health = Targets->GetTargetHealth();
-	M_TargetSummary = FString::Printf(TEXT("%s/units%d/damaged%d/destroyed%d"),
+	M_TargetSummary = FString::Printf(TEXT("%s/units%d/damaged%d/destroyed%d/soldiersdamaged%d"),
 	                                  *UEnum::GetValueAsString(Targets->GetSpawnedKind()), Health.Units,
-	                                  M_MaxTargetsDamaged, M_MaxTargetsDestroyed);
-	// The point of the targets: the aircraft must hit them (machine gun strafing only logs it).
+	                                  M_MaxTargetsDamaged, M_MaxTargetsDestroyed, M_MaxSoldiersDamaged);
+	// The point of the targets: the aircraft must hit them (the Bf 110 only logs it).
 	if (GetIsTargetHitRequired(M_Cases[M_CaseIndex].Ability))
 	{
 		Check(M_MaxTargetsDamaged >= 1, TEXT("targets_hit"), M_TargetSummary);
+	}
+	if (GetIsSoldierHitRequired(Targets->GetSpawnedKind()))
+	{
+		Check(M_MaxSoldiersDamaged >= 1, TEXT("soldiers_hit"), M_TargetSummary);
 	}
 }
 
@@ -707,6 +720,7 @@ void UAbilityPreviewTestSubsystem::TrackTargetHealth()
 	const FAbilityPreviewTargetHealth Health = Targets->GetTargetHealth();
 	M_MaxTargetsDamaged = FMath::Max(M_MaxTargetsDamaged, Health.Damaged);
 	M_MaxTargetsDestroyed = FMath::Max(M_MaxTargetsDestroyed, Health.Destroyed);
+	M_MaxSoldiersDamaged = FMath::Max(M_MaxSoldiersDamaged, Health.SoldiersDamaged);
 }
 
 FString UAbilityPreviewTestSubsystem::GetTrackName() const

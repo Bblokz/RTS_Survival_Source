@@ -1,0 +1,547 @@
+{
+ "JobName": "BaseExpansion_Desert",
+ "Category": "BaseExpansion",
+ "Fps": 60,
+ "WarmupSeconds": 6.0,
+ "DurationSeconds": 34.0,
+ "Anchor": {
+  "X": -12825.0,
+  "Y": 3675.0,
+  "Z": 0.0
+ },
+ "AnchorYaw": -10.0,
+ "ClearUnitsRadius": 40000.0,
+ "bKeepVoiceLines": true,
+ "bKeepAnnouncer": false,
+ "bKeepMusic": false,
+ "Events": [
+  {
+   "Time": -3.5,
+   "Type": "Hide",
+   "Tag": "",
+   "Text": "BP_Electricity_SinglePole",
+   "Radius": 0.0
+  },
+  {
+   "Time": -3.0,
+   "Type": "Resources",
+   "Tag": "",
+   "Value": 200000
+  },
+  {
+   "Time": -1.0,
+   "Type": "Spawn",
+   "Tag": "B_HQ",
+   "ClassPath": "/Game/RTS_Survival/Blueprints/GroundVehicles/BaseAndNomadic/ChildBlueprints/SKDFZ-7/Ger_HQ_Truck",
+   "Player": 1,
+   "Offset": {
+    "X": 5500.0,
+    "Y": 0.0,
+    "Z": 0.0
+   },
+   "Yaw": 180.0,
+   "Count": 1,
+   "Columns": 0,
+   "Spacing": 1200.0
+  },
+  {
+   "Time": 1.2,
+   "Type": "Deploy",
+   "Tag": "B_HQ",
+   "Value": 1500.0,
+   "Settings": {
+    "Yaw": 180
+   },
+   "Text": "Building"
+  },
+  {
+   "Time": -1.0,
+   "Type": "Spawn",
+   "Tag": "B_Ref",
+   "ClassPath": "/Game/RTS_Survival/Blueprints/GroundVehicles/BaseAndNomadic/ChildBlueprints/GerEco/OpelBlitz_Ref/Ger_Refinery_Truck",
+   "Player": 1,
+   "Offset": {
+    "X": 2500.0,
+    "Y": -1500.0,
+    "Z": 0.0
+   },
+   "Yaw": 180.0,
+   "Count": 1,
+   "Columns": 0,
+   "Spacing": 1200.0
+  },
+  {
+   "Time": 2.4,
+   "Type": "Deploy",
+   "Tag": "B_Ref",
+   "Value": 1500.0,
+   "Settings": {
+    "Yaw": 180
+   },
+   "Text": ""
+  },
+  {
+   "Time": -1.0,
+   "Type": "Spawn",
+   "Tag": "B_Bar",
+   "ClassPath": "/Game/RTS_Survival/Blueprints/GroundVehicles/BaseAndNomadic/ChildBlueprints/GerT1/OpelBlitz_Barracks/Ger_Barracks_Truck",
+   "Player": 1,
+   "Offset": {
+    "X": 2500.0,
+    "Y": 1500.0,
+    "Z": 0.0
+   },
+   "Yaw": 180.0,
+   "Count": 1,
+   "Columns": 0,
+   "Spacing": 1200.0
+  },
+  {
+   "Time": 0.8,
+   "Type": "Deploy",
+   "Tag": "B_Bar",
+   "Value": 1500.0,
+   "Settings": {
+    "Yaw": 180
+   },
+   "Text": ""
+  },
+  {
+   "Time": -1.0,
+   "Type": "Spawn",
+   "Tag": "B_Forge",
+   "ClassPath": "/Game/RTS_Survival/Blueprints/GroundVehicles/BaseAndNomadic/ChildBlueprints/GerT1/Opel_LightForge/Ger_Forge_Truck",
+   "Player": 1,
+   "Offset": {
+    "X": -500.0,
+    "Y": -1500.0,
+    "Z": 0.0
+   },
+   "Yaw": 180.0,
+   "Count": 1,
+   "Columns": 0,
+   "Spacing": 1200.0
+  },
+  {
+   "Time": 1.6,
+   "Type": "Deploy",
+   "Tag": "B_Forge",
+   "Value": 1500.0,
+   "Settings": {
+    "Yaw": 180
+   },
+   "Text": ""
+  },
+  {
+   "Time": -1.0,
+   "Type": "Spawn",
+   "Tag": "B_Mech",
+   "ClassPath": "/Game/RTS_Survival/Blueprints/GroundVehicles/BaseAndNomadic/ChildBlueprints/GerT1/MechanizedDepot/Ger_MechanizedDepot_Truck",
+   "Player": 1,
+   "Offset": {
+    "X": -500.0,
+    "Y": 1500.0,
+    "Z": 0.0
+   },
+   "Yaw": 180.0,
+   "Count": 1,
+   "Columns": 0,
+   "Spacing": 1200.0
+  },
+  {
+   "Time": 2.0,
+   "Type": "Deploy",
+   "Tag": "B_Mech",
+   "Value": 1500.0,
+   "Settings": {
+    "Yaw": 180
+   },
+   "Text": ""
+  }
+ ],
+ "Shots": [
+  {
+   "Name": "Convoy",
+   "Start": 0.0,
+   "End": 6.0,
+   "Rig": "Follow",
+   "Keys": [
+    {
+     "Time": 0.0,
+     "Pivot": "tag:B_Forge",
+     "Offset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     },
+     "Yaw": 25.0,
+     "Pitch": 10.0,
+     "Distance": 3000.0,
+     "Focal": 40.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": -400.0,
+      "Y": 0.0,
+      "Z": 300.0
+     },
+     "VYaw": 25.0,
+     "VPitch": 15.0,
+     "VDistance": 3000.0,
+     "VFocal": 38.0,
+     "VLookOffset": {
+      "X": -200.0,
+      "Y": 0.0,
+      "Z": 520.0
+     }
+    },
+    {
+     "Time": 6.0,
+     "Pivot": "tag:B_Forge",
+     "Offset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     },
+     "Yaw": 70.0,
+     "Pitch": 10.0,
+     "Distance": 3000.0,
+     "Focal": 40.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": -400.0,
+      "Y": 0.0,
+      "Z": 300.0
+     },
+     "VYaw": 40.0,
+     "VPitch": 15.0,
+     "VDistance": 3000.0,
+     "VFocal": 38.0,
+     "VLookOffset": {
+      "X": -200.0,
+      "Y": 0.0,
+      "Z": 520.0
+     }
+    }
+   ],
+   "Ease": "InOut",
+   "PivotLag": 0.8,
+   "Aperture": 0.0,
+   "Shake": 0.0,
+   "bAvoidOcclusion": true,
+   "MinGroundClearance": 350.0
+  },
+  {
+   "Name": "AllAtOnce",
+   "Start": 6.0,
+   "End": 12.0,
+   "Rig": "Orbit",
+   "Keys": [
+    {
+     "Time": 0.0,
+     "Pivot": "",
+     "Offset": {
+      "X": 600.0,
+      "Y": -600.0,
+      "Z": 0.0
+     },
+     "Yaw": 270.0,
+     "Pitch": 36.0,
+     "Distance": 7000.0,
+     "Focal": 22.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 400.0,
+      "Y": -300.0,
+      "Z": 300.0
+     },
+     "VYaw": 190.0,
+     "VPitch": 52.0,
+     "VDistance": 7600.0,
+     "VFocal": 18.0,
+     "VLookOffset": {
+      "X": -600.0,
+      "Y": 600.0,
+      "Z": 300.0
+     }
+    },
+    {
+     "Time": 6.0,
+     "Pivot": "",
+     "Offset": {
+      "X": 600.0,
+      "Y": -600.0,
+      "Z": 0.0
+     },
+     "Yaw": 255.0,
+     "Pitch": 40.0,
+     "Distance": 8000.0,
+     "Focal": 22.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 400.0,
+      "Y": -300.0,
+      "Z": 300.0
+     },
+     "VYaw": 175.0,
+     "VPitch": 56.0,
+     "VDistance": 7600.0,
+     "VFocal": 18.0,
+     "VLookOffset": {
+      "X": -600.0,
+      "Y": 600.0,
+      "Z": 300.0
+     }
+    }
+   ],
+   "Ease": "InOut",
+   "PivotLag": 0.7,
+   "Aperture": 0.0,
+   "Shake": 0.0,
+   "bAvoidOcclusion": true,
+   "MinGroundClearance": 350.0
+  },
+  {
+   "Name": "RefUnfold",
+   "Start": 12.0,
+   "End": 18.0,
+   "Rig": "Orbit",
+   "Keys": [
+    {
+     "Time": 0.0,
+     "Pivot": "tag:B_Ref",
+     "Offset": {
+      "X": 400.0,
+      "Y": 0.0,
+      "Z": 0.0
+     },
+     "Yaw": 230.0,
+     "Pitch": 10.0,
+     "Distance": 2600.0,
+     "Focal": 32.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 300.0
+     },
+     "VYaw": 230.0,
+     "VPitch": 20.0,
+     "VDistance": 3300.0,
+     "VFocal": 28.0,
+     "VLookOffset": {
+      "X": -300.0,
+      "Y": 0.0,
+      "Z": 450.0
+     }
+    },
+    {
+     "Time": 6.0,
+     "Pivot": "tag:B_Ref",
+     "Offset": {
+      "X": 400.0,
+      "Y": 0.0,
+      "Z": 0.0
+     },
+     "Yaw": 255.0,
+     "Pitch": 14.0,
+     "Distance": 2500.0,
+     "Focal": 32.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 300.0
+     },
+     "VYaw": 240.0,
+     "VPitch": 22.0,
+     "VDistance": 3000.0,
+     "VFocal": 28.0,
+     "VLookOffset": {
+      "X": -300.0,
+      "Y": 0.0,
+      "Z": 450.0
+     }
+    }
+   ],
+   "Ease": "InOut",
+   "PivotLag": 0.7,
+   "Aperture": 4.0,
+   "Shake": 0.0,
+   "bAvoidOcclusion": true,
+   "MinGroundClearance": 350.0
+  },
+  {
+   "Name": "PanAcross",
+   "Start": 18.0,
+   "End": 25.5,
+   "Rig": "Fixed",
+   "Keys": [
+    {
+     "Time": 0.0,
+     "Pivot": "tag:B_Forge",
+     "Offset": {
+      "X": 0.0,
+      "Y": 750.0,
+      "Z": 0.0
+     },
+     "Yaw": 180.0,
+     "Pitch": 20.0,
+     "Distance": 3000.0,
+     "Focal": 30.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 200.0
+     },
+     "VYaw": 0.0,
+     "VPitch": 0.0,
+     "VDistance": 0.0,
+     "VFocal": 26.0,
+     "VLookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     }
+    },
+    {
+     "Time": 7.5,
+     "Pivot": "tag:B_Mech",
+     "Offset": {
+      "X": 0.0,
+      "Y": -750.0,
+      "Z": 0.0
+     },
+     "Yaw": 180.0,
+     "Pitch": 20.0,
+     "Distance": 3000.0,
+     "Focal": 30.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 200.0
+     },
+     "VYaw": 0.0,
+     "VPitch": 0.0,
+     "VDistance": 0.0,
+     "VFocal": 26.0,
+     "VLookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     }
+    }
+   ],
+   "Ease": "InOut",
+   "PivotLag": 0.7,
+   "Aperture": 0.0,
+   "Shake": 0.0,
+   "bAvoidOcclusion": true,
+   "MinGroundClearance": 350.0,
+   "CameraPivot": "",
+   "CameraOffset": {
+    "X": -7500.0,
+    "Y": 0.0,
+    "Z": 2200.0
+   },
+   "VCameraOffset": {
+    "X": -4500.0,
+    "Y": -6000.0,
+    "Z": 3600.0
+   }
+  },
+  {
+   "Name": "Reveal",
+   "Start": 25.5,
+   "End": 34.0,
+   "Rig": "Orbit",
+   "Keys": [
+    {
+     "Time": 0.0,
+     "Pivot": "",
+     "Offset": {
+      "X": 1000.0,
+      "Y": 0.0,
+      "Z": 0.0
+     },
+     "Yaw": 80.0,
+     "Pitch": 24.0,
+     "Distance": 7500.0,
+     "Focal": 28.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 150.0
+     },
+     "VYaw": 170.0,
+     "VPitch": 28.0,
+     "VDistance": 7800.0,
+     "VFocal": 21.0,
+     "VLookOffset": {
+      "X": -900.0,
+      "Y": 0.0,
+      "Z": 150.0
+     }
+    },
+    {
+     "Time": 8.5,
+     "Pivot": "",
+     "Offset": {
+      "X": 1000.0,
+      "Y": 0.0,
+      "Z": 0.0
+     },
+     "Yaw": 110.0,
+     "Pitch": 32.0,
+     "Distance": 9500.0,
+     "Focal": 22.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 150.0
+     },
+     "VYaw": 185.0,
+     "VPitch": 44.0,
+     "VDistance": 9800.0,
+     "VFocal": 18.0,
+     "VLookOffset": {
+      "X": -900.0,
+      "Y": 0.0,
+      "Z": 150.0
+     }
+    }
+   ],
+   "Ease": "InOut",
+   "PivotLag": 0.7,
+   "Aperture": 0.0,
+   "Shake": 0.0,
+   "bAvoidOcclusion": true,
+   "MinGroundClearance": 350.0
+  }
+ ],
+ "MapPath": "/Game/RTS_Survival/SurvivalMode/Maps/SM_Desert_01",
+ "GameModeClassPath": "/Game/RTS_Survival/SurvivalMode/Blueprints/BP_SurvivalGameMode.BP_SurvivalGameMode_C",
+ "LaunchArgs": [
+  "-SurvivalAutoStart",
+  "-SurvivalStartIndex=0",
+  "-SurvivalGrace=3600"
+ ],
+ "HideNear": [
+  [
+   "BP_Electricity_SinglePole",
+   0
+  ]
+ ],
+ "SuppressClassPrefixes": [
+  "Ger_Aircraft_JU390B_AirborneUnarmed"
+ ],
+ "HideActorPrefixes": [],
+ "SkyMaterial": "/Game/SkyboxPack_X/Materials/Instances/M_Flowmap_Inst_02.M_Flowmap_Inst_02",
+ "ClearPlayers": [
+  2
+ ],
+ "Batch": "base"
+}

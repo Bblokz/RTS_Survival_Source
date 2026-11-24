@@ -8,6 +8,7 @@
 #include "RTS_Survival/CardSystem/PlayerProfile/SavePlayerProfile/USavePlayerProfile.h"
 #include "RTS_Survival/Units/Enums/Enum_UnitType.h"
 #include "RTS_Survival/Game/GameState/CPPGameState.h"
+#include "RTS_Survival/Game/RTSGameInstance/RTSGameInstance.h"
 #include "RTS_Survival/GameUI/TrainingUI/TrainingOptions/TrainingOptionLibrary/TrainingOptionLibrary.h"
 #include "RTS_Survival/Player/CPPController.h"
 #include "RTS_Survival/Player/PlayerResourceManager/PlayerResourceManager.h"
@@ -16,6 +17,124 @@
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 
+
+namespace PlayerProfileLoaderCampaign
+{
+	/** The cards, variants and techs one mission starts with, resolved from the campaign or the profile save. */
+	struct FMissionCards
+	{
+		TArray<FCardSaveData> SelectedCards;
+		TArray<FUnitVariantSelection> UnitVariantSelections;
+		// Bought on the world map; researched for free on top of the deck's technology cards.
+		TArray<ETechnology> CampaignTechnologies;
+		bool bIsCampaignOperation = false;
+		// Starting-unit and resource cards were cut from the campaign deck; GetCampaignDeckCards drops them.
+		bool bUsesCampaignDeck = false;
+	};
+
+	/** A campaign started before the deck builder was opened carries no deck at all. */
+	bool GetIsCardDataEmpty(const FPlayerCardSaveData& CardData)
+	{
+		return CardData.PlayerAvailableCards.IsEmpty()
+			&& CardData.SelectedCards.IsEmpty()
+			&& CardData.CardsInUnits.IsEmpty()
+			&& CardData.CardsInTechResources.IsEmpty()
+			&& CardData.NomadicBuildingLayouts.IsEmpty()
+			&& CardData.UnitVariantSelections.IsEmpty()
+			&& CardData.OwnedUnitVariants.IsEmpty();
+	}
+
+	bool GetIsCampaignDeckCardType(const ECardType CardType)
+	{
+		switch (CardType)
+		{
+		case ECardType::Technology:
+		case ECardType::BarracksTrain:
+		case ECardType::MechanicalDepotTrain:
+		case ECardType::ForgeTrain:
+		case ECardType::T2FactoryTrain:
+		case ECardType::AirbaseTrain:
+		case ECardType::ExperimentalFactoryTrain:
+			return true;
+		default:
+			return false;
+		}
+	}
+
+	TArray<FCardSaveData> GetCampaignDeckCards(const TArray<FCardSaveData>& SelectedCards)
+	{
+		TArray<FCardSaveData> CampaignDeckCards;
+		for (const FCardSaveData& SelectedCard : SelectedCards)
+		{
+			if (GetIsCampaignDeckCardType(SelectedCard.CardType))
+			{
+				CampaignDeckCards.Add(SelectedCard);
+			}
+		}
+		return CampaignDeckCards;
+	}
+
+	/**
+	 * @brief Copies the mission context when this mission is a world-map campaign operation.
+	 * @return false for survival, hangar playtests, direct map launches and PIE startup contexts.
+	 */
+	bool GetCampaignOperationContext(const UObject* WorldContextObject, FWorldMissionContext& OutMissionContext)
+	{
+		const URTSGameInstance* GameInstance = FRTS_Statics::GetRTSGameInstance(WorldContextObject);
+		if (not IsValid(GameInstance))
+		{
+			return false;
+		}
+		OutMissionContext = GameInstance->GetWorldMissionContext();
+		return OutMissionContext.GetIsCampaignOperation();
+	}
+
+	FMissionCards ResolveMissionCards(const UObject* WorldContextObject, const USavePlayerProfile& PlayerProfile)
+	{
+		FMissionCards MissionCards;
+		FWorldMissionContext MissionContext;
+		MissionCards.bIsCampaignOperation = GetCampaignOperationContext(WorldContextObject, MissionContext);
+		if (MissionCards.bIsCampaignOperation)
+		{
+			MissionCards.CampaignTechnologies = MissionContext.CampaignResearchedTechnologies;
+		}
+
+		MissionCards.bUsesCampaignDeck = MissionCards.bIsCampaignOperation
+			&& not GetIsCardDataEmpty(MissionContext.CampaignCardData);
+		if (MissionCards.bUsesCampaignDeck)
+		{
+			MissionCards.SelectedCards = GetCampaignDeckCards(MissionContext.CampaignCardData.SelectedCards);
+			MissionCards.UnitVariantSelections = MissionContext.CampaignCardData.UnitVariantSelections;
+			return MissionCards;
+		}
+
+		MissionCards.SelectedCards = PlayerProfile.M_SelectedCards;
+		MissionCards.UnitVariantSelections = PlayerProfile.M_UnitVariantSelections;
+		return MissionCards;
+	}
+
+	/** Deck technologies plus campaign technologies, each once, so no technology is applied twice. */
+	TArray<ETechnology> MergeTechnologies(const TArray<ETechnology>& CardTechnologies,
+	                                      const TArray<ETechnology>& CampaignTechnologies)
+	{
+		TArray<ETechnology> MergedTechnologies;
+		for (const ETechnology Technology : CardTechnologies)
+		{
+			if (Technology != ETechnology::Tech_NONE)
+			{
+				MergedTechnologies.AddUnique(Technology);
+			}
+		}
+		for (const ETechnology Technology : CampaignTechnologies)
+		{
+			if (Technology != ETechnology::Tech_NONE)
+			{
+				MergedTechnologies.AddUnique(Technology);
+			}
+		}
+		return MergedTechnologies;
+	}
+}
 
 // Sets default values for this component's properties
 UPlayerProfileLoader::UPlayerProfileLoader()
@@ -44,6 +163,9 @@ void UPlayerProfileLoader::LoadProfile(TObjectPtr<ARTSAsyncSpawner> AsyncSpawner
 		return;
 	}
 	FRTS_Profile::DebugPrintProfile(PlayerProfile);
+	// Outside a campaign operation this is exactly the profile save's cards and variants.
+	const PlayerProfileLoaderCampaign::FMissionCards MissionCards =
+		PlayerProfileLoaderCampaign::ResolveMissionCards(this, *PlayerProfile);
 
 	// todo renable when done with world map for profile building.
 	// UpdateNomadicUnit(ExtractTrainingOptionsOfType(PlayerProfile->M_SelectedCards, ECardType::BarracksTrain),
@@ -52,16 +174,45 @@ void UPlayerProfileLoader::LoadProfile(TObjectPtr<ARTSAsyncSpawner> AsyncSpawner
 	//                   ENomadicSubtype::Nomadic_GerLightSteelForge);
 	// UpdateNomadicUnit(ExtractTrainingOptionsOfType(PlayerProfile->M_SelectedCards, ECardType::MechanicalDepotTrain),
 	//                   ENomadicSubtype::Nomadic_GerMechanizedDepot);
-	ApplyResourceCards(ExtractResources(PlayerProfile->M_SelectedCards));
-	ApplyTechnologies(ExtractTechnologies(PlayerProfile->M_SelectedCards));
+	// Still off for campaign operations too: it would replace the per-faction training grids the game state sets
+	// up, and unit-card unlocks now go through UTrainingLayoutSubsystem.
+	ApplyResourceCards(ExtractResources(MissionCards.SelectedCards));
+	if (MissionCards.bIsCampaignOperation)
+	{
+		ApplyTechnologies(PlayerProfileLoaderCampaign::MergeTechnologies(
+			ExtractTechnologies(MissionCards.SelectedCards), MissionCards.CampaignTechnologies));
+	}
+	else
+	{
+		ApplyTechnologies(ExtractTechnologies(MissionCards.SelectedCards));
+	}
 	// Before LoadInUnits so starting units spawn as variants, and before the early return because a map without
 	// starting units still trains units through the spawner.
-	ApplyUnitVariantSelections(PlayerProfile->M_UnitVariantSelections, PlayerController, AsyncSpawner);
+	ApplyUnitVariantSelections(MissionCards.UnitVariantSelections, PlayerController, AsyncSpawner);
 	if(bDoNotLoadPlayerUnits)
 	{
 		return;
 	}
-	LoadInUnits(AsyncSpawner, ExtractUnitsToCreate(PlayerProfile->M_SelectedCards), SpawnCenter);
+	// The campaign deck holds no starting-unit cards; LoadInUnits still spawns the HQ and completes the load.
+	LoadInUnits(AsyncSpawner, ExtractUnitsToCreate(MissionCards.SelectedCards), SpawnCenter);
+}
+
+TArray<FCardSaveData> UPlayerProfileLoader::GetSelectedCardsForMission(const UObject* WorldContextObject)
+{
+	FWorldMissionContext MissionContext;
+	const bool bIsCampaignOperation = PlayerProfileLoaderCampaign::GetCampaignOperationContext(
+		WorldContextObject, MissionContext);
+	if (bIsCampaignOperation && not PlayerProfileLoaderCampaign::GetIsCardDataEmpty(MissionContext.CampaignCardData))
+	{
+		return PlayerProfileLoaderCampaign::GetCampaignDeckCards(MissionContext.CampaignCardData.SelectedCards);
+	}
+
+	const USavePlayerProfile* PlayerProfile = FRTS_Profile::LoadPlayerProfile();
+	if (not IsValid(PlayerProfile))
+	{
+		return TArray<FCardSaveData>();
+	}
+	return PlayerProfile->M_SelectedCards;
 }
 
 

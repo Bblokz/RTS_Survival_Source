@@ -1,0 +1,352 @@
+"""Imports the Ore mineral flora bushes and builds their crushable Blueprints, headless. Re-runnable.
+
+  bash run_ue.sh ue_build.py <logname> import bps     textures, material instance, meshes (LOD0+LOD1, crushed), 8 BPs
+  bash run_ue.sh ue_build.py <logname> verify         fresh process: reload, spawn each BP in a blank unsaved level, count plants
+
+Content: /Game/RTS_Survival/Blueprints/Environment/OreMountains/MineralFlora/Bushes/
+  Textures/T_OreFloraBush_BC (sRGB, alpha = card mask), T_OreFloraBush_N
+  Materials/MI_OreFloraBush          instance of WpoTreeFoliage/MasterMats/M_Foilage_00 (ISM usage already on the master)
+  Meshes/SM_OreFlora_<Name>[_Crushed]
+  BP_OreFlora_<Name>                 ACrushableCropFieldActor children (no graph): child of BP_CropField_Wheat (7 bushes, any
+                                     tank) or BP_CropField_Vineyard (bramble thicket: medium/heavy, RTS_NavArea_BlockLight)
+Each Blueprint's default FieldOutline is shrunk to its own footprint so one placed actor = one bush (thicket: 6 clumps).
+Reports: Saved/OreMountains/flora/bushes/ue_build_report.json, ue_verify_report.json. Edits no existing asset, opens no map.
+"""
+import json
+import sys
+
+import unreal
+
+SRC = 'D:/Blender/BlenderProjects/BlenderTanks/CustomMapItems/Environment/OreMineralFlora/Bushes/'
+HOME = '/Game/RTS_Survival/Blueprints/Environment/OreMountains/MineralFlora/Bushes'
+OUT = 'D:/UE5Projects/RTS_Survival/Saved/OreMountains/flora/bushes/'
+MASTER = '/Game/RTS_Survival/Blueprints/Environment/WpoTreeFoliage/MasterMats/M_Foilage_00'
+FC = '/Game/RTS_Survival/Blueprints/Environment/CrushableInstancedActor/FarmCrops/'
+WHEAT_BP = FC + 'BP_CropField_Wheat'
+VINE_BP = FC + 'BP_CropField_Vineyard'
+NAV_BLOCK_LIGHT = '/Game/RTS_Survival/Blueprints/Nav/SpecificNavTypeBlockers/RTS_NavArea_BlockLight.RTS_NavArea_BlockLight_C'
+LOD_SCREEN = [1.0, 0.025]     # a 1-2.5 m bush at the default RTS camera is ~0.03-0.06 screen size: LOD0 in the game view
+TOOLS = unreal.AssetToolsHelpers.get_asset_tools()
+EAL = unreal.EditorAssetLibrary
+MEL = unreal.MaterialEditingLibrary
+SMS = unreal.get_editor_subsystem(unreal.StaticMeshEditorSubsystem)
+
+# Blueprint name -> (variants [(mesh, crushed, weight)], parent, crush type, nav area, outline half size (x, y) cm, layout)
+# rev2 (review on the real map: single bushes were 10-38 px dots at the RTS camera): every Blueprint is a small clump by
+# default. 2 x 2 grid in a 4.6 m square, 2.3 m apart, jittered 30 % (position), random yaw, per-class plant scale; a
+# MissingPlantChance drops some spots so the clumps hold 3-4 plants (counts read back by `verify`). One actor = one object.
+def clump(smin, smax, missing=0.2):
+    return dict(row_spacing=230.0, plant_spacing=230.0, position_jitter=0.3, edge_inset=50.0, missing_plant_chance=missing,
+                min_scale=smin, max_scale=smax, random_yaw=True, yaw_jitter_degrees=0.0)
+
+
+SQUARE = [(-230, -230), (230, -230), (230, 230), (-230, 230)]
+# bilberry carpet: 6 lobes (2 rows of 3, 1.2 m apart) in a 3.5 x 2.5 m outline: a flat mat, crushed lobe by lobe
+MAT = dict(row_spacing=125.0, plant_spacing=120.0, position_jitter=0.2, edge_inset=0.0, missing_plant_chance=0.0,
+           min_scale=1.05, max_scale=1.2, random_yaw=True, yaw_jitter_degrees=0.0)
+MAT_OUTLINE = [(-175, -125), (175, -125), (175, 125), (-175, 125)]
+# bramble hedge: a trapezoid outline makes the rows 5 + 4 spots, i.e. two OFFSET rows of clumps 1.15 m apart (9 clumps,
+# about 6.3 x 2.9 m). Nav cells (spacing + 15 cm each side) overlap by 30 cm in X and in Y: no gap for a light vehicle.
+HEDGE = dict(row_spacing=100.0, plant_spacing=115.0, position_jitter=0.1, edge_inset=0.0, missing_plant_chance=0.0,
+             min_scale=0.85, max_scale=0.95, random_yaw=True, yaw_jitter_degrees=0.0)
+HEDGE_OUTLINE = [(-290, -100), (290, -100), (170, 100), (-170, 100)]
+BPS = {
+    'RustHeath': ([('RustHeath', 1.0)], 'woody', 'AnyTank', None, SQUARE, clump(1.3, 1.5), 3101),
+    'RedDogwood': ([('RedDogwood', 1.0)], 'woody', 'AnyTank', None, SQUARE, clump(1.15, 1.25), 3102),
+    'RedBilberryMat': ([('RedBilberryMat', 1.0)], 'soft', 'AnyTank', None, MAT_OUTLINE, MAT, 3103),
+    'RustRowan': ([('RustRowan', 1.0)], 'woody', 'AnyTank', None, SQUARE, clump(1.15, 1.3, 0.0), 3104),
+    'OchreBroom': ([('OchreBroom', 1.0)], 'woody', 'AnyTank', None, SQUARE, clump(1.3, 1.45, 0.0), 3105),
+    'OchreBracken': ([('OchreBracken', 1.0)], 'soft', 'AnyTank', None, SQUARE, clump(1.35, 1.5), 3106),
+    'OchreTussock': ([('OchreTussock', 1.0)], 'soft', 'AnyTank', None, SQUARE, clump(1.35, 1.5), 3107),
+    'BrambleThicket_Rust': ([('BrambleClumpRed', 1.0)], 'thicket', 'MediumOrHeavyTank', NAV_BLOCK_LIGHT, HEDGE_OUTLINE, HEDGE, 3108),
+    'BrambleThicket_Ochre': ([('BrambleClumpOchre', 1.0)], 'thicket', 'MediumOrHeavyTank', NAV_BLOCK_LIGHT, HEDGE_OUTLINE, HEDGE, 3109),
+}
+RETIRED = ['BP_OreFlora_BrambleThicket']     # rev1 mixed-colour thicket, replaced by _Rust / _Ochre (own asset, deleted)
+MESHES = ['RustHeath', 'RedDogwood', 'RedBilberryMat', 'RustRowan', 'OchreBroom', 'OchreBracken', 'OchreTussock',
+          'BrambleClumpRed', 'BrambleClumpOchre']
+MI_SCALARS = {'Trunk_Sway_Height': 1.5, 'Trunk_Sway_Intensity': 0.0, 'Trunk_Sway_Speed': 2.0, 'Trunk_Sway_Strength': 0.0,
+              'Wind_intensity': 0.06, 'Roughness': 0.9, 'Specular': 0.0, 'SS_Intensity': 0.15, 'Brightness': 1.0,
+              'Variation': 0.0, 'Desaturation': 0.0, 'Opacity_Instensity': 1.6}
+MI_VECTORS = {'SubSurface_Colour': (0.32, 0.16, 0.07)}
+report = dict(failures=[], meshes={}, blueprints={})
+F = report['failures']
+
+
+def save(obj):
+    if not unreal.EditorLoadingAndSavingUtils.save_packages([obj.get_outermost()], False):
+        F.append('save failed ' + obj.get_path_name())
+
+
+def import_texture(name, srgb, compression, alpha_cover=False):
+    task = unreal.AssetImportTask()
+    task.filename = SRC + 'Textures/' + name + '.png'
+    task.destination_path = HOME + '/Textures'
+    task.destination_name = name
+    task.automated = True
+    task.replace_existing = True
+    task.save = False
+    TOOLS.import_asset_tasks([task])
+    tex = unreal.load_asset('%s/Textures/%s' % (HOME, name))
+    tex.set_editor_property('srgb', srgb)
+    tex.set_editor_property('compression_settings', compression)
+    tex.set_editor_property('lod_group', unreal.TextureGroup.TEXTUREGROUP_WORLD)
+    if alpha_cover:
+        try:
+            tex.set_editor_property('alpha_coverage_thresholds', unreal.Vector4(0.0, 0.0, 0.0, 0.3333))
+            tex.set_editor_property('do_scale_mips_for_alpha_coverage', True)
+        except Exception as exc:
+            F.append('alpha coverage not set: %s' % exc)
+    save(tex)
+    return tex
+
+
+def build_material(bc, nr):
+    name = 'MI_OreFloraBush'
+    path = '%s/Materials/%s' % (HOME, name)
+    mi = unreal.load_asset(path) if EAL.does_asset_exist(path) else TOOLS.create_asset(
+        name, HOME + '/Materials', unreal.MaterialInstanceConstant, unreal.MaterialInstanceConstantFactoryNew())
+    MEL.set_material_instance_parent(mi, unreal.load_asset(MASTER))
+    MEL.set_material_instance_texture_parameter_value(mi, 'Albedo', bc)
+    MEL.set_material_instance_texture_parameter_value(mi, 'Normal', nr)
+    for k, v in MI_SCALARS.items():
+        MEL.set_material_instance_scalar_parameter_value(mi, k, v)
+    for k, v in MI_VECTORS.items():
+        MEL.set_material_instance_vector_parameter_value(mi, k, unreal.LinearColor(v[0], v[1], v[2], 1.0))
+    MEL.update_material_instance(mi)
+    save(mi)
+    for k, v in MI_SCALARS.items():      # the setters' return values are unreliable: read back
+        got = MEL.get_material_instance_scalar_parameter_value(mi, k)
+        if abs(got - v) > 1e-4:
+            F.append('MI scalar %s reads %s, wanted %s' % (k, got, v))
+    report['material'] = dict(asset=mi.get_path_name(), parent=MASTER, scalars=MI_SCALARS, vectors=MI_VECTORS)
+    return mi
+
+
+def fbx_options():
+    ui = unreal.FbxImportUI()
+    ui.set_editor_property('import_mesh', True)
+    ui.set_editor_property('import_as_skeletal', False)
+    ui.set_editor_property('import_materials', False)
+    ui.set_editor_property('import_textures', False)
+    ui.set_editor_property('import_animations', False)
+    data = ui.get_editor_property('static_mesh_import_data')
+    data.set_editor_property('combine_meshes', True)
+    data.set_editor_property('auto_generate_collision', False)
+    data.set_editor_property('generate_lightmap_u_vs', False)
+    data.set_editor_property('build_nanite', False)
+    data.set_editor_property('vertex_color_import_option', unreal.VertexColorImportOption.REPLACE)
+    data.set_editor_property('normal_import_method', unreal.FBXNormalImportMethod.FBXNIM_COMPUTE_NORMALS)
+    return ui
+
+
+def import_mesh(name, mi, lod1, want_bounds):
+    task = unreal.AssetImportTask()
+    task.filename = SRC + 'FBX/' + name + '.fbx'
+    task.destination_path = HOME + '/Meshes'
+    task.destination_name = name
+    task.automated = True
+    task.save = False
+    task.replace_existing = True
+    task.options = fbx_options()
+    TOOLS.import_asset_tasks([task])
+    mesh = unreal.load_asset('%s/Meshes/%s' % (HOME, name))
+    if mesh is None:
+        F.append('import failed ' + name)
+        return None
+    ns = mesh.get_editor_property('nanite_settings')
+    ns.enabled = False
+    mesh.set_editor_property('nanite_settings', ns)
+    if lod1:
+        got = SMS.import_lod(mesh, 1, SRC + 'FBX/' + name + '_LOD1.fbx')
+        if got != 1:
+            F.append('%s LOD1 import returned %s' % (name, got))
+        try:
+            SMS.set_lod_screen_sizes(mesh, LOD_SCREEN[:mesh.get_num_lods()])
+        except Exception as exc:
+            F.append('%s screen sizes: %s' % (name, exc))
+    for i in range(len(mesh.static_materials)):
+        mesh.set_material(i, mi)
+    SMS.remove_collisions(mesh)
+    save(mesh)
+    box = mesh.get_bounding_box()
+    got = dict(min=[round(box.min.x, 1), round(box.min.y, 1), round(box.min.z, 1)], max=[round(box.max.x, 1), round(box.max.y, 1), round(box.max.z, 1)])
+    # Blender +Y is Unreal -Y in this export; compare with Y mirrored
+    wb = dict(min=[want_bounds['min'][0], -want_bounds['max'][1], want_bounds['min'][2]],
+              max=[want_bounds['max'][0], -want_bounds['min'][1], want_bounds['max'][2]])
+    err = max(abs(got[k][i] - wb[k][i]) for k in ('min', 'max') for i in range(3))
+    err_noflip = max(abs(got[k][i] - want_bounds[k][i]) for k in ('min', 'max') for i in range(3))
+    report['meshes'][name] = dict(asset=mesh.get_path_name(), bounds_cm=got, bounds_err_yflip=round(err, 1), bounds_err_noflip=round(err_noflip, 1),
+                                  lod_triangles=[mesh.get_num_triangles(i) for i in range(mesh.get_num_lods())],
+                                  materials=[m.material_interface.get_path_name() for m in mesh.static_materials])
+    if min(err, err_noflip) > 3.0:
+        F.append('%s bounds differ from the Blender build by %.1f cm' % (name, min(err, err_noflip)))
+    return mesh
+
+
+def do_import():
+    info = json.load(open(SRC + 'bushes.json'))
+    C = unreal.TextureCompressionSettings
+    bc = import_texture('T_OreFloraBush_BC', True, C.TC_DEFAULT, alpha_cover=True)
+    nr = import_texture('T_OreFloraBush_N', False, C.TC_NORMALMAP)
+    mi = build_material(bc, nr)
+    unreal.SystemLibrary.execute_console_command(None, 'Interchange.FeatureFlags.Import.FBX 0')
+    try:
+        for name in MESHES:
+            rec = info[name]
+            import_mesh('SM_OreFlora_' + name, mi, True, rec['bounds_cm'])
+            import_mesh('SM_OreFlora_' + name + '_Crushed', mi, False, rec['crushed_bounds_cm'])
+    finally:
+        unreal.SystemLibrary.execute_console_command(None, 'Interchange.FeatureFlags.Import.FBX 1')
+
+
+def gen_class(path):
+    return unreal.load_object(None, '%s.%s_C' % (path, path.split('/')[-1]))
+
+
+def make_child(name, parent_path):
+    path = '%s/%s' % (HOME, name)
+    if EAL.does_asset_exist(path):
+        return unreal.load_asset(path)
+    factory = unreal.BlueprintFactory()
+    factory.set_editor_property('parent_class', gen_class(parent_path))
+    bp = TOOLS.create_asset(name, HOME, unreal.Blueprint, factory)
+    if bp is None:
+        raise RuntimeError('could not create ' + path)
+    unreal.BlueprintEditorLibrary.compile_blueprint(bp)
+    return bp
+
+
+def set_outline(spline, pts):
+    spline.clear_spline_points(False)
+    for p in pts:
+        spline.add_spline_point(unreal.Vector(p[0], p[1], 0.0), unreal.SplineCoordinateSpace.LOCAL, False)
+    for i in range(len(pts)):
+        spline.set_spline_point_type(i, unreal.SplinePointType.LINEAR, False)
+    spline.set_closed_loop(True, False)
+    spline.update_spline()
+
+
+def fx(kind):
+    """woody bushes / the thicket: the vineyard's wood-snap cue and vine debris; soft plants: the wheat / grass-hit set."""
+    src = unreal.get_default_object(gen_class(VINE_BP if kind in ('woody', 'thicket') else WHEAT_BP))
+    return src.get_editor_property('crush_fx')
+
+
+def do_bps():
+    for old in RETIRED:
+        path = '%s/%s' % (HOME, old)
+        if EAL.does_asset_exist(path):
+            report.setdefault('deleted', []).append(path if EAL.delete_asset(path) else 'FAILED ' + path)
+    for name, (variants, kind, crush, nav, outline, lay, seed) in BPS.items():
+        bp_name = 'BP_OreFlora_' + name
+        bp = make_child(bp_name, VINE_BP if kind == 'thicket' else WHEAT_BP)
+        cdo = unreal.get_default_object(bp.generated_class())
+        vs = []
+        for mesh_key, w in variants:
+            v = unreal.CrushableCropVariant()
+            v.set_editor_property('intact_mesh', unreal.load_asset('%s/Meshes/SM_OreFlora_%s' % (HOME, mesh_key)))
+            v.set_editor_property('crushed_mesh', unreal.load_asset('%s/Meshes/SM_OreFlora_%s_Crushed' % (HOME, mesh_key)))
+            v.set_editor_property('weight', w)
+            vs.append(v)
+        cdo.set_editor_property('variants', vs)
+        layout = unreal.CrushableCropLayout()
+        for k, v in lay.items():
+            layout.set_editor_property(k, v)
+        layout.set_editor_property('random_seed', seed)
+        cdo.set_editor_property('layout', layout)
+        cdo.set_editor_property('crush_destruction_type', getattr(unreal.CrushDestructionType,
+                                                                  'ANY_TANK' if crush == 'AnyTank' else 'MEDIUM_OR_HEAVY_TANK'))
+        cdo.set_editor_property('standing_plants_nav_area', unreal.load_class(None, nav) if nav else None)
+        cdo.set_editor_property('material_override', None)
+        cdo.set_editor_property('standing_plants_cast_shadow', True)
+        cdo.set_editor_property('crushed_plants_cast_shadow', False)
+        cdo.set_editor_property('crush_fx', fx(kind))
+        set_outline(cdo.get_editor_property('field_outline'), outline)
+        save(bp)
+        report['blueprints'][name] = dict(asset=bp.get_path_name(), kind=kind, crush=crush, nav=nav, outline_cm=outline,
+                                          variants=[m for m, _ in variants])
+
+
+def do_verify():
+    """Fresh process: read the saved CDOs and spawn each BP in a blank unsaved level (editor construction builds the field)."""
+    res = {}
+    les = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
+    les.new_level('/Temp/OreFloraBushProbe')
+    eas = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
+    for i, name in enumerate(BPS):
+        path = '%s/BP_OreFlora_%s' % (HOME, name)
+        gc = gen_class(path)
+        cdo = unreal.get_default_object(gc)
+        sp = cdo.get_editor_property('field_outline')
+        d = dict(cdo_outline=[[round(sp.get_location_at_spline_point(k, unreal.SplineCoordinateSpace.LOCAL).x), round(
+            sp.get_location_at_spline_point(k, unreal.SplineCoordinateSpace.LOCAL).y)] for k in range(sp.get_number_of_spline_points())],
+                 crush=str(cdo.get_editor_property('crush_destruction_type')), nav=str(cdo.get_editor_property('standing_plants_nav_area')),
+                 fx_sfx=str(cdo.get_editor_property('crush_fx').get_editor_property('collapse_sfx').get_name()))
+        a = eas.spawn_actor_from_class(gc, unreal.Vector(i * 2000.0, 0, 0), unreal.Rotator(0, 0, 0))
+        try:
+            a.rebuild_field()
+        except Exception as exc:
+            d['rebuild_error'] = str(exc)[:120]
+        d['num_plants'] = a.get_num_plants()
+        d['num_standing'] = a.get_num_standing_plants()
+        comps = []
+        for c in a.get_components_by_class(unreal.InstancedStaticMeshComponent):
+            sm = c.get_editor_property('static_mesh')
+            locs = []
+            for k in range(c.get_instance_count()):
+                t = c.get_instance_transform(k, False)
+                t = t[-1] if isinstance(t, tuple) else t
+                locs.append([round(t.translation.x), round(t.translation.y), round(t.scale3d.x, 2)])
+            comps.append(dict(name=c.get_name(), mesh=sm.get_name() if sm else None, instances=c.get_instance_count(), local_xy_scale=locs,
+                              shadow=bool(c.get_editor_property('cast_shadow')),
+                              collision=str(c.get_collision_enabled()).split('.')[-1]))
+        d['ism'] = comps
+        res[name] = d
+    vc = {}
+    for m in MESHES:
+        try:
+            vc[m] = bool(unreal.EditorStaticMeshLibrary.has_vertex_colors(unreal.load_asset('%s/Meshes/SM_OreFlora_%s' % (HOME, m))))
+        except Exception as exc:
+            vc[m] = 'ERR ' + str(exc)[:80]
+    res['_has_vertex_colors'] = vc
+    # an in-memory recompile must keep the shrunk outline (else a placed bush would become a 20 x 15 m field)
+    rc = {}
+    for name in BPS:
+        path = '%s/BP_OreFlora_%s' % (HOME, name)
+        unreal.BlueprintEditorLibrary.compile_blueprint(unreal.load_asset(path))
+        sp = unreal.get_default_object(gen_class(path)).get_editor_property('field_outline')
+        a2 = eas.spawn_actor_from_class(gen_class(path), unreal.Vector(0, 5000, 0), unreal.Rotator(0, 0, 0))
+        rc[name] = dict(points=sp.get_number_of_spline_points(),
+                        x_max=round(max(sp.get_location_at_spline_point(k, unreal.SplineCoordinateSpace.LOCAL).x for k in range(sp.get_number_of_spline_points()))),
+                        plants=a2.get_num_plants())
+    res['_after_recompile'] = rc
+    res['_lod_screen_sizes'] = {m: [round(v, 3) for v in SMS.get_lod_screen_sizes(unreal.load_asset('%s/Meshes/SM_OreFlora_%s' % (HOME, m)))]
+                                for m in MESHES}
+    json.dump(res, open(OUT + 'ue_verify_report.json', 'w'), indent=1, default=str)
+    for k, v in res.items():
+        if k.startswith('_'):
+            unreal.log('BUSHVERIFY %s %s' % (k, v))
+            continue
+        unreal.log('BUSHVERIFY %s plants %s standing %s outline %s' % (k, v['num_plants'], v['num_standing'], v['cdo_outline']))
+
+
+def main():
+    args = [a for a in sys.argv[1:] if not a.startswith('-')]
+    try:
+        if 'import' in args:
+            do_import()
+        if 'bps' in args:
+            do_bps()
+        if 'verify' in args:
+            do_verify()
+    except Exception as exc:
+        import traceback
+        F.append('EXCEPTION ' + traceback.format_exc())
+    if 'import' in args or 'bps' in args:
+        json.dump(report, open(OUT + 'ue_build_report.json', 'w'), indent=1, default=str)
+    unreal.log('BUSHBUILD done, %d failures' % len(F))
+    for f in F:
+        unreal.log_warning('BUSHBUILD failure: ' + f[:400])
+
+
+main()

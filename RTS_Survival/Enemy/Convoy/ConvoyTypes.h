@@ -21,7 +21,9 @@ enum class EConvoyCargoType : uint8
 {
 	Fuel,
 	VehicleParts,
-	Ammo
+	Ammo,
+	// Ore Mountains: escaped concrete trucks switch on extra defences at the base they reach.
+	Concrete
 };
 
 UENUM(BlueprintType)
@@ -69,7 +71,9 @@ enum class EConvoyOutcome : uint8
 	// Every truck was destroyed.
 	TrucksDestroyed,
 	// Stopped from code (EndConvoy) or the world ended.
-	Aborted
+	Aborted,
+	// No truck reached the exit: every truck was destroyed or captured, and at least one was captured.
+	TrucksStopped
 };
 
 /** What the trucks do while their escort fights. */
@@ -104,7 +108,9 @@ enum class EConvoyMemberState : uint8
 	Withdrawing,
 	Dead,
 	// Left the convoy alive (exit reached or handed off); restrictions cleared.
-	Released
+	Released,
+	// A truck that left the column at the branch fork and drives the branch path (AConvoy::SetBehaviourPlan).
+	Branching
 };
 
 UENUM(BlueprintType)
@@ -131,7 +137,16 @@ enum class EConvoyEventType : uint8
 	ReachedExit,
 	Despawned,
 	RestrictionCleared,
-	Finished
+	Finished,
+	// A truck surrendered: it left the convoy alive and belongs to its captor (neither destroyed nor escaped).
+	TruckCaptured,
+	// Mission behaviours (FConvoyBehaviourPlan); the typed payload goes out on AConvoy::OnBehaviourEvent.
+	StopStarted,
+	StopEnded,
+	BranchTruckLeft,
+	BranchTruckArrived,
+	AmbushZoneEntered,
+	HuntersDismount
 };
 
 /** One truck class in a convoy definition. */
@@ -155,6 +170,15 @@ struct FConvoyTruckSpec
 	// TruckSpeedFraction of it. 0 uses the unit data's top speed.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Convoy", meta = (ClampMin = "0"))
 	float CalibratedCruiseSpeedCms = 0.f;
+
+	// On: these trucks carry CargoTypeOverride instead of the definition's cargo type (a mixed column, e.g. the ammo
+	// trucks that branch off to a battery). The cache a destroyed truck leaves still uses the definition's cargo.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Convoy")
+	bool bOverrideCargoType = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Convoy",
+		meta = (EditCondition = "bOverrideCargoType", EditConditionHides))
+	EConvoyCargoType CargoTypeOverride = EConvoyCargoType::Ammo;
 };
 
 /** One escort entry: a unit type, how many, and where it keeps station. */
@@ -461,6 +485,8 @@ struct FConvoyMemberSnapshot
 	float WantedSpeed = 0.f;
 	bool bIsStuck = false;
 	bool bHasPartialPath = false;
+	// Trucks: what this truck carries (the definition's cargo or the truck spec's override).
+	EConvoyCargoType CargoType = EConvoyCargoType::Fuel;
 };
 
 /** Value of one cache: what it pays. */

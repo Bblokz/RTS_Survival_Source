@@ -1,0 +1,69 @@
+{
+  "static_mesh": "SM_Rus_WarFactory_A2",
+  "static_fbx": "D:/Blender/BlenderProjects/BlenderTanks/CustomMapItems/SovietsStuff/RusFactory/Model/SM_Rus_WarFactory_A2.FBX",
+  "crane_mesh": "SK_RusFactory_A2_Crane",
+  "crane_fbx": "D:/Blender/BlenderProjects/BlenderTanks/CustomMapItems/SovietsStuff/RusFactory/Model/SK_RusFactory_A2_Crane_Animated.FBX",
+  "takes": [
+    "AN_RusFactoryA2_Work",
+    "AN_RusFactoryA2_Idle"
+  ],
+  "loop_seconds": 30.0,
+  "materials": {
+    "MI_concrete2": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/RusBunkers/Materials/MI_Rus_BunkerConcrete_05",
+    "MI_metal": "/Game/Bunkers/Materials/metal/MI_metal",
+    "M_Pattern_1": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/RusBuildings/FactoryMeshes/Materials/M_Russian_CamoPattern_Tent",
+    "M_RusSandBags": "/Game/SandBagPack/Materials/MI_Rus_SandBag_01",
+    "M_ZoneIndustry_Atlas2": "/Game/RTS_Survival/Meshes/Industrial/Zone/Textures/Atlas/M_ZoneIndustry_Atlas2",
+    "MI_SovietConcrete": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/RusBunkers/Materials/MI_SovietConcrete"
+  },
+  "turret_meshes": {
+    "base": "/Game/RTS_Survival/Blueprints/Turrets/Russian/Medium/T34Turrets/Meshes/SM_T34_76_TurretBaseMesh",
+    "gun": "/Game/RTS_Survival/Blueprints/Turrets/Russian/Medium/T34Turrets/T34_76/Meshes/SK_34_76WeaponSystem"
+  },
+  "turret_sockets": {
+    "load": {
+      "blender_rel_loc_cm": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "blender_rel_rot_deg_xyz": [
+        -90.0,
+        180.0,
+        -0.0
+      ],
+      "turret_world_ue_cm": [
+        521.3,
+        40.0,
+        800.0
+      ]
+    },
+    "lorry_load": {
+      "blender_rel_loc_cm": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "blender_rel_rot_deg_xyz": [
+        -90.0,
+        90.0,
+        0.0
+      ],
+      "turret_world_ue_cm": [
+        1160.0,
+        -1340.0,
+        132.0
+      ]
+    }
+  },
+  "lorry": {
+    "hull": "/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Rus_ArmoredCar/ZIS5V/Meshes/SM_Hull_ZIS5V",
+    "chassis": "/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Rus_ArmoredCar/ZIS5V/Meshes/SK_ZIS5V_Chasis",
+    "location_ue_cm": [
+      1160.0,
+      -1200.0,
+      12.0
+    ],
+    "yaw_ue_deg": -270.0
+  }
+}

@@ -12,6 +12,7 @@
 #include "RTS_Survival/RTSCollisionTraceChannels.h"
 #include "RTS_Survival/RTSComponents/HealthComponent.h"
 #include "RTS_Survival/Units/Squads/SquadUnit/SquadUnit.h"
+#include "RTS_Survival/Utils/CollisionSetup/RTSPlayerCollision.h"
 #include "RTS_Survival/Weapons/InfantryWeapon/InfantryWeaponMaster.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogRTSCoverObserve, Log, All);
@@ -23,6 +24,7 @@ namespace CoverCombatObserverPrivate
 	// Slower than this, a soldier counts as standing still.
 	constexpr float StationarySpeed = 30.0f;
 	constexpr int32 PlayerOwnedTeam = 1;
+	constexpr int32 EnemyOwnedTeam = 2;
 	// Heights above the ground: a rifle at the shoulder, the chest of a standing man, and of a crouching one.
 	constexpr float MuzzleHeight = 150.0f;
 	constexpr float StandingChestHeight = 120.0f;
@@ -254,15 +256,15 @@ void FCoverCombatObserver::AccumulateLinesOfFire(
 	{
 		return;
 	}
-	// The channel the attackers' weapons trace on: the one this soldier's side blocks.
-	const ECollisionChannel WeaponChannel = SquadUnit.GetOwningPlayer() == PlayerOwnedTeam
-		? COLLISION_TRACE_PLAYER
-		: COLLISION_TRACE_ENEMY;
+	// Traced as an attacker's shot: on its weapon channel, with its ignore mask (the scenario is human vs player 2).
+	const int32 AttackingPlayer = SquadUnit.GetOwningPlayer() == PlayerOwnedTeam ? EnemyOwnedTeam : PlayerOwnedTeam;
+	const ECollisionChannel WeaponChannel = FRTSPlayerCollision::GetWeaponTraceChannel(AttackingPlayer);
 	const float HalfHeight = SquadUnit.GetSimpleCollisionHalfHeight();
 	const float ChestHeight = State == ECoverObservedState::CoverProtected ? CrouchedChestHeight : StandingChestHeight;
 	const FVector TargetLocation = SquadUnit.GetActorLocation() + FVector::UpVector * (ChestHeight - HalfHeight);
 	const int32 StateIndex = static_cast<int32>(State);
 	FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(RTSCoverObserveLineOfFire), true);
+	FRTSPlayerCollision::ApplyWeaponIgnoreMask(QueryParams, AttackingPlayer);
 	for (const FVector& AttackerLocation : AttackerLocations)
 	{
 		const FVector MuzzleLocation = AttackerLocation + FVector::UpVector * (MuzzleHeight - HalfHeight);

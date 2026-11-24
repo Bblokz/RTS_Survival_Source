@@ -201,6 +201,11 @@ protected:
 
 	virtual void OnUnitDies(const ERTSDeathType DeathType) override;
 
+	// Lets subclasses read the finishing squad (its owner) before bConsumeSquadWhenFinished kills its soldiers.
+	virtual void OnScavengeCompletedBySquad(ASquadController& ScavengingSquad)
+	{
+	}
+
 private:
 	// Starts with true in c tor. Set to false once one squad unit reaches and ASquadController::StartScavengeObject
 	// is called. Is set disabled on MakeScavengingSquadStopScavenging_AndDisableScavObj which happens on complete.

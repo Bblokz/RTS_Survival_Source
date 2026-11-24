@@ -5,6 +5,9 @@
 
 #include "EnemyAIBehaviour.generated.h"
 
+enum class ESquadSubtype : uint8;
+enum class ETankSubtype : uint8;
+
 UENUM(Blueprintable)
 enum class EEnemyStrategicAIBehaviour :uint8
 {
@@ -69,6 +72,21 @@ struct FEnemyAIMissionSettings
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	bool bAllowUnitTraining = true;
 
+	// Both lists empty: the AI trains anything its buildings unlock. Otherwise it only trains the squads and tanks
+	// listed here (still only those its buildings unlock), so an early mission can keep the AI to Mosin squads at its
+	// barracks. A list left empty while the other is filled means none of that kind.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Strategic AI|Training", meta=(EditCondition="bAllowUnitTraining"))
+	TArray<ESquadSubtype> RestrictTrainingToSquads;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Strategic AI|Training", meta=(EditCondition="bAllowUnitTraining"))
+	TArray<ETankSubtype> RestrictTrainingToTanks;
+
+	bool GetHasTrainingRestriction() const
+	{
+		return not RestrictTrainingToSquads.IsEmpty() || not RestrictTrainingToTanks.IsEmpty();
+	}
+
+	// Off: the AI builds nothing, which includes the trenches it digs around its bases.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	bool bAllowBuilding = false;
 

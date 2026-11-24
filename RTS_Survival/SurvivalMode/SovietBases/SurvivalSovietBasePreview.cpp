@@ -43,6 +43,7 @@
 #include "RTS_Survival/Units/Tanks/TankMaster.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
+#include "RTS_Survival/Environment/DestructableEnvActor/WallGate/WallGateNavigation.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogSovietBasePreview, Log, All);
 
@@ -1511,7 +1512,8 @@ bool FSovietBasePreviewRunner::TestPath(const int32 AgentIndex, const FVector& F
 		return false;
 	}
 	const FPathFindingQuery Query(nullptr, *NavData, ProjectedFrom.Location, ProjectedTo.Location,
-	                              UNavigationQueryFilter::GetQueryFilter(*NavData, nullptr, nullptr));
+	                              UNavigationQueryFilter::GetQueryFilter(*NavData, nullptr,
+	                                                                     URTSClosedBreachableWallsQueryFilter::StaticClass()));
 	const FPathFindingResult Result = NavigationSystem->FindPathSync(AgentProperties, Query);
 	if (Result.IsSuccessful() and Result.Path.IsValid() and not Result.IsPartial())
 	{

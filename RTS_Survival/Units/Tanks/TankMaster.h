@@ -364,6 +364,12 @@ public:
 	void Debug_StartEngineFire();
 
 	/**
+	 * @brief The tank went through the ice (UFrozenLakeIceSubsystem) and lies under it: dies where it is with the
+	 * quiet scavenging death, so the game state, selection and AI are cleaned up like any other death.
+	 */
+	void DieSunkThroughIce();
+
+	/**
 	 * @brief Testing aid: kills this tank with a regular death of the given variant, as if a projectile flying along
 	 * KillShotDirection hit it (zero for a death without a killing projectile).
 	 * @param Variant The regular death to play; overrides the shuffle for this death only.
@@ -371,6 +377,13 @@ public:
 	 */
 	UFUNCTION(BlueprintCallable, Category="Death|Debug")
 	void Debug_DieRegularDeath(ERegularDeathVariant Variant, FVector KillShotDirection);
+
+	/**
+	 * @brief Runs for every actor this tank's death spawns (its wreck), after the death effects started on it.
+	 * The hook is copied when the death starts, so it still runs if the tank is gone before the wreck loads.
+	 * @param Hook Called with each spawned actor; pass an empty function to clear it.
+	 */
+	void SetWreckSpawnedHook(TFunction<void(AActor*)> Hook) { M_WreckSpawnedHook = MoveTemp(Hook); }
 
 	/** @brief Records the travel direction of a killing projectile for the regular death's debris. */
 	virtual float TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator,
@@ -540,6 +553,12 @@ public:
 	void SetTurretsDisabled();
 
 protected:
+
+	/**
+	 * @brief Lets a subclass keep animating while off screen (a nomadic truck that deploys or packs up): disabled,
+	 * every optimised component is set as if in view and stays so until enabled again.
+	 */
+	void SetUnitOptimizationEnabled(const bool bEnable);
 
 	/** @return False for vehicles with no crew to throw out, such as a nomadic vehicle deployed as a building. */
 	virtual bool GetCanThrowCrewOnDeath() const;
@@ -769,6 +788,10 @@ protected:
 
 	virtual void SetUnitToIdleSpecificLogic() override;
 
+	/** @return True while the harvester docks or is unloaded at an unload station: new orders wait until it is done. */
+	virtual bool GetMustFinishActiveCommandBeforeNewOrder() const override;
+	virtual void OnNewOrderHeldBehindActiveCommand() override;
+
 	/** @copydoc ICommands::StopBehaviourTree()
 	 * Is the same for all derived classes (they used derive AAITankMaster controllers.
 	 */
@@ -996,6 +1019,12 @@ private:
 	void DestroyAndSpawnActorsWithRegularDeath(const FDestroySpawnActorsParameters& SpawnParams,
 	                                           const FCollapseFX& CollapseFX);
 	ERegularDeathVariant DrawRegularDeathVariant();
+
+	// Optional per-instance reaction to the spawned wreck (see SetWreckSpawnedHook).
+	TFunction<void(AActor*)> M_WreckSpawnedHook;
+
+	/** @return Callback for FRTS_Collapse::OnDestroySpawnActors: runs Inner, then a copy of M_WreckSpawnedHook. */
+	TFunction<void(AActor*)> MakeWreckSpawnedCallback(TFunction<void(AActor*)> Inner) const;
 
 	/** @brief Throws crew ragdolls out of the top of the vehicle; runs before the Blueprint can destroy it. */
 	void OnUnitDies_ThrowCrewBodies(ERTSDeathType DeathType) const;

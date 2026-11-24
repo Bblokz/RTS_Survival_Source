@@ -7,12 +7,18 @@
 #include "RTS_Survival/Game/Difficulty/GameDifficulty.h"
 #include "RTS_Survival/WorldCampaign/CampaignGeneration/Enums/Turn/WorldTurnType.h"
 #include "RTS_Survival/WorldCampaign/SaveAndState/SaveData/FWorldCampaignState.h"
+#include "RTS_Survival/WorldCampaign/StrengthTypes/WorldStrengthContribution.h"
 #include "WorldDivisionManager.generated.h"
 
 class AGeneratorWorldCampaign;
 class AWorldDivisionBase;
 class AWorldPlayerController;
 class UWorldDataComponent;
+struct FWorldEnemyReactionPieceSetup;
+
+/** Native: a division or convoy left the map (destroyed, consumed or removed after a won operation). */
+DECLARE_MULTICAST_DELEGATE_TwoParams(FOnWorldDivisionRemoved, const FGuid& /*DivisionKey*/,
+                                     const FVector& /*LastLocation*/);
 
 /**
  * @brief Controller-owned runtime system for spawning, moving, saving, and applying world divisions.
@@ -86,6 +92,63 @@ public:
 	TArray<FWorldDivisionSaveData> BuildWorldDivisionSaveData() const;
 	const TArray<TObjectPtr<AWorldDivisionBase>>& GetWorldDivisions() const { return M_WorldDivisions; }
 
+	/**
+	 * @brief Moves enemy pieces for the turn and reports back only when every movement (of any side) has ended.
+	 * @param GameDifficulty Difficulty forwarded to influence refresh after movement finishes.
+	 * @param OnMovementFinished Called once all movement finished; may run before this returns when nothing moves.
+	 * @note Does not save; the caller saves once its whole turn is done.
+	 */
+	void MoveEnemyDivisionsThenNotify(ERTSGameDifficulty GameDifficulty, const FSimpleDelegate& OnMovementFinished);
+
+	/** @return true while a turn movement pass waits for division movement to end. */
+	bool GetIsTurnMovementInProgress() const { return M_ActiveMovingTurn != EWorldTurnType::None; }
+
+	/**
+	 * @brief Spawns an enemy-owned convoy or division during the enemy turn with its configured roster.
+	 * @param PieceType Division or convoy type.
+	 * @param SpawnLocation World location of the new piece.
+	 * @param DivisionKey Stable key; the enemy turn derives it from the campaign seed.
+	 * @param GameDifficulty Difficulty used for WorldData strength lookup.
+	 * @return The registered piece, or nullptr when it could not be spawned.
+	 */
+	AWorldDivisionBase* SpawnEnemyReactionPiece(EWorldFieldDivisions PieceType,
+	                                            const FVector& SpawnLocation,
+	                                            const FGuid& DivisionKey,
+	                                            ERTSGameDifficulty GameDifficulty);
+
+	UFUNCTION(BlueprintPure, Category="World Campaign|World Divisions")
+	AWorldDivisionBase* FindDivisionByKey(const FGuid& DivisionKey) const;
+
+	/**
+	 * @brief Takes a division or convoy off the map for good, e.g. after the player won the operation against it.
+	 * @param DivisionKey Key of the piece.
+	 * @return false when no piece has this key.
+	 * @note Refreshes influence and the division save cache; the caller saves the campaign.
+	 */
+	UFUNCTION(BlueprintCallable, Category="World Campaign|World Divisions")
+	bool RemoveDivisionByKey(const FGuid& DivisionKey);
+
+	/**
+	 * @brief Weakens every enemy division and convoy within an XY radius, e.g. for an airfield or battery strike.
+	 * A piece that loses its last tank, squad or truck is removed.
+	 * @param Center Strike centre in world space.
+	 * @param Radius XY radius of the strike.
+	 * @param DamageEntryCount Whole tanks, squads or trucks each piece loses.
+	 * @return Number of pieces hit.
+	 */
+	UFUNCTION(BlueprintCallable, Category="World Campaign|World Divisions")
+	int32 ApplyDamageToEnemyDivisionsInRadius(const FVector& Center, float Radius, int32 DamageEntryCount);
+
+	/**
+	 * @brief Strength ledger for an operation against one division or convoy: its own strength plus every other
+	 * enemy piece whose influence radius covers it.
+	 * @param DivisionKey Key of the attacked piece.
+	 * @return Contributions for FWorldMissionContext::StrengthContributions; empty when the key is unknown.
+	 */
+	TArray<FWorldStrengthContribution> BuildOperationStrengthContributionsForDivision(const FGuid& DivisionKey) const;
+
+	FOnWorldDivisionRemoved& OnDivisionRemoved() { return M_OnDivisionRemoved; }
+
 private:
 	UPROPERTY()
 	TWeakObjectPtr<AWorldPlayerController> M_WorldPlayerController;
@@ -102,7 +165,21 @@ private:
 	EWorldTurnType M_ActiveMovingTurn = EWorldTurnType::None;
 	ERTSGameDifficulty M_CurrentGameDifficulty = ERTSGameDifficulty::Normal;
 	ERTSGameDifficulty M_ActiveMovementDifficulty = ERTSGameDifficulty::Normal;
-	int32 M_ActiveTurnMovementCount = 0;
+
+	// Keys of divisions whose movement still plays. Shared by overlapping player and enemy passes, so a later pass
+	// never resets an earlier pass that is still waiting.
+	TSet<FGuid> M_DivisionKeysMovingThisPass;
+
+	// Callers waiting for the current movement passes; run once after the last mover reported back.
+	TArray<FSimpleDelegate> M_MovementFinishedCallbacks;
+
+	// Set by any pass that asked for a campaign save once movement ends.
+	bool bM_ShouldSaveWhenMovementFinished = false;
+
+	// True while a pass starts its movers, so a mover finishing at once cannot end the pass early.
+	bool bM_IsStartingMovementPass = false;
+
+	FOnWorldDivisionRemoved M_OnDivisionRemoved;
 
 	/**
 	 * @brief Caches required runtime references before spawning, restoring, or moving divisions.
@@ -172,8 +249,31 @@ private:
 	 * @param OwningPlayer Owner id to move this turn.
 	 * @param TurnType Turn type stored while waiting for movement callbacks.
 	 * @param GameDifficulty Difficulty used after movement to refresh influence.
+	 * @param bSaveWhenFinished Whether the campaign is saved once all movement ended.
+	 * @param OnMovementFinished Optional callback run once all movement ended.
 	 */
-	void MoveDivisionsForOwner(int32 OwningPlayer, EWorldTurnType TurnType, ERTSGameDifficulty GameDifficulty);
+	void MoveDivisionsForOwner(int32 OwningPlayer, EWorldTurnType TurnType, ERTSGameDifficulty GameDifficulty,
+	                           bool bSaveWhenFinished, const FSimpleDelegate& OnMovementFinished);
+
+	/**
+	 * @brief Binds the finish callback and starts one division's turn movement.
+	 * @param WorldDivision Division with a pending move order.
+	 * @return true when movement started and the pass must wait for it.
+	 */
+	bool TryStartTurnMovement(AWorldDivisionBase& WorldDivision);
+
+	/** @brief Drops moving keys whose division is gone or no longer moving, so a pass can never hang. */
+	void PruneStaleMovingDivisionKeys();
+
+	/** @brief Ends the active pass once no division is moving and no pass is still starting. */
+	void TryFinishMovementPassIfIdle();
+
+	/**
+	 * @brief Applies the configured roster of a reaction piece; an empty roster keeps the class defaults.
+	 * @param WorldDivision Freshly spawned and initialized piece.
+	 * @param PieceSetup Configured setup, or nullptr.
+	 */
+	void ApplyReactionPieceRoster(AWorldDivisionBase& WorldDivision, const FWorldEnemyReactionPieceSetup* PieceSetup) const;
 
 	/**
 	 * @brief Receives movement-component completion callbacks and finishes the turn pass when all are done.
@@ -188,7 +288,8 @@ private:
 	void OnDivisionStrengthChanged(AWorldDivisionBase* WorldDivision);
 
 	/**
-	 * @brief Runs the post-movement turn-end work: influence refresh, save cache, and campaign save.
+	 * @brief Runs the post-movement turn-end work: influence refresh, save cache, the campaign save when a pass
+	 * asked for it, then the waiting callbacks.
 	 */
 	void FinishActiveTurnMovement();
 

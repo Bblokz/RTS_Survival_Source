@@ -8,7 +8,9 @@
 #include "RTS_Survival/Enemy/StrategicAI/StrategicAIBlackboard.h"
 #include "RTS_Survival/GameUI/TrainingUI/TrainingOptions/TrainingOptions.h"
 #include "RTS_Survival/Enemy/TrainingAndUnitCreation/StrategicTrainingState/StrategicTrainingState.h"
+#include "RTS_Survival/Enemy/TrainingAndUnitCreation/EnemyBuildingTrainer/EnemyTrainedUnitStandSpots.h"
 #include "RTS_Survival/GlobalAbilitySystem/GlobalAbilityType/EGlobalAbilityType.h"
+#include "RTS_Survival/Utils/RTSMapTests/RTSMapTests.h"
 #include "EnemyStrategicAIComponent.generated.h"
 
 class UGlobalAbility;
@@ -21,8 +23,17 @@ class AEnemyController;
 class URTSGameInstance;
 class UEnemyDirectControlComponent;
 class ASquadController;
+class UEnemyBuildingTrainerComponent;
 
 DECLARE_DELEGATE(FAIThinkStepDelegate);
+class ICommands;
+
+/** Where a unit a building trained came out; read when the unit gets its first orders (a squad once loaded). */
+struct FEnemyBuildingTrainedUnitExit
+{
+	FTransform ExitTransform = FTransform::Identity;
+	FVector BuildingCenter = FVector::ZeroVector;
+};
 
 USTRUCT()
 struct FAIThinkingTimerData
@@ -196,9 +207,53 @@ public:
 
 	const FStrategicAIResultBatch& GetLatestStrategicAIResults() const;
 	const FStrategicAIBlackboard& GetStrategicAIBlackboard() const;
+
+	// Fires on the game thread after a result batch of the async thread was applied to the blackboard (tests).
+	DECLARE_MULTICAST_DELEGATE_OneParam(FOnStrategicAIResultsApplied, const FStrategicAIResultBatch&);
+	FOnStrategicAIResultsApplied OnStrategicAIResultsApplied;
+
+	// Also gates the base trenches the AI digs (UEnemyBaseTrenchComponent).
+	bool GetIsAllowedBuilding() const;
 	FStrategicAIBlackboard& GetEditableStrategicAIBlackboard();
 	FEnemyStrategicTrainingState& GetEditableEnemyTrainingState();
 	void RegisterDroppedUnitWithBlackboardWhenReady(AActor* DroppedUnit);
+
+	/** Points of a unit a building trainer dropped before it trained go back to the AI. */
+	void RefundTrainingPoints(const int32 TrainingPoints);
+	/**
+	 * @brief A building trainer of this AI's player finished a unit: it joins the fog hidden until seen, joins this
+	 * controller's direct-control pool (blackboard idle) and moves to a base defense position, like every trained
+	 * unit; without a defense position it moves to a stand spot near the exit that blocks no unit of this side.
+	 * @param Trainer The building's trainer for its exit; null when the building is gone (the unit then waits
+	 * around TrainingLocation).
+	 */
+	void OnBuildingTrainerUnitSpawned(const FTrainingOption& TrainingOption, AActor* SpawnedActor,
+	                                  const FVector& TrainingLocation,
+	                                  const UEnemyBuildingTrainerComponent* Trainer = nullptr);
+
+#if RTS_WITH_MAP_TESTS
+	// Routes the units through the building trainers like a paid batch (no points are spent); returns how many
+	// were queued at a building.
+	int32 MapTest_QueueTrainingAtBuildings(const TArray<ETankSubtype>& TankSubtypes,
+	                                       const TArray<ESquadSubtype>& SquadSubtypes);
+	TArray<UEnemyBuildingTrainerComponent*> MapTest_GetBuildingTrainers();
+	int32 MapTest_GetTrainingPoints() const { return M_TrainingState.TrainingPoints; }
+	void MapTest_SetTrainingPoints(const int32 TrainingPoints) { M_TrainingState.TrainingPoints = TrainingPoints; }
+	// Runs one real training think (reservation, pick, pay, route) even while the periodic one is suspended.
+	void MapTest_RunTrainingThinkStep()
+	{
+		bM_MapTest_IsForcingTrainingThink = true;
+		Training_ThinkStep();
+		bM_MapTest_IsForcingTrainingThink = false;
+	}
+	// Keeps the live AI from queueing its own units while a test owns the buildings' queues.
+	void MapTest_SetTrainingThinkSuspended(const bool bSuspended) { bM_MapTest_IsTrainingThinkSuspended = bSuspended; }
+	int32 MapTest_GetRefundedTrainingPoints() const { return M_MapTest_RefundedTrainingPoints; }
+	// Runs the pick filter alone: what the AI may pick now that it knows its standing trainers.
+	void MapTest_CollectAvailableTrainingOptions(TArray<ETankSubtype>& OutTankSubtypes,
+	                                             TArray<ESquadSubtype>& OutSquadSubtypes);
+	FEnemyStrategicTrainingState& MapTest_GetEditableTrainingState() { return M_TrainingState; }
+#endif
 
 #if defined(RTS_WITH_ENEMY_AI_SHIPPING_TESTS) && RTS_WITH_ENEMY_AI_SHIPPING_TESTS
 	void ShippingTest_RunTrainingPressureThinkStep();
@@ -286,7 +341,33 @@ private:
 	// Keeps an unaffordable picked batch active until enough training points have accumulated.
 	FEnemyStrategicAITrainingReservation M_TrainingReservation;
 	// Each paid batch owns its own timer so overlapping training batches do not interrupt each other.
+	// Only the legacy path uses these: enemy UTrainerComponents on the blackboard (no Soviet building has one).
 	TArray<FEnemyStrategicAITrainingSpawnBatch> M_ActiveTrainingSpawnBatches;
+	// Standing buildings of this AI's player with a UEnemyBuildingTrainerComponent; refreshed every training think.
+	TArray<TWeakObjectPtr<UEnemyBuildingTrainerComponent>> M_BuildingTrainers;
+	// Building-trained units that have not had their first orders yet (squads wait until they are loaded).
+	TMap<TWeakObjectPtr<AActor>, FEnemyBuildingTrainedUnitExit> M_BuildingTrainedUnitExits;
+	// Stand spots building-trained units were sent to; one stays taken while its unit walks there or stands on it.
+	TArray<FEnemyStandSpotReservation> M_StandSpotReservations;
+	/** Sends a building-trained unit to a stand spot near its exit (see EnemyTrainedUnitStandSpots); false if none. */
+	bool Training_MoveToStandSpot(AActor* Unit, ICommands& Commands, const FEnemyBuildingTrainedUnitExit& Exit);
+	// Building-trained units waiting at their stand spot before they go to a base defense position.
+	TArray<FEnemyStandSpotWait> M_StandSpotWaits;
+	/** Sends every waiting unit whose time is up, and that is still idle in the AI's pool, to a defense position. */
+	void Training_ReleaseStandSpotWaiters();
+	/** Moves the unit to a random base defense position; false if the AI has none. */
+	bool MoveUnitToRandomDefensePosition(AActor* Unit, ICommands& Commands, const TCHAR* LogTag,
+	                                     const FVector& LogFromLocation);
+	/** The faction's units and reserved spots around an exit, without the unit itself (or its own soldiers). */
+	void Training_GatherStandSpotOccupied(const AActor* Unit, const FVector& ExitLocation,
+	                                      TArray<FEnemyStandSpotOccupied>& OutOccupied);
+	/** The unit and its soldiers join the fog now, hidden until the human player can see them. */
+	static void Training_StartFogNowHiddenUntilSeen(AActor* Unit);
+#if RTS_WITH_MAP_TESTS
+	bool bM_MapTest_IsTrainingThinkSuspended = false;
+	bool bM_MapTest_IsForcingTrainingThink = false;
+	int32 M_MapTest_RefundedTrainingPoints = 0;
+#endif
 	int32 M_NextTrainingSpawnBatchID = 1;
 #if defined(RTS_WITH_ENEMY_AI_SHIPPING_TESTS) && RTS_WITH_ENEMY_AI_SHIPPING_TESTS
 	int32 M_ShippingTest_TrainingSpawnRequestCount = 0;
@@ -367,6 +448,16 @@ private:
 		const FEnemyTrainingOptionsForTechLevel& TrainingOptions,
 		TArray<ETankSubtype>& OutTankSubtypes,
 		TArray<ESquadSubtype>& OutSquadSubtypes) const;
+
+	/**
+	 * @brief A mission can keep the AI to a few units (FEnemyAIMissionSettings::RestrictTrainingTo*), such as Mosin
+	 * squads only in an early mission; drops every unlocked option outside those lists.
+	 * @param InOutTankSubtypes Unlocked tank options, filtered in place.
+	 * @param InOutSquadSubtypes Unlocked squad options, filtered in place.
+	 */
+	void Training_ApplyMissionTrainingRestriction(
+		TArray<ETankSubtype>& InOutTankSubtypes,
+		TArray<ESquadSubtype>& InOutSquadSubtypes) const;
 	/**
 	 * @brief Narrows unlocked options to what can satisfy the broad pressure buckets before random batch selection.
 	 * @param Selection Focus and specialty picked from accumulated training pressure.
@@ -406,8 +497,28 @@ private:
 		const TArray<ETankSubtype>& TankSubtypes,
 		const TArray<ESquadSubtype>& SquadSubtypes) const;
 	bool Training_TrySpendTrainingPoints(const int32 TrainingPointCost);
+	// Collects the trainer components of the buildings this AI's player owns from the unit manager.
+	void Training_RefreshBuildingTrainers();
+	// A standing building trainer (or a legacy enemy UTrainerComponent) can take this unit type now.
+	bool Training_GetCanTrainUnitType(const EAllUnitType UnitType) const;
+	bool Training_GetHasLegacyEnemyTrainer() const;
+	// Every unit of the batch has a building that can train it.
+	bool Training_GetCanTrainBatch(const FEnemyStrategicAITrainingBatch& TrainingBatch) const;
+	// The least busy standing building that trains this option (equally busy ones take turns); null when none can.
+	UEnemyBuildingTrainerComponent* Training_PickBuildingTrainer(const FTrainingOption& TrainingOption) const;
+	int32 Training_GetTrainingOptionCost(const FTrainingOption& TrainingOption) const;
 	/**
-	 * @brief Isolated hook for later spawning/training once reservation logic has paid for the exact batch.
+	 * @brief Hands each option to the least busy building that trains it; the building trains it over time.
+	 * @param TrainingOptions Paid options.
+	 * @param OutOptionsWithoutBuilding Options no standing building could take.
+	 * @return How many options were queued at a building.
+	 */
+	int32 Training_QueueOptionsAtBuildingTrainers(const TArray<FTrainingOption>& TrainingOptions,
+	                                              TArray<FTrainingOption>& OutOptionsWithoutBuilding);
+	/**
+	 * @brief Trains a paid batch: each unit goes to the least busy standing building of its kind (barracks/tent for
+	 * squads, vehicle buildings for tanks) and appears there after its training time. Units no building can take get
+	 * their points back; a level with legacy enemy UTrainerComponents still spawns those there.
 	 * @param TankSubtypes Tank subtypes to create.
 	 * @param SquadSubtypes Squad subtypes to create.
 	 */
@@ -455,11 +566,7 @@ private:
 	bool TryGetRandomBlackboardDefensePosition(FDefensePositions& OutDefensePosition) const;
 	void DebugTrainedUnit(const FTrainingOption& TrainingOption, const FVector& TrainingLocation) const;
 
-	bool GetValidTrainingSpawnTransform(FTransform& OutTransform);
-
 	bool GetValidTrainerComponentLocationFromBlackboard(FTransform& OutSpawnTransform) const;
-
-	bool GetRandomEnemyBaseClusterSpawnTransform(FTransform& OutSpawnTransform) const;
 	
 
 	FAIThinkingTimerData M_TrainingPressureThinkTimer;
@@ -487,6 +594,9 @@ private:
 	TArray<FAIThinkingTimerData*> M_AIThinkTimers;
 
 	bool EnsureEnemyControllerIsValid() const;
+	// The AI player of the owning controller: whose units this component counts, trains and asks the async
+	// thread about. The first AI player when the component has no enemy controller as owner.
+	int32 GetControlledPlayer() const;
 	bool EnsureStochasticDecisionTreeIsValid() const;
 	void CacheGenerationSeedFromGameInstance();
 	int32 GetSeededIndex(const int32 OptionCount, const int32 DecisionSalt = 0) const;

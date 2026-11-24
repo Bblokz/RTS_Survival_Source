@@ -10,6 +10,7 @@
 #include "Components/DecalComponent.h"
 #include "Components/SceneComponent.h"
 #include "RTS_Survival/Collapse/FRTS_Collapse/FRTS_Collapse.h"
+#include "RTS_Survival/Game/Players/RTSPlayers.h"
 #include "RTS_Survival/RTSCollisionTraceChannels.h"
 #include "Kismet/KismetMathLibrary.h"
 #include "RTS_Survival/RTSComponents/HealthComponent.h"
@@ -355,8 +356,48 @@ void ATeamWeapon::SetTurretOwnerActor(AActor* NewOwner)
 	}
 
 	InitTurretOwner(NewOwner);
+	FollowOwningPlayerOfCrew(*NewOwner);
 	InitSelectionDelegatesOfOwner(NewOwner);
 	OnSetupTurret(NewOwner);
+}
+
+void ATeamWeapon::FollowOwningPlayerOfCrew(const AActor& NewTurretOwner)
+{
+	// By handle: the turret base binds this actor to the same component, and RemoveAll would take that one too.
+	if (URTSComponent* PreviousCrewRTSComponent = M_CrewOwnerListener.CrewRTSComponent.Get())
+	{
+		PreviousCrewRTSComponent->OnOwningPlayerChanged.Remove(M_CrewOwnerListener.OwnerChangedHandle);
+	}
+	M_CrewOwnerListener = FTeamWeaponCrewOwnerListener();
+	URTSComponent* CrewRTSComponent = NewTurretOwner.FindComponentByClass<URTSComponent>();
+	if (not IsValid(CrewRTSComponent))
+	{
+		return;
+	}
+	M_CrewOwnerListener.CrewRTSComponent = CrewRTSComponent;
+	M_CrewOwnerListener.OwnerChangedHandle = CrewRTSComponent->OnOwningPlayerChanged.AddUObject(
+		this, &ATeamWeapon::OnCrewChangedOwningPlayer);
+	MatchOwningPlayerOfCrew(CrewRTSComponent->GetOwningPlayer());
+}
+
+void ATeamWeapon::OnCrewChangedOwningPlayer(const uint8 /*OldOwningPlayer*/, const uint8 NewOwningPlayer)
+{
+	MatchOwningPlayerOfCrew(NewOwningPlayer);
+}
+
+void ATeamWeapon::MatchOwningPlayerOfCrew(const uint8 CrewOwningPlayer)
+{
+	// A crew without a real owner (unset, neutral) leaves the gun as its Blueprint made it.
+	if (not FRTSPlayers::IsValidPlayer(CrewOwningPlayer) || not GetIsValidRTSComponent())
+	{
+		return;
+	}
+	if (M_RTSComponent->GetOwningPlayer() == CrewOwningPlayer)
+	{
+		return;
+	}
+	// Registers the gun under the crew's player and sets its mesh up to be hit by that player's hostiles.
+	(void)SetOwningPlayerRuntime(CrewOwningPlayer);
 }
 
 void ATeamWeapon::GetCrewPositions(TArray<UCrewPosition*>& OutCrewPositions) const

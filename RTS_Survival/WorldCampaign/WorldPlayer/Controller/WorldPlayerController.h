@@ -22,6 +22,12 @@ class AWorldMissionObject;
 class AWorldEnemyObject;
 class AWorldDivisionBase;
 class UWorldStateAndSaveManager;
+class UWorldCampaignProgressManager;
+class UWorldEnemyTurnDirector;
+class UWorldCampaignTechManager;
+class UWorldCommanderMapKit;
+class UWorldBuildNodeManager;
+class AWorldBuildNode;
 class UWorldDivisionManager;
 class UWorldProfileAndUIManager;
 class UPlayerResourceManager;
@@ -36,6 +42,8 @@ class UWorldPlayerAudioController;
 class USoundBase;
 class UWorld;
 struct FWorldCampaignState;
+struct FWorldMissionContext;
+enum class EWorldOperationTarget : uint8;
 
 USTRUCT(BlueprintType)
 struct FWorldOperationMapSettings
@@ -71,6 +79,23 @@ public:
 	AGeneratorWorldCampaign* GetWorldGenerator() const;
 	UWorldStateAndSaveManager* GetWorldStateAndSaveManager() const;
 	UPlayerResourceManager* GetPlayerResourceManager() const;
+
+	/**
+	 * @brief Gets the owner of campaign progress: results, map resources, rank, tech and buildings.
+	 * @return Progress manager, or nullptr when the component is unavailable.
+	 */
+	UFUNCTION(BlueprintPure, Category = "World Campaign|Progress")
+	UWorldCampaignProgressManager* GetWorldCampaignProgressManager() const;
+
+	/** Finds the mission or enemy object standing on an anchor; nullptr when the anchor holds none. */
+	AWorldMapObject* FindWorldMapObjectByAnchorKey(const FGuid& AnchorKey) const;
+
+	/**
+	 * @brief How close a map location is to the enemy wall, measured from the player HQ.
+	 * @param WorldLocation Location to rate.
+	 * @return 0 at the player HQ, 1 at the wall or beyond it.
+	 */
+	float GetWallProximityForLocation(const FVector& WorldLocation);
 
 	UFUNCTION(BlueprintCallable, Category = "World Campaign|Turns")
 	FPlayerTurnContext GetPlayerTurnContext() const;
@@ -128,6 +153,26 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "World Campaign|Operations")
 	void LaunchOperationForWorldObject(AWorldMapObject* OperationWorldObject);
 
+	/**
+	 * @brief Attacks a moving enemy division or convoy as the player's operation for this turn. It is fought on the
+	 * next enemy procedural map; winning removes the piece from the world map.
+	 * @param EnemyDivision Enemy-owned division or convoy to attack.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "World Campaign|Operations")
+	void LaunchOperationAgainstDivision(AWorldDivisionBase* EnemyDivision);
+
+	UFUNCTION(BlueprintPure, Category = "World Campaign|Enemy Turn")
+	UWorldEnemyTurnDirector* GetWorldEnemyTurnDirector() const { return M_WorldEnemyTurnDirector; }
+
+	UFUNCTION(BlueprintPure, Category = "World Campaign|Tech")
+	UWorldCampaignTechManager* GetWorldCampaignTechManager() const { return M_WorldCampaignTechManager; }
+
+	UFUNCTION(BlueprintPure, Category = "World Campaign|Commander")
+	UWorldCommanderMapKit* GetWorldCommanderMapKit() const { return M_WorldCommanderMapKit; }
+
+	UFUNCTION(BlueprintPure, Category = "World Campaign|Build Nodes")
+	UWorldBuildNodeManager* GetWorldBuildNodeManager() const { return M_WorldBuildNodeManager; }
+
 	void ShowAsyncWorldGenerationWidget();
 	void HideAsyncWorldGenerationWidget();
 	void UpdateAsyncWorldGenerationWidget_AnchorPlacementStarted();
@@ -157,6 +202,18 @@ protected:
 
 	UFUNCTION(BlueprintImplementableEvent, Category = "World Campaign|Operations")
 	void BP_OnEnemyMapLaunch(AWorldEnemyObject* EnemyMapObject, const TSoftObjectPtr<UWorld>& EnemyMap);
+
+	/** The player clicked an enemy division or convoy; Blueprint shows its panel and may call LaunchOperationAgainstDivision. */
+	UFUNCTION(BlueprintImplementableEvent, Category = "World Campaign|Operations")
+	void BP_OnEnemyDivisionClicked(AWorldDivisionBase* EnemyDivision);
+
+	/** The player clicked a build node; Blueprint shows its build options and may call TryBuildOnNode. */
+	UFUNCTION(BlueprintImplementableEvent, Category = "World Campaign|Build Nodes")
+	void BP_OnBuildNodeClicked(AWorldBuildNode* BuildNode);
+
+	/** The enemy turn started; the player cannot act until BP_OnPlayerTurnStarted fires again. */
+	UFUNCTION(BlueprintImplementableEvent, Category = "World Campaign|Turns")
+	void BP_OnEnemyTurnStarted();
 
 private:
 	EWorldPrimaryClickContext M_PrimaryClickContext = EWorldPrimaryClickContext::None;
@@ -189,6 +246,65 @@ private:
 	bool PopulateWorldMissionContextForEnemyMap(const AWorldEnemyObject* EnemyMapObject) const;
 	bool TryGetMissionMap(EMapMission MissionType, TSoftObjectPtr<UWorld>& OutMissionMap) const;
 	bool TryGetEnemyMap(TSoftObjectPtr<UWorld>& OutEnemyMap);
+
+	/** Adds what only the campaign knows (tier cap, bought tech, the deck) to an operation's mission context. */
+	void FillCampaignFieldsOnMissionContext(FWorldMissionContext& WorldMissionContext) const;
+
+	/**
+	 * @brief Commits the player's operation for this turn: records it as pending and saves, so the result the
+	 * mission reports can be matched after the level change. Called after the mission context was populated.
+	 * @param Target What kind of target is attacked.
+	 * @param AnchorKey Anchor of the mission or enemy item.
+	 * @param MissionType Mission type, or None for an enemy item.
+	 * @return false when the campaign could not be saved; the operation must not launch then.
+	 */
+	bool BeginCampaignOperation(EWorldOperationTarget Target, const FGuid& AnchorKey, EMapMission MissionType,
+	                            const FGuid& DivisionKey = FGuid());
+
+	bool PopulateWorldMissionContextForDivision(const AWorldDivisionBase* EnemyDivision) const;
+	void OnClicked_EnemyDivision(AWorldDivisionBase* EnemyDivision);
+
+	/** Runs what happens once at the start of each new player turn: cooldowns and income. */
+	void PlayerTurn_ApplyStartOfNewTurn();
+
+	/** Connects the commander map ability's effect requests to the systems that carry them out. */
+	void BeginPlay_BindCommanderMapKit();
+	void OnCommanderDamageDivisionRequested(const FGuid& DivisionKey, int32 Damage);
+	void OnCommanderRevealRegionRequested(const FVector& Location, float Radius, int32 Turns);
+
+	/**
+	 * @brief Whether this load of the world map continues the saved campaign instead of generating a new one.
+	 */
+	bool GetShouldLoadSavedCampaign() const;
+
+	/**
+	 * @brief After a restart the game instance knows no commander, faction or difficulty; a continued campaign
+	 * takes them from its save before the generator is initialized.
+	 */
+	void BeginPlay_RestoreSessionSettingsFromSave();
+
+	/** Writes one RTS_WORLDCAMPAIGN_SUMMARY log line; headless checks read the campaign's state from it. */
+	void LogWorldCampaignSummary(const TCHAR* Moment) const;
+
+#if !UE_BUILD_SHIPPING
+	/** -RTSWorldCampaignTestLaunchPin=<PinId>: commits an operation on that pinned mission without opening a level. */
+	void DebugCommitOperationOnPinFromCommandLine();
+#endif
+
+	/**
+	 * @brief A restored campaign spawns its own anchors from the save. The anchors placed in the level are only
+	 * raw material for generating a new campaign, so on the load path they are removed.
+	 */
+	void BeginPlay_LoadSavedWorld_RemoveUnusedLevelAnchors();
+
+	/** Hides and disables every mission and enemy object the player already cleared. */
+	void WorldSetupComplete_ApplyClearedAnchors();
+
+	/**
+	 * @brief Applies the result of the operation the player just returned from.
+	 * @return true when a result was applied, which means the enemy now gets its turn.
+	 */
+	bool WorldSetupComplete_ResolveReturningOperation();
 	void OpenOperationMap(const TSoftObjectPtr<UWorld>& OperationMap) const;
 	void ShowClickedDifficultyInfluenceRadiiForActor(AActor* Actor);
 	void HideClickedDifficultyInfluenceRadii();
@@ -296,6 +412,25 @@ private:
 	bool GetIsValidWorldStateAndSaveManager() const;
 
 	UPROPERTY()
+	TObjectPtr<UWorldCampaignProgressManager> M_WorldCampaignProgressManager = nullptr;
+	bool GetIsValidWorldCampaignProgressManager() const;
+
+	UPROPERTY()
+	TObjectPtr<UWorldEnemyTurnDirector> M_WorldEnemyTurnDirector = nullptr;
+	bool GetIsValidWorldEnemyTurnDirector() const;
+
+	UPROPERTY()
+	TObjectPtr<UWorldCampaignTechManager> M_WorldCampaignTechManager = nullptr;
+
+	UPROPERTY()
+	TObjectPtr<UWorldCommanderMapKit> M_WorldCommanderMapKit = nullptr;
+	bool GetIsValidWorldCommanderMapKit() const;
+
+	UPROPERTY()
+	TObjectPtr<UWorldBuildNodeManager> M_WorldBuildNodeManager = nullptr;
+	bool GetIsValidWorldBuildNodeManager() const;
+
+	UPROPERTY()
 	TObjectPtr<UWorldDivisionManager> M_WorldDivisionManager = nullptr;
 
 	/**
@@ -347,6 +482,10 @@ private:
 	FRTSGameDifficulty M_SelectedDifficulty;
 	ERTSFaction M_PlayerFaction;
 	bool bM_HasCompletedInitialWorldSetup = false;
+	// True when this world map load generated a new campaign; a new campaign starts on the player's first turn.
+	bool bM_IsNewlyGeneratedCampaign = false;
+	// Set when the turn counter advanced; a player turn resumed from a save must not pay income or tick cooldowns again.
+	bool bM_IsStartOfNewPlayerTurn = false;
 	bool bM_IsCameraOvertakeControlActive = false;
 	bool bM_IsWorldPlayerInputDisabled = false;
 };

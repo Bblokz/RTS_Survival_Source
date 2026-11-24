@@ -11,8 +11,11 @@ class ASurvivalModeDirector;
 class ASurvivalStartLocation;
 class UBorder;
 class UButton;
+class UHorizontalBox;
+class UMaterialInterface;
 class USurvivalUiStyleAsset;
 class UTextBlock;
+class UWidget;
 
 /**
  * @brief Lets the player cycle the survival start locations (camera follows via
@@ -26,7 +29,8 @@ class UTextBlock;
  *   required: M_LocationNameText (TextBlock), M_PreviousButton, M_NextButton, M_ConfirmButton (Button)
  *   optional: M_PanelBorder (Border); M_TitleText, M_LocationIndexText, M_HintText, M_ConfirmText (TextBlock)
  *   optional: M_ResourcesText, M_SpecialText (TextBlock): close radixite/metal nodes and the location's special;
- *   created under M_LocationIndexText's panel when the Blueprint does not have them.
+ *   created under M_LocationIndexText's panel when the Blueprint does not have them. M_ResourcesText is the label
+ *   of a C++ built row with the radixite/metal glass icons and counts (moved into that row when bound).
  */
 UCLASS()
 class RTS_SURVIVAL_API UW_SurvivalStartLocationPicker : public UUserWidget
@@ -94,7 +98,8 @@ protected:
 	UPROPERTY(meta = (BindWidgetOptional))
 	TObjectPtr<UTextBlock> M_ConfirmText = nullptr;
 
-	// Close radixite and metal nodes by the drop-off ("Near the drop-off: 6 radixite, 2 metal").
+	// Label of the close radixite and metal nodes row ("Near the drop-off:  [icon] 6  [icon] 2"); holds the whole
+	// line as words ("Near the drop-off: 6 radixite, 2 metal") when a resource icon material fails to load.
 	UPROPERTY(BlueprintReadOnly, Category = "Survival|Start Location", meta = (BindWidgetOptional))
 	TObjectPtr<UTextBlock> M_ResourcesText = nullptr;
 
@@ -111,13 +116,57 @@ private:
 	int32 M_SelectedIndex = INDEX_NONE;
 	bool bM_IsConfirmed = false;
 
+	// Same glass dome icons as the top resource bar; null when the material failed to load.
+	UPROPERTY()
+	TObjectPtr<UMaterialInterface> M_RadixiteIconMaterial = nullptr;
+
+	UPROPERTY()
+	TObjectPtr<UMaterialInterface> M_MetalIconMaterial = nullptr;
+
+	// One centred line: M_ResourcesText label, radixite icon + count, metal icon + count.
+	UPROPERTY()
+	TObjectPtr<UHorizontalBox> M_ResourcesRow = nullptr;
+
+	// Only created with the icon row; null means the counts are written as words into M_ResourcesText.
+	UPROPERTY()
+	TObjectPtr<UTextBlock> M_RadixiteCountText = nullptr;
+
+	UPROPERTY()
+	TObjectPtr<UTextBlock> M_MetalCountText = nullptr;
+
 	void ApplyStyleToBoundWidgets();
 	void BindButtons();
 	void RefreshTexts();
 	void RefreshSummaryTexts();
-	/** @brief Adds the summary text blocks under the location index text when the Blueprint has none. */
+	/** @brief Adds the summary widgets under the location index text when the Blueprint has none. */
 	void EnsureSummaryTexts();
 	UTextBlock* CreateSummaryText(int32 InsertIndexOffset);
+
+	/**
+	 * @brief Puts a summary widget in the panel of the location index text (or name text) so it follows the name.
+	 * @param Widget The new summary widget.
+	 * @param InsertIndexOffset Children after the anchor text to insert at.
+	 * @return False when there is no panel to insert into.
+	 */
+	bool InsertSummaryWidget(UWidget* Widget, int32 InsertIndexOffset);
+
+	void LoadResourceIconMaterials();
+
+	/** @brief Builds the resources row with the icons; without both icon materials M_ResourcesText stays plain. */
+	void CreateResourcesRow();
+
+	/** @brief Takes M_ResourcesText's place in its panel with the row, or inserts the row after the anchor text. */
+	bool PlaceResourcesRow(UHorizontalBox* Row);
+
+	/**
+	 * @brief Adds one resource icon and its count text to the resources row.
+	 * @param IconMaterial Glass icon material of the resource.
+	 * @param LeadingGap Space before the icon, separating it from the label or the previous count.
+	 * @return The count text that RefreshSummaryTexts fills; null without a row.
+	 */
+	UTextBlock* AddResourceIconAndCount(UMaterialInterface* IconMaterial, float LeadingGap);
+
+	bool GetHasResourceIconRow() const;
 	FText GetLocationName(const int32 LocationIndex) const;
 
 	UFUNCTION()

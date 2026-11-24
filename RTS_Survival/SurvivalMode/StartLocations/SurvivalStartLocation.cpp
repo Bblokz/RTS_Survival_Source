@@ -15,6 +15,7 @@
 #include "EngineUtils.h"
 #include "Misc/DateTime.h"
 #include "RTS_Survival/Enemy/Convoy/ConvoyRoute.h"
+#include "RTS_Survival/Resources/RadixiteGrowthComponent/RadixiteGrowthComponent.h"
 #include "RTS_Survival/SurvivalMode/Director/SurvivalModeDirector.h"
 #include "RTS_Survival/SurvivalMode/StartLocations/SurvivalStartContentSettings.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
@@ -228,23 +229,78 @@ void ASurvivalStartLocation::SetRevealFogOfWar(const bool bReveal)
 	{
 		return;
 	}
+	bM_IsRevealingFogOfWar = bReveal;
 	if (bReveal)
 	{
-		M_FowComponent->SetVisionRadius(PickerVisionRadius);
+		M_FowComponent->SetVisionRadius(GetRevealVisionRadius());
 		M_FowComponent->StartFow(EFowBehaviour::Fow_Active, true);
 		return;
 	}
 	M_FowComponent->StopFowParticipation();
 }
 
+float ASurvivalStartLocation::GetRevealVisionRadius() const
+{
+	return FMath::Max(PickerVisionRadius, M_ContentRevealRadius);
+}
+
 void ASurvivalStartLocation::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
-	if (M_ContentLoadHandle.IsValid())
-	{
-		M_ContentLoadHandle->CancelHandle();
-		M_ContentLoadHandle.Reset();
-	}
+	CancelPendingContentLoad();
 	Super::EndPlay(EndPlayReason);
+}
+
+void ASurvivalStartLocation::CancelPendingContentLoad()
+{
+	if (not M_ContentLoadHandle.IsValid())
+	{
+		return;
+	}
+	M_ContentLoadHandle->CancelHandle();
+	M_ContentLoadHandle.Reset();
+}
+
+void ASurvivalStartLocation::ClearPlayerStartContent()
+{
+	// A confirm while the classes still load must not spawn resources into the Soviet base later.
+	CancelPendingContentLoad();
+	M_PendingContentPlan.Reset();
+	for (const TWeakObjectPtr<AActor>& ContentActor : M_SpawnedStartContent)
+	{
+		DestroyStartContentActor(ContentActor.Get());
+	}
+	M_SpawnedStartContent.Reset();
+	for (UInstancedStaticMeshComponent* FoliageComponent : M_FoliageComponents)
+	{
+		if (IsValid(FoliageComponent))
+		{
+			FoliageComponent->DestroyComponent();
+		}
+	}
+	M_FoliageComponents.Reset();
+	M_DebugPlan.Reset();
+	bM_HasDebugPlan = false;
+	bM_HasGeneratedPlayerContent = false;
+	M_ContentRevealRadius = 0.f;
+	if (bM_IsRevealingFogOfWar and IsValid(M_FowComponent))
+	{
+		M_FowComponent->SetVisionRadius(GetRevealVisionRadius());
+	}
+}
+
+void ASurvivalStartLocation::DestroyStartContentActor(AActor* ContentActor)
+{
+	if (not IsValid(ContentActor))
+	{
+		return;
+	}
+	// Crystals that grew nodes while the player was picking take those nodes with them; the owner's timed destruction
+	// sequence would never run because the component goes with its actor.
+	if (URadixiteGrowthComponent* GrowthComponent = ContentActor->FindComponentByClass<URadixiteGrowthComponent>())
+	{
+		GrowthComponent->DestroyAllGrowthContentImmediately();
+	}
+	ContentActor->Destroy();
 }
 
 void ASurvivalStartLocation::Tick(const float DeltaSeconds)
@@ -302,6 +358,12 @@ void ASurvivalStartLocation::GeneratePlayerStartContent(const USurvivalStartCont
 	ReportPlanShortfalls(M_PendingContentPlan);
 	M_DebugPlan = M_PendingContentPlan;
 	bM_HasDebugPlan = true;
+	// The picker reveals the location; make sure the reveal reaches the outermost generated content.
+	M_ContentRevealRadius = GetContentOuterRadius(ContentSettings);
+	if (bM_IsRevealingFogOfWar and IsValid(M_FowComponent))
+	{
+		M_FowComponent->SetVisionRadius(GetRevealVisionRadius());
+	}
 	RequestStartContentLoad();
 }
 
@@ -816,6 +878,7 @@ void ASurvivalStartLocation::DrawDebugPlan() const
 			return PitColor;
 		case ESurvivalStartContentCategory::Crater:
 		case ESurvivalStartContentCategory::Detail:
+		case ESurvivalStartContentCategory::Cactus:
 			return CraterColor;
 		case ESurvivalStartContentCategory::Special:
 			return PitColor;

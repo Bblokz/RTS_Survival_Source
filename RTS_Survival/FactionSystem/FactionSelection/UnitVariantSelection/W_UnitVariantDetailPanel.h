@@ -144,15 +144,6 @@ private:
 	void AddStatRow(const FUnitVariantStatRow& StatRow);
 
 	/**
-	 * @brief A weapon stat as a pictogram and UnitVariantStatComparison::MaxStatLevel pips, Level of them filled.
-	 * @param StatIcon The stat's pictogram; the bar is drawn without it when it is missing.
-	 * @param Level 1 to MaxStatLevel.
-	 * @param Trend Against Base: green filled pips when better, red when worse, the accent colour otherwise.
-	 * @return The bar.
-	 */
-	UWidget* BuildStatBar(UTexture2D* StatIcon, const int32 Level, const EUnitVariantStatTrend Trend);
-
-	/**
 	 * @brief A row of the panel: an icon in a well, then a title (with its change tag) over a detail widget.
 	 * @param Icon Goes into the well.
 	 * @param IconSize Width and height of the well.

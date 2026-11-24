@@ -1,0 +1,50 @@
+# BXP portrait picks (bxp_portraits.py). Phase 1 = bxps_p1 idle captures, view FrontRight unless noted.
+BTX_GerHQRadar=HQRadar|D:/UE5Projects/RTS_Survival/Saved/UnitPortraits/bxps_p1|FrontRight
+# HQPlatform: the bare spawn has no flak on the deck, so the old HQ render (gun + crew) is used (coordinator's call).
+BTX_GerHQPlatform=HQPlatform|-|-|image=D:/UE_Assets/Icons/TrainingUI/Expansions/HQExp/NoIcons/T_GER_BXP_FlakDefense.png|notes=old HQExp NoIcons render (FlakDefense); a bare spawn shows no flak on the platform
+BTX_GerHQHarvester=HQHarvesterHub|D:/UE5Projects/RTS_Survival/Saved/UnitPortraits/bxps_p1|FrontRight
+BTX_GerHQRepairBay=HQRepairBay|D:/UE5Projects/RTS_Survival/Saved/UnitPortraits/bxps_p1|FrontRight
+BTX_RefConverter=RefConverter|D:/UE5Projects/RTS_Survival/Saved/UnitPortraits/bxps_p1|FrontRight
+BTX_GerCommObservationPost=CommObservationPost|D:/UE5Projects/RTS_Survival/Saved/UnitPortraits/bxps_p1|FrontRight
+BTX_37mmFlak=Flak37|D:/UE5Projects/RTS_Survival/Saved/UnitPortraits/bxps_p1|FrontRight|box=553,820,490|zoom=1|dy=0|notes=37mm flak turret reports huge bounds, cropped by hand
+BXT_88mmFlak=Flak88|D:/UE5Projects/RTS_Survival/Saved/UnitPortraits/bxps_p1|FrontRight
+BTX_Pak38=Pak38|D:/UE5Projects/RTS_Survival/Saved/UnitPortraits/bxps_p1|FrontRight
+BTX_LeFH_150mm=LeFH150|D:/UE5Projects/RTS_Survival/Saved/UnitPortraits/bxps_p1|FrontRight
+BXT_SolarLarge=SolarLarge|D:/UE5Projects/RTS_Survival/Saved/UnitPortraits/bxps_p1|FrontRight
+BXT_GerFLakBunker=FlakBunker|D:/UE5Projects/RTS_Survival/Saved/UnitPortraits/bxps_p1|FrontRight|box=575,1095,800|zoom=1|dy=0|notes=37mm flak turret reports huge bounds, cropped by hand
+BTX_GerPak40Pit=PitPak40|D:/UE5Projects/RTS_Survival/Saved/UnitPortraits/bxps_p1|FrontRight
+BTX_GerLeFH18Pit=PitLeFH18|D:/UE5Projects/RTS_Survival/Saved/UnitPortraits/bxps_p1|FrontRight
+BTX_GerSFH18Pit=PitSFH18|D:/UE5Projects/RTS_Survival/Saved/UnitPortraits/bxps_p1|FrontRight
+BTX_GerFlak37Pit=PitFlak37|D:/UE5Projects/RTS_Survival/Saved/UnitPortraits/bxps_p1|FrontRight
+BTX_GerFlak88Pit=PitFlak88|D:/UE5Projects/RTS_Survival/Saved/UnitPortraits/bxps_p1|FrontRight
+BTX_GerMortarPit=PitMortar|D:/UE5Projects/RTS_Survival/Saved/UnitPortraits/bxps_p1|FrontRight
+BTX_GerPuppchenPit=PitPuppchen|D:/UE5Projects/RTS_Survival/Saved/UnitPortraits/bxps_p1|FrontRight
+BTX_GerPanzerschreckPit=PitPanzerschreck|D:/UE5Projects/RTS_Survival/Saved/UnitPortraits/bxps_p1|FrontRight
+BTX_GerRailPakBunker=RailPakBunker|D:/UE5Projects/RTS_Survival/Saved/UnitPortraits/bxps_p1|FrontRight
+BTX_GerTwinMG42Pit=PitTwinMG42|D:/UE5Projects/RTS_Survival/Saved/UnitPortraits/bxps_p1|FrontRight
+BTX_GerCapturedB4Pit=PitCapturedB4|D:/UE5Projects/RTS_Survival/Saved/UnitPortraits/bxps_p1|FrontRight|zoom=1.45
+HQLaserPlatform=HQLaserPlatform|D:/UE5Projects/RTS_Survival/Saved/UnitPortraits/bxps_p1|FrontRight|notes=not wired to its own type yet
+Flak88Bunker=Flak88Bunker|D:/UE5Projects/RTS_Survival/Saved/UnitPortraits/bxps_p1|FrontRight|notes=not wired to its own type yet
+FlakvierlingBunker=FlakvierlingBunker|D:/UE5Projects/RTS_Survival/Saved/UnitPortraits/bxps_p1|FrontRight|notes=not wired to its own type yet
+BTX_GerPZ38TBunker=PZ38TTurretBunker|D:/UE5Projects/RTS_Survival/Saved/UnitPortraits/bxps_pz38t|FrontRight|box=772,852,1080|zoom=1|dy=0.12|notes=recaptured 2026-11-20 after the mesh fix (round pillbox, 38(t) turret in the roof ring); logged bounds far too large, cropped by hand
+BTX_GerHQTower=HQTower|D:/UE5Projects/RTS_Survival/Saved/UnitPortraits/bxps_p1|Front|notes=bare; the phase-2 backdrop capture (bxps_p2) was compared and not clearly better. AtBuildingOrigin but a free-standing tower; pictured without the HQ
+BTX_GerBarracksRadixReactor=BarracksRadixReactor|D:/UE5Projects/RTS_Survival/Saved/UnitPortraits/bxps_p1|FrontRight|notes=bare; the phase-2 backdrop capture (bxps_p2) was compared and not clearly better. AtBuildingOrigin, stands on the ground beside the tent; pictured without the barracks
+BTX_GerBarrackFuelCell=BarracksFuelCell|D:/UE5Projects/RTS_Survival/Saved/UnitPortraits/bxps_p1|FrontRight|notes=bare; the phase-2 backdrop capture (bxps_p2) was compared and not clearly better. AtBuildingOrigin, ground piece behind the barracks; pictured without it (the barracks would hide it from these views)
+BTX_GerBarracksSniperLoft=BarracksSniperLoft|D:/UE5Projects/RTS_Survival/Saved/UnitPortraits/bxps_p1|FrontRight|notes=bare; the phase-2 backdrop capture (bxps_p2) was compared and not clearly better. AtBuildingOrigin, free-standing loft; pictured without the barracks
+BTX_GerLFactoryRadixiteReactor=ForgeRadixReactor|D:/UE5Projects/RTS_Survival/Saved/UnitPortraits/bxps_p1|FrontRight|notes=bare; the phase-2 backdrop capture (bxps_p2) was compared and not clearly better. AtBuildingOrigin, ground piece; pictured without the forge
+BTX_GerLFactoryFuelStorage=ForgeFuelStorage|D:/UE5Projects/RTS_Survival/Saved/UnitPortraits/bxps_p1|FrontRight|notes=bare; the phase-2 backdrop capture (bxps_p2) was compared and not clearly better. AtBuildingOrigin, ground piece; pictured without the forge
+BTX_GerMetalVaultSmelter=MetalVaultSmelter|D:/UE5Projects/RTS_Survival/Saved/UnitPortraits/bxps_p1|FrontRight|notes=bare; the phase-2 backdrop capture (bxps_p2) was compared and not clearly better. AtBuildingOrigin, free-standing tower behind the truck; pictured without the vault
+BTX_GerMechDepotWurfrahmenShop=MechDepotWurfrahmenShop|D:/UE5Projects/RTS_Survival/Saved/UnitPortraits/bxps_p1|FrontRight|notes=bare; the phase-2 backdrop capture (bxps_p2) was compared and not clearly better. AtBuildingOrigin, lean-to on the container's back-left side; the container would hide it from these views
+# Phase 2 (backdrop captures, folder bxps_p2) goes below.
+BTX_RefKaskade=RefKaskade|D:/UE5Projects/RTS_Survival/Saved/UnitPortraits/bxps_p2|Front|capture=T_Ger_Bxp_RefKaskade_Y130|zoom=1.25|dx=-0.12|dy=0.02|backdrop=/Game/RTS_Survival/Blueprints/GroundVehicles/BaseAndNomadic/ChildBlueprints/GerEco/OpelBlitz_Ref/BuildingMeshes/SM_OpelRefinery_BuildingMesh.SM_OpelRefinery_BuildingMesh|notes=phase 2, ViewYaw 130, refinery backdrop
+BTX_RefFlakStand=RefFlakStand|D:/UE5Projects/RTS_Survival/Saved/UnitPortraits/bxps_p2|FrontRight|capture=T_Ger_Bxp_RefFlakStand_Y0|zoom=0.95|dy=-0.03|backdrop=/Game/RTS_Survival/Blueprints/GroundVehicles/BaseAndNomadic/ChildBlueprints/GerEco/OpelBlitz_Ref/BuildingMeshes/SM_OpelRefinery_BuildingMesh.SM_OpelRefinery_BuildingMesh|notes=phase 2, ViewYaw 0, refinery backdrop
+BTX_GerCommRequisitionOffice=CommRequisitionOffice|D:/UE5Projects/RTS_Survival/Saved/UnitPortraits/bxps_p2|Front|capture=T_Ger_Bxp_CommRequisitionOffice_Y0|backdrop=/Game/RTS_Survival/Blueprints/GroundVehicles/BaseAndNomadic/ChildBlueprints/GerT2/CommunicationsCenter/BuildingMeshes/SM_CommunicationCenter_BuildingMesh.SM_CommunicationCenter_BuildingMesh|notes=phase 2, ViewYaw 0, comm center backdrop
+BTX_GerMechDepotRadioVan=MechDepotRadioVan|D:/UE5Projects/RTS_Survival/Saved/UnitPortraits/bxps_p2|Right|capture=T_Ger_Bxp_MechDepotRadioVan_Y-120|backdrop=/Game/RTS_Survival/Blueprints/GroundVehicles/BaseAndNomadic/ChildBlueprints/GerT1/MechanizedDepot/BuildingMeshes/SM_MechanizedDepot_BuildingMesh.SM_MechanizedDepot_BuildingMesh|notes=phase 2, ViewYaw -120, mech depot backdrop
+BTX_GerCommMG42Nests=CommMG42Nests|D:/UE5Projects/RTS_Survival/Saved/UnitPortraits/bxps_p2|FrontRight|capture=T_Ger_Bxp_CommMG42Nests_Y0|backdrop=/Game/RTS_Survival/Blueprints/GroundVehicles/BaseAndNomadic/ChildBlueprints/GerT2/CommunicationsCenter/BuildingMeshes/SM_CommunicationCenter_BuildingMesh.SM_CommunicationCenter_BuildingMesh|notes=phase 2, ViewYaw 0, comm center backdrop
+BTX_GerCommCipherRoom=CommCipherRoom|D:/UE5Projects/RTS_Survival/Saved/UnitPortraits/bxps_p2|Front|capture=T_Ger_Bxp_CommCipherRoom_Y0|backdrop=/Game/RTS_Survival/Blueprints/GroundVehicles/BaseAndNomadic/ChildBlueprints/GerT2/CommunicationsCenter/BuildingMeshes/SM_CommunicationCenter_BuildingMesh.SM_CommunicationCenter_BuildingMesh|notes=phase 2, ViewYaw 0, comm center backdrop
+BTX_GerForgeSchreckFrame=ForgeSchreckFrame|D:/UE5Projects/RTS_Survival/Saved/UnitPortraits/bxps_p1|FrontRight|notes=bare (phase 1): the frame stands on its own hoop footings and reads clearly; with the forge backdrop (bxps_p2 ..._Y0) the camo truck swamps it
+# Follow-up: the template's placeholder mesh is not pictured; the Medium Vehicle Factory building portrait stands in.
+BTX_GerMarderStugFactory=MarderStugFactory|-|-|image=D:/UE_Assets/Icons/TrainingUI/GerTrucks/WithoutIcon/T_Ger_MediumFactory.png|notes=BXP mesh is a placeholder container; picture = Medium Vehicle Factory building portrait (GerTrucks/WithoutIcon/T_Ger_MediumFactory.png)
+BTX_Ger37MMCaptureBunker=CaptureBunker37mm|D:/UE5Projects/RTS_Survival/Saved/UnitPortraits/bxps_p3|FrontRight|box=575,1060,700|zoom=1|dy=0|notes=map-placed capturable bunker; 37mm flak turret reports huge bounds, cropped by hand
+BTX_GerTurretCaptureBunker=CaptureBunkerTurret|D:/UE5Projects/RTS_Survival/Saved/UnitPortraits/bxps_p3|FrontRight|box=770,950,880|zoom=1|dy=0|notes=map-placed capturable bunker with the Jaguar 35mm turret; logged bounds too wide, cropped by hand
+BTX_GerFieldTrench=FieldTrench|-|-|image=D:/Blender/BlenderProjects/BlenderTanks/CustomMapItems/GerDefenses/FieldTrenches/UI/T_BxpOption_GerFieldTrench.png|notes=dragged ARTSFieldTrench (HQ Field Defenses tab), not a BXP actor; picture = the in-game option picture source (512 px) resized

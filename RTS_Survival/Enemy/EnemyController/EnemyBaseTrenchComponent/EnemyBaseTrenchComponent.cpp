@@ -15,8 +15,6 @@
 
 namespace EnemyBaseTrenchPrivate
 {
-	// The enemy AI plays as player 2.
-	constexpr int32 EnemyPlayerIndex = 2;
 	// A plan that does not fit is shortened and planned again at most this often.
 	constexpr int32 MaximumShortenAttempts = 8;
 	constexpr float LengthTolerance = 1.0f;
@@ -110,13 +108,13 @@ void UEnemyBaseTrenchComponent::ThinkStep()
 	const UFieldTrenchAnchorSubsystem* AnchorSubsystem = IsValid(World)
 		? World->GetSubsystem<UFieldTrenchAnchorSubsystem>()
 		: nullptr;
-	if (not Settings.bEnabled || not IsValid(AnchorSubsystem))
+	if (not Settings.bEnabled || not IsValid(AnchorSubsystem) || not GetIsBuildingAllowed())
 	{
 		return;
 	}
 	UpdateBasesFromStrategicAI();
 	TArray<FFieldTrenchAnchorHandle> FreeAnchors;
-	AnchorSubsystem->GetFreeAnchorsOfPlayer(EnemyBaseTrenchPrivate::EnemyPlayerIndex, FreeAnchors);
+	AnchorSubsystem->GetFreeAnchorsOfPlayer(GetControlledPlayer(), FreeAnchors);
 	FreeAnchors.RemoveAll([this](const FFieldTrenchAnchorHandle& Anchor)
 	{
 		return GetIsAnchorFailed(Anchor);
@@ -130,6 +128,29 @@ void UEnemyBaseTrenchComponent::ThinkStep()
 		}
 		(void)TryDigForBase(BaseIndex, FreeAnchors);
 	}
+}
+
+int32 UEnemyBaseTrenchComponent::GetControlledPlayer() const
+{
+	const AEnemyController* EnemyController = Cast<AEnemyController>(GetOwner());
+	if (not IsValid(EnemyController))
+	{
+		return RTSPlayers::FirstAIPlayer;
+	}
+	return EnemyController->GetControlledPlayer();
+}
+
+bool UEnemyBaseTrenchComponent::GetIsBuildingAllowed() const
+{
+	const AEnemyController* EnemyController = Cast<AEnemyController>(GetOwner());
+	const UEnemyStrategicAIComponent* StrategicAI = IsValid(EnemyController)
+		? EnemyController->GetEnemyStrategicAIComponent()
+		: nullptr;
+	if (not IsValid(StrategicAI))
+	{
+		return false;
+	}
+	return StrategicAI->GetIsAllowedBuilding();
 }
 
 void UEnemyBaseTrenchComponent::UpdateBasesFromStrategicAI()
@@ -406,7 +427,7 @@ bool UEnemyBaseTrenchComponent::TryLayTrench(
 		TrenchLength += Piece.LengthCm;
 	}
 	// The AI has no resources to pay with; the caps limit it instead.
-	Trench->StartConstruction(Pieces, EnemyPlayerIndex, TMap<ERTSResourceType, int32>());
+	Trench->StartConstruction(Pieces, GetControlledPlayer(), TMap<ERTSResourceType, int32>());
 	M_Trenches.Add(Trench);
 	++Base.TrenchCount;
 	Base.DugMetres += TrenchLength / CentimetresPerMetre;

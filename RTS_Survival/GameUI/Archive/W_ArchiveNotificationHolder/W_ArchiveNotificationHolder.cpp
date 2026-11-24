@@ -12,21 +12,44 @@ void UW_ArchiveNotificationHolder::AddNewArchiveNotification(
 	const FTrainingOption OptionalUnit,
 	const float NotificationTime)
 {
-	if (not EnsureNotificationClassIsValid())
+	UW_ArchivePushNotification* const NewNotification = CreateNotification(NotificationTime);
+	if (not NewNotification)
 	{
 		return;
+	}
+	NewNotification->SetupNotification(ItemType, OptionalUnit);
+	ScheduleRemovalAndShow(NewNotification, NotificationTime);
+}
+
+void UW_ArchiveNotificationHolder::AddNewCustomArchiveNotification(const FArchiveCustomContent& Content,
+                                                                   const float NotificationTime)
+{
+	UW_ArchivePushNotification* const NewNotification = CreateNotification(NotificationTime);
+	if (not NewNotification)
+	{
+		return;
+	}
+	NewNotification->SetupCustomNotification(Content);
+	ScheduleRemovalAndShow(NewNotification, NotificationTime);
+}
+
+UW_ArchivePushNotification* UW_ArchiveNotificationHolder::CreateNotification(const float NotificationTime)
+{
+	if (not EnsureNotificationClassIsValid())
+	{
+		return nullptr;
 	}
 
 	if (not GetIsValidNotificationScrollBox())
 	{
-		return;
+		return nullptr;
 	}
 
 	if (NotificationTime <= 0.f)
 	{
 		RTSFunctionLibrary::ReportError(
 			TEXT("AddNewArchiveNotification: NotificationTime must be > 0."));
-		return;
+		return nullptr;
 	}
 
 	UW_ArchivePushNotification* NewNotification =
@@ -36,14 +59,16 @@ void UW_ArchiveNotificationHolder::AddNewArchiveNotification(
 	{
 		RTSFunctionLibrary::ReportError(
 			TEXT("AddNewArchiveNotification: Failed to create notification widget."));
-		return;
+		return nullptr;
 	}
-
-	NewNotification->SetupNotification(ItemType, OptionalUnit);
 	NewNotification->SetNotificationHolder(this);
-
 	NotificationScrollBox->AddChild(NewNotification);
+	return NewNotification;
+}
 
+void UW_ArchiveNotificationHolder::ScheduleRemovalAndShow(UW_ArchivePushNotification* NewNotification,
+                                                          const float NotificationTime)
+{
 	UWorld* World = GetWorld();
 	if (not World)
 	{

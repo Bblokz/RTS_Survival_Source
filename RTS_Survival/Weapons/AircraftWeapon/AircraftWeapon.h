@@ -32,6 +32,9 @@ public:
 	/** Setter mirroring turret/hull/infantry: keeps WeaponState owners and target struct in sync. */
 	void SetOwningPlayer(const int32 PlayerIndex);
 
+	/** Bound to the aircraft's RTS component: the weapons follow the aircraft when it changes owner at runtime. */
+	void OnAircraftChangedPlayer(uint8 OldOwningPlayer, uint8 NewOwningPlayer);
+
 	void UpdateLandedState(const EAircraftLandingState NewLandedState)
 	{
 		M_LandedState = NewLandedState;
@@ -114,6 +117,9 @@ protected:
 private:
 	UPROPERTY()
 	TArray<UWeaponState*> M_TWeapons;
+
+	// Gives a 15-25 mm cannon the aircraft cannon fire loop and 20 mm ground impacts (UAircraftGunAudioPlayer).
+	void SetupAircraftCannonAudio(class UWeaponStateMultiProjectile& Cannon, UMeshComponent* MeshComponent);
 
 	bool GetIsValidWeapon(const UWeaponState* Weapon) const;
 

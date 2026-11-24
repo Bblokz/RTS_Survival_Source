@@ -33,10 +33,27 @@ public:
 		const FVector& LocalExtent,
 		const FQuat& WorldRotation);
 
+	/**
+	 * @brief Opt-in for an exact box that must stay where it was set up when the owner moves (a sinking ruin remnant):
+	 * the engine otherwise rebuilds the modifier from the owner's collision on every owner transform update.
+	 */
+	void SetKeepExactBoxWhenOwnerMoves(bool bKeep);
+
 protected:
 	// Called when the game starts
 	virtual void BeginPlay() override;
 
+	virtual void CalculateBounds() const override;
+
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void ScaleCurrentExtent(const float Scale);
+
+private:
+	// The last exact box from SetUpNavModifierVolume (box in its rotation frame + rotation); restored by
+	// CalculateBounds while bM_KeepExactBoxWhenOwnerMoves.
+	bool bM_HasExactBox = false;
+	bool bM_KeepExactBoxWhenOwnerMoves = false;
+	FBox M_ExactBoxInRotationFrame = FBox(ForceInit);
+	FQuat M_ExactBoxRotation = FQuat::Identity;
+	FBox M_ExactWorldBounds = FBox(ForceInit);
 };

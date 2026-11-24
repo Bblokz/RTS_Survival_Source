@@ -8,6 +8,7 @@
 #include "RTS_Survival/Behaviours/BehaviourComp.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/RTSCollisionTraceChannels.h"
+#include "RTS_Survival/Utils/CollisionSetup/RTSPlayerCollision.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 #include "RTS_Survival/GameUI/Pooled_AnimatedVerticalIcons/AnimatedIconWidgetPoolManager.h"
 #include "RTS_Survival/GameUI/Pooled_AnimatedVerticalText/Pooling/AnimatedTextWidgetPoolManager/AnimatedTextWidgetPoolManager.h"
@@ -326,7 +327,7 @@ void UAOEBehaviourComponent::HandleSweepComplete(TArray<FHitResult>&& HitResults
 			continue;
 		}
 
-		if (not IsValidTarget(HitActor))
+		if (not GetIsHitInSearchedRelation(Hit) || not IsValidTarget(HitActor))
 		{
 			continue;
 		}
@@ -600,17 +601,34 @@ ETriggerOverlapLogic UAOEBehaviourComponent::GetOverlapLogicForOwner() const
 	{
 		return ETriggerOverlapLogic::OverlapBoth;
 	}
+	const int32 OwningPlayer = M_RTSComponent->GetOwningPlayer();
 	if (AOEBehaviourSettings.bSearchForEnemies)
 	{
 		// search for enemies.
-		return M_RTSComponent->GetOwningPlayer() == 1
-			       ? ETriggerOverlapLogic::OverlapEnemy
-			       : ETriggerOverlapLogic::OverlapPlayer;
+		return FRTSPlayerCollision::GetOverlapLogicForHostilesOf(OwningPlayer);
 	}
 	//  search for allies.
-	return M_RTSComponent->GetOwningPlayer() == 1
-		       ? ETriggerOverlapLogic::OverlapPlayer
-		       : ETriggerOverlapLogic::OverlapEnemy;
+	return FRTSPlayerCollision::GetOverlapLogicForAlliesOf(OwningPlayer);
+}
+
+bool UAOEBehaviourComponent::GetIsHitInSearchedRelation(const FHitResult& Hit) const
+{
+	if (AOEBehaviourSettings.bSearchForBothAlliesAndEnemies || not IsValid(M_RTSComponent))
+	{
+		return true;
+	}
+	const UPrimitiveComponent* HitComponent = Hit.GetComponent();
+	// Destructibles are only swept when the settings ask for them and belong to no side.
+	if (IsValid(HitComponent) && HitComponent->GetCollisionObjectType() == ECC_Destructible)
+	{
+		return true;
+	}
+	const int32 OwningPlayer = M_RTSComponent->GetOwningPlayer();
+	if (AOEBehaviourSettings.bSearchForEnemies)
+	{
+		return FRTSPlayerCollision::IsHitDamageableByPlayer(Hit.GetActor(), HitComponent, OwningPlayer);
+	}
+	return FRTSPlayerCollision::IsHitAlliedToPlayer(Hit.GetActor(), HitComponent, OwningPlayer);
 }
 
 UBehaviourComp* UAOEBehaviourComponent::GetBehaviourCompOfSquadController(AActor* ValidHitActor) const

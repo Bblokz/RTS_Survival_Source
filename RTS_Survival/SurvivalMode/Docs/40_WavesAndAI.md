@@ -226,6 +226,38 @@ Selection per wave:
 4. Spawn points: a front centred at a random spot along the zone, 700 uu apart, extra rows step inward, projected to
    the navmesh. Groups of more than 12 units per edge are split into several formations.
 
+## 7b. Far-side heavy airlift and rim slide (2026-11-12)
+
+When the player confirms a start, `USurvivalWaveDirectorComponent::ConfigureEdgesForStart` (code in
+`Waves/SurvivalWaveDirectorAirlift.cpp`) lays out the edges for that start:
+
+- **Map centre** = centre of the box around all enabled zones' placed spawn centres (SM_Desert_01: the FOW centre).
+- **Airlift origin** = the enabled zone whose direction from the map centre is most opposite to the start's. It never
+  sends ground waves (`GetEligibleEdges` skips it). Instead, with a wave group at most every
+  `OppositeAirlift.MinSecondsBetweenAirlifts` (60 s), `TanksPerAirlift(minute)` heavy tanks (roles `HeavyTank`,
+  `SuperHeavy`; weights from the pool's unlock/ramp/fade rules) are flown in by `Rus_PE8_Aircraft_Transport` (one tank
+  each, `OrderAircraftDrop`) from over that zone to a drop centre at the map centre (or on rings around it, the first
+  point with a heavy-vehicle path to the base). Before Tier 2 (KV-1) unlocks the far side stays quiet. The count is
+  clamped to the free alive load. Curve (all difficulties): (0,1) (20,1) (30,2) (45,3) (60,4) (90,5).
+- Released tanks are taken off the strategic AI's blackboard (`DeregisterDirectControlUnit`) and, once all landed (+3 s)
+  or 25 s after the first, become one attack-move formation to a unique final waypoint chosen at launch; it is tracked
+  like a ground group (retarget, minimap marker, round attribution through a spawn marker at the transports).
+- **Rim slide**: every other zone moves along its rim (the axis across its inward arrow) `EdgeSlide.SlideFraction` (0.6)
+  of the way toward the start's coordinate on that axis, shrinking the slide until the point projects to the navmesh,
+  stays >= 1.5 x `MinEdgeDistanceFromBase` from the start and `BuildAreaRadius + 6000` from every other start (Soviet
+  bases). `ASurvivalEdgeSpawnZone::GetSpawnCenter` returns the slid centre for the rest of the match.
+- **Attack move**: `bWavesUseUnitAttackMove` turns on `UEnemyFormationController::SetUseUnitAttackMoveOrders`, so units of
+  attack-move formations get unit attack-move orders between waypoints (they engage what they meet, then resume). Units
+  in an engagement (`IdAttack`) are never treated as stuck.
+- **Stalled groups**: a formation waits for every unit at each waypoint, so one stuck tank used to park its whole group
+  (seen with and without attack move, e.g. groups from the west rim held up at the Scorpion Basin Soviet base). A tracked
+  group that reaches no new waypoint for `StalledGroupSeconds` (90 s) continues as a new formation with the units that
+  arrived (fresh path to the base); the stragglers are handed to the strategic AI.
+- Slid zones also stay `OwnStartContentClearance` (4000) beyond the outer edge of the player's own start content.
+- Test hooks (map-test builds): `-SurvivalDecoyTest` (one player Pz IV H put 30 m ahead of a wave group far from the base; `SURVIVALDECOY` lines count wave units attacking it), `-SurvivalNoUnitAttackMove` / `-SurvivalNoEdgeSlide` for A/B runs, `-SurvivalStartMinute=N` offsets the survival clock, `-SurvivalWaveProbe` logs
+  `SURVIVALWAVEPROBE` lines (attack-move / plain move / attacking counts of wave units) every 10 s. Runner:
+  `Source/Tools/SurvivalImprovements/survival_improvements_test.py`.
+
 ## 8. Targeting and retargeting
 
 - Target = `ASurvivalModeDirector::GetCurrentPlayerBaseLocation()` evaluated when the wave launches.
@@ -275,7 +307,8 @@ global-ability think step (shared cooldowns with the Artillery/AirRaid/Airborne 
 Cross-agent notes:
 - **Soviet-base agent:** the strategic AI's own tech still comes from building expansions: `BTX_RusBarracks` →
   BasicInfantry, `BTX_RusFactory` / `BTX_RusCoolingTowers` → LightTanks, `BTX_RusResearchCenter` → Tier2; bases need
-  enemy trainer components (`InitTrainerAsEnemyTrainerComponent`) or the AI trains nothing. Base buildings are what
+  standing trainer buildings with a `UEnemyBuildingTrainerComponent` (`Source/Docs/EnemyAI/EnemyBuildingTraining.md`) or the
+  AI trains nothing. Base buildings are what
   `FindEnemyBase_TimerRequest` clusters into DefendBase points.
 - **Mission-UI agent:** see §12.
 

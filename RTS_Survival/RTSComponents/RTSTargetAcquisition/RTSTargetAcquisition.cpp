@@ -7,6 +7,7 @@
 
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/DeveloperSettings.h"
+#include "RTS_Survival/Game/Players/RTSPlayers.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 
@@ -178,9 +179,16 @@ bool URTSTargetAcquisition::GetIsEngageableTarget(AActor* Target) const
 	{
 		return false;
 	}
-	if (M_OwnerRTSComponent->GetOwningPlayer() == 1)
+	const int32 OwningPlayer = GetOwningPlayer();
+	// Teams or the target's owner can change while a unit goes after it; an ally is never worth the attack.
+	// Unowned and neutral targets keep counting, as before four players.
+	if (FRTSPlayers::IsActorAlliedToPlayer(Target, OwningPlayer))
 	{
-		return RTSFunctionLibrary::RTSIsVisibleTarget(Target, GetOwningPlayer());
+		return false;
+	}
+	if (FRTSPlayers::IsHumanPlayer(OwningPlayer))
+	{
+		return RTSFunctionLibrary::RTSIsVisibleTarget(Target, OwningPlayer);
 	}
 	return RTSFunctionLibrary::RTSIsValid(Target);
 }
@@ -370,7 +378,7 @@ void URTSTargetAcquisition::DebugDrawAggroSearchState(const float AggroRange) co
 
 float URTSTargetAcquisition::GetAddedAggroRangeForOwningPlayer() const
 {
-	if (GetOwningPlayer() == 1)
+	if (FRTSPlayers::IsHumanPlayer(GetOwningPlayer()))
 	{
 		return DeveloperSettings::TargetAcquisition::AddedAggroRange;
 	}

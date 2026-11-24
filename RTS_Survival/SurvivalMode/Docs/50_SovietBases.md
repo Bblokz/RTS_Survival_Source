@@ -238,10 +238,10 @@ One seed reproduces axis, mirror, plan variant, unit picks and placements exactl
 - **Base clusters**: `ConfigureStrategicAIBaseDetection` merges core and satellite types into `FindEnemyBase_TimerRequest`,
   raises `MaxBasesToReturn` and `CoreClusterDistanceXY` (at least the plan's `RequiredCoreClusterDistance`, the smallest link
   that chains all production buildings) and caps the score thresholds.
-- **Training location**: bases have no enemy trainer component. `GetValidTrainingSpawnTransform` falls back to
-  `GetRandomEnemyBaseClusterSpawnTransform`, so by the code trained units appear at a random base cluster. A watched match has not shown this yet: in 380 s of the menu flow nothing spawned within 15 m of a cluster centre. The note
-  in `40_WavesAndAI.md` that the AI trains nothing without a trainer component does not match this code. Until the first cluster
-  search finishes the AI reports once that it has no spawn transform.
+- **Training location** (2026-11-18): the AI trains at its own buildings over time. Barracks and tents take squads;
+  the Rus Factory, Assembly Yard and Platform Factory take tanks. These buildings carry a `UEnemyBuildingTrainerComponent`.
+  A building shows activity while it trains, and the unit leaves at its `AITrainingExit` after
+  `20 s + 1.5 s per training point`. The base-cluster fallback is gone. See `Source/Docs/EnemyAI/EnemyBuildingTraining.md`.
 - **Reserves**: `RegisterAsBlackboardIdle(true)`, same path as freshly trained units.
 - **Patrols** are infantry only: vehicles of a patrol group hold the post they spawned on, so they leave no tyre-trail loops.
 

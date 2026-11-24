@@ -47,6 +47,8 @@ private:
 	float M_NextHeartbeatSeconds = 0.f;
 	bool bM_HasStartedGame = false;
 	bool bM_HasFinished = false;
+	bool bM_HasTakenGarrisonBarSnapshot = false;
+	bool bM_HasLoggedLandscapeComponents = false;
 	bool bM_HasPressedLoadCampaign = false;
 	bool bM_HasPressedSurvival = false;
 	// Steps of the survival route through the faction map: 0 faction, 1 variants, 2 difficulty, 3 done.
@@ -73,6 +75,8 @@ private:
 	void ContinueTutorialOvertakes() const;
 	void KeepGameUnpaused() const;
 	// Ends the run with a FAIL naming the on-screen widgets when the game stays paused (defeat, a locked dialog).
+	// -RTSGarrisonBarSnapshot=<dir>: once, after a few game seconds.
+	void TickGarrisonBarSnapshot(const float SecondsRun);
 	bool TickStuckPause(const float RealSecondsRun);
 	void LogHeartbeat(const float SecondsRun, const float RealSecondsRun);
 	void Finish();

@@ -8,6 +8,7 @@
 #include "Kismet/KismetMathLibrary.h"
 #include "RTS_Survival/Weapons/SmallArmsProjectileManager/SmallArmsProjectileManager.h"
 #include "RTS_Survival/Game/GameState/CPPGameState.h"
+#include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/CollisionSetup/FRTS_CollisionSetup.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
@@ -29,7 +30,9 @@ UHullWeaponComponent::UHullWeaponComponent()
 
 void UHullWeaponComponent::SetOwningPlayer(const int32 PlayerIndex)
 {
-	M_OwningPlayer = PlayerIndex;
+	// Weapon setup passes the owner of its init struct, which Blueprints may leave at 0: the weapon then fights for
+	// the player of the unit it is mounted on.
+	M_OwningPlayer = FRTSWeaponHelpers::ResolveWeaponOwningPlayer(PlayerIndex, GetOwner());
 	M_TargetingData.InitTargetStruct(M_OwningPlayer);
 }
 
@@ -129,6 +132,7 @@ void UHullWeaponComponent::BeginPlay()
 {
 	Super::BeginPlay();
 	BeginPlay_InitTurretOwner(GetOwner());
+	BeginPlay_BindToOwningPlayerChanges();
 	BeginPlay_SetupCallbackToProjectileManager();
 	BeginPlay_SetupGameUnitManager();
 	BeginPlay_SetupMeshOrientationTimer();
@@ -732,6 +736,31 @@ void UHullWeaponComponent::BeginPlay_InitTurretOwner(AActor* NewTurretOwner)
 	}
 	TurretOwner.SetInterface(Cast<ITurretOwner>(NewTurretOwner));
 	TurretOwner.SetObject(NewTurretOwner);
+}
+
+void UHullWeaponComponent::BeginPlay_BindToOwningPlayerChanges()
+{
+	const AActor* OwnerActor = GetOwner();
+	URTSComponent* OwnerRTSComponent = IsValid(OwnerActor)
+		                                   ? OwnerActor->FindComponentByClass<URTSComponent>()
+		                                   : nullptr;
+	if (not IsValid(OwnerRTSComponent))
+	{
+		return;
+	}
+	OwnerRTSComponent->OnOwningPlayerChanged.AddUObject(this, &UHullWeaponComponent::OnOwnerChangedPlayer);
+}
+
+void UHullWeaponComponent::OnOwnerChangedPlayer(const uint8 /*OldOwningPlayer*/, const uint8 NewOwningPlayer)
+{
+	SetOwningPlayer(NewOwningPlayer);
+	for (UWeaponState* Weapon : M_TWeapons)
+	{
+		if (IsValid(Weapon) && Weapon->GetOwningPlayer() != NewOwningPlayer)
+		{
+			Weapon->ChangeOwningPlayer(NewOwningPlayer);
+		}
+	}
 }
 
 bool UHullWeaponComponent::GetIsValidWeapon(const UWeaponState* Weapon) const

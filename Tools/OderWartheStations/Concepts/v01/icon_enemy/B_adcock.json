@@ -1,0 +1,323 @@
+{
+ "key": "B_adcock",
+ "title": "B  Adcock-Kreuz: four guyed masts round a buried goniometer",
+ "notes": [
+  "Four 10 m timber masts on a diamond (N/E/S/W, 8 m out), each with a crossarm and three guy wires.",
+  "Feeders on low posts run from every mast to a concrete goniometer pit in the middle (0.8 m high, walk round it).",
+  "Receiver hut outside the cross at the back-right, generator at the back-left; the yard between the masts is open.",
+  "Flag front-left inside the cross: steel, 7.5 m, plinth, no guys; set apart from the timber masts by colour/height.",
+  "Reads 'aerial array' from far away; widest footprint, the front mast stands in front of the yard."
+ ],
+ "subtitle": "Panzer IV + soldier for scale  |  origin = capture centre (25 m radius)  |  site 17 x 17 m, masts 10 m, flag 7.5 m",
+ "footprint": [
+  24.3,
+  20.3
+ ],
+ "height": 9.4,
+ "mast_height": 11.2,
+ "views": {
+  "rts": {
+   "file": "B_adcock_rts.png",
+   "size": [
+    1600,
+    1100
+   ],
+   "px_per_m": 54.54545454545455,
+   "caption": "Front elevation (icon source)",
+   "labels": []
+  },
+  "rear": {
+   "file": "B_adcock_rear.png",
+   "size": [
+    800,
+    550
+   ],
+   "px_per_m": 27.272727272727273,
+   "caption": null,
+   "labels": [
+    {
+     "text": "Adcock mast (x4)",
+     "kind": "aerial",
+     "xy": [
+      247.0,
+      6.9
+     ]
+    },
+    {
+     "text": "Goniometer pit",
+     "kind": "aerial",
+     "xy": [
+      423.9,
+      305.6
+     ]
+    },
+    {
+     "text": "Receiver hut",
+     "kind": "hut",
+     "xy": [
+      175.1,
+      271.1
+     ]
+    },
+    {
+     "text": "Generator (runs while held)",
+     "kind": "gen",
+     "xy": [
+      457.0,
+      408.6
+     ]
+    },
+    {
+     "text": "Capture flag (rises 5.5 m)",
+     "kind": "flag",
+     "xy": [
+      549.0,
+      136.0
+     ]
+    },
+    {
+     "text": "Holder sign (red star / Balkenkreuz)",
+     "kind": "held",
+     "xy": [
+      402.5,
+      200.9
+     ]
+    },
+    {
+     "text": "Capture bar (UI) 12 m",
+     "kind": "ui",
+     "xy": [
+      400.0,
+      72.4
+     ]
+    }
+   ]
+  },
+  "top": {
+   "file": "B_adcock_top.png",
+   "size": [
+    800,
+    800
+   ],
+   "px_per_m": 35.29411764705882,
+   "caption": null,
+   "labels": [
+    {
+     "text": "Adcock mast (x4)",
+     "kind": "aerial",
+     "xy": [
+      682.4,
+      452.9
+     ]
+    },
+    {
+     "text": "Goniometer pit",
+     "kind": "aerial",
+     "xy": [
+      400.0,
+      452.9
+     ]
+    },
+    {
+     "text": "Receiver hut",
+     "kind": "hut",
+     "xy": [
+      618.8,
+      205.9
+     ]
+    },
+    {
+     "text": "Generator (runs while held)",
+     "kind": "gen",
+     "xy": [
+      174.1,
+      212.9
+     ]
+    },
+    {
+     "text": "Capture flag (rises 5.5 m)",
+     "kind": "flag",
+     "xy": [
+      287.1,
+      572.9
+     ]
+    },
+    {
+     "text": "Holder sign (red star / Balkenkreuz)",
+     "kind": "held",
+     "xy": [
+      541.2,
+      601.2
+     ]
+    },
+    {
+     "text": "Capture bar (UI) 12 m",
+     "kind": "ui",
+     "xy": [
+      400.0,
+      400.0
+     ]
+    }
+   ],
+   "grid": [
+    [
+     -658.8,
+     1511.8,
+     -658.8,
+     -605.9
+    ],
+    [
+     -482.4,
+     1511.8,
+     -482.4,
+     -605.9
+    ],
+    [
+     -305.9,
+     1511.8,
+     -305.9,
+     -605.9
+    ],
+    [
+     -129.4,
+     1511.8,
+     -129.4,
+     -605.9
+    ],
+    [
+     47.1,
+     1511.8,
+     47.1,
+     -605.9
+    ],
+    [
+     223.5,
+     1511.8,
+     223.5,
+     -605.9
+    ],
+    [
+     400.0,
+     1511.8,
+     400.0,
+     -605.9
+    ],
+    [
+     576.5,
+     1511.8,
+     576.5,
+     -605.9
+    ],
+    [
+     752.9,
+     1511.8,
+     752.9,
+     -605.9
+    ],
+    [
+     929.4,
+     1511.8,
+     929.4,
+     -605.9
+    ],
+    [
+     1105.9,
+     1511.8,
+     1105.9,
+     -605.9
+    ],
+    [
+     1282.4,
+     1511.8,
+     1282.4,
+     -605.9
+    ],
+    [
+     1458.8,
+     1511.8,
+     1458.8,
+     -605.9
+    ],
+    [
+     -658.8,
+     1511.8,
+     1458.8,
+     1511.8
+    ],
+    [
+     -658.8,
+     1335.3,
+     1458.8,
+     1335.3
+    ],
+    [
+     -658.8,
+     1158.8,
+     1458.8,
+     1158.8
+    ],
+    [
+     -658.8,
+     982.4,
+     1458.8,
+     982.4
+    ],
+    [
+     -658.8,
+     805.9,
+     1458.8,
+     805.9
+    ],
+    [
+     -658.8,
+     629.4,
+     1458.8,
+     629.4
+    ],
+    [
+     -658.8,
+     452.9,
+     1458.8,
+     452.9
+    ],
+    [
+     -658.8,
+     276.5,
+     1458.8,
+     276.5
+    ],
+    [
+     -658.8,
+     100.0,
+     1458.8,
+     100.0
+    ],
+    [
+     -658.8,
+     -76.5,
+     1458.8,
+     -76.5
+    ],
+    [
+     -658.8,
+     -252.9,
+     1458.8,
+     -252.9
+    ],
+    [
+     -658.8,
+     -429.4,
+     1458.8,
+     -429.4
+    ],
+    [
+     -658.8,
+     -605.9,
+     1458.8,
+     -605.9
+    ]
+   ]
+  }
+ },
+ "main_view": "rts"
+}

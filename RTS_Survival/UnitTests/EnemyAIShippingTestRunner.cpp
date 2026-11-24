@@ -2118,7 +2118,7 @@ namespace RTS::UnitTests::EnemyAIShipping
 		const FEnemyStrategicTrainingState TrainingStateBefore = TrainingState;
 		constexpr int32 InitialTrainingPoints = 17;
 		constexpr float InitialIncomeRemainder = 0.375f;
-		const int32 AuthoredTrainingPointsPerMinute = TrainingState.EnemyLevelTraining.TrainingPointsPerMinute;
+		const float AuthoredTrainingPointsPerMinute = TrainingState.EnemyLevelTraining.TrainingPointsPerMinute;
 		TrainingState.TrainingPoints = InitialTrainingPoints;
 		TrainingState.TrainingPointIncomeRemainder = InitialIncomeRemainder;
 		const TArray<float> ElapsedTimeSlices = { 7.25f, 13.5f, 4.125f, 20.75f, 14.375f };
@@ -2127,21 +2127,24 @@ namespace RTS::UnitTests::EnemyAIShipping
 			StrategicAIComponent->ShippingTest_AccumulateTrainingPointIncomeForElapsedSeconds(ElapsedTimeSlice);
 		}
 
-		const int32 ExpectedTrainingPoints = InitialTrainingPoints + AuthoredTrainingPointsPerMinute;
+		// The slices add up to one minute, so the authored rate (which may be fractional) is earned once.
+		const float ExpectedEarnedPoints = InitialIncomeRemainder + AuthoredTrainingPointsPerMinute;
+		const int32 ExpectedTrainingPoints = InitialTrainingPoints + FMath::FloorToInt(ExpectedEarnedPoints);
+		const float ExpectedIncomeRemainder = ExpectedEarnedPoints - FMath::FloorToInt(ExpectedEarnedPoints);
 		RecordExpectation(
-			AuthoredTrainingPointsPerMinute >= 0
+			AuthoredTrainingPointsPerMinute >= 0.f
 				&& TrainingState.TrainingPoints == ExpectedTrainingPoints
 				&& FMath::IsNearlyEqual(
 					TrainingState.TrainingPointIncomeRemainder,
-					InitialIncomeRemainder,
+					ExpectedIncomeRemainder,
 					KINDA_SMALL_NUMBER),
 			TEXT("Training.PointIncome.AuthoredPerMinuteRate"),
 			FString::Printf(
-				TEXT("rate=%d expected_points=%d actual_points=%d expected_remainder=%.3f actual_remainder=%.3f"),
+				TEXT("rate=%.3f expected_points=%d actual_points=%d expected_remainder=%.3f actual_remainder=%.3f"),
 				AuthoredTrainingPointsPerMinute,
 				ExpectedTrainingPoints,
 				TrainingState.TrainingPoints,
-				InitialIncomeRemainder,
+				ExpectedIncomeRemainder,
 				TrainingState.TrainingPointIncomeRemainder));
 		TrainingState = TrainingStateBefore;
 	}

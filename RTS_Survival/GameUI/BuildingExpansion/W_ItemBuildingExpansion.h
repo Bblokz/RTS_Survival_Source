@@ -9,6 +9,7 @@
 #include "W_ItemBuildingExpansion.generated.h"
 
 class UW_BxpDescription;
+class UW_HotKey;
 class UImage;
 class UButton;
 class USizeBox;
@@ -20,6 +21,7 @@ enum class EBuildingExpansionType : uint8;
  * @brief This widget represents a building expansion item in the UI.
  * The amount of items in the scrollbar is determined by the primary selected actor.
  * The status is updated directly from the bxp which requests
+ * Shows the slot's chorded hotkey (Alt+Q ... Alt+G by default) in the optional M_BxpHotkey badge.
  */
 UCLASS()
 class RTS_SURVIVAL_API UW_ItemBuildingExpansion : public UUserWidget
@@ -57,6 +59,9 @@ public:
 	void EnableDisableItem(const bool bEnabled);
 	
 	void SimulatedClickedBxpItem();
+
+	/** @return True when clicked; false while the item is hidden (unused slot) or its button is disabled. */
+	bool TryActivateFromHotkey();
 
 protected:
 	
@@ -108,6 +113,10 @@ protected:
 	// The image of this widget that is a child of the button.
 	UPROPERTY(meta = (BindWidget), BlueprintReadOnly)
 	UImage* M_BxpItemImage;
+
+	// Badge with this slot's IA_BuildingExpansion<N> hotkey; optional so items without one still compile.
+	UPROPERTY(meta = (BindWidgetOptional), BlueprintReadOnly)
+	TObjectPtr<UW_HotKey> M_BxpHotkey;
 
 private:
 	// Uproperty; makes use of GC.

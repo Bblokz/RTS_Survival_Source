@@ -17,7 +17,9 @@ enum class ETrainingItemStatus : uint8
 	TS_LockedByUnit,
 	TS_LockedByNeedVacantAircraftPad,
 	TS_LockedByExpansion,
-	TS_Unlocked
+	TS_Unlocked,
+	// A mission (tutorial) does not allow this option yet, see UMissionTrainingRestrictionSubsystem.
+	TS_LockedByMission
 };
 
 UENUM()

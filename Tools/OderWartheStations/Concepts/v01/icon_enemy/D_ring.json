@@ -1,0 +1,307 @@
+{
+ "key": "D_ring",
+ "title": "D  Peilring: a ring of twelve short masts round the hut",
+ "notes": [
+  "A small circular array (late-war Wullenweber idea): twelve 4.5 m masts on a 9 m ring, joined by a top wire.",
+  "The ring outlines the station from any zoom; units walk in through the gaps between masts.",
+  "Receiver hut at the back of the ring, generator outside on the right, feeders from the ring to the hut.",
+  "Flag front-left inside the ring: the only thing taller than the masts, so it reads at once.",
+  "Most unusual silhouette; the ring is a 'capture zone' look without UI, but 12 masts cost more draws."
+ ],
+ "subtitle": "Panzer IV + soldier for scale  |  origin = capture centre (25 m radius)  |  ring 18 m across, masts 4.5 m, flag 7.5 m",
+ "footprint": [
+  22.9,
+  18.6
+ ],
+ "height": 4.4,
+ "mast_height": 8.1,
+ "views": {
+  "rts": {
+   "file": "D_ring_rts.png",
+   "size": [
+    1600,
+    1100
+   ],
+   "px_per_m": 54.54545454545455,
+   "caption": "Front elevation (icon source)",
+   "labels": []
+  },
+  "rear": {
+   "file": "D_ring_rear.png",
+   "size": [
+    800,
+    550
+   ],
+   "px_per_m": 27.272727272727273,
+   "caption": null,
+   "labels": [
+    {
+     "text": "Ring array (12 masts)",
+     "kind": "aerial",
+     "xy": [
+      216.9,
+      130.9
+     ]
+    },
+    {
+     "text": "Receiver hut",
+     "kind": "hut",
+     "xy": [
+      331.5,
+      285.8
+     ]
+    },
+    {
+     "text": "Generator (runs while held)",
+     "kind": "gen",
+     "xy": [
+      105.7,
+      210.9
+     ]
+    },
+    {
+     "text": "Capture flag (rises 5.5 m)",
+     "kind": "flag",
+     "xy": [
+      526.3,
+      146.4
+     ]
+    },
+    {
+     "text": "Holder sign (red star / Balkenkreuz)",
+     "kind": "held",
+     "xy": [
+      409.0,
+      204.5
+     ]
+    },
+    {
+     "text": "Capture bar (UI) 10 m",
+     "kind": "ui",
+     "xy": [
+      392.0,
+      112.8
+     ]
+    }
+   ]
+  },
+  "top": {
+   "file": "D_ring_top.png",
+   "size": [
+    800,
+    800
+   ],
+   "px_per_m": 35.29411764705882,
+   "caption": null,
+   "labels": [
+    {
+     "text": "Ring array (12 masts)",
+     "kind": "aerial",
+     "xy": [
+      717.6,
+      435.3
+     ]
+    },
+    {
+     "text": "Receiver hut",
+     "kind": "hut",
+     "xy": [
+      417.6,
+      272.9
+     ]
+    },
+    {
+     "text": "Generator (runs while held)",
+     "kind": "gen",
+     "xy": [
+      805.9,
+      311.8
+     ]
+    },
+    {
+     "text": "Capture flag (rises 5.5 m)",
+     "kind": "flag",
+     "xy": [
+      280.0,
+      512.9
+     ]
+    },
+    {
+     "text": "Holder sign (red star / Balkenkreuz)",
+     "kind": "held",
+     "xy": [
+      512.9,
+      576.5
+     ]
+    },
+    {
+     "text": "Capture bar (UI) 10 m",
+     "kind": "ui",
+     "xy": [
+      400.0,
+      382.4
+     ]
+    }
+   ],
+   "grid": [
+    [
+     -658.8,
+     1494.1,
+     -658.8,
+     -623.5
+    ],
+    [
+     -482.4,
+     1494.1,
+     -482.4,
+     -623.5
+    ],
+    [
+     -305.9,
+     1494.1,
+     -305.9,
+     -623.5
+    ],
+    [
+     -129.4,
+     1494.1,
+     -129.4,
+     -623.5
+    ],
+    [
+     47.1,
+     1494.1,
+     47.1,
+     -623.5
+    ],
+    [
+     223.5,
+     1494.1,
+     223.5,
+     -623.5
+    ],
+    [
+     400.0,
+     1494.1,
+     400.0,
+     -623.5
+    ],
+    [
+     576.5,
+     1494.1,
+     576.5,
+     -623.5
+    ],
+    [
+     752.9,
+     1494.1,
+     752.9,
+     -623.5
+    ],
+    [
+     929.4,
+     1494.1,
+     929.4,
+     -623.5
+    ],
+    [
+     1105.9,
+     1494.1,
+     1105.9,
+     -623.5
+    ],
+    [
+     1282.4,
+     1494.1,
+     1282.4,
+     -623.5
+    ],
+    [
+     1458.8,
+     1494.1,
+     1458.8,
+     -623.5
+    ],
+    [
+     -658.8,
+     1494.1,
+     1458.8,
+     1494.1
+    ],
+    [
+     -658.8,
+     1317.6,
+     1458.8,
+     1317.6
+    ],
+    [
+     -658.8,
+     1141.2,
+     1458.8,
+     1141.2
+    ],
+    [
+     -658.8,
+     964.7,
+     1458.8,
+     964.7
+    ],
+    [
+     -658.8,
+     788.2,
+     1458.8,
+     788.2
+    ],
+    [
+     -658.8,
+     611.8,
+     1458.8,
+     611.8
+    ],
+    [
+     -658.8,
+     435.3,
+     1458.8,
+     435.3
+    ],
+    [
+     -658.8,
+     258.8,
+     1458.8,
+     258.8
+    ],
+    [
+     -658.8,
+     82.4,
+     1458.8,
+     82.4
+    ],
+    [
+     -658.8,
+     -94.1,
+     1458.8,
+     -94.1
+    ],
+    [
+     -658.8,
+     -270.6,
+     1458.8,
+     -270.6
+    ],
+    [
+     -658.8,
+     -447.1,
+     1458.8,
+     -447.1
+    ],
+    [
+     -658.8,
+     -623.5,
+     1458.8,
+     -623.5
+    ]
+   ]
+  }
+ },
+ "main_view": "rts"
+}

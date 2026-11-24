@@ -182,6 +182,9 @@ protected:
 	float DebugGraceSecondsOverride = -1.f;
 
 private:
+	// Test runs only (-SurvivalStartMinute=N): added to the survival clock; 0 in a normal game.
+	float M_DebugSurvivalSecondsOffset = 0.f;
+
 	UPROPERTY(VisibleAnywhere, Category = "Survival")
 	TObjectPtr<USurvivalDeploymentComponent> M_Deployment;
 
@@ -227,6 +230,8 @@ private:
 	void ShowHud();
 
 	void BeginDeployment();
+	// Start content around every start location while the player picks (unpicked ones are cleared on confirm).
+	void GenerateStartContentAtEveryLocation();
 	void GenerateStartLocationContent();
 	void StartGracePeriod();
 	void OnGracePeriodFinished();

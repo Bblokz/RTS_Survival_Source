@@ -38,8 +38,9 @@ class UW_MissionWidgetManager;
 class UMissionBase;
 class UDontLoseCommanderMission;
 class UW_GameDifficultyPicker;
-class UW_Defeat;
-class UW_Victory;
+class UW_MissionEnd;
+class AMissionDebriefStage;
+enum class EMissionDebriefOutcome : uint8;
 class AActor;
 class UObject;
 class USceneComponent;
@@ -350,6 +351,7 @@ public:
 	 */
 	void ActivateNewMission(UMissionBase* NewMission);
 	bool GetHasCompletedMissionClassExact(TSubclassOf<UMissionBase> MissionClass) const;
+	bool GetHasFailedMissionClassExact(TSubclassOf<UMissionBase> MissionClass) const;
 	/**
 	 * @brief Completes the active commander-loss mission before optionally creating its replacement.
 	 * @param PostRemovalAction Determines whether a replacement mission should be activated.
@@ -390,6 +392,12 @@ public:
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|Victory")
 	void TriggerVictory(bool bShowBackToMenu);
+
+	// The end screen once the mission ended (tests and tools); null before.
+	UW_MissionEnd* GetMissionEndWidget() const { return M_MissionEndWidget; }
+	// Map tests walk a mission chain from the missions that are active.
+	const TArray<UMissionBase*>& GetActiveMissions() const { return M_ActiveMissions; }
+	AMissionDebriefStage* GetDebriefStage() const { return M_DebriefStage; }
 	void CallBackOnMissionWhenEnemyUnitsDestroyed(
 		const EEnemyUnitQueryType EnemyUnitQueryType,
 		TWeakObjectPtr<UMissionBase> Mission,
@@ -466,11 +474,13 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Difficulty|Faction Backup")
 	FPlayerFactionBackupData PlayerFactionBackupData;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mission|Defeat")
-	TSubclassOf<UW_Defeat> M_DefeatWidgetClass;
+	// Buttons and outcome line of the end screen; defaults to the C++ overlay, a Blueprint child can restyle it.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mission|End Screen")
+	TSoftClassPtr<UW_MissionEnd> M_MissionEndWidgetClass;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mission|Victory")
-	TSubclassOf<UW_Victory> M_VictoryWidgetClass;
+	// The 3D debrief (stamp, order, burn) spawned when the mission ends; none shows the buttons over the paused game.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mission|End Screen")
+	TSubclassOf<AMissionDebriefStage> M_DebriefStageClass;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mission|Victory")
 	TSoftObjectPtr<UWorld> M_MapToLoadOnContinueVictory;
@@ -488,6 +498,17 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mission|Enemy")
 	EEnemyDirector M_EnemyDirector = EEnemyDirector::DirectorOfShield;
+
+	// Never-explored ground shows as a dim, desaturated, cold-tinted image instead of pure black, so the player can
+	// read the terrain on large maps. Explored ground keeps its own brighter, full-colour look.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mission|Fog Of War")
+	bool bRevealUnexploredFog = false;
+
+	// Brightness of never-explored ground. Explored ground renders at 0.125 of the scene; the desaturation and tint
+	// take roughly a quarter off this value, so up to 0.15 unexplored ground stays the darker of the two.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mission|Fog Of War",
+		meta=(EditCondition="bRevealUnexploredFog", ClampMin="0.0", ClampMax="0.15", UIMin="0.0", UIMax="0.15"))
+	float UnexploredFogReveal = 0.1f;
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void InitMissionSounds(const FMissionSoundSettings MissionSettings);
@@ -518,6 +539,17 @@ private:
 	UPROPERTY(Transient)
 	TSet<FTopLevelAssetPath> M_CompletedMissionClassPaths;
 
+	// Same as M_CompletedMissionClassPaths for failed missions; class-completed triggers can opt in to these.
+	UPROPERTY(Transient)
+	TSet<FTopLevelAssetPath> M_FailedMissionClassPaths;
+
+	/**
+	 * @brief Tells every other started mission that a mission ended, so stages react in their own event graph.
+	 * @param EndedMission The mission that just completed or failed; it is never notified itself.
+	 * @param bCompleted True when it completed, false when it failed.
+	 */
+	void NotifyActiveMissionsOfEndedMission(const UMissionBase* EndedMission, const bool bCompleted);
+
 	UPROPERTY()
 	TSubclassOf<UW_MissionWidgetManager> M_WidgetManagerClass;
 
@@ -541,6 +573,7 @@ private:
 	bool GetIsValidGameDifficultyPickerWidgetClass() const;
 	void BeginPlay_InitMissionScheduler();
 	void BeginPlay_InitMissionTriggerVolumesManager();
+	void BeginPlay_InitUnexploredFogReveal() const;
 	void HidePlayerGlobalAbilityPanelIfNeeded() const;
 	bool EnsureValidPlayerController() const;
 	bool GetIsValidMissionScheduler() const;
@@ -554,17 +587,24 @@ private:
 	void RemoveActiveMission(UMissionBase* Mission);
 
 	UPROPERTY()
-	TObjectPtr<UW_Defeat> M_DefeatWidget;
+	TObjectPtr<UW_MissionEnd> M_MissionEndWidget;
 
 	UPROPERTY()
-	TObjectPtr<UW_Victory> M_VictoryWidget;
+	TObjectPtr<AMissionDebriefStage> M_DebriefStage;
 
-	void TriggerDefeat_LockPauseAndShowWidget();
-	void TriggerDefeat_ShowDefeatWidget();
-	bool GetIsValidDefeatWidgetClass() const;
-	void TriggerVictory_LockPausePlayMusicAndShowWidget(bool bShowBackToMenu);
-	void TriggerVictory_ShowVictoryWidget(bool bShowBackToMenu);
-	bool GetIsValidVictoryWidgetClass() const;
+	/**
+	 * @brief Hides the HUD, shows the end screen widget and starts the 3D debrief behind it; the game is already paused.
+	 * @param Outcome Victory or defeat.
+	 * @param ReasonText Line under the outcome.
+	 * @param bShowBackToMenu Victory: whether the Main Menu button shows.
+	 */
+	void ShowMissionEnd(const EMissionDebriefOutcome Outcome, const FText& ReasonText, const bool bShowBackToMenu);
+	UW_MissionEnd* ShowMissionEnd_CreateWidget(const EMissionDebriefOutcome Outcome, const FText& ReasonText,
+	                                           const bool bShowBackToMenu);
+	// @return Whether the stage runs; without it the buttons show at once.
+	bool ShowMissionEnd_StartStage(const EMissionDebriefOutcome Outcome);
+	void HandleDebriefButtonsDue();
+	static FText GetDefeatReasonText(const ERTSDefeatType DefeatType);
 	bool GetIsValidMapToLoadOnContinueVictory() const;
 	bool GetIsValidMenuLevelToLoadOnVictory() const;
 	// The configured continue level; when a mission names none it is reported and the menu level is used instead.
@@ -627,7 +667,8 @@ private:
 	bool EnsureValidSpawnCommandQueueState(FMissionSpawnCommandQueueState* SpawnCommandQueueState) const;
 	bool EnsureValidTowAsyncSpawner(class ARTSAsyncSpawner* RTSAsyncSpawner) const;
 	bool EnsureValidSpawnCommandQueueAsyncSpawner(class ARTSAsyncSpawner* RTSAsyncSpawner) const;
-	bool EnsureEnemyControllerIsValid(AEnemyController* EnemyController) const;
+	bool EnsureEnemyControllerIsValid(const AEnemyController* EnemyController) const;
+	// The formation units of every enemy controller whose player fights the human.
 	TArray<AActor*> GetEnemyActorsForQueryType(const EEnemyUnitQueryType EnemyUnitQueryType) const;
 	void RegisterTrackedEnemyActor(AActor* EnemyActor);
 	void UnregisterTrackedEnemyActor(AActor* EnemyActor);
@@ -698,5 +739,9 @@ private:
 	void SetGameCampaignGenerationSettingsWithBackupSettingsFromPIE();
 	int32 M_NextSeededSpawnBatchRequestId = 1;
 
+	// Reaches the controller of every AI player.
 	void PropagateGameDifficultyToEnemyStrategicAI(const FRTSGameDifficulty& GameDifficulty) const;
+	void PropagateGameDifficultyToEnemyController(
+		const AEnemyController* EnemyAIController,
+		const FRTSGameDifficulty& GameDifficulty) const;
 };

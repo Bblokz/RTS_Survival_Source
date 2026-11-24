@@ -2556,6 +2556,8 @@ void UFieldDefenseTestSubsystem::StartEnemyBaseTrenches()
 	TestSettings.MaxTrenchMetresPerBase = EnemyTrenchMetresPerBase;
 	TestSettings.MaxTrenchesPerBase = EnemyTrenchesPerBase;
 	BaseTrenches->MapTest_SetSettings(TestSettings);
+	// The AI only digs trenches while it may build.
+	StrategicAI->GetEditableStrategicAIBlackboard().StrategicAIMissionSettings.bAllowBuilding = true;
 	const ANomadicVehicle* HQ = M_HQ.Get();
 	const FVector2D TowardsHQ = IsValid(HQ)
 		                            ? (FVector2D(HQ->GetActorLocation()) - FVector2D(M_EnemyBaseCentre)).GetSafeNormal()

@@ -52,6 +52,11 @@ struct FUnitPortraitLookOverride
 	bool bHasTeamColor = false;
 	// Written to custom primitive data on every mesh of the unit; alpha is the team colour weight.
 	FLinearColor TeamColor = FLinearColor::Transparent;
+	// Static mesh placed at the unit's own transform as scenery (not framed): the parent building under an
+	// expansion that is built at the building origin, so a hung cabin or a roof frame is not pictured in mid-air.
+	FString BackdropMeshPath;
+	// Extra yaw (degrees) for every camera of this entry: pictures an add-on from the side its building leaves open.
+	float ViewYawOffset = 0.f;
 };
 
 /** One vehicle of the capture list: the file name stem and the Blueprint class to spawn. */
@@ -119,6 +124,9 @@ private:
 	TWeakObjectPtr<ASkyLight> M_SkyFill;
 	TWeakObjectPtr<ACPPController> M_PlayerController;
 	TWeakObjectPtr<AActor> M_Unit;
+
+	// The entry's backdrop mesh actor, destroyed with the unit.
+	TWeakObjectPtr<AActor> M_Backdrop;
 	FVector M_UnitSpawnLocation = FVector::ZeroVector;
 	FUnitPortraitShotState M_ShotState;
 	bool bM_IsSuppressingErrorDialogs = false;
@@ -157,6 +165,7 @@ private:
 	void SpawnSkyFill();
 
 	AActor* SpawnUnit(const FUnitPortraitEntry& Entry) const;
+	void SpawnBackdrop(const FUnitPortraitEntry& Entry);
 	/**
 	 * @brief Reads the optional "|Swap=<from>><to>|TeamColor=r,g,b[,a]" fields after a list entry's class path.
 	 * @param OptionsText Everything after the first '|' of the entry.

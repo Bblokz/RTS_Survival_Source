@@ -1,0 +1,474 @@
+{
+ "JobName": "AS_Ore_Ju87",
+ "Category": "AirStrikes",
+ "Fps": 60,
+ "WarmupSeconds": 6.0,
+ "DurationSeconds": 32.0,
+ "Anchor": {
+  "X": -100.0,
+  "Y": 2000.0,
+  "Z": 0.0
+ },
+ "AnchorYaw": 90.0,
+ "ClearUnitsRadius": 9000.0,
+ "bKeepVoiceLines": true,
+ "bKeepAnnouncer": false,
+ "bKeepMusic": false,
+ "Events": [
+  {
+   "Time": -1.5,
+   "Type": "Spawn",
+   "Tag": "Column",
+   "ClassPath": "/Game/RTS_Survival/Blueprints/Squads/Rus/Rus_Squad_Mosin",
+   "Player": 2,
+   "Offset": {
+    "X": -3000.0,
+    "Y": -250.0,
+    "Z": 0.0
+   },
+   "Yaw": 0.0,
+   "Count": 1,
+   "Columns": 0,
+   "Spacing": 1200.0
+  },
+  {
+   "Time": -1.5,
+   "Type": "Spawn",
+   "Tag": "Column",
+   "ClassPath": "/Game/RTS_Survival/Blueprints/Squads/Rus/Rus_Squad_Mosin",
+   "Player": 2,
+   "Offset": {
+    "X": -4500.0,
+    "Y": -250.0,
+    "Z": 0.0
+   },
+   "Yaw": 0.0,
+   "Count": 1,
+   "Columns": 0,
+   "Spacing": 1200.0
+  },
+  {
+   "Time": -1.5,
+   "Type": "Spawn",
+   "Tag": "Column",
+   "ClassPath": "/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Rus_Light/BT-7/Rus_Vehicle_BT-7",
+   "Player": 2,
+   "Offset": {
+    "X": -6000.0,
+    "Y": 250.0,
+    "Z": 0.0
+   },
+   "Yaw": 0.0,
+   "Count": 1,
+   "Columns": 0,
+   "Spacing": 1200.0
+  },
+  {
+   "Time": -1.5,
+   "Type": "Spawn",
+   "Tag": "Column",
+   "ClassPath": "/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Rus_ArmoredCar/BA-11/Rus_ArmoredCar_BA14",
+   "Player": 2,
+   "Offset": {
+    "X": -7500.0,
+    "Y": -250.0,
+    "Z": 0.0
+   },
+   "Yaw": 0.0,
+   "Count": 1,
+   "Columns": 0,
+   "Spacing": 1200.0
+  },
+  {
+   "Time": 0.2,
+   "Type": "Move",
+   "Tag": "Column",
+   "TargetOffset": {
+    "X": 4500.0,
+    "Y": 0.0,
+    "Z": 0.0
+   },
+   "TargetYaw": 0
+  },
+  {
+   "Time": 1.0,
+   "Type": "Ability",
+   "Tag": "Air",
+   "Text": "GA_3xJu87Strafing",
+   "Offset": {
+    "X": -1500.0,
+    "Y": 0.0,
+    "Z": 0.0
+   },
+   "TargetOffset": {
+    "X": 2500.0,
+    "Y": 0.0,
+    "Z": 0.0
+   },
+   "Settings": {
+    "Repeat": 1,
+    "ClaimSeconds": 30
+   },
+   "ClassPath": "/Game/RTS_Survival/Blueprints/Aircraft/GerAircraft/JU_87VTO/Ger_Aircraft_StukaJu87_Airborne"
+  }
+ ],
+ "Shots": [
+  {
+   "Name": "Column",
+   "Start": 0.0,
+   "End": 6.0,
+   "Rig": "Follow",
+   "Keys": [
+    {
+     "Time": 0.0,
+     "Pivot": "tag:Column",
+     "Offset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     },
+     "Yaw": 200.0,
+     "Pitch": 26.0,
+     "Distance": 3200.0,
+     "Focal": 30.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 150.0
+     },
+     "VYaw": 0.0,
+     "VPitch": 32.0,
+     "VDistance": 2600.0,
+     "VFocal": 22.0,
+     "VLookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     }
+    },
+    {
+     "Time": 6.0,
+     "Pivot": "tag:Column",
+     "Offset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     },
+     "Yaw": 190.0,
+     "Pitch": 26.0,
+     "Distance": 3200.0,
+     "Focal": 30.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 150.0
+     },
+     "VYaw": 0.0,
+     "VPitch": 32.0,
+     "VDistance": 2600.0,
+     "VFocal": 22.0,
+     "VLookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     }
+    }
+   ],
+   "Ease": "InOut",
+   "PivotLag": 1.0,
+   "Aperture": 0.0,
+   "Shake": 0.0,
+   "bAvoidOcclusion": true,
+   "MinGroundClearance": 350.0
+  },
+  {
+   "Name": "Inbound",
+   "Start": 6.0,
+   "End": 10.5,
+   "Rig": "Follow",
+   "Keys": [
+    {
+     "Time": 0.0,
+     "Pivot": "tag:Air[0]",
+     "Offset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     },
+     "Yaw": 205.0,
+     "Pitch": 14.0,
+     "Distance": 3200.0,
+     "Focal": 34.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": -500.0
+     },
+     "VYaw": 0.0,
+     "VPitch": 20.0,
+     "VDistance": 3600.0,
+     "VFocal": 24.0,
+     "VLookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     }
+    },
+    {
+     "Time": 4.5,
+     "Pivot": "tag:Air[0]",
+     "Offset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     },
+     "Yaw": 150.0,
+     "Pitch": 14.0,
+     "Distance": 3200.0,
+     "Focal": 34.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": -500.0
+     },
+     "VYaw": 0.0,
+     "VPitch": 20.0,
+     "VDistance": 3600.0,
+     "VFocal": 24.0,
+     "VLookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     }
+    }
+   ],
+   "Ease": "InOut",
+   "PivotLag": 0.08,
+   "Aperture": 0.0,
+   "Shake": 0.0,
+   "bAvoidOcclusion": true,
+   "MinGroundClearance": 350.0
+  },
+  {
+   "Name": "StrafeRun",
+   "Start": 10.5,
+   "End": 18.5,
+   "Rig": "Orbit",
+   "Keys": [
+    {
+     "Time": 0.0,
+     "Pivot": "tag:Column",
+     "Offset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     },
+     "Yaw": 120.0,
+     "Pitch": 30.0,
+     "Distance": 4200.0,
+     "Focal": 26.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 600.0
+     },
+     "VYaw": 0.0,
+     "VPitch": 36.0,
+     "VDistance": 4600.0,
+     "VFocal": 20.0,
+     "VLookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     }
+    },
+    {
+     "Time": 8.0,
+     "Pivot": "tag:Column",
+     "Offset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     },
+     "Yaw": 95.0,
+     "Pitch": 28.0,
+     "Distance": 3800.0,
+     "Focal": 26.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 600.0
+     },
+     "VYaw": 0.0,
+     "VPitch": 34.0,
+     "VDistance": 4200.0,
+     "VFocal": 20.0,
+     "VLookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     }
+    }
+   ],
+   "Ease": "InOut",
+   "PivotLag": 0.7,
+   "Aperture": 0.0,
+   "Shake": 0.0,
+   "bAvoidOcclusion": true,
+   "MinGroundClearance": 350.0
+  },
+  {
+   "Name": "Wreckage",
+   "Start": 18.5,
+   "End": 25.0,
+   "Rig": "Orbit",
+   "Keys": [
+    {
+     "Time": 0.0,
+     "Pivot": "tag:Column",
+     "Offset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     },
+     "Yaw": 60.0,
+     "Pitch": 24.0,
+     "Distance": 3000.0,
+     "Focal": 30.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 150.0
+     },
+     "VYaw": 0.0,
+     "VPitch": 28.0,
+     "VDistance": 3200.0,
+     "VFocal": 22.0,
+     "VLookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     }
+    },
+    {
+     "Time": 6.5,
+     "Pivot": "tag:Column",
+     "Offset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     },
+     "Yaw": 20.0,
+     "Pitch": 28.0,
+     "Distance": 2800.0,
+     "Focal": 30.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 150.0
+     },
+     "VYaw": 0.0,
+     "VPitch": 30.0,
+     "VDistance": 3000.0,
+     "VFocal": 22.0,
+     "VLookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     }
+    }
+   ],
+   "Ease": "InOut",
+   "PivotLag": 0.7,
+   "Aperture": 0.0,
+   "Shake": 0.0,
+   "bAvoidOcclusion": true,
+   "MinGroundClearance": 350.0
+  },
+  {
+   "Name": "Aftermath",
+   "Start": 25.0,
+   "End": 32.0,
+   "Rig": "Orbit",
+   "Keys": [
+    {
+     "Time": 0.0,
+     "Pivot": "tag:Column",
+     "Offset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     },
+     "Yaw": 200.0,
+     "Pitch": 24.0,
+     "Distance": 3000.0,
+     "Focal": 28.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 150.0
+     },
+     "VYaw": 0.0,
+     "VPitch": 28.0,
+     "VDistance": 3200.0,
+     "VFocal": 20.0,
+     "VLookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     }
+    },
+    {
+     "Time": 7.0,
+     "Pivot": "tag:Column",
+     "Offset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     },
+     "Yaw": 228.0,
+     "Pitch": 40.0,
+     "Distance": 5000.0,
+     "Focal": 22.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 150.0
+     },
+     "VYaw": 0.0,
+     "VPitch": 44.0,
+     "VDistance": 5400.0,
+     "VFocal": 18.0,
+     "VLookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     }
+    }
+   ],
+   "Ease": "InOut",
+   "PivotLag": 0.7,
+   "Aperture": 0.0,
+   "Shake": 0.0,
+   "bAvoidOcclusion": true,
+   "MinGroundClearance": 350.0
+  }
+ ],
+ "MapPath": "/Game/RTS_Survival/Maps/GerMissions/Ger_2ndOreMountains",
+ "GameModeClassPath": "/Game/RTS_Survival/Blueprints/GameSettings/RTS_BP_GamemodeBase.RTS_BP_GamemodeBase_C",
+ "HideActorPrefixes": [
+  "ORE_PH_"
+ ],
+ "SkyMaterial": "/Game/SkyboxPack_X/Materials/Instances/M_Flowmap_Inst_04.M_Flowmap_Inst_04",
+ "Batch": "air"
+}

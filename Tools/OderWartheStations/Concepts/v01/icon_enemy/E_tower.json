@@ -1,0 +1,323 @@
+{
+ "key": "E_tower",
+ "title": "E  Peilturm: forest watchtower with the loop on its cabin",
+ "notes": [
+  "A timber fire-watch tower (the line runs through dead pine forest) re-used as the DF post: cabin at 7.2 m.",
+  "Loop aerial on the cabin roof turns slowly; the tallest landmark of the six, seen over the trees.",
+  "Generator shed at the tower foot, cable up the tower leg; ladder on the camera side.",
+  "Flag front-left on its plinth, holder sign on the yard edge; the yard in front of the tower is open.",
+  "Most readable over forest; the capture bar must sit high (14 m) and the tower hides units behind it."
+ ],
+ "subtitle": "Panzer IV + soldier for scale  |  origin = capture centre (25 m radius)  |  site 12 x 11 m, tower 9 m, loop top 12.8 m, flag 7.5 m",
+ "footprint": [
+  9.0,
+  10.7
+ ],
+ "height": 13.2,
+ "mast_height": 13.2,
+ "views": {
+  "rts": {
+   "file": "E_tower_rts.png",
+   "size": [
+    1600,
+    1100
+   ],
+   "px_per_m": 54.54545454545455,
+   "caption": "Front elevation (icon source)",
+   "labels": []
+  },
+  "rear": {
+   "file": "E_tower_rear.png",
+   "size": [
+    800,
+    550
+   ],
+   "px_per_m": 27.272727272727273,
+   "caption": null,
+   "labels": [
+    {
+     "text": "Watchtower cabin (receiver)",
+     "kind": "hut",
+     "xy": [
+      352.1,
+      225.4
+     ]
+    },
+    {
+     "text": "Rotating loop aerial",
+     "kind": "aerial",
+     "xy": [
+      319.0,
+      99.7
+     ]
+    },
+    {
+     "text": "Generator shed",
+     "kind": "hut",
+     "xy": [
+      402.5,
+      380.3
+     ]
+    },
+    {
+     "text": "Generator",
+     "kind": "gen",
+     "xy": [
+      444.0,
+      367.9
+     ]
+    },
+    {
+     "text": "Capture flag (rises 5.5 m)",
+     "kind": "flag",
+     "xy": [
+      545.2,
+      203.4
+     ]
+    },
+    {
+     "text": "Holder sign (red star / Balkenkreuz)",
+     "kind": "held",
+     "xy": [
+      409.0,
+      250.6
+     ]
+    },
+    {
+     "text": "Capture bar (UI) 14 m",
+     "kind": "ui",
+     "xy": [
+      408.0,
+      54.9
+     ]
+    }
+   ]
+  },
+  "top": {
+   "file": "E_tower_top.png",
+   "size": [
+    800,
+    800
+   ],
+   "px_per_m": 35.29411764705882,
+   "caption": null,
+   "labels": [
+    {
+     "text": "Watchtower cabin (receiver)",
+     "kind": "hut",
+     "xy": [
+      400.0,
+      294.1
+     ]
+    },
+    {
+     "text": "Rotating loop aerial",
+     "kind": "aerial",
+     "xy": [
+      452.9,
+      294.1
+     ]
+    },
+    {
+     "text": "Generator shed",
+     "kind": "hut",
+     "xy": [
+      294.1,
+      258.8
+     ]
+    },
+    {
+     "text": "Generator",
+     "kind": "gen",
+     "xy": [
+      294.1,
+      350.6
+     ]
+    },
+    {
+     "text": "Capture flag (rises 5.5 m)",
+     "kind": "flag",
+     "xy": [
+      244.7,
+      505.9
+     ]
+    },
+    {
+     "text": "Holder sign (red star / Balkenkreuz)",
+     "kind": "held",
+     "xy": [
+      512.9,
+      576.5
+     ]
+    },
+    {
+     "text": "Capture bar (UI) 14 m",
+     "kind": "ui",
+     "xy": [
+      400.0,
+      417.6
+     ]
+    }
+   ],
+   "grid": [
+    [
+     -658.8,
+     1529.4,
+     -658.8,
+     -588.2
+    ],
+    [
+     -482.4,
+     1529.4,
+     -482.4,
+     -588.2
+    ],
+    [
+     -305.9,
+     1529.4,
+     -305.9,
+     -588.2
+    ],
+    [
+     -129.4,
+     1529.4,
+     -129.4,
+     -588.2
+    ],
+    [
+     47.1,
+     1529.4,
+     47.1,
+     -588.2
+    ],
+    [
+     223.5,
+     1529.4,
+     223.5,
+     -588.2
+    ],
+    [
+     400.0,
+     1529.4,
+     400.0,
+     -588.2
+    ],
+    [
+     576.5,
+     1529.4,
+     576.5,
+     -588.2
+    ],
+    [
+     752.9,
+     1529.4,
+     752.9,
+     -588.2
+    ],
+    [
+     929.4,
+     1529.4,
+     929.4,
+     -588.2
+    ],
+    [
+     1105.9,
+     1529.4,
+     1105.9,
+     -588.2
+    ],
+    [
+     1282.4,
+     1529.4,
+     1282.4,
+     -588.2
+    ],
+    [
+     1458.8,
+     1529.4,
+     1458.8,
+     -588.2
+    ],
+    [
+     -658.8,
+     1529.4,
+     1458.8,
+     1529.4
+    ],
+    [
+     -658.8,
+     1352.9,
+     1458.8,
+     1352.9
+    ],
+    [
+     -658.8,
+     1176.5,
+     1458.8,
+     1176.5
+    ],
+    [
+     -658.8,
+     1000.0,
+     1458.8,
+     1000.0
+    ],
+    [
+     -658.8,
+     823.5,
+     1458.8,
+     823.5
+    ],
+    [
+     -658.8,
+     647.1,
+     1458.8,
+     647.1
+    ],
+    [
+     -658.8,
+     470.6,
+     1458.8,
+     470.6
+    ],
+    [
+     -658.8,
+     294.1,
+     1458.8,
+     294.1
+    ],
+    [
+     -658.8,
+     117.6,
+     1458.8,
+     117.6
+    ],
+    [
+     -658.8,
+     -58.8,
+     1458.8,
+     -58.8
+    ],
+    [
+     -658.8,
+     -235.3,
+     1458.8,
+     -235.3
+    ],
+    [
+     -658.8,
+     -411.8,
+     1458.8,
+     -411.8
+    ],
+    [
+     -658.8,
+     -588.2,
+     1458.8,
+     -588.2
+    ]
+   ]
+  }
+ },
+ "main_view": "rts"
+}

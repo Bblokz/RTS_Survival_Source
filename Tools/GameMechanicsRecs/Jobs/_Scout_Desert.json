@@ -1,0 +1,252 @@
+{
+ "JobName": "Scout_Desert",
+ "Category": "_Scout",
+ "Fps": 60,
+ "WarmupSeconds": 5.0,
+ "DurationSeconds": 0.6,
+ "Anchor": {
+  "X": 0.0,
+  "Y": 0.0,
+  "Z": 0.0
+ },
+ "AnchorYaw": 0.0,
+ "ClearUnitsRadius": 0.0,
+ "bKeepVoiceLines": true,
+ "bKeepAnnouncer": false,
+ "bKeepMusic": false,
+ "Events": [
+  {
+   "Time": -3.5,
+   "Type": "Hide",
+   "Tag": "",
+   "Text": "BP_Electricity_SinglePole",
+   "Radius": 25000.0
+  },
+  {
+   "Time": -1.0,
+   "Type": "Marker",
+   "Tag": "",
+   "Offset": {
+    "X": -7408.557358432856,
+    "Y": 2719.935022831883,
+    "Z": 0.0
+   },
+   "Text": "red",
+   "Value": 250.0,
+   "Settings": {
+    "Height": 900.0
+   }
+  },
+  {
+   "Time": -1.0,
+   "Type": "Marker",
+   "Tag": "",
+   "Offset": {
+    "X": -8885.768987951167,
+    "Y": 2980.407289332279,
+    "Z": 0.0
+   },
+   "Text": "green",
+   "Value": 900.0,
+   "Settings": {
+    "Height": 900.0
+   }
+  },
+  {
+   "Time": -1.0,
+   "Type": "Marker",
+   "Tag": "",
+   "Offset": {
+    "X": -10623.452883969876,
+    "Y": 1763.6679263143621,
+    "Z": 0.0
+   },
+   "Text": "red",
+   "Value": 250.0,
+   "Settings": {
+    "Height": 900.0
+   }
+  },
+  {
+   "Time": -1.0,
+   "Type": "Marker",
+   "Tag": "",
+   "Offset": {
+    "X": -12100.664513488187,
+    "Y": 2024.140192814758,
+    "Z": 0.0
+   },
+   "Text": "green",
+   "Value": 900.0,
+   "Settings": {
+    "Height": 900.0
+   }
+  },
+  {
+   "Time": -1.0,
+   "Type": "Marker",
+   "Tag": "",
+   "Offset": {
+    "X": -10102.508350969085,
+    "Y": 4718.091185350986,
+    "Z": 0.0
+   },
+   "Text": "red",
+   "Value": 250.0,
+   "Settings": {
+    "Height": 900.0
+   }
+  },
+  {
+   "Time": -1.0,
+   "Type": "Marker",
+   "Tag": "",
+   "Offset": {
+    "X": -11579.719980487396,
+    "Y": 4978.563451851382,
+    "Z": 0.0
+   },
+   "Text": "green",
+   "Value": 900.0,
+   "Settings": {
+    "Height": 900.0
+   }
+  },
+  {
+   "Time": -1.0,
+   "Type": "Marker",
+   "Tag": "",
+   "Offset": {
+    "X": -13577.876143006499,
+    "Y": 2284.612459315153,
+    "Z": 0.0
+   },
+   "Text": "red",
+   "Value": 250.0,
+   "Settings": {
+    "Height": 900.0
+   }
+  },
+  {
+   "Time": -1.0,
+   "Type": "Marker",
+   "Tag": "",
+   "Offset": {
+    "X": -15055.087772524812,
+    "Y": 2545.084725815549,
+    "Z": 0.0
+   },
+   "Text": "green",
+   "Value": 900.0,
+   "Settings": {
+    "Height": 900.0
+   }
+  },
+  {
+   "Time": -1.0,
+   "Type": "Marker",
+   "Tag": "",
+   "Offset": {
+    "X": -13056.931610005708,
+    "Y": 5239.035718351777,
+    "Z": 0.0
+   },
+   "Text": "red",
+   "Value": 250.0,
+   "Settings": {
+    "Height": 900.0
+   }
+  },
+  {
+   "Time": -1.0,
+   "Type": "Marker",
+   "Tag": "",
+   "Offset": {
+    "X": -14534.14323952402,
+    "Y": 5499.507984852173,
+    "Z": 0.0
+   },
+   "Text": "green",
+   "Value": 900.0,
+   "Settings": {
+    "Height": 900.0
+   }
+  },
+  {
+   "Time": -1.0,
+   "Type": "Marker",
+   "Tag": "",
+   "Offset": {
+    "X": -12825.0,
+    "Y": 3675.0,
+    "Z": 0.0
+   },
+   "Text": "white",
+   "Value": 150.0,
+   "Settings": {
+    "Height": 2500.0
+   }
+  }
+ ],
+ "Shots": [
+  {
+   "Name": "BaseExpansion_Desert",
+   "Start": 0.0,
+   "End": 0.6,
+   "Rig": "Orbit",
+   "Keys": [
+    {
+     "Time": 0.0,
+     "Pivot": "",
+     "Offset": {
+      "X": -12825.0,
+      "Y": 3675.0,
+      "Z": 0.0
+     },
+     "Yaw": 170.0,
+     "Pitch": 84.0,
+     "Distance": 17000.0,
+     "Focal": 24.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     },
+     "VYaw": 0.0,
+     "VPitch": 0.0,
+     "VDistance": 0.0,
+     "VFocal": 0.0,
+     "VLookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     }
+    }
+   ],
+   "Ease": "InOut",
+   "PivotLag": 0.7,
+   "Aperture": 0.0,
+   "Shake": 0.0,
+   "bAvoidOcclusion": false,
+   "MinGroundClearance": 350.0
+  }
+ ],
+ "MapPath": "/Game/RTS_Survival/SurvivalMode/Maps/SM_Desert_01",
+ "GameModeClassPath": "/Game/RTS_Survival/SurvivalMode/Blueprints/BP_SurvivalGameMode.BP_SurvivalGameMode_C",
+ "LaunchArgs": [
+  "-SurvivalAutoStart",
+  "-SurvivalStartIndex=0",
+  "-SurvivalGrace=3600"
+ ],
+ "HideNear": [
+  [
+   "BP_Electricity_SinglePole",
+   25000
+  ]
+ ],
+ "SuppressClassPrefixes": [
+  "Ger_Aircraft_JU390B_AirborneUnarmed"
+ ],
+ "HideActorPrefixes": []
+}

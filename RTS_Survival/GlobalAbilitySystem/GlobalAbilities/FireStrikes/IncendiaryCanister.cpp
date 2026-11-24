@@ -5,12 +5,12 @@
 #include "Components/StaticMeshComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "NiagaraFunctionLibrary.h"
+#include "RTS_Survival/Game/Players/RTSPlayers.h"
 #include "RTS_Survival/Subsystems/FireSubsystem/RTSFireSubsystem.h"
 #include "RTS_Survival/Utils/AOE/FRTS_AOE.h"
 
 namespace IncendiaryCanisterConstants
 {
-	constexpr int32 HumanPlayer = 1;
 	// The async burst damage still reads this actor as its causer, so it stays (hidden) a little after the burst.
 	constexpr float LifeAfterBurstSeconds = 2.f;
 	// Exponent of the height curve: the canister leaves the aircraft level and drops ever faster.
@@ -98,9 +98,11 @@ void AIncendiaryCanister::DealImpactDamage()
 	{
 		return;
 	}
-	const ETriggerOverlapLogic OverlapLogic = M_OwningPlayer == IncendiaryCanisterConstants::HumanPlayer
-		                                          ? ETriggerOverlapLogic::OverlapEnemy
-		                                          : ETriggerOverlapLogic::OverlapPlayer;
+	// The burst hits the units of the players hostile to the caller; a canister without an owner keeps hitting for
+	// the AI side, as it did when there were two sides.
+	const int32 BurstPlayer = FRTSPlayers::IsNeutralOwner(M_OwningPlayer)
+		                          ? RTSPlayers::FirstAIPlayer
+		                          : M_OwningPlayer;
 	const FRTSGroundFireSettings& Burn = M_Settings.GroundFire;
 	FRTS_AOE::DealDamageVsRearArmorInRadiusAsync(
 		this,
@@ -112,7 +114,7 @@ void AIncendiaryCanister::DealImpactDamage()
 		Burn.ArmorPenFallOff,
 		Burn.MaxArmorPen,
 		ERTSDamageType::Fire,
-		OverlapLogic,
+		FAoeInstigator::HostilesOf(BurstPlayer),
 		EShieldDamageSource::Flamethrower,
 		TArray<TWeakObjectPtr<AActor>>(),
 		EVehicleModuleSplashPolicy::Ignore,

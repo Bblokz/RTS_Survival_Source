@@ -5,6 +5,7 @@
 
 #include "Animation/WidgetAnimation.h"
 #include "Components/Image.h"
+#include "Components/ProgressBar.h"
 #include "Components/TextBlock.h"
 #include "Healthbar_TargetTypeIconState/ProjectSettings/TargetTypeIconSettings.h"
 #include "RTS_Survival/DeveloperSettings.h"
@@ -168,6 +169,35 @@ void UW_HealthBar::InitRTSHealthBar(UWidgetAnimation* DamageAnimation, UMaterial
 	}
 }
 
+bool UW_HealthBar::GetHasConversionProgressBar() const
+{
+	return IsValid(ConversionProgressBar);
+}
+
+void UW_HealthBar::SetConversionProgressVisible(const bool bVisible) const
+{
+	if (not GetHasConversionProgressBar())
+	{
+		return;
+	}
+	if (not bVisible)
+	{
+		ConversionProgressBar->SetPercent(0.f);
+	}
+	ConversionProgressBar->SetVisibility(bVisible
+		                                     ? ESlateVisibility::HitTestInvisible
+		                                     : ESlateVisibility::Collapsed);
+}
+
+void UW_HealthBar::SetConversionProgress(const float NewPercentage) const
+{
+	if (not GetHasConversionProgressBar())
+	{
+		return;
+	}
+	ConversionProgressBar->SetPercent(FMath::Clamp(NewPercentage, 0.f, 1.f));
+}
+
 void UW_HealthBar::NativeOnInitialized()
 {
 	Super::NativeOnInitialized();
@@ -176,6 +206,9 @@ void UW_HealthBar::NativeOnInitialized()
 	{
 		M_FireThresholdBarImage->SetVisibility(ESlateVisibility::Hidden);
 	}
+
+	// Hidden until a converter reports that conversion runs.
+	SetConversionProgressVisible(false);
 
 	// Load target type icon from game settings.
 	if (const UTargetTypeIconSettings* Settings = UTargetTypeIconSettings::Get())

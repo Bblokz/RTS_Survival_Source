@@ -191,6 +191,17 @@ FSoftObjectPath FieldTrenchLayout::GetPieceMeshPath(const EFieldTrenchPiece Piec
 	return FSoftObjectPath(FString(MeshFolder) + MeshName + TEXT(".") + MeshName);
 }
 
+FSoftObjectPath FieldTrenchLayout::GetPieceRampMeshPath(const EFieldTrenchPiece Piece, const EFieldTrenchKit Kit)
+{
+	const FSoftObjectPath MeshPath = GetPieceMeshPath(Piece, Kit);
+	if (MeshPath.IsNull())
+	{
+		return FSoftObjectPath();
+	}
+	const FString RampName = MeshPath.GetAssetName() + TEXT("_Ramp");
+	return FSoftObjectPath(MeshPath.GetLongPackageName() + TEXT("_Ramp.") + RampName);
+}
+
 void FieldTrenchLayout::PlacePieceOnPort(
 	const EFieldTrenchPiece Piece,
 	const int32 EntryPortIndex,

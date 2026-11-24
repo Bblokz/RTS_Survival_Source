@@ -41,6 +41,12 @@ void UW_Portrait::SetDefaultSubtitleSetup()
 	SpeakerNames.Add(ERTSPortraitTypes::GermanMechanizedPioneers,
 	                 NSLOCTEXT("Portrait", "SpeakerPioneer", "Pioneer"));
 	SpeakerNames.Add(ERTSPortraitTypes::GermanCommando, NSLOCTEXT("Portrait", "SpeakerCommando", "Commando"));
+	SpeakerNames.Add(ERTSPortraitTypes::SovietMosin, NSLOCTEXT("Portrait", "SpeakerRifleman", "Rifleman"));
+	SpeakerNames.Add(ERTSPortraitTypes::GermanTigerLoader, NSLOCTEXT("Portrait", "SpeakerLoader", "Loader"));
+	SpeakerNames.Add(ERTSPortraitTypes::GermanLuchsScavenger,
+	                 NSLOCTEXT("Portrait", "SpeakerLuchsCommander", "Luchs Commander"));
+	SpeakerNames.Add(ERTSPortraitTypes::SovietIS2Driver, NSLOCTEXT("Portrait", "SpeakerIS2Driver", "IS-2 Driver"));
+	SpeakerNames.Add(ERTSPortraitTypes::SovietInterceptStarik, NSLOCTEXT("Portrait", "SpeakerStarik", "Starik"));
 
 	static ConstructorHelpers::FObjectFinder<UFont> MainFont(SubtitleStyleDefaults::MainFontPath);
 	static ConstructorHelpers::FObjectFinder<UFont> ReadableFont(SubtitleStyleDefaults::ReadableFontPath);
@@ -124,9 +130,18 @@ void UW_Portrait::PlaceSubtitleUnderPortrait()
 	SubtitleSlot->SetAnchors(Anchors);
 	SubtitleSlot->SetAlignment(FVector2D(CentreAlignment, 0.0f));
 	SubtitleSlot->SetAutoSize(true);
+	const float SubtitleCentreX = BlockPosition.X + (CentreAlignment - BlockAlignment.X) * BlockSize.X;
 	SubtitleSlot->SetPosition(FVector2D(
-		BlockPosition.X + (CentreAlignment - BlockAlignment.X) * BlockSize.X,
+		SubtitleCentreX,
 		BlockPosition.Y + (1.0f - BlockAlignment.Y) * BlockSize.Y + SubtitleStyle.GapBelowPortrait));
+	bM_HasSubtitleLeftEdge = FMath::IsNearlyZero(Anchors.Minimum.X);
+	M_SubtitleLeftEdge = SubtitleCentreX - CentreAlignment * SubtitleStyle.BoxWidth;
+}
+
+bool UW_Portrait::GetSubtitleLeftEdge(float& OutLeftEdge) const
+{
+	OutLeftEdge = M_SubtitleLeftEdge;
+	return bM_HasSubtitleLeftEdge;
 }
 
 void UW_Portrait::StartSubtitles(const ERTSPortraitTypes PortraitType, const USoundBase* VoiceLine,
@@ -141,6 +156,11 @@ void UW_Portrait::StartSubtitles(const ERTSPortraitTypes PortraitType, const USo
 	M_Subtitle->StartLine(GetSpeakerName(PortraitType, Transcript),
 	                      Transcript != nullptr ? Transcript->Sentences : NoSentences,
 	                      MoveTemp(GetPlaybackSeconds));
+}
+
+FString UW_Portrait::GetShownSubtitleText() const
+{
+	return M_Subtitle != nullptr ? M_Subtitle->GetShownText() : FString();
 }
 
 const FCinematicTranscriptRow* UW_Portrait::FindTranscript(const USoundBase* VoiceLine) const

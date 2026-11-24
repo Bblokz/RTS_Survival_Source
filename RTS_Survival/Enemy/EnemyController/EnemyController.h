@@ -11,6 +11,7 @@
 #include "RTS_Survival/Enemy/EnemyController/EnemyDirectControlComponent/EnemyDirectControlComponent.h"
 #include "RTS_Survival/Enemy/StrategicAI/StochasticDecisionTree/StochasticDecisionTree.h"
 #include "RTS_Survival/Enemy/TrainingAndUnitCreation/EnemyAITechLevel/EnemyAITechLevel.h"
+#include "RTS_Survival/Game/Players/RTSPlayers.h"
 #include "RTS_Survival/GlobalAbilitySystem/GlobalAbilitiesManager/GlobalAbilitiesManager.h"
 #include "EnemyController.generated.h"
 
@@ -19,6 +20,7 @@ class UTrainerComponent;
 struct FTrainingOption;
 struct FAttackWaveElement;
 struct FAttackMoveWaveSettings;
+struct FAttackWaveRequest;
 enum class EEnemyWaveType : uint8;
 enum class EPostRetreatCounterStrategy : uint8;
 class UEnemyWaveController;
@@ -36,6 +38,8 @@ class URTSGameInstance;
 
 /**
  * @brief Coordinates enemy formations and wave orchestration for AI-controlled assaults.
+ * Place one per AI player in a map and set ControlledPlayer: everything the controller spawns, counts and orders
+ * belongs to that player. Find it with FRTS_Statics::GetEnemyControllerForPlayer.
  */
 UCLASS()
 class RTS_SURVIVAL_API AEnemyController : public AActorObjectsMaster
@@ -46,6 +50,28 @@ public:
 	// Sets default values for this actor's properties
 	AEnemyController(const FObjectInitializer& ObjectInitializer);
 
+	/** @return The AI player this controller plays (FirstAIPlayer..MaxPlayers). */
+	UFUNCTION(BlueprintPure, Category = "Enemy Controller")
+	int32 GetControlledPlayer() const;
+
+	/**
+	 * @brief Owner to hand to the async spawner for a unit this controller creates.
+	 * @return INDEX_NONE for the first AI player, whose units keep the owner of their Blueprint as they always did;
+	 * the controlled player for every other AI player.
+	 */
+	int32 GetSpawnOwnerOverride() const;
+
+	/**
+	 * @brief Whether this controller may take a unit under its command.
+	 * @param Unit Squad controller, tank or other unit actor.
+	 * @return False only for a unit of another AI player, which has a controller of its own. Human, neutral and
+	 * unset owners are accepted, as they were when there was one controller.
+	 */
+	bool GetCanControlUnit(const AActor* Unit) const;
+
+	/** Logs a unit this controller spawned that came up for another player (a Blueprint with a different owner). */
+	void LogSpawnedUnitOwnerMismatch(const AActor* SpawnedUnit) const;
+
 	UStochasticDecisionTree* GetStrategicDecisionTree();
 
 	/**
@@ -53,6 +79,14 @@ public:
 	 * across maps (survival). Call after BeginPlay; think timers keep running.
 	 */
 	void OverrideStrategicDecisionTree(const UStochasticDecisionTree* Template);
+
+	/**
+	 * @brief Editor setup for mission maps: gives this placed controller its own copy of an authored tree (for example
+	 * DA_SurvivalWaveSettings' tree). Without a tree no training pressure builds, so the AI never trains.
+	 * @param Template Tree to copy, with its instanced sub-actions; saved with the map.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Strategic AI|Brain")
+	void CopyStrategicDecisionTreeFrom(const UStochasticDecisionTree* Template);
 	UGlobalAbilitiesManager* GetGlobalAbilitiesManager();
 
 	// This is used to evaluate whether the AI can use its decision tree to manually control units that are 'idle' on the blackboard
@@ -262,6 +296,17 @@ public:
 
 
 	/**
+	 * @brief Starts a wave configured entirely by data (placed AEnemyWaveSpawner actors) on this controller's wave
+	 * controller, so it shares wave supply, owning-building checks, formations and the direct-control handoff.
+	 * @param Request Units, movement kind, iteration count, owning building and callbacks of the wave.
+	 * @return The wave ID, or INDEX_NONE when the request is invalid or the wave controller is missing.
+	 */
+	int32 StartWaveFromRequest(const FAttackWaveRequest& Request);
+
+	/** @brief Stops a wave started with StartWaveFromRequest; units it already spawned keep their orders. */
+	void StopWave(const int32 WaveID);
+
+	/**
 	 * @brief Assigns squads to construct field constructions at provided locations.
 	 * @param SquadControllers Squads used to determine available field constructions.
 	 * @param ConstructionLocations Locations to build at.
@@ -362,6 +407,15 @@ public:
 		const float TileTillCounterAttackAfterLastRetreatingUnitReached = 60.f,
 		const float MaxTimeWaitTillCounterAttack = 120.f);
 
+	/**
+	 * @brief Pulls one unit out of its formation and sends it to a rally point, e.g. a beaten squad falling back to
+	 * its base. The retreat controller tracks it and removes it on arrival, as if it went inside.
+	 * @param UnitActor A squad controller or vehicle of this enemy.
+	 * @param RallyLocation Where it runs to; projected onto the navmesh when possible.
+	 * @return True when the order was issued and the retreat controller tracks the unit.
+	 */
+	bool RetreatUnitToRallyPoint(AActor* UnitActor, const FVector& RallyLocation);
+
 	// ------------------------------------------------------------
 	// Enemy Resources Management
 	// ------------------------------------------------------------
@@ -427,6 +481,11 @@ protected:
 
 	virtual void PostInitializeComponents() override;
 
+	// The AI player this controller plays: 2, 3 or 4. A map holds at most one controller per player; a second one
+	// for the same player is reported and ignored.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Enemy Controller", meta = (ClampMin = "2", ClampMax = "4"))
+	int32 ControlledPlayer = RTSPlayers::FirstAIPlayer;
+
 	UPROPERTY(EditAnywhere, Instanced, BlueprintReadOnly, Category="Strategic AI|Brain",
 		meta=(AllowPrivateAccess="true"))
 	TObjectPtr<UStochasticDecisionTree> M_StochasticDecisionTree = nullptr;
@@ -457,6 +516,8 @@ private:
 	void BeginPlay_InitStochasticDecisionTree();
 	void BeginPlay_MoveAISettingsToStrategicAIBlackboard() const;
 	void BeginPlay_InitEnemyGlobalAbilities();
+	// Runs before the controller registers: a ControlledPlayer that is no AI player is reported and set to the first.
+	void PostInitializeComponents_ValidateControlledPlayer();
 
 	UPROPERTY()
 	TObjectPtr<UEnemyFormationController> M_FormationController;

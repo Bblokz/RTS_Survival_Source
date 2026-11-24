@@ -8,6 +8,7 @@
 #include "Engine/StreamableManager.h"
 #include "TimerManager.h"
 #include "RTS_Survival/Enemy/Convoy/ConvoyDefinition.h"
+#include "RTS_Survival/Enemy/Convoy/SurrenderingCargoTruck/SurrenderingCargoTruck.h"
 #include "RTS_Survival/GameUI/MiniMap/CustomIcons/MinimapIconTypes.h"
 #include "RTS_Survival/Scavenging/ScavengeObject/ScavengableObject.h"
 #include "RTS_Survival/Units/SquadController.h"
@@ -19,6 +20,52 @@ namespace ConvoyCargoConstants
 {
 	// The convoy actor lingers this long after its last cache resolved, so late events still find it.
 	constexpr float SelfDestroyDelaySeconds = 2.f;
+}
+
+namespace ConvoyCargoHelpers
+{
+	/**
+	 * @brief A truck whose cargo differs from the definition's (a mixed column) pays its whole share in the resource
+	 * of its own cargo type, with the same mapping a captured truck uses; other trucks pay the definition's cargo.
+	 * @return The cache value of this truck.
+	 */
+	FConvoyCargoValue GetCacheValueOfTruck(const FConvoyCargoValue& CargoPerTruck, const EConvoyCargoType TruckCargo,
+	                                       const EConvoyCargoType DefinitionCargo, const AActor* TruckActor)
+	{
+		if (TruckCargo == DefinitionCargo)
+		{
+			return CargoPerTruck;
+		}
+		const ASurrenderingCargoTruck* SurrenderingTruck = Cast<ASurrenderingCargoTruck>(TruckActor);
+		const FSurrenderingTruckPayoutMapping DefaultMapping;
+		const FSurrenderingTruckPayoutMapping& Mapping = SurrenderingTruck != nullptr
+			                                                 ? SurrenderingTruck->GetPayoutMapping()
+			                                                 : DefaultMapping;
+		FConvoyCargoValue Value;
+		const int32 Total = CargoPerTruck.GetTotal();
+		if (Total > 0)
+		{
+			Value.Resources.Add(Mapping.GetPayoutResource(TruckCargo), Total);
+		}
+		return Value;
+	}
+
+	/** @return Beside the wreck where the truck died (also off the road on a branch), away from the road centre. */
+	FVector GetCacheLocationOfTruck(const FConvoyMember& Truck, const FConvoyRoutePolyline& Polyline,
+	                                const float CacheSideOffset)
+	{
+		const float Side = Truck.LateralOffset >= 0.f ? 1.f : -1.f;
+		const AActor* Wreck = Truck.Actor.Get();
+		if (not IsValid(Wreck))
+		{
+			// No wreck to stand beside: its last spot along the main road.
+			FVector RouteLocation = Polyline.GetOffsetPoint(Truck.RouteDistance,
+			                                                Truck.LateralOffset + Side * CacheSideOffset);
+			RouteLocation.Z = Truck.Location.Z;
+			return RouteLocation;
+		}
+		return Wreck->GetActorLocation() + Wreck->GetActorRightVector() * (Side * CacheSideOffset);
+	}
 }
 
 void AConvoy::UpdateDeaths()
@@ -66,7 +113,10 @@ void AConvoy::HandleTruckLost(FConvoyMember& Member)
 {
 	Broadcast(EConvoyEventType::TruckDestroyed, &Member,
 	          FString::Printf(TEXT("%s trucks_left=%d"), *Member.UnitName, GetAliveTruckCount()));
-	if (M_Outcome == EConvoyOutcome::None)
+	// The armoured case truck leaves its own sealed cache instead of the cargo cache.
+	const ASurrenderingCargoTruck* SurrenderingTruck = Cast<ASurrenderingCargoTruck>(Member.Actor.Get());
+	const bool bDropsCargoCache = SurrenderingTruck == nullptr or SurrenderingTruck->GetDropsConvoyCargoCache();
+	if (M_Outcome == EConvoyOutcome::None and bDropsCargoCache)
 	{
 		ScheduleCargoCache(Member);
 	}
@@ -74,6 +124,11 @@ void AConvoy::HandleTruckLost(FConvoyMember& Member)
 	{
 		return;
 	}
+	OnLastTruckGone(M_CapturedTruckCount > 0 ? TEXT("every truck destroyed or captured") : TEXT("every truck destroyed"));
+}
+
+void AConvoy::OnLastTruckGone(const FString& Reason)
+{
 	// The last truck is gone: the escorts stop keeping station and are no longer slowed.
 	for (FConvoyMember& Escort : M_Members)
 	{
@@ -93,7 +148,66 @@ void AConvoy::HandleTruckLost(FConvoyMember& Member)
 		}
 		Escort.bHasOrder = false;
 	}
-	SetState(EConvoyState::TrucksLost, TEXT("every truck destroyed"));
+	SetState(EConvoyState::TrucksLost, Reason);
+}
+
+EConvoyOutcome AConvoy::GetOutcomeWithoutTrucks() const
+{
+	return M_CapturedTruckCount > 0 ? EConvoyOutcome::TrucksStopped : EConvoyOutcome::TrucksDestroyed;
+}
+
+bool AConvoy::ReleaseCapturedTruck(AActor* Truck)
+{
+	if (M_Outcome != EConvoyOutcome::None or not IsValid(Truck))
+	{
+		return false;
+	}
+	FConvoyMember* Member = M_Members.FindByPredicate([Truck](const FConvoyMember& Candidate)
+	{
+		return Candidate.Actor.Get() == Truck;
+	});
+	if (Member == nullptr or Member->Role != EConvoyUnitRole::Truck or not Member->GetIsAlive())
+	{
+		return false;
+	}
+	// Leaves alive: restriction and death binding cleared, so a later death is not a lost convoy truck.
+	ReleaseMember(*Member, false);
+	++M_CapturedTruckCount;
+	if (M_LastThreatTime < 0.0)
+	{
+		// Escorts left without trucks guard the last threat; a capture without a fight leaves them this spot.
+		M_LastThreatLocation = Member->Location;
+	}
+	RemoveConvoyIconIfAttachedTo(Truck);
+	Broadcast(EConvoyEventType::TruckCaptured, Member,
+	          FString::Printf(TEXT("%s trucks_left=%d captured=%d"), *Member->UnitName, GetAliveTruckCount(),
+	                          M_CapturedTruckCount));
+	if (M_Outcome == EConvoyOutcome::None and M_State != EConvoyState::TrucksLost)
+	{
+		if (GetAliveTruckCount() > 0)
+		{
+			AssignSlots();
+			Broadcast(EConvoyEventType::SlotReassigned, nullptr, FString::Printf(TEXT("trucks=%d"), GetAliveTruckCount()));
+		}
+		else
+		{
+			OnLastTruckGone(TEXT("every truck destroyed or captured"));
+		}
+	}
+	OnTruckCaptured.Broadcast(this, Truck);
+	return true;
+}
+
+void AConvoy::RemoveConvoyIconIfAttachedTo(const AActor* Actor)
+{
+	if (M_ConvoyIconId == NAME_None or M_IconActor.Get() != Actor)
+	{
+		return;
+	}
+	// The mark follows the front truck of the column; UpdateMinimapIcon puts it on the next one.
+	URTSBlueprintFunctionLibrary::BP_RemoveCustomMiniMapIcon(this, M_ConvoyIconId);
+	M_ConvoyIconId = NAME_None;
+	M_IconActor.Reset();
 }
 
 void AConvoy::ScheduleCargoCache(const FConvoyMember& Truck)
@@ -101,12 +215,10 @@ void AConvoy::ScheduleCargoCache(const FConvoyMember& Truck)
 	FConvoyCargoCache& Cache = M_Caches.AddDefaulted_GetRef();
 	Cache.CacheId = M_NextCacheId++;
 	Cache.TruckMemberId = Truck.MemberId;
-	Cache.Value = M_CargoPerTruck;
-	// Beside the wreck, on the side away from the route centre line.
-	const float Side = Truck.LateralOffset >= 0.f ? 1.f : -1.f;
-	Cache.Location = M_Polyline.GetOffsetPoint(Truck.RouteDistance,
-	                                           Truck.LateralOffset + Side * M_Definition->Cargo.CacheSideOffset);
-	Cache.Location.Z = Truck.Location.Z;
+	Cache.Value = ConvoyCargoHelpers::GetCacheValueOfTruck(M_CargoPerTruck, Truck.CargoType,
+	                                                         M_Definition->Cargo.CargoType, Truck.Actor.Get());
+	Cache.Location = ConvoyCargoHelpers::GetCacheLocationOfTruck(Truck, M_Polyline,
+	                                                               M_Definition->Cargo.CacheSideOffset);
 	UConvoyRouteLibrary::ProjectToVehicleNavmesh(GetWorld(), Cache.Location, Cache.Location);
 	const int32 CacheId = Cache.CacheId;
 	TWeakObjectPtr<AConvoy> WeakThis(this);

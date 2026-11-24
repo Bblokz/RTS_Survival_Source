@@ -156,6 +156,15 @@ public:
 	// Formation units must stay free to follow the formation, e.g. never lock themselves in place.
 	bool GetIsUnitInActiveFormation(const AActor* UnitActor) const;
 
+	/**
+	 * @brief Game modes whose waves must fight whatever they meet on the way (survival) send attack-move formation
+	 * units to their waypoints with unit attack-move orders instead of plain moves. Off by default (campaign).
+	 */
+	void SetUseUnitAttackMoveOrders(const bool bUseUnitAttackMoveOrders)
+	{
+		bM_UseUnitAttackMoveOrders = bUseUnitAttackMoveOrders;
+	}
+
 #if !UE_BUILD_SHIPPING || RTS_WITH_MAP_TESTS
 	// Test hook: a formation unit counted as having reached its waypoint, with the spot it was sent to.
 	FOnFormationUnitReachedWaypointForTest OnFormationUnitReachedWaypointForTest;
@@ -184,6 +193,10 @@ private:
 
 
 	TMap<int32, FFormationData> M_ActiveFormations;
+
+	// See SetUseUnitAttackMoveOrders: attack-move formations then order unit attack moves between waypoints.
+	bool bM_UseUnitAttackMoveOrders = false;
+	bool GetShouldUseUnitAttackMove(const int32 FormationID) const;
 
 #if defined(RTS_WITH_ENEMY_AI_SHIPPING_TESTS) && RTS_WITH_ENEMY_AI_SHIPPING_TESTS
 	mutable TMap<int32, FEnemyAIShippingFormationProgress> M_ShippingTest_FormationProgressByID;

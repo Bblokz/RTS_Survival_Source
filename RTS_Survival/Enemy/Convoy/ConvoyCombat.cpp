@@ -7,6 +7,7 @@
 
 #include "RTS_Survival/Enemy/Convoy/ConvoyDefinition.h"
 #include "RTS_Survival/Game/GameState/GameUnitManager/GameUnitManager.h"
+#include "RTS_Survival/Game/Players/RTSPlayers.h"
 #include "RTS_Survival/Interfaces/Commands.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/Units/SquadController.h"
@@ -16,16 +17,16 @@
 
 namespace ConvoyCombatConstants
 {
-	constexpr uint8 PlayerOne = 1;
-	constexpr uint8 PlayerTwo = 2;
 	constexpr double EngageOrderRefreshSeconds = 3.0;
 	constexpr double WithdrawTimeoutSeconds = 240.0;
 }
 
-uint8 AConvoy::GetHostilePlayer() const
+uint8 AConvoy::GetHostilePlayersMask() const
 {
-	using namespace ConvoyCombatConstants;
-	return M_Params.OwningPlayer == PlayerOne ? PlayerTwo : PlayerOne;
+	const int32 ConvoyOwner = FRTSPlayers::IsValidPlayer(M_Params.OwningPlayer)
+		                          ? M_Params.OwningPlayer
+		                          : RTSPlayers::FirstAIPlayer;
+	return FRTSPlayers::GetHostileMask(ConvoyOwner);
 }
 
 bool AConvoy::FindNearestThreat(FVector& OutThreatLocation) const
@@ -58,12 +59,13 @@ bool AConvoy::FindNearestThreat(FVector& OutThreatLocation) const
 			}
 		}
 	};
-	const uint8 Hostile = GetHostilePlayer();
-	for (const ATankMaster* Tank : UnitManager->GetPlayerTanks(Hostile))
+	// Units of every player the convoy's owner fights.
+	const uint8 HostilePlayersMask = GetHostilePlayersMask();
+	for (const ATankMaster* Tank : UnitManager->GetTanksOfPlayers(HostilePlayersMask))
 	{
 		ConsiderHostile(Tank);
 	}
-	for (const ASquadUnit* Soldier : UnitManager->GetSquadUnitsOfPlayer(Hostile))
+	for (const ASquadUnit* Soldier : UnitManager->GetSquadUnitsOfPlayers(HostilePlayersMask))
 	{
 		ConsiderHostile(Soldier);
 	}
@@ -260,6 +262,7 @@ void AConvoy::UpdateTrucksLost(const double Now)
 	}
 	if (not bAnyAlive)
 	{
-		FinishConvoy(EConvoyOutcome::TrucksDestroyed, false);
+		// Escaped also when every truck delivered on the branch; a stopped column keeps its destroyed/stopped outcome.
+		FinishConvoy(GetFinalOutcomeWithoutTrucks(), false);
 	}
 }

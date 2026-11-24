@@ -15,10 +15,12 @@ class AWorldFowCloud;
 class AWorldMapObject;
 class AWorldPlayerController;
 class UTexture2D;
+class UWorldCampaignProgressManager;
 class UWorldMapFowComponent;
 
 /**
  * @brief Spawned by the world player controller after campaign generation to calculate actor FOW states and the cloud mask.
+ * Refreshes itself when an anchor is cleared; call RefreshWorldFow after changing reveal sources (watch posts).
  */
 UCLASS()
 class RTS_SURVIVAL_API AWorldFowManager : public AActor
@@ -37,6 +39,30 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "World Campaign|FOW")
 	void UpdateFowFromCurrentWorldState();
+
+	/**
+	 * @brief Re-runs the reveal rules and rebuilds the cloud mask. Reveals only grow: anchors already Visible stay
+	 * Visible, cleared anchors and anchors inside a reveal source become Visible.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "World Campaign|FOW")
+	void RefreshWorldFow();
+
+	/**
+	 * @brief Adds or replaces one extra reveal circle (matched by SourceId). Does not refresh; call RefreshWorldFow.
+	 * @param RevealSource Circle to reveal; a radius of zero removes nothing and reveals nothing.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "World Campaign|FOW")
+	void SetRevealSource(const FWorldFowRevealSource& RevealSource);
+
+	/** Replaces every extra reveal circle at once. Does not refresh; call RefreshWorldFow. */
+	UFUNCTION(BlueprintCallable, Category = "World Campaign|FOW")
+	void SetRevealSources(const TArray<FWorldFowRevealSource>& RevealSources);
+
+	UFUNCTION(BlueprintCallable, Category = "World Campaign|FOW")
+	void RemoveRevealSource(FName SourceId);
+
+	UFUNCTION(BlueprintPure, Category = "World Campaign|FOW")
+	TArray<FWorldFowRevealSource> GetRevealSources() const;
 
 	UFUNCTION(CallInEditor, Category = "World Campaign|FOW|Debug")
 	void Debug_RevealAll();
@@ -80,6 +106,19 @@ protected:
 private:
 	bool GetIsValidWorldGenerator() const;
 	bool GetIsValidWorldFowCloud() const;
+	bool GetIsValidWorldCampaignProgressManager() const;
+	void BindToCampaignProgress();
+	void UnbindFromCampaignProgress();
+	void OnAnchorCleared(const FGuid& AnchorKey);
+
+	/**
+	 * @brief Marks cleared anchors and anchors inside a reveal source Visible before the flood, so they seed it and
+	 * the fog opens as the player advances.
+	 */
+	void ApplyPersistentRevealsToAnchors();
+	bool GetIsAnchorCleared(const AAnchorPoint* AnchorPoint) const;
+	bool GetIsAnchorInsideRevealSource(const AAnchorPoint* AnchorPoint) const;
+	void StampRevealSourcesToMask();
 	void Debug_DrawRadiusForConnections(EWorldMapFowState DebugState) const;
 	void Debug_DrawRadiusForAnchors(EWorldMapFowState DebugState) const;
 	void Debug_DrawRadiusForWorldObjects(EWorldMapFowState DebugState, UClass* WorldObjectClass) const;
@@ -130,6 +169,18 @@ private:
 
 	TArray<FColor> M_MaskPixels;
 	TMap<TObjectKey<const AAnchorPoint>, EWorldMapFowState> M_AnchorStates;
+
+	// Extra reveal circles (watch posts); stamped into the visible channel and they make anchors inside Visible.
+	TMap<FName, FWorldFowRevealSource> M_RevealSourcesById;
+
+	// Source of cleared anchors; found on the controller in InitializeWorldFow.
+	UPROPERTY()
+	TWeakObjectPtr<UWorldCampaignProgressManager> M_WorldCampaignProgressManager;
+
+	FDelegateHandle M_AnchorClearedHandle;
+
+	// False when the controller has no progress manager; cleared anchors are then simply not revealed.
+	bool bM_HasCampaignProgress = false;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|FOW", meta = (AllowPrivateAccess = "true"))
 	int32 M_MaskResolution = 512;

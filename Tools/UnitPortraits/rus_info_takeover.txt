@@ -1,0 +1,7 @@
+# Soviet vehicles for the vehicle info takeovers (2026-11-11); plain (desert) variants, which the German missions spawn.
+T_Rus_LightTank_T26=/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Rus_Light/T26/Rus_Vehicle_T26.Rus_Vehicle_T26_C
+T_Rus_LightTank_BT7=/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Rus_Light/BT-7/Rus_Vehicle_BT-7.Rus_Vehicle_BT-7_C
+T_Rus_LightTank_BT7_4=/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Rus_Light/BT-7/Rus_Vehicle_BT-7-4.Rus_Vehicle_BT-7-4_C
+T_Rus_MediumTank_T34_76=/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Rus_Medium/T34/Rus_Vehicle_T3476.Rus_Vehicle_T3476_C
+T_Rus_MediumTank_T34E=/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Rus_Medium/T34/Rus_Vehicle_T34E.Rus_Vehicle_T34E_C
+T_Rus_HeavyTank_KV1_L11=/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Rus_Heavy/KV1/Rus_Vehicle_KV-1_L11.Rus_Vehicle_KV-1_L11_C

@@ -41,10 +41,16 @@ struct FEnemyTrainingOptionsForTechLevel
 	EEnemyAITechLevel TechLevel = EEnemyAITechLevel::NotInitialized;
 
 	// What building expansions does the enemy AI need to have built to unlock this tech level?
-	// If multiple are listed, then building either one of them will unlock the level.
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	// If multiple are listed, then building either one of them will unlock the level,
+	// unless bRequireAllTypesUnlockingThisLevel is set. An empty list never unlocks the level.
+	// Only finished expansions count (ABuildingExpansion::GetIsStanding).
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	TArray<EBuildingExpansionType> TypesUnlockingThisLevel;
-	
+
+	// Set: every listed type must stand (e.g. research centre AND assembly yard). Unset: any one of them is enough.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	bool bRequireAllTypesUnlockingThisLevel = false;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TArray<ETankSubtype> TrainableTankSubtypes = {};
 	
@@ -68,9 +74,10 @@ struct FEnemyLevelTraining
 	// With how many points does the AI start for training? Note that 10 = one light tank.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 TrainingPointsStart = 10;
-	// Scales how much the AI can train; 10 points is one light tank.
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	int32 TrainingPointsPerMinute = 3;
+	// Scales how much the AI can train; 10 points is one light tank. Fractions carry over between minutes,
+	// so 1.5 with a 3-point Mosin squad trains one squad every 2 minutes.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0.0"))
+	float TrainingPointsPerMinute = 3.f;
 
 	TArray<EBuildingExpansionType> GetUniqueBuildingTypesForTechLevels() const;
 

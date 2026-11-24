@@ -11,10 +11,12 @@
 #include "Materials/MaterialInstanceDynamic.h"
 #include "RTS_Survival/RTSCollisionTraceChannels.h"
 #include "RTS_Survival/Enemy/EnemyController/EnemyController.h"
+#include "RTS_Survival/Game/Players/RTSPlayers.h"
 #include "RTS_Survival/GlobalAbilitySystem/GlobalAbilities/GlobalAbilityHelpers.h"
 #include "RTS_Survival/Player/CPPController.h"
 #include "RTS_Survival/RTSComponents/ArmorCalculationComponent/ArmorCalculation.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
+#include "RTS_Survival/Utils/CollisionSetup/RTSPlayerCollision.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 #include "RTS_Survival/Weapons/WeaponData/FRTSWeaponHelpers/FRTSWeaponHelpers.h"
@@ -22,7 +24,6 @@
 
 namespace SonnengewehrBeamConstants
 {
-	constexpr uint8 HumanPlayer = 1;
 	// The engine's basic shapes are 100 cm across; the cylinder and sphere have their pivot in the middle.
 	constexpr float BasicShapeSizeCm = 100.f;
 	constexpr float WarningPlanePaddingCm = 300.f;
@@ -538,7 +539,7 @@ void ASonnengewehrBeam::BurnOverlap(const FOverlapResult& Overlap, const FVector
 		return;
 	}
 	ActorsThisTick.Add(Victim);
-	if (not RTSFunctionLibrary::RTSIsValid(Victim) || GetIsSparedOwnUnit(*Victim))
+	if (not RTSFunctionLibrary::RTSIsValid(Victim) || GetIsSparedOwnUnit(*Victim, Overlap.GetComponent()))
 	{
 		return;
 	}
@@ -614,16 +615,10 @@ float ASonnengewehrBeam::GetLaserDamageOnVictim(const AActor& Victim, const UPri
 FCollisionObjectQueryParams ASonnengewehrBeam::GetBeamObjectQueryParams() const
 {
 	// Same object types as the game's area damage (FRTS_AOE).
+	// No ignore mask: like area damage it must still find the destructibles of the ordering player's side, so allied
+	// units are taken out by GetIsSparedOwnUnit instead.
 	FCollisionObjectQueryParams ObjectQueryParams;
-	const ETriggerOverlapLogic Affected = GetBurntSides();
-	if (Affected == ETriggerOverlapLogic::OverlapEnemy || Affected == ETriggerOverlapLogic::OverlapBoth)
-	{
-		ObjectQueryParams.AddObjectTypesToQuery(COLLISION_OBJ_ENEMY);
-	}
-	if (Affected == ETriggerOverlapLogic::OverlapPlayer || Affected == ETriggerOverlapLogic::OverlapBoth)
-	{
-		ObjectQueryParams.AddObjectTypesToQuery(COLLISION_OBJ_PLAYER);
-	}
+	FRTSPlayerCollision::AddObjectTypesForOverlapLogic(ObjectQueryParams, GetBurntSides());
 	ObjectQueryParams.AddObjectTypesToQuery(ECC_Destructible);
 	return ObjectQueryParams;
 }
@@ -634,21 +629,26 @@ ETriggerOverlapLogic ASonnengewehrBeam::GetBurntSides() const
 	{
 		return ETriggerOverlapLogic::OverlapBoth;
 	}
-	// The enemy object channel holds the AI's units; the player channel holds the human player's.
-	return M_OwningPlayer == SonnengewehrBeamConstants::HumanPlayer
-		       ? ETriggerOverlapLogic::OverlapEnemy
-		       : ETriggerOverlapLogic::OverlapPlayer;
+	// The channels the ordering player's hostiles are on; allied AI players share the AI channel with hostile ones.
+	return FRTSPlayerCollision::GetOverlapLogicForHostilesOf(M_OwningPlayer);
 }
 
-bool ASonnengewehrBeam::GetIsSparedOwnUnit(const AActor& Victim) const
+bool ASonnengewehrBeam::GetIsSparedOwnUnit(const AActor& Victim, const UPrimitiveComponent* HitComponent) const
 {
 	if (M_Settings.bBurnOwnUnits)
 	{
 		return false;
 	}
-	// Second gate behind the channel filter: destructibles and odd child-actor channels still reach the overlap.
-	const URTSComponent* RTSComponent = Victim.FindComponentByClass<URTSComponent>();
-	return IsValid(RTSComponent) && RTSComponent->GetOwningPlayer() == M_OwningPlayer;
+	// Second gate behind the channel filter: destructibles, odd child-actor channels and the units of allied AI
+	// players (on the same channel as hostile ones) still reach the overlap. Destructibles burn unless they belong
+	// to the ordering player or an ally; units only when the ordering player can damage their owner (allies are
+	// spared, neutral units only burn under the human's beam, as with two sides).
+	const bool bIsDestructible = IsValid(HitComponent) && HitComponent->GetCollisionObjectType() == ECC_Destructible;
+	if (bIsDestructible)
+	{
+		return FRTSPlayers::IsActorAlliedToPlayer(&Victim, M_OwningPlayer);
+	}
+	return not FRTSPlayerCollision::IsHitDamageableByPlayer(&Victim, HitComponent, M_OwningPlayer);
 }
 
 FVector ASonnengewehrBeam::GetGroundAt(const FVector& Location) const
@@ -660,9 +660,11 @@ FVector ASonnengewehrBeam::GetGroundAt(const FVector& Location) const
 
 AActor* ASonnengewehrBeam::GetDamageCauser() const
 {
-	if (M_OwningPlayer == SonnengewehrBeamConstants::HumanPlayer)
+	if (FRTSPlayers::IsHumanPlayer(M_OwningPlayer))
 	{
 		return FRTS_Statics::GetRTSController(this);
 	}
-	return FRTS_Statics::GetEnemyController(this);
+	// The controller of the AI player that ordered the beam; a map without one keeps the default controller.
+	AEnemyController* OwnController = FRTS_Statics::GetEnemyControllerForPlayer(this, M_OwningPlayer);
+	return IsValid(OwnController) ? OwnController : FRTS_Statics::GetEnemyController(this);
 }

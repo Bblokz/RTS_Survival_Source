@@ -43,6 +43,17 @@ public:
 	void StartSubtitles(ERTSPortraitTypes PortraitType, const USoundBase* VoiceLine,
 	                    TFunction<float()> GetPlaybackSeconds);
 
+	/** Words the subtitle box shows now; for tests and debugging. */
+	UFUNCTION(BlueprintPure, Category = "Portrait|Subtitle")
+	FString GetShownSubtitleText() const;
+
+	/**
+	 * @brief Left edge of the subtitle box from the left of this widget's root canvas (negative: it sticks out left).
+	 * The box is centred under the portrait and wider than it. Only known for a portrait block anchored at the left.
+	 * @return False when unknown.
+	 */
+	bool GetSubtitleLeftEdge(float& OutLeftEdge) const;
+
 protected:
 	virtual void NativeOnInitialized() override;
 
@@ -94,6 +105,10 @@ private:
 
 	UPROPERTY()
 	TObjectPtr<UW_PortraitSubtitle> M_Subtitle;
+
+	// Set by PlaceSubtitleUnderPortrait when the portrait block is anchored at the canvas's left edge.
+	bool bM_HasSubtitleLeftEdge = false;
+	float M_SubtitleLeftEdge = 0.f;
 
 	void SetDefaultSubtitleSetup();
 	void CreateSubtitleWidget();

@@ -24,7 +24,10 @@
 #endif
 
 class UAircraftOwnerComp;
+class UNomadicDeployAnimationComponent;
+class UNomadicDeployAnimationData;
 class UResourceDropOff;
+class AResourceUnloadStation;
 class UBoxComponent;
 class UBuildRadiusComp;
 class UEnergyComp;
@@ -66,7 +69,6 @@ struct FNomadicCargoSettings
 
 /**
  * @brief A vehicle that can deploy into a building and pack it up back into a vehicle.
- * @note Set "Allow CPUAccess" in the static mesh editor for the building mesh to allow for smoke effects.
  * @note ---------------------------------------------------------------
  * @note Follow the conversion path:
  * @note 1) StartBuildingConstruction BP: OnMoveTruckToBuildingLocationBP
@@ -76,7 +78,7 @@ struct FNomadicCargoSettings
  * @note 3) BP: BeginBuildingTruckAnimationMontage
  * @note This starts the montage animation in the blueprint.
  * @note 4) OnTruckMontageFinished BP: BPOnStartMeshAnimation
- * @note Now starts the material animation using timers.
+ * @note Now plays the baked VAT deploy of DeployAnimationData (UNomadicDeployAnimationComponent) with its smoke screen.
  * @note 5) FinishedConvertingToBuilding.
  * Creates building attachments and opens command queue again.
  * @note ---------------------------------------------------------------
@@ -206,17 +208,17 @@ protected:
 	 * @brief Initializes the NomadicVehicle.
 	 * @param NewPreviewMesh The mesh used to choose the building location.
 	 * @param NewBuildingMesh The actual high poly mesh of the building.
-	 * @param NewConstructionAnimationMaterial The material used to animate the building construction.
-	 * @param SmokeSystems The smoke systems to spawn when the building is being constructed.
+	 * @param NewConstructionAnimationMaterial Only used for the airbase roof while packing up (UAircraftOwnerComp).
+	 * @param SmokeSystems Unused since the VAT deploy (DeployAnimationData carries the effects); kept for the BP nodes.
 	 * @param NewConstructionFrames The amount of frames in the construction animation.
 	 * @param NewConstructionMontageTime The amount of time spend on montage.
 	 * @param NewMeshAnimationTime The amount of time spend on mesh animation.
 	 * @param NewConvertToVehicleTime How long it takes to convert from a building back to a vehicle.
-	 * @param NewAmountSmokesCovertToVehicle How many smokes to spawn when converting to a vehicle.
+	 * @param NewAmountSmokesCovertToVehicle Unused since the VAT deploy; kept for the BP nodes.
 	 * @param NewAttachmentsToSpawn The attachments to spawn once the building is constructed.
 	 * @param NewNiagaraAttachmentsToSpawn The niagara attachments to spawn once the building is constructed.
 	 * @param NewSoundAttachmentsToSpawn The sound attachments to spawn once the building is constructed.
-	 * @param NewConversionSmokeRadius In how big of a circle surrounding the vehicle we create smokes when starting conversion.
+	 * @param NewConversionSmokeRadius Unused since the VAT deploy; kept for the BP nodes.
 	 * @param NewConversionProgressBar The progress bar to display the conversion progress which is a derived blueprint
 	 * of which the cpp class is UTimeProgressBarWidget.
 	 * @param NewTruckUIOffset The offset to apply to the truck UI elements when converting to a vehicle.
@@ -249,6 +251,11 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	bool bStartAsConvertedToBuilding = false;
+
+	// Baked VAT deploy mesh + smoke screen of this building (Source/Tools/NomadicDeploy). Without it the building
+	// simply appears after the mesh animation time.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "DeployAnimation")
+	TObjectPtr<UNomadicDeployAnimationData> DeployAnimationData;
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	UStaticMeshComponent* AddStaticMeshCompToBuildingMesh(const FName SocketName, UStaticMesh* Mesh);
@@ -433,6 +440,16 @@ protected:
 	UPROPERTY()
 	int32 M_BuildingMoveFailureCount = 0;
 
+	// True while a deploy or pack-up runs with the unit optimiser paused (see SetConversionKeepsAnimating).
+	bool bM_IsConversionOptimizationPaused = false;
+
+	/**
+	 * @brief The off-screen optimiser stops skeletal mesh ticks, which froze the truck montage of a deploy the
+	 * player is not looking at (an air-delivered HQ never unfolded): pause it for the conversion.
+	 * @param bIsConverting True when a deploy or pack-up starts, false once the vehicle is a truck or building again.
+	 */
+	void SetConversionKeepsAnimating(const bool bIsConverting);
+
 	// True from the create building order until the truck reaches the building location or the order ends.
 	bool bM_IsMovingToBuildingLocation = false;
 
@@ -615,78 +632,44 @@ private:
 	// Unpacks the airbase if this vehicle has aircraft logic.
 	void OnFinishedConvertToBuilding_UnpackAirbase();
 
-	// Cache for original materials of the building mesh
-	// Always empty by calling ResetCachedMaterials as the index also needs to be reset!
+	// Plays the baked VAT deploy / pack-up of DeployAnimationData on M_DeployMeshComponent.
 	UPROPERTY()
-	TArray<UMaterialInterface*> M_CachedOriginalMaterials;
+	TObjectPtr<UNomadicDeployAnimationComponent> M_DeployAnimationComponent;
 
-	// Timer handle for reapplying materials
-	FTimerHandle MaterialReapplyTimerHandle;
-
-	// To save original materials of the building mesh.
-	void CacheOriginalMaterials();
-
-	/**
-	 * Applies construction material to all non truck material slots.
-	 * @return The amount of materials that occur in both the truck and the building and are excluded.
-	 * from the construction material animation.
-	 * @param bOnlyCalculateExcludedMaterials Whether to only calculate the excluded materials and do not
-	 * change any materials on the building mesh.
-	 */
-	uint32 ApplyConstructionMaterial(const bool bOnlyCalculateExcludedMaterials) const;
-
-	// Called by timer to reapply original materials one by one.
-	void ReapplyOriginalMaterial();
-
-	// To stop reapplying materials and finish building.
-	void FinishReapplyingMaterials();
-
-	/**
-	 * Calculates the mean location of the material at the provided index.
-	 * @param MaterialIndex The index of the material to calculate the mean location for.
-	 * @param VertexPositions The vertex positions of the building mesh for this material.
-	 * @param TransformOfBuildingMesh The transform of the building mesh.
-	 * @return The mean location of the material.
-	 */
-	FVector CalculateMeanMaterialLocation(const int32 MaterialIndex,
-	                                      const TArray<FVector3f>& VertexPositions,
-	                                      const FTransform& TransformOfBuildingMesh) const;
-
-	/**
-	 * Computes the size (extent) of each mesh part associated with a material index.
-	 * It's used to determine the relative scale for the smoke effects.
-	 * @param VertexPositions 
-	 * @return The size of the mesh part.
-	 */
-	FVector CalculateMeshPartSize(const TArray<FVector3f>& VertexPositions) const;
-
-	// The current material index to reapply a material to.
+	// Shows the VAT deploy mesh while the building deploys or packs up; the building mesh is hidden meanwhile.
 	UPROPERTY()
-	int32 M_MaterialIndex;
+	TObjectPtr<UStaticMeshComponent> M_DeployMeshComponent;
 
-	UPROPERTY()
-	TArray<FTransform> M_CreateSmokeTransforms;
+	bool GetIsValidDeployAnimationComponent() const;
 
-	/**
-	 * @brief Creates an array of smoke locations for all materials, uses async to find material means.
-	 * @note Requires the final mesh of the BuildingMeshComponent to be set to "Allow CPUAccess" in the static mesh editor.
-	 */
-	void InitSmokeLocations();
+	// Step 4 entry: the deploy animation reached the full building.
+	void OnDeployAnimationFinished();
 
-	// Calculates random locations in the box of the building mesh to spawn smoke at.
-	void SetSmokeLocationsToRandomInBox();
+	// The pack-up animation reached the truck.
+	void OnPackUpAnimationFinished();
 
-	UPROPERTY()
-	// The smoke system(s) to spawn when the building is being constructed.
-	TArray<UNiagaraSystem*> M_SmokeSystems;
+	// Pending removal of the building attachments at pack-up start: they go only once the deploy's end-of-deploy
+	// cover bursts (progress ~0.985) have fired again on the way down, so they vanish inside the smoke.
+	FTimerHandle M_PackUpAttachmentRemovalTimerHandle;
 
-	// Spawns a smoke system at the provided location.
-	void CreateRandomSmokeSystemAtTransform(const FTransform& Transform) const;
+	// Destroys the building attachments now, or a few percent into the pack-up when a deploy animation plays.
+	void ScheduleAttachmentRemovalForPackUp();
+
+	// True (and the pending removal cancelled) when the attachments were still waiting to be removed.
+	bool CancelPendingAttachmentRemoval();
 
 	void CancelBuildingMeshAnimation();
 
 	// Attaches all the attachments to the building mesh.
 	void CreateBuildingAttachments();
+
+	// Spawns the unload crane (when set) on the building mesh and links it to the resource drop-off.
+	void CreateUnloadStation();
+
+	// Optional crane that unloads harvesters at this building's drop-off (the HQ's loop crane, BP_HQUnloadStation).
+	// Spawned with the other building attachments and removed with them on pack-up.
+	UPROPERTY(EditDefaultsOnly, Category="Resources|Unload Station", meta=(AllowPrivateAccess="true"))
+	TSubclassOf<AResourceUnloadStation> M_UnloadStationClass;
 
 	/**
 	 * @brief Goes through the array of BuildingAttachments and spawns them.
@@ -746,31 +729,8 @@ private:
 	UPROPERTY()
 	TArray<UAudioComponent*> M_SpawnedSoundCues;
 
-	// Also resets the class-global material index.
-	void ResetCachedMaterials();
-
-	// Creates the smoke for the vehicle conversion.
-	void CreateSmokeForVehicleConversion() const;
-
-	UPROPERTY()
-	int M_AmountSmokesCovertToVehicle;
-
-	// Instantly sets all the building materials on the building mesh to the material array saved
-	// in the cache.
-	void SetAllBuildingMaterialsToCache();
-
-	// In how big of a circle surrounding the vehicle we create smokes when starting conversion.
-	UPROPERTY()
-	float M_ConversionSmokeRadius;
-
 	UPROPERTY()
 	UTimeProgressBarWidget* M_ConversionProgressBar;
-
-	/**
-	 * @brief Starts the mesh material animation.
-	 * @param Interval The interval in seconds between updating each material slot.
-	 */
-	void SetAnimationTimer(const float Interval);
 
 	/**
 	 * @brief Applies local offset to the truck UI elements depending on the conversion.

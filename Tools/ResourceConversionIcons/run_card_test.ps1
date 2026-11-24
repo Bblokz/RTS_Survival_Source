@@ -1,0 +1,14 @@
+# Runs conversion_card_headless_test.py in a throwaway Development editor (not the shared one, no UECP).
+param([string]$Map = "/Game/RTS_Survival/Maps/GerMissions/Ger_DestroyT35",
+      [string]$Log = "$PSScriptRoot\..\..\..\Saved\ResourceConversionIcons\card_test.log")
+$Engine = "D:\UnrealEngine\UE5.5_ReleaseBranch\UnrealEngine\Engine\Binaries\Win64\UnrealEditor.exe"
+$Project = "D:\UE5Projects\RTS_Survival\RTS_Survival.uproject"
+$Script = (Join-Path $PSScriptRoot "conversion_card_headless_test.py").Replace([char]92, [char]47)
+$Arguments = @($Project, "-ini:Engine:[/Script/EngineSettings.GameMapsSettings]:EditorStartupMap=$Map",
+    "-ExecCmds=`"py $Script`"", "-unattended", "-nosplash", "-DisablePlugins=Fab,BpGeneratorUltimate",
+    "-NoLiveCoding", "-abslog=$Log")
+$Process = Start-Process -FilePath $Engine -ArgumentList $Arguments -PassThru
+$Finished = $Process.WaitForExit(900000)
+if (-not $Finished) { Stop-Process -Id $Process.Id -Force; "TIMEOUT pid $($Process.Id)" }
+"EXIT $($Process.ExitCode)"
+Select-String -Path $Log -Pattern "CONVCARD|Error: .*Python" | Select-Object -Last 40 | ForEach-Object { $_.Line }

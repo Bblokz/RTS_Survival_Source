@@ -231,12 +231,40 @@ namespace VariantBatchFourWeaponsPrivate
 		FlankerData.ShrapnelPen = 0.f;
 		WeaponDataMap.Add(EWeaponName::KwK_Long60MM_APCR_Flanker, FlankerData);
 	}
+	/** @brief Keeps the Frozen Lake siege gun independently tunable; damage is per barrel, not per volley. */
+	void AddTripleCrownIceCannon(TMap<EWeaponName, FWeaponData>& WeaponDataMap)
+	{
+		const FWeaponData* const RadixiteHowitzerData = WeaponDataMap.Find(EWeaponName::LeFH_Radixite_200MM);
+		if (not RadixiteHowitzerData)
+		{
+			RTSFunctionLibrary::ReportError("Triple Crown: radixite howitzer baseline is missing.");
+			return;
+		}
+		FWeaponData TripleCrownData = *RadixiteHowitzerData;
+		TripleCrownData.WeaponName = EWeaponName::TripleCrown_Radixite_300MM;
+		TripleCrownData.WeaponCalibre = 300.f;
+		TripleCrownData.ShellTypes = {EWeaponShellType::Shell_Radixite};
+		TripleCrownData.BaseDamage *= 1.5f;
+		TripleCrownData.Range = 14000.f;
+		TripleCrownData.MagCapacity = 1;
+		TripleCrownData.ReloadSpeed = 18.f;
+		TripleCrownData.BaseCooldown = 1.25f;
+		TripleCrownData.CooldownFlux = 0;
+		TripleCrownData.Accuracy = 95;
+		TripleCrownData.ProjectileMovementSpeed = 9000.f;
+		TripleCrownData.ShrapnelRange = 650.f;
+		TripleCrownData.RadixiteDotTotalDamage = 90.f;
+		TripleCrownData.RadixiteDotDurationSeconds = 6.f;
+		WeaponDataMap.Add(EWeaponName::TripleCrown_Radixite_300MM, TripleCrownData);
+	}
+
 }
 
 void VariantBatchFourWeapons::AddWeapons(TMap<EWeaponName, FWeaponData>& WeaponDataMap)
 {
 	using namespace VariantBatchFourWeaponsPrivate;
 	AddWespeRadixiteHowitzer(WeaponDataMap);
+	AddTripleCrownIceCannon(WeaponDataMap);
 	AddPzIIIMLaser(WeaponDataMap);
 	AddPzIIIMPanzerschreck(WeaponDataMap);
 	AddHetzerHullFlamm(WeaponDataMap);

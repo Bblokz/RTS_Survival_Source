@@ -9,6 +9,7 @@
 #include "RTS_Survival/RTSComponents/ExperienceComponent/ExperienceComponent.h"
 #include "RTS_Survival/RTSComponents/ExperienceComponent/ExperienceInterface/ExperienceInterface.h"
 #include "RTS_Survival/Units/Aircraft/AircraftReloadManager/AircraftReloadManager.h"
+#include "RTS_Survival/Units/Aircraft/AircraftTerrainFollow/AircraftTerrainFollow.h"
 #include "RTS_Survival/Weapons/BombComponent/BombComponent.h"
 
 #include "AAircraftMaster.generated.h"
@@ -51,6 +52,8 @@ class UAircraftOwnerComp;
 DECLARE_MULTICAST_DELEGATE_OneParam(FOnAircraftStraightRunPassedPoint, AAircraftMaster*);
 DECLARE_MULTICAST_DELEGATE_TwoParams(FOnAircraftDropPayloadReleased, AAircraftMaster* /*Aircraft*/,
                                      ATankMaster* /*ReleasedTank*/);
+DECLARE_MULTICAST_DELEGATE_TwoParams(FOnAircraftDropSquadReleased, AAircraftMaster* /*Aircraft*/,
+                                     AActor* /*ReleasedSquad*/);
 
 UCLASS()
 class AAircraftMaster : public ASelectablePawnMaster, public IExperienceInterface, public IRTSUnit
@@ -126,6 +129,27 @@ public:
 	/** @return Current landed state enum (routing hint for animation/weapon/movement). */
 	inline EAircraftLandingState GetLandedState() const { return M_LandedState; }
 
+	/** @return Height between the landed position and the airborne position after a vertical take-off. */
+	float GetTakeOffHeight() const { return M_AircraftMovementSettings.TakeOffHeight; }
+
+	/** @return Terrain following state, for map tests and debugging. */
+	const FAircraftTerrainFollow& GetTerrainFollow() const { return M_TerrainFollow; }
+
+	// Map tests and debugging: one line with the movement state, attack path point, strafe and weapon state.
+	FString DescribeFlightForTests() const;
+
+	/** @return Cruise speed of move and attack flights (cm/s), for map tests. */
+	float GetMaxMoveSpeedForTests() const { return M_AircraftMovementSettings.MaxMoveSpeed; }
+
+	/** @return Idle / moving / attacking, for map tests. */
+	EAircraftMovementState GetMovementStateForTests() const { return M_MovementState; }
+
+	/** @return Whether the aircraft flies into or out of an attack dive, where terrain following must not act. */
+	bool GetIsFlyingAttackDive() const
+	{
+		return M_MovementState == EAircraftMovementState::AttackMove && M_AircraftAttackData.Path.GetIsFlyingDiveSegment();
+	}
+
 	/** @brief Blueprint hook for weapon fire montage per index/mode; owned by aircraft animation pipeline. */
 	UFUNCTION(BlueprintImplementableEvent)
 	void BP_OnPlayWeaponAnimation(const int32 WeaponIndex, const EWeaponFireMode FireMode);
@@ -172,6 +196,10 @@ public:
 	// Fired once per tank drop (rope-slung or not) after the tank is detached, placed on the ground, selectable and
 	// has its weapons back.
 	FOnAircraftDropPayloadReleased OnAircraftDropPayloadReleased;
+
+	// Fired once per squad of a landed squad drop, the moment the squad has spawned at the aircraft (before its
+	// walk out of the cargo door). Not fired when the aircraft is already gone by the time the squad spawns.
+	FOnAircraftDropSquadReleased OnAircraftDropSquadReleased;
 
 	/**
 	 * @brief While held, a straight run keeps flying past its end point instead of destroying itself, so payload that
@@ -411,6 +439,55 @@ private:
 	UPROPERTY()
 	FAircraftLandedData M_AircraftLandedData;
 
+	/**
+	 * @brief The only way to set the cruise height from outside terrain following: the clearance above the ground is
+	 * then captured again from the new height.
+	 * @param NewTargetAirborneHeight Cruise height (world Z) to fly at from now on.
+	 */
+	void SetTargetAirborneHeight(const float NewTargetAirborneHeight);
+
+	// Moves the cruise height (TargetAirborneHeight) with the terrain below; see Tick_TerrainFollow.
+	FAircraftTerrainFollow M_TerrainFollow;
+
+	/** @brief Starts the ground samples of this aircraft at a random moment so aircraft do not all trace together. */
+	void BeginPlay_InitTerrainFollow();
+
+	/**
+	 * @brief Samples the ground at an interval and eases the cruise height, the aircraft and its current path up or
+	 * down with it. Skipped while the aircraft aims (dives, bomb runs) or flies a height planned elsewhere.
+	 */
+	void Tick_TerrainFollow(const float DeltaTime);
+
+	/** @return Whether the current flight may change height with the terrain. */
+	bool TerrainFollow_GetIsAllowed() const;
+
+	/** @brief Traces the ground below the aircraft and along its flight ahead, and hands it to M_TerrainFollow. */
+	void TerrainFollow_SampleGround();
+
+	/** @brief Moves the aircraft, its cruise height and the path it flies by DeltaZ, keeping all of them in step. */
+	void TerrainFollow_ShiftCruiseHeight(const float DeltaZ);
+
+	/** @return Nose pitch (degrees) that shows the current terrain climb or descent. */
+	float TerrainFollow_GetClimbPitch() const;
+
+	/**
+	 * @brief Ability flights spawn at a height chosen for their target, often far off over other ground: keep the
+	 * cruise height's clearance above the target's ground instead of above the spawn point.
+	 * @param TargetLocation XY whose ground the clearance is measured from.
+	 * @param MinClearance Lowest clearance kept; below it the aircraft climbs to it smoothly. 0 uses the terrain
+	 * following's MinGroundClearance.
+	 */
+	void TerrainFollow_CaptureClearanceAboveTarget(const FVector& TargetLocation, const float MinClearance = 0.f);
+
+	/**
+	 * @brief Traces down to the landscape at one XY location; movable things that block the landscape channel (team
+	 * weapons) are skipped so aircraft do not hop over them.
+	 * @param Location XY to sample; Z is the centre of the trace.
+	 * @param OutGroundZ Ground height when hit.
+	 * @return Whether the landscape was hit.
+	 */
+	bool TraceLandscapeGroundZ(const FVector& Location, float& OutGroundZ) const;
+
 	/** @brief Idle circling parameters (center, angle, grace-steering). */
 	UPROPERTY()
 	FAircraftIdleData M_AircraftIdleData;
@@ -440,6 +517,101 @@ private:
 
 	/** @brief Idle circling (or hover) behavior while airborne with no active command. */
 	void Tick_IdleCircling(float DeltaTime);
+
+	// -------------------------------------------------------------
+	// ----------------------- Bank-to-turn flight -----------------------
+	// -------------------------------------------------------------
+	/** @return Whether move, attack and idle flights use the bank-to-turn flight model (not -AircraftLegacyFlight). */
+	bool GetIsFlightModelActive() const;
+
+	/**
+	 * @brief Bank-to-turn path following: passes the points the aircraft has flown by (issuing the attack actions of
+	 * each new point), then aims a little ahead along the path.
+	 * @param Path Move or attack path.
+	 * @param bIsAttackPath Attack paths issue fire / bomb actions per point and end in OnAttackMoveCompleted.
+	 * @param DeltaTime Frame time.
+	 */
+	void Tick_FlyPath(FAircraftPath& Path, const bool bIsAttackPath, const float DeltaTime);
+
+	/** @return False once the path ended this frame (its completion may already have started a new one). */
+	bool FlyPath_AdvancePassedPoints(FAircraftPath& Path, const bool bIsAttackPath);
+
+	/**
+	 * @brief The frame a path ends still flies: idle circling or the new path that the completion started, so the
+	 * turn never freezes for a frame. Nothing when the aircraft hovers, lands or is destroyed.
+	 */
+	void FlyPath_ContinueAfterPathEnded(const float DeltaTime);
+
+	/** @return How far ahead along the path or idle circle the aircraft aims at its current speed (cm). */
+	float GetFlightLookAheadDistance(const bool bIsDiving = false) const;
+
+	/** @brief One bank-to-turn frame along a path: aim ahead, dive floor and altitude hold outside dives. */
+	void FlyAlongPath(const FAircraftPath& Path, const float DeltaTime);
+
+	/** @return Cruise speed, or less on the way into a hover (return to base, drop point). */
+	float FlyPath_GetWantedSpeed(const FAircraftPath& Path) const;
+
+	/** @return Braking rate into a hover: the comfortable rate, harder when the path left is too short for it. */
+	float FlyPath_GetArrivalDeceleration(const FAircraftPath& Path) const;
+
+	/**
+	 * @brief Raises the dive floor to stay clear of the ground under the aircraft (sampled while diving), not only
+	 * of the target's ground; only limits the descent, so the dive's aim is not changed above the floor.
+	 * @param PathFloorZ The dive segment's own floor.
+	 * @param DeltaTime Frame time, for the sample timer.
+	 * @return The floor to fly this frame.
+	 */
+	TOptional<float> FlyPath_GetDiveFloorAboveGroundBelow(const TOptional<float>& PathFloorZ, const float DeltaTime);
+
+	/** Ground under a diving aircraft, sampled now and then and eased between samples, for the dive floor. */
+	struct FAircraftDiveGroundFloor
+	{
+		// Ground height the floor follows; moves toward the last sample at a capped speed, so the floor never steps.
+		float GroundZ = 0.f;
+		float SampledGroundZ = 0.f;
+		float SecondsToNextSample = 0.f;
+		bool bM_HasGround = false;
+
+		void Reset()
+		{
+			SecondsToNextSample = 0.f;
+			bM_HasGround = false;
+		}
+	};
+
+	FAircraftDiveGroundFloor M_DiveGroundFloor;
+
+	/**
+	 * @brief One bank-to-turn frame toward a point.
+	 * @param AimPoint Where to fly toward.
+	 * @param WantedSpeed Speed to reach and keep (cm/s).
+	 * @param FloorZ Dive floor, when one applies.
+	 * @param bHoldAltitude Cruise and idle: ease to the aim height instead of pointing the nose at the aim point.
+	 * @param DeltaTime Frame time.
+	 * @param bIsArriving Slowing into a hover: brakes at the arrival deceleration.
+	 * @param ArrivalDeceleration Braking rate of the arrival (at least the settings' ArrivalDeceleration).
+	 */
+	void FlyTowardPoint(const FVector& AimPoint, const float WantedSpeed, const TOptional<float>& FloorZ,
+	                    const bool bHoldAltitude, const float DeltaTime, const bool bIsArriving = false,
+	                    const float ArrivalDeceleration = 0.f);
+
+	/** @brief Gives a new move or attack path the turn radius it is planned with and the side already turned to. */
+	void PreparePathPlanning(FAircraftPath& Path);
+
+	// Attack plans since the last dive: after a few the dive checks relax, so the aircraft never circles forever.
+	int32 M_AttackPlansWithoutDive = 0;
+
+	/** @brief PostInitializeComponents: an aircraft spawned in the air starts at idle speed along its nose. */
+	void PostInit_SetAirborneSpawnSpeed() const;
+
+	/** @return Flight heading (velocity, or the nose when nearly still) as a level rotation for path planning. */
+	FRotator GetFlightPlanningRotation() const;
+
+	/** @brief Puts the idle circle beside the flight, tangent to it on the side the aircraft already turns to. */
+	void InitIdleCircleAlongFlight();
+
+	/** @brief Bank-to-turn idle circling: aims a little ahead on the circle at the idle speed. */
+	void Tick_IdleCircling_FlightModel(float DeltaTime);
 
 	struct FIssuedActionsState
 	{
@@ -631,17 +803,25 @@ private:
 		FVector PostStrafeMoveToLocation = FVector::ZeroVector;
 		float StrafePointTotalLerpTime = 0.f;
 		float CurrentLerpTime = 0.f;
+		// How far along the active run the guns aim, from where the aircraft is; only ever moves forward.
+		float FlightProgressAlpha = 0.f;
 		// Cached from the ordered lane and reused for orientation-based follow-up runs.
 		float StrafePointDistance = 0.f;
 		bool bM_IsStrafing = false;
 		bool bM_IsLerpingStrafePoint = false;
 		bool bM_IsFirstAttackRun = true;
+		// An attack path from far away is only an approach without a dive; such a path does not count as a run.
+		bool bM_HasDivedThisRun = false;
 		bool bM_IsRetreatingToDestroy = false;
+		// Keeps attacking the authored target instead of switching to aggro after the first run.
+		bool bM_RepeatRunsOverTarget = false;
 		FTimerHandle StrafeTimerHandle;
 
 		void ResetRuntime()
 		{
 			CurrentLerpTime = 0.f;
+			FlightProgressAlpha = 0.f;
+			bM_HasDivedThisRun = false;
 			bM_IsStrafing = false;
 			bM_IsLerpingStrafePoint = false;
 			bM_IsFirstAttackRun = true;
@@ -754,14 +934,6 @@ private:
 	/** @return Highest ground Z sampled on the straight line from the aircraft to the drop point. */
 	float AircraftDrop_GetHighestGroundZAlongApproach() const;
 
-	/**
-	 * @brief Traces down to the landscape at one XY location.
-	 * @param Location XY to sample; Z is the centre of the trace.
-	 * @param OutGroundZ Ground height when hit.
-	 * @return Whether the landscape was hit.
-	 */
-	bool AircraftDrop_TraceGroundZ(const FVector& Location, float& OutGroundZ) const;
-
 	void AircraftDrop_StartRopeSlingDescent();
 	void AircraftDrop_OnRopeSlingPayloadGrounded();
 	void AircraftDrop_StartRopeSlingClimb();
@@ -794,10 +966,14 @@ private:
 	void Strafe_StartTimer(const float TotalStrafeTime);
 	void Strafe_OnTimerFinished();
 	void Strafe_TickTargetLocation(const float DeltaTime);
+	// Aims the guns where the aircraft's own flight will put them on the run line, so fire walks with the aircraft.
+	void Strafe_TickTargetFromFlightProgress();
 	void Strafe_UpdateWeaponTargetLocation() const;
 	FVector Strafe_GetOrientedEndLocation(const FVector& CurrentTargetLocation) const;
 	FVector Strafe_GetNextRunEndLocation() const;
 	void Strafe_StartAttackRun();
+	// Makes the run's dive steep and long enough that the nose (and so the fixed guns) points at the ground.
+	void Strafe_ApplyDiveProfile();
 	void IssuePostLiftOffAttackGroundAction();
 	void Strafe_OnAttackDiveStarted();
 	void Strafe_OnDiveRecoveryStarted();

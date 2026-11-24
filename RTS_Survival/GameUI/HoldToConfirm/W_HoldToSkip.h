@@ -8,6 +8,7 @@
 
 class UProgressBar;
 class UTextBlock;
+class IInputProcessor;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnHoldCompleted);
 
@@ -25,8 +26,10 @@ struct FHoldToSkipRuntimeState
 };
 
 /**
- * @brief Presents a hold-to-skip prompt that owns the Space key handling while it has focus.
+ * @brief Presents a hold-to-skip prompt that owns the Space key while it is on screen.
  * Missions show this during cinematic takeover so players can skip without reopening gameplay UI.
+ * @note Space reaches it through a Slate input preprocessor, so it does not depend on keyboard focus (a mouse click or
+ * another widget taking focus would otherwise silence Space).
  */
 UCLASS()
 class RTS_SURVIVAL_API UW_HoldToSkip : public UUserWidget
@@ -35,6 +38,7 @@ class RTS_SURVIVAL_API UW_HoldToSkip : public UUserWidget
 
 public:
 	virtual void NativeConstruct() override;
+	virtual void NativeDestruct() override;
 	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
 	virtual FReply NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent) override;
 	virtual FReply NativeOnKeyUp(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent) override;
@@ -60,6 +64,11 @@ public:
 	FOnHoldCompleted OnHoldCompleted;
 
 private:
+	// Sees Space before any widget does, whatever has keyboard focus; registered while the prompt is constructed.
+	TSharedPtr<IInputProcessor> M_InputProcessor;
+	void RegisterInputProcessor();
+	void UnregisterInputProcessor();
+
 	bool GetIsValidProgressBar() const;
 	void UpdateHoldProgress(const float InDeltaTime);
 	void UpdateProgressBarVisual(const float InDeltaTime, const float InTargetProgress);

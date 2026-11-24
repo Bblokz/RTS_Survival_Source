@@ -476,6 +476,7 @@ EPlayerAimAbilityTypes APlayerAimAbility::GetAimTypeFromGrenadeAbility(
 	{
 	case EGrenadeAbilityType::GerAtGrenade:
 	case EGrenadeAbilityType::BundleSturmKommando:
+	case EGrenadeAbilityType::StickGrenadeVultures:
 	case EGrenadeAbilityType::RusRPG43:
 		return EPlayerAimAbilityTypes::AntiVehicleGrenade;
 	default:

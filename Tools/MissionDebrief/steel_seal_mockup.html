@@ -1,0 +1,974 @@
+<title>Steel Seal Round 6</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Oswald:wght@700&family=Saira+Condensed:wght@400;500;600;700&family=Special+Elite&display=swap">
+<style>
+/* Layout: one column; one large 16:9 live WebGL frame (6B Steel Seal, round 6) with its controls, notes, then build notes.
+   Single dark look on purpose: the Rotsignal family (black oxide, gunmetal, dull signal red, bone). */
+:root{
+  color-scheme: dark;
+  --page:#0b0c0d; --rule:#2a2e31; --bone:#e6dfcf; --bone-dim:#a9a395; --muted:#80858a; --signal:#c24a3a; --signal-hi:#e0644f;
+  --f-ui:"Saira Condensed","Arial Narrow",sans-serif;
+  --f-type:"Special Elite","Courier New",monospace;
+}
+html{background:var(--page)}
+body{background:var(--page);color:var(--bone);font:400 16px/1.55 var(--f-ui);margin:0}
+[hidden]{display:none!important}
+.wrap{max-width:1180px;margin:0 auto;padding-block:40px 80px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:40px}
+header.top{display:flex;flex-direction:column;gap:14px;max-width:800px}
+.eyebrow{font:600 13px/1 var(--f-ui);letter-spacing:.28em;text-transform:uppercase;color:var(--signal);border-left:3px solid var(--signal);padding-left:10px}
+h1{font:400 clamp(34px,6vw,58px)/1 "Anton",Impact,sans-serif;letter-spacing:.02em;margin:0;text-wrap:balance}
+.lede{color:var(--bone-dim);font-size:17px;margin:0}
+.seg{display:inline-flex;border:1px solid #474b50;border-radius:4px;overflow:hidden;background:#15171a}
+.seg button,.ctl{font:600 13px/1 var(--f-ui);letter-spacing:.16em;text-transform:uppercase;color:var(--bone-dim);background:transparent;border:0;padding:10px 14px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:linear-gradient(180deg,#3a3e42,#26292c);color:var(--bone);box-shadow:inset 0 -2px 0 var(--signal)}
+.ctl{border:1px solid #474b50;border-radius:4px;background:#15171a}
+.ctl:hover,.seg button:hover{color:var(--bone)}
+button:focus-visible{outline:2px solid var(--signal-hi);outline-offset:2px}
+.card{display:flex;flex-direction:column;gap:16px}
+.card-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 16px}
+.num{font:400 40px/1 "Anton",Impact,sans-serif;color:var(--signal)}
+.card-head h2{font:700 28px/1.05 var(--f-ui);letter-spacing:.04em;text-transform:uppercase;margin:0}
+.card-head .de{font:400 16px/1 var(--f-type);color:var(--muted)}
+.card-head .ctls{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
+.notes{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px 28px;border-top:1px solid var(--rule);padding-top:16px}
+.notes div{min-width:0}
+.notes dt{font:600 12px/1 var(--f-ui);letter-spacing:.22em;text-transform:uppercase;color:var(--signal);margin-bottom:6px}
+.notes dd{margin:0;color:var(--bone-dim);font-size:15.5px;line-height:1.5}
+.notes dd b{color:var(--bone);font-weight:600}
+.stage{position:relative;aspect-ratio:16/9;width:100%;max-width:100%;container-type:inline-size;overflow:hidden;background:#070809;border:1px solid var(--rule);border-radius:4px}
+.stage canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+.stage .shade{position:absolute;left:0;right:0;bottom:0;height:34%;background:linear-gradient(0deg,rgba(4,5,6,.88),rgba(4,5,6,0));pointer-events:none;opacity:0;transition:opacity .8s}
+.stage.bar .shade{opacity:1}
+.stage .fail{position:absolute;inset:0;display:grid;place-items:center;color:var(--bone-dim);font-size:18px;padding:24px;text-align:center}
+.endbar{position:absolute;left:50%;bottom:3.6cqw;transform:translate(-50%,1.6cqw);opacity:0;display:flex;flex-direction:column;align-items:center;gap:.9cqw;text-align:center;width:max-content;max-width:90cqw;transition:opacity .7s cubic-bezier(.2,.7,.2,1),transform .7s cubic-bezier(.2,.7,.2,1)}
+.stage.bar .endbar{opacity:1;transform:translate(-50%,0)}
+.kick{font:600 1.45cqw/1 var(--f-ui);letter-spacing:.32em;text-transform:uppercase;color:var(--signal)}
+.reason{font:500 1.8cqw/1.1 var(--f-ui);color:var(--bone-dim);letter-spacing:.04em}
+.btns{display:flex;gap:1.4cqw;margin-top:.4cqw}
+.btn{position:relative;font:600 1.7cqw/1 var(--f-ui);letter-spacing:.16em;text-transform:uppercase;color:var(--bone);padding:1.1cqw 3.6cqw 1.3cqw;background:linear-gradient(180deg,#3e4246,#26292c 55%,#1d1f22);border:1px solid #55595e;border-radius:.35cqw;box-shadow:inset 0 1px 0 rgba(255,255,255,.14),inset 0 -.2cqw 0 rgba(0,0,0,.45),0 .35cqw .9cqw rgba(0,0,0,.65);white-space:nowrap}
+.btn::before{content:"";position:absolute;inset:0 1cqw;background:radial-gradient(circle,#80868b 0 .2cqw,transparent .25cqw) left center/.6cqw .6cqw no-repeat,radial-gradient(circle,#80868b 0 .2cqw,transparent .25cqw) right center/.6cqw .6cqw no-repeat}
+.btn::after{content:"";position:absolute;left:16%;right:16%;bottom:.35cqw;height:.16cqw;background:var(--signal);opacity:.28}
+.btn.pri::after{opacity:.95;box-shadow:0 0 .6cqw rgba(194,74,58,.7)}
+section.ref{display:flex;flex-direction:column;gap:14px}
+section.ref h2{font:700 24px/1.1 var(--f-ui);letter-spacing:.05em;text-transform:uppercase;margin:0}
+section.ref li{color:var(--bone-dim);max-width:78ch}
+section.ref ul{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:8px}
+section.ref li b{color:var(--bone);font-weight:600}
+.verify{display:inline-block;font:600 11px/1 var(--f-ui);letter-spacing:.14em;text-transform:uppercase;padding:3px 6px;border:1px solid #8a7440;color:#e2c98b;border-radius:3px;margin-left:4px;vertical-align:1px}
+footer.fine{color:var(--muted);font-size:14px;border-top:1px solid var(--rule);padding-top:18px}
+@media (max-width:640px){.card-head .ctls{margin-left:0;width:100%}.num{font-size:32px}.card-head h2{font-size:22px}}
+@media (prefers-reduced-motion: reduce){.endbar,.stage .shade{transition:none}}
+.shot .endbar,.shot .stage .shade{transition:none}
+.shot .wrap{padding:0;max-width:none}
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="eyebrow">Victory &amp; defeat · round 6 · design 6B</div>
+    <h1>Steel Seal End Screen</h1>
+    <p class="lede">The Steel Seal, round 6: the ink is now physically shaded. The ink pad is a worn, enamelled steel tin with its lid open, a paper label inside, and a felt pad soaked unevenly in ink: wet and glossy where it pools, drier at the edges, with the last impression lifted out of it. The stamp on the order is slightly raised ink in a faint pressed dent, so the letter edges catch the lamp. It starts satin-wet and dries duller over a few seconds. The wet ink on the rubber face has its own clear coat.</p>
+  </header>
+
+  <section class="card" id="card" aria-labelledby="h-6b">
+    <div class="card-head"><span class="num">6B</span><h2 id="h-6b">Steel Seal</h2><span class="de">Stahlstempel</span>
+      <div class="ctls"><div class="seg" role="group" aria-label="Outcome"><button type="button" id="b-victory" data-st="victory" aria-pressed="true">Victory</button><button type="button" id="b-defeat" data-st="defeat" aria-pressed="false">Defeat</button></div>
+      <button type="button" class="ctl" id="b-replay">Replay</button></div></div>
+    <div class="stage" role="img" aria-label="Steel Seal end screen, live 3D mock-up"><div class="shade"></div><div class="endbar"></div></div>
+    <dl class="notes">
+      <div><dt>Victory</dt><dd>The stamp lifts out of the ink tin and slams VICTORY onto the order. It tips up toward the camera and spins once around, which shows off the model. After the spin the letters read correctly, and the stamp holds still for a moment before it leaves.</dd></div>
+      <div><dt>Defeat</dt><dd>The stamp slams and spins the same way with DEFEAT. Then fire takes the order in from the edges. The stamped letters survive in the middle, and their outside edges keep burning: crawling embers, small flames, smoke and sparks, lit by the fire.</dd></div>
+      <div><dt>The turn</dt><dd>A stamp face is a mirror image, and no rotation can make mirrored letters read correctly. So the face is swapped for a readable one halfway through the spin, while it points away from the camera and can't be seen. In Unreal that is two face meshes, or one material switch, on that frame.</dd></div>
+      <div><dt>Desk &amp; props</dt><dd>The MP 40 and StG 44 are the in-game meshes with their textures (colour, normal, metal/rough, AO). The 9 mm and 7.92 Kurz rounds are placed so their footprints never overlap, and get scratched, tarnished PBR materials. The worn steel table and the lamp are as before.</dd></div>
+    </dl>
+  </section>
+
+  <section class="ref" aria-labelledby="ue-h">
+    <h2 id="ue-h">Building it in Unreal</h2>
+    <ul>
+      <li><b>Stamp:</b> one steel seal mesh with its PBR textures, plus two face meshes per word: a mirrored one for the slam and a readable one shown after the spin. The print on the paper always uses the readable word.</li>
+      <li><b>Desk and props:</b> the MP 40 (<code>SM_Ger_InfWeapon_MP40</code>) and StG 44 (<code>SM_Weapon_MP44</code>) are already in the project, so the stage places them as static meshes. Note: the in-game StG 44 material <code>MAT_mp44</code> only uses the albedo map. Its normal, roughness, metalness and AO maps sit next to the mesh but aren't wired in, and this mock-up uses them. The wall map is one displaced plane with its own normal and roughness maps.</li>
+      <li><b>Paper and burn:</b> one material for the order texture, the ink mask switched on at the slam, and the burn. The burn comes in from the edges, spares the stamped letters through a keep mask, and keeps a crawling ember band on their edges. Flames, smoke and sparks along those edges come from a Niagara system that spawns on the same mask.</li>
+      <li><b>On screen while paused:</b> <code>PauseAndLockGame</code> is a real pause. My suggestion is a small debrief stage off the map, with its own camera taking over the view and its actors set to tick while paused, with the buttons as a normal widget on top. Niagara and material Time under pause still need checking in the engine <span class="verify">to verify</span>.</li>
+    </ul>
+  </section>
+
+  <footer class="fine">This is a browser sketch built in three.js. The weapons are the game's meshes and textures (exported to glTF and packed for the web); the desk, map, lamp, stamp and rounds use generated textures. Fonts are Google stand-ins; the mission name and reasons are sample text. Earlier rounds keep their own pages.</footer>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.149.0/build/three.min.js"></script>
+<script>
+(() => {
+'use strict';
+const T = window.THREE;
+const W = 2.1, H = 2.97, CW = 1024, CH = Math.round(1024 * H / W);
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const seg = (t, a, b) => clamp((t - a) / (b - a));
+const lerp = (a, b, t) => a + (b - a) * t;
+const smooth = (a, b, x) => { const t = clamp((x - a) / (b - a)); return t * t * (3 - 2 * t); };
+const EASE = { lin: x => x, in: x => x * x * x, out: x => 1 - Math.pow(1 - x, 3), inout: x => x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2 };
+const rngf = s => () => { s = (s * 16807) % 2147483647; return (s - 1) / 2147483646; };
+const mkCanvas = (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; };
+
+/* ---------------- procedural textures (built once) ---------------- */
+function makeNoise(S, seed) {
+  const r = rngf(seed), out = new Float32Array(S * S); let amp = 1, tot = 0;
+  for (const f of [4, 8, 16, 32, 64]) {
+    const g = new Float32Array(f * f); for (let i = 0; i < f * f; i++) g[i] = r();
+    for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+      const gx = x / S * f, gy = y / S * f, x0 = Math.floor(gx), y0 = Math.floor(gy), tx = gx - x0, ty = gy - y0;
+      const sx = tx * tx * (3 - 2 * tx), sy = ty * ty * (3 - 2 * ty);
+      const a = g[(y0 % f) * f + (x0 % f)], b = g[(y0 % f) * f + ((x0 + 1) % f)], c = g[((y0 + 1) % f) * f + (x0 % f)], d = g[((y0 + 1) % f) * f + ((x0 + 1) % f)];
+      out[y * S + x] += amp * lerp(lerp(a, b, sx), lerp(c, d, sx), sy);
+    }
+    tot += amp; amp *= .5;
+  }
+  const cv = mkCanvas(S, S), ctx = cv.getContext('2d'), im = ctx.createImageData(S, S);
+  for (let i = 0; i < S * S; i++) { out[i] = clamp((out[i] / tot - .5) * 1.9 + .5); const v = Math.round(out[i] * 255); im.data[i * 4] = im.data[i * 4 + 1] = im.data[i * 4 + 2] = v; im.data[i * 4 + 3] = 255; }
+  ctx.putImageData(im, 0, 0);
+  const at = (u, v) => { u -= Math.floor(u); v -= Math.floor(v); const x = u * S, y = (1 - v) * S; const x0 = Math.floor(x) % S, y0 = Math.floor(y) % S, x1 = (x0 + 1) % S, y1 = (y0 + 1) % S, tx = x - Math.floor(x), ty = y - Math.floor(y);
+    return lerp(lerp(out[y0 * S + x0], out[y0 * S + x1], tx), lerp(out[y1 * S + x0], out[y1 * S + x1], tx), ty); };
+  return { cv, at, S };
+}
+function heightToNormal(src, strength) {
+  const w = src.width, h = src.height, d = src.getContext('2d').getImageData(0, 0, w, h).data;
+  const out = mkCanvas(w, h), oc = out.getContext('2d'), im = oc.createImageData(w, h);
+  const H_ = (x, y) => d[((Math.min(h - 1, Math.max(0, y))) * w + Math.min(w - 1, Math.max(0, x))) * 4] / 255;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const dx = (H_(x + 1, y) - H_(x - 1, y)) * strength, dy = (H_(x, y + 1) - H_(x, y - 1)) * strength;
+    let nx = -dx, ny = dy, nz = 1; const l = Math.hypot(nx, ny, nz); nx /= l; ny /= l; nz /= l;
+    const i = (y * w + x) * 4; im.data[i] = (nx * .5 + .5) * 255; im.data[i + 1] = (ny * .5 + .5) * 255; im.data[i + 2] = (nz * .5 + .5) * 255; im.data[i + 3] = 255;
+  }
+  oc.putImageData(im, 0, 0); return out;
+}
+const SH = {};
+function woodCanvas(dark, light, rings, seedShift) {
+  const cv = mkCanvas(512, 512), c = cv.getContext('2d'), im = c.createImageData(512, 512);
+  for (let y = 0; y < 512; y++) for (let x = 0; x < 512; x++) {
+    const n = SH.noise.at(x / 512 * 1.5 + seedShift, y / 512 * .35), fine = SH.noise.at(x / 512 * 9, y / 512 * .6 + seedShift);
+    const ring = (y / 512 * rings + n * 4) % 1, k = Math.pow(Math.abs(ring - .5) * 2, 4) * .22 + fine * .3 + n * .25;
+    const i = (y * 512 + x) * 4; im.data[i] = lerp(light[0], dark[0], k); im.data[i + 1] = lerp(light[1], dark[1], k); im.data[i + 2] = lerp(light[2], dark[2], k); im.data[i + 3] = 255; }
+  c.putImageData(im, 0, 0); return cv;
+}
+function buildShared() {
+  SH.noise = makeNoise(256, 11);
+  const n2 = makeNoise(256, 29);
+  const N = SH.noise;
+  SH.grunge = mkCanvas(512, 512); { const c = SH.grunge.getContext('2d'), im = c.createImageData(512, 512);
+    for (let y = 0; y < 512; y++) for (let x = 0; x < 512; x++) { const v = n2.at(x / 512 * 3, 1 - y / 512 * 3) * .6 + N.at(x / 512 * 11, y / 512 * 11) * .4; const a = clamp((v - .1) * 5.5) * (.82 + .18 * N.at(x / 512 * 2, y / 512 * 2)); im.data[(y * 512 + x) * 4 + 3] = a * 255; }
+    c.putImageData(im, 0, 0); }
+  SH.walnut = woodCanvas([40, 23, 12], [92, 56, 32], 28, 0);
+  SH.beech = woodCanvas([88, 52, 26], [150, 98, 58], 22, .37);
+  const kh = mkCanvas(256, 256); { const c = kh.getContext('2d'), im = c.createImageData(256, 256), P = 16;
+    const tri = v => Math.abs(((v % P) + P) % P - P / 2) / (P / 2);
+    for (let y = 0; y < 256; y++) for (let x = 0; x < 256; x++) { const v = Math.min(tri(x + y), tri(x - y)) * 255, i = (y * 256 + x) * 4; im.data[i] = im.data[i + 1] = im.data[i + 2] = v; im.data[i + 3] = 255; }
+    c.putImageData(im, 0, 0); }
+  SH.knurl = heightToNormal(kh, 3);
+  SH.rough = mkCanvas(256, 256); { const c = SH.rough.getContext('2d'), im = c.createImageData(256, 256);
+    for (let y = 0; y < 256; y++) for (let x = 0; x < 256; x++) { const v = (.38 + N.at(x / 256 * 3, y / 256 * 3) * .3 + N.at(x / 256 * 17, y / 256 * 2) * .12) * 255, i = (y * 256 + x) * 4; im.data[i] = im.data[i + 1] = im.data[i + 2] = v; im.data[i + 3] = 255; }
+    c.putImageData(im, 0, 0); }
+  SH.dot = mkCanvas(64, 64); { const c = SH.dot.getContext('2d'), g = c.createRadialGradient(32, 32, 0, 32, 32, 32);
+    g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(.35, 'rgba(255,255,255,.6)'); g.addColorStop(1, 'rgba(255,255,255,0)'); c.fillStyle = g; c.fillRect(0, 0, 64, 64); }
+  SH.flame = mkCanvas(64, 64); { const c = SH.flame.getContext('2d'); c.translate(32, 40); c.scale(.62, 1); const g = c.createRadialGradient(0, 0, 0, 0, 0, 36);
+    g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(.4, 'rgba(255,255,255,.55)'); g.addColorStop(1, 'rgba(255,255,255,0)'); c.fillStyle = g; c.beginPath(); c.moveTo(0, -40); c.quadraticCurveTo(34, 0, 0, 24); c.quadraticCurveTo(-34, 0, 0, -40); c.fill(); }
+  SH.smoke = mkCanvas(64, 64); { const c = SH.smoke.getContext('2d'), g = c.createRadialGradient(32, 32, 0, 32, 32, 32);
+    g.addColorStop(0, 'rgba(255,255,255,.9)'); g.addColorStop(.6, 'rgba(255,255,255,.35)'); g.addColorStop(1, 'rgba(255,255,255,0)'); c.fillStyle = g; c.fillRect(0, 0, 64, 64); }
+  buildDeskMaps(); buildWall(); buildSoot(); buildMap(); buildTinMaps();
+  SH.contact = mkCanvas(128, 64); { const c = SH.contact.getContext('2d'); c.translate(64, 32); c.scale(1, .5); const g = c.createRadialGradient(0, 0, 0, 0, 0, 64);
+    g.addColorStop(0, 'rgb(255,255,255)'); g.addColorStop(.62, 'rgb(225,225,225)'); g.addColorStop(.85, 'rgb(70,70,70)'); g.addColorStop(1, 'rgb(0,0,0)'); c.fillStyle = '#000'; c.fillRect(-64, -64, 128, 128); c.fillStyle = g; c.fillRect(-64, -64, 128, 128); }
+  SH.round = { brass: roundTex('brass', 3), copper: roundTex('copper', 7), lacquer: roundTex('lacquer', 11) };
+}
+
+/* worn steel field desk: colour, ORM (G rough, B metal) and height -> normal */
+function buildDeskMaps() {
+  const Wd = 1536, Hd = 1152, N = SH.noise, r = rngf(77);
+  const col = mkCanvas(Wd, Hd), orm = mkCanvas(Wd, Hd), hgt = mkCanvas(Wd, Hd);
+  const c = col.getContext('2d'), o = orm.getContext('2d'), h = hgt.getContext('2d');
+  const ci = c.createImageData(Wd, Hd), oi = o.createImageData(Wd, Hd), hi = h.createImageData(Wd, Hd);
+  for (let y = 0; y < Hd; y++) for (let x = 0; x < Wd; x++) {
+    const u = x / Wd, v = y / Hd;
+    const lo = N.at(u * 3, v * 2.25), mid = N.at(u * 9 + .3, v * 6.75 + .7), fine = N.at(u * 40, v * 30);
+    const wear = clamp((N.at(u * 5 + .51, v * 3.75 + .13) * .65 + mid * .35 - .62) * 7);  // bare metal patches
+    const grime = clamp((lo - .45) * 1.6);
+    let R = 54 + mid * 12 + fine * 6, G = 57 + mid * 12 + fine * 6, B = 52 + mid * 10 + fine * 5;          // worn feldgrau paint
+    R *= 1 - grime * .35; G *= 1 - grime * .35; B *= 1 - grime * .35;
+    const bare = 88 + fine * 30;
+    R = lerp(R, bare, wear); G = lerp(G, bare + 2, wear); B = lerp(B, bare + 4, wear);
+    const i = (y * Wd + x) * 4;
+    ci.data[i] = R; ci.data[i + 1] = G; ci.data[i + 2] = B; ci.data[i + 3] = 255;
+    oi.data[i] = 255; oi.data[i + 1] = lerp(190 + fine * 30, 95 + fine * 40, wear); oi.data[i + 2] = lerp(15, 235, wear); oi.data[i + 3] = 255;
+    const hv = 150 - wear * 22 + fine * 6; hi.data[i] = hi.data[i + 1] = hi.data[i + 2] = hv; hi.data[i + 3] = 255;
+  }
+  c.putImageData(ci, 0, 0); o.putImageData(oi, 0, 0); h.putImageData(hi, 0, 0);
+  const stroke = (ctx, style, lw, pts) => { ctx.strokeStyle = style; ctx.lineWidth = lw; ctx.beginPath(); ctx.moveTo(pts[0], pts[1]); ctx.quadraticCurveTo(pts[2], pts[3], pts[4], pts[5]); ctx.stroke(); };
+  c.lineCap = o.lineCap = h.lineCap = 'round';
+  // scratches in clusters with a shared direction
+  for (let k = 0; k < 46; k++) {
+    const cx = r() * Wd, cy = r() * Hd, dir = r() * Math.PI, spread = 30 + r() * 180, count = 8 + Math.floor(r() * 30);
+    for (let j = 0; j < count; j++) {
+      const x = cx + (r() - .5) * spread * 2, y = cy + (r() - .5) * spread * 2, a = dir + (r() - .5) * .5, l = 12 + r() * r() * 220, bend = (r() - .5) * l * .25;
+      const pts = [x, y, x + Math.cos(a) * l / 2 - Math.sin(a) * bend, y + Math.sin(a) * l / 2 + Math.cos(a) * bend, x + Math.cos(a) * l, y + Math.sin(a) * l];
+      const lw = .35 + r() * .55, al = .05 + r() * .14;
+      stroke(c, `rgba(${118 + r() * 25},${120 + r() * 25},${120 + r() * 25},${al})`, lw, pts);
+      stroke(o, `rgba(255,${80 + r() * 40},210,${al + .2})`, lw, pts);
+      stroke(h, `rgba(90,90,90,${al + .25})`, lw, pts);
+    }
+  }
+  // fine swirl scuffs
+  for (let k = 0; k < 260; k++) { const x = r() * Wd, y = r() * Hd, rad = 10 + r() * 60, a0 = r() * 6.28;
+    c.strokeStyle = `rgba(140,140,136,${.03 + r() * .05})`; c.lineWidth = .6; c.beginPath(); c.arc(x, y, rad, a0, a0 + .6 + r() * 1.6); c.stroke(); }
+  // paint chips showing bare metal
+  for (let k = 0; k < 170; k++) { const x = r() * Wd, y = r() * Hd, s = 1.5 + r() * r() * 9, n = 5 + Math.floor(r() * 4);
+    const path = () => { const p = new Path2D(); for (let j = 0; j < n; j++) { const a = j / n * 6.28, rr = s * (.5 + r() * .7); j ? p.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr) : p.moveTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr); } p.closePath(); return p; };
+    const p = path(); c.fillStyle = `rgb(${110 + r() * 30},${112 + r() * 30},${115 + r() * 30})`; c.fill(p); o.fillStyle = 'rgb(255,90,240)'; o.fill(p); h.fillStyle = 'rgb(118,118,118)'; h.fill(p); }
+  // rust spots
+  for (let k = 0; k < 16; k++) { const x = r() * Wd, y = r() * Hd, s = 3 + r() * 14; const g = c.createRadialGradient(x, y, 0, x, y, s);
+    g.addColorStop(0, `rgba(${110 + r() * 30},${52 + r() * 14},${24},${.55 + r() * .3})`); g.addColorStop(1, 'rgba(90,45,20,0)'); c.fillStyle = g; c.fillRect(x - s, y - s, s * 2, s * 2);
+    o.fillStyle = 'rgba(255,235,0,.6)'; o.beginPath(); o.arc(x, y, s * .6, 0, 6.28); o.fill(); }
+  // cup rings and oil stains
+  for (let k = 0; k < 4; k++) { const x = Wd * (.15 + r() * .7), y = Hd * (.2 + r() * .6), s = 34 + r() * 18;
+    c.strokeStyle = 'rgba(60,40,22,.22)'; c.lineWidth = 2 + r() * 2; c.beginPath(); c.arc(x, y, s, 0, 6.28); c.stroke(); c.lineWidth = 1.2; c.beginPath(); c.arc(x + 3, y - 2, s - 4, .3, 4.4); c.stroke(); }
+  for (let k = 0; k < 6; k++) { const x = r() * Wd, y = r() * Hd, s = 30 + r() * 90; const g = c.createRadialGradient(x, y, 0, x, y, s);
+    g.addColorStop(0, 'rgba(14,12,10,.45)'); g.addColorStop(.7, 'rgba(14,12,10,.2)'); g.addColorStop(1, 'rgba(14,12,10,0)'); c.fillStyle = g; c.fillRect(x - s, y - s, s * 2, s * 2);
+    o.fillStyle = 'rgba(255,60,40,.5)'; o.beginPath(); o.arc(x, y, s * .6, 0, 6.28); o.fill(); }
+  // dents
+  for (let k = 0; k < 14; k++) { const x = r() * Wd, y = r() * Hd, s = 10 + r() * 40; const g = h.createRadialGradient(x, y, 0, x, y, s); g.addColorStop(0, 'rgba(60,60,60,.6)'); g.addColorStop(1, 'rgba(60,60,60,0)'); h.fillStyle = g; h.fillRect(x - s, y - s, s * 2, s * 2); }
+  SH.deskCol = col; SH.deskOrm = orm; SH.deskNrm = heightToNormal(hgt, 2.2);
+}
+/* barracks wall: painted steel sheet panels, worn to bare metal, rust streaks running down from rivets and seams,
+   scratches, dents and a few bullet strikes. Plane is 16 x 8 units centred at y 2.8 (so v=0 is y -1.2). */
+const WALL = { seamsX: [-6.5, -2.5, 1.5, 5.5], seamY: 3.6, rivetStep: .42 };
+function buildWall() {
+  const Wd = 2048, Hd = 1024, N = SH.noise, r = rngf(53);
+  const px = x => (x + 8) / 16 * Wd, py = y => (1 - (y + 1.2) / 8) * Hd;
+  const col = mkCanvas(Wd, Hd), orm = mkCanvas(Wd, Hd), hgt = mkCanvas(Wd, Hd);
+  const c = col.getContext('2d'), o = orm.getContext('2d'), h = hgt.getContext('2d');
+  const ci = c.createImageData(Wd, Hd), oi = o.createImageData(Wd, Hd), hi = h.createImageData(Wd, Hd);
+  const deskY = py(0);
+  for (let y = 0; y < Hd; y++) for (let x = 0; x < Wd; x++) {
+    const u = x / Wd, v = y / Hd;
+    const lo = N.at(u * 4, v * 2), mid = N.at(u * 14 + .2, v * 7 + .5), fine = N.at(u * 70, v * 35), pit = N.at(u * 160 + .3, v * 80 + .1);
+    const nearDesk = smooth(deskY - 260, deskY, y);                                     // splash and scuff zone above the desk
+    const wear = clamp((N.at(u * 9 + .7, v * 4.5 + .3) * .7 + mid * .3 - .66 + nearDesk * .12) * 6);
+    const rust = clamp((N.at(u * 6 + .11, v * 3 + .77) * .6 + lo * .4 - .63 + nearDesk * .25) * 3.2) * (.75 + .25 * N.at(u * 40, v * 3));
+    let R = 56 + mid * 12 + fine * 6, G = 61 + mid * 12 + fine * 6, B = 55 + mid * 10 + fine * 5;              // faded olive-grey paint
+    const grime = clamp((lo - .4) * 1.4) * .3 + nearDesk * .15; R *= 1 - grime; G *= 1 - grime; B *= 1 - grime;
+    R = lerp(R, 96 + fine * 26, wear); G = lerp(G, 97 + fine * 26, wear); B = lerp(B, 98 + fine * 26, wear);   // bare steel
+    const rr = rust * (.7 + pit * .5);
+    R = lerp(R, 84 + pit * 34, rr); G = lerp(G, 44 + pit * 16, rr); B = lerp(B, 24 + pit * 8, rr);           // rust
+    const i = (y * Wd + x) * 4;
+    ci.data[i] = R; ci.data[i + 1] = G; ci.data[i + 2] = B; ci.data[i + 3] = 255;
+    oi.data[i] = 255; oi.data[i + 1] = clamp(lerp(lerp(.66, .38, wear), .92, rr) + (fine - .5) * .1) * 255; oi.data[i + 2] = lerp(lerp(.15, .95, wear), .2, rr) * 255; oi.data[i + 3] = 255;
+    hi.data[i] = hi.data[i + 1] = hi.data[i + 2] = 140 + (lo - .5) * 50 - wear * 10 - rr * (pit - .3) * 50; hi.data[i + 3] = 255;
+  }
+  c.putImageData(ci, 0, 0); o.putImageData(oi, 0, 0); h.putImageData(hi, 0, 0);
+  // seams under the battens: dark gaps and a stepped edge
+  for (const sx of WALL.seamsX) { const x = px(sx); c.fillStyle = 'rgba(10,10,9,.8)'; c.fillRect(x - 3, 0, 6, Hd); h.fillStyle = 'rgb(70,70,70)'; h.fillRect(x - 3, 0, 6, Hd); }
+  { const y = py(WALL.seamY); c.fillStyle = 'rgba(10,10,9,.8)'; c.fillRect(0, y - 3, Wd, 6); h.fillStyle = 'rgb(70,70,70)'; h.fillRect(0, y - 3, Wd, 6); }
+  // rust streaks: run down from every rivet and from the horizontal seam
+  const streak = (x, y, len, w, a) => { const g = c.createLinearGradient(0, y, 0, y + len); g.addColorStop(0, `rgba(96,46,20,${a})`); g.addColorStop(1, 'rgba(96,46,20,0)');
+    c.fillStyle = g; c.beginPath(); c.moveTo(x - w / 2, y); c.quadraticCurveTo(x + (r() - .5) * 6, y + len * .6, x + (r() - .5) * 10, y + len); c.lineTo(x + w / 2, y); c.fill();
+    o.fillStyle = 'rgba(255,230,40,.35)'; o.fillRect(x - w / 2, y, w, len * .6); };
+  for (const sx of WALL.seamsX) for (let y = 0; y < 6.6; y += WALL.rivetStep) if (r() < .55) streak(px(sx) + (r() < .5 ? -1 : 1) * 22, py(y), 40 + r() * 160, 6 + r() * 8, .35 + r() * .35);
+  for (let x = -8; x < 8; x += WALL.rivetStep) if (r() < .5) streak(px(x), py(WALL.seamY) + 16, 50 + r() * 200, 6 + r() * 10, .3 + r() * .35);
+  for (let k = 0; k < 26; k++) streak(r() * Wd, r() * deskY, 60 + r() * 220, 3 + r() * 6, .15 + r() * .2);
+  // scratches and gouges
+  c.lineCap = o.lineCap = h.lineCap = 'round';
+  for (let k = 0; k < 30; k++) { const cx = r() * Wd, cy = r() * Hd, dir = r() * Math.PI, n = 4 + Math.floor(r() * 14);
+    for (let j = 0; j < n; j++) { const x = cx + (r() - .5) * 120, y = cy + (r() - .5) * 120, a = dir + (r() - .5) * .4, l = 12 + r() * r() * 160, w = .5 + r() * 1.2, al = .15 + r() * .35;
+      const pts = [x, y, x + Math.cos(a) * l, y + Math.sin(a) * l];
+      for (const [ctx, s] of [[c, `rgba(150,150,146,${al})`], [o, `rgba(255,90,240,${al + .2})`], [h, `rgba(80,80,80,${al + .3})`]]) { ctx.strokeStyle = s; ctx.lineWidth = w; ctx.beginPath(); ctx.moveTo(pts[0], pts[1]); ctx.lineTo(pts[2], pts[3]); ctx.stroke(); } } }
+  // dents and bullet strikes
+  for (let k = 0; k < 16; k++) { const x = r() * Wd, y = r() * Hd, s = 14 + r() * 50; const g = h.createRadialGradient(x, y, 0, x, y, s); g.addColorStop(0, 'rgba(80,80,80,.7)'); g.addColorStop(1, 'rgba(80,80,80,0)'); h.fillStyle = g; h.fillRect(x - s, y - s, s * 2, s * 2); }
+  for (const [wx, wy] of [[2.9, 2.2], [3.3, 1.7], [-3.6, 2.9], [4.6, .9], [-4.8, 1.4]]) { const x = px(wx), y = py(wy);
+    const ring = c.createRadialGradient(x, y, 0, x, y, 14); ring.addColorStop(0, 'rgba(8,7,6,1)'); ring.addColorStop(.35, 'rgba(8,7,6,1)'); ring.addColorStop(.45, 'rgba(160,160,155,.9)'); ring.addColorStop(1, 'rgba(150,150,145,0)');
+    c.fillStyle = ring; c.fillRect(x - 16, y - 16, 32, 32);
+    const hr = h.createRadialGradient(x, y, 0, x, y, 18); hr.addColorStop(0, 'rgba(0,0,0,1)'); hr.addColorStop(.4, 'rgba(0,0,0,1)'); hr.addColorStop(.55, 'rgba(230,230,230,.9)'); hr.addColorStop(1, 'rgba(140,140,140,0)');
+    h.fillStyle = hr; h.fillRect(x - 18, y - 18, 36, 36);
+    o.fillStyle = 'rgba(255,60,255,.9)'; o.beginPath(); o.arc(x, y, 10, 0, 6.28); o.fill();
+    streak(x, y + 8, 70 + r() * 120, 6, .45); }
+  SH.wall = col; SH.wallOrm = orm; SH.wallNrm = heightToNormal(hgt, 3.2);
+  // battens + rivets get a small rust-and-paint texture of their own
+  const bt = mkCanvas(64, 512), b = bt.getContext('2d'), bi = b.createImageData(64, 512);
+  for (let y = 0; y < 512; y++) for (let x = 0; x < 64; x++) { const n = N.at(x / 64, y / 512 * 8), rr = clamp((N.at(x / 64 * 2 + .5, y / 512 * 10) - .55) * 4), i = (y * 64 + x) * 4;
+    bi.data[i] = lerp(60 + n * 14, 115, rr); bi.data[i + 1] = lerp(64 + n * 14, 56, rr); bi.data[i + 2] = lerp(58 + n * 12, 26, rr); bi.data[i + 3] = 255; }
+  b.putImageData(bi, 0, 0); SH.batten = bt;
+}
+/* situation map pinned to the wall: colour, roughness, fine height (normal) and large-scale displacement */
+function buildMap() {
+  const Wm = 1024, Hm = 662, N = SH.noise, r = rngf(19);
+  const col = mkCanvas(Wm, Hm), c = col.getContext('2d'), rgh = mkCanvas(Wm, Hm), g = rgh.getContext('2d'), fine = mkCanvas(Wm, Hm), h = fine.getContext('2d');
+  const ci = c.createImageData(Wm, Hm), hi = h.createImageData(Wm, Hm);
+  for (let y = 0; y < Hm; y++) for (let x = 0; x < Wm; x++) {
+    const u = x / Wm, v = y / Hm, n = N.at(u * 3, v * 2), fib = N.at(u * 70, v * 45), fox = N.at(u * 7 + .3, v * 5 + .6);
+    const edgeD = Math.min(u, 1 - u, v * 1.55, (1 - v) * 1.55), age = 1 - smooth(0, .07, edgeD), spot = clamp((fox - .74) * 5);
+    let R = 216 * (.93 + n * .09), G = 205 * (.93 + n * .09), B = 174 * (.92 + n * .08);
+    R = lerp(R, 168, age * .55 + spot * .35); G = lerp(G, 140, age * .55 + spot * .35); B = lerp(B, 96, age * .55 + spot * .35);
+    const k = (fib - .5) * 10, i = (y * Wm + x) * 4;
+    ci.data[i] = R + k; ci.data[i + 1] = G + k; ci.data[i + 2] = B + k; ci.data[i + 3] = 255;
+    hi.data[i] = hi.data[i + 1] = hi.data[i + 2] = 128 + (fib - .5) * 70 + (n - .5) * 30; hi.data[i + 3] = 255;
+  }
+  c.putImageData(ci, 0, 0); h.putImageData(hi, 0, 0);
+  g.fillStyle = 'rgb(228,228,228)'; g.fillRect(0, 0, Wm, Hm);
+  const blob = (ctx, cx, cy, rad, fill) => { ctx.fillStyle = fill; ctx.beginPath(); for (let a = 0; a <= 32; a++) { const t = a / 32 * Math.PI * 2, rr = rad * (.7 + N.at(cx / Wm * 3 + Math.cos(t) * .4, cy / Hm * 3 + Math.sin(t) * .4) * .6); a ? ctx.lineTo(cx + Math.cos(t) * rr, cy + Math.sin(t) * rr * .8) : ctx.moveTo(cx + Math.cos(t) * rr, cy + Math.sin(t) * rr * .8); } ctx.fill(); };
+  for (let k = 0; k < 11; k++) blob(c, r() * Wm, r() * Hm, 40 + r() * 70, 'rgba(112,138,88,.38)');                           // woods
+  for (const [hx, hy] of [[260, 180], [700, 420], [820, 150]]) for (let k = 1; k < 9; k++) {                                   // contour lines
+    c.strokeStyle = `rgba(140,95,55,${k % 4 ? .45 : .7})`; c.lineWidth = k % 4 ? 1 : 1.8; c.beginPath();
+    for (let a = 0; a <= 48; a++) { const t = a / 48 * Math.PI * 2, rr = k * 17 * (.75 + N.at(hx / 100 + Math.cos(t) * .5, hy / 100 + Math.sin(t) * .5 + k * .1) * .5); a ? c.lineTo(hx + Math.cos(t) * rr * 1.3, hy + Math.sin(t) * rr) : c.moveTo(hx + Math.cos(t) * rr * 1.3, hy + Math.sin(t) * rr); }
+    c.stroke(); }
+  c.lineCap = g.lineCap = 'round'; c.lineJoin = 'round';
+  c.strokeStyle = 'rgba(70,112,150,.9)'; c.lineWidth = 9; c.beginPath(); c.moveTo(0, 470); c.bezierCurveTo(200, 430, 330, 560, 520, 500); c.bezierCurveTo(690, 450, 760, 300, 1024, 270); c.stroke();
+  c.strokeStyle = 'rgba(160,190,210,.8)'; c.lineWidth = 3; c.stroke();
+  blob(c, 600, 560, 60, 'rgba(90,128,165,.75)');
+  const road = (pts) => { for (const [w, s] of [[6, 'rgba(60,45,35,.85)'], [3, 'rgba(206,128,70,.95)']]) { c.strokeStyle = s; c.lineWidth = w; c.beginPath(); pts.forEach((p, i) => i ? c.lineTo(p[0], p[1]) : c.moveTo(p[0], p[1])); c.stroke(); } };
+  road([[0, 120], [180, 160], [360, 260], [540, 300], [760, 360], [1024, 380]]); road([[420, 0], [430, 140], [360, 260], [330, 420], [300, 662]]);
+  c.strokeStyle = 'rgba(30,30,30,.85)'; c.lineWidth = 2; c.beginPath(); c.moveTo(0, 600); c.lineTo(1024, 520); c.stroke();
+  for (let x = 0; x < 1024; x += 14) { const y = 600 - x * 80 / 1024; c.beginPath(); c.moveTo(x, y - 4); c.lineTo(x, y + 4); c.stroke(); }
+  for (const [tx, ty] of [[360, 262], [540, 302], [770, 356]]) for (let k = 0; k < 14; k++) { c.fillStyle = 'rgba(45,40,36,.8)'; c.fillRect(tx + (r() - .5) * 60, ty + (r() - .5) * 40, 5 + r() * 7, 4 + r() * 6); }
+  c.strokeStyle = 'rgba(40,40,40,.4)'; c.lineWidth = 1; c.font = '13px "Special Elite"'; c.fillStyle = 'rgba(40,36,30,.8)';
+  for (let x = 64, n = 52; x < Wm; x += 128, n++) { c.beginPath(); c.moveTo(x, 0); c.lineTo(x, Hm); c.stroke(); c.fillText(String(n), x + 3, 14); }
+  for (let y = 64, n = 31; y < Hm; y += 128, n--) { c.beginPath(); c.moveTo(0, y); c.lineTo(Wm, y); c.stroke(); c.fillText(String(n), 4, y - 3); }
+  c.fillStyle = 'rgba(40,36,30,.85)'; c.font = '20px "Special Elite"'; c.fillText('1 : 25 000   Blatt 3552', Wm - 300, Hm - 18);
+  // grease pencil: enemy line (red) and own attacks (blue). Wax is raised and glossier than the paper.
+  const pencil = (style, w, pts, arrow) => {
+    for (const [ctx, s, ww] of [[c, style, w], [g, 'rgb(105,105,105)', w], [h, 'rgba(200,200,200,.6)', w]]) { ctx.strokeStyle = s; ctx.lineWidth = ww; ctx.lineCap = 'round'; ctx.beginPath(); pts.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])); ctx.stroke();
+      if (arrow) { const [a, b] = [pts[pts.length - 2], pts[pts.length - 1]], ang = Math.atan2(b[1] - a[1], b[0] - a[0]); ctx.fillStyle = s; ctx.beginPath(); ctx.moveTo(b[0] + Math.cos(ang) * 22, b[1] + Math.sin(ang) * 22); ctx.lineTo(b[0] + Math.cos(ang + 2.3) * 24, b[1] + Math.sin(ang + 2.3) * 24); ctx.lineTo(b[0] + Math.cos(ang - 2.3) * 24, b[1] + Math.sin(ang - 2.3) * 24); ctx.closePath(); ctx.fill(); } } };
+  const front = []; for (let k = 0; k <= 30; k++) { const t = k / 30; front.push([120 + t * 800, 230 + Math.sin(t * 7) * 40 + t * 60]); }
+  pencil('rgba(168,32,24,.92)', 6, front);
+  for (let k = 1; k < 30; k += 3) { const [x, y] = front[k]; for (const [ctx, s] of [[c, 'rgba(168,32,24,.92)'], [g, 'rgb(105,105,105)']]) { ctx.strokeStyle = s; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(x, y - 6, 9, Math.PI, 0); ctx.stroke(); } }
+  pencil('rgba(32,62,138,.92)', 7, [[200, 560], [260, 470], [330, 380], [380, 320]], true);
+  pencil('rgba(32,62,138,.92)', 7, [[640, 600], [610, 520], [600, 450], [620, 380]], true);
+  // creases from folding in thirds and half
+  for (const fx of [Wm / 3, Wm * 2 / 3]) { c.fillStyle = 'rgba(90,70,40,.18)'; c.fillRect(fx - 1, 0, 2, Hm); c.fillStyle = 'rgba(255,255,240,.18)'; c.fillRect(fx + 1, 0, 2, Hm); }
+  c.fillStyle = 'rgba(90,70,40,.18)'; c.fillRect(0, Hm / 2 - 1, Wm, 2);
+  h.filter = 'blur(3px)'; h.fillStyle = 'rgba(40,40,40,.9)'; for (const fx of [Wm / 3, Wm * 2 / 3]) h.fillRect(fx - 2, 0, 4, Hm); h.fillStyle = 'rgba(230,230,230,.9)'; h.fillRect(0, Hm / 2 - 2, Wm, 4); h.filter = 'none';
+  // large-scale waviness: panels between folds bow out, bottom edge lifts away from the wall between the pins
+  const disp = mkCanvas(256, 166), d = disp.getContext('2d'), di = d.createImageData(256, 166);
+  for (let y = 0; y < 166; y++) for (let x = 0; x < 256; x++) {
+    const u = x / 256, v = y / 166, panelU = Math.sin((u * 3 % 1) * Math.PI), panelV = Math.sin((v * 2 % 1) * Math.PI);
+    const lift = smooth(.8, 1, v) * Math.sin(u * Math.PI) * .8, val = clamp(panelU * panelV * .35 + N.at(u * 2, v * 2) * .25 + lift), i = (y * 256 + x) * 4;
+    di.data[i] = di.data[i + 1] = di.data[i + 2] = val * 255; di.data[i + 3] = 255; }
+  d.putImageData(di, 0, 0);
+  // fine normal = fibres + wax + creases, plus the bends of the displacement
+  const hn = mkCanvas(Wm, Hm), hnc = hn.getContext('2d'); hnc.drawImage(fine, 0, 0); hnc.globalAlpha = .55; hnc.globalCompositeOperation = 'overlay'; hnc.drawImage(disp, 0, 0, Wm, Hm);
+  SH.mapCol = col; SH.mapRgh = rgh; SH.mapDisp = disp; SH.mapNrm = heightToNormal(hn, 2.4);
+}
+/* scratched, tarnished PBR for cartridge parts: colour, ORM (G rough, B metal), normal. UV: u around, v along the round */
+function roundTex(kind, seed) {
+  const S = 256, N = SH.noise, r = rngf(seed);
+  const P = { brass: { base: [198, 150, 72], tar: [118, 86, 40], rough: .26, metal: 1 }, copper: { base: [178, 100, 58], tar: [96, 52, 34], rough: .3, metal: 1 },
+              lacquer: { base: [76, 74, 52], tar: [52, 50, 36], rough: .48, metal: .35 } }[kind];
+  const col = mkCanvas(S, S), c = col.getContext('2d'), orm = mkCanvas(S, S), o = orm.getContext('2d'), hgt = mkCanvas(S, S), h = hgt.getContext('2d');
+  const ci = c.createImageData(S, S), oi = o.createImageData(S, S), hi = h.createImageData(S, S);
+  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+    const u = x / S, v = y / S, n = N.at(u * 2 + seed * .1, v * 4), streak = N.at(u * 48, v * 1.2 + seed * .07), tar = clamp((N.at(u * 3 + .4 + seed * .13, v * 3 + .2) - .58) * 3.5);
+    const k = .9 + n * .14 + (streak - .5) * .12, i = (y * S + x) * 4;
+    ci.data[i] = lerp(P.base[0], P.tar[0], tar * .8) * k; ci.data[i + 1] = lerp(P.base[1], P.tar[1], tar * .8) * k; ci.data[i + 2] = lerp(P.base[2], P.tar[2], tar * .8) * k; ci.data[i + 3] = 255;
+    oi.data[i] = 255; oi.data[i + 1] = clamp(P.rough + tar * .3 + (streak - .5) * .1) * 255; oi.data[i + 2] = P.metal * 255; oi.data[i + 3] = 255;
+    hi.data[i] = hi.data[i + 1] = hi.data[i + 2] = 140 + (streak - .5) * 40; hi.data[i + 3] = 255;
+  }
+  c.putImageData(ci, 0, 0); o.putImageData(oi, 0, 0); h.putImageData(hi, 0, 0);
+  c.lineCap = o.lineCap = h.lineCap = 'round';
+  for (let k = 0; k < 46; k++) {                       // handling scratches, mostly along the round
+    const x = r() * S, y = r() * S, a = Math.PI / 2 + (r() - .5) * (r() < .8 ? .35 : 2.5), l = 10 + r() * 90, w = .5 + r() * .9;
+    const x2 = x + Math.cos(a) * l, y2 = y + Math.sin(a) * l;
+    const bright = kind === 'lacquer' ? 'rgba(150,150,146,.75)' : (kind === 'brass' ? 'rgba(250,214,150,.6)' : 'rgba(240,160,120,.55)');
+    for (const [ctx, s] of [[c, bright], [o, `rgba(255,${kind === 'lacquer' ? 70 : 40},255,.8)`], [h, 'rgba(60,60,60,.8)']]) { ctx.strokeStyle = s; ctx.lineWidth = w; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x2, y2); ctx.stroke(); }
+  }
+  for (let k = 0; k < (kind === 'lacquer' ? 14 : 6); k++) {   // chips (bare steel through lacquer) and dings
+    const x = r() * S, y = r() * S, s = 1.5 + r() * 4;
+    if (kind === 'lacquer') { c.fillStyle = 'rgb(140,140,135)'; c.beginPath(); c.arc(x, y, s, 0, 6.28); c.fill(); o.fillStyle = 'rgb(255,80,255)'; o.beginPath(); o.arc(x, y, s, 0, 6.28); o.fill(); }
+    const gd = h.createRadialGradient(x, y, 0, x, y, s * 1.6); gd.addColorStop(0, 'rgba(70,70,70,.9)'); gd.addColorStop(1, 'rgba(70,70,70,0)'); h.fillStyle = gd; h.fillRect(x - s * 2, y - s * 2, s * 4, s * 4);
+  }
+  return { col, orm, nrm: heightToNormal(hgt, 2.5) };
+}
+function buildSoot() {
+  const cv = mkCanvas(512, 512), c = cv.getContext('2d'), im = c.createImageData(512, 512), N = SH.noise;
+  for (let y = 0; y < 512; y++) for (let x = 0; x < 512; x++) { const u = x / 512, v = y / 512; const d = Math.max(Math.abs(u - .5) / .42, Math.abs(v - .5) / .45);
+    const a = clamp((1 - d) * 3) * clamp(N.at(u * 3, v * 3) * 1.1 + .25), i = (y * 512 + x) * 4; im.data[i] = im.data[i + 1] = im.data[i + 2] = a * 255; im.data[i + 3] = 255; }
+  c.putImageData(im, 0, 0); SH.soot = cv;
+}
+
+/* ---------------- stamp artwork ---------------- */
+function fitText(ctx, text, maxW, capH, font, spacing) {
+  const fs = capH / .74; ctx.font = `${font.w} ${fs}px "${font.f}"`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  if ('letterSpacing' in ctx) ctx.letterSpacing = spacing || '0px';
+  const tw = ctx.measureText(text).width; ctx.save(); ctx.scale(Math.min(1, maxW / tw), 1); ctx.fillText(text, 0, capH * .05); ctx.restore();
+  if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
+}
+const OSW = { w: 700, f: 'Oswald' };
+function drawDesign(ctx, d, w, h, color, lettersOnly) {
+  ctx.save(); ctx.fillStyle = color; ctx.strokeStyle = color;
+  if (!lettersOnly) {
+    const lw = h * .075; ctx.lineWidth = lw; ctx.strokeRect(-w / 2 + lw / 2, -h / 2 + lw / 2, w - lw, h - lw);
+    const ins = h * .15; ctx.lineWidth = h * .028; ctx.strokeRect(-w / 2 + ins, -h / 2 + ins, w - 2 * ins, h - 2 * ins);
+  }
+  fitText(ctx, d.word, w * .8, h * .5, OSW, `${h * .05}px`);
+  ctx.restore();
+}
+
+/* ---------------- paper texture ---------------- */
+function wrapText(ctx, text, x, y, maxW, lh) {
+  const words = text.split(' '); let line = '';
+  for (const w of words) { const t = line ? line + ' ' + w : w; if (ctx.measureText(t).width > maxW && line) { ctx.fillText(line, x, y); y += lh; line = w; } else line = t; }
+  ctx.fillText(line, x, y); return y + lh;
+}
+function paperCanvas() {
+  const cv = mkCanvas(CW, CH), c = cv.getContext('2d');
+  const g = c.createLinearGradient(0, 0, 0, CH); g.addColorStop(0, '#e3dac6'); g.addColorStop(1, '#d4c9b1'); c.fillStyle = g; c.fillRect(0, 0, CW, CH);
+  c.globalAlpha = .22; c.globalCompositeOperation = 'multiply'; c.drawImage(SH.noise.cv, 0, 0, CW, CH); c.globalAlpha = .1; c.drawImage(SH.noise.cv, 0, 0, CW / 3, CH / 3); c.drawImage(SH.noise.cv, CW / 3, 0, CW / 3, CH / 3);
+  c.globalCompositeOperation = 'source-over'; c.globalAlpha = 1;
+  const rg = c.createRadialGradient(CW / 2, CH / 2, CW * .35, CW / 2, CH / 2, CH * .75); rg.addColorStop(0, 'rgba(120,90,40,0)'); rg.addColorStop(1, 'rgba(120,90,40,.3)'); c.fillStyle = rg; c.fillRect(0, 0, CW, CH);
+  for (const fy of [CH / 3, CH * 2 / 3]) { c.fillStyle = 'rgba(90,70,40,.16)'; c.fillRect(0, fy - 1, CW, 2); c.fillStyle = 'rgba(255,255,255,.25)'; c.fillRect(0, fy + 1, CW, 2); }
+  c.fillStyle = '#2b2723'; c.font = '24px "Special Elite"'; c.textBaseline = 'alphabetic';
+  c.textAlign = 'left'; c.fillText('HQ · OPERATIONS SECTION', 90, 110); c.textAlign = 'right'; c.fillText('COPY 3 OF 5', CW - 90, 110);
+  c.fillRect(90, 126, CW - 180, 2); c.textAlign = 'left';
+  c.font = '50px "Special Elite"'; c.fillText('OPERATIONAL ORDER No. 14', 90, 210);
+  c.font = '30px "Special Elite"'; c.fillStyle = '#4b443a'; c.fillText('Subject: Breaking the enemy line', 90, 262);
+  c.fillStyle = '#2b2723'; let y = 340;
+  const paras = ['1. Enemy holds the bunker belt between the lakes with ███████ and armour in reserve behind the second line.',
+    '2. Division attacks at first light, takes the ████████ crossing and holds it until relieved by the follow-on regiment.',
+    '3. Artillery fires on the marked bunkers from H-10 and lifts on the flare signal. Engineers clear the anti-tank ditch at points B and C.',
+    '4. Supply points open at the depot once the crossing is held.',
+    '5. Report on completion to ██████ by field telephone or runner.'];
+  for (const p of paras) y = wrapText(c, p, 90, y, CW - 180, 46) + 22;
+  c.font = '24px "Special Elite"'; c.fillText('Signed: ____________________', 90, CH - 120); c.textAlign = 'right'; c.fillText('Received: 06:40', CW - 90, CH - 120);
+  return cv;
+}
+
+/* ---------------- materials ---------------- */
+function roundMat(R) { const orm = tex(R.orm); return new T.MeshStandardMaterial({ map: tex(R.col, { srgb: true }), roughnessMap: orm, metalnessMap: orm, normalMap: tex(R.nrm), normalScale: new T.Vector2(.8, .8), roughness: 1, metalness: 1 }); }
+function tex(cv, opts = {}) { const t = new T.CanvasTexture(cv); if (opts.srgb) t.encoding = T.sRGBEncoding; if (opts.rep) { t.wrapS = t.wrapT = T.RepeatWrapping; t.repeat.set(opts.rep, opts.rep); } t.anisotropy = 8; return t; }
+const MAT = {
+  oxide: () => new T.MeshStandardMaterial({ color: 0x24272a, metalness: .9, roughness: 1, roughnessMap: tex(SH.rough, { rep: 2 }) }),
+  brass: () => new T.MeshStandardMaterial({ color: 0xb48f48, metalness: 1, roughness: .3 }),
+  chrome: () => new T.MeshStandardMaterial({ color: 0xa5abb0, metalness: 1, roughness: .22 }),
+  knurl: () => { const n = tex(SH.knurl, { rep: 1 }); n.repeat.set(5, 3); return new T.MeshStandardMaterial({ color: 0x3a3d40, metalness: .95, roughness: .42, normalMap: n, normalScale: new T.Vector2(1.2, 1.2) }); },
+  rubber: () => new T.MeshStandardMaterial({ color: 0x2c0f0b, roughness: .85 }),
+  blued: () => new T.MeshStandardMaterial({ color: 0x141619, metalness: .85, roughness: 1, roughnessMap: tex(SH.rough, { rep: .08 }), envMapIntensity: .6 }),
+  phosphate: () => new T.MeshStandardMaterial({ color: 0x1d1f1e, metalness: .45, roughness: .62, envMapIntensity: .6 }),
+  bakelite: () => new T.MeshStandardMaterial({ color: 0x2b1711, metalness: 0, roughness: .4 }),
+  beech: () => new T.MeshPhysicalMaterial({ map: tex(SH.walnut, { srgb: true, rep: .035 }), color: 0xc9b8a6, roughness: .55, clearcoat: .3, clearcoatRoughness: .4 }),
+  caseBrass: () => roundMat(SH.round.brass),
+  caseSteel: () => roundMat(SH.round.lacquer),
+  copper: () => roundMat(SH.round.copper),
+  enamel: () => new T.MeshStandardMaterial({ color: 0x2b3829, metalness: .25, roughness: .42 })
+};
+
+/* ---------------- geometry helpers ---------------- */
+function rrShape(w, d, r) { const s = new T.Shape(), x = -w / 2, y = -d / 2; s.moveTo(x + r, y); s.lineTo(x + w - r, y); s.quadraticCurveTo(x + w, y, x + w, y + r); s.lineTo(x + w, y + d - r); s.quadraticCurveTo(x + w, y + d, x + w - r, y + d); s.lineTo(x + r, y + d); s.quadraticCurveTo(x, y + d, x, y + d - r); s.lineTo(x, y + r); s.quadraticCurveTo(x, y, x + r, y); return s; }
+function blockGeo(w, d, h, r, b) {
+  const g = new T.ExtrudeGeometry(rrShape(w - 2 * b, d - 2 * b, r), { depth: h - 2 * b, bevelEnabled: true, bevelThickness: b, bevelSize: b, bevelSegments: 3, curveSegments: 10 });
+  g.rotateX(-Math.PI / 2); g.translate(0, b, 0); return g;
+}
+const lathe = (pts, s = 1, seg = 56) => new T.LatheGeometry(pts.map(p => new T.Vector2(p[0] * s, p[1] * s)), seg);
+const mesh = (g, m) => { const o = new T.Mesh(g, m); o.castShadow = true; o.receiveShadow = true; return o; };
+const polyShape = pts => { const s = new T.Shape(); pts.forEach((p, i) => i ? s.lineTo(p[0], p[1]) : s.moveTo(p[0], p[1])); s.closePath(); return s; };
+function ext(shape, depth, mat, bevel = .25) {
+  const g = new T.ExtrudeGeometry(shape, { depth: Math.max(.01, depth - 2 * bevel), bevelEnabled: true, bevelThickness: bevel, bevelSize: bevel, bevelSegments: 2, curveSegments: 10 });
+  g.translate(0, 0, -(depth - 2 * bevel) / 2); return mesh(g, mat);
+}
+function cylX(len, r, x0, y, mat) { const g = new T.CylinderGeometry(r, r, len, 28); g.rotateZ(Math.PI / 2); g.translate(x0 + len / 2, y, 0); return mesh(g, mat); }
+function cylBetween(a, b, r, mat) { const A = new T.Vector3(...a), B = new T.Vector3(...b), d = B.clone().sub(A), g = new T.CylinderGeometry(r, r, d.length(), 20); const m = mesh(g, mat);
+  m.position.copy(A).add(B).multiplyScalar(.5); m.quaternion.setFromUnitVectors(new T.Vector3(0, 1, 0), d.normalize()); return m; }
+// lay a side-profile model (x along gun, y up, z thickness) flat on the desk
+function layFlat(sub, halfThick, flip) { const g = new T.Group(); sub.rotation.x = flip ? Math.PI / 2 : -Math.PI / 2; sub.position.y = halfThick; g.add(sub); return g; }
+
+/* ---------------- the game's own MP40 and StG 44: geometry + PBR maps exported from Unreal ---------------- */
+async function loadWeapon(name) {
+  const base = 'steel_seal_assets/' + name;
+  const meta = await (await fetch(base + '.json')).json();
+  const bytes = Uint8Array.from(atob(meta.data), ch => ch.charCodeAt(0)), buf = bytes.buffer;
+  const n = meta.vertexCount; let o = 0;
+  const pos = new Float32Array(buf, o, n * 3); o += n * 12;
+  const nrm = new Float32Array(buf, o, n * 3); o += n * 12;
+  const uv = new Float32Array(buf, o, n * 2); o += n * 8;
+  const idx = new Uint32Array(buf, o, meta.indexCount);
+  const geo = new T.BufferGeometry();
+  geo.setAttribute('position', new T.BufferAttribute(pos, 3)); geo.setAttribute('normal', new T.BufferAttribute(nrm, 3));
+  geo.setAttribute('uv', new T.BufferAttribute(uv, 2)); geo.setAttribute('uv2', new T.BufferAttribute(uv, 2)); geo.setIndex(new T.BufferAttribute(idx, 1));
+  const img = src => new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = () => rej(new Error('image ' + src)); im.src = src; });
+  const [c, nm, orm] = await Promise.all([img(base + '_color.jpg'), img(base + '_normal.jpg'), img(base + '_orm.jpg')]);
+  return { meta, geo, c, nm, orm };
+}
+// lay a weapon on its side: model x = along the gun, y = up, z = thickness (cm); flip picks which side faces up
+function weaponOnDesk(Wp, flip) {
+  const t = (im, srgb) => { const x = new T.Texture(im); x.flipY = false; if (srgb) x.encoding = T.sRGBEncoding; x.anisotropy = 8; x.needsUpdate = true; return x; };
+  const orm = t(Wp.orm);
+  const m = new T.MeshStandardMaterial({ map: t(Wp.c, true), normalMap: t(Wp.nm), aoMap: orm, roughnessMap: orm, metalnessMap: orm, roughness: 1, metalness: 1, envMapIntensity: .9 });
+  const o = new T.Mesh(Wp.geo, m); o.castShadow = true; o.receiveShadow = true; o.scale.setScalar(.1);
+  o.rotation.x = flip ? Math.PI / 2 : -Math.PI / 2;
+  o.position.y = (flip ? Wp.meta.max[2] : -Wp.meta.min[2]) * .1 + .002;
+  const g = new T.Group(); g.add(o); return g;
+}
+const CASE9 = [[0, 0], [.049, 0], [.049, .007], [.043, .011], [.043, .019], [.049, .024], [.049, .19], [0, .19]];
+const CASEK = [[0, 0], [.059, 0], [.059, .008], [.052, .013], [.052, .022], [.059, .028], [.059, .24], [.046, .29], [.042, .33], [0, .33]];
+function round9(standing, mats) {
+  const g = new T.Group(), c = mesh(lathe(CASE9, 1, 32), mats.brass), b = mesh(lathe([[0, 0], [.045, 0], [.045, .03], [.035, .07], [.018, .095], [0, .105]], 1, 32), mats.copper);
+  b.position.y = .19; const inner = new T.Group(); inner.add(c, b);
+  if (!standing) { inner.rotation.z = Math.PI / 2; inner.position.set(.15, .049, 0); }
+  g.add(inner); return g;
+}
+function roundKurz(standing, mats) {
+  const g = new T.Group(), c = mesh(lathe(CASEK, 1, 32), mats.steel), b = mesh(lathe([[0, 0], [.041, 0], [.041, .05], [.028, .11], [.012, .145], [0, .15]], 1, 32), mats.copper);
+  b.position.y = .33; const inner = new T.Group(); inner.add(c, b);
+  if (!standing) { inner.rotation.z = Math.PI / 2; inner.position.set(.24, .059, 0); }
+  g.add(inner); return g;
+}
+// place rounds so no two touch: each round's footprint is a chain of circles, checked against all placed ones and keep-out boxes
+function scatterRounds(scene, am, seed, keepOut) {
+  const r = rngf(seed), placed = [];
+  const fits = cs => cs.every(([x, z, rr]) => placed.every(([px, pz, pr]) => Math.hypot(x - px, z - pz) > rr + pr + .012)
+    && keepOut.every(b => x + rr < b[0] || x - rr > b[1] || z + rr < b[2] || z - rr > b[3]));
+  const lying = (x, z, yaw, len, rad) => { const ax = Math.cos(yaw), az = -Math.sin(yaw), n = Math.max(2, Math.ceil(len / (rad * 1.4)));
+    return Array.from({ length: n }, (_, i) => { const s = (i / (n - 1) - .5) * (len - 2 * rad); return [x + ax * s, z + az * s, rad]; }); };
+  // rounds sit a hair into the desk so the contact line never shows a gap; a soft contact shadow grounds each one
+  const contactMat = new T.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: .92, alphaMap: tex(SH.contact), depthWrite: false });
+  const add = (o, x, z, yaw, cs, fp) => { placed.push(...cs); o.position.set(x, -.002, z); o.rotation.y = yaw;
+    const sh = new T.Mesh(new T.PlaneGeometry(fp[0], fp[1]), contactMat); sh.rotation.x = -Math.PI / 2; sh.position.y = .0035; sh.renderOrder = 1; o.add(sh); scene.add(o); };
+  const scatter = (make, len, rad, region, count) => { for (let k = 0; k < count; k++) for (let tries = 0; tries < 120; tries++) {
+    const x = lerp(region[0], region[1], r()), z = lerp(region[2], region[3], r()), yaw = r() * Math.PI * 2, cs = lying(x, z, yaw, len, rad);
+    if (fits(cs)) { add(make(false, am), x, z, yaw, cs, [len + .05, rad * 2 + .05]); break; } } };
+  for (let i = 0; i < 4; i++) { const x = -1.75 + (i % 2) * .112, z = 1.05 + Math.floor(i / 2) * .112; add(round9(true, am), x, z, r() * 6.28, [[x, z, .049]], [.15, .15]); }
+  for (const [x, z] of [[1.85, -1.25], [1.985, -1.2]]) add(roundKurz(true, am), x, z, r() * 6.28, [[x, z, .059]], [.17, .17]);
+  scatter(round9, .297, .049, [-2.2, -1.25, .45, 2.0], 10);
+  scatter(roundKurz, .48, .059, [1.4, 2.7, .6, 2.3], 7);
+}
+function lamp(base, shadeAt, target) {
+  const g = new T.Group(), en = MAT.enamel(), ch = MAT.chrome();
+  const b = mesh(lathe([[0, 0], [.55, 0], [.56, .05], [.48, .13], [.14, .16], [.1, .22], [0, .22]]), en); b.position.set(...base); g.add(b);
+  const joint = [base[0] + .25, 1.75, base[2] + .3];
+  g.add(cylBetween([base[0], .2, base[2]], joint, .045, ch), cylBetween(joint, shadeAt, .04, ch));
+  const jb = mesh(new T.SphereGeometry(.08, 16, 12), en); jb.position.set(...joint); g.add(jb);
+  const shade = new T.Group(); shade.position.set(...shadeAt);
+  const dir = new T.Vector3(...target).sub(new T.Vector3(...shadeAt)).normalize(); shade.quaternion.setFromUnitVectors(new T.Vector3(0, 1, 0), dir);
+  const outer = mesh(lathe([[.09, -.12], [.12, -.05], [.33, .3], [.37, .34]], 1, 48), new T.MeshStandardMaterial({ color: 0x2b3829, metalness: .25, roughness: .42, side: T.FrontSide }));
+  const inner = new T.Mesh(lathe([[.085, -.11], [.115, -.045], [.322, .3], [.36, .335]], 1, 48), new T.MeshStandardMaterial({ color: 0xf2ead8, roughness: .5, side: T.BackSide, emissive: 0xffd9a0, emissiveIntensity: .35 }));
+  const bulb = new T.Mesh(new T.SphereGeometry(.09, 20, 14), new T.MeshStandardMaterial({ color: 0xffffff, emissive: 0xffd9a0, emissiveIntensity: 2.6 })); bulb.position.y = .02;
+  shade.add(outer, inner, bulb); g.add(shade);
+  return { g, bulbPos: new T.Vector3(0, .1, 0).applyQuaternion(shade.quaternion).add(shade.position), dir };
+}
+
+/* ---------------- the stamp ---------------- */
+function buildFace(design, inkCss, fw, fd, readable) {
+  const S = 1024, Hc = Math.round(S * fd / fw);
+  const sharp = mkCanvas(S, Hc), sc = sharp.getContext('2d'); sc.fillStyle = '#000'; sc.fillRect(0, 0, S, Hc);
+  // the tip-up pose shows the face's local -z as "up", so the readable face is the print layout without the vertical flip
+  sc.translate(S / 2, Hc / 2); sc.scale(1, readable ? 1 : -1); drawDesign(sc, design, S * .96, Hc * .96, '#fff');
+  const soft = mkCanvas(S, Hc), so = soft.getContext('2d'); so.filter = 'blur(2px)'; so.drawImage(sharp, 0, 0);
+  const ld = sharp.getContext('2d').getImageData(0, 0, S, Hc);
+  const col = mkCanvas(S, Hc), cc = col.getContext('2d'); cc.fillStyle = '#4c1a13'; cc.fillRect(0, 0, S, Hc);
+  cc.globalAlpha = .25; cc.globalCompositeOperation = 'multiply'; cc.drawImage(SH.noise.cv, 0, 0, S, Hc); cc.globalAlpha = 1; cc.globalCompositeOperation = 'source-over';
+  const inkL = mkCanvas(S, Hc), il = inkL.getContext('2d'), id = il.createImageData(S, Hc), ic = new T.Color(inkCss);
+  for (let i = 0; i < ld.data.length; i += 4) { id.data[i] = ic.r * 255; id.data[i + 1] = ic.g * 255; id.data[i + 2] = ic.b * 255; id.data[i + 3] = ld.data[i]; }
+  il.putImageData(id, 0, 0); cc.drawImage(inkL, 0, 0);
+  const rough = mkCanvas(S, Hc), rc = rough.getContext('2d'), rd = rc.createImageData(S, Hc);
+  for (let i = 0; i < ld.data.length; i += 4) { const v = lerp(220, 70, ld.data[i] / 255); rd.data[i] = rd.data[i + 1] = rd.data[i + 2] = v; rd.data[i + 3] = 255; }
+  rc.putImageData(rd, 0, 0);
+  const geo = new T.PlaneGeometry(fw, fd, 320, Math.round(320 * fd / fw)); geo.rotateX(Math.PI / 2);
+  const m = new T.MeshPhysicalMaterial({ map: tex(col, { srgb: true }), roughnessMap: tex(rough), normalMap: tex(heightToNormal(soft, 6)), displacementMap: tex(soft), displacementScale: .035, roughness: 1, metalness: 0, clearcoat: .7, clearcoatMap: tex(sharp), clearcoatRoughness: .14 });
+  const f = mesh(geo, m); f.position.y = .035; return f;
+}
+function buildStamp(design, inkCss, fw, fd) {
+  const g = new T.Group(); g.rotation.order = 'YXZ';
+  const mirrored = buildFace(design, inkCss, fw, fd, false), readable = buildFace(design, inkCss, fw, fd, true); readable.visible = false;
+  g.add(mirrored, readable); g.userData.faces = [mirrored, readable];
+  const back = mesh(new T.BoxGeometry(fw + .04, .05, fd + .04), MAT.rubber()); back.position.y = .06; g.add(back);
+  const base = .085;
+  const blk = mesh(blockGeo(fw + .12, fd + .12, .2, .05, .03), MAT.oxide()); blk.position.y = base; g.add(blk);
+  const col = mesh(blockGeo(fw - .1, fd - .12, .07, .05, .015), MAT.brass()); col.position.y = base + .2; g.add(col);
+  const neck = mesh(new T.CylinderGeometry(.11, .14, .24, 48), MAT.oxide()); neck.position.y = base + .39; g.add(neck);
+  const fer = mesh(new T.CylinderGeometry(.16, .16, .08, 48), MAT.brass()); fer.position.y = base + .55; g.add(fer);
+  const grip = mesh(new T.CylinderGeometry(.165, .165, .62, 48, 1), MAT.knurl()); grip.position.y = base + .9; g.add(grip);
+  const cap = mesh(new T.SphereGeometry(.18, 48, 24, 0, Math.PI * 2, 0, Math.PI / 2), MAT.chrome()); cap.scale.y = .55; cap.position.y = base + 1.21; g.add(cap);
+  return g;
+}
+
+/* ---------------- ink tin: stamped steel tray in worn enamel, hinged lid with a paper label, felt pad soaked in ink ---------------- */
+function buildTinMaps() {
+  const S = 512, N = SH.noise, r = rngf(23);
+  const col = mkCanvas(S, S), orm = mkCanvas(S, S), hgt = mkCanvas(S, S);
+  const c = col.getContext('2d'), o = orm.getContext('2d'), h = hgt.getContext('2d');
+  const ci = c.createImageData(S, S), oi = o.createImageData(S, S), hi = h.createImageData(S, S);
+  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+    const u = x / S, v = y / S, n = N.at(u * 3, v * 3), f = N.at(u * 30, v * 30);
+    const wear = clamp((N.at(u * 4 + .2, v * 4 + .7) * .75 + f * .25 - .74) * 6), rr = clamp((N.at(u * 5 + .5, v * 5 + .1) - .84) * 6);
+    let R = 30 * (.9 + n * .18), G = 37 * (.9 + n * .18), B = 32 * (.9 + n * .18);                       // dark green enamel
+    R = lerp(R, 118 + f * 30, wear); G = lerp(G, 119 + f * 30, wear); B = lerp(B, 121 + f * 30, wear);   // bare steel
+    R = lerp(R, 70, rr); G = lerp(G, 38, rr); B = lerp(B, 20, rr);                                       // rust
+    const i = (y * S + x) * 4;
+    ci.data[i] = R; ci.data[i + 1] = G; ci.data[i + 2] = B; ci.data[i + 3] = 255;
+    oi.data[i] = 255; oi.data[i + 1] = clamp(lerp(lerp(.3, .42, wear), .9, rr) + (f - .5) * .08) * 255; oi.data[i + 2] = lerp(0, .9, wear) * (1 - rr) * 255; oi.data[i + 3] = 255;
+    hi.data[i] = hi.data[i + 1] = hi.data[i + 2] = 128 - wear * 26 + (f - .5) * 16 - rr * 20; hi.data[i + 3] = 255;
+  }
+  c.putImageData(ci, 0, 0); o.putImageData(oi, 0, 0); h.putImageData(hi, 0, 0);
+  c.lineCap = o.lineCap = h.lineCap = 'round';
+  for (let k = 0; k < 26; k++) { const x = r() * S, y = r() * S, a = r() * Math.PI, l = 8 + r() * r() * 70, w = .4 + r() * .5;
+    for (const [ctx, s] of [[c, 'rgba(140,140,136,.35)'], [o, 'rgba(255,70,235,.6)'], [h, 'rgba(80,80,80,.6)']]) { ctx.strokeStyle = s; ctx.lineWidth = w; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l); ctx.stroke(); } }
+  for (let k = 0; k < 4; k++) { const x = r() * S, y = r() * S, s = 10 + r() * 22;                          // old ink smears (dry, matte)
+    const g = c.createRadialGradient(x, y, 0, x, y, s); g.addColorStop(0, 'rgba(62,10,8,.75)'); g.addColorStop(1, 'rgba(62,10,8,0)'); c.fillStyle = g; c.fillRect(x - s, y - s, s * 2, s * 2);
+    o.fillStyle = 'rgba(255,200,0,.5)'; o.beginPath(); o.arc(x, y, s * .6, 0, 6.28); o.fill(); }
+  SH.tin = { col, orm, nrm: heightToNormal(hgt, 2.5) };
+  // paper label glued inside the lid (one per ink colour)
+  SH.tinLabel = {};
+  for (const [st, word] of [['victory', 'ROT'], ['defeat', 'SCHWARZ']]) {
+  const lb = mkCanvas(512, 180), l = lb.getContext('2d');
+  l.fillStyle = '#cfc3a2'; l.fillRect(0, 0, 512, 180); l.globalAlpha = .3; l.globalCompositeOperation = 'multiply'; l.drawImage(N.cv, 0, 0, 512, 180); l.globalAlpha = 1; l.globalCompositeOperation = 'source-over';
+  l.strokeStyle = '#3a2f24'; l.lineWidth = 4; l.strokeRect(10, 10, 492, 160); l.lineWidth = 1.5; l.strokeRect(20, 20, 472, 140);
+  l.fillStyle = '#2e261e'; l.textAlign = 'center'; l.font = '700 54px "Oswald"'; l.fillText('STEMPELKISSEN', 256, 86);
+  l.font = '24px "Special Elite"'; l.fillText(`Farbe: ${word}  ·  Nr. 2  ·  Feldbedarf`, 256, 130);
+  for (let k = 0; k < 4; k++) { const x = 60 + r() * 400, y = 30 + r() * 120, s = 14 + r() * 16; l.fillStyle = 'rgba(100,20,14,.18)'; l.beginPath(); l.ellipse(x, y, s, s * .75, r() * 3, 0, 6.28); l.fill(); }
+  const rg = l.createRadialGradient(256, 90, 60, 256, 90, 300); rg.addColorStop(0, 'rgba(90,60,20,0)'); rg.addColorStop(1, 'rgba(90,60,20,.45)'); l.fillStyle = rg; l.fillRect(0, 0, 512, 180);
+  SH.tinLabel[st] = lb; }
+}
+function feltPad(win, design) {
+  const Wp = 1024, Hp = 394, N = SH.noise, r = rngf(win ? 61 : 67);
+  const base = win ? [56, 5, 4] : [17, 15, 14], wet = win ? [28, 2, 2] : [6, 5, 5], dry = win ? [82, 20, 15] : [44, 41, 39];
+  const col = mkCanvas(Wp, Hp), orm = mkCanvas(Wp, Hp), hgt = mkCanvas(Wp, Hp);
+  const c = col.getContext('2d'), o = orm.getContext('2d'), h = hgt.getContext('2d');
+  const ci = c.createImageData(Wp, Hp), oi = o.createImageData(Wp, Hp), hi = h.createImageData(Wp, Hp);
+  for (let y = 0; y < Hp; y++) for (let x = 0; x < Wp; x++) {
+    const u = x / Wp, v = y / Hp, fib = N.at(u * 41 + .13, v * 15.6 + .27), fib2 = N.at(u * 17 + .3, v * 6.5 + .6), sat = N.at(u * 3 + .1, v * 1.2 + .4);
+    const d = Math.min(u, 1 - u, v * 2.6, (1 - v) * 2.6), dryEdge = 1 - smooth(0, .06, d), w = clamp(sat * 1.35 - .12 - dryEdge * .6);
+    const pool = clamp((w - .72) * 4), k = .9 + fib * .14 + (fib2 - .5) * .08, i = (y * Wp + x) * 4;
+    for (let ch = 0; ch < 3; ch++) ci.data[i + ch] = lerp(lerp(dry[ch], base[ch], w), wet[ch], pool) * k;
+    ci.data[i + 3] = 255;
+    oi.data[i] = 255; oi.data[i + 1] = clamp(lerp(.62, .14, w) - pool * .08 + (fib - .5) * .12) * 255; oi.data[i + 2] = 0; oi.data[i + 3] = 255;
+    hi.data[i] = hi.data[i + 1] = hi.data[i + 2] = 128 + (fib - .5) * 34 + (fib2 - .5) * 30; hi.data[i + 3] = 255;
+  }
+  c.putImageData(ci, 0, 0); o.putImageData(oi, 0, 0); h.putImageData(hi, 0, 0);
+  // where the stamp has been pressed in, the face lifted ink: drier, lighter, slightly sunken letters (plus an older, offset imprint)
+  const imprint = (dx, dy, rot, a) => { const fw = Wp * 1.85 / 2.11, fh = Hp * .64 / .81;
+    for (const [ctx, s, blur] of [[c, `rgba(${dry[0]},${dry[1]},${dry[2]},${a})`, 1], [o, `rgba(255,${200},0,${a})`, 1], [h, `rgba(60,60,60,${a})`, 2]]) {
+      ctx.save(); ctx.filter = `blur(${blur}px)`; ctx.translate(Wp / 2 + dx, Hp / 2 + dy); ctx.rotate(rot); drawDesign(ctx, design, fw, fh, s); ctx.restore(); } };
+  imprint(-34, 10, -.05, .1); imprint(0, 0, 0, .28);
+  const mat = new T.MeshPhysicalMaterial({ map: tex(col, { srgb: true }), roughnessMap: tex(orm), normalMap: tex(heightToNormal(hgt, 3)), normalScale: new T.Vector2(.5, .5),
+    roughness: 1, metalness: 0, clearcoat: .3, clearcoatRoughness: .16, envMapIntensity: .45 });
+  const g = new T.PlaneGeometry(2.11, .81); g.rotateX(-Math.PI / 2);
+  const m = new T.Mesh(g, mat); m.receiveShadow = true; return m;
+}
+function buildInkTin(win, design) {
+  const g = new T.Group(), rep = .45;
+  const ormT = tex(SH.tin.orm, { rep }), paint = new T.MeshStandardMaterial({ map: tex(SH.tin.col, { srgb: true, rep }), roughnessMap: ormT, metalnessMap: ormT, normalMap: tex(SH.tin.nrm, { rep }), roughness: 1, metalness: 1, envMapIntensity: .85 });
+  const walls = (w, d, hgt, inset) => { const s = rrShape(w, d, .08); s.holes.push(rrShape(w - inset * 2, d - inset * 2, .05));
+    const geo = new T.ExtrudeGeometry(s, { depth: hgt, bevelEnabled: true, bevelThickness: .008, bevelSize: .008, bevelSegments: 2, curveSegments: 10 }); geo.rotateX(-Math.PI / 2); geo.translate(0, .008, 0); return geo; };
+  g.add(mesh(walls(2.25, .95, .09, .06), paint), mesh(blockGeo(2.2, .9, .012, .07, .004), paint));
+  const feltSide = mesh(new T.BoxGeometry(2.11, .07, .81), new T.MeshStandardMaterial({ color: win ? 0x2a0503 : 0x0a0909, roughness: .8 })); feltSide.position.y = .048; g.add(feltSide);
+  const pad = feltPad(win, design); pad.position.y = .0835; g.add(pad);
+  // lid, hinged at the back edge and opened past vertical so its label faces the camera
+  const hinge = new T.Group(); hinge.position.set(0, .1, -.475); hinge.rotation.x = -(Math.PI / 2 + .38); g.add(hinge);
+  const lw = walls(2.25, .95, .04, .05); lw.translate(0, 0, .475); hinge.add(mesh(lw, paint));
+  const plate = blockGeo(2.25, .95, .012, .08, .004); plate.translate(0, .05, .475); hinge.add(mesh(plate, paint));
+  const lg = new T.PlaneGeometry(1.5, .53); lg.rotateX(Math.PI / 2);
+  const label = new T.Mesh(lg, new T.MeshStandardMaterial({ map: tex(SH.tinLabel[win ? 'victory' : 'defeat'], { srgb: true }), roughness: .85 })); label.position.set(0, .047, .475); label.receiveShadow = true; hinge.add(label);
+  return g;
+}
+
+/* ---------------- paper with ink + burn ---------------- */
+function paperMesh(U) {
+  const m = new T.MeshStandardMaterial({ map: U.paperTex, roughness: .93, metalness: 0, bumpMap: U.inkHeight, bumpScale: 0 });
+  m.onBeforeCompile = sh => {
+    for (const k of Object.keys(U.u)) sh.uniforms[k] = U.u[k];
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec2 vBurnUv;').replace('#include <uv_vertex>', '#include <uv_vertex>\nvBurnUv = uv;');
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', `#include <common>
+varying vec2 vBurnUv; uniform sampler2D uInk; uniform sampler2D uNoise; uniform sampler2D uKeep;
+uniform float uInkA; uniform float uInkRough; uniform float uBurn; uniform float uKeepOn; uniform float uTime; uniform float uMaxD;
+uniform vec3 uInkColor; uniform vec2 uSize;`)
+      .replace('#include <map_fragment>', `#include <map_fragment>
+  vec2 bp = vBurnUv * uSize;
+  float n1 = texture2D(uNoise, vBurnUv * 1.3).r;
+  float n2 = texture2D(uNoise, vBurnUv * 4.1 + 0.37).r;
+  float fd = clamp(min(min(bp.x, uSize.x - bp.x), min(bp.y, uSize.y - bp.y)) / (uSize.x * 0.5), 0.0, 1.0);
+  float f = fd + (n1 - 0.5) * 0.34 + (n2 - 0.5) * 0.09 + smoothstep(0.3, 0.62, texture2D(uKeep, vBurnUv).r) * uKeepOn * 1.6;
+  float edge = f - uBurn;
+  if (edge < 0.0) discard;
+  float ink = smoothstep(0.08, 0.55, texture2D(uInk, vBurnUv).a) * uInkA;
+  vec3 inkC = uInkColor * (0.5 + 0.4 * texture2D(uNoise, vBurnUv * 7.0 + 0.2).r);
+  diffuseColor.rgb = mix(diffuseColor.rgb, inkC, ink * 0.95);
+  float scorch = 1.0 - smoothstep(0.0, 0.2, edge);
+  diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(0.5, 0.33, 0.18), scorch * 0.9);
+  float crawl = texture2D(uNoise, vBurnUv * 5.0 + vec2(uTime * 0.04, -uTime * 0.09)).r;
+  float charT = 1.0 - smoothstep(0.0, mix(0.06, 0.12, uKeepOn), edge);
+  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.03, 0.022, 0.018), charT);
+  float emberW = mix(0.028, 0.04 + crawl * 0.06, uKeepOn);
+  float emberT = 1.0 - smoothstep(0.0, emberW, edge);
+  float flick = max(0.25, 0.75 + 0.35 * sin(uTime * 11.0 + n2 * 40.0) * sin(uTime * 7.3 + n1 * 25.0));
+  vec3 hot = mix(vec3(1.0, 0.2, 0.03), vec3(1.0, 0.78, 0.4), pow(emberT, 3.0));
+  vec3 burnGlow = hot * emberT * flick * mix(4.5, 9.0, uKeepOn) * (0.6 + 0.8 * crawl);`)
+      .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n  roughnessFactor = mix(roughnessFactor, uInkRough + 0.12 * n2, ink);')
+      .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n  totalEmissiveRadiance += burnGlow;');
+  };
+  const geo = new T.PlaneGeometry(W, H); geo.rotateX(-Math.PI / 2);
+  const p = new T.Mesh(geo, m); p.receiveShadow = true; return p;
+}
+function inkCanvas(design, color, cx, cy, wPx, hPx, rot, splatter) {
+  const cv = mkCanvas(CW, CH), c = cv.getContext('2d');
+  const draw = (alpha, blur, spl) => { c.save(); c.filter = blur ? `blur(${blur}px)` : 'none'; c.globalAlpha = alpha; c.translate(cx, cy); c.rotate(rot); drawDesign(c, design, wPx, hPx, color);
+  if (spl) { const r = rngf(5); c.fillStyle = color; for (let i = 0; i < 46; i++) { const a = r() * Math.PI * 2, d = .55 + r() * .4; c.beginPath(); c.arc(Math.cos(a) * wPx * d * .62, Math.sin(a) * hPx * d * 1.05, 1 + r() * r() * 7, 0, Math.PI * 2); c.fill(); } }
+  c.restore(); };
+  draw(.16, 1.5, false);   // ink wicking into the paper fibres around each stroke
+  draw(1, 0, splatter);
+  c.globalCompositeOperation = 'destination-in'; c.fillStyle = c.createPattern(SH.grunge, 'repeat'); c.fillRect(0, 0, CW, CH);
+  return cv;
+}
+// relief for the stamped ink: the face presses a shallow dent into the paper, the ink itself stands slightly proud
+function inkHeightCanvas(ink, cx, cy, wPx, hPx, rot) {
+  const cv = mkCanvas(CW, CH), c = cv.getContext('2d'); c.fillStyle = 'rgb(128,128,128)'; c.fillRect(0, 0, CW, CH);
+  c.save(); c.filter = 'blur(7px)'; c.translate(cx, cy); c.rotate(rot); c.fillStyle = 'rgb(108,108,108)'; c.fillRect(-wPx / 2, -hPx / 2, wPx, hPx); c.restore();
+  const w = mkCanvas(CW, CH), wc = w.getContext('2d'); wc.drawImage(ink, 0, 0); wc.globalCompositeOperation = 'source-in'; wc.fillStyle = '#fff'; wc.fillRect(0, 0, CW, CH);
+  c.filter = 'blur(1px)'; c.globalAlpha = .85; c.drawImage(w, 0, 0); c.filter = 'none'; c.globalAlpha = 1;
+  return cv;
+}
+function keepCanvas(design, cx, cy, wPx, hPx, rot) {
+  const w = CW / 2, h = CH / 2, sharp = mkCanvas(w, h), s = sharp.getContext('2d'); s.fillStyle = '#000'; s.fillRect(0, 0, w, h);
+  s.translate(cx / 2, cy / 2); s.rotate(rot); drawDesign(s, design, wPx / 2, hPx / 2, '#fff', true);
+  const cv = mkCanvas(w, h), c = cv.getContext('2d'); c.filter = 'blur(5px)'; c.drawImage(sharp, 0, 0);
+  const data = c.getImageData(0, 0, w, h).data;
+  return { cv, at: (u, v) => { const x = Math.min(w - 1, Math.max(0, Math.floor(u * w))), y = Math.min(h - 1, Math.max(0, Math.floor((1 - v) * h))); return data[(y * w + x) * 4] / 255; } };
+}
+
+/* ---------------- particles: embers, flames, smoke ---------------- */
+const PVS = `attribute float aSize; attribute vec4 aCol; varying vec4 vCol; uniform float uScale;
+void main(){ vCol = aCol; vec4 mv = modelViewMatrix * vec4(position, 1.0); gl_PointSize = aSize * uScale / -mv.z; gl_Position = projectionMatrix * mv; }`;
+const PFS = `uniform sampler2D uTex; varying vec4 vCol; void main(){ vec4 t = texture2D(uTex, gl_PointCoord); gl_FragColor = vec4(vCol.rgb * t.rgb, vCol.a * t.a); }`;
+const KIND = {
+  ember: { init: s => { s.max = .8 + Math.random() * 1.4; s.vx = (Math.random() - .5) * .25; s.vy = .25 + Math.random() * .5; s.vz = (Math.random() - .5) * .25; s.wob = .12; },
+    look: (s, a, size, col, i) => { size[i] = .028; const f = 1 - a; col[i * 4] = 1.6; col[i * 4 + 1] = .35 + .5 * f; col[i * 4 + 2] = .08; col[i * 4 + 3] = f; } },
+  flame: { init: s => { s.max = .25 + Math.random() * .4; s.vx = (Math.random() - .5) * .08; s.vy = .3 + Math.random() * .45; s.vz = (Math.random() - .5) * .08; s.wob = .06; },
+    look: (s, a, size, col, i) => { size[i] = (.06 + .11 * Math.sin(Math.min(1, a * 1.3) * Math.PI)) * s.k; const q = Math.min(1, a * 1.5);
+      col[i * 4] = 1.5; col[i * 4 + 1] = lerp(1.0, .3, q); col[i * 4 + 2] = lerp(.45, .04, Math.min(1, a * 2.2)); col[i * 4 + 3] = (1 - a) * .85; } },
+  smoke: { init: s => { s.max = 1.8 + Math.random() * 1.8; s.vx = (Math.random() - .5) * .12 + .06; s.vy = .2 + Math.random() * .2; s.vz = (Math.random() - .5) * .12; s.wob = .08; },
+    look: (s, a, size, col, i) => { size[i] = (.16 + .75 * a) * s.k; col[i * 4] = .07; col[i * 4 + 1] = .062; col[i * 4 + 2] = .055; col[i * 4 + 3] = .4 * Math.min(1, a * 5) * (1 - a); } }
+};
+function makeParts(scene, N, texCanvas, additive, order, kind) {
+  const geo = new T.BufferGeometry(), pos = new Float32Array(N * 3).fill(-50), size = new Float32Array(N), col = new Float32Array(N * 4);
+  geo.setAttribute('position', new T.BufferAttribute(pos, 3)); geo.setAttribute('aSize', new T.BufferAttribute(size, 1)); geo.setAttribute('aCol', new T.BufferAttribute(col, 4));
+  const mat = new T.ShaderMaterial({ uniforms: { uTex: { value: tex(texCanvas) }, uScale: { value: 600 } }, vertexShader: PVS, fragmentShader: PFS, transparent: true, depthWrite: false, blending: additive ? T.AdditiveBlending : T.NormalBlending });
+  const pts = new T.Points(geo, mat); pts.frustumCulled = false; pts.renderOrder = order; scene.add(pts);
+  const st = Array.from({ length: N }, () => ({ life: 1, max: 0, vx: 0, vy: 0, vz: 0, wob: 0, seed: Math.random() * 9, k: 1 })); let next = 0, acc = 0;
+  return { mat, step(dt, rate, sample) {
+    acc += rate * dt;
+    while (acc >= 1) { acc -= 1; const p = sample(); if (!p) continue; const i = next; next = (next + 1) % N; const s = st[i];
+      KIND[kind].init(s); s.k = .75 + Math.random() * .6; s.life = 0; pos[i * 3] = p[0]; pos[i * 3 + 1] = p[1]; pos[i * 3 + 2] = p[2]; }
+    for (let i = 0; i < N; i++) { const s = st[i]; if (s.life >= s.max) { col[i * 4 + 3] = 0; size[i] = 0; continue; }
+      s.life += dt; const a = Math.min(1, s.life / s.max);
+      pos[i * 3] += (s.vx + Math.sin(s.life * 5 + s.seed) * s.wob) * dt; pos[i * 3 + 1] += s.vy * dt; pos[i * 3 + 2] += s.vz * dt; KIND[kind].look(s, a, size, col, i); }
+    geo.attributes.position.needsUpdate = true; geo.attributes.aSize.needsUpdate = true; geo.attributes.aCol.needsUpdate = true; } };
+}
+
+/* ---------------- environment ---------------- */
+function makeEnv(renderer) {
+  const pm = new T.PMREMGenerator(renderer), sc = new T.Scene();
+  sc.add(new T.Mesh(new T.BoxGeometry(12, 7, 12), new T.MeshBasicMaterial({ color: 0x141516, side: T.BackSide })));
+  const panel = (w, h, c, p, r) => { const m = new T.Mesh(new T.PlaneGeometry(w, h), new T.MeshBasicMaterial({ color: new T.Color().setRGB(...c), side: T.DoubleSide })); m.position.set(...p); m.rotation.set(...r); sc.add(m); };
+  panel(3, 1.6, [3.2, 2.6, 1.9], [-1.5, 3.4, -1.5], [Math.PI / 2, 0, 0]);
+  panel(2.4, 3, [.9, 1.05, 1.3], [5.9, 1.5, 2], [0, Math.PI / 2, 0]);
+  panel(3, .8, [1.4, 1.2, 1], [2, 1.2, -5.9], [0, 0, 0]);
+  const rt = pm.fromScene(sc, .03); pm.dispose(); return rt.texture;
+}
+
+/* ---------------- keyframed motion ---------------- */
+function poseAt(keys, t) {
+  if (t <= keys[0].t) return keys[0];
+  for (let i = 1; i < keys.length; i++) { const b = keys[i]; if (t <= b.t) { const a = keys[i - 1], k = EASE[b.e || 'inout'](seg(t, a.t, b.t));
+    return { p: a.p.map((v, j) => lerp(v, b.p[j], k)), r: a.r.map((v, j) => lerp(v, b.r[j], k)) }; } }
+  return keys[keys.length - 1];
+}
+const shakeAt = (t, t0, amp, len = .45) => { if (t < t0 || t > t0 + len) return [0, 0, 0]; const d = Math.pow(1 - (t - t0) / len, 2) * amp; return [Math.sin(t * 93) * d, Math.sin(t * 71 + 1) * d, Math.sin(t * 83 + 2) * d]; };
+
+function disposeScene(sc) { sc.traverse(o => { if (o.geometry) o.geometry.dispose(); const ms = o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : []; for (const m of ms) { for (const k in m) { const v = m[k]; if (v && v.isTexture) v.dispose(); } if (m.uniforms) for (const k in m.uniforms) { const v = m.uniforms[k].value; if (v && v.isTexture) v.dispose(); } m.dispose(); } }); }
+
+/* ---------------- the scene ---------------- */
+const WPOS = { mp40: { p: [-4.6, 0, .4], yaw: Math.PI / 2 + .6, flip: true }, stg44: { p: [.2, 0, -3.3], yaw: .06, flip: false } };
+const CFG = { fw: 1.85, fd: .64, paperYaw: .06, land: [0, .12], theta: -.1, tin: [-2.55, -.45], cam: { p: [2.7, 2.55, 4.75], l: [-.45, .2, -.45], fov: 38 } };
+function buildScene(card, st) {
+  const win = st === 'victory', scene = new T.Scene(), V = CFG;
+  scene.background = new T.Color(0x050506); scene.environment = card.env;
+  const cam = new T.PerspectiveCamera(V.cam.fov, card.aspect, .05, 60);
+  const hemi = new T.HemisphereLight(0xc8d0da, 0x14110e, .14); scene.add(hemi);
+  const fill = new T.DirectionalLight(0xc4cfe2, .55); fill.position.set(4, 4.5, 6); scene.add(fill);
+  const rim = new T.DirectionalLight(0xb8c8ff, .35); rim.position.set(3, 3, -5); scene.add(rim);
+  const fire = new T.PointLight(0xff7a2a, 0, 7, 2); scene.add(fire);
+  // desk, wall, lamp
+  const desk = new T.Mesh(new T.PlaneGeometry(16, 12), new T.MeshStandardMaterial({ map: tex(SH.deskCol, { srgb: true }), roughnessMap: tex(SH.deskOrm), metalnessMap: tex(SH.deskOrm), normalMap: tex(SH.deskNrm), normalScale: new T.Vector2(1, 1), roughness: 1, metalness: 1, envMapIntensity: .5 }));
+  desk.rotation.x = -Math.PI / 2; desk.position.set(0, 0, 1.4); desk.receiveShadow = true; scene.add(desk);
+  const edge = mesh(new T.BoxGeometry(16, .35, .25), new T.MeshStandardMaterial({ color: 0x2a2c2b, metalness: .5, roughness: .6 })); edge.position.set(0, -.18, -4.5); scene.add(edge);
+  const wall = new T.Mesh(new T.PlaneGeometry(16, 8), (() => { const orm = tex(SH.wallOrm); return new T.MeshStandardMaterial({ map: tex(SH.wall, { srgb: true }), roughnessMap: orm, metalnessMap: orm, normalMap: tex(SH.wallNrm), roughness: 1, metalness: 1, envMapIntensity: .7 }); })());
+  wall.position.set(0, 2.8, -5.0); wall.receiveShadow = true; scene.add(wall);
+  // steel battens over the panel seams, with domed rivets
+  const battenMat = new T.MeshStandardMaterial({ map: tex(SH.batten, { srgb: true }), metalness: .7, roughness: .62, envMapIntensity: .7 });
+  const rivetMat = new T.MeshStandardMaterial({ color: 0x5a4c40, metalness: .75, roughness: .55, envMapIntensity: .7 });
+  const rivets = [];
+  for (const sx of WALL.seamsX) { const bt = mesh(new T.BoxGeometry(.28, 8, .05), battenMat); bt.position.set(sx, 2.8, -4.975); scene.add(bt); for (let y = .25; y < 6.6; y += WALL.rivetStep) rivets.push([sx, y, -4.95]); }
+  { const bt = mesh(new T.BoxGeometry(16, .28, .05), battenMat); bt.position.set(0, WALL.seamY, -4.972); scene.add(bt); for (let x = -7.8; x < 8; x += WALL.rivetStep) if (!WALL.seamsX.some(s => Math.abs(s - x) < .2)) rivets.push([x, WALL.seamY, -4.947]); }
+  const rg = new T.SphereGeometry(.045, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2); rg.rotateX(Math.PI / 2); rg.scale(1, 1, .6);
+  const rv = new T.InstancedMesh(rg, rivetMat, rivets.length); const mtx = new T.Matrix4();
+  rivets.forEach((p, i) => rv.setMatrixAt(i, mtx.makeTranslation(p[0], p[1], p[2]))); rv.castShadow = true; rv.receiveShadow = true; scene.add(rv);
+  // pinned situation map: displaced paper with fibre/crease/wax normals and glossier grease pencil, held by 3D pins
+  const mapM = new T.Mesh(new T.PlaneGeometry(3.4, 2.2, 170, 110), new T.MeshStandardMaterial({ map: tex(SH.mapCol, { srgb: true }), roughnessMap: tex(SH.mapRgh), normalMap: tex(SH.mapNrm), normalScale: new T.Vector2(1.3, 1.3), displacementMap: tex(SH.mapDisp), displacementScale: .06, roughness: 1, metalness: 0 }));
+  mapM.position.set(-.45, 1.5, -4.992); mapM.rotation.z = -.018; mapM.castShadow = true; mapM.receiveShadow = true; scene.add(mapM);
+  // on a steel wall the map is held by round magnets
+  const magMat = new T.MeshStandardMaterial({ color: 0x7e1a12, roughness: .4, metalness: .2 });
+  for (const [x, y] of [[-1.6, 1.0], [1.6, 1.0], [-1.6, -1.0], [1.6, -1.0], [0, 1.02]]) {
+    const mg = mesh(new T.CylinderGeometry(.07, .075, .035, 28), magMat); mg.rotation.x = Math.PI / 2; mg.position.set(x, y, .02); mapM.add(mg); }
+  const L = lamp([-4.25, 0, -1.75], [-3.05, 2.2, -1.3], [-1.7, 0, -.8]); scene.add(L.g);
+  const spot = new T.SpotLight(0xffcf96, 6.5, 14, .78, .55, 1.6); spot.position.copy(L.bulbPos); spot.target.position.set(-.2, 0, -.2); spot.castShadow = true;
+  spot.shadow.mapSize.set(4096, 4096); spot.shadow.focus = .8; spot.shadow.bias = -.00025; spot.shadow.normalBias = .006; spot.shadow.radius = 1.6; spot.shadow.camera.near = .3; spot.shadow.camera.far = 14; scene.add(spot, spot.target);
+  const glow = new T.PointLight(0xffc98a, .9, 5, 2); glow.position.copy(L.bulbPos).addScaledVector(L.dir, -.25); scene.add(glow);
+  // lamp spill raking across the wall map from the left, so the paper relief and pins read
+  const wash = new T.SpotLight(0xffd4a4, 2.4, 10, .42, .75, 1.2); wash.position.copy(L.bulbPos).add(new T.Vector3(-.2, .4, -.3)); wash.target.position.set(-.3, 1.8, -5);
+  wash.castShadow = true; wash.shadow.mapSize.set(1024, 1024); wash.shadow.bias = -.0005; scene.add(wash, wash.target);
+  // the game's weapons
+  if (SH.weapons) {
+    const mp = weaponOnDesk(SH.weapons.mp40, WPOS.mp40.flip); mp.position.set(...WPOS.mp40.p); mp.rotation.y = WPOS.mp40.yaw; scene.add(mp);
+    const sg = weaponOnDesk(SH.weapons.stg44, WPOS.stg44.flip); sg.position.set(...WPOS.stg44.p); sg.rotation.y = WPOS.stg44.yaw; scene.add(sg);
+  }
+  const am = { brass: MAT.caseBrass(), copper: MAT.copper(), steel: MAT.caseSteel() };
+  scatterRounds(scene, am, 41, [[-3.8, -1.3, -1.0, .15], [-1.2, 1.2, -1.6, 1.6]]);
+  const tinG = buildInkTin(win, { word: win ? 'VICTORY' : 'DEFEAT' }); tinG.position.set(V.tin[0], 0, V.tin[1]); tinG.rotation.y = .08; scene.add(tinG);
+
+  // paper, ink, burn
+  const design = { word: win ? 'VICTORY' : 'DEFEAT' }, inkColor = win ? '#6c1009' : '#141110';
+  const py = .004, yawP = V.paperYaw, Lx = V.land[0], Lz = V.land[1];
+  const wx = Lx * Math.cos(yawP) + Lz * Math.sin(yawP), wz = -Lx * Math.sin(yawP) + Lz * Math.cos(yawP), yawS = yawP + V.theta, top = py + .002;
+  const icx = (Lx / W + .5) * CW, icy = (Lz / H + .5) * CH, iw = V.fw / W * CW, ih = V.fd / W * CW;
+  const ink = inkCanvas(design, inkColor, icx, icy, iw * .96, ih * .96, -V.theta, win), inkH = inkHeightCanvas(ink, icx, icy, iw * .96, ih * .96, -V.theta);
+  const keep = win ? null : keepCanvas(design, icx, icy, iw * .96, ih * .96, -V.theta);
+  const noiseT = tex(SH.noise.cv); noiseT.wrapS = noiseT.wrapT = T.RepeatWrapping;
+  const icl = new T.Color(inkColor).convertSRGBToLinear();
+  const U = { paperTex: tex(paperCanvas(), { srgb: true }), inkHeight: tex(inkH), u: {
+    uInk: { value: tex(ink) }, uNoise: { value: noiseT }, uKeep: { value: keep ? tex(keep.cv) : tex(mkCanvas(4, 4)) },
+    uInkA: { value: 0 }, uInkRough: { value: .16 }, uBurn: { value: -1 }, uKeepOn: { value: keep ? 1 : 0 }, uTime: { value: 0 }, uMaxD: { value: 1.9 },
+    uInkColor: { value: new T.Vector3(icl.r, icl.g, icl.b) }, uSize: { value: new T.Vector2(W, H) } } };
+  const paper = paperMesh(U); paper.position.y = py; paper.rotation.y = yawP; scene.add(paper);
+  const soot = new T.Mesh(new T.PlaneGeometry(W * 1.35, H * 1.3), new T.MeshBasicMaterial({ color: 0x030202, transparent: true, opacity: 0, alphaMap: tex(SH.soot), depthWrite: false }));
+  soot.rotation.x = -Math.PI / 2; soot.rotation.z = yawP; soot.position.y = .0015; scene.add(soot);
+  const toWorld = (u, v, lift = .01) => { const lx = (u - .5) * W, lz = -(v - .5) * H; return [lx * Math.cos(yawP) + lz * Math.sin(yawP), py + lift, -lx * Math.sin(yawP) + lz * Math.cos(yawP)]; };
+  const burnF = (u, v) => { const bx = u * W, by = v * H; return clamp(Math.min(bx, W - bx, by, H - by) / (W * .5)) + (SH.noise.at(u * 1.3, v * 1.3) - .5) * .34 + (SH.noise.at(u * 4.1 + .37, v * 4.1 + .37) - .5) * .09 + (keep ? smooth(.3, .62, keep.at(u, v)) * 1.6 : 0); };
+  const wordBox = [icx / CW, 1 - icy / CH, iw / CW * .6, ih / CH * .75];
+
+  // stamp: slam, tip toward camera, spin (face swap while it points away), hold, exit
+  const stamp = buildStamp(design, inkColor, V.fw, V.fd); scene.add(stamp);
+  const camP = new T.Vector3(...V.cam.p), land = new T.Vector3(wx, top, wz);
+  const tip = land.clone().lerp(camP, .36); tip.y = Math.max(tip.y, 1.25);
+  const toCam = camP.clone().sub(tip), yawTip = Math.atan2(toCam.x, toCam.z), elev = Math.atan2(toCam.y, Math.hypot(toCam.x, toCam.z)), tilt = -(Math.PI / 2 + elev);
+  const tx = V.tin[0], tz = V.tin[1], y0 = .085, slam = 1.85, spinA = 3.15, spinB = 4.05;
+  const holdEnd = win ? 4.95 : 4.45, exitEnd = holdEnd + .7;
+  const keys = [
+    { t: 0, p: [tx, y0, tz], r: [0, .08, 0] }, { t: .5, p: [tx, y0, tz], r: [0, .08, 0] },
+    { t: .95, p: [tx, 1.1, tz], r: [0, .08, 0], e: 'out' }, { t: 1.6, p: [wx - .2, 1.35, wz], r: [0, yawS, .12] },
+    { t: slam, p: [wx, top, wz], r: [0, yawS, 0], e: 'in' }, { t: 2.15, p: [wx, top, wz], r: [0, yawS, 0] },
+    { t: 3.0, p: [tip.x, tip.y, tip.z], r: [tilt, yawTip, 0] }, { t: holdEnd, p: [tip.x, tip.y + .05, tip.z], r: [tilt, yawTip, 0] },
+    { t: exitEnd, p: [tip.x + 3.6, tip.y + 2.6, tip.z - .4], r: [tilt + .3, yawTip - .7, 0], e: 'in' }];
+
+  const embers = win ? null : makeParts(scene, 360, SH.dot, true, 3, 'ember');
+  const smoke = win ? null : makeParts(scene, 220, SH.smoke, false, 1, 'smoke');
+  const flames = win ? null : makeParts(scene, 700, SH.flame, true, 2, 'flame');
+  const burnA = 4.5, burnB = 7.2, burnTo = 1.08;
+  const dur = win ? exitEnd + .3 : 7.9, bar = win ? 4.35 : 7.35;
+  const baseCam = camP.clone(), look0 = new T.Vector3(...V.cam.l), look1 = win ? look0.clone() : new T.Vector3(wx, py, wz), look = new T.Vector3();
+  const endCam = win ? baseCam.clone() : baseCam.clone().lerp(look1, .6).add(new T.Vector3(0, .15, 0));
+  const pScale = () => card.r.getDrawingBufferSize(new T.Vector2()).y / (2 * Math.tan(cam.fov * Math.PI / 360));
+  const sampleEdge = (b, tol, box) => { for (let i = 0; i < (box ? 48 : 16); i++) { const u = box ? box[0] + (Math.random() - .5) * 2 * box[2] : Math.random(), v = box ? box[1] + (Math.random() - .5) * 2 * box[3] : Math.random(); if (Math.abs(burnF(u, v) - b) < tol) return toWorld(u, v, .015); } return null; };
+
+  return {
+    scene, cam, dur, bar,
+    update(t, dt, now) {
+      U.u.uTime.value = now;
+      const ck = win ? 0 : EASE.inout(seg(t, 4.6, dur));
+      cam.position.copy(baseCam).lerp(endCam, ck); look.copy(look0).lerp(look1, ck);
+      const sh = shakeAt(t, slam, .06); cam.position.x += sh[0]; cam.position.y += sh[1]; cam.position.z += sh[2];
+      cam.fov = V.cam.fov - (t > slam && t < slam + .3 ? (1 - (t - slam) / .3) * 1.6 : 0); cam.updateProjectionMatrix(); cam.lookAt(look);
+      // stamp
+      const P = poseAt(keys, t); stamp.position.set(...P.p); stamp.rotation.set(P.r[0], P.r[1], P.r[2]);
+      const sp = EASE.inout(seg(t, spinA, spinB)); stamp.rotation.y += sp * Math.PI * 2;
+      if (t > spinB && t < holdEnd) { const k = seg(t, spinB, spinB + .5); stamp.rotation.z += Math.sin(k * Math.PI * 2.5) * (1 - k) * .06; }
+      const showReadable = sp >= .5; stamp.userData.faces[0].visible = !showReadable; stamp.userData.faces[1].visible = showReadable;
+      const sq = t > slam && t < slam + .25 ? (1 - (t - slam) / .25) * .035 : 0; stamp.scale.set(1 + sq * .4, 1 - sq, 1 + sq * .4);
+      stamp.visible = t < exitEnd - .02;
+      U.u.uInkA.value = t >= slam ? 1 : 0; paper.material.bumpScale = t >= slam ? .03 : 0; U.u.uInkRough.value = lerp(.34, .55, seg(t, slam, slam + 6));
+      // burn
+      if (!win) {
+        for (const p of [embers, smoke, flames]) p.mat.uniforms.uScale.value = pScale();
+        const k = seg(t, burnA, burnB), b = t < burnA ? -1 : lerp(-.14, burnTo, EASE.inout(k));
+        U.u.uBurn.value = b; soot.material.opacity = .85 * seg(t, burnA + .3, burnB);
+        const main = t > burnA && t < burnB + .1, ridge = t > burnB - .6;
+        const fl = .7 + .3 * Math.sin(now * 13) * Math.sin(now * 7.7);
+        fire.position.set(wx, main ? .9 : .55, wz); fire.intensity = (main ? 3.4 * seg(t, burnA, burnA + .4) : 0) * fl + (ridge ? 2.6 * fl : 0);
+        spot.intensity = lerp(6.5, 3.6, seg(t, burnA, burnB)); fill.intensity = lerp(.85, .55, seg(t, burnA, burnB));
+        flames.step(dt, main ? 320 : (ridge ? 520 : 0), () => main && !ridge ? sampleEdge(b, .03) : sampleEdge(b, .04, wordBox));
+        embers.step(dt, main ? 120 : (ridge ? 35 : 0), () => main && !ridge ? sampleEdge(b, .04) : sampleEdge(b, .035, wordBox));
+        smoke.step(dt, main ? 30 : (ridge ? 18 : 0), () => main && !ridge ? sampleEdge(b, .05) : sampleEdge(b, .04, wordBox));
+      }
+    }
+  };
+}
+
+/* ---------------- card ---------------- */
+const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const card = { sec: document.getElementById('card'), stage: document.querySelector('#card .stage'), bar: document.querySelector('#card .endbar'), st: 'victory', t: 0, playing: false, visible: false };
+function endbarHTML(st) { const v = st === 'victory'; return `<div class="kick">${v ? 'Mission accomplished' : 'Mission failed'}</div><div class="reason">${v ? 'Oder-Warthe Line · all objectives secured' : 'Oder-Warthe Line · headquarters destroyed'}</div><div class="btns">${v ? '<span class="btn pri">Continue</span><span class="btn">Main menu</span>' : '<span class="btn pri">Restart</span><span class="btn">Quit</span>'}</div>`; }
+function initGL(c) {
+  try {
+    const r = new T.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+    r.outputEncoding = T.sRGBEncoding; r.toneMapping = T.ACESFilmicToneMapping; r.toneMappingExposure = 1.1;
+    r.shadowMap.enabled = true; r.shadowMap.type = T.PCFShadowMap;
+    c.stage.insertBefore(r.domElement, c.stage.firstChild); c.r = r; c.env = makeEnv(r); resize(c); return true;
+  } catch (e) { c.stage.insertAdjacentHTML('afterbegin', '<div class="fail">This preview needs WebGL, which is turned off in this browser.</div>'); return false; }
+}
+function resize(c) { if (!c.r) return; const w = c.stage.clientWidth, h = c.stage.clientHeight; c.aspect = w / h; c.r.setPixelRatio(Math.min(1.5, window.devicePixelRatio || 1)); c.r.setSize(w, h, false); if (c.S) { c.S.cam.aspect = c.aspect; c.S.cam.updateProjectionMatrix(); c.r.render(c.S.scene, c.S.cam); } }
+function rebuild(c) { if (c.S) disposeScene(c.S.scene); c.S = buildScene(c, c.st); }
+function setState(c, st) {
+  c.st = st; c.sec.querySelectorAll('.seg button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.st === st)));
+  c.bar.innerHTML = endbarHTML(st);
+  if (!c.r) return;
+  rebuild(c); c.playing = false; c.t = c.S.dur; c.stage.classList.add('bar');
+  // settle the rest frame (lets the burning ridges build up)
+  let t = Math.max(0, c.S.dur - 1.5); while (t < c.S.dur) { t += 1 / 30; c.S.update(t, 1 / 30, performance.now() / 1000); }
+  c.r.render(c.S.scene, c.S.cam);
+}
+function play(c) { if (!c.S || reduced) return; rebuild(c); c.t = 0; c.playing = true; c.last = performance.now(); c.stage.classList.remove('bar'); }
+card.sec.querySelectorAll('.seg button').forEach(b => b.addEventListener('click', () => { setState(card, b.dataset.st); play(card); }));
+document.getElementById('b-replay').addEventListener('click', () => play(card));
+window.addEventListener('resize', () => resize(card));
+
+function loop(now) {
+  const c = card;
+  if (c.S && c.visible) {
+    const dt = Math.min(.05, (now - (c.last || now)) / 1000); c.last = now;
+    if (c.playing) { c.t += dt; if (c.t >= c.S.bar) c.stage.classList.add('bar'); if (c.t >= c.S.dur) c.playing = false; }
+    if (c.playing || c.st === 'defeat') { c.S.update(c.playing ? c.t : c.S.dur, dt, now / 1000); c.r.render(c.S.scene, c.S.cam); }
+  }
+  requestAnimationFrame(loop);
+}
+
+async function boot() {
+  if (!T) { card.stage.insertAdjacentHTML('afterbegin', '<div class="fail">The 3D library did not load.</div>'); return; }
+  try { await Promise.all(['700 64px Oswald', '64px Anton', '32px "Special Elite"'].map(f => document.fonts.load(f))); } catch (e) {}
+  buildShared();
+  try { const [mp40, stg44] = await Promise.all([loadWeapon('mp40'), loadWeapon('stg44')]); SH.weapons = { mp40, stg44 }; }
+  catch (e) { SH.weapons = null; console.warn('weapon assets did not load', e); }
+  // review stills: #shot-victory-t45 renders one frame (4.5 s) and stops
+  const shot = /^#shot-(victory|defeat)-t(\d+)$/.exec(location.hash);
+  if (shot) {
+    document.body.classList.add('shot');
+    document.querySelectorAll('header.top, section.ref, footer.fine, .notes, .card-head').forEach(e => e.hidden = true);
+    if (!initGL(card)) return;
+    card.st = shot[1]; card.bar.innerHTML = endbarHTML(shot[1]); rebuild(card);
+    const tEnd = +shot[2] / 10; let t = 0;
+    while (t < tEnd) { const dt = Math.min(1 / 30, tEnd - t); t += dt; card.S.update(t, dt, t); }
+    card.stage.classList.toggle('bar', tEnd >= card.S.bar); card.r.render(card.S.scene, card.S.cam);
+    return;
+  }
+  if (initGL(card)) setState(card, 'victory');
+  if ('IntersectionObserver' in window) {
+    new IntersectionObserver(es => es.forEach(e => { card.visible = e.isIntersecting; card.last = performance.now();
+      if (e.isIntersecting && !card.played) { card.played = true; play(card); } }), { threshold: .4 }).observe(card.stage);
+  } else card.visible = true;
+  requestAnimationFrame(loop);
+}
+boot();
+})();
+</script>

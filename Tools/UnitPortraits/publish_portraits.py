@@ -18,6 +18,12 @@ FOLDER_BY_PREFIX = {
     "T_Ger_MediumTank_": "GerTanks/Medium/NoIcon",
     "T_Ger_HeavyTank_": "GerTanks/Heavy/NoIcon",
     "T_Ger_Pit_": "GermanPits",
+    # Soviet vehicles (vehicle info takeovers, 2026-11-11).
+    "T_Rus_LightTank_": "RusTanks/Light/NoIcon",
+    "T_Rus_MediumTank_": "RusTanks/Medium/NoIcon",
+    "T_Rus_HeavyTank_": "RusTanks/Heavy/NoIcon",
+    # Soviet infantry (squad info takeovers, 2026-11-15).
+    "T_Rus_Squad_": "RusSquads/NoIcon",
 }
 
 

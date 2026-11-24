@@ -133,6 +133,9 @@ private:
 	UPROPERTY()
 	TWeakObjectPtr<AEnemyController> M_EnemyController;
 	bool GetIsValidEnemyController() const;
+	// The AI player of the owning controller: only its units are on the roster, and only the soldiers of the
+	// players it fights count as grenade targets. The first AI player without an enemy controller as owner.
+	int32 GetControlledPlayer() const;
 
 	UPROPERTY()
 	TWeakObjectPtr<AMissionManager> M_MissionManager;
@@ -151,7 +154,8 @@ private:
 	UPROPERTY()
 	TArray<TWeakObjectPtr<AActor>> M_DirectControlRetreatUnits;
 
-	// Player soldier locations, gathered at most once per tick and only when a grenade is considered.
+	// Soldier locations of the players hostile to the controlled player, gathered at most once per tick and only
+	// when a grenade is considered.
 	TArray<FVector> M_PlayerSoldierLocations;
 	bool bM_HasGatheredPlayerSoldiersThisTick = false;
 

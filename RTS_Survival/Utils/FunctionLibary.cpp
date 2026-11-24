@@ -13,6 +13,7 @@
 #include "NavMesh/NavMeshPath.h"
 #include "NavMesh/RecastNavMesh.h"
 #include "RTS_Survival/DeveloperSettings.h"
+#include "RTS_Survival/Game/Players/RTSPlayers.h"
 #include "RTS_Survival/RTSCollisionTraceChannels.h"
 
 class ARecastNavMesh;
@@ -364,19 +365,100 @@ bool RTSFunctionLibrary::RTSIsValidWeak(const TWeakObjectPtr<AActor> ActorToChec
 	return ActorToCheck->IsUnitAlive();
 }
 
-bool RTSFunctionLibrary::RTSIsVisibleTarget(AActor* ActorToCheck, const int32 EnemyPlayerOfActor)
+namespace RTSTargetVisibility
+{
+	// Everything else that hides a unit (still spawning, parked, packed up) also turns its collision off, so a
+	// fog mark left on such a unit does not count.
+	bool GetIsHiddenOnlyByFog(const AActor& Actor)
+	{
+		using DeveloperSettings::GamePlay::FoW::TagUnitHiddenByFog;
+		return Actor.GetActorEnableCollision() && Actor.Tags.Contains(TagUnitHiddenByFog);
+	}
+
+	// All AI players share one view: units of player 1 (and things nobody owns) must be in the enemy vision,
+	// units of AI players are always seen unless something other than the fog hides them.
+	bool GetIsVisibleToAIPlayers(const AActor& AliveActor, const int32 TargetOwner)
+	{
+		using DeveloperSettings::GamePlay::FoW::TagUnitInEnemyVision;
+		const bool bIsOwnedByAIPlayer = TargetOwner != INDEX_NONE
+			&& FRTSPlayers::IsValidAIPlayer(FRTSPlayers::NormalizePlayer(TargetOwner));
+		if (not bIsOwnedByAIPlayer)
+		{
+			return not AliveActor.IsHidden() && AliveActor.Tags.Contains(TagUnitInEnemyVision);
+		}
+		return not AliveActor.IsHidden() || GetIsHiddenOnlyByFog(AliveActor);
+	}
+
+	/**
+	 * @brief GetIsVisibleToAIPlayers for callers that do not know the owner yet: weapons check their target often,
+	 * and the tags settle most cases without the owner lookup.
+	 * @param AliveActor Valid actor that is alive.
+	 * @return True if the units of AI players see the actor.
+	 */
+	bool GetIsVisibleToAIPlayersLookUpOwner(const AActor& AliveActor)
+	{
+		using DeveloperSettings::GamePlay::FoW::TagUnitInEnemyVision;
+		const bool bNeedsOwner = AliveActor.IsHidden()
+			                         ? GetIsHiddenOnlyByFog(AliveActor)
+			                         : not AliveActor.Tags.Contains(TagUnitInEnemyVision);
+		if (not bNeedsOwner)
+		{
+			// Hidden by more than the fog, or in the enemy vision: the same answer for every owner.
+			return not AliveActor.IsHidden();
+		}
+		return GetIsVisibleToAIPlayers(AliveActor, FRTSPlayers::GetOwningPlayerOfActor(&AliveActor));
+	}
+}
+
+bool RTSFunctionLibrary::RTSIsVisibleTarget(AActor* ActorToCheck, const int32 ViewerPlayer)
 {
 	if (!IsValid(ActorToCheck))
 	{
 		return false;
 	}
-	using DeveloperSettings::GamePlay::FoW::TagUnitInEnemyVision;
-	// If player 1 is the enemy then this actor must not be hidden in fow (visible to player 1).
-	// if Player 1 is the ally then this actor must be in the enemy vision (tagged with enemy vision).
-	const bool bIsVisible = EnemyPlayerOfActor == 1
-		                        ? not ActorToCheck->IsHidden()
-		                        : ActorToCheck->Tags.Contains(TagUnitInEnemyVision);
-	return ActorToCheck->IsUnitAlive() && not ActorToCheck->IsHidden() && bIsVisible;
+	if (not ActorToCheck->IsUnitAlive())
+	{
+		return false;
+	}
+	// If player 1 is the viewer then this actor must not be hidden in fow (visible to player 1).
+	if (FRTSPlayers::IsHumanPlayer(ViewerPlayer))
+	{
+		return not ActorToCheck->IsHidden();
+	}
+	// If an AI player is the viewer then who owns the actor decides what makes it visible.
+	return RTSTargetVisibility::GetIsVisibleToAIPlayersLookUpOwner(*ActorToCheck);
+}
+
+bool RTSFunctionLibrary::RTSIsVisibleTargetOfOwner(const AActor* AliveActor, const int32 TargetOwner,
+                                                   const int32 ViewerPlayer)
+{
+	if (AliveActor == nullptr)
+	{
+		return false;
+	}
+	if (FRTSPlayers::IsHumanPlayer(ViewerPlayer))
+	{
+		return not AliveActor->IsHidden();
+	}
+	return RTSTargetVisibility::GetIsVisibleToAIPlayers(*AliveActor, TargetOwner);
+}
+
+uint8 RTSFunctionLibrary::RTSGetVisibleToMask(const AActor* AliveActor, const int32 TargetOwner)
+{
+	if (AliveActor == nullptr)
+	{
+		return 0;
+	}
+	uint8 VisibleToMask = 0;
+	if (not AliveActor->IsHidden())
+	{
+		VisibleToMask |= RTSPlayers::HumanPlayerBit;
+	}
+	if (RTSTargetVisibility::GetIsVisibleToAIPlayers(*AliveActor, TargetOwner))
+	{
+		VisibleToMask |= RTSPlayers::AIPlayersMask;
+	}
+	return VisibleToMask;
 }
 
 

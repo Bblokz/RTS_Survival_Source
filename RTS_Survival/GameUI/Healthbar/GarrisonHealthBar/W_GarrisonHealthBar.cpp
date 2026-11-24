@@ -3,10 +3,58 @@
 
 #include "W_GarrisonHealthBar.h"
 
+#include "Blueprint/WidgetTree.h"
+#include "Components/CanvasPanel.h"
+#include "Components/CanvasPanelSlot.h"
+#include "Components/HorizontalBox.h"
 #include "Components/RichTextBlock.h"
 #include "Components/SizeBox.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/RTSRichTextConverters/FRTSRichTextConverter.h"
+
+namespace GarrisonHealthBarModuleBox
+{
+	// Must match HealthComponentModuleConstants::ModuleBoxWidgetName, which the health component looks up.
+	const FName ModuleBoxName(TEXT("ModuleBox"));
+	// The tanks' bar (W_BpHealthBar_Modules) shows module icons right under the health bar, where this bar has its
+	// garrison seat boxes (GarrisonHzBox, 192 high, centred at y 95.7): the icons go under the seat row instead,
+	// top-aligned at the same x as on the tanks' bar (checked on rendered snapshots, -RTSGarrisonBarSnapshot).
+	const FVector2D ModuleBoxPosition(-97.f, 205.f);
+	const FVector2D ModuleBoxAlignment(0.5f, 0.f);
+	const FAnchors CentreAnchors(0.5f, 0.5f);
+}
+
+void UW_GarrisonHealthBar::NativeOnInitialized()
+{
+	Super::NativeOnInitialized();
+	AddModuleBoxIfMissing();
+}
+
+void UW_GarrisonHealthBar::AddModuleBoxIfMissing()
+{
+	using namespace GarrisonHealthBarModuleBox;
+	if (not IsValid(WidgetTree) || IsValid(GetWidgetFromName(ModuleBoxName)))
+	{
+		return;
+	}
+	UCanvasPanel* RootCanvas = Cast<UCanvasPanel>(WidgetTree->RootWidget);
+	if (not IsValid(RootCanvas))
+	{
+		RTSFunctionLibrary::ReportError("Garrison health bar " + GetClass()->GetName() +
+			" has no canvas root; cannot add the ModuleBox for module icons.");
+		return;
+	}
+	UHorizontalBox* ModuleBox = WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass(), ModuleBoxName);
+	UCanvasPanelSlot* ModuleBoxSlot = RootCanvas->AddChildToCanvas(ModuleBox);
+	if (not IsValid(ModuleBoxSlot))
+	{
+		return;
+	}
+	ModuleBoxSlot->SetAnchors(CentreAnchors);
+	ModuleBoxSlot->SetPosition(ModuleBoxPosition);
+	ModuleBoxSlot->SetAlignment(ModuleBoxAlignment);
+	ModuleBoxSlot->SetAutoSize(true);
+}
 
 void UW_GarrisonHealthBar::SetupGarrison(const int32 Slots, const int32 Seats, const int32 MaxSquads,
                                          const EGarrisonSeatsTextType TypeText)

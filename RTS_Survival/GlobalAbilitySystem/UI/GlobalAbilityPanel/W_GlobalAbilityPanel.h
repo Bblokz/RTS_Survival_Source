@@ -24,7 +24,14 @@ class RTS_SURVIVAL_API UW_GlobalAbilityPanel : public UUserWidget
 	
 	UW_GA_Description* GetDescription() const {return Description;}
 	TArray<UW_GA_Item*> GetAbilityItems() const;
-	
+
+	/**
+	 * @brief Hotkey entry point: clicks the slot's ability button only when the player could click it themselves.
+	 * @param SlotIndex Zero-based slot from the top of the sidebar (IA_GlobalAbility1 = 0).
+	 * @return True when the ability was asked to activate.
+	 */
+	bool TryActivateAbilityFromHotkey(const int32 SlotIndex) const;
+
 	protected:
 	virtual void NativeOnInitialized() override;
 	

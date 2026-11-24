@@ -85,6 +85,11 @@ void ACPPResourceMaster::SetupResourceCollisions(TArray<UMeshComponent*> Resourc
 	}
 	for(auto EachResourceGeometryComponent : ResourceGeometryComponents)
 	{
+		if (not IsValid(EachResourceGeometryComponent))
+		{
+			// An empty entry is a component the Blueprint no longer has: nothing to set up.
+			continue;
+		}
 		FRTS_CollisionSetup::SetupDestructibleEnvActorGeometryComponentCollision(EachResourceGeometryComponent);
 	}
 }

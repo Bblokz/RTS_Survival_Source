@@ -128,6 +128,22 @@ front panel to `Plate_FrontUpperGlacis`. Only the middle two panels sit over the
 hull boxes reach over the sides, so a side shell there meets 15 armour and can damage the engine. Such hits do not
 reach the add-on zone.
 
+## Panzer II Luchs (spaced armour)
+
+`Ger_Vehicle_PanzerII_Luchs_SpacedArmor` converted 2026-11-11 with `RTS.AddOnArmor.ConvertBlueprint`
+(`Hull=SM_Luchs_SpacedArmor_Hull_AddOnPanels Armor=Plate_SideLeft:30|Plate_SideRight:30|Plate_SideLowerLeft:20|Plate_SideLowerRight:20`),
+run in the shared editor. 5 plates per side; debris panel `SM_Luchs_SpacedArmor_Hull_AddOnPanels_Debris`.
+
+- Before the conversion its SetupArmor had the base Luchs values x1.35 (sides 40.5 upper / 27 lower). The structural
+  sides are now the base Luchs's 30 / 20, and both zones carry **10.5** add-on armour (set on the component's
+  `M_ZoneSettings`, which `ConvertBlueprint` leaves at the default 15). Intact 40.5 / 30.5 (the lower side gained 3.5),
+  yellow 35.25 / 25.25, stripped 30 / 20 = a plain Luchs.
+- Same finding as the Pz II F: only panels 2 and 3 sit over `Plate_SideLowerLeft`. Panels 0 and 1 resolve to
+  `Plate_Rear` (20.25) and panel 4 to `Plate_FrontUpperGlacis` (25), so hits there never reach the add-on zone.
+- Validation `TAG=Luchs_Converted` on `UT_B4Howitzer` (DebugGame-Cmd, no injection): PASS, 0 failures (88 checks), with
+  15 hits to red, crew repair, full service and the death blast (9 pieces, 2 bursts). On `RTS_ToCopySmall` the Luchs
+  spawns at Z 1112 and falls through the ground after the third hit.
+
 ## Panzer II F base and Radixite (Strike Division fences)
 
 `Ger_Vehicle_PanzerII_F` (the base, trained by the Strike Division) and its children `_RadixiteAutocannon` and `_Strike`
@@ -358,6 +374,24 @@ side at the five rivet seams (x -192, -121, -48, 25, 96), where the mesh already
 - **Not changed:** the wreck and `SM_TrainingPreview_T34E` still show the skirts. The old `SM_T-34E_Hull` is no longer
   used by a Blueprint.
 
+## Director of Forge units (all 21 converted, 2026-11-16)
+
+Every unit in `DA_Directoriate_UnitOverrides` -> `M_DirectorOfForgeOverrides` now has shoot-off panels. The 13 added on
+2026-11-16 each got a Blender kit (`Content/RTS_Survival/Blueprints/_HullVariants/<Unit>_Forge/`). Each kit is
+appended to a copy of the stock hull, then `BuildPanelHull` and `ExtractPanelDebris` are run, then
+`ConvertBlueprint HullComponent=Hull` with the default 15 zones. The table, special cases and the Unreal recipe are in
+`_HullVariants/ForgeSkirts/README.md`. Special cases:
+- The FieldKit T-34/76 and the green IS-6 inherit from a converted Forge BP. They keep their own hull and destroy the
+  inherited `AddOnArmorPanels` in their UCS.
+- IS-2: the Forge override now points at `Rus_Vehicle_IS-2_Soviet`. Its existing `SM_IS_1_Armor_R_05` plates became
+  panels on the `Armor` component. Its `SetupArmor` override uses the IS-1 Soviet fitted side boxes.
+- KV-1 Arc (KV-1E hull): slot 1 carries the paint, so the kit is baked into slot 1.
+- GAZ-MM 72-K: the legacy side boxes are only ~1.3 cm thick (scale 0.2 squared). The Forge child overrides
+  `SetupArmor` with unit-scale side boxes, as on the BA-11.
+- BM-13: the stock BM-13 has no ArmorCalculation. The Forge child adds one and a `SetupArmor` function, called after
+  the parent BeginPlay.
+- Not run in PIE or the validator.
+
 ## Prepared vehicles
 
 Hulls built by `Tools/AddOnArmorBreak/build_panel_hulls.py`: `<hull>_AddOnPanels` next to each source mesh. Only the
@@ -389,7 +423,7 @@ without injection; the Pz II F does not.
 |---|---|---|---|---|---|
 | PanzerII_F_SpacedArmor | SM_PZIIF_SpacedArmor_Hull | 5 | plates | MI_Hull_PZII_DesertCamo | full, **converted** |
 | PanzerII_F, _RadixiteAutocannon, _Strike | SM_PZIIF_Fenced_Hull | 5 | wire-mesh fences (sections) | MI_Hull_PZII_DesertCamo | full on base + Radixite (Strike not run), **converted** |
-| PanzerII_Luchs_SpacedArmor | SM_Luchs_SpacedArmor_Hull | 5 | plates | MI_Hull_LuchsSpacedArmor_Camo | full |
+| PanzerII_Luchs_SpacedArmor | SM_Luchs_SpacedArmor_Hull | 5 | plates | MI_Hull_LuchsSpacedArmor_Camo | full, **converted** |
 | PanzerIII_M_SpacedArmor | SM_PanzerIIIM_SpacedArmor_Hull | 4 | plates | MI_PZIII_Hull_DesertAPO | pictures |
 | PanzerIV_H_StandardPlus | SM_Hull_PzIVH_StandardPlus | 5 | Schürzen slabs | M_Brumbar_Sides | pictures |
 | PanzerIV_Commander | SM_PzIV_Commander_Hull | 5 | Schürzen slabs | MI_PZIV_Hull_DesertAPO, M_Brumbar_Sides | pictures |

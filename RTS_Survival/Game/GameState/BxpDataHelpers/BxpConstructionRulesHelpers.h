@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "CoreMinimal.h"
 #include "RTS_Survival/Buildings/BuildingExpansion/BuildingExpansion.h"
@@ -40,6 +40,7 @@ namespace BxpConstructionRules
 		{EBuildingExpansionType::BTX_GerHQHarvester, WithFootprint(SocketConstructionRules, 500.f, 500.f)},
 		{EBuildingExpansionType::BTX_GerHQRepairBay, WithFootprint(FreeConstructionRules, 700.f, 350.f)},
 		{EBuildingExpansionType::BTX_GerHQTower, WithFootprint(OriginConstructionRules, 200.f, 200.f)},
+		{EBuildingExpansionType::BTX_GerHQLaser, WithFootprint(SocketConstructionRules, 500.f, 500.f)},
 
 		// Refinery Expansions.
 		{EBuildingExpansionType::BTX_RefConverter, WithFootprint(SocketConstructionRules, 800.f, 400.f)},
@@ -78,6 +79,17 @@ namespace BxpConstructionRules
 		// stool to the cable post (the span into the tent wall is left out).
 		{EBuildingExpansionType::BTX_GerBarracksRadixReactor, WithFootprint(OriginConstructionRules, 745.f, 435.f)},
 		{EBuildingExpansionType::BTX_GerBarrackFuelCell, WithFootprint(OriginConstructionRules, 500.f, 300.f)},
+		// The sniper loft behind the reactor's spot: 3.9 m from the back bent's foot bags to the landing's front posts,
+		// 4.55 m from the gangway's landing to the left foot bags (mesh bounds X -778..-387, Y 223..677 cm).
+		{EBuildingExpansionType::BTX_GerBarracksSniperLoft, WithFootprint(OriginConstructionRules, 395.f, 455.f)},
+
+		// Ger Mechanized Depot Expansions.
+		// The radio van in the slot beside the container, its aerial tower on the top crate: 8.8 m from the tower
+		// sleepers to the van's nose, 2.25 m across the van and its camo net (mesh bounds X -598..280, Y -360..-138 cm).
+		{EBuildingExpansionType::BTX_GerMechDepotRadioVan, WithFootprint(OriginConstructionRules, 880.f, 225.f)},
+		// The Wurfrahmen lean-to along the container's right side: 6.8 m along the 251, 4.7 m from the wall posts to the
+		// fitted side unit (mesh bounds X -883..-207, Y -817..-349 cm).
+		{EBuildingExpansionType::BTX_GerMechDepotWurfrahmenShop, WithFootprint(OriginConstructionRules, 680.f, 470.f)},
 
 		// --- Free-placed defenses ---
 		// Note that the default construction grid square is 200 in size.
@@ -101,6 +113,8 @@ namespace BxpConstructionRules
 		{EBuildingExpansionType::BTX_Rus53KPit, WithFootprint(FreeConstructionRules, 1150.f, 1150.f)},
 		// The same gun held to a 90 degree arc: only that wedge is swept, so a small square wall holds it.
 		{EBuildingExpansionType::BTX_Rus53KSectorPit, WithFootprint(FreeConstructionRules, 920.f, 920.f)},
+		// The off-centre 36.6 m bunker requires a 40 x 30 m footprint around its origin.
+		{EBuildingExpansionType::BTX_RusTripleCrownBunker, WithFootprint(FreeConstructionRules, 4000.f, 3000.f)},
 		// Same emplacement as the B-4 pit.
 		{EBuildingExpansionType::BTX_RusML20Pit, WithFootprint(FreeConstructionRules, 2000.f, 2000.f)},
 		// The BS-3 turns a full circle with its wide trails inside a square bag wall.
@@ -114,6 +128,10 @@ namespace BxpConstructionRules
 		{EBuildingExpansionType::BTX_GerTwinMG42Pit, WithFootprint(FreeConstructionRules, 900.f, 900.f)},
 		// The concrete block is 10.8 m across at its foot; the props and the rear ladder stand just outside it.
 		{EBuildingExpansionType::BTX_GerRailPakBunker, WithFootprint(FreeConstructionRules, 1250.f, 1250.f)},
+		// Footprints from the bunker meshes' bounds (Flakstand 14.7 x 17.3 m, Flakvierling 9.5 x 9.2 m, 38(t) 7.0 x 7.0 m).
+		{EBuildingExpansionType::BTX_GerFlak88Bunker, WithFootprint(FreeConstructionRules, 1500.f, 1750.f)},
+		{EBuildingExpansionType::BTX_GerFlakvierlingBunker, WithFootprint(FreeConstructionRules, 960.f, 940.f)},
+		{EBuildingExpansionType::BTX_GerPZ38TBunker, WithFootprint(FreeConstructionRules, 720.f, 720.f)},
 		// The square bag walls are 9.5 m across; the ammo niche bulges 1.2 m out of the left wall.
 		{EBuildingExpansionType::BTX_GerFlak88Pit, WithFootprint(FreeConstructionRules, 1200.f, 1200.f)},
 		// Compact square mortar pits whose walls are approximately 9 m across.

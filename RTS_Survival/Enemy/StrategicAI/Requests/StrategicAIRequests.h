@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "RTS_Survival/Buildings/BuildingExpansion/BuildingExpansionEnums.h"
 #include "RTS_Survival/Enemy/EnemyController/EnemyDirectControlComponent/DirectControl_Retreat/RetreatGroupState.h"
+#include "RTS_Survival/Game/Players/RTSPlayers.h"
 
 #include "StrategicAIRequests.generated.h"
 
@@ -1331,6 +1332,28 @@ struct FResultPlayerUnitBulkLocations
 };
 
 /**
+ * @brief Says for which AI player a strategic request batch is answered, with the relations of that player copied
+ * by value: the async thread cannot read player relations. Stamped by the strategic AI component at every send.
+ * The defaults describe the first AI player fighting only the human, as when there was one AI player.
+ */
+USTRUCT()
+struct FStrategicAIRequester
+{
+	GENERATED_BODY()
+
+	// Plain members: the struct only travels by C++ copy inside the batch, nothing reads it through reflection.
+
+	// "Own" units in the helpers (base buildings, tanks to retreat, hazmats) are owned by exactly this player.
+	int32 RequestingPlayer = RTSPlayers::FirstAIPlayer;
+
+	// Bits of the players this player fights: the "player" units of the request and result structs.
+	uint8 HostileMask = RTSPlayers::HumanPlayerBit;
+
+	// Bits of this player and its allies: only used to keep generated positions clear of friendly units.
+	uint8 FriendlyMask = static_cast<uint8>(1 << (RTSPlayers::FirstAIPlayer - 1));
+};
+
+/**
  * @brief Aggregates multiple strategic AI request types into a single async batch.
  * Used to enqueue all pending strategic AI queries for one async processing pass.
  *
@@ -1399,6 +1422,10 @@ struct FStrategicAIRequestBatch
 	/** Batches tactical mine-location queries using game-thread snapshots only. */
 	UPROPERTY()
 	TArray<FFindMineLocations> FindMineLocationsRequests;
+
+	/** The AI player all requests of this batch are answered for; set on the game thread when the batch is sent. */
+	UPROPERTY()
+	FStrategicAIRequester Requester;
 };
 
 /**

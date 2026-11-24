@@ -13,7 +13,9 @@
 #include "RTS_Survival/Units/SquadController.h"
 #include "RTS_Survival/Units/Squads/SquadUnit/AnimSquadUnit/SquadUnitAnimInstance.h"
 #include "RTS_Survival/Weapons/InfantryWeapon/InfantryWeaponMaster.h"
+#include "RTS_Survival/Game/Players/RTSPlayers.h"
 #include "RTS_Survival/Utils/AOE/FRTS_AOE.h"
+#include "RTS_Survival/Utils/CollisionSetup/RTSPlayerCollision.h"
 #include "TimerManager.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/SkeletalMesh.h"
@@ -37,25 +39,21 @@ namespace GrenadeComponentConstants
 	// A target vehicle that drove further than this many throw ranges from the thrower is no longer followed.
 	constexpr float MaxTrackedVehicleRangeMultiplier = 2.f;
 
-	ECollisionChannel GetVictimObjectType(const int32 OwningPlayer)
-	{
-		return OwningPlayer == 1 ? COLLISION_OBJ_ENEMY : COLLISION_OBJ_PLAYER;
-	}
-
 	/**
-	 * @brief Closest hull of an armored vehicle of the victim side around a location.
+	 * @brief Closest hull of an armored vehicle the thrower fights around a location.
 	 * @param World World to search.
 	 * @param Location Search center.
 	 * @param SearchRadius Search radius.
-	 * @param VictimObjectType Collision object type of the side the grenade hurts.
+	 * @param ThrowingPlayer Player that throws the grenade; only vehicles hostile to it count.
 	 * @param IgnoredActor Actor to leave out (the grenade itself).
 	 * @return The hull component, or null when no armored vehicle is that close.
 	 */
 	UPrimitiveComponent* FindClosestVehicleHull(UWorld& World, const FVector& Location, const float SearchRadius,
-	                                            const ECollisionChannel VictimObjectType, const AActor* IgnoredActor)
+	                                            const int32 ThrowingPlayer, const AActor* IgnoredActor)
 	{
 		FCollisionObjectQueryParams ObjectQueryParams;
-		ObjectQueryParams.AddObjectTypesToQuery(VictimObjectType);
+		FRTSPlayerCollision::AddObjectTypesForOverlapLogic(
+			ObjectQueryParams, FRTSPlayerCollision::GetOverlapLogicForHostilesOf(ThrowingPlayer));
 		const FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(GrenadeFindVehicleHull), false, IgnoredActor);
 		TArray<FOverlapResult> Overlaps;
 		World.OverlapMultiByObjectType(Overlaps, Location, FQuat::Identity, ObjectQueryParams,
@@ -69,6 +67,11 @@ namespace GrenadeComponentConstants
 			// Only armored vehicles take a sticky grenade; soldiers and buildings do not.
 			if (not IsValid(OverlapActor) || not IsValid(OverlapComponent) ||
 				not IsValid(OverlapActor->FindComponentByClass<UArmorCalculation>()))
+			{
+				continue;
+			}
+			// Allied AI vehicles share the object channel of hostile ones.
+			if (not FRTSPlayerCollision::IsHitDamageableByPlayer(OverlapActor, OverlapComponent, ThrowingPlayer))
 			{
 				continue;
 			}
@@ -420,7 +423,7 @@ AActor* AGrenadeActor::TryStickToVehicle()
 	}
 	const FVector LandingLocation = GetActorLocation();
 	UPrimitiveComponent* ClosestHull = FindClosestVehicleHull(
-		*World, LandingLocation, StickToVehicleSearchRadius, GetVictimObjectType(M_ThrowOwningPlayer), this);
+		*World, LandingLocation, StickToVehicleSearchRadius, M_ThrowOwningPlayer, this);
 	if (not IsValid(ClosestHull))
 	{
 		return nullptr;
@@ -479,7 +482,7 @@ void AGrenadeActor::ShowFuseWarning(const float FuseSeconds, const bool bIsStuck
 	RadiusPool->SetRTSRadiusScalarParameter(M_FuseWarningRadiusId, FuseWarningDurationParameter, FuseSeconds);
 	// Player grenades show in a calmer colour than the enemy's.
 	RadiusPool->SetRTSRadiusScalarParameter(M_FuseWarningRadiusId, FuseWarningIsEnemyParameter,
-	                                        M_ThrowOwningPlayer == 1 ? 0.f : 1.f);
+	                                        FRTSPlayers::IsHumanPlayer(M_ThrowOwningPlayer) ? 0.f : 1.f);
 	if (bIsStuckToVehicle)
 	{
 		RadiusPool->AttachRTSRadiusToActorYawOnly(M_FuseWarningRadiusId, this, FVector::ZeroVector);
@@ -512,7 +515,6 @@ void AGrenadeActor::Explode()
 	UNiagaraComponent* ImpactEffect = PlayExplosionFX(ExplosionLocation);
 	if (DamageParams.AoeRange > 0.f && DamageParams.Damage > 0.f)
 	{
-		const ETriggerOverlapLogic OverlapLogic = GetOverlapLogicForOwningPlayer(M_ThrowOwningPlayer);
 		const TArray<TWeakObjectPtr<AActor>> ActorsToIgnore;
 		// Measured to each victim's hull: a grenade on a tank's engine deck is inside the radius of that tank.
 		constexpr EAoeFalloffDistance FalloffDistance = EAoeFalloffDistance::ClosestCollision;
@@ -527,7 +529,7 @@ void AGrenadeActor::Explode()
 			DamageParams.ArmorPenFallOff,
 			DamageParams.MaxArmorPen,
 			DamageParams.DamageType,
-			OverlapLogic,
+			FAoeInstigator::HostilesOf(M_ThrowOwningPlayer),
 			EShieldDamageSource::Shrapnel,
 			ActorsToIgnore,
 			EVehicleModuleSplashPolicy::DamageExternalModules,
@@ -539,11 +541,6 @@ void AGrenadeActor::Explode()
 	OnGrenadeExploded.Broadcast(this, ExplosionLocation);
 	ResetGrenade();
 	DestroyIfReleased();
-}
-
-ETriggerOverlapLogic AGrenadeActor::GetOverlapLogicForOwningPlayer(const int32 OwningPlayer)
-{
-	return OwningPlayer == 1 ? ETriggerOverlapLogic::OverlapEnemy : ETriggerOverlapLogic::OverlapPlayer;
 }
 
 bool AGrenadeActor::StartBurnArea(const FGrenadeComponentSettings& DamageParams, const FVector& BurnLocation,
@@ -574,7 +571,7 @@ bool AGrenadeActor::StartBurnArea(const FGrenadeComponentSettings& DamageParams,
 	M_BurnState.ArmorPenFallOff = DamageParams.ArmorPenFallOff;
 	M_BurnState.MaxArmorPen = DamageParams.MaxArmorPen;
 	M_BurnState.DamageType = DamageParams.DamageType;
-	M_BurnState.OverlapLogic = GetOverlapLogicForOwningPlayer(OwningPlayer);
+	M_BurnState.OwningPlayer = OwningPlayer;
 
 	World->GetTimerManager().SetTimer(
 		M_BurnState.BurnTickTimerHandle,
@@ -604,7 +601,8 @@ void AGrenadeActor::OnBurnTick()
 		M_BurnState.ArmorPenFallOff,
 		M_BurnState.MaxArmorPen,
 		M_BurnState.DamageType,
-		M_BurnState.OverlapLogic,
+		// Asked on every tick: whoever became allied with the thrower meanwhile stops burning.
+		FAoeInstigator::HostilesOf(M_BurnState.OwningPlayer),
 		EShieldDamageSource::Flamethrower,
 		ActorsToIgnore,
 		EVehicleModuleSplashPolicy::Ignore,
@@ -953,7 +951,7 @@ void UGrenadeComponent::CacheTargetVehicle(const FVector& TargetLocation)
 		return;
 	}
 	const UPrimitiveComponent* TargetHull = FindClosestVehicleHull(
-		*World, TargetLocation, TargetVehicleSearchRadius, GetVictimObjectType(M_OwningPlayer), GetOwner());
+		*World, TargetLocation, TargetVehicleSearchRadius, M_OwningPlayer, GetOwner());
 	AActor* TargetVehicle = IsValid(TargetHull) ? TargetHull->GetOwner() : nullptr;
 	if (not IsValid(TargetVehicle))
 	{

@@ -42,7 +42,10 @@ public:
 	 */
 	void RequestAttackMoveTarget(const bool bIsInCombat, TFunction<void(AActor*)> OnTargetFound);
 
-	/** @return Whether this owner may attack the target: visible for the player, alive for the AI. */
+	/**
+	 * @return Whether this owner may attack the target: not owned by itself or an ally, and visible for the human
+	 * player or alive for an AI player.
+	 */
 	bool GetIsEngageableTarget(AActor* Target) const;
 	
 

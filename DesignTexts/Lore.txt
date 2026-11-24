@@ -1,72 +1,292 @@
 ﻿2 Lore Introduction
 
-In the waning months of the Second World War, a desperate race to harness the destruc-
-tive might of atomic energy forever altered the course of human history. In September of
-1944, a few days after the first successful V2 rocket attacks from Germany against London
-Soviet spies successfully infiltrated Germany’s V2 rocket program, capturing intelligence
-and technological blueprints.
-With this stolen knowledge, Soviet engineers developed an intercontinental ballistic mis-
-sile capable of delivering payloads across vast distances. While in complete secrecy, Soviet
-scientists were at that time nearly completed with their atomic weapon program, ultima-
-tely mounting these onto their adapted V2 rockets. Meanwhile, the Western Allies and
-Germans frantically pursued their atomic programs but failed to complete their develop-
-ments in time.
-This technological edge made the war decisively one-sided. Only the Soviet Union suc-
-cessfully developed nuclear weapons, which they first unleashed against Germany.
-Following this Soviets declared war on Japan in August 1945, invading Japanese-held
-territories in Manchuria and northern China. Escalating hostilities between the two po-
-wers intensified after Japan refused unconditional surrender, mobilising defensive efforts
-and initiating preemptive strikes against Soviet positions in East Asia. In response, Sta-
-lin authorised the use of nuclear weapons against Japan, devastating major cities and
-military installations, effectively ending Japanese resistance and completing Soviet domi-
-nance across Eurasia.
-Determined to end the war swiftly and decisively, Soviet leadership saw the Axis po-
-wers’ defeat as merely the first step toward establishing global dominance. As mistrust
-and ideological tensions escalated rapidly between the Soviet Union and Western Allies,
-the Soviets preemptively struck the American and British and French forces to elimi-
-nate potential future threats. What followed was massive devastation—cities reduced to
-rubble, armies annihilated, and humanity plunged into a catastrophic state.
+Operation Svarog & why
 
-2.1 Radixite Birth
+The Central Soviet Directorate (CSD) is the last superpower standing. The Soviets used nukes to win
+WW2, so why do they no longer use them? That question, and many others, is what the player should be
+asking after the intro cinematic.
 
-The Soviets failed to anticipate the catastrophic environmental repercussions of their
-nuclear bombardments. The detonations released enormous amounts of radioactive ma-
-terial into the atmosphere, reducing sunlight and initially leading scientists to predict a
-nuclear winter. Yet, something unexpected occurred—the nuclear detonations and sub-
-sequent radiation created unique geological and atmospheric conditions that birthed a
-new crystalline substance: Radixite. These luminous crystals released heat and energy,
-counteracting the cooling effects scientists had anticipated. Instead of plunging into a
-prolonged winter, the Earth’s climate warmed dramatically, transforming landscapes into
-barren, Mars-like deserts perpetually engulfed by intense dust storms. Radixite became
-the catalyst for this radical and enduring climatic shift.
+The resistance faction is German and is caught between the eastern and western powers. It makes
+perfect sense that they are not up to date with everything that happened. The player should feel the
+same way at the start of the game: they only know fragments, and most of those are wrong.
 
-2.2 How Sovjet Russia became a main power
+2.0 High level timeline
 
-The Russians fared relatively well, primarily due to their distance from the blasts and
-their vast, sparsely populated territories and extensive underground bunkers, initially con-
-structed to withstand conventional warfare. These isolated facilities, many deep within
-Siberia and other remote regions, shielded significant numbers of their population and
-military infrastructure from direct nuclear impacts.
+October 1944 (shown in the intro cinematic)
+  A month after the first V2 launch at England, Soviet spies get access to German V2 technology.
 
-2.3 How Nomads Emerged
+January 1945 - The Fall of the Reich
+  The Soviets successfully launch a V2-like rocket carrying their nuke at Berlin.
 
-Decades later, the survivors emerged into a transformed world. Civilization as it once was
-lay in ruin; remnants of former greatness—twisted, rusted steel skeletons of buildings,
-scattered vehicle parts, and World War II artefacts—were strewn across the wasteland.
-Amidst these radiant ruins, factions began to form anew, driven by the desperate need
-to control precious resources.
-The Russians, having weathered the storm better than most, consolidated power within
-formidable, concrete-reinforced bases. They leveraged their surviving technology and su-
-perior numbers, becoming the dominant force in this harsh new world. With no central
-authority left standing, scattered groups of German and Western Allies survivors adap-
-ted to nomadic lifestyles, scavenging for essential resources—particularly the valuable
-Radixite crystals.
-Now, the world is on the brink of a renewed conflict. The Russian leadership, aware
-of the destabilising effects of nuclear weaponry, prefers to rely on conventional military
-might to maintain control. Fearful of causing further environmental catastrophe, they
-refrain from deploying nuclear arsenals—at least for now.
+May 1945 - The Manhattan Catastrophe
+  Fearing retaliation, the Soviets launch a coordinated, long-range atomic strike on the American
+  Manhattan Project facilities. The US and UK are crippled, their leadership scattered, and World
+  War II effectively ends with absolute Soviet hegemony.
+
+August 1945 - The Purple Death is unleashed
+  With their militaries shattered, a rogue faction of surviving Allied scientists and intelligence
+  officers enacts a doomsday revenge protocol. They release the "Phytophage" over the Ukrainian and
+  Siberian breadbaskets, timed with the autumn harvest, to starve the Soviet juggernaut. It
+  immediately mutates out of control.
+
+1945 - 1946 - The Choking Year
+  Things happen very quickly. The Phytophage mutates ridiculously fast. It consumes not only the
+  wheat it was designed for but other biological material as well. Millions die directly from
+  exposure to what is now called the green death. The Phytophage jumps continents, destroys most of
+  the food on Earth and starves millions more.
+
+1946 - 1947 - Operation Svarog
+  As a desperate act to stop the Phytophage spreading further east, the Soviets execute Operation
+  Svarog: they nuke several parts of their own land, creating abiotic firebreaks, and then retreat
+  behind the Ural Shield. A massive, mostly unrecorded war raged across European soil, likely
+  between advancing Red Army units and hundreds of thousands of scattered Western divisions.
+
+1948 - 1975 - A Revolution
+  Something changed in the Soviet dictatorship. The absolute rule of a single dictator was violently
+  dismantled (see The Directorial Power) and replaced by the CSD.
+
+1976 - The player's era (30 years later)
+  For thirty years the CSD has locked itself behind the iron walls of the Ural Shield, with only
+  scattered Soviet outposts throughout western Europe. They believe Svarog erased the Germans.
+  They are wrong.
+
+2.1 The Phytophage
+
+Known as the Phytophage, the pathogen did not just kill crops. It mutated, jumping to all cellulose
+and organic matter. It turned forests into toxic, self-combusting peat bogs and choked rivers with
+black (purple), suffocating algae. It was fast, airborne, and threatened to starve the entire planet
+within years.
+
+In 1976 the purple Phytophage is still active in some areas.
+
+2.2 Radixite Birth
+
+When the CSD enacted Operation Svarog, the V2 nukes did not just incinerate the Phytophage. They
+caused a catastrophic chemical reaction. The intense atomic heat fused the bio-engineered Phytophage
+matter with irradiated minerals, which created what is now called Radixite.
+
+- This is why Radixite seems alive: part of the bio-weapon is still in there. (In game it already
+  grows and makes sound.)
+- Because of its organic origin it acts like a sponge for radiation.
+- Because of the Phytophage it grows roots like plants. (Already in the game.)
+- Maturation: it takes decades for the Radixite veins to grow deep into the crust and boil off the
+  oceans and water tables, transforming the world into scorched desert.
+- Some water still remains but is clearly contaminated.
+- The Radixite heating effect is everywhere.
+
+2.3 Why nukes are no longer used ("The Dead Sky Threshold")
+
+The sky is dark but the ground is boiling.
+
+- The Chain Reaction Risk: Radixite is highly volatile when exposed to atomic fission, which is why
+  the CSD no longer uses nukes.
+- The Powder Keg Effect: dropping a nuke on the surface is like lighting a fuse that runs straight to
+  the planet's core. The atomic heat travels along the Radixite root system at supersonic speeds.
+
+2.4 The Directorial Power
+
+Why is there not a single dictator? The Svarog Mutiny. Stalin went mad after his daughter died to the
+Purple Death, and launched more nukes on the motherland in the hope of wiping it out. (IRL Svetlana
+was his only daughter; he was close to her.) A mutiny came and resulted in a coup.
+
+The power is divided into three pillars, the Troika of the CSD:
+
+- Director of Shield (the Weapon): exterior military and perimeter defence. Commands the heavy tanks
+  and mechs, artillery arrays, and the shock-troops that guard the glassed Svarog Line.
+- Director of Forge (the Engine): oversees the massive subterranean foundries. Their troops wear
+  heavy thermal shielding and cryo-suits, and wield Radixite-powered weaponry.
+- Director of Harvest (the Sustenance): controls the food supply.
+
+2.5 How Nomads Emerged
+
+The survivors adapted to the heated landscape. Remnants of former greatness (twisted, rusted steel
+skeletons of buildings, scattered vehicle parts, and World War II artefacts) are strewn across the
+wasteland. Scattered groups of German and Western Allies survivors live as nomads, scavenging for
+essential resources, particularly Radixite crystals.
+
+The Burrowers
+Survival by going deep. When the firebreaks were detonated, remnants of local populations, scattered
+military units, and miners retreated into the vast underground networks of Western Europe and
+western Russia (metro systems, deep salt mines, subterranean military bunkers).
+
+  The "Gandy-Dancers" (Armored Combat Engineers): named after old-time American railroad track crews,
+  these are the shock-troops of excavation. They do not just clear the path; they build the war zone.
+
+2.6 What the player thinks vs. what they discover
+
+Several things are very unclear to the player at the start:
+- Why would the Soviets nuke part of their own land? (The player is led to believe it was due to a
+  second war with the Western coalition.)
+- Why did the Soviets stop using nukes?
+- How was Radixite formed exactly?
+- Why are there transition zones of purple mold-like glue to Radixite?
+- What weapon did the Western coalition unleash against the Soviet nuclear empire?
+- Aren't the Soviets supposed to be a dictatorship? Why is it now acting like a board?
+
+Act 1: The Purple Death
+  Thinks: the Allies dropped a generic bio-weapon that killed millions on contact.
+  Discovers: it was not meant to kill people directly. It was a desperate famine weapon (the
+  Phytophage) that mutated out of control.
+  - Environmental clues: ruined Soviet agricultural sectors (massive, rusted silo complexes). The
+    ground is choked with fossilized, blackened, twisted roots instead of normal ruins.
+  - The Drop Pods: a crashed, 30-year-old Allied stealth bomber or payload pod. Inside are rusty
+    canisters labelled "Project Demeter: Wheat Defoliant - For Agricultural Targets Only."
+  - Audio logs / intel: old, desperate radio recordings of Allied scientists crying, realizing the
+    pathogen has jumped from cellulose to human tissue, apologizing for dooming the world.
+
+Act 2: The Firebreak (the truth of Operation Svarog)
+  Thinks: the Soviets nuked their own territory in a fit of paranoid madness, or to scorch the earth
+  against the Western coalition.
+  Discovers: the nukes were surgical tools. They created a "Glass Wall" to stop the Phytophage
+  reaching the Ural Mountains.
+  - The Svarog Line: a perfectly straight, 50-mile-wide canyon of smooth, green, vitrified glass.
+  - Abandoned command posts: inside ruined CSD watchtowers along the glass line, tactical maps show
+    the relentless eastward spread of the "Green Death" stopping exactly where the nukes were dropped.
+  - The narrative shift: the CSD did not nuke their own cities out of cruelty. They sacrificed
+    millions of their own people to build an abiotic wall to save the rest.
+
+Act 3: The Beating Heart (the truth of Radixite)
+  Thinks: Radixite is a weird, volatile rock caused by radiation that powers their weapons.
+  Discovers: Radixite is a living, subterranean root network. It is the fossilized, mutated remains
+  of the Phytophage, feeding on atomic energy.
+  - Mining outposts: at a CSD Radixite mining facility, instead of pickaxes the CSD uses extreme
+    cryo-tech to "sedate" the crystals before harvesting.
+  - Interactive environments: when the player fires heavy weapons or uses Radixite-powered gear near
+    natural veins, the crystals glow brighter, pulse, and physically expand toward the heat source.
+
+Act 4: The Kola Incident (why nukes are banned)
+  Thinks: the Soviets stopped using nukes because they ran out, or because the atmosphere could not
+  take it.
+  Discovers: dropping a nuke will ignite the Radixite root network and blow the planet's crust apart
+  from the inside.
+
+2.7 Visual design of the Phytophage
+
+Very distinctive from the Radixite crystal: a purple, wet and moldy look.
+- Specular gloss map (wetness shader).
+- Very slow, sine-wave driven WPO coupled with a panning normal map, for slow movement and maybe a
+  glow effect depending on the normal map.
+- Fresnel effect mapped to the edges of the mesh geometry, combined with a highly contrasting
+  roughness map. Deep crevices and thick bulges are hyper-glossy and wet; as the mesh wraps around
+  corners the Fresnel scatters light to simulate millions of tiny, dry fungal hairs.
+
+Mesh design: The Suffocator
+- The Creeping Mats: a thick, sagging blanket. When it fills a hallway it covers and rounds out the
+  sharp corners of the walls. It hangs from the ceiling in heavy, purple, dripping shapes like melted
+  wax or thick, cooling tar.
+- Necrotic Pustules: dark purple pods in tight clusters in room corners or around pipes. Some look
+  shriveled and dead; others are still swollen and tight.
+- The Veins: thick, raised tubes connecting the mats that pulse gently like human blood vessels.
+  They actively search for organic things, wrapping tightly around old wooden supply crates and the
+  bones of 1940s soldiers, completely swallowing them.
+
+The Radixite Transition (visual storytelling): in levels near the nuclear impact craters, the player
+finds a room covered in purple Tar-Blight. Closer to a massive blast hole in the wall, the purple mesh
+physically shatters and spikes, transitioning seamlessly into the jagged, glowing orange crystals of
+Radixite. It is the visual proof that the bio-weapon and the fuel source are the same entity.
+
+2.8 Start of game cinematic
+
+Near the end of WW2 the Soviets unlocked the nuke first and added it to stolen V2 rocket tech.
+
+"Kommandant it is good to have you back. It is my job to brief you on what we know today."
+
+"In October of 1944, a month after we successfully launched our first V2 rocket against ze British,
+Soviet spies managed to capture our blueprints and created their own rocket program."
+
+"History remembers 1945 as the year ze world broke. We were told the atomic bomb was decades away.
+But God, were we wrong. Ze Soviets managed to win the race for the atom and zhey used our rocket
+technology to carry it."
+
+[Show the nuke part of the cinematic]
+"Berlin was ze first target und many followed."
+
+"But as intel shows us now, ze Third Reich wasn't zheir only target. Und in May 1945 zhey struck
+across the ocean, nuking the facilities of the Manhattan Project; clearly afraid of ze western
+coalition developing nuclear technology of their own!"
+
+"Clearly ze western powers could not accept defeat and in zheir dying breath zhey unleashed something
+else, not a bomb but a silent weapon of some biological material. Whatever ze hell it was, it worked
+too well. Millions died to direct contact with it. As far as we know it was some kind of bio weapon
+for genocide."
+
+"Things escalated quickly after zhis and we think ze Soviets nuked most parts of Eurasia as part of a
+larger war which they thought against the western coalition. After zhis zhey moved far eastward and
+hid behind the Ural Shield."
+
+"The atomic fire sank deep into the bedrock and the radioactive material fused with the biological
+parts of what we assume to be the western bio weapon. This caused a chemical reaction we now call
+Radixite. Radixite is powerful as a resource but it seems alive and very unstable."
+
+"These chemical reactions have caused massive heat waves which dried up most bodies of water and
+turned many parts of the landscape into a scorching desert."
+
+"For reasons unknown now the Soviets have stopped using nukes ever since."
+
+"It has been thirty years. Our survivors have adapted to the heated landscape. They think they
+sterilized the earth. They think we are dead. It's time to show them what survived the fire!"
+
+2.9 Website timeline (archival text)
+
+"Archival Notice: About what follows, a lot is as of yet unknown. Thirty years of static, ash, and,
+well, the nukes, left huge blackouts in our history. What is presented here is compiled from the
+limited data available."
+
+The Stolen Blueprints - October 1944
+  Soviet spies infiltrate classified testing facilities, securing advanced German V2 rocket
+  blueprints just a month after they first strike across the English Channel. While it seemed that
+  atomic weapons were still far away for the Western allies, the Soviets are ahead of the race and
+  use the V2 technology to build the world's first nuclear missile.
+
+The Fall of the Reich - January 1945
+  The Soviets successfully launch a modified V2 rocket. Its target: Berlin. The resulting atomic
+  detonation instantly vaporises the city, breaking what was left of the German war machine in a
+  single strike.
+
+The Manhattan Preemption - May 1945
+  Because of failing diplomacy and fearing the Western Coalition is developing a nuclear arsenal of
+  their own, the Soviets strike across the ocean. Manhattan Project facilities are wiped out.
+  Western leadership is scattered, and World War II seems to end in absolute Soviet hegemony...
+
+The Purple Death - August 1945
+  Unable to accept defeat, a rogue faction of the shattered Western powers enacts some kind of
+  desperate doomsday protocol.
+  Archival Notice: Apart from the mold-like purple growth found all over Europe not much is known
+  about this presumably genocidal weapon.
+
+Operation Svarog - 1946 - 1947
+  A massive, mostly unrecorded war raged across European soil, likely between advancing Red Army
+  units and hundreds of thousands of scattered Western divisions. For reasons unknown, the Soviets
+  began nuking vast amounts of territory they already controlled, which we later came to know as
+  Operation Svarog. This ended with most Soviet troops and civilians retreating eastward behind the
+  iron gates of the Ural Shield.
+
+A Revolution - 1948 - 1975
+  Following the blasts something changed in the Soviet Union's dictatorship. The absolute rule of a
+  single dictator, the defining pillar of the Soviet state, was violently dismantled. In their place
+  stood The Central Soviet Directorate (CSD), a technocratic military oligarchy governed by a supreme
+  council of three: The Troika.
+  CSD Troika = Director of Shield (The Weapon) + Director of Harvest (The Sustenance)
+               + Director of the Forge (The Engine)
+
+The Resistance - 1976
+  For thirty years, while the CSD Troika locked themselves behind the iron walls of the Ural Shield,
+  there have been only scattered Soviet outposts throughout western Europe. They believe Svarog
+  erased us, but they are wrong. And now the time has come to take what is ours!
+
+2.10 Kassel Eisenwerk (mission intro lines)
+
+[Heavy German accent] "Herzlich willkommen in Kassel-Eisenwerk, Kommandant! [confusion] Or, well,
+whatever ist left of ze place anyway."
+
+[Heavy German accent] "When ze CSD detonated ze Operation Svarog und withdrew behind ze Ural Shield,
+they didn't abandon the West entirely."
+
+[Heavy German accent] "Some points are still held under firm control by ze Director of Shield. Ze old
+Eisenwerk is of strategic importance to ze Soviets."
 
 characters:
+(Carried over from the previous version of this file; not yet revised for the CSD / Troika setting.)
 🔶 1. The Hazmat Trooper — “The Canary”
 
 Role: Early-game presence, frontline scout, first taste of Soviet power.

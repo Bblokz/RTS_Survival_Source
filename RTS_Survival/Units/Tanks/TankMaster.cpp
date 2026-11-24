@@ -6,6 +6,7 @@
 #include "AITankMaster.h"
 #include "Components/AudioComponent.h"
 #include "RTS_Survival/DeveloperSettings.h"
+#include "RTS_Survival/Game/Players/RTSPlayers.h"
 #include "RTS_Survival/RTSComponents/RTSOptimizer/RTSOptimizer.h"
 #include "RTS_Survival/Units/Ragdoll/RTSRagdollSettings.h"
 #include "RTS_Survival/Units/Ragdoll/RTSRagdollSubsystem.h"
@@ -834,12 +835,13 @@ void ATankMaster::SetupCollisionForMeshAttachedToTracks(UMeshComponent* MeshToSe
 {
 	(void)bIsHarvester;
 
-	bool bOwnedByPlayer1 = false;
+	// Without an RTS component the mesh is set up as that of the first AI player, as it always was.
+	int32 OwningPlayer = RTSPlayers::FirstAIPlayer;
 	if (GetIsValidRTSComponent())
 	{
-		bOwnedByPlayer1 = RTSComponent->GetOwningPlayer() == 1;
+		OwningPlayer = RTSComponent->GetOwningPlayer();
 	}
-	FRTS_CollisionSetup::SetupCollisionForMeshAttachedToTracks(MeshToSetup, bOwnedByPlayer1);
+	FRTS_CollisionSetup::SetupTrackAttachedMeshCollision(MeshToSetup, OwningPlayer);
 }
 
 
@@ -1120,6 +1122,19 @@ void ATankMaster::SetUnitToIdleSpecificLogic()
 			// Try to target the last actor if it is still in range.
 			EachTurret->SetAutoEngageTargets(true);
 		}
+	}
+}
+
+bool ATankMaster::GetMustFinishActiveCommandBeforeNewOrder() const
+{
+	return IsValid(M_HarvesterComponent) && M_HarvesterComponent->GetIsLockedForUnload();
+}
+
+void ATankMaster::OnNewOrderHeldBehindActiveCommand()
+{
+	if (IsValid(M_HarvesterComponent))
+	{
+		M_HarvesterComponent->HoldNewOrderUntilUnloaded();
 	}
 }
 
@@ -1534,6 +1549,15 @@ bool ATankMaster::GetIsValidOptimizationComponent() const
 	RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, "M_OptimizationComponent",
 	                                                      "ATankMaster::GetIsValidOptimizationComponent");
 	return false;
+}
+
+void ATankMaster::SetUnitOptimizationEnabled(const bool bEnable)
+{
+	if (not GetIsValidOptimizationComponent())
+	{
+		return;
+	}
+	M_OptimizationComponent->SetOptimizationEnabled(bEnable);
 }
 
 bool ATankMaster::GetCanThrowCrewOnDeath() const

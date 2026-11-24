@@ -184,6 +184,29 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Camera")
 	void MoveCameraOverTime(const FMovePlayerCamera& NewMove);
 
+	/** @return False when there is no camera pawn (menu maps). */
+	bool GetCameraPawnPose(FVector& OutLocation, FRotator& OutRotation) const;
+
+	// True while a MoveCameraOverTime move runs or waits in the queue; it places the pawn every frame until done.
+	bool GetIsMovingOverTime() const { return bM_IsCameraMoving || M_CameraMoveQueue.Num() > 0; }
+
+	/**
+	 * @brief Scripted camera shots (mission location intros) place the pawn every frame while player input is locked.
+	 * The move keeps to the camera bounds, so it stops at a boundary instead of leaving the playable area.
+	 */
+	void ApplyScriptedCameraPose(const FVector& Location, const FRotator& Rotation);
+
+	/**
+	 * @brief Reads what a scripted shot needs to aim the camera at a ground point.
+	 * @param OutArmLength Current spring arm length (zoom).
+	 * @param OutArmRelativeRotation Spring arm rotation relative to the camera pawn (its fixed RTS tilt).
+	 * @return False when there is no camera pawn or spring arm.
+	 */
+	bool GetScriptedCameraArmState(float& OutArmLength, FRotator& OutArmRelativeRotation) const;
+
+	/** Scripted shots (mission camera tours) set the zoom while player input is locked; no zoom limits apply. */
+	void ApplyScriptedCameraArmLength(const float ArmLength) const;
+
 
 	virtual void BeginPlay() override;
 	virtual void PostInitProperties() override;

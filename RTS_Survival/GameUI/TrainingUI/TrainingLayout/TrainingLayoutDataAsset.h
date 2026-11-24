@@ -59,7 +59,7 @@ private:
 
 	/**
 	 * @brief The German headquarters layout both doctrines share; a doctrine adds its own field defenses to it.
-	 * @param DoctrineFieldDefenses Field defense slots appended after the shared ones.
+	 * @param DoctrineFieldDefenses The doctrine's own field defense slots, shown in Barriers after the field trench.
 	 * @return The headquarters building layout.
 	 */
 	static FTrainingLayoutBuilding MakeDefaultHeadquartersLayout(

@@ -11,6 +11,7 @@
 
 #include "Abilities.h"
 #include "InputAction.h"
+#include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "EnhancedInputSubsystemInterface.h"
 #include "InputMappingContext.h"
@@ -63,6 +64,7 @@
 #include "RTS_Survival/GlobalAbilitySystem/GlobalAbilities/GlobalAbilityCostState.h"
 #include "RTS_Survival/GlobalAbilitySystem/GlobalAbilities/GlobalAbilityHelpers.h"
 #include "RTS_Survival/GlobalAbilitySystem/GlobalAbilitiesManager/GlobalAbilitiesManager.h"
+#include "RTS_Survival/GlobalAbilitySystem/UI/GlobalAbilityPanel/W_GlobalAbilityPanel.h"
 #include "RTS_Survival/LandscapeDeformSystem/LandscapeDeformManager/LandscapeDeformManager.h"
 #include "RTS_Survival/MasterObjects/HealthBase/HpCharacterObjectsMaster.h"
 #include "RTS_Survival/Missions/MissionManager/MissionManager.h"
@@ -970,11 +972,115 @@ void ACPPController::OnNomadicExpansionShortCut()
 
 void ACPPController::OnBxpShortCut(const int32 BxpIndex)
 {
+	if (bM_IsMainMenuController || not IsValid(M_MainGameUI) || not M_MainGameUI->IsVisible())
+	{
+		// No bxp panel to click: main menu, HUD not created yet, or hidden by a cinematic take-over.
+		return;
+	}
 	if (not EnsureIsValidBuildingUI_ItemPanel())
 	{
 		return;
 	}
-	M_BuildingUI_ItemPanel->SimulateClickBuildingExpansion(BxpIndex);
+	M_BuildingUI_ItemPanel->TryActivateBuildingExpansionFromHotkey(BxpIndex);
+}
+
+void ACPPController::OnGlobalAbilityShortCut(const int32 GlobalAbilitySlotIndex)
+{
+	if (bM_IsMainMenuController || not IsValid(M_MainGameUI) || not M_MainGameUI->IsVisible())
+	{
+		// No sidebar to fire from: main menu, HUD not created yet, or hidden by a cinematic take-over.
+		return;
+	}
+
+	UW_GlobalAbilityPanel* GlobalAbilityPanel = M_MainGameUI->GetGlobalAbilityPanel();
+	if (not IsValid(GlobalAbilityPanel))
+	{
+		return;
+	}
+
+	GlobalAbilityPanel->TryActivateAbilityFromHotkey(GlobalAbilitySlotIndex);
+}
+
+void ACPPController::SetupInput_BindChordedSlotHotkeys()
+{
+	if (bM_IsMainMenuController || not IsValid(M_ChordedActionInputMappingContext))
+	{
+		return;
+	}
+
+	UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(InputComponent);
+	if (not IsValid(EnhancedInputComponent))
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Chorded slot hotkeys need an EnhancedInputComponent on the controller."));
+		return;
+	}
+
+	BindChordedSlotHotkeys(
+		EnhancedInputComponent,
+		RTSHotkeyTypes::GlobalAbilityHotkeySlotCount,
+		&RTSHotkeyTypes::GetGlobalAbilityActionName,
+		&ACPPController::OnGlobalAbilityHotkeyStarted);
+	BindChordedSlotHotkeys(
+		EnhancedInputComponent,
+		RTSHotkeyTypes::BuildingExpansionHotkeySlotCount,
+		&RTSHotkeyTypes::GetBuildingExpansionActionName,
+		&ACPPController::OnBuildingExpansionHotkeyStarted);
+}
+
+void ACPPController::BindChordedSlotHotkeys(
+	UEnhancedInputComponent* EnhancedInputComponent,
+	const int32 SlotCount,
+	FName (*GetSlotActionName)(int32),
+	void (ACPPController::*OnSlotHotkeyStarted)(const FInputActionInstance&))
+{
+	for (int32 SlotIndex = 0; SlotIndex < SlotCount; ++SlotIndex)
+	{
+		const FName ActionName = GetSlotActionName(SlotIndex);
+		const UInputAction* SlotAction = FindInputActionByName(M_ChordedActionInputMappingContext, ActionName);
+		if (not IsValid(SlotAction))
+		{
+			RTSFunctionLibrary::ReportError(
+				TEXT("Chorded mapping context has no slot hotkey action: ") + ActionName.ToString());
+			continue;
+		}
+
+		// Started fires once per press; the chord trigger reports Triggered on every frame the keys are held.
+		EnhancedInputComponent->BindAction(SlotAction, ETriggerEvent::Started, this, OnSlotHotkeyStarted);
+	}
+}
+
+void ACPPController::OnGlobalAbilityHotkeyStarted(const FInputActionInstance& ActionInstance)
+{
+	const UInputAction* SourceAction = ActionInstance.GetSourceAction();
+	if (not IsValid(SourceAction))
+	{
+		return;
+	}
+
+	const int32 SlotIndex = RTSHotkeyTypes::GetGlobalAbilitySlotFromActionName(SourceAction->GetFName());
+	if (SlotIndex == INDEX_NONE)
+	{
+		return;
+	}
+
+	OnGlobalAbilityShortCut(SlotIndex);
+}
+
+void ACPPController::OnBuildingExpansionHotkeyStarted(const FInputActionInstance& ActionInstance)
+{
+	const UInputAction* SourceAction = ActionInstance.GetSourceAction();
+	if (not IsValid(SourceAction))
+	{
+		return;
+	}
+
+	const int32 SlotIndex = RTSHotkeyTypes::GetBuildingExpansionSlotFromActionName(SourceAction->GetFName());
+	if (SlotIndex == INDEX_NONE)
+	{
+		return;
+	}
+
+	OnBxpShortCut(SlotIndex);
 }
 
 UPlayerPortraitManager* ACPPController::GetPlayerPortraitManager() const
@@ -1309,6 +1415,7 @@ bool ACPPController::GetIsFormationArrowDragReady() const
 void ACPPController::SetupInputComponent()
 {
 	Super::SetupInputComponent();
+	SetupInput_BindChordedSlotHotkeys();
 }
 
 void ACPPController::DisplayErrorMessage(const EPlayerError Error)
@@ -1441,6 +1548,24 @@ void ACPPController::MissionOnHqSpawned(const FUnitCost BonusPerResource)
 	}
 	M_PlayerResourceManager->AddCustomResourceBonuses(ExtraResourceBonuses);
 	OnPlayerProfileLoadComplete();
+}
+
+void ACPPController::RegisterPlayerHQ(ANomadicVehicle* PlayerHQ)
+{
+	if (not IsValid(PlayerHQ))
+	{
+		RTSFunctionLibrary::ReportError(TEXT("RegisterPlayerHQ was given no valid nomadic."));
+		return;
+	}
+	M_PlayerHQ = PlayerHQ;
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(M_HqReferenceHandle);
+	}
+	if (GetIsValidPlayerResourceManager())
+	{
+		M_PlayerResourceManager->SetupPlayerHQDropOffReference(M_PlayerHQ);
+	}
 }
 
 void ACPPController::SpawnReinforcementAttackWave(
@@ -2018,6 +2143,46 @@ bool ACPPController::MapTest_ClickFieldTrenchAt(const FVector& Location)
 	return false;
 }
 
+int32 ACPPController::MapTest_ConvertNomadicAt(ANomadicVehicle* NomadicTruck, const FVector& Location,
+                                               bool& bOutNeededBuildRadius)
+{
+	constexpr int32 InvalidInput = 0;
+	constexpr int32 Ordered = 1;
+	constexpr int32 NotATruck = 2;
+	constexpr int32 NoPreview = 3;
+	constexpr int32 SpotRejected = 4;
+	constexpr int32 ClickNotTaken = 5;
+	bOutNeededBuildRadius = false;
+	if (not IsValid(NomadicTruck) || not GetIsValidConstructionPreview())
+	{
+		return InvalidInput;
+	}
+	if (not NomadicTruck->GetIsInTruckMode())
+	{
+		return NotATruck;
+	}
+	SelectSingleUnitFromUI(NomadicTruck);
+	ConstructBuilding(NomadicTruck);
+	if (M_IsBuildingPreviewModeActive != EPlayerBuildingPreviewMode::NomadicPreviewMode)
+	{
+		return NoPreview;
+	}
+	bOutNeededBuildRadius = CPPConstructionPreviewRef->MapTest_GetNeedsBuildRadius();
+	if (not CPPConstructionPreviewRef->MapTest_EvaluateNomadicPlacement(Location))
+	{
+		StopPreviewAndBuildingMode(false);
+		return SpotRejected;
+	}
+	FVector ClickedLocation = Location;
+	if (TryPlaceBuilding(ClickedLocation))
+	{
+		StopPreviewAndBuildingMode(true);
+	}
+	const bool bTookOrder = NomadicTruck->GetHasCommandInQueue(EAbilityID::IdCreateBuilding)
+		|| not NomadicTruck->GetIsInTruckMode();
+	return bTookOrder ? Ordered : ClickNotTaken;
+}
+
 bool ACPPController::MapTest_PlaceFieldDefenseAt(const FVector& Location, float& OutInclineDegrees)
 {
 	OutInclineDegrees = 0.f;
@@ -2183,7 +2348,8 @@ bool ACPPController::OnBxpSpawnedAsync_InstantPlacement(
 	}
 	else
 	{
-		BxpRotation = FRotator::ZeroRotator;
+		// Same as the first placement: origin expansions turn with their building mesh (yaw only).
+		BxpRotation = FRotator(0.f, BxpOwner->GetAttachToMeshComponent()->GetComponentRotation().Yaw, 0.f);
 		BxpLocation = BxpOwner->GetAttachToMeshComponent()->GetComponentLocation();
 		if (BxpLocation.IsNearlyZero())
 		{
@@ -3480,6 +3646,13 @@ bool ACPPController::GetIsClickedUnitSelectable(AActor* ClickedActor) const
 	{
 		ASelectablePawnMaster* SelectablePawn = Cast<ASelectablePawnMaster>(ClickedActor);
 		if (not SelectablePawn || not SelectablePawn->GetRTSComponent())
+		{
+			return false;
+		}
+		// Units that are not the player's to command (supply trucks, scripted aircraft) ignore clicks like they
+		// ignore the marquee.
+		const USelectionComponent* PawnSelectionComponent = SelectablePawn->GetSelectionComponent();
+		if (IsValid(PawnSelectionComponent) && not PawnSelectionComponent->GetCanBeSelected())
 		{
 			return false;
 		}
@@ -7347,6 +7520,14 @@ void ACPPController::InitMiniMapWithFowDataOnMainMenu(const EMiniMapStartDirecti
 	M_MainGameUI->InitMiniMap(M_FowManager, StartDirection);
 }
 
+bool ACPPController::GetCanStartScreenTakeover() const
+{
+	return not M_PauseGameState.bM_IsGameLocked
+		&& not bM_IsCinematicTakeOverActive
+		&& not bM_IsInTechTree
+		&& not bM_IsInArchive;
+}
+
 bool ACPPController::PauseGame_GetIsGameLocked() const
 {
 	if (M_PauseGameState.bM_IsGameLocked)
@@ -8317,9 +8498,17 @@ void ACPPController::SetupGlobalAbilityManager(UMainGameUI* MainMenuWidget, cons
 	);
 #else
 	// Without a mission manager (skirmish, survival) the whole kit is available at its normal costs.
-	M_PlayerGlobabilitiesManager->SetPlayerMissionSettings(IsValid(MissionManager)
-		                                                       ? MissionManager->GetPlayerGlobalAbilitySettings()
-		                                                       : FMissionPlayerGlobalAbilitySettings());
+	FMissionPlayerGlobalAbilitySettings PlayerAbilitySettings = IsValid(MissionManager)
+		                                                            ? MissionManager->GetPlayerGlobalAbilitySettings()
+		                                                            : FMissionPlayerGlobalAbilitySettings();
+	const FWorldMissionContext WorldMissionContext = GameInstance->GetWorldMissionContext();
+	if (WorldMissionContext.GetIsCampaignOperation())
+	{
+		// In the campaign the player's rank caps the tier; the mission's own cap can only lower it further.
+		PlayerAbilitySettings.MaxAllowedTier = FMath::Min(PlayerAbilitySettings.MaxAllowedTier,
+		                                                  WorldMissionContext.CampaignGlobalAbilityTierCap);
+	}
+	M_PlayerGlobabilitiesManager->SetPlayerMissionSettings(PlayerAbilitySettings);
 
 	M_PlayerGlobabilitiesManager->InitGlobalAbilitiesManager(
 		1,

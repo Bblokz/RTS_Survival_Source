@@ -29,6 +29,7 @@
 #include "TrainingDescription/W_TrainingDescription.h"
 #include "TrainingRequirementWidget/W_TrainingRequirement.h"
 #include "TrainingUIWidget/TrainingItemState/TrainingWidgetState.h"
+#include "RTS_Survival/Missions/TrainingRestriction/MissionTrainingRestrictionSubsystem.h"
 
 class UTrainerComponent;
 
@@ -3000,6 +3001,7 @@ void UTrainingMenuManager::InitAllGameFieldDefenseTrainingOptions()
 	using DeveloperSettings::GameBalance::TrainingTime::GerPuppchenPitBuildTime;
 	using DeveloperSettings::GameBalance::TrainingTime::GerPanzerschreckPitBuildTime;
 	using DeveloperSettings::GameBalance::TrainingTime::GerRailPakBunkerBuildTime;
+	using DeveloperSettings::GameBalance::TrainingTime::GerConcreteBunkerBuildTime;
 	using DeveloperSettings::GameBalance::TrainingTime::GerTwinMG42PitBuildTime;
 
 	auto AddFieldDefenseTrainingOption = [this](const EBuildingExpansionType BxpType, URTSRequirement* Requirement,
@@ -3036,6 +3038,17 @@ void UTrainingMenuManager::InitAllGameFieldDefenseTrainingOptions()
 		EBuildingExpansionType::BTX_GerRailPakBunker,
 		FRTS_RequirementHelpers::CreateUnitRequirement(GetTransientPackage(), RequiredTierTwoBuilding),
 		GerRailPakBunkerBuildTime);
+	// The breakthrough doctrine's other concrete bunkers, beside the rail Pak bunker in its HQ layout.
+	for (const EBuildingExpansionType ConcreteBunker : {
+		     EBuildingExpansionType::BTX_GerFlak88Bunker, EBuildingExpansionType::BTX_GerFlakvierlingBunker,
+		     EBuildingExpansionType::BTX_GerPZ38TBunker
+	     })
+	{
+		AddFieldDefenseTrainingOption(
+			ConcreteBunker,
+			FRTS_RequirementHelpers::CreateUnitRequirement(GetTransientPackage(), RequiredTierTwoBuilding),
+			GerConcreteBunkerBuildTime);
+	}
 	// Never queued: the trench digs itself, so its training time is unused.
 	AddFieldDefenseTrainingOption(EBuildingExpansionType::BTX_GerFieldTrench, nullptr);
 }
@@ -3081,6 +3094,11 @@ void UTrainingMenuManager::OnLeftClickTrainingItem(const FTrainingWidgetState& T
 	const TArray<FTrainingSubSectionState>& SubSections = M_PrimarySelectedTrainer->GetTrainingSubSections();
 	if (not SubSections.IsValidIndex(M_ShownSubSectionIndex) || TrainingItem.ItemID.IsNone())
 	{
+		return;
+	}
+	if (GetIsOptionLockedByMission(TrainingItem.ItemID))
+	{
+		// The mission has not unlocked this yet (tutorial step); the item already shows as locked.
 		return;
 	}
 	// Queue items remember their option by its index over all sub sections.
@@ -3318,8 +3336,55 @@ FTrainingWidgetState UTrainingMenuManager::CreateWidgetStateForOption(const FTra
 		WidgetState.TrainingStatusSecondRequirement,
 		WidgetState.bIsSecondRequirementMet,
 		WidgetState.bIsFirstRequirementMet);
+	if (GetIsOptionLockedByMission(Option))
+	{
+		// Shown as one plain requirement: the mission's lock, nothing to build or research for it.
+		WidgetState.TrainingStatus = ETrainingItemStatus::TS_LockedByMission;
+		WidgetState.RequirementCount = ERequirementCount::SingleRequirement;
+		WidgetState.RequiredUnit = FTrainingOption();
+		WidgetState.RequiredTech = ETechnology::Tech_NONE;
+	}
 	WidgetState.VariantPresentation = GetVariantPresentationForOption(Option);
 	return WidgetState;
+}
+
+#if RTS_WITH_MAP_TESTS
+bool UTrainingMenuManager::MapTest_ClickTrainingOption(UTrainerComponent* Trainer, const FTrainingOption& Option,
+                                                       bool& bOutLockedByMission)
+{
+	bOutLockedByMission = false;
+	if (not IsValid(Trainer))
+	{
+		return false;
+	}
+	SetupTrainingOptionsForTrainer(Trainer, true);
+	const TArray<FTrainingSubSectionState>& SubSections = Trainer->GetTrainingSubSections();
+	for (int32 SubSectionIndex = 0; SubSectionIndex < SubSections.Num(); ++SubSectionIndex)
+	{
+		const int32 SlotIndex = SubSections[SubSectionIndex].Options.IndexOfByKey(Option);
+		if (SlotIndex == INDEX_NONE)
+		{
+			continue;
+		}
+		OnSubSectionTabClicked(SubSectionIndex);
+		const FTrainingWidgetState ItemState = CreateWidgetStateForOption(Option, 0);
+		bOutLockedByMission = ItemState.TrainingStatus == ETrainingItemStatus::TS_LockedByMission;
+		const bool bWasQueueEmpty = Trainer->GetIsQueueEmpty();
+		OnTrainingItemClicked(ItemState, SlotIndex, true);
+		return bWasQueueEmpty && not Trainer->GetIsQueueEmpty();
+	}
+	return false;
+}
+#endif
+
+bool UTrainingMenuManager::GetIsOptionLockedByMission(const FTrainingOption& Option) const
+{
+	const UWorld* World = IsValid(M_TrainingMenu) ? M_TrainingMenu->GetWorld() : nullptr;
+	const UMissionTrainingRestrictionSubsystem* Restriction = IsValid(World)
+		                                                          ? World->GetSubsystem<
+			                                                          UMissionTrainingRestrictionSubsystem>()
+		                                                          : nullptr;
+	return IsValid(Restriction) && not Restriction->GetIsOptionAllowed(Option);
 }
 
 FUnitVariantTrainingPresentation UTrainingMenuManager::GetVariantPresentationForOption(

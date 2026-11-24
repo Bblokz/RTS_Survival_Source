@@ -13,6 +13,7 @@
 #include "RTS_Survival/CaptureMechanic/CaptureMechanicHelpers.h"
 #include "RTS_Survival/CaptureMechanic/CaptureInterface/CaptureInterface.h"
 #include "RTS_Survival/Game/GameState/CPPGameState.h"
+#include "RTS_Survival/Game/Players/RTSPlayers.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/RTSCollisionTraceChannels.h"
 #include "RTS_Survival/PickupItems/Items/WeaponPickUp/WeaponPickup.h"
@@ -37,6 +38,7 @@
 #include "RTS_Survival/Scavenging/ScavengeObject/ScavengableObject.h"
 #include "RTS_Survival/Scavenging/ScavengerComponent/ScavengerComponent.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
+#include "RTS_Survival/Utils/UnitSpawning/RTSUnitOwnerSpawning.h"
 #include "Kismet/GameplayStatics.h"
 #include "RTS_Survival/Audio/SpacialVoiceLinePlayer/SpatialVoiceLinePlayer.h"
 #include "RTS_Survival/FOWSystem/FowComponent/FowComp.h"
@@ -54,6 +56,13 @@
 #include "Squads/SquadUnitHpComp/SquadUnitHealthComponent.h"
 #include "RTS_Survival/Player/ConstructionPreview/StaticMeshPreview/StaticPreviewMesh.h"
 #include "RTS_Survival/Weapons/InfantryWeapon/InfantryWeaponMaster.h"
+
+namespace SquadControllerSpawnStatics
+{
+	// A spawn grid point lies on the navmesh and a unit's location is its capsule centre: lift it by its half height
+	// plus this margin so it stands on the ground instead of dropping onto it.
+	constexpr float SpawnLiftMarginCm = 10.f;
+}
 
 namespace SquadControllerParachuteStatics
 {
@@ -940,7 +949,12 @@ void ASquadController::OnRTSUnitSpawned(const bool bSetDisabled, const float Tim
 		if (GetIsValidSquadUnit(eachSqUnit))
 		{
 			// Uses the grid points and attempts to project them to obtain valid points.
-			FVector SpawnLocation = FindIdealSpawnLocation() + (0, 0, 150);
+			// (This used to add "(0, 0, 150)": the comma operator made that +150 on X, Y and Z, so every soldier
+			// jumped 2.1 m diagonally and dropped 60 cm when it was placed.)
+			const UCapsuleComponent* const Capsule = eachSqUnit->GetCapsuleComponent();
+			const float LiftCm = (IsValid(Capsule) ? Capsule->GetScaledCapsuleHalfHeight() : 90.f)
+				+ SquadControllerSpawnStatics::SpawnLiftMarginCm;
+			const FVector SpawnLocation = FindIdealSpawnLocation() + FVector(0.f, 0.f, LiftCm);
 
 			eachSqUnit->OnSquadSpawned(bSetDisabled, TimeNotSelectable, SpawnLocation);
 		}
@@ -3667,6 +3681,15 @@ FVector ASquadController::FindIdealSpawnLocation()
 			// Successfully projected onto navmesh
 			return ProjectedLocation.Location;
 		}
+		// A grid point more than 2 m from the navmesh (squad placed above or below the ground) is out of reach of the
+		// tight search, and the traces below only look down to the grid point, so its units spawned in the air at the
+		// fallback. Search further up and down first (2026-11-20 Shipping runs: fallback spawns 16 -> 3 over all maps).
+		constexpr float WideProjectionHalfHeight = 1500.f;
+		const FVector WideProjectionExtent(ProjectionExtent.X, ProjectionExtent.Y, WideProjectionHalfHeight);
+		if (NavSys->ProjectPointToNavigation(InitialLocation, ProjectedLocation, WideProjectionExtent))
+		{
+			return ProjectedLocation.Location;
+		}
 	}
 
 	// If NavMesh projection failed, perform a visibility trace from 250 units above the initial location down to the initial position
@@ -3736,6 +3759,21 @@ void ASquadController::RegisterReinforcedUnit(ASquadUnit* ReinforcedUnit)
 	}
 	M_TSquadUnits.Add(ReinforcedUnit);
 	UpdateReinforcementAvailability();
+}
+
+void ASquadController::MatchSoldierToSquadOwner(ASquadUnit* Soldier) const
+{
+	if (not GetIsValidRTSComponent())
+	{
+		return;
+	}
+	const uint8 SquadOwner = RTSComponent->GetOwningPlayer();
+	if (not FRTSPlayers::IsValidPlayer(SquadOwner))
+	{
+		// A squad without a real owner (unset, neutral) leaves its soldiers as their Blueprint made them.
+		return;
+	}
+	FRTSUnitOwnerSpawning::MatchSoldierToSquadOwner(Soldier, SquadOwner);
 }
 
 void ASquadController::OnSquadFullyReinforced()
@@ -3833,11 +3871,17 @@ FVector ASquadController::GetSpawnLocationForSquad() const
 
 FVector ASquadController::FindIdealSpawnLocation_GetNextGridPoint()
 {
-	constexpr int32 MaxUnits = 8;
-	if (M_SpawnIndex >= MaxUnits)
+	if (not M_Offsets.IsValidIndex(M_SpawnIndex))
 	{
-		RTSFunctionLibrary::ReportError("SpawnIndex exceeds the number of grid points.");
-		return M_GridOriginLocation;
+		// Squads larger than the 8-point grid (and spawns before a grid exists) used to stack every remaining soldier
+		// on the grid origin; they get points on a ring outside the grid instead.
+		constexpr float GoldenAngleRadians = 2.39996323f;
+		constexpr float ExtraRingRadiusFactor = 1.1f;
+		const int32 ExtraIndex = FMath::Max(0, M_SpawnIndex - M_Offsets.Num());
+		M_SpawnIndex++;
+		const float Angle = ExtraIndex * GoldenAngleRadians;
+		const float Radius = FMath::Max(M_GridSize, 1.f) * ExtraRingRadiusFactor;
+		return M_GridOriginLocation + FVector(FMath::Cos(Angle) * Radius, FMath::Sin(Angle) * Radius, 0.f);
 	}
 
 	// Get the next offset from the precomputed offsets
@@ -4232,6 +4276,8 @@ void ASquadController::OnSquadUnitClassLoaded(TSoftClassPtr<ASquadUnit> LoadedCl
 				UnitClass, Spawnlocation, FRotator::ZeroRotator, SpawnParameters);
 			if (IsValid(SpawnedUnit))
 			{
+				// The soldier belongs to the player of its squad, whatever owner its own Blueprint has.
+				MatchSoldierToSquadOwner(SpawnedUnit);
 				// Set the squad controller reference on the unit
 				SpawnedUnit->SetSquadController(this);
 				M_TSquadUnits.Add(SpawnedUnit);

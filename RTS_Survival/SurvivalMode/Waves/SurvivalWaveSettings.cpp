@@ -3,6 +3,7 @@
 #include "SurvivalWaveSettings.h"
 
 #include "RTS_Survival/Enemy/StrategicAI/StochasticDecisionTree/StochasticDecisionTree.h"
+#include "RTS_Survival/Units/Aircraft/AircraftMaster/AAircraftMaster.h"
 
 #define LOCTEXT_NAMESPACE "SurvivalWaveSettings"
 
@@ -34,6 +35,13 @@ namespace SurvivalWaveDefaults
 	const TArray<FCurveKey> BaseStrategicTrainingPointsPerMinute = {
 		{0.f, 4.f}, {10.f, 8.f}, {20.f, 12.f}, {40.f, 18.f}, {60.f, 24.f}
 	};
+	// Heavy tanks per airlift from the far side; heavies only unlock with Tier 2, so the first airlifts carry one.
+	const TArray<FCurveKey> BaseTanksPerAirlift = {
+		{0.f, 1.f}, {20.f, 1.f}, {30.f, 2.f}, {45.f, 3.f}, {60.f, 4.f}, {90.f, 5.f}
+	};
+	// The Soviet transport the heavy tank drop abilities fly.
+	const TCHAR* const AirliftAircraftClassPath =
+		TEXT("/Game/RTS_Survival/Blueprints/Aircraft/RusAircraft/PE8Bomber/Rus_PE8_Aircraft_Transport.Rus_PE8_Aircraft_Transport_C");
 
 	struct FDifficultyScales
 	{
@@ -134,6 +142,14 @@ namespace SurvivalWaveDefaults
 		static const FSurvivalWaveDifficultyProfile BuiltInNormal = BuildProfile(DifficultyScales[1]);
 		return BuiltInNormal;
 	}
+}
+
+FSurvivalHeavyAirliftSettings::FSurvivalHeavyAirliftSettings()
+{
+	using namespace SurvivalWaveDefaults;
+	AircraftClass = TSoftClassPtr<AAircraftMaster>(FSoftObjectPath(AirliftAircraftClassPath));
+	FillCurve(TanksPerAirlift, BaseTanksPerAirlift, 1.f, 1.f);
+	AirliftRoles = {ESurvivalWaveUnitRole::HeavyTank, ESurvivalWaveUnitRole::SuperHeavy};
 }
 
 USurvivalWaveSettings::USurvivalWaveSettings()

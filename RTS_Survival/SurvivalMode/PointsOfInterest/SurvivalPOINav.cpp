@@ -5,6 +5,7 @@
 #include "Engine/World.h"
 #include "NavFilters/NavigationQueryFilter.h"
 #include "NavigationSystem.h"
+#include "RTS_Survival/Environment/DestructableEnvActor/WallGate/WallGateNavigation.h"
 
 namespace SurvivalPOINavConstants
 {
@@ -46,7 +47,8 @@ namespace SurvivalPOINav
 		for (int32 Hop = 0; Hop < MaxPathHops; ++Hop)
 		{
 			const FPathFindingQuery Query(nullptr, *NavData, Current, Goal.Location,
-			                              UNavigationQueryFilter::GetQueryFilter(*NavData, nullptr, nullptr));
+			                              UNavigationQueryFilter::GetQueryFilter(*NavData, nullptr,
+			                                                                     URTSClosedBreachableWallsQueryFilter::StaticClass()));
 			const FPathFindingResult Path = NavigationSystem->FindPathSync(Agent, Query);
 			Result.Hops = Hop + 1;
 			if (not Path.IsSuccessful() or not Path.Path.IsValid() or Path.Path->GetPathPoints().IsEmpty())

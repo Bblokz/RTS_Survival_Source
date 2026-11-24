@@ -163,9 +163,10 @@ void IBuildingExpansionOwner::BatchAsyncLoadAttachedPackedBxps(
 	TArray<int32> ToSpawnBxpIndexes;
 	// Used on instant placement in controller; to set up the bxp at the correct spot.
 	TArray<FBxpOptionData> ToSpawnBxpTypeAndConstructionRules;
-	int32 BxpIndex = 0;
-	for (auto EachBxp : BuildingExpansionItems)
+	// The slot index must be the item's position in the array: empty or unbuilt slots before a packed one count too.
+	for (int32 BxpIndex = 0; BxpIndex < BuildingExpansionItems.Num(); ++BxpIndex)
 	{
+		const FBuildingExpansionItem& EachBxp = BuildingExpansionItems[BxpIndex];
 		if (EachBxp.ExpansionStatus != EBuildingExpansionStatus::BXS_PackedUp)
 		{
 			continue;
@@ -174,16 +175,16 @@ void IBuildingExpansionOwner::BatchAsyncLoadAttachedPackedBxps(
 			EBxpConstructionType::Socket;
 		const bool bIsOriginConstruction = EachBxp.BxpConstructionRules.ConstructionType ==
 			EBxpConstructionType::AtBuildingOrigin;
-		if (bIsOriginConstruction || bIsSocketConstruction)
+		if (not bIsOriginConstruction && not bIsSocketConstruction)
 		{
-			ToSpawnBxps.Add(EachBxp.ExpansionType);
-			ToSpawnBxpIndexes.Add(BxpIndex);
-			FBxpOptionData OptionData;
-			OptionData.ExpansionType = EachBxp.ExpansionType;
-			OptionData.BxpConstructionRules = EachBxp.BxpConstructionRules;
-			ToSpawnBxpTypeAndConstructionRules.Add(OptionData);
+			continue;
 		}
-		++BxpIndex;
+		ToSpawnBxps.Add(EachBxp.ExpansionType);
+		ToSpawnBxpIndexes.Add(BxpIndex);
+		FBxpOptionData OptionData;
+		OptionData.ExpansionType = EachBxp.ExpansionType;
+		OptionData.BxpConstructionRules = EachBxp.BxpConstructionRules;
+		ToSpawnBxpTypeAndConstructionRules.Add(OptionData);
 	}
 	AsyncSpawner->AsyncBatchLoadInstantPlaceExpansions(
 		ToSpawnBxps,

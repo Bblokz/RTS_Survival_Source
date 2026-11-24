@@ -279,6 +279,11 @@ bool URTSGameUserSettings::GetCheckUnitRangeOnHover() const
 	return bM_CheckUnitRangeOnHover;
 }
 
+bool URTSGameUserSettings::GetShowInfoTakeovers() const
+{
+	return bM_ShowInfoTakeovers;
+}
+
 void URTSGameUserSettings::SetMasterVolume(const float NewMasterVolume)
 {
 	M_MasterVolume = NewMasterVolume;
@@ -363,6 +368,11 @@ void URTSGameUserSettings::SetHideActionButtonHotkeys(const bool bNewHideActionB
 void URTSGameUserSettings::SetCheckUnitRangeOnHover(const bool bNewCheckUnitRangeOnHover)
 {
 	bM_CheckUnitRangeOnHover = bNewCheckUnitRangeOnHover;
+}
+
+void URTSGameUserSettings::SetShowInfoTakeovers(const bool bNewShowInfoTakeovers)
+{
+	bM_ShowInfoTakeovers = bNewShowInfoTakeovers;
 }
 
 float URTSGameUserSettings::GetEnvironmentDetailDensity() const

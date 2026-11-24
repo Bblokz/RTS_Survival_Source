@@ -17,8 +17,6 @@
 #include "Components/VerticalBoxSlot.h"
 #include "Slate/SlateBrushAsset.h"
 #include "Engine/Texture2D.h"
-#include "Engine/World.h"
-#include "TimerManager.h"
 #include "RTS_Survival/FactionSystem/FactionSelection/UnitVariantSelection/UnitVariantSelectionWidgetHelpers.h"
 #include "RTS_Survival/Player/PlayerUnitVariantManager/PlayerUnitVariantManager.h"
 #include "RTS_Survival/SurvivalMode/Director/SurvivalModeDirector.h"
@@ -38,13 +36,13 @@ namespace SurvivalRewardPickerConstants
 	constexpr float CardGap = 18.f;
 	constexpr float PanelPadding = 18.f;
 	constexpr float IconSize = 44.f;
+	// Space between the title and the card row.
+	constexpr float TitleBottomPadding = 12.f;
 	constexpr int32 TitleFontSize = 20;
-	constexpr int32 TimerFontSize = 14;
 	constexpr int32 CardTitleFontSize = 15;
 	constexpr int32 SupplyFontSize = 12;
 	constexpr int32 LineFontSize = 13;
 	constexpr int32 VariantFontSize = 10;
-	constexpr float TimerRefreshSeconds = 0.25f;
 }
 
 void UW_SurvivalRewardPicker::NativeOnInitialized()
@@ -59,15 +57,6 @@ void UW_SurvivalRewardPicker::NativeOnInitialized()
 	// The game keeps running underneath; only the cards take the mouse.
 	SetVisibility(ESlateVisibility::SelfHitTestInvisible);
 	BuildTree();
-}
-
-void UW_SurvivalRewardPicker::NativeDestruct()
-{
-	if (const UWorld* World = GetWorld())
-	{
-		World->GetTimerManager().ClearTimer(M_TimerRefreshHandle);
-	}
-	Super::NativeDestruct();
 }
 
 const FSurvivalUiStyle* UW_SurvivalRewardPicker::GetStyle() const
@@ -96,7 +85,6 @@ void UW_SurvivalRewardPicker::BuildTree()
 	}
 	const FSurvivalUiStyle* Style = GetStyle();
 	const FSlateColor TextColor = Style ? Style->TextColor : FSlateColor(FLinearColor::White);
-	const FSlateColor AccentColor = Style ? Style->AccentColor : FSlateColor(FLinearColor(0.25f, 0.94f, 1.f));
 
 	UCanvasPanel* Root = WidgetTree->ConstructWidget<UCanvasPanel>(UCanvasPanel::StaticClass(), TEXT("Root"));
 	Root->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
@@ -124,13 +112,9 @@ void UW_SurvivalRewardPicker::BuildTree()
 
 	M_TitleText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("Title"));
 	StyleText(M_TitleText, true, TitleFontSize, TextColor);
-	Column->AddChildToVerticalBox(M_TitleText)->SetHorizontalAlignment(HAlign_Center);
-
-	M_TimerText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("Timer"));
-	StyleText(M_TimerText, false, TimerFontSize, AccentColor);
-	UVerticalBoxSlot* TimerSlot = Column->AddChildToVerticalBox(M_TimerText);
-	TimerSlot->SetHorizontalAlignment(HAlign_Center);
-	TimerSlot->SetPadding(FMargin(0.f, 2.f, 0.f, 12.f));
+	UVerticalBoxSlot* TitleSlot = Column->AddChildToVerticalBox(M_TitleText);
+	TitleSlot->SetHorizontalAlignment(HAlign_Center);
+	TitleSlot->SetPadding(FMargin(0.f, 0.f, 0.f, TitleBottomPadding));
 
 	M_CardRow = WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass(), TEXT("Cards"));
 	Column->AddChildToVerticalBox(M_CardRow)->SetHorizontalAlignment(HAlign_Center);
@@ -158,12 +142,6 @@ void UW_SurvivalRewardPicker::InitRewardPicker(ASurvivalModeDirector* Director, 
 			CardSlot->SetPadding(FMargin(Index == 0 ? 0.f : SurvivalRewardPickerConstants::CardGap, 0.f, 0.f, 0.f));
 			CardSlot->SetVerticalAlignment(VAlign_Fill);
 		}
-	}
-	RefreshTimer();
-	if (UWorld* World = GetWorld())
-	{
-		World->GetTimerManager().SetTimer(M_TimerRefreshHandle, this, &UW_SurvivalRewardPicker::RefreshTimer,
-		                                  SurvivalRewardPickerConstants::TimerRefreshSeconds, true);
 	}
 }
 
@@ -325,22 +303,6 @@ FSlateBrush UW_SurvivalRewardPicker::MakeIconBrush(const FTrainingOption& Unit, 
 	const USlateBrushAsset* TableBrush = UUnitVariantPresentationLibrary::FindTrainingTableImageBrush(
 		M_TrainingOptionsTable, Unit);
 	return IsValid(TableBrush) ? TableBrush->Brush : FSlateBrush();
-}
-
-void UW_SurvivalRewardPicker::RefreshTimer()
-{
-	if (not IsValid(M_TimerText) or not M_Director.IsValid())
-	{
-		return;
-	}
-	// Without auto pick an unclaimed choice stays open into the wave.
-	if (not M_Director->GetIsInIntermission())
-	{
-		M_TimerText->SetText(NSLOCTEXT("SurvivalReward", "WaveRunning", "WAVE IN PROGRESS  -  PICK ANY TIME"));
-		return;
-	}
-	const FText Clock = SurvivalArmyUi::FormatClock(M_Director->GetIntermissionSecondsRemaining());
-	M_TimerText->SetText(FText::Format(NSLOCTEXT("SurvivalReward", "Timer", "NEXT WAVE IN {0}"), Clock));
 }
 
 void UW_SurvivalRewardPicker::OnCardClicked(const int32 OptionIndex)

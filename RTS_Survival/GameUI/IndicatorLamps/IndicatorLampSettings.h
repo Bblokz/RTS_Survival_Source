@@ -36,7 +36,30 @@ public:
 	UPROPERTY(Config, EditAnywhere, Category="Idle Unit Buttons", meta=(ClampMin="0.0"))
 	float IdleLampOverhang = 4.f;
 
+	/** M_UI_IndicatorLampHalo: the light an idle lamp throws on the HUD around it, pulsing with the lamp. Empty: none. */
+	UPROPERTY(Config, EditAnywhere, Category="Idle Unit Buttons")
+	TSoftObjectPtr<UMaterialInterface> IdleLampHaloMaterial;
+
+	/** Edge of the idle lamp's halo over the edge of the lamp. */
+	UPROPERTY(Config, EditAnywhere, Category="Idle Unit Buttons", meta=(ClampMin="1.0"))
+	float IdleLampHaloScale = 3.5f;
+
 	/** Seconds a lamp takes to light up or go dark, like a warming filament. */
 	UPROPERTY(Config, EditAnywhere, Category="Lamps", meta=(ClampMin="0.0"))
 	float FadeSeconds = 0.1f;
+
+	/**
+	 * M_UI_SignalLamp instance for the page lamps of every info takeover: the lamp and a halo that lights the panel
+	 * around it. Empty falls back to the takeover style's flat PageLampLit / PageLampUnlit brushes.
+	 */
+	UPROPERTY(Config, EditAnywhere, Category="Info Takeover Page Lamps")
+	TSoftObjectPtr<UMaterialInterface> PageLampMaterial;
+
+	/** Edge of the halo over the edge of the lamp; the material fades the halo out before the halo's edge. */
+	UPROPERTY(Config, EditAnywhere, Category="Info Takeover Page Lamps", meta=(ClampMin="1.0"))
+	float PageLampHaloScale = 3.f;
+
+	/** Seconds a page lamp takes to light up or go dark when the page changes. */
+	UPROPERTY(Config, EditAnywhere, Category="Info Takeover Page Lamps", meta=(ClampMin="0.0"))
+	float PageLampFadeSeconds = 0.15f;
 };

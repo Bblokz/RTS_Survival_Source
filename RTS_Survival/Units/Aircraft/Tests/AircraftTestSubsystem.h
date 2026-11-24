@@ -29,7 +29,99 @@ enum class EAircraftTestPhase : uint8
 	AircraftStrafeRunning,
 	// -AircraftDropValidate: the German vehicle drop abilities must land every vehicle they promise, in its exact variant.
 	AircraftDropRunning,
+	// -AircraftBaseTakeOffValidate: an aircraft parked in an airbase bay takes off, flies out, lands back and takes off again.
+	AircraftBaseTakeOffRunning,
+	// -AircraftTerrainFollowValidate: an airborne aircraft flies over the bumpiest route from the anchor and keeps its
+	// clearance above the ground; then an attack dive, which terrain following must leave alone.
+	AircraftTerrainFollowRunning,
+	// -AircraftFlightValidate: an airborne aircraft flies sharp turns, an attack, idles and re-acquires a target; its
+	// speed, sideslip, turn smoothness and dive height are measured.
+	AircraftFlightRunning,
 	Finished
+};
+
+UENUM()
+enum class EAircraftFlightTestStep : uint8
+{
+	Settling,
+	// Move orders that force a 90 degree, a 180 degree and a sharp 135 degree turn.
+	TurnRight,
+	TurnBack,
+	TurnSharpLeft,
+	// Attack on an enemy vehicle; it is removed once the first dive is over, so the attack ends.
+	Attacking,
+	// No order: the aircraft goes over into its idle circle.
+	IdleAfterAttack,
+	// A second enemy appears behind the aircraft: the idle aircraft must find it and attack it on its own.
+	Reacquiring,
+	// A third enemy right ahead and close: too close to dive on at once, the aircraft must come back for it.
+	AttackingClose,
+	// A fourth enemy drives across the aircraft's path: the dive must still start aligned on it.
+	AttackingMoving,
+	Done
+};
+
+/** What -AircraftFlightValidate measured over one step of the flight. */
+USTRUCT()
+struct FAircraftFlightStepMetrics
+{
+	GENERATED_BODY()
+
+	int32 Frames = 0;
+	// Speed over the ground divided by the aircraft's cruise speed.
+	float LowestSpeedRatio = BIG_NUMBER;
+	double SpeedRatioSum = 0.0;
+	// Fastest speed so far in the step, and the largest fall below it: what a turn costs in speed.
+	float HighestSpeedRatio = 0.f;
+	float LargestSpeedDrop = 0.f;
+	// Angle between the nose and the flight direction, both flattened (degrees).
+	float LargestSlipDeg = 0.f;
+	// Change of the yaw rate per second (deg/s²): high values are visible snaps in the turn.
+	float LargestYawAccelerationDeg = 0.f;
+	float LargestYawRateDeg = 0.f;
+	float LargestRollRateDeg = 0.f;
+	// Largest bank to the right and to the left: both large in one step means the bank reversed (an S-turn).
+	float LargestRightRollDeg = 0.f;
+	float LargestLeftRollDeg = 0.f;
+	float LowestAboveGround = BIG_NUMBER;
+	// Dives: turn rate when a dive starts and how far the heading swings during it (degrees); a dive that starts
+	// mid-turn fires banked and off its target.
+	int32 DiveCount = 0;
+	// Seconds from the step's start to its first dive (-1 without one).
+	float SecondsToFirstDive = -1.f;
+	float LargestDiveStartYawRateDeg = 0.f;
+	float LargestDiveHeadingSweepDeg = 0.f;
+};
+
+/** The aircraft of -AircraftFlightValidate and what was measured per step. */
+USTRUCT()
+struct FAircraftFlightUnderTest
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	TWeakObjectPtr<AAircraftMaster> Aircraft;
+
+	UPROPERTY()
+	TWeakObjectPtr<AActor> Target;
+
+	EAircraftFlightTestStep Step = EAircraftFlightTestStep::Settling;
+	float StepStartSeconds = 0.f;
+	float MaxMoveSpeed = 0.f;
+	bool bHasLastSample = false;
+	float LastYaw = 0.f;
+	float LastRoll = 0.f;
+	float LastYawRate = 0.f;
+	bool bHasLastYawRate = false;
+	bool bSawDive = false;
+	bool bSawIdle = false;
+	bool bWasDiving = false;
+	float DiveStartYaw = 0.f;
+	float ClosestTargetDistance = BIG_NUMBER;
+	float FarthestTargetDistance = 0.f;
+	TArray<FAircraftFlightStepMetrics> StepMetrics;
+	// One row per frame: written to Saved/AircraftFlightQA/<label>.csv at the end.
+	TArray<FString> CsvRows;
 };
 
 UENUM()
@@ -61,6 +153,81 @@ struct FAircraftVtoUnderTest
 	bool bSawVerticalTakeOff = false;
 	bool bSawTakeOffMontage = false;
 	int32 MagazineBeforeAttack = 0;
+};
+
+UENUM()
+enum class EAircraftBaseTakeOffStep : uint8
+{
+	WaitingForAirbase,
+	// Parked in its bay; BeginPlay, the anim instance and the bay settle before the move order.
+	Settling,
+	TakingOff,
+	// Airborne after the first take-off: the hand-over to normal flight must not jolt the height.
+	FlyingOut,
+	ReturningToBase,
+	SecondTakeOff,
+	Done
+};
+
+/** The aircraft of -AircraftBaseTakeOffValidate and what was seen of its take-offs and landing. */
+USTRUCT()
+struct FAircraftBaseTakeOffUnderTest
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	TWeakObjectPtr<ANomadicVehicle> Airbase;
+
+	UPROPERTY()
+	TWeakObjectPtr<AAircraftMaster> Aircraft;
+
+	EAircraftBaseTakeOffStep Step = EAircraftBaseTakeOffStep::WaitingForAirbase;
+	float StepStartSeconds = 0.f;
+	FVector BayLocation = FVector::ZeroVector;
+	float ParkedZ = 0.f;
+	float LastZ = 0.f;
+	float LargestZStepPerSecond = 0.f;
+	float HeightAboveGroundAtAirborne = 0.f;
+	bool bSawVerticalTakeOff = false;
+};
+
+UENUM()
+enum class EAircraftTerrainFollowTestStep : uint8
+{
+	// Airborne at the route start; the clearance is captured.
+	Settling,
+	FlyingRoute,
+	AttackDiving,
+	Done
+};
+
+/** The aircraft of -AircraftTerrainFollowValidate and what was measured over the route. */
+USTRUCT()
+struct FAircraftTerrainFollowFlightUnderTest
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	TWeakObjectPtr<AAircraftMaster> Aircraft;
+
+	EAircraftTerrainFollowTestStep Step = EAircraftTerrainFollowTestStep::Settling;
+	float StepStartSeconds = 0.f;
+	FVector RouteStart = FVector::ZeroVector;
+	FVector RouteEnd = FVector::ZeroVector;
+	float RouteLowestGroundZ = 0.f;
+	float RouteHighestGroundZ = 0.f;
+	float Clearance = 0.f;
+	float LastZ = 0.f;
+	float LowestAircraftZ = BIG_NUMBER;
+	float HighestAircraftZ = -BIG_NUMBER;
+	float LowestAboveGround = BIG_NUMBER;
+	float HighestAboveGround = -BIG_NUMBER;
+	float FastestVerticalRate = 0.f;
+	float NextSampleLogSeconds = 0.f;
+	int32 DiveFrames = 0;
+	int32 DiveFramesWithTerrainMotion = 0;
+	float LastDiveSeconds = -1.f;
+	FVector AttackPoint = FVector::ZeroVector;
 };
 
 /** One anti-air unit under test and what its turrets did against the aircraft. */
@@ -192,6 +359,28 @@ private:
 	TMap<TWeakObjectPtr<AAircraftMaster>, int32> M_StrafeAircraftFirstMagazines;
 	int32 M_StrafeMostAircraftSeen = 0;
 	bool bM_StrafeAnyFired = false;
+	// World time the first measured MG round left a gun; the QA window runs from here.
+	float M_StrafeFirstShotSeconds = -1.f;
+	// Last time the strafing aircraft's flight state was logged.
+	float M_StrafeLastFlightLogSeconds = -1.f;
+	// Screenshots of the strafe taken so far, from a camera placed over the target when the first round is fired.
+	int32 M_StrafeScreenshotCount = 0;
+	TWeakObjectPtr<AActor> M_StrafeCamera;
+	// Enemy armoured cars put on the strafe line once the first aircraft's approach is known, and their start health.
+	TArray<TWeakObjectPtr<AActor>> M_StrafeTargets;
+	TArray<float> M_StrafeTargetStartHealth;
+	bool bM_StrafeTargetsPlaced = false;
+	// -AircraftStrafeTargets=Infantry: enemy squads instead; their soldiers join M_StrafeTargets once they exist.
+	TArray<TWeakObjectPtr<AActor>> M_StrafeTargetSquads;
+	bool bM_StrafeSoldiersRecorded = false;
+	// Load during the QA window: the most strafe impact particles alive at once, and the frame times.
+	int32 M_StrafePeakLiveParticles = 0;
+	// VFX showcase while the aircraft fly in: synthetic strafe bands drawn straight into the impact batcher.
+	float M_StrafeShowcaseImpactBudget = 0.f;
+	int32 M_StrafeShowcaseScreenshotCount = 0;
+	float M_StrafeWorstFrameSeconds = 0.f;
+	double M_StrafeFrameSecondsSum = 0.0;
+	int32 M_StrafeFrameCount = 0;
 
 	// -AircraftDropValidate: nothing else holds the running abilities, and their load callbacks outlive StartAircraftDrop.
 	UPROPERTY()
@@ -275,11 +464,100 @@ private:
 	void CheckVtoLoadout(const FAircraftVtoUnderTest& Entry);
 	void EnterVtoStep(FAircraftVtoUnderTest& Entry, EAircraftVtoTestStep NewStep);
 
+	// ---------------- Take-off from an airbase (AircraftBaseTakeOffTest.cpp) ----------------
+	UPROPERTY()
+	FAircraftBaseTakeOffUnderTest M_BaseTakeOff;
+
+	void StartAircraftBaseTakeOff();
+	void TickAircraftBaseTakeOff();
+	void TickBaseTakeOffWaitingForAirbase(FAircraftBaseTakeOffUnderTest& Entry);
+	void TickBaseTakeOffSettling(FAircraftBaseTakeOffUnderTest& Entry);
+	/**
+	 * @brief Waits for the vertical take-off out of the bay and checks it ends exactly at the take-off height.
+	 * @param Entry The aircraft under test.
+	 * @param Label Prefix of the check names, one per take-off.
+	 * @param NextStep Step once airborne.
+	 */
+	void TickBaseTakeOffTakingOff(FAircraftBaseTakeOffUnderTest& Entry, const FString& Label,
+	                              EAircraftBaseTakeOffStep NextStep);
+	void TickBaseTakeOffFlyingOut(FAircraftBaseTakeOffUnderTest& Entry);
+	void TickBaseTakeOffReturning(FAircraftBaseTakeOffUnderTest& Entry);
+	/** @return Whether a move order away from the airbase was accepted; a parked aircraft takes off for it. */
+	bool OrderBaseTakeOffMoveOut(FAircraftBaseTakeOffUnderTest& Entry, const FString& Label);
+	/** @return Height of the aircraft above the landscape below it; -1 when no landscape is below. */
+	float GetHeightAboveLandscape(const AAircraftMaster& Aircraft) const;
+	void EnterBaseTakeOffStep(FAircraftBaseTakeOffUnderTest& Entry, EAircraftBaseTakeOffStep NewStep);
+
+	// ---------------- Terrain following over relief (AircraftTerrainFollowFlightTest.cpp) ----------------
+	UPROPERTY()
+	FAircraftTerrainFollowFlightUnderTest M_TerrainFlight;
+
+	void StartAircraftTerrainFollow();
+	void TickAircraftTerrainFollow();
+	/**
+	 * @brief Picks the straight route from the anchor with the largest ground height range, so the flight crosses
+	 * the strongest relief the map has nearby.
+	 * @param Entry Receives route start, end and its lowest / highest ground.
+	 * @return Whether a route over landscape was found.
+	 */
+	bool FindBumpiestRoute(FAircraftTerrainFollowFlightUnderTest& Entry) const;
+	/** @return Landscape height at the XY; false where no landscape is. */
+	bool GetLandscapeZ(const FVector2D& Location2D, float& OutGroundZ) const;
+	void TickTerrainFollowSettling(FAircraftTerrainFollowFlightUnderTest& Entry);
+	void TickTerrainFollowFlyingRoute(FAircraftTerrainFollowFlightUnderTest& Entry);
+	void TickTerrainFollowAttackDiving(FAircraftTerrainFollowFlightUnderTest& Entry);
+	/** @brief Updates the extremes and vertical rate, and logs a sample row now and then. */
+	void RecordTerrainFollowSample(FAircraftTerrainFollowFlightUnderTest& Entry, const TCHAR* StepName);
+	void EnterTerrainFollowStep(FAircraftTerrainFollowFlightUnderTest& Entry, EAircraftTerrainFollowTestStep NewStep);
+
+	// ---------------- Flight smoothness (AircraftFlightSmoothnessTest.cpp) ----------------
+	UPROPERTY()
+	FAircraftFlightUnderTest M_Flight;
+
+	void StartAircraftFlight();
+	void TickAircraftFlight();
+	void TickFlightSettling(FAircraftFlightUnderTest& Entry);
+	/** @brief Orders a move whose target lies at the given yaw offset from the aircraft's flight direction. */
+	void OrderFlightTurn(FAircraftFlightUnderTest& Entry, float YawOffsetDeg, float Distance,
+	                     EAircraftFlightTestStep NextStep);
+	void TickFlightTurning(FAircraftFlightUnderTest& Entry);
+	void TickFlightAttacking(FAircraftFlightUnderTest& Entry);
+	void TickFlightIdle(FAircraftFlightUnderTest& Entry);
+	void TickFlightReacquiring(FAircraftFlightUnderTest& Entry);
+	/** @brief Spawns an enemy ahead that drives across the aircraft's path, and orders the attack on it. */
+	void StartFlightMovingTargetAttack(FAircraftFlightUnderTest& Entry);
+	/** @return An enemy armoured car spawned on the ground at the yaw offset and distance from the aircraft. */
+	AActor* SpawnFlightTarget(const FAircraftFlightUnderTest& Entry, float YawOffsetDeg, float Distance);
+	/** @brief Measures this frame into the current step's metrics and adds a CSV row. */
+	void RecordFlightSample(FAircraftFlightUnderTest& Entry);
+	void EnterFlightStep(FAircraftFlightUnderTest& Entry, EAircraftFlightTestStep NewStep);
+	/** @brief Logs every step's metrics, checks them and writes the CSV. */
+	void FinishAircraftFlight(FAircraftFlightUnderTest& Entry);
+
 	// ---------------- Strafing global ability (AircraftStrafeTest.cpp) ----------------
 	void StartAircraftStrafe();
 	void TickAircraftStrafe();
 	/** @return Whether any strafing aircraft has fired since it was first seen. */
 	bool TrackStrafeAircraft();
+	// Logs the measured MG rounds (FAircraftStrafeShotRecorder), checks them for the strafe gun and writes the CSV.
+	void FinishAircraftStrafeQA();
+	// Burst counts of the strafe gun audio, then the 20 mm cannon audio set-up on a spawned Me 410.
+	void CheckStrafeGunAudio();
+	// Spawns every aircraft Blueprint once and checks each strafe MG and 15-25 mm cannon got its gun sounds.
+	void CheckGunAudioOfEveryAircraft();
+	// Views the target from an oblique camera and takes screenshots at fixed times after the first round.
+	void TickStrafeScreenshots(const float SecondsSinceFirstShot);
+	// Places the QA camera (made once) to look at LookAt from behind and above, and makes it the view.
+	void PointStrafeCamera(const FVector& LookAt);
+	// Draws two walking strafe bands (7.92 mm and 20 mm) in front of the camera and screenshots them.
+	void TickStrafeImpactShowcase(const float SecondsSincePhaseStart, const float DeltaSeconds);
+	// Puts enemy armoured cars on the strafe line, broadside, between the target and 30 m past it.
+	void PlaceStrafeTargets(const FVector& ApproachingAircraftLocation);
+	void SpawnStrafeTargetSquad(const FTransform& Transform);
+	// Squads spawn their soldiers after BeginPlay: records each soldier and its health as a target once they are there.
+	void RecordStrafeTargetSoldiers();
+	// Total health the strafe targets lost (destroyed ones count their whole start health).
+	float GetStrafeTargetDamage(int32& OutDestroyed) const;
 
 	// ---------------- Vehicle drop global abilities (AircraftDropTest.cpp) ----------------
 	void StartAircraftDrop();

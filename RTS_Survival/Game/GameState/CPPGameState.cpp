@@ -1,4 +1,4 @@
-﻿// Copyright (C) 2020-2025 Bas Blokzijl - All rights reserved.
+// Copyright (C) 2020-2025 Bas Blokzijl - All rights reserved.
 
 #include "CPPGameState.h"
 
@@ -61,7 +61,7 @@ ACPPGameState::ACPPGameState()
 	// Init default fallback weapon.
 	DefaultWeapon.BaseDamage = 7 * DeveloperSettings::GameBalance::Weapons::DamagePerMM;
 	DefaultWeapon.DamageFlux = 10;
-	DefaultWeapon.Range = 7000;
+	DefaultWeapon.Range = 7000 * DeveloperSettings::GameBalance::Ranges::DirectFireRangeMlt;
 	DefaultWeapon.ArmorPen = 12;
 	DefaultWeapon.MagCapacity = 80;
 	DefaultWeapon.ReloadSpeed = 7;
@@ -1042,8 +1042,8 @@ void ACPPGameState::AddStrikeDivisionBxpOptions()
 			return Existing.ExpansionType == EBuildingExpansionType::BTX_37mmFlak;
 		});
 	}
-	// The Kaskade, the flak stand, the Schreck frame and the smelter are drawn in the Strike Division's field-kit look,
-	// so only this faction's buildings offer them.
+	// The Kaskade, the flak stand, the Schreck frame, the smelter, the radio van, the Wurfrahmen shop and the sniper
+	// loft are drawn on the Strike Division's building meshes, so only this faction's buildings offer them.
 	AddOptions(ENomadicSubtype::Nomadic_GerRefinery, InitBxpOptions({
 		           AsEconomic(EBuildingExpansionType::BTX_RefKaskade),
 		           AsDefense(EBuildingExpansionType::BTX_RefFlakStand)
@@ -1053,6 +1053,13 @@ void ACPPGameState::AddStrikeDivisionBxpOptions()
 	           }));
 	AddOptions(ENomadicSubtype::Nomadic_GerMetalVault, InitBxpOptions({
 		           AsEconomic(EBuildingExpansionType::BTX_GerMetalVaultSmelter)
+	           }));
+	AddOptions(ENomadicSubtype::Nomadic_GerMechanizedDepot, InitBxpOptions({
+		           AsTech(EBuildingExpansionType::BTX_GerMechDepotRadioVan),
+		           AsTech(EBuildingExpansionType::BTX_GerMechDepotWurfrahmenShop)
+	           }));
+	AddOptions(ENomadicSubtype::Nomadic_GerBarracks, InitBxpOptions({
+		           AsDefense(EBuildingExpansionType::BTX_GerBarracksSniperLoft)
 	           }));
 }
 
@@ -2661,7 +2668,8 @@ void ACPPGameState::InitAllGameSmallArmsWeapons()
 	WeaponData.BaseDamage = DamagePerMM * WeaponData.WeaponCalibre
 		+ WeaponData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams;
 	WeaponData.DamageFlux = DamageFluxPercentage;
-	WeaponData.Range = SmallArmsRifleRange + 500;
+	WeaponData.Range = RTSFunctionLibrary::RoundToNearestMultipleOf(
+		SmallArmsRifleRange + 500 * DeveloperSettings::GameBalance::Ranges::DirectFireRangeMlt, 5);
 	WeaponData.ArmorPen = 143;
 	WeaponData.ArmorPenMaxRange = 130;
 	WeaponData.MagCapacity = 3;
@@ -3249,7 +3257,7 @@ void ACPPGameState::InitAllGameRailGunData()
 	// projectile speed up and damage down when firing: the best pen of its class, with little falloff, for a slow reload.
 	{
 		constexpr float SniperFiredDamage = 100.f;
-		constexpr float SniperRange = 5600.f;
+		constexpr float SniperRange = 5600.f * DeveloperSettings::GameBalance::Ranges::DirectFireRangeMlt;
 		FWeaponData RailSniperData = {};
 		RailSniperData.WeaponName = EWeaponName::GerRailSniper20MM;
 		RailSniperData.DamageType = ERTSDamageType::Kinetic;
@@ -3474,7 +3482,8 @@ void ACPPGameState::InitAllGameLightWeapons()
 	WeaponData.TNTExplosiveGrams = 0;
 	WeaponData.BaseDamage = 20 * DamagePerMM;
 	WeaponData.DamageFlux = DamageFluxPercentage;
-	WeaponData.Range = BasicSmallArmsRange + 250;
+	WeaponData.Range = RTSFunctionLibrary::RoundToNearestMultipleOf(
+		BasicSmallArmsRange + 250 * DeveloperSettings::GameBalance::Ranges::DirectFireRangeMlt, 5);
 	WeaponData.ArmorPen = 28;
 	WeaponData.ArmorPenMaxRange = 14;
 	WeaponData.MagCapacity = 24;
@@ -3525,7 +3534,8 @@ void ACPPGameState::InitAllGameLightWeapons()
 	WeaponData.TNTExplosiveGrams = 0;
 	WeaponData.BaseDamage = 23 * DamagePerMM + 4;
 	WeaponData.DamageFlux = DamageFluxPercentage;
-	WeaponData.Range = BasicSmallArmsRange + 250;
+	WeaponData.Range = RTSFunctionLibrary::RoundToNearestMultipleOf(
+		BasicSmallArmsRange + 250 * DeveloperSettings::GameBalance::Ranges::DirectFireRangeMlt, 5);
 	WeaponData.ArmorPen = 45;
 	WeaponData.ArmorPenMaxRange = 38;
 	WeaponData.MagCapacity = 10;
@@ -3550,7 +3560,8 @@ void ACPPGameState::InitAllGameLightWeapons()
 	WeaponData.TNTExplosiveGrams = 0.f;
 	WeaponData.BaseDamage = 30.f;
 	WeaponData.DamageFlux = DamageFluxPercentage;
-	WeaponData.Range = BasicSmallArmsRange + 250.f;
+	WeaponData.Range = RTSFunctionLibrary::RoundToNearestMultipleOf(
+		BasicSmallArmsRange + 250 * DeveloperSettings::GameBalance::Ranges::DirectFireRangeMlt, 5);
 	WeaponData.ArmorPen = 90.f;
 	WeaponData.ArmorPenMaxRange = 80.f;
 	WeaponData.MagCapacity = 12;
@@ -5241,7 +5252,7 @@ void ACPPGameState::InitAllGameHeavyWeapons()
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::sIG_33_150MM, WeaponData);
 
 	// Towed sFH 18 (team weapon and the sFH 18 pit): the sIG 33's 15 cm shell from a long barrel. It outranges the
-	// leFH 18 (HowitzerArtilleryRange, 8800) like the real guns (about 13.3 km against 10.7 km), by the same 20% as
+	// leFH 18 (HowitzerArtilleryRange, 9680) like the real guns (about 13.3 km against 10.7 km), by the same 20% as
 	// the ML-20 pit: 10600. Only the range differs from the sIG 33; the JagdPanther Bollwerk sets its own range.
 	constexpr float Sfh18RangeOverLeFH18 = 1.2f;
 	FWeaponData Sfh18TowedData = WeaponData;
@@ -5690,7 +5701,7 @@ void ACPPGameState::InitAllGameRocketData()
 	RocketData.DamageType = ERTSDamageType::Kinetic;
 	RocketData.Cooldown = 2.5f;
 	RocketData.Damage = 300.f;
-	RocketData.Range = 10000.f;
+	RocketData.Range = 10000.f * DeveloperSettings::GameBalance::Ranges::DirectFireRangeMlt;
 	RocketData.ArmorPen = 110.f;
 	RocketData.ProjectileSpeed = 5000.f;
 	RocketData.ProjectileAccelerationFactor = 1.f;
@@ -5706,7 +5717,7 @@ void ACPPGameState::InitAllGameRocketData()
 	RocketData.DamageType = ERTSDamageType::Kinetic;
 	RocketData.Cooldown = 0.33f;
 	RocketData.Damage = 150.f;
-	RocketData.Range = 10000.f;
+	RocketData.Range = 10000.f * DeveloperSettings::GameBalance::Ranges::DirectFireRangeMlt;
 	RocketData.ArmorPen = 100.f;
 	RocketData.ProjectileSpeed = 5000.f;
 	RocketData.ProjectileAccelerationFactor = 2.f;
@@ -5723,7 +5734,7 @@ void ACPPGameState::InitAllGameRocketData()
 	RocketData.DamageType = ERTSDamageType::Kinetic;
 	RocketData.Cooldown = 0.33f;
 	RocketData.Damage = 120.f;
-	RocketData.Range = 10000.f;
+	RocketData.Range = 10000.f * DeveloperSettings::GameBalance::Ranges::DirectFireRangeMlt;
 	RocketData.ArmorPen = 80.f;
 	RocketData.ProjectileSpeed = 5000.f;
 	RocketData.ProjectileAccelerationFactor = 2.f;
@@ -5741,7 +5752,7 @@ void ACPPGameState::InitAllGameRocketData()
 	RocketData.DamageType = ERTSDamageType::Kinetic;
 	RocketData.Cooldown = 0.45f;
 	RocketData.Damage = 260.f;
-	RocketData.Range = 10000.f;
+	RocketData.Range = 10000.f * DeveloperSettings::GameBalance::Ranges::DirectFireRangeMlt;
 	RocketData.ArmorPen = 160.f;
 	RocketData.ProjectileSpeed = 4500.f;
 	RocketData.ProjectileAccelerationFactor = 2.f;
@@ -5931,7 +5942,9 @@ void ACPPGameState::InitAllGameArmoredCarData()
 		});
 		TankData.ExperienceLevels = GetLightArtillerySpecialVehicleExpLevels();
 		TankData.ExperienceMultiplier = 1.0f;
-		TankData.Abilities = TankAbilitiesWithRockets;
+		// The launcher turret is the rocket weapon (no UAttachedRockets), so no Fire Rockets card; the Blueprint's
+		// rocket barrage aim ability adds its own card.
+		TankData.Abilities = BasicTankAbilities;
 		M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_Panzerwerfer, TankData);
 	}
 
@@ -6372,6 +6385,31 @@ void ACPPGameState::InitAllGameArmoredCarData()
 		TankData.ExperienceMultiplier = 1.0f;
 		TankData.Abilities = BasicTankAbilities;
 		M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_GAZMM_72K, TankData);
+	}
+
+	// Opel supply truck: unarmed and not controllable; it only needs to move, so no card beyond the basics.
+	{
+		constexpr float OpelSupplyTruckHealthMlt = 0.9f;
+		constexpr float OpelSupplyTruckRotationSpeed = 35.f;
+		constexpr float OpelSupplyTruckMaxSpeedKmh = 50.f;
+		constexpr float OpelSupplyTruckReverseSpeedKmh = 20.f;
+		constexpr float OpelSupplyTruckExpWorthMlt = 0.8f;
+
+		TankData.MaxHealth = RTSFunctionLibrary::RoundToNearestMultipleOf(
+			ArmoredCarHealthBase * OpelSupplyTruckHealthMlt, 5);
+		TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIArmoredCarResistances(TankData.MaxHealth);
+		TankData.VehicleRotationSpeed = OpelSupplyTruckRotationSpeed * TankTurnRateMultiplier;
+		TankData.VehicleMaxSpeedKmh = OpelSupplyTruckMaxSpeedKmh;
+		TankData.VehicleReverseSpeedKmh = OpelSupplyTruckReverseSpeedKmh;
+		TankData.VisionRadius = ArmoredCarVisionRadius;
+		TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(
+			BaseArmoredCarExp * OpelSupplyTruckExpWorthMlt, 5);
+		// Never trained: the HQ sends it for free.
+		TankData.Cost = FUnitCost();
+		TankData.ExperienceLevels = GetArmoredCarExpLevels();
+		TankData.ExperienceMultiplier = 1.0f;
+		TankData.Abilities = BasicTankAbilities;
+		M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_OpelSupplyTruck, TankData);
 	}
 }
 
@@ -8808,6 +8846,7 @@ void ACPPGameState::InitAllGameBxpData()
 	using namespace DeveloperSettings::GameBalance::UnitCosts::Bxps;
 	using namespace DeveloperSettings::GameBalance::VisionRadii::BxpVision;
 	using namespace DeveloperSettings::GameBalance::UnitHealth;
+	namespace SovietBuildingShotHealth = DeveloperSettings::GameBalance::SovietBuildingShotHealth;
 
 
 	TArray<FUnitAbilityEntry> ArmedBxpAbilities = FAbilityHelpers::ConvertAbilityIdsToEntries({
@@ -8833,6 +8872,7 @@ void ACPPGameState::InitAllGameBxpData()
 	BxpHelpers::GerBxpData::InitGerLFactoryBxpData(M_TPlayerBxpDataHashMap);
 	BxpHelpers::GerBxpData::InitRefineryBxpData(M_TPlayerBxpDataHashMap);
 	BxpHelpers::GerBxpData::InitGerMetalVaultBxpData(M_TPlayerBxpDataHashMap);
+	BxpHelpers::GerBxpData::InitGerMechDepotBxpData(M_TPlayerBxpDataHashMap);
 	BxpHelpers::GerBxpData::InitGerCaptureBunkersBxpData(M_TPlayerBxpDataHashMap);
 	BxpHelpers::GerBxpData::InitGerBarracksBxpData(M_TPlayerBxpDataHashMap);
 	BxpHelpers::GerBxpData::InitGerCommCenterBxpData(M_TPlayerBxpDataHashMap);
@@ -8941,7 +8981,7 @@ void ACPPGameState::InitAllGameBxpData()
 		},
 	});
 	BxpData.Abilities = ArmedBxpAbilities;
-	BxpData.Health = RTSFunctionLibrary::RoundToNearestMultipleOf(T3NomadicBuildingHealth * 5, 10);
+	BxpData.Health = SovietBuildingShotHealth::ReinforcedHealthForShots(SovietBuildingShotHealth::FactoryShots);
 	BxpData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIReinforcedArmorResistances(BxpData.Health);
 	M_TPlayerBxpDataHashMap.Add(EBuildingExpansionType::BTX_RusFactory, BxpData);
 
@@ -8973,7 +9013,7 @@ void ACPPGameState::InitAllGameBxpData()
 		},
 	});
 	BxpData.Abilities = ArmedBxpAbilities;
-	BxpData.Health = RTSFunctionLibrary::RoundToNearestMultipleOf(T3NomadicBuildingHealth * 7, 10);
+	BxpData.Health = SovietBuildingShotHealth::ReinforcedHealthForShots(SovietBuildingShotHealth::PlatformFactoryShots);
 	BxpData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIReinforcedArmorResistances(BxpData.Health);
 	M_TPlayerBxpDataHashMap.Add(EBuildingExpansionType::BTX_RusPlatformFactory, BxpData);
 
@@ -9004,7 +9044,7 @@ void ACPPGameState::InitAllGameBxpData()
 		},
 	});
 	BxpData.Abilities = ArmedBxpAbilities;
-	BxpData.Health = RTSFunctionLibrary::RoundToNearestMultipleOf(T2NomadicBuildingHealth * 2, 10);
+	BxpData.Health = SovietBuildingShotHealth::ReinforcedHealthForShots(SovietBuildingShotHealth::ResearchCenterShots);
 	BxpData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIReinforcedArmorResistances(BxpData.Health);
 	M_TPlayerBxpDataHashMap.Add(EBuildingExpansionType::BTX_RusResearchCenter, BxpData);
 
@@ -9024,7 +9064,7 @@ void ACPPGameState::InitAllGameBxpData()
 		},
 	});
 	BxpData.Abilities = ArmedBxpAbilities;
-	BxpData.Health = RTSFunctionLibrary::RoundToNearestMultipleOf(T2NomadicBuildingHealth * 2, 10);
+	BxpData.Health = SovietBuildingShotHealth::ReinforcedHealthForShots(SovietBuildingShotHealth::IndustrialRefineryShots);
 	BxpData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIReinforcedArmorResistances(BxpData.Health);
 	M_TPlayerBxpDataHashMap.Add(EBuildingExpansionType::BTX_RusIndustrialRefinery, BxpData);
 
@@ -9044,7 +9084,7 @@ void ACPPGameState::InitAllGameBxpData()
 		},
 	});
 	BxpData.Abilities = ArmedBxpAbilities;
-	BxpData.Health = RTSFunctionLibrary::RoundToNearestMultipleOf(T2NomadicBuildingHealth * 2, 10);
+	BxpData.Health = SovietBuildingShotHealth::BasicHealthForShots(SovietBuildingShotHealth::CoolingTowersShots);
 	BxpData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIBasicBuildingArmorResistances(BxpData.Health);
 	M_TPlayerBxpDataHashMap.Add(EBuildingExpansionType::BTX_RusCoolingTowers, BxpData);
 
@@ -9064,7 +9104,7 @@ void ACPPGameState::InitAllGameBxpData()
 		},
 	});
 	BxpData.Abilities = ArmedBxpAbilities;
-	BxpData.Health = RTSFunctionLibrary::RoundToNearestMultipleOf(T1NomadicBuildingHealth * 1, 10);
+	BxpData.Health = SovietBuildingShotHealth::BasicHealthForShots(SovietBuildingShotHealth::BarracksShots);
 	BxpData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIBasicBuildingArmorResistances(BxpData.Health);
 	M_TPlayerBxpDataHashMap.Add(EBuildingExpansionType::BTX_RusBarracks, BxpData);
 
@@ -9170,7 +9210,7 @@ void ACPPGameState::InitAllGameBxpData()
 		},
 	});
 	BxpData.Abilities = ArmedBxpAbilities;
-	BxpData.Health = RTSFunctionLibrary::RoundToNearestMultipleOf(T1BxpHealth * 1, 10);
+	BxpData.Health = SovietBuildingShotHealth::BasicHealthForShots(SovietBuildingShotHealth::AmmoStorageShots);
 	BxpData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIBasicBuildingArmorResistances(BxpData.Health);
 	M_TPlayerBxpDataHashMap.Add(EBuildingExpansionType::BTX_RusAmmoStorage, BxpData);
 
@@ -9190,7 +9230,7 @@ void ACPPGameState::InitAllGameBxpData()
 		},
 	});
 	BxpData.Abilities = ArmedBxpAbilities;
-	BxpData.Health = RTSFunctionLibrary::RoundToNearestMultipleOf(T1BxpHealth * 0.8, 10);
+	BxpData.Health = SovietBuildingShotHealth::BasicHealthForShots(SovietBuildingShotHealth::FuelStorageSmallShots);
 	BxpData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIBasicBuildingArmorResistances(BxpData.Health);
 	M_TPlayerBxpDataHashMap.Add(EBuildingExpansionType::BTX_RusFuelStorage1, BxpData);
 
@@ -9211,7 +9251,7 @@ void ACPPGameState::InitAllGameBxpData()
 		},
 	});
 	BxpData.Abilities = ArmedBxpAbilities;
-	BxpData.Health = RTSFunctionLibrary::RoundToNearestMultipleOf(T1BxpHealth * 2.5, 10);
+	BxpData.Health = SovietBuildingShotHealth::BasicHealthForShots(SovietBuildingShotHealth::FuelStorageLargeShots);
 	BxpData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIBasicBuildingArmorResistances(BxpData.Health);
 	M_TPlayerBxpDataHashMap.Add(EBuildingExpansionType::BTX_RusFuelStorage2, BxpData);
 	M_TPlayerBxpDataHashMap.Add(EBuildingExpansionType::BTX_Rus_SuppliesStorage, BxpData);
@@ -9367,6 +9407,18 @@ void ACPPGameState::InitAllGameBxpData()
 		{ERTSResourceType::Resource_Metal, Rus53KSectorPit_Metal},
 	});
 	M_TPlayerBxpDataHashMap.Add(EBuildingExpansionType::BTX_Rus53KSectorPit, Pit53KSectorData);
+
+	FBxpData TripleCrownData = B4PitData;
+	TripleCrownData.Health = B4PitData.Health * 2.f;
+	TripleCrownData.ConstructionTime = 90.f;
+	TripleCrownData.VisionRadius = 14000.f;
+	TripleCrownData.Cost = FUnitCost({
+		{ERTSResourceType::Resource_Radixite, 1500},
+		{ERTSResourceType::Resource_Metal, 1500},
+	});
+	TripleCrownData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIReinforcedArmorResistances(
+		TripleCrownData.Health);
+	M_TPlayerBxpDataHashMap.Add(EBuildingExpansionType::BTX_RusTripleCrownBunker, TripleCrownData);
 
 	// -----------------------------------------------------------------------
 	// ------------------------- RUS BS-3 PIT --------------------------------
@@ -9541,6 +9593,7 @@ void ACPPGameState::InitAllGameNomadicData()
 		AsEconomic(EBuildingExpansionType::BTX_GerHQHarvester),
 		AsEconomic(EBuildingExpansionType::BTX_GerHQRepairBay),
 		AsDefense(EBuildingExpansionType::BTX_GerHQTower),
+		AsDefense(EBuildingExpansionType::BTX_GerHQLaser),
 	});
 
 	NomadicData.MaxAmountBuildingExpansions = 5;
@@ -9716,7 +9769,8 @@ void ACPPGameState::InitAllGameNomadicData()
 		AsTech(EBuildingExpansionType::BTX_GerBarrackFuelCell),
 		AsTech(EBuildingExpansionType::BTX_GerBarracksRadixReactor)
 	});
-	NomadicData.MaxAmountBuildingExpansions = 2;
+	// Flak, fuel cell, reactor and (Strike Division only, see AddStrikeDivisionBxpOptions) the sniper loft.
+	NomadicData.MaxAmountBuildingExpansions = 3;
 	NomadicData.ExperienceLevels = GetNomadicTruckExpLevels();
 	NomadicData.ExperienceMultiplier = 1.0;
 	NomadicData.ExperienceWorth = T1NomadicExp;
@@ -9766,7 +9820,8 @@ void ACPPGameState::InitAllGameNomadicData()
 	NomadicData.BuildingExpansionOptions = InitBxpOptions({
 		AsDefense(EBuildingExpansionType::BTX_37mmFlak),
 	});
-	NomadicData.MaxAmountBuildingExpansions = 2;
+	// Flak and (Strike Division only, see AddStrikeDivisionBxpOptions) the radio van and the Wurfrahmen shop.
+	NomadicData.MaxAmountBuildingExpansions = 3;
 	NomadicData.ExperienceLevels = GetNomadicTruckExpLevels();
 	NomadicData.ExperienceMultiplier = 1.0;
 	NomadicData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(T1NomadicExp * 1.2, 5);
@@ -10398,6 +10453,31 @@ void ACPPGameState::InitAllGameSquadData()
 	SquadData.ExperienceWorth = EliteInfantryExp;
 	SquadData.StressTolerance = DeveloperSettings::GameBalance::InfantrySettings::StressTolerance::Elite;
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Ger_EliteScavengers, SquadData);
+
+	// Burrowers (Berlin cellar miners, Docs/Campaign/BerlinBurrowers.md): the Scavenger body and stats; they repair
+	// but do not scavenge (the Scavengers stay the harvesters). Their own abilities (tunnel move, listening post,
+	// clearing cave-ins) are still open with the owner and fill the free slots later.
+	TArray<FUnitAbilityEntry> BurrowerAbilities = FAbilityHelpers::ConvertAbilityIdsToEntries({
+		EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdPatrol, EAbilityID::IdRetreat,
+		EAbilityID::IdSwitchWeapon, EAbilityID::IdNoAbility, EAbilityID::IdRepair, EAbilityID::IdNoAbility,
+		EAbilityID::IdAttackGround,
+		EAbilityID::IdPickupItem, EAbilityID::IdEnterCargo, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
+		EAbilityID::IdNoAbility,
+	});
+	SquadData.MaxHealth = BasicInfantryHealth;
+	SquadData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIBasicInfantryResistances(SquadData.MaxHealth);
+	SquadData.MaxWalkSpeedCms = BasicInfantrySpeed;
+	SquadData.MaxAcceleration = BasicInfantryAcceleration;
+	SquadData.VisionRadius = InfantryVisionRadius;
+	SquadData.Cost = FUnitCost({
+		{ERTSResourceType::Resource_Radixite, Burrowers_Radixite}
+	});
+	SquadData.Abilities = BurrowerAbilities;
+	SquadData.ExperienceWorth = BaseInfantryExp;
+	SquadData.ExperienceLevels = GetTier1InfantryExpLevels();
+	SquadData.ExperienceMultiplier = 1.0;
+	SquadData.StressTolerance = DeveloperSettings::GameBalance::InfantrySettings::StressTolerance::Untrained;
+	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Ger_Burrowers, SquadData);
 
 	// Red Spine: three light mech walkers on the infantry skeleton, heavy infantry armour, MP46s, normal pace.
 	SquadData.MaxHealth = RedSpineWalkerHealth;

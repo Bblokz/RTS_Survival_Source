@@ -127,7 +127,26 @@ public:
 	/** @return A IsValid GameExplosionsManager or null. */
 	static UGameExplosionsManager* GetGameExplosionsManager(const UObject* WorldContextObject);
 
+	/**
+	 * @return The default enemy controller: the one of the first AI player, or the lowest-numbered one when that
+	 * player has none. Null when the map has no controller.
+	 */
 	static AEnemyController* GetEnemyController(const UObject* WorldContextObject);
+
+	/**
+	 * @brief Finds the controller that plays a player, for code that knows whose unit or ability it handles.
+	 * @param WorldContextObject Any object of the world.
+	 * @param Player Owning player of the unit or ability.
+	 * @return For AI players 2..MaxPlayers their own controller, or null when the map has none for that player.
+	 * Every other owner (human, neutral, unset) has no controller of its own and gets the default one, as before.
+	 */
+	static AEnemyController* GetEnemyControllerForPlayer(const UObject* WorldContextObject, int32 Player);
+
+	/** @return The controller for the owner of this unit (see GetEnemyControllerForPlayer); null for a null unit. */
+	static AEnemyController* GetEnemyControllerOfUnit(const AActor* Unit);
+
+	/** @return Every enemy controller of the world, lowest player number first. */
+	static TArray<AEnemyController*> GetAllEnemyControllers(const UObject* WorldContextObject);
 
 	/** @return A IsValid UGameUnitManager or null. */
 	static UGameUnitManager* GetGameUnitManager(const UObject* WorldContextObject);

@@ -480,7 +480,7 @@ void UNomadicAirDeliverySubsystem::FinishRun(const int32 RunIndex, ANomadicVehic
 	// The requester hears of the truck before it starts to unfold, so a callback on the conversion is not missed.
 	TWeakObjectPtr<ANomadicVehicle> WeakNomadic(Nomadic);
 	Run.OnLanded.ExecuteIfBound(Nomadic);
-	if (WeakNomadic.IsValid())
+	if (WeakNomadic.IsValid() && Run.Order.bBuildOnLanding)
 	{
 		OrderBuildOnSpot(*WeakNomadic.Get(), Run.GroundBuildLocation, Run.Order.BuildRotation);
 	}

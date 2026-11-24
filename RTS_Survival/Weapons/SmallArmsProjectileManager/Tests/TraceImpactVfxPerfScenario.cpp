@@ -29,6 +29,9 @@
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 #include "RTS_Survival/Weapons/InfantryWeapon/InfantryWeaponMaster.h"
 #include "RTS_Survival/Weapons/SmallArmsProjectileManager/SmallArmsProjectileManager.h"
+#include "RTS_Survival/Weapons/RTSWeaponVFXSettings/RTSWeaponVFXSettings.h"
+#include "RTS_Survival/Weapons/SmallArmsProjectileManager/MuzzleVfx/SmallArmsMuzzleVfxBatcher.h"
+#include "RTS_Survival/Weapons/SmallArmsProjectileManager/MuzzleVfx/SmallArmsMuzzleRoundAudit.h"
 #include "RTS_Survival/Weapons/SmallArmsProjectileManager/TraceImpactVfx/TraceImpactVfxBatcher.h"
 #include "RTS_Survival/Weapons/SmallArmsProjectileManager/TraceImpactVfx/TraceImpactVfxPerfCounters.h"
 
@@ -57,6 +60,27 @@ namespace TraceImpactVfxPerfScenarioPrivate
 	constexpr float CloseUpHeight = 350.0f;
 	constexpr float CloseUpPitch = -25.0f;
 	constexpr int32 FramesBetweenScreenshots = 300;
+	// Muzzle showcase: one muzzle per class (pistol .. AT rifle) across the picture, firing to the right of the camera.
+	// A cycle: the automatic classes fire a burst of MuzzleShowcaseBurstRounds, the others one round; pictures are taken
+	// while the flash is up and later, when only the smoke is left.
+	constexpr int32 MuzzleShowcaseCycleFrames = 120;
+	constexpr int32 MuzzleShowcaseFramesBetweenRounds = 6;
+	constexpr int32 MuzzleShowcaseBurstRounds = 5;
+	constexpr int32 MuzzleShowcaseFlashScreenshotFrame = 25;
+	constexpr int32 MuzzleShowcaseSmokeScreenshotFrame = 80;
+	constexpr float MuzzleShowcaseSpacing = 140.0f;
+	constexpr float MuzzleShowcaseHeight = 120.0f;
+	constexpr float MuzzleShowcaseDistanceFromCamera = 520.0f;
+	// The old launch effect of a class fires this far behind the new one.
+	constexpr float MuzzleShowcaseLegacyDistance = 220.0f;
+	constexpr float MuzzleShowcaseRtsBack = 1500.0f;
+	constexpr float MuzzleShowcaseRtsHeight = 2100.0f;
+	constexpr float MuzzleShowcaseRtsPitch = -55.0f;
+	const TCHAR* LegacyRifleLaunchPath =
+		TEXT("/Game/RTS_Survival/Blueprints/Turrets/German/Light/PumaTurrets/50mmPuma/VFX/NS_PumaMG_LaunchEffect.NS_PumaMG_LaunchEffect");
+	const TCHAR* LegacyAutomaticLaunchPath =
+		TEXT("/Game/RTS_Survival/Blueprints/Squads/InfantryWeapons/VFX/NS_MuzzleFlash_SmallArmsRandomBurst.NS_MuzzleFlash_SmallArmsRandomBurst");
+
 	// Showcase: a row of impact types across the picture, left to right in the order of ETraceImpactVfxType.
 	constexpr float ShowcaseDistanceFromCamera = 650.0f;
 	constexpr float ShowcaseSpacing = 180.0f;
@@ -141,6 +165,12 @@ namespace TraceImpactVfxPerfScenarioPrivate
 		return FString();
 	}
 
+	// "batched" when the small arms muzzle batcher draws the infantry muzzles, "legacy" when each weapon does.
+	const TCHAR* GetMuzzleVfxMode(const UWorld& World)
+	{
+		return USmallArmsMuzzleVfxBatcher::FindReadyBatcher(&World) != nullptr ? TEXT("batched") : TEXT("legacy");
+	}
+
 	bool GetIsDrawingCentralised(UWorld& World)
 	{
 		for (TActorIterator<ASmallArmsProjectileManager> ManagerIterator(&World); ManagerIterator; ++ManagerIterator)
@@ -158,6 +188,9 @@ void FTraceImpactVfxPerfScenario::Start()
 	bM_DumpStats = FParse::Param(FCommandLine::Get(), TEXT("TraceImpactVfxStatDump"));
 	bM_TakeScreenshots = FParse::Param(FCommandLine::Get(), TEXT("TraceImpactVfxScreenshots"));
 	bM_ShowcaseImpactTypes = FParse::Param(FCommandLine::Get(), TEXT("TraceImpactVfxShowcase"));
+	bM_ShowcaseMuzzles = FParse::Param(FCommandLine::Get(), TEXT("SmallArmsMuzzleShowcase"));
+	bM_MuzzleShowcaseFromRtsHeight = FParse::Param(FCommandLine::Get(), TEXT("SmallArmsMuzzleShowcaseRts"));
+	bM_TakeScreenshots = bM_TakeScreenshots || bM_ShowcaseMuzzles;
 	FParse::Value(FCommandLine::Get(), TEXT("TraceImpactVfxSquads="), M_SquadsPerSide);
 	FParse::Value(FCommandLine::Get(), TEXT("TraceImpactVfxFrames="), M_FightFrames);
 	FParse::Value(FCommandLine::Get(), TEXT("TraceImpactVfxLineDistance="), M_LineDistance);
@@ -410,7 +443,16 @@ void FTraceImpactVfxPerfScenario::KeepCameraOnFight(UWorld& World)
 	{
 		return;
 	}
-	if (bM_TakeScreenshots)
+	if (bM_ShowcaseMuzzles)
+	{
+		const FVector RowCenter = M_FightCenter + FVector(M_LineDistance * 0.5f - CloseUpDistance, 0.0f, 0.0f);
+		M_OverviewCamera->SetActorLocationAndRotation(
+			bM_MuzzleShowcaseFromRtsHeight
+				? RowCenter + FVector(MuzzleShowcaseDistanceFromCamera - MuzzleShowcaseRtsBack, 0.0f, MuzzleShowcaseRtsHeight)
+				: RowCenter + FVector(0.0f, 0.0f, CloseUpHeight),
+			FRotator(bM_MuzzleShowcaseFromRtsHeight ? MuzzleShowcaseRtsPitch : CloseUpPitch, 0.0f, 0.0f));
+	}
+	else if (bM_TakeScreenshots)
 	{
 		// Close to the Soviet line, so the impacts on and around the soldiers can be told apart in a picture.
 		M_OverviewCamera->SetActorLocationAndRotation(
@@ -502,6 +544,75 @@ void FTraceImpactVfxPerfScenario::DrawShowcaseImpacts(UWorld& World) const
 	}
 }
 
+int32 FTraceImpactVfxPerfScenario::GetFramesIntoMuzzleCycle() const
+{
+	using namespace TraceImpactVfxPerfScenarioPrivate;
+	// The frames of the fight count down; a cycle starts where the count is a multiple of the cycle length, minus one.
+	return MuzzleShowcaseCycleFrames - 1 - M_FramesLeftInPhase % MuzzleShowcaseCycleFrames;
+}
+
+bool FTraceImpactVfxPerfScenario::GetIsMuzzleShowcaseScreenshotFrame() const
+{
+	using namespace TraceImpactVfxPerfScenarioPrivate;
+	const int32 FramesIntoCycle = GetFramesIntoMuzzleCycle();
+	return FramesIntoCycle == MuzzleShowcaseFlashScreenshotFrame || FramesIntoCycle == MuzzleShowcaseSmokeScreenshotFrame;
+}
+
+void FTraceImpactVfxPerfScenario::DrawShowcaseMuzzles(UWorld& World) const
+{
+	using namespace TraceImpactVfxPerfScenarioPrivate;
+	const int32 FramesIntoCycle = GetFramesIntoMuzzleCycle();
+	const int32 RoundIndex = FramesIntoCycle / MuzzleShowcaseFramesBetweenRounds;
+	if (FramesIntoCycle % MuzzleShowcaseFramesBetweenRounds != 0 || RoundIndex >= MuzzleShowcaseBurstRounds)
+	{
+		return;
+	}
+	USmallArmsMuzzleVfxBatcher* MuzzleBatcher = USmallArmsMuzzleVfxBatcher::FindReadyBatcher(&World);
+	const URTSWeaponVFXSettings* VfxSettings = URTSWeaponVFXSettings::Get();
+	const bool bDrawsLegacy = FParse::Param(FCommandLine::Get(), TEXT("SmallArmsMuzzleShowcaseLegacy"));
+	const ESmallArmsMuzzleClass Classes[] = {
+		ESmallArmsMuzzleClass::Pistol, ESmallArmsMuzzleClass::SubmachineGun, ESmallArmsMuzzleClass::AssaultRifle,
+		ESmallArmsMuzzleClass::Rifle, ESmallArmsMuzzleClass::MachineGun, ESmallArmsMuzzleClass::AntiTankRifle
+	};
+	constexpr int32 ClassCount = UE_ARRAY_COUNT(Classes);
+	const float RowX = M_FightCenter.X + M_LineDistance * 0.5f - CloseUpDistance + MuzzleShowcaseDistanceFromCamera;
+	// Fires to the right of the camera and a little away from it, so the flash is seen from the side.
+	const FVector FireDirection = FVector(0.35f, 1.0f, 0.0f).GetSafeNormal();
+	for (int32 ClassIndex = 0; ClassIndex < ClassCount; ++ClassIndex)
+	{
+		const ESmallArmsMuzzleClass MuzzleClass = Classes[ClassIndex];
+		const bool bIsAutomatic = MuzzleClass == ESmallArmsMuzzleClass::SubmachineGun
+			|| MuzzleClass == ESmallArmsMuzzleClass::AssaultRifle || MuzzleClass == ESmallArmsMuzzleClass::MachineGun;
+		if (RoundIndex > 0 && not bIsAutomatic)
+		{
+			continue;
+		}
+		FVector Muzzle(RowX, M_FightCenter.Y + (ClassIndex - (ClassCount - 1) * 0.5f) * MuzzleShowcaseSpacing, M_FightCenter.Z);
+		FHitResult GroundHit;
+		const FVector TraceOffset(0.0f, 0.0f, ShowcaseGroundTraceHalfHeight);
+		if (World.LineTraceSingleByChannel(GroundHit, Muzzle + TraceOffset, Muzzle - TraceOffset, ECC_WorldStatic))
+		{
+			Muzzle = GroundHit.ImpactPoint;
+		}
+		Muzzle.Z += MuzzleShowcaseHeight;
+		if (MuzzleBatcher != nullptr && VfxSettings != nullptr)
+		{
+			const FSmallArmsMuzzleProfile Profile = VfxSettings->GetSmallArmsMuzzleProfile(MuzzleClass);
+			// The weapons throttle their smoke by time; at a round every 0.1 s that is every other round here.
+			const bool bPuffsSmoke = not bIsAutomatic || RoundIndex % 2 == 0;
+			MuzzleBatcher->AddShot(Muzzle, FireDirection, Profile.FlashScale,
+			                       bPuffsSmoke ? Profile.SmokeScale : 0.0f, Profile.SmokeLifetimeMlt);
+		}
+		if (bDrawsLegacy)
+		{
+			UNiagaraSystem* LegacySystem = LoadObject<UNiagaraSystem>(
+				nullptr, bIsAutomatic ? LegacyAutomaticLaunchPath : LegacyRifleLaunchPath);
+			UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+				&World, LegacySystem, Muzzle + FVector(MuzzleShowcaseLegacyDistance, 0.0f, 0.0f), FireDirection.Rotation());
+		}
+	}
+}
+
 void FTraceImpactVfxPerfScenario::RecordFrame(UWorld& World)
 {
 	using namespace TraceImpactVfxPerfScenarioPrivate;
@@ -519,20 +630,35 @@ void FTraceImpactVfxPerfScenario::RecordFrame(UWorld& World)
 	{
 		DrawShowcaseImpacts(World);
 	}
-	const bool bIsScreenshotFrame = bM_ShowcaseImpactTypes
-		? M_FramesLeftInPhase % ShowcaseFramesBetweenScreenshots ==
-		ShowcaseFramesBetweenScreenshots - ShowcaseScreenshotDelayFrames
-		: M_FramesLeftInPhase % FramesBetweenScreenshots == 0;
+	if (bM_ShowcaseMuzzles)
+	{
+		DrawShowcaseMuzzles(World);
+	}
+	const bool bIsImpactShowcaseScreenshotFrame = M_FramesLeftInPhase % ShowcaseFramesBetweenScreenshots ==
+		ShowcaseFramesBetweenScreenshots - ShowcaseScreenshotDelayFrames;
+	const bool bIsScreenshotFrame = bM_ShowcaseMuzzles
+		? GetIsMuzzleShowcaseScreenshotFrame()
+		: (bM_ShowcaseImpactTypes
+			   ? bIsImpactShowcaseScreenshotFrame
+			   : M_FramesLeftInPhase % FramesBetweenScreenshots == 0);
 	if (bM_TakeScreenshots && bIsScreenshotFrame)
 	{
 		const FString FileName = FPaths::ProjectSavedDir() / TEXT("Screenshots") / FString::Printf(
-			TEXT("TraceImpactVfx_%s_%02d.png"),
+			TEXT("TraceImpactVfx_%s_muzzle-%s_%02d.png"),
 			bM_ShowcaseImpactTypes
 				? TEXT("showcase")
 				: (GetIsDrawingCentralised(World) ? TEXT("centralised") : TEXT("legacy")),
+			GetMuzzleVfxMode(World),
 			M_ScreenshotCount++);
 		FScreenshotRequest::RequestScreenshot(FileName, false, false);
 		UE_LOG(LogRTSTraceImpactVfx, Display, TEXT("RTS_TRACE_IMPACT_VFX screenshot file=%s"), *FileName);
+		if (bM_ShowcaseMuzzles)
+		{
+			const USmallArmsMuzzleVfxBatcher* MuzzleBatcher = USmallArmsMuzzleVfxBatcher::FindReadyBatcher(&World);
+			UE_LOG(LogRTSTraceImpactVfx, Display, TEXT("RTS_MUZZLE_VFX particles frame_in_cycle=%d:%s"),
+			       GetFramesIntoMuzzleCycle(),
+			       MuzzleBatcher != nullptr ? *MuzzleBatcher->DescribeFirstParticles() : TEXT(" no batcher"));
+		}
 	}
 	// Taken after the test's own work, so that is not part of the next frame's time.
 	M_LastTickSeconds = FPlatformTime::Seconds();
@@ -620,6 +746,14 @@ void FTraceImpactVfxPerfScenario::Tick(URTSCoverFinderWorldSubsystem& CoverSubsy
 	UE_LOG(LogRTSTraceImpactVfx, Display, TEXT("RTS_TRACE_IMPACT_VFX impacts by weapon owner: %s"), *ImpactsByOwner);
 	UE_LOG(LogRTSTraceImpactVfx, Display, TEXT("RTS_TRACE_IMPACT_VFX emitters alive/spawned: %s"),
 	       *DescribeTraceImpactEmitters(*World));
+	const USmallArmsMuzzleVfxBatcher* MuzzleBatcher = USmallArmsMuzzleVfxBatcher::FindReadyBatcher(World);
+	UE_LOG(LogRTSTraceImpactVfx, Display, TEXT("RTS_MUZZLE_VFX bench mode=%s shots=%lld emitters alive/spawned: %s"),
+	       GetMuzzleVfxMode(*World),
+	       MuzzleBatcher != nullptr ? MuzzleBatcher->GetTotalPublishedShots() : 0,
+	       MuzzleBatcher != nullptr ? *MuzzleBatcher->DescribeEmitterParticleCounts() : TEXT(""));
+	// Every round of a batched weapon should hand one flash to the batcher, burst fire included.
+	UE_LOG(LogRTSTraceImpactVfx, Display, TEXT("RTS_MUZZLE_VFX rounds vs flashes: %s"),
+	       *SmallArmsMuzzleRoundAudit::Describe());
 	FTraceImpactVfxPerfCounters::bIsGathering = false;
 	M_Phase = ETraceImpactVfxPerfPhase::Inactive;
 	UE_LOG(LogRTSTraceImpactVfx, Display, TEXT("RTS_TRACE_IMPACT_VFX RESULT DONE map=%s"), *World->GetName());

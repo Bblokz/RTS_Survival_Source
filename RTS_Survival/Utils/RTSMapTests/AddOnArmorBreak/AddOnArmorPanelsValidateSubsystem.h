@@ -121,6 +121,13 @@ private:
 	// -AddOnArmorPanelsFirstHitPanel=<layout index>: the first shell hits this left panel instead of the middle one, so an
 	// end plate's own debris mesh can be checked; INDEX_NONE when not given.
 	int32 M_RequestedFirstHitPanel = INDEX_NONE;
+	// -AddOnArmorPanelsHeroCamera: a 1920x1080 three-quarter front-left camera and a series of pictures while the first
+	// shell's plate flies, for screenshots of a plate being shot off (e.g. the spaced armour info takeover).
+	bool bM_HeroCamera = false;
+	int32 M_NextHeroFlightFrame = 0;
+	// -AddOnArmorPanelsSpawnYaw=<deg>, plus -AddOnArmorPanelsFaceSun to turn the left side to the sun first.
+	float M_SpawnYawOffset = 0.f;
+	bool bM_FaceSun = false;
 
 	// Add-on modules in slot order (left zone, then right zone) and the layout's panels per side.
 	int32 M_LeftModuleId = INDEX_NONE;
@@ -162,6 +169,10 @@ private:
 	void InjectPanels(ATankMaster& Tank) const;
 	bool CollectModulesAndPanels();
 	void CreateCameras();
+	/** @return The tank's spawn yaw: the offset, turned so the left side faces the map's sun when asked. */
+	float GetSpawnYaw() const;
+	/** @brief Hero camera runs: pictures at fixed times after the first shell while its plate is in the air. */
+	void TickHeroFlightFrames(float SecondsSinceShot);
 	void AimCameras() const;
 	void ExportPictures(const FString& Label) const;
 

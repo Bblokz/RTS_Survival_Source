@@ -1,0 +1,492 @@
+{
+ "JobName": "Cand_Berlin",
+ "Category": "_Scout",
+ "Fps": 60,
+ "WarmupSeconds": 5.0,
+ "DurationSeconds": 5.3999999999999995,
+ "Anchor": {
+  "X": 0.0,
+  "Y": 0.0,
+  "Z": 0.0
+ },
+ "AnchorYaw": 0.0,
+ "ClearUnitsRadius": 0.0,
+ "bKeepVoiceLines": true,
+ "bKeepAnnouncer": false,
+ "bKeepMusic": false,
+ "Events": [
+  {
+   "Time": -1.0,
+   "Type": "Marker",
+   "Tag": "",
+   "Offset": {
+    "X": 0.0,
+    "Y": 6000.0,
+    "Z": 0.0
+   },
+   "Text": "white",
+   "Value": 200.0,
+   "Settings": {
+    "Height": 2500.0
+   }
+  },
+  {
+   "Time": -1.0,
+   "Type": "Marker",
+   "Tag": "",
+   "Offset": {
+    "X": 5000.0,
+    "Y": -2000.0,
+    "Z": 0.0
+   },
+   "Text": "white",
+   "Value": 200.0,
+   "Settings": {
+    "Height": 2500.0
+   }
+  },
+  {
+   "Time": -1.0,
+   "Type": "Marker",
+   "Tag": "",
+   "Offset": {
+    "X": 17500.0,
+    "Y": -12500.0,
+    "Z": 0.0
+   },
+   "Text": "white",
+   "Value": 200.0,
+   "Settings": {
+    "Height": 2500.0
+   }
+  },
+  {
+   "Time": -1.0,
+   "Type": "Marker",
+   "Tag": "",
+   "Offset": {
+    "X": 22400.0,
+    "Y": -15500.0,
+    "Z": 0.0
+   },
+   "Text": "white",
+   "Value": 200.0,
+   "Settings": {
+    "Height": 2500.0
+   }
+  },
+  {
+   "Time": -1.0,
+   "Type": "Marker",
+   "Tag": "",
+   "Offset": {
+    "X": -6000.0,
+    "Y": 20000.0,
+    "Z": 0.0
+   },
+   "Text": "white",
+   "Value": 200.0,
+   "Settings": {
+    "Height": 2500.0
+   }
+  },
+  {
+   "Time": -1.0,
+   "Type": "Marker",
+   "Tag": "",
+   "Offset": {
+    "X": 8000.0,
+    "Y": 15000.0,
+    "Z": 0.0
+   },
+   "Text": "white",
+   "Value": 200.0,
+   "Settings": {
+    "Height": 2500.0
+   }
+  },
+  {
+   "Time": -1.0,
+   "Type": "Marker",
+   "Tag": "",
+   "Offset": {
+    "X": -15000.0,
+    "Y": -25000.0,
+    "Z": 0.0
+   },
+   "Text": "white",
+   "Value": 200.0,
+   "Settings": {
+    "Height": 2500.0
+   }
+  },
+  {
+   "Time": -1.0,
+   "Type": "Marker",
+   "Tag": "",
+   "Offset": {
+    "X": 15000.0,
+    "Y": 10000.0,
+    "Z": 0.0
+   },
+   "Text": "white",
+   "Value": 200.0,
+   "Settings": {
+    "Height": 2500.0
+   }
+  },
+  {
+   "Time": -1.0,
+   "Type": "Marker",
+   "Tag": "",
+   "Offset": {
+    "X": -8000.0,
+    "Y": 30000.0,
+    "Z": 0.0
+   },
+   "Text": "white",
+   "Value": 200.0,
+   "Settings": {
+    "Height": 2500.0
+   }
+  }
+ ],
+ "Shots": [
+  {
+   "Name": "C0_0_6000",
+   "Start": 0.0,
+   "End": 0.6,
+   "Rig": "Orbit",
+   "Keys": [
+    {
+     "Time": 0.0,
+     "Pivot": "",
+     "Offset": {
+      "X": 0.0,
+      "Y": 6000.0,
+      "Z": 0.0
+     },
+     "Yaw": 180.0,
+     "Pitch": 84.0,
+     "Distance": 30000.0,
+     "Focal": 24.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     },
+     "VYaw": 0.0,
+     "VPitch": 0.0,
+     "VDistance": 0.0,
+     "VFocal": 0.0
+    }
+   ],
+   "Ease": "InOut",
+   "PivotLag": 0.7,
+   "Aperture": 0.0,
+   "Shake": 0.0,
+   "bAvoidOcclusion": false,
+   "MinGroundClearance": 350.0
+  },
+  {
+   "Name": "C1_5000_-2000",
+   "Start": 0.6,
+   "End": 1.2,
+   "Rig": "Orbit",
+   "Keys": [
+    {
+     "Time": 0.0,
+     "Pivot": "",
+     "Offset": {
+      "X": 5000.0,
+      "Y": -2000.0,
+      "Z": 0.0
+     },
+     "Yaw": 180.0,
+     "Pitch": 84.0,
+     "Distance": 30000.0,
+     "Focal": 24.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     },
+     "VYaw": 0.0,
+     "VPitch": 0.0,
+     "VDistance": 0.0,
+     "VFocal": 0.0
+    }
+   ],
+   "Ease": "InOut",
+   "PivotLag": 0.7,
+   "Aperture": 0.0,
+   "Shake": 0.0,
+   "bAvoidOcclusion": false,
+   "MinGroundClearance": 350.0
+  },
+  {
+   "Name": "C2_17500_-12500",
+   "Start": 1.2,
+   "End": 1.7999999999999998,
+   "Rig": "Orbit",
+   "Keys": [
+    {
+     "Time": 0.0,
+     "Pivot": "",
+     "Offset": {
+      "X": 17500.0,
+      "Y": -12500.0,
+      "Z": 0.0
+     },
+     "Yaw": 180.0,
+     "Pitch": 84.0,
+     "Distance": 30000.0,
+     "Focal": 24.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     },
+     "VYaw": 0.0,
+     "VPitch": 0.0,
+     "VDistance": 0.0,
+     "VFocal": 0.0
+    }
+   ],
+   "Ease": "InOut",
+   "PivotLag": 0.7,
+   "Aperture": 0.0,
+   "Shake": 0.0,
+   "bAvoidOcclusion": false,
+   "MinGroundClearance": 350.0
+  },
+  {
+   "Name": "C3_22400_-15500",
+   "Start": 1.7999999999999998,
+   "End": 2.4,
+   "Rig": "Orbit",
+   "Keys": [
+    {
+     "Time": 0.0,
+     "Pivot": "",
+     "Offset": {
+      "X": 22400.0,
+      "Y": -15500.0,
+      "Z": 0.0
+     },
+     "Yaw": 180.0,
+     "Pitch": 84.0,
+     "Distance": 30000.0,
+     "Focal": 24.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     },
+     "VYaw": 0.0,
+     "VPitch": 0.0,
+     "VDistance": 0.0,
+     "VFocal": 0.0
+    }
+   ],
+   "Ease": "InOut",
+   "PivotLag": 0.7,
+   "Aperture": 0.0,
+   "Shake": 0.0,
+   "bAvoidOcclusion": false,
+   "MinGroundClearance": 350.0
+  },
+  {
+   "Name": "C4_-6000_20000",
+   "Start": 2.4,
+   "End": 3.0,
+   "Rig": "Orbit",
+   "Keys": [
+    {
+     "Time": 0.0,
+     "Pivot": "",
+     "Offset": {
+      "X": -6000.0,
+      "Y": 20000.0,
+      "Z": 0.0
+     },
+     "Yaw": 180.0,
+     "Pitch": 84.0,
+     "Distance": 30000.0,
+     "Focal": 24.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     },
+     "VYaw": 0.0,
+     "VPitch": 0.0,
+     "VDistance": 0.0,
+     "VFocal": 0.0
+    }
+   ],
+   "Ease": "InOut",
+   "PivotLag": 0.7,
+   "Aperture": 0.0,
+   "Shake": 0.0,
+   "bAvoidOcclusion": false,
+   "MinGroundClearance": 350.0
+  },
+  {
+   "Name": "C5_8000_15000",
+   "Start": 3.0,
+   "End": 3.5999999999999996,
+   "Rig": "Orbit",
+   "Keys": [
+    {
+     "Time": 0.0,
+     "Pivot": "",
+     "Offset": {
+      "X": 8000.0,
+      "Y": 15000.0,
+      "Z": 0.0
+     },
+     "Yaw": 180.0,
+     "Pitch": 84.0,
+     "Distance": 30000.0,
+     "Focal": 24.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     },
+     "VYaw": 0.0,
+     "VPitch": 0.0,
+     "VDistance": 0.0,
+     "VFocal": 0.0
+    }
+   ],
+   "Ease": "InOut",
+   "PivotLag": 0.7,
+   "Aperture": 0.0,
+   "Shake": 0.0,
+   "bAvoidOcclusion": false,
+   "MinGroundClearance": 350.0
+  },
+  {
+   "Name": "C6_-15000_-25000",
+   "Start": 3.5999999999999996,
+   "End": 4.2,
+   "Rig": "Orbit",
+   "Keys": [
+    {
+     "Time": 0.0,
+     "Pivot": "",
+     "Offset": {
+      "X": -15000.0,
+      "Y": -25000.0,
+      "Z": 0.0
+     },
+     "Yaw": 180.0,
+     "Pitch": 84.0,
+     "Distance": 30000.0,
+     "Focal": 24.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     },
+     "VYaw": 0.0,
+     "VPitch": 0.0,
+     "VDistance": 0.0,
+     "VFocal": 0.0
+    }
+   ],
+   "Ease": "InOut",
+   "PivotLag": 0.7,
+   "Aperture": 0.0,
+   "Shake": 0.0,
+   "bAvoidOcclusion": false,
+   "MinGroundClearance": 350.0
+  },
+  {
+   "Name": "C7_15000_10000",
+   "Start": 4.2,
+   "End": 4.8,
+   "Rig": "Orbit",
+   "Keys": [
+    {
+     "Time": 0.0,
+     "Pivot": "",
+     "Offset": {
+      "X": 15000.0,
+      "Y": 10000.0,
+      "Z": 0.0
+     },
+     "Yaw": 180.0,
+     "Pitch": 84.0,
+     "Distance": 30000.0,
+     "Focal": 24.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     },
+     "VYaw": 0.0,
+     "VPitch": 0.0,
+     "VDistance": 0.0,
+     "VFocal": 0.0
+    }
+   ],
+   "Ease": "InOut",
+   "PivotLag": 0.7,
+   "Aperture": 0.0,
+   "Shake": 0.0,
+   "bAvoidOcclusion": false,
+   "MinGroundClearance": 350.0
+  },
+  {
+   "Name": "C8_-8000_30000",
+   "Start": 4.8,
+   "End": 5.3999999999999995,
+   "Rig": "Orbit",
+   "Keys": [
+    {
+     "Time": 0.0,
+     "Pivot": "",
+     "Offset": {
+      "X": -8000.0,
+      "Y": 30000.0,
+      "Z": 0.0
+     },
+     "Yaw": 180.0,
+     "Pitch": 84.0,
+     "Distance": 30000.0,
+     "Focal": 24.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     },
+     "VYaw": 0.0,
+     "VPitch": 0.0,
+     "VDistance": 0.0,
+     "VFocal": 0.0
+    }
+   ],
+   "Ease": "InOut",
+   "PivotLag": 0.7,
+   "Aperture": 0.0,
+   "Shake": 0.0,
+   "bAvoidOcclusion": false,
+   "MinGroundClearance": 350.0
+  }
+ ],
+ "MapPath": "/Game/RTS_Survival/Maps/GerMissions/Ger_Berlin",
+ "GameModeClassPath": "/Game/RTS_Survival/Blueprints/GameSettings/RTS_BP_GamemodeBase.RTS_BP_GamemodeBase_C",
+ "HideActorPrefixes": []
+}

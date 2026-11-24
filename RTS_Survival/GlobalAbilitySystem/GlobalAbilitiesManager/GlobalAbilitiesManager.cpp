@@ -4,10 +4,13 @@
 #include "GlobalAbilitiesManager.h"
 
 #include "RTS_Survival/Game/GameState/GameUnitManager/GameUnitManager.h"
+#include "RTS_Survival/Game/Players/RTSPlayers.h"
 #include "RTS_Survival/Buildings/BuildingExpansion/BuildingExpansionEnums.h"
 #include "RTS_Survival/GlobalAbilitySystem/GlobalAbilities/GlobalAbility.h"
+#include "RTS_Survival/GlobalAbilitySystem/GlobalAbilities/AircraftStrafing/GA_AircraftStrafing.h"
 #include "RTS_Survival/GlobalAbilitySystem/DevSettings/RTSGlobalAbilitySettings.h"
 #include "RTS_Survival/GlobalAbilitySystem/DevSettings/GlobalAbilitySetDataAsset.h"
+#include "RTS_Survival/GlobalAbilitySystem/EnemyAirWarnings/EnemyAirWarningSubsystem.h"
 #include "RTS_Survival/GlobalAbilitySystem/UI/W_GA_Description/W_GA_Description.h"
 #include "RTS_Survival/GlobalAbilitySystem/UI/W_GA_Item/W_GA_Item.h"
 #include "RTS_Survival/TechTree/Technologies/Technologies.h"
@@ -815,11 +818,139 @@ FText UGlobalAbilitiesManager::GetHoverDescriptionForAbility(const UGlobalAbilit
 	}
 	if (Ability->M_AbilityCosts.CoolDownRemaining > 0)
 	{
-		return FText::FromString(FRTSRichTextConverter::MakeRTSRich(
+		return AppendChargesToDescription(Ability, FText::FromString(FRTSRichTextConverter::MakeRTSRich(
 			FString::Printf(TEXT("On Cooldown: %d"), Ability->M_AbilityCosts.CoolDownRemaining),
-			ERTSRichText::Text_Bad14));
+			ERTSRichText::Text_Bad14)));
 	}
-	return Ability->M_UISettings.Description;
+	return AppendChargesToDescription(Ability, Ability->M_UISettings.Description);
+}
+
+FText UGlobalAbilitiesManager::AppendChargesToDescription(const UGlobalAbility* Ability, const FText& Description) const
+{
+	if (not IsValid(Ability) || Ability->M_RemainingCharges <= 0)
+	{
+		return Description;
+	}
+	const FString ChargesLine = FRTSRichTextConverter::MakeRTSRich(
+		FString::Printf(TEXT("Charges left: %d"), Ability->M_RemainingCharges), ERTSRichText::Text_Exp);
+	return FText::FromString(Description.ToString() + TEXT("\n") + ChargesLine);
+}
+
+UGlobalAbility* UGlobalAbilitiesManager::GrantMissionGlobalAbility(const FMissionGrantedGlobalAbility& Grant)
+{
+	if (not IsPlayerAbilityManager() || Grant.Ability == EGlobalAbility::GA_None)
+	{
+		return nullptr;
+	}
+	UGlobalAbility* const Ability = CreateMissionGrantedAbilityCopy(Grant);
+	if (not IsValid(Ability))
+	{
+		return nullptr;
+	}
+	ApplyMissionGrantOverrides(Ability, Grant);
+	AddMissionGrantToPanel(Ability);
+	return Ability;
+}
+
+UGlobalAbility* UGlobalAbilitiesManager::CreateMissionGrantedAbilityCopy(const FMissionGrantedGlobalAbility& Grant)
+{
+	const URTSGlobalAbilitySettings* const GlobalAbilitySettings = GetDefault<URTSGlobalAbilitySettings>();
+	UGlobalAbilitySetDataAsset* const AbilitySetDataAsset = IsValid(GlobalAbilitySettings)
+		                                                        ? GlobalAbilitySettings->GlobalAbilityDataAsset.
+		                                                        LoadSynchronous()
+		                                                        : nullptr;
+	// A mission grant ignores the mission's tier cap: the mission chose to hand out exactly this ability.
+	UGlobalAbility* const AbilityCopy = IsValid(AbilitySetDataAsset)
+		                                    ? AbilitySetDataAsset->GetGLobalAbilityForTypeAsCopyFromTemplate(
+			                                    Grant.Ability).Get()
+		                                    : nullptr;
+	if (not IsValid(AbilityCopy))
+	{
+		RTSFunctionLibrary::ReportError("Mission grant: global ability " + UEnum::GetValueAsString(Grant.Ability)
+			+ " is not in the global ability data asset.\n At function UGlobalAbilitiesManager::"
+			"CreateMissionGrantedAbilityCopy");
+		return nullptr;
+	}
+	AbilityCopy->M_AbilityType = Grant.Ability;
+	return AbilityCopy;
+}
+
+void UGlobalAbilitiesManager::ApplyMissionGrantOverrides(UGlobalAbility* Ability,
+                                                         const FMissionGrantedGlobalAbility& Grant)
+{
+	if (Grant.bFreeOfCost || GetAreResourceCostsDisabled())
+	{
+		Ability->M_AbilityCosts.Costs.ResourceCosts.Reset();
+	}
+	if (Grant.CooldownSeconds > 0)
+	{
+		Ability->M_AbilityCosts.CoolDownTime = Grant.CooldownSeconds;
+	}
+	// Ready at once: the first charge can be used the moment the ability arrives.
+	Ability->M_AbilityCosts.CoolDownRemaining = 0;
+	Ability->M_RemainingCharges = Grant.Charges > 0 ? Grant.Charges : INDEX_NONE;
+	if (UGA_AircraftStrafing* const Strafing = Cast<UGA_AircraftStrafing>(Ability))
+	{
+		Strafing->SetMissionStrafeOverrides(Grant.StrafeAircraftCount, Grant.StrafeSeconds,
+		                                    Grant.bStrafeStaysOnTarget);
+	}
+	if (M_AppliedCooldownMlt < 1.f)
+	{
+		ApplyCooldownMltToAbility(Ability, M_AppliedCooldownMlt);
+	}
+	Ability->InitGlobalAbility(M_OwningPlayer, this, Cast<ACPPController>(GetOwner()));
+}
+
+void UGlobalAbilitiesManager::AddMissionGrantToPanel(UGlobalAbility* Ability)
+{
+	if (not EnsureIsValidGlobalAbilityPanel())
+	{
+		return;
+	}
+	UW_GlobalAbilityPanel* const Panel = M_GlobalAbilityPanel.Get();
+	if (not Panel->IsVisible())
+	{
+		// The mission hid the commander's kit: those abilities were never usable here, so only grants are shown.
+		bM_PanelShowsOnlyMissionGrants = true;
+		M_GlobalAbilities.Reset();
+	}
+	M_GlobalAbilities.Add(Ability);
+	RefreshPanelAfterMissionGrantChange();
+}
+
+void UGlobalAbilitiesManager::ConsumeMissionCharge(UGlobalAbility* Ability)
+{
+	if (not IsValid(Ability) || Ability->M_RemainingCharges <= 0)
+	{
+		return;
+	}
+	Ability->M_RemainingCharges -= 1;
+	if (Ability->M_RemainingCharges > 0)
+	{
+		return;
+	}
+	M_GlobalAbilities.Remove(Ability);
+	M_SpentMissionAbilities.Add(Ability);
+	RefreshPanelAfterMissionGrantChange();
+}
+
+bool UGlobalAbilitiesManager::GetIsAbilityPanelVisible() const
+{
+	return M_GlobalAbilityPanel.IsValid() && M_GlobalAbilityPanel->IsVisible();
+}
+
+void UGlobalAbilitiesManager::RefreshPanelAfterMissionGrantChange()
+{
+	if (not EnsureIsValidGlobalAbilityPanel())
+	{
+		return;
+	}
+	UW_GlobalAbilityPanel* const Panel = M_GlobalAbilityPanel.Get();
+	InitAbilityPanel(M_GlobalAbilities);
+	const bool bShouldHidePanel = bM_PanelShowsOnlyMissionGrants && M_GlobalAbilities.IsEmpty();
+	// Self hit test invisible: the slots stay clickable without the panel's frame blocking clicks on the world.
+	Panel->SetVisibility(bShouldHidePanel ? ESlateVisibility::Collapsed : ESlateVisibility::SelfHitTestInvisible);
+	CheckRequirements();
 }
 
 FString UGlobalAbilitiesManager::GetUnitRequirementDisplayName(const FTrainingOption& UnitId) const
@@ -864,6 +995,7 @@ void UGlobalAbilitiesManager::OnAbilityFinishedExecuting(UGlobalAbility* Ability
 	if (IsPlayerAbilityManager())
 	{
 		UpdateAbilityItemAvailability(Ability, false, false);
+		ConsumeMissionCharge(Ability);
 	}
 }
 
@@ -1121,6 +1253,14 @@ bool UGlobalAbilitiesManager::TryExecuteAbilityAtLocation(UGlobalAbility* Abilit
 
 	Ability->ExecuteAbilityAtLocation(TargetLocation);
 	OnAbilityFinishedExecuting(Ability);
+	if (IsEnemyAbilityManager())
+	{
+		// The enemy sent aircraft: the announcer portrait warns the player (silent for non-air abilities).
+		if (UEnemyAirWarningSubsystem* AirWarnings = UEnemyAirWarningSubsystem::Get(this))
+		{
+			AirWarnings->OnEnemyAbilityExecuted(Ability->GetAbilityType());
+		}
+	}
 	return true;
 }
 
@@ -1142,40 +1282,47 @@ bool UGlobalAbilitiesManager::CheckDoesEnemyHaveUnit(const FTrainingOption& Unit
 	case EAllUnitType::UNType_Aircraft:
 		return CheckDoesEnemyHaveAircraft(UnitId);
 	case EAllUnitType::UNType_StandaloneTurret:
-		{
-			constexpr int32 EnemyPlayerIndex = 2;
-			return IsValid(M_GameUnitManager.Get()->FindUnitForPlayer(UnitId, EnemyPlayerIndex));
-		}
+		return IsValid(M_GameUnitManager.Get()->FindUnitForPlayer(UnitId, GetEnemyUnitRequirementPlayer()));
 	}
 	return true;
+}
+
+uint8 UGlobalAbilitiesManager::GetEnemyUnitRequirementPlayer() const
+{
+	// Each AI player's manager unlocks its abilities with that player's own units.
+	const int32 RequirementPlayer = FRTSPlayers::IsValidAIPlayer(M_OwningPlayer)
+		                                ? M_OwningPlayer
+		                                : RTSPlayers::FirstAIPlayer;
+	return static_cast<uint8>(RequirementPlayer);
 }
 
 bool UGlobalAbilitiesManager::CheckDoesEnemyHaveSquad(const FTrainingOption& UnitId) const
 {
 	const ESquadSubtype SquadSubtype = static_cast<ESquadSubtype>(UnitId.SubtypeValue);
-	return M_GameUnitManager.Get()->GetHasEnemySquadOfType(SquadSubtype);
+	return M_GameUnitManager.Get()->GetHasSquadOfTypeForPlayer(GetEnemyUnitRequirementPlayer(), SquadSubtype);
 }
 
 bool UGlobalAbilitiesManager::CheckDoesEnemyHaveTank(const FTrainingOption& UnitId) const
 {
 	const ETankSubtype TankSubtype = static_cast<ETankSubtype>(UnitId.SubtypeValue);
-	return M_GameUnitManager.Get()->GetHasEnemyTankOfType(TankSubtype);
+	return M_GameUnitManager.Get()->GetHasTankOfTypeForPlayer(GetEnemyUnitRequirementPlayer(), TankSubtype);
 }
 
 bool UGlobalAbilitiesManager::CheckDoesEnemyHaveNomadic(const FTrainingOption& UnitId) const
 {
 	const ENomadicSubtype NomadicSubtype = static_cast<ENomadicSubtype>(UnitId.SubtypeValue);
-	return M_GameUnitManager.Get()->GetHasEnemyNomadicOfType(NomadicSubtype);
+	return M_GameUnitManager.Get()->GetHasNomadicOfTypeForPlayer(GetEnemyUnitRequirementPlayer(), NomadicSubtype);
 }
 
 bool UGlobalAbilitiesManager::CheckDoesEnemyHaveBuildingExpansion(const FTrainingOption& UnitId) const
 {
 	const EBuildingExpansionType BuildingExpansionSubtype = static_cast<EBuildingExpansionType>(UnitId.SubtypeValue);
-	return M_GameUnitManager.Get()->GetHasEnemyBxpOfType(BuildingExpansionSubtype);
+	return M_GameUnitManager.Get()->GetHasBxpOfTypeForPlayer(
+		GetEnemyUnitRequirementPlayer(), BuildingExpansionSubtype);
 }
 
 bool UGlobalAbilitiesManager::CheckDoesEnemyHaveAircraft(const FTrainingOption& UnitId) const
 {
 	const EAircraftSubtype AircraftSubtype = static_cast<EAircraftSubtype>(UnitId.SubtypeValue);
-	return M_GameUnitManager.Get()->GetHasEnemyAircraftOfType(AircraftSubtype);
+	return M_GameUnitManager.Get()->GetHasAircraftOfTypeForPlayer(GetEnemyUnitRequirementPlayer(), AircraftSubtype);
 }

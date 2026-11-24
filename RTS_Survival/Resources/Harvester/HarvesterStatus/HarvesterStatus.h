@@ -18,7 +18,11 @@ enum EHarvesterAIAction : uint8
 	AsyncFindResource,
 	FinishHarvestCommand,
 	UnstuckTowardsResource,
-	UnstuckTowardsDropOff
+	UnstuckTowardsDropOff,
+	// Crane unload at a drop-off with an unload station: line up ahead of the reserved bay, reverse in, wait.
+	MoveToUnloadBayApproach,
+	ReverseIntoUnloadBay,
+	CraneUnloading
 };
 
 static FString GetStringHarvesterAIStatus(EHarvesterAIAction Status)
@@ -43,6 +47,12 @@ static FString GetStringHarvesterAIStatus(EHarvesterAIAction Status)
 		return "AsyncFindResource";
 	case EHarvesterAIAction::FinishHarvestCommand:
 		return "FinishHarvestCommand";
+	case EHarvesterAIAction::MoveToUnloadBayApproach:
+		return "MoveToUnloadBayApproach";
+	case EHarvesterAIAction::ReverseIntoUnloadBay:
+		return "ReverseIntoUnloadBay";
+	case EHarvesterAIAction::CraneUnloading:
+		return "CraneUnloading";
 	default:
 		return "Unknown";
 	}

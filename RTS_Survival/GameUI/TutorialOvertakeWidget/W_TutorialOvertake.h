@@ -22,8 +22,10 @@ public:
 	void OvertakeUI(const UObject* WorldContextObject);
 
 protected:
+	// Virtual so info takeovers also stop their sounds and show the next queued takeover; map smoke tests call it by
+	// name to clear any overtake.
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
-	void OnClickedContinue();
+	virtual void OnClickedContinue();
 
 private:
 	UPROPERTY()

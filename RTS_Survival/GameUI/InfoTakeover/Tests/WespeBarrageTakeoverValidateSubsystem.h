@@ -1,0 +1,108 @@
+// Copyright (C) Bas Blokzijl - All rights reserved.
+
+#pragma once
+
+#include "CoreMinimal.h"
+#include "Subsystems/WorldSubsystem.h"
+
+#include "WespeBarrageTakeoverValidateSubsystem.generated.h"
+
+class ACPPController;
+class UAsyncShowWespeBarrageTakeover;
+class UPlayerStartGameControl;
+class UW_WespeBarrageTakeover;
+
+enum class EWespeBarrageTakeoverValidatePhase : uint8
+{
+	WaitingForHud,
+	// The node was called while the start-game screen waits; the takeover must not open over it.
+	WaitingBeforeStart,
+	StartingGame,
+	WatchingTakeover,
+	// UNDERSTOOD was pressed; On Closed must have fired once with the game unpaused.
+	CheckingClosed,
+	Done
+};
+
+/**
+ * @brief Headless check of the Wespe Barrage takeover, started with -WespeBarrageTakeoverValidate (best with -game
+ * -RenderOffscreen on a unit test map): calls the Show Wespe Barrage Takeover node before the start button, checks it
+ * waits, screenshots the typing, two clip frames, the finished panel and the HUD after closing to
+ * Saved/InfoTakeover/WespeBarrage/<height>p/, checks that the clip atlas loaded, that the game paused and that the clip
+ * keeps changing frames while it is paused, that On Closed fires once after UNDERSTOOD with the game
+ * unpaused and that it still opens
+ * (without the never-show box) and closes as shown while unit intel is turned off. Grep WESPE_BARRAGE_TAKEOVER. Restores the setting and quits.
+ */
+UCLASS()
+class RTS_SURVIVAL_API UWespeBarrageTakeoverValidateSubsystem : public UTickableWorldSubsystem
+{
+	GENERATED_BODY()
+
+public:
+	virtual bool ShouldCreateSubsystem(UObject* Outer) const override;
+	virtual void OnWorldBeginPlay(UWorld& InWorld) override;
+	virtual void Tick(float DeltaTime) override;
+	virtual TStatId GetStatId() const override;
+	virtual bool IsTickableWhenPaused() const override { return true; }
+	virtual bool IsTickableInEditor() const override { return false; }
+
+private:
+	EWespeBarrageTakeoverValidatePhase M_Phase = EWespeBarrageTakeoverValidatePhase::WaitingForHud;
+	double M_PhaseStartSeconds = 0.0;
+	double M_OpenSeconds = 0.0;
+	// Real seconds after opening at which the finished panel was captured.
+	double M_DoneShotSeconds = 0.0;
+	// Real seconds after opening at which the typewriter was first seen done; negative until then.
+	double M_TypingDoneSeconds = -1.0;
+	int32 M_ShotsTaken = 0;
+	// Clip frames seen change while the takeover is open; the clip must play while the game is paused.
+	int32 M_LastClipFrame = INDEX_NONE;
+	int32 M_ClipFrameChanges = 0;
+	int32 M_ClipShotsTaken = 0;
+	int32 M_MainClosedCount = 0;
+	int32 M_TurnedOffClosedCount = 0;
+	int32 M_Failures = 0;
+	bool bM_MainWasShown = false;
+	bool bM_MainWasPausedWhenClosed = false;
+	bool bM_TurnedOffWasShown = false;
+	bool bM_HasOpened = false;
+	bool bM_HasCapturedAfterClose = false;
+	bool bM_OriginalSettingValue = true;
+
+	TWeakObjectPtr<ACPPController> M_PlayerController;
+	TWeakObjectPtr<UPlayerStartGameControl> M_StartGameControl;
+	TWeakObjectPtr<UW_WespeBarrageTakeover> M_WatchedTakeover;
+
+	UPROPERTY()
+	TObjectPtr<UAsyncShowWespeBarrageTakeover> M_MainNode;
+
+	UPROPERTY()
+	TObjectPtr<UAsyncShowWespeBarrageTakeover> M_TurnedOffNode;
+
+	void EnterPhase(const EWespeBarrageTakeoverValidatePhase NewPhase);
+	double GetSecondsInPhase() const;
+
+	void TickWaitingForHud();
+	void TickWaitingBeforeStart();
+	void TickStartingGame();
+	void TickWatchingTakeover();
+	void TickCheckingClosed();
+
+	void CallMainNode();
+	void StartWatching(UW_WespeBarrageTakeover& Takeover);
+	void CheckShowsWhileTurnedOff();
+	void TrackClip(const UW_WespeBarrageTakeover& Takeover, const double SecondsOpen);
+
+	UFUNCTION()
+	void HandleMainClosed(bool bWasShown);
+
+	UFUNCTION()
+	void HandleTurnedOffClosed(bool bWasShown);
+
+	void SetTakeoversEnabled(const bool bEnabled) const;
+	UW_WespeBarrageTakeover* GetActiveWespeBarrageTakeover() const;
+	void DismissDifficultyPicker() const;
+	void Capture(const FString& Label) const;
+	void Fail(const FString& Reason);
+	void Finish();
+};

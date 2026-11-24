@@ -15,6 +15,7 @@
 #include "RTS_Survival/WorldCampaign/CampaignGeneration/GenerationRules/NeutralItemPlacementRules.h"
 #include "RTS_Survival/WorldCampaign/CampaignGeneration/GenerationRules/WorldCampaignCountDifficultyTuning.h"
 #include "RTS_Survival/WorldCampaign/CampaignGeneration/GenerationRules/WorldCampaignPlacementFailurePolicy.h"
+#include "RTS_Survival/WorldCampaign/CampaignGeneration/PinnedPlaces/WorldCampaignPinnedPlaces.h"
 
 #include "WorldCampaignAsyncPlacement.generated.h"
 
@@ -215,6 +216,8 @@ namespace WorldCampaignAsyncPlacement
 		TArray<EMapMission> ExcludedMissionsFromMapPlacement;
 		FWorldCampaignCountDifficultyTuning CountAndDifficultyTuning;
 		FWorldCampaignPlacementFailurePolicy PlacementFailurePolicy;
+		// Pins resolved on the game thread; empty when pinned places are off, which keeps the solver unchanged.
+		FWorldCampaignResolvedPins PinnedPlaces;
 	};
 
 	/**

@@ -113,6 +113,22 @@ public:
 	/** Destroys probes that are still settling, without reading them; the menu calls it when it closes. */
 	void CancelProbes();
 
+	/**
+	 * @brief The weapons of a live unit as the variant screen lists them (identical weapons merged), for screens that
+	 * show a unit already in the world, such as the vehicle info takeover.
+	 * @param Unit A tank or building expansion whose BeginPlay weapon setup has run.
+	 * @return Empty for other actors or a unit without weapons.
+	 */
+	static TArray<FUnitVariantWeaponStats> ReadWeaponStats(const AActor& Unit);
+
+	/**
+	 * @brief Merges weapons the caller collected itself (identical weapons counted), for units the probe does not know,
+	 * such as the soldiers of a squad in the squad info takeover.
+	 * @param WeaponStates Weapons whose BeginPlay setup has run; null entries are skipped.
+	 * @return One entry per distinct weapon.
+	 */
+	static TArray<FUnitVariantWeaponStats> ReadWeaponStatsFromStates(const TArray<const UWeaponState*>& WeaponStates);
+
 private:
 	UPROPERTY()
 	TMap<TObjectPtr<UClass>, FUnitVariantProbeResult> M_Results;

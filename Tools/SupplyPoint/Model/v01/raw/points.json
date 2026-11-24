@@ -1,0 +1,56 @@
+{
+ "top": {
+  "approach": [
+   121.3,
+   650.0
+  ],
+  "park": [
+   652.2,
+   858.0
+  ],
+  "exit": [
+   1183.0,
+   650.0
+  ],
+  "tower": [
+   598.0,
+   619.7
+  ],
+  "reach_max": [
+   879.5,
+   782.2
+  ],
+  "reach_min": [
+   485.4,
+   684.7
+  ],
+  "capture": [
+   858.0,
+   1165.3
+  ],
+  "flag": [
+   328.4,
+   350.0
+  ],
+  "bay_Radixite": [
+   357.8,
+   532.2
+  ],
+  "bay_Metal": [
+   598.0,
+   364.0
+  ],
+  "bay_VehicleParts": [
+   838.2,
+   532.2
+  ]
+ },
+ "lift_captions": [
+  "1 hook on the metal bundle",
+  "2 lift clear, metal stock steps down",
+  "3 slew over the parts bay, trolley out",
+  "4 over the bed gap, hook swivels to the truck",
+  "5 lower between the canvas bows",
+  "6 release, hook up; next kind or rest"
+ ]
+}

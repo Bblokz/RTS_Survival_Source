@@ -6,6 +6,7 @@
 #include "FowType.h"
 #include "RTS_Survival/DeveloperSettings.h"
 #include "RTS_Survival/FOWSystem/FowManager/FowManager.h"
+#include "RTS_Survival/Game/Players/RTSPlayers.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/Units/Squads/SquadUnit/SquadUnit.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
@@ -34,7 +35,14 @@ void UFowComp::SetVisionRadius(const float NewVisionRadius)
 void UFowComp::StartFow(const EFowBehaviour FowComponentBehaviour, const bool bStartImmediately)
 {
 	M_FowBehaviour = FowComponentBehaviour;
+	bM_HasStartedFow = true;
 
+	if (bM_StartNowHiddenRequested)
+	{
+		bM_StartNowHiddenRequested = false;
+		StartFowNowHiddenUntilSeen();
+		return;
+	}
 	if (bStartImmediately)
 	{
 		OnFowStartParticipation();
@@ -47,8 +55,40 @@ void UFowComp::StartFow(const EFowBehaviour FowComponentBehaviour, const bool bS
 	StartFowParticipationInSeconds(TimeTillActivateFow);
 }
 
+void UFowComp::StartFowNowHiddenUntilSeen()
+{
+	if (not bM_HasStartedFow)
+	{
+		bM_StartNowHiddenRequested = true;
+		return;
+	}
+	if (not GetIsValidFowManager() || M_FowManager->GetIsFowParticipant(this))
+	{
+		// No fog to show the owner again, or the fog already decides what is seen.
+		return;
+	}
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(M_FowParticpationHandle);
+	}
+	AActor* const FowOwner = GetOwner();
+	if (M_FowBehaviour != EFowBehaviour::Fow_Active && IsValid(FowOwner) && not FowOwner->IsHidden())
+	{
+		// Hidden by the fog from the first frame, the way OnFowVisibilityUpdated hides it: the next fog update shows
+		// it if the human player can see it.
+		bM_OwnerHiddenByFog = true;
+		if (FowOwner->GetActorEnableCollision())
+		{
+			FowOwner->Tags.AddUnique(DeveloperSettings::GamePlay::FoW::TagUnitHiddenByFog);
+		}
+		FowOwner->SetActorHiddenInGame(true);
+	}
+	OnFowStartParticipation();
+}
+
 void UFowComp::OnFowVisibilityUpdated(const float Visibility)
 {
+	using DeveloperSettings::GamePlay::FoW::TagUnitHiddenByFog;
 	using DeveloperSettings::GamePlay::FoW::TagUnitInEnemyVision;
 	using DeveloperSettings::GamePlay::FoW::VisibleEnoughToRevealEnemy;
 	using DeveloperSettings::GamePlay::FoW::VisibleEnoughToRevealPlayer;
@@ -85,6 +125,8 @@ void UFowComp::OnFowVisibilityUpdated(const float Visibility)
 	SetShouldDrawMiniMapIcon(Visibility >= VisibleEnoughToRevealEnemy);
 	if (Visibility >= VisibleEnoughToRevealEnemy)
 	{
+		bM_OwnerHiddenByFog = false;
+		FowOwner->Tags.Remove(TagUnitHiddenByFog);
 		FowOwner->SetActorHiddenInGame(false);
 		if constexpr (DeveloperSettings::Debugging::GFowComponents_Compile_DebugSymbols)
 		{
@@ -93,6 +135,19 @@ void UFowComp::OnFowVisibilityUpdated(const float Visibility)
 			                nullptr, FColor::Red, 1.0f, false);
 		}
 		return;
+	}
+	// Marked only when the fog is what hides the unit, so the other AI players keep seeing it. A unit that was
+	// hidden already when the fog came is hidden by something else (still spawning, parked) and stays unmarked.
+	bM_OwnerHiddenByFog = bM_OwnerHiddenByFog || not FowOwner->IsHidden();
+	// Everything else that hides a unit also turns its collision off: while it is off the fog is not the only
+	// reason, once it is back on the fog is again.
+	if (bM_OwnerHiddenByFog && FowOwner->GetActorEnableCollision())
+	{
+		FowOwner->Tags.AddUnique(TagUnitHiddenByFog);
+	}
+	else
+	{
+		FowOwner->Tags.Remove(TagUnitHiddenByFog);
 	}
 	FowOwner->SetActorHiddenInGame(true);
 	if constexpr (DeveloperSettings::Debugging::GFowComponents_Compile_DebugSymbols)
@@ -123,6 +178,64 @@ void UFowComp::StopFowParticipation()
 	if (GetIsValidFowManager())
 	{
 		M_FowManager->RemoveFowParticipant(this);
+	}
+	// Out of the fog nothing keeps the mark up to date; whoever stops the fog decides whether the unit shows.
+	bM_OwnerHiddenByFog = false;
+	if (AActor* FowOwner = GetOwner())
+	{
+		FowOwner->Tags.Remove(DeveloperSettings::GamePlay::FoW::TagUnitHiddenByFog);
+	}
+}
+
+void UFowComp::OnOwnerOwningPlayerChanged(const uint8 OldOwner, const uint8 NewOwner)
+{
+	// The minimap colour follows the owner.
+	UpdateMiniMapIconSettingsFromOwnerRTSComponent();
+	// Not started yet: whoever starts the fog picks the behaviour from the owner the unit has by then.
+	if (not bM_HasStartedFow)
+	{
+		return;
+	}
+	const bool bGivesHumanVision = M_FowBehaviour == EFowBehaviour::Fow_Active;
+	if (bGivesHumanVision == FRTSPlayers::IsHumanPlayer(NewOwner))
+	{
+		return;
+	}
+	SwitchFowBehaviour(bGivesHumanVision ? EFowBehaviour::Fow_PassiveEnemyVision : EFowBehaviour::Fow_Active);
+}
+
+void UFowComp::SwitchFowBehaviour(const EFowBehaviour NewBehaviour)
+{
+	// A start that is still pending joins the fog later, with the new behaviour.
+	const bool bWasParticipating = GetIsValidFowManager() && M_FowManager->GetIsFowParticipant(this);
+	if (bWasParticipating)
+	{
+		M_FowManager->RemoveFowParticipant(this);
+	}
+	ClearFogStateOnOwner();
+	bM_OwnerHiddenByFog = false;
+	M_FowBehaviour = NewBehaviour;
+	if (bWasParticipating)
+	{
+		OnFowStartParticipation();
+	}
+}
+
+void UFowComp::ClearFogStateOnOwner() const
+{
+	using DeveloperSettings::GamePlay::FoW::TagUnitHiddenByFog;
+	using DeveloperSettings::GamePlay::FoW::TagUnitInEnemyVision;
+	AActor* FowOwner = GetOwner();
+	if (not IsValid(FowOwner))
+	{
+		return;
+	}
+	FowOwner->Tags.Remove(TagUnitInEnemyVision);
+	// Only what the fog hid is shown again; a unit hidden for another reason stays hidden.
+	const bool bWasHiddenByFog = FowOwner->Tags.Remove(TagUnitHiddenByFog) > 0;
+	if (bWasHiddenByFog && FowOwner->IsHidden())
+	{
+		FowOwner->SetActorHiddenInGame(false);
 	}
 }
 
@@ -212,6 +325,7 @@ void UFowComp::BeginPlay_InitMiniMapIconSettings()
 
 	UpdateMiniMapIconSettingsFromOwnerRTSComponent();
 	RTSComponent->OnSubTypeInitialized.AddUObject(this, &UFowComp::UpdateMiniMapIconSettingsFromOwnerRTSComponent);
+	RTSComponent->OnOwningPlayerChanged.AddUObject(this, &UFowComp::OnOwnerOwningPlayerChanged);
 }
 
 void UFowComp::UpdateMiniMapIconSettingsFromOwnerRTSComponent()

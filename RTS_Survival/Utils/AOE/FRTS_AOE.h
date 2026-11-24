@@ -33,6 +33,36 @@ enum class EAoeDistanceSource : uint8
 	BoundsBox
 };
 
+// Whose units an area effect of a player reaches, seen from that player.
+enum class EAoeTargets : uint8
+{
+	Hostiles,
+	Allies,
+	// Every unit in range, whoever owns it.
+	HostilesAndAllies
+};
+
+/**
+ * @brief Who causes an area effect and whom it reaches: use it for everything a player's unit or ability causes.
+ * Hostile and allied AI players share one object channel, so such an effect checks the owner of every unit it finds.
+ * The ETriggerOverlapLogic entry points stay for authored and mission callers, where "Enemy" means any AI player.
+ */
+struct RTS_SURVIVAL_API FAoeInstigator
+{
+	int32 OwningPlayer = 0;
+	EAoeTargets Targets = EAoeTargets::Hostiles;
+
+	static FAoeInstigator HostilesOf(int32 InOwningPlayer);
+	static FAoeInstigator AlliesOf(int32 InOwningPlayer);
+
+	/**
+	 * @brief Reads an authored Player / Enemy / Both setting from the owner's point of view.
+	 * @param InOwningPlayer Player whose unit or ability causes the effect.
+	 * @param OwnerRelativeLogic OverlapPlayer = the owner and its allies, OverlapEnemy = its hostiles.
+	 */
+	static FAoeInstigator FromOwnerRelativeLogic(int32 InOwningPlayer, ETriggerOverlapLogic OwnerRelativeLogic);
+};
+
 /**
  * @brief Utility struct providing async area-of-effect helpers for damage and behaviours.
  */
@@ -40,6 +70,70 @@ struct RTS_SURVIVAL_API FRTS_AOE
 {
 	FRTS_AOE();
 	~FRTS_AOE();
+
+	/**
+	 * @brief Owner-relative version of ApplyToActorsAsync: only units with the wanted relation to the instigator
+	 * reach the callback; destructibles reach it as before.
+	 * @param InstigatorActor Actor used for world access and self-ignoring.
+	 * @param Epicenter Center of the area search.
+	 * @param Radius Radius of the sphere sweep.
+	 * @param Instigator Player that causes the effect and whose units it reaches.
+	 * @param OnActorFound Callback invoked on the game thread for each hit actor.
+	 */
+	static void ApplyToActorsAsync(
+		AActor* InstigatorActor,
+		const FVector& Epicenter,
+		float Radius,
+		const FAoeInstigator& Instigator,
+		TFunction<void(AActor&)> OnActorFound
+	);
+
+	/**
+	 * @brief Owner-relative version of DealDamageInRadiusAsync: damages the units hostile to the instigator (or the
+	 * relation it asks for) and every destructible in range.
+	 * @param DamageCauser Actor credited as damage causer.
+	 * @param Epicenter Center of the area search.
+	 * @param Radius Radius of the damage sphere.
+	 * @param BaseDamage Damage applied at the epicenter before falloff.
+	 * @param DamageFalloffExponent Exponent controlling how aggressively damage decays towards the edge.
+	 * @param DamageType Damage type to assign to the generated damage event.
+	 * @param Instigator Player that causes the damage and whose units it reaches.
+	 * @param ShieldDamageSource Identifies shieldable AOE versus explicitly bypassing mine damage.
+	 * @param ActorsToIgnore Actors that should be excluded from the sweep and from receiving damage.
+	 */
+	static void DealDamageInRadiusAsync(
+		AActor* DamageCauser,
+		const FVector& Epicenter,
+		float Radius,
+		float BaseDamage,
+		float DamageFalloffExponent,
+		ERTSDamageType DamageType,
+		const FAoeInstigator& Instigator,
+		EShieldDamageSource ShieldDamageSource,
+		const TArray<TWeakObjectPtr<AActor>>& ActorsToIgnore = TArray<TWeakObjectPtr<AActor>>()
+	);
+
+	/**
+	 * @brief Owner-relative version of DealDamageVsRearArmorInRadiusAsync; the parameters it shares mean the same.
+	 * @param Instigator Player that causes the damage and whose units it reaches.
+	 */
+	static void DealDamageVsRearArmorInRadiusAsync(
+		AActor* DamageCauser,
+		const FVector& Epicenter,
+		float Radius,
+		float BaseDamage,
+		float DamageFalloffExponent,
+		float FullDmgArmorPen,
+		float ArmorPenFallOff,
+		float MaxArmorPen,
+		ERTSDamageType DamageType,
+		const FAoeInstigator& Instigator,
+		EShieldDamageSource ShieldDamageSource,
+		const TArray<TWeakObjectPtr<AActor>>& ActorsToIgnore = TArray<TWeakObjectPtr<AActor>>(),
+		EVehicleModuleSplashPolicy ModuleSplashPolicy = EVehicleModuleSplashPolicy::Ignore,
+		EWeaponShellType ModuleDamageShellType = static_cast<EWeaponShellType>(0),
+		EAoeFalloffDistance FalloffDistance = EAoeFalloffDistance::ActorOrigin
+	);
 
 	/**
 	 * @brief Apply a callback to all actors found via async sphere sweep.
@@ -190,12 +284,66 @@ struct RTS_SURVIVAL_API FRTS_AOE
 	);
 
 private:
+	// What one sweep looks for: its object channels and, for an owner-relative effect, whose units it keeps.
+	struct FAoeSweepTargets
+	{
+		ETriggerOverlapLogic OverlapLogic = ETriggerOverlapLogic::OverlapBoth;
+		// Not set by the authored and mission entry points: they keep every unit they find, as they always did.
+		TOptional<FAoeInstigator> UnitOwnerFilter;
+		// Player the damage is attributed to in map tests; INDEX_NONE for the authored and mission entry points.
+		int32 AttackingPlayer = INDEX_NONE;
+	};
+
+	static FAoeSweepTargets MakeLiteralSweepTargets(ETriggerOverlapLogic OverlapLogic);
+	static FAoeSweepTargets MakeOwnerRelativeSweepTargets(const FAoeInstigator& Instigator);
+
+	/** @return Whether an owner-relative effect reaches this hit: every destructible, and units by their owner. */
+	static bool GetIsHitReachedByInstigator(const FHitResult& Hit, const FAoeInstigator& Instigator);
+
+	static void SweepAndApplyToActors(
+		AActor* InstigatorActor,
+		const FVector& Epicenter,
+		float Radius,
+		const FAoeSweepTargets& SweepTargets,
+		TFunction<void(AActor&)> OnActorFound
+	);
+
+	static void SweepAndDealDamageInRadius(
+		AActor* DamageCauser,
+		const FVector& Epicenter,
+		float Radius,
+		float BaseDamage,
+		float DamageFalloffExponent,
+		ERTSDamageType DamageType,
+		const FAoeSweepTargets& SweepTargets,
+		EShieldDamageSource ShieldDamageSource,
+		const TArray<TWeakObjectPtr<AActor>>& ActorsToIgnore
+	);
+
+	static void SweepAndDealDamageVsRearArmor(
+		AActor* DamageCauser,
+		const FVector& Epicenter,
+		float Radius,
+		float BaseDamage,
+		float DamageFalloffExponent,
+		float FullDmgArmorPen,
+		float ArmorPenFallOff,
+		float MaxArmorPen,
+		ERTSDamageType DamageType,
+		const FAoeSweepTargets& SweepTargets,
+		EShieldDamageSource ShieldDamageSource,
+		const TArray<TWeakObjectPtr<AActor>>& ActorsToIgnore,
+		EVehicleModuleSplashPolicy ModuleSplashPolicy,
+		EWeaponShellType ModuleDamageShellType,
+		EAoeFalloffDistance FalloffDistance
+	);
+
 	static FCollisionObjectQueryParams BuildObjectQueryParams(ETriggerOverlapLogic OverlapLogic);
 	static void StartAsyncSphereSweep(
 		AActor* InstigatorActor,
 		const FVector& Epicenter,
 		float Radius,
-		const FCollisionObjectQueryParams& ObjectQueryParams,
+		const FAoeSweepTargets& SweepTargets,
 		const TArray<TWeakObjectPtr<AActor>>& ActorsToIgnore,
 		TFunction<void(TArray<FHitResult>&&)> OnSweepComplete
 	);

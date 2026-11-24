@@ -22,6 +22,8 @@
 
 
 class UBuildingExpansionEnergyComponent;
+class UNomadicDeployAnimationComponent;
+class UNomadicDeployAnimationData;
 class UResourceDropOff;
 class UGlobalAbilitiesManager;
 class UPitAdditionalTurretComponent;
@@ -82,6 +84,14 @@ public:
 	FOnBxpCancelledPackingUp OnBxpCancelPackingUp;
 
 	/**
+	 * Opt-in baked VAT construction (built by Source/Tools/NomadicDeploy in its expansion mode): when set, construction,
+	 * unpacking and pack-up play this deploy with its smoke screen instead of the construction material animation.
+	 * Leave empty to keep the construction material animation. Field defenses always use the material animation.
+	 */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "DeployAnimation")
+	TObjectPtr<UNomadicDeployAnimationData> DeployAnimationData;
+
+	/**
 	 * @brief Initializes the building expansion with necessary status. 
 	 * @param NewOwner The owner of the building expansion.
 	 * @param NewStatus The status of the building expansion.
@@ -91,6 +101,14 @@ public:
 
 	inline EBuildingExpansionType GetBuildingExpansionType() const { return M_BuildingExpansionType; };
 	inline EBuildingExpansionStatus GetBuildingExpansionStatus() const { return M_StatusBuildingExpansion; };
+
+	/**
+	 * @brief Whether the expansion stands finished at its spot, so it may count towards tech unlocks.
+	 * Placed-in-level and spawned-finished expansions keep their initial status and count as standing.
+	 * @return False while looking for placement, being built, unpacking, packed up or looking to unpack.
+	 */
+	bool GetIsStanding() const;
+
 	inline TScriptInterface<IBuildingExpansionOwner> GetBuildingExpansionOwner() const { return M_Owner; }
 
 	/**
@@ -209,6 +227,13 @@ protected:
 	virtual void UnitDies(const ERTSDeathType DeathType) override;
 
 	/**
+	 * @brief Runs the Blueprint health handler, then keeps the building mesh and its slot materials when the expansion
+	 * has procedural wall holes: older health graphs still swap to _At66/_At50/_At33 meshes or damaged materials on the
+	 * notify levels (and play their explosions there); a swap would wipe the holes, so mesh and materials are put back.
+	 */
+	virtual void OnHealthChanged(const EHealthLevel PercentageLeft, const bool bIsHealing) override;
+
+	/**
 	 * @brief Destroy the bxp and spawn actors around the location.
 	 * @param SpawnParams Defines what actors to spawn and where.
 	 * @param CollapseFX Optional FX to play.
@@ -216,9 +241,23 @@ protected:
 	virtual void DestroyAndSpawnActors(
 		const FDestroySpawnActorsParameters& SpawnParams,
 		FCollapseFX CollapseFX) override final;
-	
+
+	// DestroyAndSpawnActors leaves these classes out of whatever the death graph spawns, e.g. loot piles that would
+	// block player buildings on the ruin (Rus barracks / cooling towers, 2026-11-18).
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Death")
+	TArray<TSoftClassPtr<AActor>> DeathSpawnClassesToSkip;
+
+	// When above 0, overrides VfxLifetime of every CollapseFX the death graph passes in (VerticalDestruction,
+	// CollapseMesh, DestroyAndSpawnActors). Soviet fuel tanks, megaphones and the container hut die with the looping
+	// NS_Fire_Tank, which never ends on its own (8 s, 2026-11-22).
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Death")
+	float DeathVfxLifetime = 0.f;
+
 	UFUNCTION(BlueprintImplementableEvent)
 	void BP_OnUnitDies();
+
+	/** @return True when the Blueprint implements BP_OnUnitDies; pits then die by it instead of the PitDefense sink. */
+	bool GetHasBlueprintDeath() const;
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void DisableAllWeapons();
@@ -346,6 +385,9 @@ private:
 	UFUNCTION()
 	void OnVerticalDestructionComplete();
 
+	/** @return A copy of CollapseFX that carries DeathVfxLifetime when this class sets one. */
+	FCollapseFX GetCollapseFXWithDeathVfxLifetime(const FCollapseFX& CollapseFX) const;
+
 	FBxpData GetBxpData(const EBuildingExpansionType BxpSubType, ABuildingExpansion* BxpRequesting) const;
 
 	UPROPERTY()
@@ -443,6 +485,16 @@ private:
 	void ApplyGlobalAbilityCooldownBonus();
 	void RemoveGlobalAbilityCooldownBonus();
 	UGlobalAbilitiesManager* GetPlayerGlobalAbilitiesManager() const;
+
+	// The fraction of their reload time the owner's Panzerwerfers take while this expansion is built
+	// (FBxpData::PanzerwerferReloadMlt; 1 = no effect).
+	float M_PanzerwerferReloadMlt = 1.f;
+
+	// Set while this expansion is a source in UPanzerwerferReloadBonusSubsystem, so it is taken back exactly once.
+	bool bM_IsPanzerwerferReloadBonusRegistered = false;
+
+	void ApplyPanzerwerferReloadBonus();
+	void RemovePanzerwerferReloadBonus();
 
 	void OnFinishedExpansionConstruction();
 
@@ -585,4 +637,47 @@ private:
 	void DebugDisplayMessage(const FString& Message) const;
 
 	void AttemptAttachSpawnSystem(const FSwapToDestroyedMesh& CollapseParameters, UNiagaraSystem* AttachSystem);
+
+	// ---------------- VAT deploy (DeployAnimationData) ----------------
+	// Created in game worlds only when DeployAnimationData is set, so expansions without it carry no extra components.
+	UPROPERTY()
+	TObjectPtr<UNomadicDeployAnimationComponent> M_DeployAnimationComponent;
+
+	// Shows the VAT deploy mesh while the expansion builds or packs up; the building mesh is hidden meanwhile.
+	UPROPERTY()
+	TObjectPtr<UStaticMeshComponent> M_DeployMeshComponent;
+
+	// Removes the building attachments shortly after a pack-up starts, under the deploy's cover smoke.
+	FTimerHandle M_PackUpAttachmentRemovalTimerHandle;
+
+	// Set when a pack-up interrupted the construction; a cancelled pack-up then resumes the construction.
+	bool bM_DeployPackUpInterruptedConstruction = false;
+
+	void PostInit_CreateDeployAnimation();
+
+	// Whether construction and pack-up play the VAT deploy instead of the construction material animation.
+	bool GetUsesDeployAnimation() const;
+
+	/**
+	 * @brief Plays the deploy toward the built expansion and runs the progress bar along with it.
+	 * @param StartProgress 0 for a new construction; the shown progress when a cancelled pack-up resumes it.
+	 */
+	void StartDeployAnimationConstruction(const float StartProgress);
+
+	void StartDeployAnimationPackUp(const float TotalTime);
+	void CancelDeployAnimationPackUp();
+	void OnDeployAnimationConstructionFinished();
+	void OnDeployAnimationPackUpFinished();
+
+	// Death mid-animation: the collapse needs the real (building) mesh component visible.
+	void StopDeployAnimationForDeath();
+
+	// Built expansions: delays the attachment removal and BP_OnStartPackUpBxp (which hides turrets / extra meshes)
+	// until the deploy's cover smoke at progress 1 has built up.
+	void ScheduleAttachmentRemovalForPackUp(const float TotalTime);
+
+	void OnPackUpCoverSmokeStands();
+
+	// @return Whether a removal was still pending (the attachments still stand).
+	bool CancelPendingAttachmentRemoval();
 };

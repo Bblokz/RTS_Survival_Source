@@ -5,6 +5,7 @@
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/GameUI/ActionUI/ActionUIManager/ActionUIManager.h"
 #include "RTS_Survival/Game/GameState/CPPGameState.h"
+#include "RTS_Survival/Game/Players/RTSPlayers.h"
 #include "RTS_Survival/UnitData/AircraftData.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
@@ -50,7 +51,7 @@ void URTSExperienceComp::InitExperienceComponent(const TScriptInterface<IExperie
 	M_Owner = Owner;
 	M_OwningPlayer = OwningPlayer;
 	(void)GetIsValidOwner();
-	if (OwningPlayer != 1 && OwningPlayer != 2)
+	if (not FRTSPlayers::IsValidPlayer(OwningPlayer))
 	{
 		RTSFunctionLibrary::ReportError("Owning player is not valid! "
 			"\n component: " + GetName()
@@ -201,10 +202,10 @@ bool URTSExperienceComp::GetIsPlayerOneOwnedUnit() const
 	const URTSComponent* RTSComponent = OwnerActor->FindComponentByClass<URTSComponent>();
 	if (not IsValid(RTSComponent))
 	{
-		return M_OwningPlayer == 1;
+		return FRTSPlayers::IsHumanPlayer(M_OwningPlayer);
 	}
 
-	return RTSComponent->GetOwningPlayer() == 1;
+	return FRTSPlayers::IsHumanPlayer(RTSComponent->GetOwningPlayer());
 }
 
 void URTSExperienceComp::OnLevelUp_ApplyBehaviour()

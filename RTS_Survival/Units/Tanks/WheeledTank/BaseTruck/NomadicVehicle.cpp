@@ -12,6 +12,8 @@
 
 #include "Components/AudioComponent.h"
 #include "ExpansionRadius/ExpansionRadiusComp.h"
+#include "NomadicDeployAnimation/NomadicDeployAnimationComponent.h"
+#include "NomadicDeployAnimation/NomadicDeployAnimationData.h"
 #include "NomadicAttachments/NomadicAttachmentHelpers/FNomadicAttachmentHelpers.h"
 #include "RTS_Survival/Buildings/EnergyComponent/EnergyComp.h"
 #include "RTS_Survival/GameUI/Healthbar/GarrisonHealthBar/W_GarrisonHealthBar.h"
@@ -19,6 +21,7 @@
 #include "RTS_Survival/Player/ConstructionPreview/MoveUnitsFromConstruction/FMoveUnitsFromConstruction.h"
 #include "RTS_Survival/Player/PlayerBuildRadiusManager/PlayerBuildRadiusManager.h"
 #include "RTS_Survival/Resources/ResourceDropOff/ResourceDropOff.h"
+#include "RTS_Survival/Resources/UnloadStation/ResourceUnloadStation.h"
 #include "RTS_Survival/Resources/ResourceStorageOwner/ResourceStorageLevel.h"
 #include "RTS_Survival/RTSComponents/HealthComponent.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
@@ -29,6 +32,7 @@
 #include "RTS_Survival/RTSComponents/NavCollision/RTSNavCollision.h"
 #include "RTS_Survival/Units/Aircraft/AirBase/AircraftOwnerComp/AircraftOwnerComp.h"
 #include "RTS_Survival/Units/Squads/Reinforcement/ReinforcementPoint.h"
+#include "RTS_Survival/Game/Players/RTSPlayers.h"
 #include "RTS_Survival/Utils/CollisionSetup/FRTS_CollisionSetup.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 
@@ -44,12 +48,13 @@ ANomadicVehicle::ANomadicVehicle(const FObjectInitializer& ObjectInitializer)
 	  M_MeshAnimationTime(20.f),
 	  M_ConstructionFrames(30.f),
 	  M_ConvertToVehicleTime(20.f),
-	  M_MaterialIndex(0),
-	  M_AmountSmokesCovertToVehicle(0),
-	  M_ConversionSmokeRadius(100.f),
 	  M_DesiredTruckUIOffset(FVector::ZeroVector)
 {
 	M_NomadStatus = ENomadStatus::Truck;
+	M_DeployAnimationComponent = CreateDefaultSubobject<UNomadicDeployAnimationComponent>(
+		TEXT("DeployAnimationComponent"));
+	// The deploy mesh component is created in InitNomadicVehicle: as a native default subobject it would become the
+	// actor's root (the blueprint's chassis root is not known yet in this constructor).
 	BuildingExpansionComponent = CreateDefaultSubobject<
 		UBuildingExpansionOwnerComp>(TEXT("BuildingExpansionComponent"));
 	if (!IsValid(BuildingExpansionComponent))
@@ -253,7 +258,26 @@ void ANomadicVehicle::InitNomadicVehicle(
 	}
 
 
-	M_SmokeSystems = SmokeSystems;
+	// Never on the class defaults or a template: a deploy mesh saved into the Blueprint became the root of every
+	// spawned truck (Ger_HQ_Truck, 2026-11-12), so the chassis physics could no longer move the actor.
+	const bool bIsTemplate = HasAnyFlags(RF_ClassDefaultObject | RF_ArchetypeObject);
+	if (not bIsTemplate && GetIsValidDeployAnimationComponent() && IsValid(BuildingMeshComponent))
+	{
+		if (not IsValid(M_DeployMeshComponent))
+		{
+			// One component per truck for its whole life; hidden and collision-free until a deploy plays.
+			M_DeployMeshComponent = NewObject<UStaticMeshComponent>(this, TEXT("DeployAnimationMesh"), RF_Transient);
+			M_DeployMeshComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+			M_DeployMeshComponent->SetCanEverAffectNavigation(false);
+			M_DeployMeshComponent->SetVisibility(false);
+			M_DeployMeshComponent->SetupAttachment(BuildingMeshComponent);
+			M_DeployMeshComponent->RegisterComponent();
+		}
+		M_DeployAnimationComponent->InitDeployAnimation(BuildingMeshComponent, M_DeployMeshComponent,
+		                                                DeployAnimationData);
+		M_DeployAnimationComponent->OnPlayConstructionSound.BindUObject(
+			this, &ANomadicVehicle::PlayRandomConstructionSound);
+	}
 	if (NewConstructionFrames <= 0.f)
 	{
 		M_ConstructionFrames = 30.f;
@@ -286,18 +310,9 @@ void ANomadicVehicle::InitNomadicVehicle(
 	{
 		M_ConvertToVehicleTime = NewConvertToVehicleTime;
 	}
-	M_AmountSmokesCovertToVehicle = NewAmountSmokesCovertToVehicle;
 	M_AttachmentsToSpawn = NewAttachmentsToSpawn;
 	M_NiagaraAttachmentsToSpawn = NewNiagaraAttachmentsToSpawn;
 	M_SoundAttachmentsToSpawn = NewSoundAttachmentsToSpawn;
-	if (NewConversionSmokeRadius <= 0.f)
-	{
-		M_ConversionSmokeRadius = 100.f;
-	}
-	else
-	{
-		M_ConversionSmokeRadius = NewConversionSmokeRadius;
-	}
 	M_ConversionProgressBar = NewConversionProgressBar;
 	M_DesiredTruckUIOffset = NewTruckUIOffset;
 	M_SelectionDecalSettings = NewSelectionDecalSettings;
@@ -384,7 +399,6 @@ void ANomadicVehicle::BeginDestroy()
 	}
 	if (UWorld* World = GetWorld())
 	{
-		World->GetTimerManager().ClearTimer(MaterialReapplyTimerHandle);
 		World->GetTimerManager().ClearTimer(ConvertToVehicleTimerHandle);
 	}
 	DestroyStaticPreviewMesh();
@@ -436,16 +450,17 @@ void ANomadicVehicle::PostInitializeComponents()
 
 void ANomadicVehicle::SetupMountCollision(UMeshComponent* MountMesh)
 {
-	bool bOwnedByPlayer1 = false;
+	// Without an RTS component the mount is set up as that of the first AI player, as it always was.
+	int32 OwningPlayer = RTSPlayers::FirstAIPlayer;
 	if (GetIsValidRTSComponent())
 	{
-		bOwnedByPlayer1 = RTSComponent->GetOwningPlayer() == 1;
+		OwningPlayer = RTSComponent->GetOwningPlayer();
 	}
 	if (EnsureRTSOverlapEvasionComponent())
 	{
 		RTSOverlapEvasionComponent->TrackOverlapMeshOfOwner(this, MountMesh);
 	}
-	FRTS_CollisionSetup::SetupCollisionForNomadicMount(MountMesh, bOwnedByPlayer1);
+	FRTS_CollisionSetup::SetupNomadicMountCollision(MountMesh, OwningPlayer);
 }
 
 void ANomadicVehicle::ExecuteMoveCommand(const FVector MoveToLocation)
@@ -584,6 +599,7 @@ void ANomadicVehicle::StartBuildingConstruction()
 	}
 
 	OnNomadConvertToBuilding.Broadcast();
+	SetConversionKeepsAnimating(true);
 	M_NomadStatus = ENomadStatus::CreatingBuildingRotating;
 	// Save the preview transform.
 	M_BuildingTransform = IsValid(M_StaticPreviewMesh)
@@ -628,8 +644,6 @@ void ANomadicVehicle::OnFinishedStandaloneRotation()
 		M_NomadStatus = ENomadStatus::CreatingBuildingTruckAnim;
 		M_ConversionProgressBar->StartProgressBar(GetTotalConstructionTime());
 
-		CreateSmokeForVehicleConversion();
-
 		// Prevents any further commands from being executed called with true.
 		// See OnBuildingFinished.
 		SetCommandQueueEnabled(false);
@@ -664,30 +678,29 @@ void ANomadicVehicle::OnTruckMontageFinished()
 		// Cleanup preview mesh as now the collision of the building mesh will take over.
 		DestroyStaticPreviewMesh();
 
-		// Show the building mesh.
+		// The building mesh collides from now on; it stays hidden while the deploy mesh animates (unless the
+		// building has no baked deploy, then it simply stands there for the mesh animation time).
 		BuildingMeshComponent->SetStaticMesh(M_BuildingMesh);
-		BuildingMeshComponent->SetVisibility(true);
 		BuildingMeshComponent->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
 
 		// Offset the truck UI.
 		MoveTruckUIWithLocalOffsets(true);
 
-		// Cache original materials
-		CacheOriginalMaterials();
-		// Init smoke locations for material animation.
-		InitSmokeLocations();
-
 		// Set decal to buildig mode
 		AdjustSelectionDecalToConversion(true);
 
-		// apply construction materials and calculate amount materials to exclude.
-		const uint32 AmountMaterialsToExclude = ApplyConstructionMaterial(false);
-		RTSFunctionLibrary::PrintString(
-			"\n\nMaterials to exclude::" + FString::FromInt(AmountMaterialsToExclude) + "\n\n");
-
-		// Start timer to reapply original materials
-		const float Interval = M_MeshAnimationTime / (M_CachedOriginalMaterials.Num() - AmountMaterialsToExclude);
-		SetAnimationTimer(Interval);
+		if (GetIsValidDeployAnimationComponent())
+		{
+			BuildingMeshComponent->SetVisibility(not M_DeployAnimationComponent->GetHasDeployAnimation());
+			M_DeployAnimationComponent->PlayDeploy(
+				M_MeshAnimationTime,
+				FOnNomadicDeployAnimationFinished::CreateUObject(this, &ANomadicVehicle::OnDeployAnimationFinished));
+		}
+		else
+		{
+			BuildingMeshComponent->SetVisibility(true);
+			OnDeployAnimationFinished();
+		}
 		BPOnStartMeshAnimation();
 	}
 }
@@ -710,6 +723,7 @@ void ANomadicVehicle::OnFinishedConvertingToBuilding()
 	if (IsValid(M_ConversionProgressBar) && IsValid(PlayerController))
 	{
 		M_NomadStatus = ENomadStatus::Building;
+		SetConversionKeepsAnimating(false);
 		// Stop before the training component uses the same progress bar.
 		M_ConversionProgressBar->StopProgressBar();
 		PlayerController->TruckConverted(this, true);
@@ -839,11 +853,13 @@ void ANomadicVehicle::TerminateCreateBuildingCommand()
 			StopRotating();
 			RTSFunctionLibrary::PrintString("terminate building command as ROTATING creating building");
 			M_NomadStatus = ENomadStatus::Truck;
+			SetConversionKeepsAnimating(false);
 			break;
 		case ENomadStatus::CreatingBuildingTruckAnim:
 			BPStopTruckAnimationMontage();
 			RTSFunctionLibrary::PrintString("terminate building command as MONTAGE");
 			M_NomadStatus = ENomadStatus::Truck;
+			SetConversionKeepsAnimating(false);
 			break;
 		case ENomadStatus::CreatingBuildingMeshAnim:
 			RTSFunctionLibrary::PrintString("terminate building command as MESH ANIMATION");
@@ -851,6 +867,7 @@ void ANomadicVehicle::TerminateCreateBuildingCommand()
 		// Set decal to truck mode
 			AdjustSelectionDecalToConversion(false);
 			M_NomadStatus = ENomadStatus::Truck;
+			SetConversionKeepsAnimating(false);
 			break;
 		case ENomadStatus::Building:
 			break;
@@ -884,6 +901,7 @@ void ANomadicVehicle::ExecuteConvertToVehicleCommand()
 		return;
 	}
 	M_NomadStatus = ENomadStatus::CreatingTruck;
+	SetConversionKeepsAnimating(true);
 	FResourceConversionHelper::OnNomadicExpanded(this, false);
 	OnStartConvertToVehicle_HandleInstanceSpecificComponents();
 
@@ -902,41 +920,19 @@ void ANomadicVehicle::ExecuteConvertToVehicleCommand()
 		M_TrainingPreviewHelper.HandleTrainingDisabledOrNomadTruck();
 	}
 
-	// Save the building materials to reapply to the mesh after deconstruction is complete.
-	CacheOriginalMaterials();
-
-	CreateSmokeForVehicleConversion();
-	DestroyAllBuildingAttachments();
-
-	// check if smoke systems are initiated
-	uint8 ZeroCounter = 0;
-	for (auto SmokeLocation : M_CreateSmokeTransforms)
-	{
-		if (SmokeLocation.Equals(FTransform::Identity))
-		{
-			ZeroCounter++;
-		}
-		if (ZeroCounter > 1)
-		{
-			// Init smoke locations for material animation.
-			InitSmokeLocations();
-			break;
-		}
-	}
-	// don't apply construction materials but only calculate the amount of materials to exclude.
-	const uint32 AmountMaterialsToExclude = ApplyConstructionMaterial(true);
-	RTSFunctionLibrary::PrintString(
-		"\n\nMaterials to exclude::" + FString::FromInt(AmountMaterialsToExclude) + "\n\n");
-
-	// We now reapply construction materials from the top of the array.
-	M_MaterialIndex = M_CachedOriginalMaterials.Num() - 1;
+	ScheduleAttachmentRemovalForPackUp();
 
 	// After training component stopped using it.
 	M_ConversionProgressBar->StartProgressBar(M_ConvertToVehicleTime);
 
-	// Start timer to reapply construction materials, m_NomadStatus is used to determine if we are creating the truck or the building.
-	const float Interval = M_ConvertToVehicleTime / (M_CachedOriginalMaterials.Num() - AmountMaterialsToExclude);
-	SetAnimationTimer(Interval);
+	// The baked deploy plays backwards into the truck; the building mesh keeps its collision until the truck is back.
+	if (GetIsValidDeployAnimationComponent() && IsValid(BuildingMeshComponent))
+	{
+		BuildingMeshComponent->SetVisibility(not M_DeployAnimationComponent->GetHasDeployAnimation());
+		M_DeployAnimationComponent->PlayPackUp(
+			M_ConvertToVehicleTime,
+			FOnNomadicDeployAnimationFinished::CreateUObject(this, &ANomadicVehicle::OnPackUpAnimationFinished));
+	}
 	if (PlayerController->GetMainMenuUI())
 	{
 		PlayerController->GetMainMenuUI()->RequestShowCancelVehicleConversion(this);
@@ -965,16 +961,16 @@ void ANomadicVehicle::TerminateConvertToVehicleCommand()
 	}
 
 	M_NomadStatus = ENomadStatus::Building;
+	SetConversionKeepsAnimating(false);
 	M_ConversionProgressBar->StopProgressBar();
-	const UWorld* World = GetWorld();
-	if (World)
+	if (GetIsValidDeployAnimationComponent())
 	{
-		World->GetTimerManager().ClearTimer(MaterialReapplyTimerHandle);
+		M_DeployAnimationComponent->StopAndHide();
 	}
-	// set building materials to original materials before construction materials were applied.
-	SetAllBuildingMaterialsToCache();
-	// Reset index and cache.
-	ResetCachedMaterials();
+	if (IsValid(BuildingMeshComponent))
+	{
+		BuildingMeshComponent->SetVisibility(true);
+	}
 
 	if (PlayerController->GetMainMenuUI())
 	{
@@ -984,66 +980,16 @@ void ANomadicVehicle::TerminateConvertToVehicleCommand()
 	// Propagate to possible bxps to cancel the packing.
 	CancelPackUpExpansions();
 	FResourceConversionHelper::OnNomadicExpanded(this, true);
-	// Create the building attachments again.
-	CreateBuildingAttachments();
+	// Create the building attachments again, unless the cancel came before their delayed removal.
+	if (not CancelPendingAttachmentRemoval())
+	{
+		CreateBuildingAttachments();
+	}
 
 	SetCommandQueueEnabled(true);
 	OnNomadCancelledConvertToVehicle.Broadcast();
 	// Propagate to Blueprints.
 	BP_OnCancelledConvertingToVehicle();
-}
-
-void ANomadicVehicle::CreateSmokeForVehicleConversion() const
-{
-	const UWorld* World = GetWorld();
-	if (!World)
-	{
-		return;
-	}
-
-	const FVector Center = GetActorLocation();
-	const FVector BaseScale = FVector(1.f);
-	const float Z = Center.Z; // Use the Z coordinate of the actor's location for all smoke effects
-
-	for (int32 i = 0; i < M_AmountSmokesCovertToVehicle; ++i)
-	{
-		// Calculate angle for this smoke effect
-		const float Angle = (360.f / M_AmountSmokesCovertToVehicle) * i;
-		const float Radians = FMath::DegreesToRadians(Angle);
-
-		// Calculate x and y position for smoke effect in the circle
-		const float X = Center.X + M_ConversionSmokeRadius * FMath::Cos(Radians);
-		const float Y = Center.Y + M_ConversionSmokeRadius * FMath::Sin(Radians);
-		const FVector SmokeLocation = FVector(X, Y, Z);
-		// 20% variability in scale.
-		const FVector SmokeScale = BaseScale + FVector(FMath::RandRange(-0.2f, 0.2f),
-		                                               FMath::RandRange(-0.2f, 0.2f),
-		                                               FMath::RandRange(-0.2f, 0.2f));
-
-		// Spawn smoke effect at this location
-		CreateRandomSmokeSystemAtTransform(FTransform(FRotator::ZeroRotator, SmokeLocation, SmokeScale));
-	}
-}
-
-void ANomadicVehicle::SetAllBuildingMaterialsToCache()
-{
-	if (IsValid(BuildingMeshComponent))
-	{
-		for (int Index = 0; Index < M_CachedOriginalMaterials.Num(); ++Index)
-		{
-			BuildingMeshComponent->SetMaterial(Index, M_CachedOriginalMaterials[Index]);
-		}
-	}
-}
-
-void ANomadicVehicle::SetAnimationTimer(const float Interval)
-{
-	if (const UWorld* World = GetWorld())
-	{
-		World->GetTimerManager().ClearTimer(MaterialReapplyTimerHandle);
-		World->GetTimerManager().SetTimer(MaterialReapplyTimerHandle, this, &ANomadicVehicle::ReapplyOriginalMaterial,
-		                                  Interval, true);
-	}
 }
 
 void ANomadicVehicle::MoveTruckUIWithLocalOffsets(const bool bMoveToBuildingPosition)
@@ -1173,7 +1119,10 @@ void ANomadicVehicle::OnStartConvertToVehicle_HandleInstanceSpecificComponents()
 	// If we have an airbase owner and aircraft are inside, force them to takeoff first.
 	if (GetIsValidAircraftOwnerComp())
 	{
-		M_AircraftOwnerComp->OnPackUpAirbaseStart(M_ConstructionAnimationMaterial);
+		// With a baked deploy the VAT mesh carries the closed roof; the real roof is hidden instead of re-skinned.
+		const bool bHasDeployAnimation = GetIsValidDeployAnimationComponent()
+			&& M_DeployAnimationComponent->GetHasDeployAnimation();
+		M_AircraftOwnerComp->OnPackUpAirbaseStart(bHasDeployAnimation ? nullptr : M_ConstructionAnimationMaterial);
 	}
 
 	// Disable DropOff of resources.
@@ -1192,6 +1141,11 @@ void ANomadicVehicle::OnCancelledConvertToVehicle_HandleInstanceSpecificComponen
 void ANomadicVehicle::OnFinishedConvertingToVehicle()
 {
 	FResourceConversionHelper::OnNomadicExpanded(this, false);
+	// A very short pack-up can end before the delayed attachment removal ran.
+	if (CancelPendingAttachmentRemoval())
+	{
+		DestroyAllBuildingAttachments();
+	}
 
 	if (not IsValid(M_ConversionProgressBar) || not IsValid(PlayerController) || not IsValid(BuildingMeshComponent))
 	{
@@ -1202,14 +1156,15 @@ void ANomadicVehicle::OnFinishedConvertingToVehicle()
 	}
 
 	M_NomadStatus = ENomadStatus::Truck;
+	SetConversionKeepsAnimating(false);
 	// Pack up all building expansions.
 	FinishPackUpAllExpansions();
 	OnFinishedConvertingToVehicle_HandleInstanceSpecificComponents();
 
 	M_ConversionProgressBar->StopProgressBar();
-	if (UWorld* World = GetWorld())
+	if (GetIsValidDeployAnimationComponent())
 	{
-		World->GetTimerManager().ClearTimer(MaterialReapplyTimerHandle);
+		M_DeployAnimationComponent->StopAndHide();
 	}
 	// Show the vehicle mesh
 	SetDisableChaosVehicleMesh(false);
@@ -1217,11 +1172,6 @@ void ANomadicVehicle::OnFinishedConvertingToVehicle()
 	// hide the building mesh.
 	BuildingMeshComponent->SetVisibility(false);
 	BuildingMeshComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-
-	// set building materials to original materials before construction materials were applied.
-	SetAllBuildingMaterialsToCache();
-	// Reset index and cache.
-	ResetCachedMaterials();
 
 	// free up the command queue, important to call this after the status is set to truck as otherwise the
 	// terminate conversion command will trigger because enableing the queue will clear it first -> Sets unit to idle.
@@ -1494,8 +1444,11 @@ bool ANomadicVehicle::ShippingTest_ForceFinishConversionToBuilding()
 		return M_NomadStatus == ENomadStatus::Building;
 	}
 
-	SetAllBuildingMaterialsToCache();
-	FinishReapplyingMaterials();
+	if (GetIsValidDeployAnimationComponent())
+	{
+		M_DeployAnimationComponent->StopAndHide();
+	}
+	OnDeployAnimationFinished();
 	return M_NomadStatus == ENomadStatus::Building;
 }
 #endif
@@ -1594,6 +1547,16 @@ void ANomadicVehicle::MoveToBuildingLocationForConstruction()
 		false,
 		EAbilityID::IdCreateBuilding,
 		AINomadicVehicle->GetConstructionAcceptanceRad());
+}
+
+void ANomadicVehicle::SetConversionKeepsAnimating(const bool bIsConverting)
+{
+	if (bM_IsConversionOptimizationPaused == bIsConverting)
+	{
+		return;
+	}
+	bM_IsConversionOptimizationPaused = bIsConverting;
+	SetUnitOptimizationEnabled(not bIsConverting);
 }
 
 void ANomadicVehicle::OnMoveToBuildingLocationSucceeded()
@@ -2030,322 +1993,87 @@ void ANomadicVehicle::SetupChassisMeshCollision()
 {
 	if (IsValid(RTSComponent))
 	{
-		if (RTSComponent->GetOwningPlayer() == 1)
-		{
-			FRTS_CollisionSetup::SetupNomadicMvtPlayer(ChassisMesh);
-		}
-		else
-		{
-			FRTS_CollisionSetup::SetupNomadicMvtEnemy(ChassisMesh);
-		}
+		FRTS_CollisionSetup::SetupNomadicMovementMeshCollision(ChassisMesh, RTSComponent->GetOwningPlayer());
 	}
 }
 
 
-void ANomadicVehicle::CacheOriginalMaterials()
+bool ANomadicVehicle::GetIsValidDeployAnimationComponent() const
+{
+	if (IsValid(M_DeployAnimationComponent))
+	{
+		return true;
+	}
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, "M_DeployAnimationComponent",
+	                                                      "GetIsValidDeployAnimationComponent", this);
+	return false;
+}
+
+void ANomadicVehicle::OnDeployAnimationFinished()
 {
 	if (IsValid(BuildingMeshComponent))
 	{
-		ResetCachedMaterials();
-		if (BuildingMeshComponent)
-		{
-			for (int32 i = 0; i < BuildingMeshComponent->GetNumMaterials(); ++i)
-			{
-				M_CachedOriginalMaterials.Add(BuildingMeshComponent->GetMaterial(i));
-			}
-		}
+		BuildingMeshComponent->SetVisibility(true);
 	}
+	OnFinishedConvertingToBuilding();
 }
 
-uint32 ANomadicVehicle::ApplyConstructionMaterial(const bool bOnlyCalculateExcludedMaterials) const
+void ANomadicVehicle::OnPackUpAnimationFinished()
 {
-	uint32 AmountBuildingTruckMaterials = 0;
-	if (!(IsValid(BuildingMeshComponent) && IsValid(M_ConstructionAnimationMaterial) && IsValid(ChassisMesh)))
-	{
-		RTSFunctionLibrary::ReportNullErrorComponent(this, "BuildingMeshComponent, M_ConstructionAnimationMaterial "
-		                                             "or ChassisMesh",
-		                                             "ApplyConstructionMaterial");
-		return AmountBuildingTruckMaterials;
-	}
-	for (int32 i = 0; i < BuildingMeshComponent->GetNumMaterials(); ++i)
-	{
-		// Don't apply construction material to materials that are part of the truck.
-		if (!ChassisMesh->GetMaterials().Contains(BuildingMeshComponent->GetMaterial(i)))
-		{
-			if (!bOnlyCalculateExcludedMaterials)
-			{
-				BuildingMeshComponent->SetMaterial(i, M_ConstructionAnimationMaterial);
-			}
-		}
-		else
-		{
-			// Count the amount of materials that are part of the truck and the building.
-			AmountBuildingTruckMaterials++;
-		}
-	}
-	return AmountBuildingTruckMaterials;
-}
-
-void ANomadicVehicle::ReapplyOriginalMaterial()
-{
-	if (!IsValid(BuildingMeshComponent) && IsValid(ChassisMesh) && IsValid(M_ConstructionAnimationMaterial))
-	{
-		RTSFunctionLibrary::ReportNullErrorComponent(
-			this, "BuildingMeshComponent, ChassisMesh or M_ConstructionAnimationMaterial",
-			"ReapplyOriginalMaterial");
-		return;
-	}
-	// If we are creating the truck we reverse apply construction materials to the building mesh.
-	if (M_NomadStatus == ENomadStatus::CreatingTruck)
-	{
-		if (M_MaterialIndex != 0)
-		{
-			if (ChassisMesh->GetMaterials().Contains(M_CachedOriginalMaterials[M_MaterialIndex]))
-			{
-				// This material is part of the truck, not the animation, skip it.
-				M_MaterialIndex--;
-				// Retry.
-				ReapplyOriginalMaterial();
-			}
-			else
-			{
-				BuildingMeshComponent->SetMaterial(M_MaterialIndex, M_ConstructionAnimationMaterial);
-				CreateRandomSmokeSystemAtTransform(M_CreateSmokeTransforms[M_MaterialIndex]);
-				M_MaterialIndex--;
-				PlayRandomConstructionSound();
-			}
-		}
-		else
-		{
-			OnFinishedConvertingToVehicle();
-		}
-	}
-	else
-	{
-		if (M_MaterialIndex < M_CachedOriginalMaterials.Num())
-		{
-			if (ChassisMesh->GetMaterials().Contains(M_CachedOriginalMaterials[M_MaterialIndex]))
-			{
-				// This material is part of the truck, not the animation, skip it.
-				M_MaterialIndex++;
-				// Retry.
-				ReapplyOriginalMaterial();
-			}
-			else
-			{
-				// We have an unique building material slot to apply the original material to.
-				BuildingMeshComponent->SetMaterial(M_MaterialIndex, M_CachedOriginalMaterials[M_MaterialIndex]);
-				CreateRandomSmokeSystemAtTransform(M_CreateSmokeTransforms[M_MaterialIndex]);
-				M_MaterialIndex++;
-				PlayRandomConstructionSound();
-			}
-		}
-		else
-		{
-			FinishReapplyingMaterials();
-		}
-	}
-}
-
-void ANomadicVehicle::FinishReapplyingMaterials()
-{
-	if (const UWorld* World = GetWorld())
-	{
-		World->GetTimerManager().ClearTimer(MaterialReapplyTimerHandle);
-		OnFinishedConvertingToBuilding();
-		// Empty the cached materials and reset the index.
-		ResetCachedMaterials();
-	}
-}
-
-FVector ANomadicVehicle::CalculateMeanMaterialLocation(
-	const int32 MaterialIndex,
-	const TArray<FVector3f>& VertexPositions,
-	const FTransform& TransformOfBuildingMesh) const
-{
-	FVector3f MeanLocation = FVector3f::ZeroVector;
-	int32 VertexCount = VertexPositions.Num();
-
-	for (const FVector3f& Position : VertexPositions)
-	{
-		MeanLocation += Position;
-	}
-
-	if (VertexCount > 0)
-	{
-		MeanLocation /= VertexCount;
-	}
-
-	// Convert MeanLocation to FVector for returning, and transform to world space.
-	return TransformOfBuildingMesh.TransformPosition((FVector)MeanLocation);
-}
-
-FVector ANomadicVehicle::CalculateMeshPartSize(const TArray<FVector3f>& VertexPositions) const
-{
-	FVector Min(FLT_MAX);
-	FVector Max(-FLT_MAX);
-
-	for (const FVector3f& Position : VertexPositions)
-	{
-		// Convert to FVector
-		FVector ConvertedPosition = FVector(Position);
-		Min = Min.ComponentMin(ConvertedPosition);
-		Min = Min.ComponentMin(ConvertedPosition);
-		Max = Max.ComponentMax(ConvertedPosition);
-	}
-
-	// Size vector of the mesh part
-	return Max - Min;
-}
-
-void ANomadicVehicle::InitSmokeLocations()
-{
-	if (not IsValid(BuildingMeshComponent) || not BuildingMeshComponent->GetStaticMesh())
-	{
-		RTSFunctionLibrary::ReportError("Building Mesh component or static mesh is not set on vehicle: " + GetName());
-		return;
-	}
-
-	SetSmokeLocationsToRandomInBox();
-	const FStaticMeshRenderData* const RenderData = BuildingMeshComponent->GetStaticMesh()->GetRenderData();
-	// A cooked run without rendering (-NullRHI) loads meshes without render data; the random locations stay.
-	if (RenderData == nullptr || RenderData->LODResources.Num() == 0)
+	if (M_NomadStatus != ENomadStatus::CreatingTruck)
 	{
 		return;
 	}
-	// Save guard to check if the mesh allows CPU access otherwise it breaks shipped builds.
-	if (BuildingMeshComponent->GetStaticMesh()->bAllowCPUAccess)
-	{
-		FStaticMeshLODResources& LODResources = BuildingMeshComponent->GetStaticMesh()->GetRenderData()->LODResources[0];
-		FIndexArrayView Indices = LODResources.IndexBuffer.GetArrayView();
-		TArray<TArray<FVector3f>> VertexPositionsByMaterial;
-		VertexPositionsByMaterial.SetNum(BuildingMeshComponent->GetNumMaterials());
-
-		TArray<float> MeshPartSizes;
-		MeshPartSizes.SetNum(BuildingMeshComponent->GetNumMaterials());
-		float MaxPartSize = 0;
-
-		// Collect vertices and calculate mesh part sizes. REQUIRES "Allow CPUAccess" in the static mesh editor.
-		for (int32 SectionIndex = 0; SectionIndex < LODResources.Sections.Num(); ++SectionIndex)
-		{
-			const FStaticMeshSection& Section = LODResources.Sections[SectionIndex];
-			TArray<FVector3f> PartVertices;
-
-			for (uint32 i = Section.FirstIndex; i < Section.FirstIndex + Section.NumTriangles * 3; i++)
-			{
-				PartVertices.Add(LODResources.VertexBuffers.PositionVertexBuffer.VertexPosition(Indices[i]));
-			}
-
-			FVector PartSize = CalculateMeshPartSize(PartVertices);
-			MeshPartSizes[Section.MaterialIndex] = PartSize.Size();
-
-			MaxPartSize = FMath::Max(MaxPartSize, MeshPartSizes[Section.MaterialIndex]);
-			VertexPositionsByMaterial[Section.MaterialIndex] = MoveTemp(PartVertices);
-		}
-
-		const FTransform ComponentTransform = BuildingMeshComponent->GetComponentTransform();
-		FVector OriginLocation = ComponentTransform.GetLocation();
-		RTSFunctionLibrary::PrintString("InitSmokeLocations:: Before AsyncTask");
-		// A weak pointer to this object to prevent a dangling pointer in the async task.
-		TWeakObjectPtr<ANomadicVehicle> WeakThis(this);
-		AsyncTask(ENamedThreads::AnyBackgroundThreadNormalTask, [WeakThis, VertexPositionsByMaterial,
-			          ComponentTransform, OriginLocation, MeshPartSizes, MaxPartSize]()
-		          {
-			          RTSFunctionLibrary::PrintString("InitSmokeLocations:: At async task");
-			          if (not WeakThis.IsValid())
-			          {
-				          return;
-			          }
-
-			          ANomadicVehicle* StrongThis = WeakThis.Get();
-			          TArray<FTransform> CalculatedTransforms;
-			          for (int32 i = 0; i < VertexPositionsByMaterial.Num(); ++i)
-			          {
-				          FVector MeanLocation = StrongThis->CalculateMeanMaterialLocation(
-					          i, VertexPositionsByMaterial[i], ComponentTransform);
-				          // Normalize scale factor based on the largest part
-				          const float ScaleFactor = FMath::Max(2 * (MeshPartSizes[i] / MaxPartSize), 0.33);
-
-				          FRotator Rotation = (MeanLocation - OriginLocation).Rotation();
-				          FTransform Transform(Rotation, MeanLocation,
-				                               FVector(ScaleFactor, ScaleFactor, ScaleFactor));
-				          CalculatedTransforms.Add(Transform);
-			          }
-			          AsyncTask(ENamedThreads::GameThread, [WeakThis, CalculatedTransforms]()
-			          {
-				          // Check if the object still exists we cannot access members, for that we need the strong pointer.
-				          if (WeakThis.IsValid())
-				          {
-					          ANomadicVehicle* StrongThis = WeakThis.Get();
-					          StrongThis->M_CreateSmokeTransforms = CalculatedTransforms;
-					          RTSFunctionLibrary::PrintString("InitSmokeLocations:: Rewrite back to game thread");
-				          }
-			          });
-		          });
-	}
-	else
-	{
-		RTSFunctionLibrary::ReportError("Mesh is not CPU Accessible, cannot calculate smoke locations.");
-	}
+	OnFinishedConvertingToVehicle();
 }
 
-void ANomadicVehicle::SetSmokeLocationsToRandomInBox()
+void ANomadicVehicle::ScheduleAttachmentRemovalForPackUp()
 {
-	if (not IsValid(BuildingMeshComponent))
+	// Fraction of the pack-up after which the attachments go: the end-of-deploy cover bursts sit at progress ~0.985,
+	// so by 3 % into the pack-up their smoke has fired and hides the attachments disappearing.
+	constexpr float AttachmentRemovalPackUpFraction = 0.03f;
+	const bool bHasDeployAnimation = GetIsValidDeployAnimationComponent()
+		&& M_DeployAnimationComponent->GetHasDeployAnimation();
+	UWorld* const World = GetWorld();
+	const float RemovalDelaySeconds = M_ConvertToVehicleTime * AttachmentRemovalPackUpFraction;
+	if (not bHasDeployAnimation || not IsValid(World) || RemovalDelaySeconds <= 0.f)
 	{
+		DestroyAllBuildingAttachments();
 		return;
 	}
-
-	const FBoxSphereBounds MeshBounds = BuildingMeshComponent->CalcBounds(
-		BuildingMeshComponent->GetComponentTransform());
-	const FBox Box = MeshBounds.GetBox();
-	const int32 NumMaterials = BuildingMeshComponent->GetNumMaterials();
-
-	M_CreateSmokeTransforms.Init(FTransform::Identity, NumMaterials);
-	for (FTransform& Transform : M_CreateSmokeTransforms)
+	TWeakObjectPtr<ANomadicVehicle> WeakThis(this);
+	FTimerDelegate RemoveAttachmentsDelegate;
+	RemoveAttachmentsDelegate.BindLambda([WeakThis]()
 	{
-		Transform.SetLocation(FMath::RandPointInBox(Box));
-	}
+		if (not WeakThis.IsValid())
+		{
+			return;
+		}
+		WeakThis->DestroyAllBuildingAttachments();
+	});
+	World->GetTimerManager().SetTimer(M_PackUpAttachmentRemovalTimerHandle, RemoveAttachmentsDelegate,
+	                                  RemovalDelaySeconds, false);
 }
 
-void ANomadicVehicle::CreateRandomSmokeSystemAtTransform(const FTransform& Transform) const
+bool ANomadicVehicle::CancelPendingAttachmentRemoval()
 {
-	if (M_SmokeSystems.Num() == 0)
+	UWorld* const World = GetWorld();
+	if (not IsValid(World) || not World->GetTimerManager().IsTimerActive(M_PackUpAttachmentRemovalTimerHandle))
 	{
-		// No smoke systems are available
-		return;
+		return false;
 	}
-
-	// Randomly select a smoke system from the array
-	UNiagaraSystem* SelectedSystem = M_SmokeSystems[FMath::RandRange(0, M_SmokeSystems.Num() - 1)];
-	if (SelectedSystem)
-	{
-		// Spawn the Niagara system using the provided transform
-		const UWorld* World = GetWorld();
-		if (World)
-		{
-			// Spawn the system at the transform's location, using its rotation
-			UNiagaraComponent* NiagaraComponent = UNiagaraFunctionLibrary::SpawnSystemAtLocation(
-				World, SelectedSystem, Transform.GetLocation(), Transform.GetRotation().Rotator(),
-				Transform.GetScale3D(), true, true, ENCPoolMethod::AutoRelease, true);
-		}
-	}
+	World->GetTimerManager().ClearTimer(M_PackUpAttachmentRemovalTimerHandle);
+	return true;
 }
 
 void ANomadicVehicle::CancelBuildingMeshAnimation()
 {
 	if (IsValid(BuildingMeshComponent))
 	{
-		if (const UWorld* World = GetWorld())
+		if (GetIsValidDeployAnimationComponent())
 		{
-			World->GetTimerManager().ClearTimer(MaterialReapplyTimerHandle);
+			M_DeployAnimationComponent->StopAndHide();
 		}
-		// Reapply original materials to the building mesh for a possible later animation.
-		for (int32 i = 0; i < M_CachedOriginalMaterials.Num(); ++i)
-		{
-			BuildingMeshComponent->SetMaterial(i, M_CachedOriginalMaterials[i]);
-		}
-		ResetCachedMaterials();
 
 		// Show the vehicle mesh.
 		SetDisableChaosVehicleMesh(false);
@@ -2374,9 +2102,39 @@ void ANomadicVehicle::CreateBuildingAttachments()
 		return;
 	}
 	CreateChildActorAttachments();
+	CreateUnloadStation();
 	CreateNiagaraAttachments();
 	CreateSoundAttachments();
 	CreateNavModifierAttachments();
+}
+
+void ANomadicVehicle::CreateUnloadStation()
+{
+	if (not M_UnloadStationClass || not IsValid(M_ResourceDropOff))
+	{
+		return;
+	}
+	UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		return;
+	}
+	const FTransform MeshTransform = BuildingMeshComponent->GetComponentTransform();
+	FActorSpawnParameters SpawnParameters;
+	SpawnParameters.Owner = this;
+	SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	AResourceUnloadStation* Station = World->SpawnActor<AResourceUnloadStation>(
+		M_UnloadStationClass, MeshTransform.GetLocation(), MeshTransform.Rotator(), SpawnParameters);
+	if (not IsValid(Station))
+	{
+		RTSFunctionLibrary::ReportError("Failed to spawn the unload station of nomadic vehicle: " + GetName());
+		return;
+	}
+	// Its frame is the building mesh's frame: rail, bays and bins are authored in building-mesh centimetres.
+	Station->AttachToComponent(BuildingMeshComponent, FAttachmentTransformRules::SnapToTargetNotIncludingScale);
+	Station->InitUnloadStation(M_ResourceDropOff, BuildingMeshComponent);
+	M_ResourceDropOff->SetUnloadStation(Station);
+	M_SpawnedAttachments.Add(Station);
 }
 
 void ANomadicVehicle::CreateChildActorAttachments()
@@ -2559,8 +2317,3 @@ void ANomadicVehicle::DestroyAllBuildingAttachments()
 }
 
 
-void ANomadicVehicle::ResetCachedMaterials()
-{
-	M_CachedOriginalMaterials.Empty();
-	M_MaterialIndex = 0;
-}

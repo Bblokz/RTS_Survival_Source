@@ -37,7 +37,8 @@ struct RTS_SURVIVAL_API FPulseAuraBehaviourSettings
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Pulse Aura")
 	TArray<TSubclassOf<UBehaviour>> BehavioursToApply;
 
-	// Defines which overlap group we query in the async overlap library.
+	// Defines which overlap group we query in the async overlap library, read from the side of the aura's owner:
+	// OverlapPlayer = the owner's own and allied units, OverlapEnemy = units hostile to the owner.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Pulse Aura")
 	ETriggerOverlapLogic OverlapRule = ETriggerOverlapLogic::OverlapPlayer;
 };
@@ -69,7 +70,6 @@ private:
 	void RefreshPulseTimer(float DeltaTime);
 	void ExecutePulse();
 	void ApplyBehavioursToTargetActor(AActor& TargetActor) const;
-	ETriggerOverlapLogic GetResolvedOverlapRule() const;
 	void ShowAuraRadius();
 	void HideAuraRadius();
 	bool GetIsValidOwningActor() const;

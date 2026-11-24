@@ -37,6 +37,9 @@ Tracked tanks leave twin ruts in soft ground (grass, desert, sand and gravel lay
    - `TankTrailStrength > 0` on the landscape material tells the subsystem to run; otherwise it does nothing.
    - `MI_RTS_Landscape_DryCastle_Inst` has the switch on and strength 1, so every map on it has trails: Ger_Trains, Ger_DestroyT35, Ger_MarderStugMission and UnitTests/Ger_Trains.
    - `MI_RTS_Landscape_DesertPaintable` has it on too. That covers Ger_FirstMission, RedLine, the two start tutorials, RTS_Shorts and the test and template maps on that instance, 19 maps in all. Its hard layers (DesertRockDark, ScorchConcrete) keep no ruts.
+   - `M_RTS_Landscape_FrozenLake` (Ger_FrozenLake) adds its own snow-rut stage after the shared function: wider,
+     deeper-shaded ruts with a berm in snow. The shared function is unchanged; see
+     `Docs/Campaign/FrozenLakeMap.md` (Snow ruts).
    - The console variable `rts.TankTrails 0` turns trails off at runtime: drawing stops and the material branch is skipped.
 
 ## Measured cost (2026-10-27, Ger_Trains, 40 Panzer IV H, 1920x1080, DebugGame build, editor and other sessions running on the same machine)

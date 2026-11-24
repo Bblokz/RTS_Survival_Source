@@ -4,11 +4,13 @@
 #include "Engine/StreamableManager.h"
 #include "Engine/AssetManager.h"
 #include "RTS_Survival/Buildings/BuildingExpansion/Interface/BuildingExpansionOwner.h"
+#include "RTS_Survival/Game/Players/RTSPlayers.h"
 #include "RTS_Survival/GameUI/TrainingUI/Interface/Trainer.h"
 #include "RTS_Survival/GameUI/TrainingUI/TrainingOptions/TrainingOptionLibrary/TrainingOptionLibrary.h"
 #include "RTS_Survival/Interfaces/RTSInterface/RTSUnit.h"
 #include "RTS_Survival/Player/CPPController.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
+#include "RTS_Survival/Utils/UnitSpawning/RTSUnitOwnerSpawning.h"
 
 ARTSAsyncSpawner::ARTSAsyncSpawner(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer), M_PlayerController(nullptr)
@@ -501,7 +503,8 @@ void ARTSAsyncSpawner::OnAsyncSpawnOptionAtLocationComplete(
 	const FVector& Location,
 	const int32 ID,
 	const int32 SpawnRequestId,
-	const FRotator& SpawnRotation)
+	const FRotator& SpawnRotation,
+	const int32 OwningPlayerOverride)
 {
 	// Resolve the loaded asset
 	UObject* LoadedAsset = AssetPath.ResolveObject();
@@ -527,16 +530,14 @@ void ARTSAsyncSpawner::OnAsyncSpawnOptionAtLocationComplete(
 	}
 
 	// Spawn the actor at the provided location
-	FActorSpawnParameters SpawnParams;
 	UWorld* World = GetWorld();
 	if (not World)
 	{
 		InvokeSpawnCallback(SpawnRequestId, TrainingOption, nullptr, ID);
 		return;
 	}
-	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
-	AActor* SpawnedActor = World->SpawnActor<AActor>(
-		AssetClass, Location, SpawnRotation, SpawnParams);
+	AActor* SpawnedActor = SpawnOptionAtLocationForOwner(
+		*World, AssetClass, Location, SpawnRotation, OwningPlayerOverride);
 
 	if (not IsValid(SpawnedActor))
 	{
@@ -545,10 +546,6 @@ void ARTSAsyncSpawner::OnAsyncSpawnOptionAtLocationComplete(
 			"\nAt function OnAsyncSpawnOptionAtLocationComplete in ARTSAsyncSpawner.cpp");
 		InvokeSpawnCallback(SpawnRequestId, TrainingOption, nullptr, ID);
 		return;
-	}
-	if (APawn* SpawnedPawn = Cast<APawn>(SpawnedActor))
-	{
-		SpawnedPawn->SpawnDefaultController();
 	}
 
 
@@ -566,6 +563,44 @@ void ARTSAsyncSpawner::OnAsyncSpawnOptionAtLocationComplete(
 	}
 
 	InvokeSpawnCallback(SpawnRequestId, TrainingOption, SpawnedActor, ID);
+}
+
+AActor* ARTSAsyncSpawner::SpawnOptionAtLocationForOwner(
+	UWorld& World,
+	UClass* AssetClass,
+	const FVector& Location,
+	const FRotator& SpawnRotation,
+	const int32 OwningPlayerOverride) const
+{
+	constexpr ESpawnActorCollisionHandlingMethod CollisionHandling =
+		ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
+	if (FRTSPlayers::IsValidPlayer(OwningPlayerOverride))
+	{
+		// Sets the owner before BeginPlay and spawns the default controller of a pawn.
+		return FRTSUnitOwnerSpawning::SpawnUnitForPlayer(
+			World, AssetClass, FTransform(SpawnRotation, Location), static_cast<uint8>(OwningPlayerOverride),
+			CollisionHandling);
+	}
+	if (OwningPlayerOverride != INDEX_NONE)
+	{
+		RTSFunctionLibrary::ReportError(
+			"Async spawner was asked to spawn a unit for player " + FString::FromInt(OwningPlayerOverride) +
+			", which is no player; the unit keeps the owner of its Blueprint.");
+	}
+
+	FActorSpawnParameters SpawnParams;
+	SpawnParams.SpawnCollisionHandlingOverride = CollisionHandling;
+	AActor* SpawnedActor = World.SpawnActor<AActor>(
+		AssetClass, Location, SpawnRotation, SpawnParams);
+	if (not IsValid(SpawnedActor))
+	{
+		return nullptr;
+	}
+	if (APawn* SpawnedPawn = Cast<APawn>(SpawnedActor))
+	{
+		SpawnedPawn->SpawnDefaultController();
+	}
+	return SpawnedActor;
 }
 
 void ARTSAsyncSpawner::InvokeSpawnCallback(
@@ -643,7 +678,8 @@ bool ARTSAsyncSpawner::AsyncSpawnOptionAtLocation(const FTrainingOption Training
                                                   const int32 SpawnID, TFunction<void(
 	                                                  const FTrainingOption&, AActor* SpawnedActor,
 	                                                  const int32 ID)> OnSpawnedCallback,
-                                                  const FRotator& OptionalRotation)
+                                                  const FRotator& OptionalRotation,
+                                                  const int32 OwningPlayerOverride)
 {
 	// Validate the TrainingOption
 	if (TrainingOption.IsNone())
@@ -667,7 +703,7 @@ bool ARTSAsyncSpawner::AsyncSpawnOptionAtLocation(const FTrainingOption Training
 
 
 	return AsyncSpawnClassAtLocation(M_TrainingOptionMap[TrainingOption], TrainingOption, Location, CallbackOwner,
-	                                 SpawnID, OnSpawnedCallback, OptionalRotation);
+	                                 SpawnID, OnSpawnedCallback, OptionalRotation, OwningPlayerOverride);
 }
 
 bool ARTSAsyncSpawner::AsyncSpawnClassAtLocation(const TSoftClassPtr<AActor>& AssetClass,
@@ -677,7 +713,8 @@ bool ARTSAsyncSpawner::AsyncSpawnClassAtLocation(const TSoftClassPtr<AActor>& As
                                                  const int32 SpawnID, TFunction<void(
 	                                                 const FTrainingOption&, AActor* SpawnedActor,
 	                                                 const int32 ID)> OnSpawnedCallback,
-                                                 const FRotator& OptionalRotation)
+                                                 const FRotator& OptionalRotation,
+                                                 const int32 OwningPlayerOverride)
 {
 	if (AssetClass.IsNull())
 	{
@@ -702,7 +739,7 @@ bool ARTSAsyncSpawner::AsyncSpawnClassAtLocation(const TSoftClassPtr<AActor>& As
 			TrainingOption,
 			Location,
 			SpawnID,
-			SpawnRequestId, OptionalRotation);
+			SpawnRequestId, OptionalRotation, OwningPlayerOverride);
 	}
 	else
 	{
@@ -711,7 +748,8 @@ bool ARTSAsyncSpawner::AsyncSpawnClassAtLocation(const TSoftClassPtr<AActor>& As
 
 		const TWeakObjectPtr<ARTSAsyncSpawner> WeakThis(this);
 		FStreamableDelegate Delegate = FStreamableDelegate::CreateLambda(
-			[WeakThis, AssetPath, TrainingOption, Location, SpawnID, SpawnRequestId, OptionalRotation]()
+			[WeakThis, AssetPath, TrainingOption, Location, SpawnID, SpawnRequestId, OptionalRotation,
+				OwningPlayerOverride]()
 			{
 				if (not WeakThis.IsValid())
 				{
@@ -723,7 +761,8 @@ bool ARTSAsyncSpawner::AsyncSpawnClassAtLocation(const TSoftClassPtr<AActor>& As
 					Location,
 					SpawnID,
 					SpawnRequestId,
-					OptionalRotation);
+					OptionalRotation,
+					OwningPlayerOverride);
 			});
 
 		TSharedPtr<FStreamableHandle> LoadingHandle = M_StreamableManager.RequestAsyncLoad(

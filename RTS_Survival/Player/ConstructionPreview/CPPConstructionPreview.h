@@ -54,7 +54,8 @@ public:
 
 	FName GetBxpSocketName() const;
 
-#if RTS_WITH_SHIPPING_MAP_TESTS
+// Also in map tests: headless there is no cursor for the tick to snap a socket or origin BXP preview to.
+#if RTS_WITH_SHIPPING_MAP_TESTS || RTS_WITH_MAP_TESTS
 	bool ShippingTest_GetHasActivePreview() const;
 	bool ShippingTest_PrimeBxpPlacementAtLocation(const FVector& InClickedLocation);
 #endif
@@ -71,6 +72,17 @@ public:
 
 	/** @return Map tests: the world area of the last evaluated field defense footprint. */
 	FBox2D MapTest_GetFieldDefenseFootprintArea() const { return M_FieldDefenseFootprintArea; }
+
+	/**
+	 * @brief Map tests: judges a nomadic conversion placement with this spot standing in for the cursor, exactly as
+	 * the tick does; the nomadic preview must be active.
+	 * @param CursorLocation Ground location that stands in for the cursor.
+	 * @return Whether a placement click there would be accepted.
+	 */
+	bool MapTest_EvaluateNomadicPlacement(const FVector& CursorLocation);
+
+	/** @return Map tests: whether the active preview must be placed inside a build radius. */
+	bool MapTest_GetNeedsBuildRadius() const { return bM_NeedWithinBuildRadius; }
 #endif
 
 	/** @return If the building preview is overlapping with something. */

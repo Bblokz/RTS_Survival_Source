@@ -657,6 +657,8 @@ void USquadReinforcementComponent::SpawnMissingUnits()
 			continue;
 		}
 
+		// The reinforcement belongs to the player of its squad, whatever owner its own Blueprint has.
+		M_SquadController->MatchSoldierToSquadOwner(SpawnedUnit);
 		SpawnedUnit->SetSquadController(M_SquadController.Get());
 		SpawnedUnit->OnSquadSpawned(false, 0.0f, M_ReinforcementRequestState.M_CachedLocation);
 		SpawnedUnits.Add(SpawnedUnit);

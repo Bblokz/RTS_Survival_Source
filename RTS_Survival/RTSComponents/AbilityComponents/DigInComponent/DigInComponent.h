@@ -36,7 +36,7 @@ public:
 	void SetupOwner(const TScriptInterface<IDigInUnit>& NewOwner);
 	/** @return Whether the digin wall state is so that the unit can move. */
 	bool GetIsMovable() const { return M_DigInStatus == EDigInStatus::Movable; }
-	/** @return Whether the wall stands and the unit is fully dug in. */
+	/** @return Whether the wall is finished and the unit stands dug in (not while the wall is still going up). */
 	bool GetIsDugIn() const { return M_DigInStatus == EDigInStatus::CompletedBuildingWall; }
 	/** @return Whether the unit digs in or stands dug in; it should not be ordered away then. */
 	bool GetIsDiggingInOrDugIn() const

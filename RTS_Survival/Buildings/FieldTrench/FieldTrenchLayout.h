@@ -127,6 +127,12 @@ namespace FieldTrenchLayout
 	RTS_SURVIVAL_API FSoftObjectPath GetPieceMeshPath(EFieldTrenchPiece Piece, EFieldTrenchKit Kit = EFieldTrenchKit::German);
 
 	/**
+	 * @return The piece's vehicle ramp next to its mesh (<mesh>_Ramp): convex hulls over the earth bank and the bag
+	 * walls that vehicles drive over; empty when the piece has no mesh.
+	 */
+	RTS_SURVIVAL_API FSoftObjectPath GetPieceRampMeshPath(EFieldTrenchPiece Piece, EFieldTrenchKit Kit = EFieldTrenchKit::German);
+
+	/**
 	 * @brief Puts a piece so that one of its ports joins an open port.
 	 * @param Piece The piece to place.
 	 * @param EntryPortIndex Which port of the piece joins; entering a bend from its second port turns it the other way.

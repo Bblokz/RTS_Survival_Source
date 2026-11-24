@@ -3,6 +3,7 @@
 #include "WeaponTargetingData.h"
 #include "GameFramework/Actor.h"
 #include "Kismet/KismetMathLibrary.h"
+#include "RTS_Survival/Game/Players/RTSPlayers.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Weapons/AimOffsetProvider/AimOffsetProvider.h"
 #include "RTS_Survival/Weapons/WeaponRangeData/WeaponRangeData.h"
@@ -49,6 +50,8 @@ void FWeaponTargetingData::SetTargetActor(AActor* NewTarget)
 
 	M_TargetMode = ETargetMode::Actor;
 	M_TargetActor = NewTarget;
+	// Whoever hands over a target has just judged it; it is only judged again once relations change.
+	M_TargetRelationsVersion = FRTSPlayers::GetRelationsVersion();
 	bM_IsAircraftTarget = FWeaponRangeData::GetIsAntiAirRangeTarget(NewTarget);
 	LoadAimOffsetsFromActor(NewTarget);
 
@@ -96,7 +99,34 @@ bool FWeaponTargetingData::GetIsTargetValid() const
 	{
 		return true;
 	}
-	return RTSFunctionLibrary::RTSIsVisibleTarget(M_TargetActor, M_OwningPlayer);
+	if (not RTSFunctionLibrary::RTSIsVisibleTarget(M_TargetActor, M_OwningPlayer))
+	{
+		return false;
+	}
+	return not GetHasTargetBecomeAllied();
+}
+
+bool FWeaponTargetingData::GetHasTargetBecomeAllied() const
+{
+	const uint32 RelationsVersion = FRTSPlayers::GetRelationsVersion();
+	if (RelationsVersion == M_TargetRelationsVersion)
+	{
+		return false;
+	}
+	// A weapon whose own player is not known yet cannot judge; it keeps the target it was given.
+	if (not FRTSPlayers::IsValidPlayer(M_OwningPlayer))
+	{
+		return false;
+	}
+	const int32 TargetOwner = FRTSPlayers::GetOwningPlayerOfActor(M_TargetActor);
+	// Unowned and neutral targets (an ordered attack on a destructible) stay valid; only an owner that is now on
+	// our side ends the engagement. The version is not stored then, so the target stays invalid until replaced.
+	if (TargetOwner != INDEX_NONE && FRTSPlayers::AreAllied(M_OwningPlayer, TargetOwner))
+	{
+		return true;
+	}
+	M_TargetRelationsVersion = RelationsVersion;
+	return false;
 }
 
 void FWeaponTargetingData::TickAimSelection()

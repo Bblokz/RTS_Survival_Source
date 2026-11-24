@@ -114,10 +114,22 @@ void UW_IdleUnitButton::BuildIdleLamp(UOverlay& Overlay)
 		return;
 	}
 	// The round dome leaves the square's corners free; the lamp sits in the top-right one, against the bezel.
-	UOverlaySlot* const LampSlot = Overlay.AddChildToOverlay(LampImage);
-	LampSlot->SetHorizontalAlignment(HAlign_Right);
-	LampSlot->SetVerticalAlignment(VAlign_Top);
-	LampSlot->SetPadding(FMargin(0.0f, -Settings->IdleLampOverhang, -Settings->IdleLampOverhang, 0.0f));
+	const FMargin LampPadding(0.0f, -Settings->IdleLampOverhang, -Settings->IdleLampOverhang, 0.0f);
+	// The halo goes in first, in the same slot, so it lights the button glass and bezel under the lamp.
+	if (UImage* const HaloImage = M_IdleLamp.BuildHalo(*WidgetTree, Settings->IdleLampHaloMaterial.LoadSynchronous(),
+	                                                    Settings->IdleLampHaloScale))
+	{
+		AddIdleLampLayer(Overlay, *HaloImage, LampPadding);
+	}
+	AddIdleLampLayer(Overlay, *LampImage, LampPadding);
+}
+
+void UW_IdleUnitButton::AddIdleLampLayer(UOverlay& Overlay, UImage& Layer, const FMargin& LampPadding)
+{
+	UOverlaySlot* const LayerSlot = Overlay.AddChildToOverlay(&Layer);
+	LayerSlot->SetHorizontalAlignment(HAlign_Right);
+	LayerSlot->SetVerticalAlignment(VAlign_Top);
+	LayerSlot->SetPadding(LampPadding);
 }
 
 FButtonStyle UW_IdleUnitButton::MakeGlassButtonStyle() const

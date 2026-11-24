@@ -39,6 +39,11 @@ public:
 	 * @param bAllowOverwrite Whether to replace an existing key.
 	 */
 	void SetAnchorKey(const FGuid& InAnchorKey, bool bAllowOverwrite = false);
+
+	/** Pin id of the configured pinned place this anchor stands for; NAME_None for ordinary anchors. */
+	FName GetPinId() const { return M_PinId; }
+	void SetPinId(const FName InPinId) { M_PinId = InPinId; }
+
 	int32 GetConnectionCount() const;
 
 	const TArray<TObjectPtr<AAnchorPoint>>& GetNeighborAnchors() const { return M_NeighborAnchors; }
@@ -81,6 +86,11 @@ private:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Anchor", meta = (AllowPrivateAccess = "true"))
 	FGuid M_AnchorKey;
+
+	// Matches FWorldCampaignPinnedPlace::PinId in UWorldCampaignMapContentSettings. A hand-placed anchor with a pin id
+	// is used for that pin instead of spawning one; the generator then re-keys it from the pin id so saves restore it.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Anchor", meta = (AllowPrivateAccess = "true"))
+	FName M_PinId = NAME_None;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World Campaign|Anchor", meta = (AllowPrivateAccess = "true"))
 	TArray<TObjectPtr<AConnection>> M_Connections;

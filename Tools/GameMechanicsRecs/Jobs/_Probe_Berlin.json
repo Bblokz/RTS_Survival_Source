@@ -1,0 +1,31 @@
+{
+  "JobName": "Probe_Berlin",
+  "Category": "_Probes",
+  "MapPath": "/Game/RTS_Survival/Maps/GerMissions/Ger_Berlin",
+  "GameModeClassPath": "/Game/RTS_Survival/Blueprints/GameSettings/RTS_BP_GamemodeBase.RTS_BP_GamemodeBase_C",
+  "Fps": 30,
+  "WarmupSeconds": 6,
+  "DurationSeconds": 8,
+  "Anchor": {"X": 13542, "Y": 42444, "Z": 0},
+  "AnchorYaw": -90,
+  "ClearUnitsRadius": 6000,
+  "Events": [
+    {"Time": -1, "Type": "Spawn", "Tag": "Hero", "Player": 1, "ClassPath": "/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Heavy/Tiger/Ger_Vehicle_TigerH1", "Offset": {"X": 0, "Y": 0, "Z": 0}, "Yaw": 0},
+    {"Time": -1, "Type": "Spawn", "Tag": "Inf", "Player": 1, "ClassPath": "/Game/RTS_Survival/Blueprints/Squads/Ger/Barracks_Infantry/Scavengers/Squad_Ger_Scavengers", "Offset": {"X": -600, "Y": 900, "Z": 0}, "Yaw": 0},
+    {"Time": -1, "Type": "Spawn", "Tag": "Enemy", "Player": 2, "ClassPath": "/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Rus_Medium/T34/Rus_Vehicle_T3485", "Offset": {"X": 4500, "Y": 300, "Z": 0}, "Yaw": 180},
+    {"Time": 0.5, "Type": "Attack", "Tag": "Hero", "TargetTag": "Enemy", "Text": "Attack"},
+    {"Time": 1.0, "Type": "Move", "Tag": "Inf", "TargetOffset": {"X": 1200, "Y": 900, "Z": 0}, "Text": "Move"}
+  ],
+  "Shots": [
+    {"Name": "HeroOrbit", "Start": 0, "End": 4, "Rig": "Orbit",
+     "Keys": [
+       {"Time": 0, "Pivot": "tag:Hero", "Yaw": 140, "Pitch": 14, "Distance": 2200, "Focal": 30},
+       {"Time": 4, "Pivot": "tag:Hero", "Yaw": 200, "Pitch": 18, "Distance": 2400, "Focal": 30}
+     ]},
+    {"Name": "PanToEnemy", "Start": 4, "End": 8, "Rig": "Fixed",
+     "Keys": [
+       {"Time": 0, "Pivot": "tag:Hero", "Yaw": 210, "Pitch": 20, "Distance": 2600, "Focal": 28},
+       {"Time": 4, "Pivot": "tag:Enemy", "Yaw": 210, "Pitch": 20, "Distance": 2600, "Focal": 28}
+     ]}
+  ]
+}

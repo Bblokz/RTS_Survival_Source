@@ -1,0 +1,456 @@
+{
+ "key": "H_kippbock",
+ "title": "H  Kippbock: tilting A-frame in a round sandbag yard",
+ "notes": [
+  "A round sandbag berm (0.9 m) with two gates; the lane runs straight through it along +x (in left, out right).",
+  "Parks at x 1.25, y -1.4, heading 0 deg (one stop) with the bed under the frame's forward tilt.",
+  "Crane: portal A-frame (7 m legs + cross beam) hinged at y 0.7, held by back winch ropes and front stays.",
+  "Motion: tilt (luff) forward over the bed / back over the stocks + trolley across the cross beam (x) + hoist. No slew.",
+  "Stocks side by side behind the hinge line in steel trays: radixite, metal, parts at x -2.5 / 0 / 2.5.",
+  "Loads drop front -> middle -> rear between the bed bows (the trolley picks the gap).",
+  "Animated: flag rise on the berm; frame tilts back, trolley to a tray, lift, tilts forward, lower; tray levels step down.",
+  "Big rocking motion reads from far away; the ring makes the point a clear \"place\" on the map.",
+  "BP points: approach (-13, -1.4), park (1.25, -1.4) +x, exit (15, -1.4). Flag on the berm (-2.6, 6.75), 5.25 m travel."
+ ],
+ "subtitle": "Opel Blitz (real mesh) + soldier for scale  |  ring 15.4 m across, A-frame 7 m legs, flag 8 m on the berm",
+ "footprint": [
+  15.3,
+  15.4
+ ],
+ "height": 7.6,
+ "mast_height": 8.6,
+ "views": {
+  "rts": {
+   "file": "H_kippbock_rts.png",
+   "size": [
+    1600,
+    1100
+   ],
+   "px_per_m": 61.81818181818182,
+   "caption": null,
+   "labels": [
+    {
+     "text": "Truck in",
+     "kind": "lane",
+     "xy": [
+      306.5,
+      618.4
+     ]
+    },
+    {
+     "text": "Truck out",
+     "kind": "lane",
+     "xy": [
+      1158.9,
+      947.8
+     ]
+    },
+    {
+     "text": "Opel Blitz parks here (empty bed)",
+     "kind": "truck",
+     "xy": [
+      870.6,
+      721.6
+     ]
+    },
+    {
+     "text": "Tilting A-frame: tilt + trolley + hoist",
+     "kind": "crane",
+     "xy": [
+      867.5,
+      442.3
+     ]
+    },
+    {
+     "text": "Radixite stock",
+     "kind": "radixite",
+     "xy": [
+      783.1,
+      551.5
+     ]
+    },
+    {
+     "text": "Metal stock",
+     "kind": "metal",
+     "xy": [
+      908.5,
+      599.9
+     ]
+    },
+    {
+     "text": "Vehicle parts stock",
+     "kind": "parts",
+     "xy": [
+      1033.8,
+      648.3
+     ]
+    },
+    {
+     "text": "Capture flag (rises up the pole)",
+     "kind": "flag",
+     "xy": [
+      892.0,
+      78.6
+     ]
+    },
+    {
+     "text": "lowered / neutral",
+     "kind": "flag",
+     "xy": [
+      892.0,
+      402.3
+     ]
+    },
+    {
+     "text": "Progress bar (UI)",
+     "kind": "ui",
+     "xy": [
+      814.5,
+      220.9
+     ]
+    }
+   ]
+  },
+  "rear": {
+   "file": "H_kippbock_rear.png",
+   "size": [
+    800,
+    550
+   ],
+   "px_per_m": 30.90909090909091,
+   "caption": null,
+   "labels": [
+    {
+     "text": "Truck in",
+     "kind": "lane",
+     "xy": [
+      646.7,
+      418.2
+     ]
+    },
+    {
+     "text": "Truck out",
+     "kind": "lane",
+     "xy": [
+      220.6,
+      253.5
+     ]
+    },
+    {
+     "text": "Opel Blitz parks here (empty bed)",
+     "kind": "truck",
+     "xy": [
+      364.7,
+      251.8
+     ]
+    },
+    {
+     "text": "Tilting A-frame: tilt + trolley + hoist",
+     "kind": "crane",
+     "xy": [
+      366.3,
+      113.4
+     ]
+    },
+    {
+     "text": "Radixite stock",
+     "kind": "radixite",
+     "xy": [
+      408.4,
+      404.8
+     ]
+    },
+    {
+     "text": "Metal stock",
+     "kind": "metal",
+     "xy": [
+      345.8,
+      380.5
+     ]
+    },
+    {
+     "text": "Vehicle parts stock",
+     "kind": "parts",
+     "xy": [
+      283.1,
+      356.3
+     ]
+    },
+    {
+     "text": "Capture flag (rises up the pole)",
+     "kind": "flag",
+     "xy": [
+      354.0,
+      254.9
+     ]
+    },
+    {
+     "text": "lowered / neutral",
+     "kind": "flag",
+     "xy": [
+      354.0,
+      416.7
+     ]
+    },
+    {
+     "text": "Progress bar (UI)",
+     "kind": "ui",
+     "xy": [
+      392.8,
+      121.2
+     ]
+    }
+   ]
+  },
+  "top": {
+   "file": "H_kippbock_top.png",
+   "size": [
+    800,
+    800
+   ],
+   "px_per_m": 30.58823529411765,
+   "caption": null,
+   "labels": [
+    {
+     "text": "Truck in",
+     "kind": "lane",
+     "xy": [
+      143.1,
+      461.2
+     ]
+    },
+    {
+     "text": "Truck out",
+     "kind": "lane",
+     "xy": [
+      663.1,
+      461.2
+     ]
+    },
+    {
+     "text": "Opel Blitz parks here (empty bed)",
+     "kind": "truck",
+     "xy": [
+      487.2,
+      461.2
+     ]
+    },
+    {
+     "text": "Tilting A-frame: tilt + trolley + hoist",
+     "kind": "crane",
+     "xy": [
+      485.3,
+      461.2
+     ]
+    },
+    {
+     "text": "Radixite stock",
+     "kind": "radixite",
+     "xy": [
+      323.5,
+      308.2
+     ]
+    },
+    {
+     "text": "Metal stock",
+     "kind": "metal",
+     "xy": [
+      400.0,
+      308.2
+     ]
+    },
+    {
+     "text": "Vehicle parts stock",
+     "kind": "parts",
+     "xy": [
+      476.5,
+      308.2
+     ]
+    },
+    {
+     "text": "Capture flag (rises up the pole)",
+     "kind": "flag",
+     "xy": [
+      320.5,
+      211.9
+     ]
+    },
+    {
+     "text": "lowered / neutral",
+     "kind": "flag",
+     "xy": [
+      320.5,
+      211.9
+     ]
+    },
+    {
+     "text": "Progress bar (UI)",
+     "kind": "ui",
+     "xy": [
+      400.0,
+      387.8
+     ]
+    }
+   ],
+   "grid": [
+    [
+     -517.6,
+     1336.0,
+     -517.6,
+     -499.3
+    ],
+    [
+     -364.7,
+     1336.0,
+     -364.7,
+     -499.3
+    ],
+    [
+     -211.8,
+     1336.0,
+     -211.8,
+     -499.3
+    ],
+    [
+     -58.8,
+     1336.0,
+     -58.8,
+     -499.3
+    ],
+    [
+     94.1,
+     1336.0,
+     94.1,
+     -499.3
+    ],
+    [
+     247.1,
+     1336.0,
+     247.1,
+     -499.3
+    ],
+    [
+     400.0,
+     1336.0,
+     400.0,
+     -499.3
+    ],
+    [
+     552.9,
+     1336.0,
+     552.9,
+     -499.3
+    ],
+    [
+     705.9,
+     1336.0,
+     705.9,
+     -499.3
+    ],
+    [
+     858.8,
+     1336.0,
+     858.8,
+     -499.3
+    ],
+    [
+     1011.8,
+     1336.0,
+     1011.8,
+     -499.3
+    ],
+    [
+     1164.7,
+     1336.0,
+     1164.7,
+     -499.3
+    ],
+    [
+     1317.6,
+     1336.0,
+     1317.6,
+     -499.3
+    ],
+    [
+     -517.6,
+     1336.0,
+     1317.6,
+     1336.0
+    ],
+    [
+     -517.6,
+     1183.1,
+     1317.6,
+     1183.1
+    ],
+    [
+     -517.6,
+     1030.1,
+     1317.6,
+     1030.1
+    ],
+    [
+     -517.6,
+     877.2,
+     1317.6,
+     877.2
+    ],
+    [
+     -517.6,
+     724.2,
+     1317.6,
+     724.2
+    ],
+    [
+     -517.6,
+     571.3,
+     1317.6,
+     571.3
+    ],
+    [
+     -517.6,
+     418.4,
+     1317.6,
+     418.4
+    ],
+    [
+     -517.6,
+     265.4,
+     1317.6,
+     265.4
+    ],
+    [
+     -517.6,
+     112.5,
+     1317.6,
+     112.5
+    ],
+    [
+     -517.6,
+     -40.5,
+     1317.6,
+     -40.5
+    ],
+    [
+     -517.6,
+     -193.4,
+     1317.6,
+     -193.4
+    ],
+    [
+     -517.6,
+     -346.4,
+     1317.6,
+     -346.4
+    ],
+    [
+     -517.6,
+     -499.3,
+     1317.6,
+     -499.3
+    ]
+   ]
+  }
+ },
+ "main_view": "rts"
+}

@@ -300,8 +300,15 @@ namespace DeveloperSettings
 			inline constexpr int32 GerCommRequisitionOfficeBuildTime = RoundToNearestMultipleOf(20.f * GameTimeMlt, 2);
 			// Two portal frames and a hung cabin: more to raise than the office.
 			inline constexpr int32 GerCommCipherRoomBuildTime = RoundToNearestMultipleOf(30.f * GameTimeMlt, 2);
+			// Strike Division round 2026-11-17: the radio van with its aerial tower, the Wurfrahmen lean-to and the
+			// timber sniper loft.
+			inline constexpr int32 GerMechDepotRadioVanBuildTime = RoundToNearestMultipleOf(25.f * GameTimeMlt, 2);
+			inline constexpr int32 GerMechDepotWurfrahmenShopBuildTime = RoundToNearestMultipleOf(25.f * GameTimeMlt, 2);
+			inline constexpr int32 GerBarracksSniperLoftBuildTime = RoundToNearestMultipleOf(20.f * GameTimeMlt, 2);
 			// A poured concrete pillbox takes longer than a sandbag pit.
 			inline constexpr int32 GerRailPakBunkerBuildTime = RoundToNearestMultipleOf(40.f * GameTimeMlt, 2);
+			// The other breakthrough concrete bunkers pour as long as the rail Pak bunker.
+			inline constexpr int32 GerConcreteBunkerBuildTime = GerRailPakBunkerBuildTime;
 		}
 
 
@@ -583,6 +590,9 @@ namespace DeveloperSettings
 				// Scavengers (250) and the armoured Panzer Grenadiers (675 + 200); well below the Rail Troopers.
 				inline constexpr int32 EliteScavengers_Radixite = 450;
 				inline constexpr int32 EliteScavengers_Metal = 125;
+				// Burrowers: given free on contact in the Berlin mission, never trained. The value only matters
+				// where a squad's worth is read (refunds, score); set a little above the Scavengers.
+				inline constexpr int32 Burrowers_Radixite = 300;
 				// Red Spine: 3 light mech walkers (Etasphere01) with MP46s. Priced like the elite squads it matches
 				// in total health (Iron Storm 700 + 300, Panzer Grenadiers 675 + 200), below the heavier walkers.
 				inline constexpr int32 RedSpine_Radixite = 650;
@@ -925,6 +935,8 @@ namespace DeveloperSettings
 				inline constexpr int32 GerHQPlatform_Metal = 75;
 				inline constexpr int32 GerHQTower_Radixite = 200;
 				inline constexpr int32 GerHQTower_Metal = 75;
+				inline constexpr int32 GerHQLaser_Radixite = 450;
+				inline constexpr int32 GerHQLaser_Metal = 150;
 				inline constexpr int32 GerHQRepairBay_Radixite = 300;
 				inline constexpr int32 GerHQRepairBay_Metal = 150;
 				inline constexpr int32 GerLFactoryRadixiteReactor_Radixite = 300;
@@ -1013,8 +1025,25 @@ namespace DeveloperSettings
 				inline constexpr int32 GerCommCipherRoom_Metal = 220;
 				// While the player has a Cipher room, commander abilities recharge in this fraction of their cooldown.
 				inline constexpr float GerCommCipherRoomGlobalAbilityCooldownMlt = 0.8f;
+				// Strike Division round 2026-11-17 (mechanized depot and barracks origin expansions).
+				inline constexpr int32 GerMechDepotRadioVan_Radixite = 320;
+				inline constexpr int32 GerMechDepotRadioVan_Metal = 180;
+				inline constexpr int32 GerMechDepotWurfrahmenShop_Radixite = 360;
+				inline constexpr int32 GerMechDepotWurfrahmenShop_Metal = 220;
+				// While the player has a Wurfrahmen shop, Panzerwerfers reload in this fraction of their reload time.
+				inline constexpr float GerMechDepotWurfrahmenShopPanzerwerferReloadMlt = 0.75f;
+				// Priced like the Schreck frame: a crewed origin defence on a raised deck.
+				inline constexpr int32 GerBarracksSniperLoft_Radixite = 340;
+				inline constexpr int32 GerBarracksSniperLoft_Metal = 160;
 				inline constexpr int32 GerRailPakBunker_Radixite = 850;
 				inline constexpr int32 GerRailPakBunker_Metal = 420;
+				// Breakthrough concrete bunkers (user pick 2026-11-20), priced around the rail Pak bunker.
+				inline constexpr int32 GerFlak88Bunker_Radixite = 900;
+				inline constexpr int32 GerFlak88Bunker_Metal = 450;
+				inline constexpr int32 GerFlakvierlingBunker_Radixite = 600;
+				inline constexpr int32 GerFlakvierlingBunker_Metal = 300;
+				inline constexpr int32 GerPZ38TBunker_Radixite = 500;
+				inline constexpr int32 GerPZ38TBunker_Metal = 250;
 				inline constexpr int32 GerFlak88Pit_Radixite = 560;
 				inline constexpr int32 GerFlak88Pit_Metal = 360;
 				inline constexpr int32 GerMortarPit_Radixite = 340;
@@ -1047,33 +1076,50 @@ namespace DeveloperSettings
 			// own range so the range shown to the player stays the ground range.
 			inline constexpr float AntiAirRangeMlt = 4.f;
 			inline constexpr float GameRangeMlt = 0.4f;
-			inline constexpr float BasicSmallArmsRange = RoundToNearestMultipleOfFive(8000.f * GameRangeMlt);
-			inline constexpr float SmallArmsRifleRange = RoundToNearestMultipleOfFive(8400.f * GameRangeMlt);
-			inline constexpr float SmallArmsSniperRange = RoundToNearestMultipleOfFive(8700.f * GameRangeMlt);
-			inline constexpr float AircraftSmallArmsRange = RoundToNearestMultipleOfFive(8000);
+			// Range boost for every weapon that is not artillery (small arms, cannons, lasers, flame, aircraft guns).
+			// Literal ranges outside this namespace multiply by it too.
+			inline constexpr float DirectFireRangeMlt = 1.1f;
+			// Range boost for mortars, rocket artillery, howitzers and arcing guns; the *ArtilleryRange constants.
+			inline constexpr float ArtilleryRangeMlt = 1.1f;
+			inline constexpr float BasicSmallArmsRange = RoundToNearestMultipleOfFive(
+				8000.f * GameRangeMlt * DirectFireRangeMlt);
+			inline constexpr float SmallArmsRifleRange = RoundToNearestMultipleOfFive(
+				8400.f * GameRangeMlt * DirectFireRangeMlt);
+			inline constexpr float SmallArmsSniperRange = RoundToNearestMultipleOfFive(
+				8700.f * GameRangeMlt * DirectFireRangeMlt);
+			inline constexpr float AircraftSmallArmsRange = RoundToNearestMultipleOfFive(8000 * DirectFireRangeMlt);
 
-			inline constexpr float LightCannonRange = RoundToNearestMultipleOfFive(8700.f * GameRangeMlt);
-			inline constexpr float LightAssaultCannonRange = RoundToNearestMultipleOfFive(9800.f * GameRangeMlt);
-			inline constexpr float MediumCannonRange = RoundToNearestMultipleOfFive(9200.f * GameRangeMlt);
-			inline constexpr float MediumAssaultCannonRange = RoundToNearestMultipleOfFive(10600.f * GameRangeMlt);
-			inline constexpr float HeavyCannonRange = RoundToNearestMultipleOfFive(9200.f * GameRangeMlt);
-			inline constexpr float HeavyAssaultCannonRange = RoundToNearestMultipleOfFive(10600.f * GameRangeMlt);
+			inline constexpr float LightCannonRange = RoundToNearestMultipleOfFive(
+				8700.f * GameRangeMlt * DirectFireRangeMlt);
+			inline constexpr float LightAssaultCannonRange = RoundToNearestMultipleOfFive(
+				9800.f * GameRangeMlt * DirectFireRangeMlt);
+			inline constexpr float MediumCannonRange = RoundToNearestMultipleOfFive(
+				9200.f * GameRangeMlt * DirectFireRangeMlt);
+			inline constexpr float MediumAssaultCannonRange = RoundToNearestMultipleOfFive(
+				10600.f * GameRangeMlt * DirectFireRangeMlt);
+			inline constexpr float HeavyCannonRange = RoundToNearestMultipleOfFive(
+				9200.f * GameRangeMlt * DirectFireRangeMlt);
+			inline constexpr float HeavyAssaultCannonRange = RoundToNearestMultipleOfFive(
+				10600.f * GameRangeMlt * DirectFireRangeMlt);
 
 			// Medium artillery range ~105 mm howitzers
-			inline constexpr float LightArtilleryRange = RoundToNearestMultipleOfFive(14000.f * GameRangeMlt);
-			inline constexpr float MediumArtilleryRange = 17000.f * GameRangeMlt;
-			inline constexpr float HeavyArtilleryRange = 19000.f * GameRangeMlt;
+			inline constexpr float LightArtilleryRange = RoundToNearestMultipleOfFive(
+				14000.f * GameRangeMlt * ArtilleryRangeMlt);
+			inline constexpr float MediumArtilleryRange = 17000.f * GameRangeMlt * ArtilleryRangeMlt;
+			inline constexpr float HeavyArtilleryRange = 19000.f * GameRangeMlt * ArtilleryRangeMlt;
 
 			// Static artillery range  /  howitzers
-			inline constexpr float HowitzerArtilleryRange = 22000.f * GameRangeMlt;
-			inline constexpr float RailwayArtilleryRange = 30000.f * GameRangeMlt;
+			inline constexpr float HowitzerArtilleryRange = 22000.f * GameRangeMlt * ArtilleryRangeMlt;
+			inline constexpr float RailwayArtilleryRange = 30000.f * GameRangeMlt * ArtilleryRangeMlt;
 
-			// Laser weapons
+			// Laser weapons; MediumCannonRange already carries DirectFireRangeMlt.
 			inline constexpr float MediumLaserWeaponRange = RoundToNearestMultipleOf(MediumCannonRange * 1.2f, 100);
 
 			// Flame weapons
-			inline constexpr float LightFlameRange = RoundToNearestMultipleOf(1800 * GameRangeMlt, 5);
-			inline constexpr float MediumFlameRange = RoundToNearestMultipleOf(3000 * GameRangeMlt, 5);
+			inline constexpr float LightFlameRange = RoundToNearestMultipleOf(
+				1800 * GameRangeMlt * DirectFireRangeMlt, 5);
+			inline constexpr float MediumFlameRange = RoundToNearestMultipleOf(
+				3000 * GameRangeMlt * DirectFireRangeMlt, 5);
 		}
 
 		namespace VisionRadii
@@ -1094,25 +1140,34 @@ namespace DeveloperSettings
 				// like medium tanks.
 				inline constexpr float T2BxpVisionRadius = 4500.f;
 				inline constexpr float MegaBunkerVisionRadius = 10000.f;
+				// The radio van's 12 m aerial tower: twice a medium tank's sight, so clearly above the Communication
+				// Center's observation post (T2BxpVisionRadius); below the mega bunker.
+				inline constexpr float GerMechDepotRadioVanVisionRadius = 9000.f;
+				// The sniper loft's deck: a scope on a raised post, so it sees most of the Kar98k sniper's reach
+				// (SmallArmsSniperRange) by itself; above every team weapon.
+				inline constexpr float GerBarracksSniperLoftVisionRadius = 8000.f;
 			}
 
 			namespace UnitVision
 			{
-				inline constexpr float T1TankVisionRadius = 4000.f;
-				inline constexpr float OpenTopVehicleVisionRadius = 4800.f;
-				inline constexpr float ArmoredCarVisionRadius = 5500;
-				inline constexpr float T2TankVisionRadius = 4500.f;
-				inline constexpr float T3TankVisionRadius = 5000.f;
-				inline constexpr float SuperHeavyTankVision = 5000.f;
-				inline constexpr float TrainVisionRadius = 12000.f;
+				// Sight boost applied to every unit's vision radius; buildings and expansions keep theirs.
+				inline constexpr float UnitVisionMlt = 1.1f;
 
-				inline constexpr float InfantryVisionRadius = 4500.f;
-				inline constexpr float MachineGunTeamWeaponVisionRadius = 5000.f;
-				inline constexpr float AntiTankGunTeamWeaponVisionRadius = 5800.f;
-				inline constexpr float MortarTeamWeaponVisionRadius = 6500.f;
-				inline constexpr float FlakTeamWeaponVisionRadius = 6200.f;
-				inline constexpr float ArtilleryTeamWeaponVisionRadius = 7000.f;
-				inline constexpr float AircraftVisionRadius = 12000.f;
+				inline constexpr float T1TankVisionRadius = 4000.f * UnitVisionMlt;
+				inline constexpr float OpenTopVehicleVisionRadius = 4800.f * UnitVisionMlt;
+				inline constexpr float ArmoredCarVisionRadius = 5500 * UnitVisionMlt;
+				inline constexpr float T2TankVisionRadius = 4500.f * UnitVisionMlt;
+				inline constexpr float T3TankVisionRadius = 5000.f * UnitVisionMlt;
+				inline constexpr float SuperHeavyTankVision = 5000.f * UnitVisionMlt;
+				inline constexpr float TrainVisionRadius = 12000.f * UnitVisionMlt;
+
+				inline constexpr float InfantryVisionRadius = 4500.f * UnitVisionMlt;
+				inline constexpr float MachineGunTeamWeaponVisionRadius = 5000.f * UnitVisionMlt;
+				inline constexpr float AntiTankGunTeamWeaponVisionRadius = 5800.f * UnitVisionMlt;
+				inline constexpr float MortarTeamWeaponVisionRadius = 6500.f * UnitVisionMlt;
+				inline constexpr float FlakTeamWeaponVisionRadius = 6200.f * UnitVisionMlt;
+				inline constexpr float ArtilleryTeamWeaponVisionRadius = 7000.f * UnitVisionMlt;
+				inline constexpr float AircraftVisionRadius = 12000.f * UnitVisionMlt;
 			}
 		}
 
@@ -1712,6 +1767,66 @@ namespace DeveloperSettings
 			};
 		}
 
+		// Soviet base buildings take their health from a number of medium tank shots instead of a flat value.
+		// Reference shot: the Pz IV's KwK 40 L48 firing APHE (the default shell) as a direct hit, ~221 damage.
+		// Buildings carry no armor calculation and projectile damage has no flux, so shots to kill are exact; HE
+		// (x1.6) needs fewer shots. Splash ignores the directly hit actor, so it does not add to the count.
+		namespace SovietBuildingShotHealth
+		{
+			inline constexpr float MediumTankShotCalibreMM = 75.f;
+			inline constexpr float MediumTankShotTNTGrams = 73.f;
+			inline constexpr float MediumTankShotDamage =
+				Weapons::DamagePerMM * MediumTankShotCalibreMM
+				+ Weapons::DamagePerTNTEquivalentGrams * MediumTankShotTNTGrams;
+			inline constexpr float HealthRoundingStep = 10.f;
+			// Health sits half a shot below the kill threshold so small damage tweaks do not change the count.
+			inline constexpr float ShotBracketCentreOffset = 0.5f;
+
+			/**
+			 * @brief Health that dies to exactly this many reference shots against the given armor reduction.
+			 * @param ShotsToKill Reference shots that destroy the building; one fewer leaves it standing.
+			 * @param Reduction The armor preset's damage reduction (multiplier first, then flat points).
+			 * @return Health rounded to a multiple of ten, centred in the shot bracket.
+			 */
+			constexpr float GetHealthForMediumTankShots(const int32 ShotsToKill,
+			                                            const FDamageReductionSettings& Reduction)
+			{
+				const float DamagePerShot = MediumTankShotDamage * Reduction.DamageReductionMlt
+					- Reduction.DamageReduction;
+				const float CentredHealth = (ShotsToKill - ShotBracketCentreOffset) * DamagePerShot;
+				return static_cast<int32>(CentredHealth / HealthRoundingStep + 0.5f) * HealthRoundingStep;
+			}
+
+			constexpr float BasicHealthForShots(const int32 ShotsToKill)
+			{
+				return GetHealthForMediumTankShots(ShotsToKill, UnitResistances::BasicBuildingArmor::DamageReduction);
+			}
+
+			constexpr float ReinforcedHealthForShots(const int32 ShotsToKill)
+			{
+				return GetHealthForMediumTankShots(ShotsToKill, UnitResistances::ReinforcedArmor::DamageReduction);
+			}
+
+			// Basic building armor.
+			inline constexpr int32 FuelStorageSmallShots = 3;
+			inline constexpr int32 AmmoStorageShots = 3;
+			inline constexpr int32 BarracksShots = 4;
+			inline constexpr int32 AntennaShots = 4;
+			// Also used by the supplies storage, which shares the large fuel storage's data.
+			inline constexpr int32 FuelStorageLargeShots = 5;
+			inline constexpr int32 WarehouseShots = 5;
+			inline constexpr int32 CoolingTowersShots = 6;
+			// Reinforced armor.
+			inline constexpr int32 AquirfierVerticalShots = 8;
+			inline constexpr int32 AquirfierShots = 10;
+			inline constexpr int32 ResearchCenterShots = 8;
+			inline constexpr int32 IndustrialRefineryShots = 10;
+			inline constexpr int32 ChemicalPlantShots = 12;
+			// The large factories stay sturdier than the rest of the base.
+			inline constexpr int32 FactoryShots = 12;
+			inline constexpr int32 PlatformFactoryShots = 16;
+		}
+
 
 		namespace InfantrySettings
 		{
@@ -1933,6 +2048,9 @@ namespace DeveloperSettings
 		namespace FoW
 		{
 			inline const FName TagUnitInEnemyVision = "IsInEnemyVision";
+			// On an AI-owned unit while the fog, and nothing else, hides it from the human: other AI players
+			// still see such a unit. Set and cleared by UFowComp only.
+			inline const FName TagUnitHiddenByFog = "IsHiddenByFog";
 			inline constexpr float VisibleEnoughToRevealEnemy = 0.10;
 			// Note that enemy vision is binary as either a player unit is in enemy vision which means that the particle
 			// associated with this unit has size 1 or not in which case the size is zero.

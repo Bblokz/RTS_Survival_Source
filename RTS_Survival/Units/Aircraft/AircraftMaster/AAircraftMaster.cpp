@@ -6,10 +6,14 @@
 #include "RTS_Survival/Units/Aircraft/AircraftDeath/AircraftDeathComponent.h"
 #include "RTS_Survival/Units/RTSDeathType/RTSDeathType.h"
 #include "Components/DecalComponent.h"
+#include "Components/PrimitiveComponent.h"
 #include "RTS_Survival/Weapons/AircraftWeapon/AircraftWeapon.h"
+#include "RTS_Survival/Weapons/AircraftWeapon/AircraftStrafeGun/WeaponStateAircraftStrafeGun.h"
 #include "RTS_Survival/RTSComponents/RTSTargetAcquisition/AircraftTargetAcquisition/AircraftTargetAcquisition.h"
 #include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetMathLibrary.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
 #include "RTS_Survival/RTSCollisionTraceChannels.h"
 #include "RTS_Survival/Utils/CollisionSetup/FRTS_CollisionSetup.h"
 #include "RTS_Survival/Enemy/EnemyController/EnemyController.h"
@@ -31,6 +35,7 @@
 #include "RTS_Survival/Utils/RTSBlueprintFunctionLibrary.h"
 #include "RTS_Survival/Utils/RTSRichTextConverters/FRTSRichTextConverter.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
+#include "RTS_Survival/Utils/UnitSpawning/RTSUnitOwnerSpawning.h"
 #include "RTS_Survival/Weapons/BombComponent/BombComponent.h"
 #include "Serialization/AsyncPackageLoader.h"
 
@@ -70,7 +75,60 @@ namespace
 		constexpr float MinHoverSecondsAfterRetract = 0.5f;
 		// Ground samples on the straight approach line used to pick a cruise height that clears hills.
 		constexpr int32 ApproachGroundSamples = 12;
-		constexpr float GroundTraceHalfHeight = 200000.0f;
+	}
+
+	namespace AircraftGroundTrace
+	{
+		// Starts far above the aircraft so hills higher than the aircraft are found too.
+		constexpr float HalfHeight = 200000.0f;
+		// Movable blockers (team weapon meshes) skipped before giving up on finding the ground below.
+		constexpr int32 MaxSkippedMovableHits = 3;
+
+		bool GetIsStaticGroundHit(const FHitResult& Hit)
+		{
+			const UPrimitiveComponent* HitComponent = Hit.GetComponent();
+			return IsValid(HitComponent) && HitComponent->Mobility != EComponentMobility::Movable;
+		}
+	}
+
+	namespace AircraftTerrainFollowSampling
+	{
+		// Ground samples spread evenly over the look-ahead distance, besides the one right below the aircraft.
+		constexpr int32 LookAheadSamples = 4;
+	}
+
+	namespace AircraftBankToTurnFlight
+	{
+		// Turns slower than this (deg/s) do not decide which side the idle circle goes to; the bank does.
+		constexpr float MinYawRateForIdleSide = 3.f;
+		constexpr float MinRollForIdleSide = 2.f;
+		// Guards the look-ahead and idle circle against a zero radius or speed.
+		constexpr float MinIdleRadius = 500.f;
+
+		bool GetIsLegacyFlightRequested()
+		{
+			static const bool bLegacyFlight = FParse::Param(FCommandLine::Get(), TEXT("AircraftLegacyFlight"));
+			return bLegacyFlight;
+		}
+	}
+
+	namespace AircraftDiveGroundFloor
+	{
+		// While diving, the ground under the aircraft is sampled this often for the dive floor (seconds).
+		constexpr float SampleIntervalSeconds = 0.15f;
+		// The dive floor keeps at least this much above the ground under the aircraft, not only above the target, so
+		// a ridge between the dive start and a target in a valley is cleared too (cm).
+		constexpr float ClearanceAboveGroundBelow = 600.f;
+		// Fastest the floor follows a new ground sample (cm/s): a 30 degree slope at 4000 cm/s.
+		constexpr float MaxFloorChangeSpeed = 2300.f;
+	}
+
+	namespace AircraftPathPlanning
+	{
+		// A turn rate above this (deg/s) makes a new path keep turning to the same side for targets far off the nose.
+		constexpr float MinYawRateForPreferredSide = 10.f;
+		// After this many attack plans in a row without a dive the next one relaxes the dive checks.
+		constexpr int32 MaxAttackPlansBeforeRelaxedDive = 4;
 	}
 }
 
@@ -120,6 +178,7 @@ void AAircraftMaster::BeginPlay()
 	// Make sure the aircraft weapon knows if we are airborne or landed.
 	BeginPlay_PropagateStateToWpAndAnimInst();
 	BeginPlay_SetupWeaponHitCollision();
+	BeginPlay_InitTerrainFollow();
 	if (ensure(GetIsValidTargetAcquisition()))
 	{
 		M_TargetAcquisition->ActivateAcquisition();
@@ -305,8 +364,9 @@ void AAircraftMaster::PostInitializeComponents()
 		// Do not use the function as we wait for references to be set before propagating the state.
 		/** @See BeginPlay_PropagateStateToWpAndAnimInst */
 		M_LandedState = EAircraftLandingState::Airborne;
-		M_AircraftLandedData.TargetAirborneHeight = GetActorLocation().Z;
+		SetTargetAirborneHeight(GetActorLocation().Z);
 		UpdateFowVisionRadiusForLandedState();
+		PostInit_SetAirborneSpawnSpeed();
 	}
 
 	// was: M_MovementState = EAircraftMovementState::Idle;
@@ -407,6 +467,7 @@ void AAircraftMaster::Tick(float DeltaTime)
 
 	if (M_StraightRunState.bM_IsActive)
 	{
+		Tick_TerrainFollow(DeltaTime);
 		Tick_StraightRun(DeltaTime);
 		return;
 	}
@@ -431,6 +492,7 @@ void AAircraftMaster::Tick(float DeltaTime)
 		Tick_WaitingForBayOpening(DeltaTime);
 		return;
 	}
+	Tick_TerrainFollow(DeltaTime);
 	if (M_MovementState == EAircraftMovementState::MovingTo)
 	{
 		CarpetBombing_UpdateBombTargetLocation();
@@ -500,6 +562,7 @@ void AAircraftMaster::TerminateMoveCommand()
 
 void AAircraftMaster::ExecuteAttackCommand(AActor* TargetActor)
 {
+	M_AttackPlansWithoutDive = 0;
 	// A shot-down aircraft takes no more orders; its death component flies the wreck.
 	if (not IsUnitAlive())
 	{
@@ -526,6 +589,7 @@ void AAircraftMaster::ExecuteAttackCommand(AActor* TargetActor)
 
 void AAircraftMaster::ExecuteAttackGroundCommand(const FVector GroundLocation)
 {
+	M_AttackPlansWithoutDive = 0;
 	// A shot-down aircraft takes no more orders; its death component flies the wreck.
 	if (not IsUnitAlive())
 	{
@@ -825,7 +889,7 @@ void AAircraftMaster::StartVto()
 	const float Apex = M_AircraftMovementSettings.TakeOffHeight;
 	const float GroundZ = M_AircraftLandedData.LandedPosition.Z;
 
-	M_AircraftLandedData.TargetAirborneHeight = GroundZ + Apex;
+	SetTargetAirborneHeight(GroundZ + Apex);
 	M_AircraftLandedData.LandedRotation = GetActorRotation();
 
 	// Kick the usual prepare timer path
@@ -1092,6 +1156,11 @@ void AAircraftMaster::PostInit_InitWeaponInitAnim()
 void AAircraftMaster::UpdateLandedState(const EAircraftLandingState NewState)
 {
 	M_LandedState = NewState;
+	if (NewState != EAircraftLandingState::Airborne)
+	{
+		// Terrain following does not run in these states; no climb may carry over into the next flight.
+		M_TerrainFollow.Suspend();
+	}
 	UpdateFowVisionRadiusForLandedState();
 	UpdateAircraftWeaponWithLandedState();
 	UpdateAircraftAnimationWithLandedState();
@@ -1142,6 +1211,7 @@ void AAircraftMaster::StartMoveTo()
 {
 	M_AircraftMoveData.Path.Owner = this;
 	M_MovementState = EAircraftMovementState::MovingTo;
+	PreparePathPlanning(M_AircraftMoveData.Path);
 	FRotator StartRotation;
 	const FVector StartLocation = OnMoveStartGetLocationAndRotation(StartRotation, GetActorLocation(),
 	                                                                GetActorRotation());
@@ -1166,7 +1236,14 @@ FVector AAircraftMaster::OnMoveStartGetLocationAndRotation(
 		RTSFunctionLibrary::ReportError(
 			"Target Airborne Height is zero in AAircraftMaster::OnMoveStartGetLocationAndRotation. "
 			"Ensure to set the target airborne height before calling this function.");
-		M_AircraftLandedData.TargetAirborneHeight = M_AircraftMovementSettings.TakeOffHeight;
+		SetTargetAirborneHeight(M_AircraftMovementSettings.TakeOffHeight);
+	}
+	if (GetIsFlightModelActive())
+	{
+		// The path starts where the aircraft is, at cruise height, along its flight: the flight model climbs or
+		// descends into it at its own pitch limits, so no offset start point (which made a kink) is needed.
+		OutRotation = GetFlightPlanningRotation();
+		return FVector(CurrentLocation.X, CurrentLocation.Y, M_AircraftLandedData.TargetAirborneHeight);
 	}
 	const float DeltaZ = M_AircraftLandedData.TargetAirborneHeight - CurrentLocation.Z;
 	FVector OutLocation;
@@ -1234,6 +1311,7 @@ void AAircraftMaster::StartAttackGround()
 	M_AircraftMovement->MaxSpeed = M_AircraftMovementSettings.MaxMoveSpeed;
 	M_AircraftMovement->Acceleration = M_AircraftMovementSettings.Acceleration;
 	M_AircraftMovement->Deceleration = M_AircraftMovementSettings.Deceleration;
+	PreparePathPlanning(M_AircraftAttackData.Path);
 	M_AircraftAttackData.StartPathFindingToLocation(StartLocation, StartRotation,
 	                                                M_AircraftMovementSettings.BezierCurveSettings,
 	                                                M_AircraftMovementSettings.AttackMoveSettings,
@@ -1276,6 +1354,7 @@ void AAircraftMaster::StartAttackActor()
 	M_AircraftMovement->MaxSpeed = M_AircraftMovementSettings.MaxMoveSpeed;
 	M_AircraftMovement->Acceleration = M_AircraftMovementSettings.Acceleration;
 	M_AircraftMovement->Deceleration = M_AircraftMovementSettings.Deceleration;
+	PreparePathPlanning(M_AircraftAttackData.Path);
 	M_AircraftAttackData.StartPathFinding(StartLocation, StartRotation,
 	                                      M_AircraftMovementSettings.BezierCurveSettings,
 	                                      M_AircraftMovementSettings.AttackMoveSettings,
@@ -1404,6 +1483,11 @@ void AAircraftMaster::Tick_IdleCircling(float DeltaTime)
 	{
 		return;
 	}
+	if (GetIsFlightModelActive())
+	{
+		Tick_IdleCircling_FlightModel(DeltaTime);
+		return;
+	}
 
 	// Circle parameters
 	const float Radius = M_AircraftMovementSettings.IdleRadius;
@@ -1442,7 +1526,7 @@ void AAircraftMaster::Tick_IdleCircling(float DeltaTime)
 	// Build desired rotation
 	FRotator DesiredRot;
 	DesiredRot.Yaw = Dir.Rotation().Yaw;
-	DesiredRot.Pitch = 0.f;
+	DesiredRot.Pitch = TerrainFollow_GetClimbPitch();
 
 	// Gracefully ramp roll toward signed idle bank
 	const float TargetRoll = (M_AircraftMovementSettings.IdleBankAngle * TurnSign) * SteerScale;
@@ -1529,6 +1613,11 @@ void AAircraftMaster::OnVtoStart()
 
 void AAircraftMaster::Tick_MoveTo(const float DeltaTime)
 {
+	if (GetIsFlightModelActive())
+	{
+		Tick_FlyPath(M_AircraftMoveData.Path, false, DeltaTime);
+		return;
+	}
 	auto& Path = M_AircraftMoveData.Path;
 	auto& Points = Path.PathPoints;
 	int32& CurrentPathIndex = Path.CurrentPathIndex;
@@ -1567,11 +1656,16 @@ void AAircraftMaster::Tick_MoveTo(const float DeltaTime)
 	}
 
 	const FAircraftPathPoint NextPoint = Points[CurrentPathIndex + 1];
-	M_AircraftMovement->TickMovement_Homing(NextPoint, DeltaTime);
+	M_AircraftMovement->TickMovement_Homing(NextPoint, DeltaTime, TerrainFollow_GetClimbPitch());
 }
 
 void AAircraftMaster::Tick_AttackMove(const float DeltaTime)
 {
+	if (GetIsFlightModelActive())
+	{
+		Tick_FlyPath(M_AircraftAttackData.Path, true, DeltaTime);
+		return;
+	}
 	auto& Path = M_AircraftAttackData.Path;
 	auto& Points = Path.PathPoints;
 	int32& CurrentPathIndex = Path.CurrentPathIndex;
@@ -1616,7 +1710,7 @@ void AAircraftMaster::Tick_AttackMove(const float DeltaTime)
 		return;
 	}
 	const FAircraftPathPoint NextPoint = Points[CurrentPathIndex + 1];
-	M_AircraftMovement->TickMovement_Homing(NextPoint, DeltaTime);
+	M_AircraftMovement->TickMovement_Homing(NextPoint, DeltaTime, TerrainFollow_GetClimbPitch());
 }
 
 void AAircraftMaster::AttackMove_IssueActionForNewTargetPoint(const FAircraftPathPoint& NextPoint)
@@ -1629,6 +1723,7 @@ void AAircraftMaster::AttackMove_IssueActionForNewTargetPoint(const FAircraftPat
 	case EAirPathPointType::Bezier:
 		break;
 	case EAirPathPointType::AttackDive:
+		M_AttackPlansWithoutDive = 0;
 		Strafe_OnAttackDiveStarted();
 		StartWeaponFire();
 		break;
@@ -1645,6 +1740,11 @@ void AAircraftMaster::AttackMove_IssueActionForNewTargetPoint(const FAircraftPat
 		break;
 	}
 	StopIssuedActionForNewType(NewPointType);
+	if (NextPoint.IsDivePoint() || NextPoint.IsDiveRecoveryPoint())
+	{
+		// The dive aims from this frame on: no terrain climb may carry into it.
+		M_TerrainFollow.Suspend();
+	}
 }
 
 void AAircraftMaster::StopIssuedActionForNewType(const EAirPathPointType NewType)
@@ -1749,6 +1849,19 @@ void AAircraftMaster::OnAttackMoveCompleted()
 	}
 	if (M_StrafeState.bM_IsStrafing)
 	{
+		if (not M_StrafeState.bM_HasDivedThisRun)
+		{
+			// The path only brought the aircraft into dive range (spawned far out, or a U-turn): plan the same run
+			// again from here instead of ending the strafe without a shot. TotalStrafeTime still ends it.
+			Strafe_StartAttackRun();
+			return;
+		}
+		if (M_StrafeState.bM_RepeatRunsOverTarget)
+		{
+			Strafe_PrepareNextAttackRun();
+			Strafe_StartAttackRun();
+			return;
+		}
 		Strafe_CompleteInitialRunAndEnableAggro();
 		return;
 	}
@@ -1768,6 +1881,7 @@ void AAircraftMaster::OnAttackMoveCompleted()
 
 void AAircraftMaster::CleanUpAttackAndSwitchToIdle()
 {
+	M_AttackPlansWithoutDive = 0;
 	SetMovementToIdle();
 	FRTSAircraftHelpers::AircraftDebug(TEXT("Attack command Complete"), FColor::Yellow);
 }
@@ -1986,6 +2100,11 @@ void AAircraftMaster::OnLandscapeTraceHit(const FHitResult& TraceHit) const
 void AAircraftMaster::SetMovementToIdle()
 {
 	M_MovementState = EAircraftMovementState::Idle;
+	if (GetIsFlightModelActive())
+	{
+		InitIdleCircleAlongFlight();
+		return;
+	}
 	InitIdleCircleFromCurrentPose();
 
 	// Configure soft-entry into idle circling
@@ -2260,7 +2379,7 @@ void AAircraftMaster::OnOwnerDies_ResetToIdleAirborne()
 	// Clear landing cache
 	M_AircraftLandedData.LandedPosition = FVector::ZeroVector;
 	M_AircraftLandedData.LandedRotation = FRotator::ZeroRotator;
-	M_AircraftLandedData.TargetAirborneHeight = GetActorLocation().Z;
+	SetTargetAirborneHeight(GetActorLocation().Z);
 
 	M_AircraftMoveData.Reset();
 	M_AircraftAttackData.Reset();
@@ -2594,6 +2713,7 @@ void AAircraftMaster::StrafeLocation(const FStrafeAircraftSettings& StrafeAircra
                                      const FAircraftAttackMoveSettings& OverrideAttackMoveSettings)
 {
 	Strafe_ClearTimer();
+	M_AttackPlansWithoutDive = 0;
 	M_PreStrafeAttackMoveSettings = M_AircraftMovementSettings.AttackMoveSettings;
 	M_AircraftMovementSettings.AttackMoveSettings = OverrideAttackMoveSettings;
 
@@ -2610,6 +2730,7 @@ void AAircraftMaster::StrafeLocation(const FStrafeAircraftSettings& StrafeAircra
 	M_StrafeState.bM_IsLerpingStrafePoint = false;
 	M_StrafeState.bM_IsFirstAttackRun = true;
 	M_StrafeState.bM_IsRetreatingToDestroy = false;
+	M_StrafeState.bM_RepeatRunsOverTarget = StrafeAircraftSettings.bRepeatRunsOverTarget;
 
 	M_AircraftAttackData.TargetActor = nullptr;
 	M_AircraftAttackData.TargetLocation = M_StrafeState.StrafeStartLocation;
@@ -2627,6 +2748,8 @@ void AAircraftMaster::StrafeLocation(const FStrafeAircraftSettings& StrafeAircra
 		return;
 	}
 
+	TerrainFollow_CaptureClearanceAboveTarget(M_StrafeState.StrafeStartLocation,
+	                                          AircraftStrafeHeights::MinCruiseClearanceAboveTarget);
 	Strafe_StartAttackRun();
 }
 
@@ -2672,6 +2795,11 @@ void AAircraftMaster::Strafe_TickTargetLocation(const float DeltaTime)
 	{
 		return;
 	}
+	if (not UWeaponStateAircraftStrafeGun::GetIsLegacyAircraftGunsRequested())
+	{
+		Strafe_TickTargetFromFlightProgress();
+		return;
+	}
 
 	if (M_StrafeState.StrafePointTotalLerpTime <= KINDA_SMALL_NUMBER)
 	{
@@ -2692,6 +2820,70 @@ void AAircraftMaster::Strafe_TickTargetLocation(const float DeltaTime)
 	Strafe_UpdateWeaponTargetLocation();
 
 	if (LerpAlpha >= 1.f)
+	{
+		M_StrafeState.bM_IsLerpingStrafePoint = false;
+	}
+}
+
+FString AAircraftMaster::DescribeFlightForTests() const
+{
+	const FAircraftPath& Path = M_AircraftAttackData.Path;
+	const bool bHasNextPoint = Path.PathPoints.IsValidIndex(Path.CurrentPathIndex + 1);
+	const int32 NextPointType = bHasNextPoint
+		                            ? static_cast<int32>(Path.PathPoints[Path.CurrentPathIndex + 1].PointType)
+		                            : -1;
+	const int32 Magazine = IsValid(M_AircraftWeapon) && M_AircraftWeapon->GetWeapons().Num() > 0
+		                       && IsValid(M_AircraftWeapon->GetWeapons()[0])
+		                       ? M_AircraftWeapon->GetWeapons()[0]->GetCurrentMagCapacity()
+		                       : -1;
+	return FString::Printf(
+		TEXT("loc=%s pitch=%.1f yaw=%.1f landed=%d move_state=%d attack_ground=%d target=%s path=%d/%d next_type=%d "
+			"strafing=%d lerping=%d progress=%.2f weapons_active=%d weapons=%d mag0=%d"),
+		*GetActorLocation().ToCompactString(), GetActorRotation().Pitch, GetActorRotation().Yaw,
+		static_cast<int32>(M_LandedState), static_cast<int32>(M_MovementState),
+		M_AircraftAttackData.bM_IsAttackGround ? 1 : 0, *M_AircraftAttackData.TargetLocation.ToCompactString(),
+		Path.CurrentPathIndex, Path.PathPoints.Num(), NextPointType,
+		M_StrafeState.bM_IsStrafing ? 1 : 0, M_StrafeState.bM_IsLerpingStrafePoint ? 1 : 0,
+		M_StrafeState.FlightProgressAlpha, IssuedActionsState.bM_AreWeaponsActive ? 1 : 0,
+		IsValid(M_AircraftWeapon) ? M_AircraftWeapon->GetWeapons().Num() : -1, Magazine);
+}
+
+void AAircraftMaster::Strafe_TickTargetFromFlightProgress()
+{
+	// The guns look this steeply down at the ground ahead; with the strafe gun's nose cone the fire then lands
+	// where the aircraft is heading instead of following a timer.
+	constexpr float PreferredGunDepressionDeg = 20.f;
+	constexpr float MinGunLeadCm = 1000.f;
+	constexpr float MaxGunLeadCm = 4500.f;
+	const FVector RunStart = M_StrafeState.ActiveLerpStartLocation;
+	const FVector RunEnd = M_StrafeState.ActiveLerpEndLocation;
+	const FVector RunLine2D = FVector(RunEnd.X - RunStart.X, RunEnd.Y - RunStart.Y, 0.f);
+	const float RunLengthSquared = RunLine2D.SizeSquared();
+	if (RunLengthSquared <= KINDA_SMALL_NUMBER)
+	{
+		M_AircraftAttackData.TargetLocation = RunEnd;
+		Strafe_UpdateWeaponTargetLocation();
+		M_StrafeState.bM_IsLerpingStrafePoint = false;
+		return;
+	}
+	// In a steep dive the guns look as far down as the nose does.
+	constexpr float MaxGunDepressionDeg = 60.f;
+	const FVector AircraftLocation = GetActorLocation();
+	const float GroundZ = FMath::Lerp(RunStart.Z, RunEnd.Z, M_StrafeState.FlightProgressAlpha);
+	const float GunDepressionDeg = FMath::Clamp(-GetActorRotation().Pitch, PreferredGunDepressionDeg,
+	                                            MaxGunDepressionDeg);
+	const float GunLead = FMath::Clamp(
+		(AircraftLocation.Z - GroundZ) / FMath::Tan(FMath::DegreesToRadians(GunDepressionDeg)),
+		MinGunLeadCm, MaxGunLeadCm);
+	FVector Forward2D = GetActorForwardVector();
+	Forward2D.Z = 0.f;
+	const FVector LeadPoint = AircraftLocation + Forward2D.GetSafeNormal() * GunLead;
+	const float Alpha = FMath::Clamp(
+		FVector::DotProduct(LeadPoint - RunStart, RunLine2D) / RunLengthSquared, 0.f, 1.f);
+	M_StrafeState.FlightProgressAlpha = FMath::Max(M_StrafeState.FlightProgressAlpha, Alpha);
+	M_AircraftAttackData.TargetLocation = FMath::Lerp(RunStart, RunEnd, M_StrafeState.FlightProgressAlpha);
+	Strafe_UpdateWeaponTargetLocation();
+	if (M_StrafeState.FlightProgressAlpha >= 1.f)
 	{
 		M_StrafeState.bM_IsLerpingStrafePoint = false;
 	}
@@ -2749,9 +2941,39 @@ void AAircraftMaster::Strafe_StartAttackRun()
 	const FVector WeaponStartLocation = M_StrafeState.NextRunStartLocation;
 	const FVector AttackRunEndLocation = Strafe_GetNextRunEndLocation();
 
+	M_StrafeState.bM_HasDivedThisRun = false;
+	Strafe_ApplyDiveProfile();
 	M_AircraftAttackData.TargetLocation = AttackRunEndLocation;
 	StartAttackGround();
 	M_AircraftAttackData.TargetLocation = WeaponStartLocation;
+}
+
+void AAircraftMaster::Strafe_ApplyDiveProfile()
+{
+	if (UWeaponStateAircraftStrafeGun::GetIsLegacyAircraftGunsRequested())
+	{
+		return;
+	}
+	// The dive bottoms out this high above the run's ground, most of the way along the run.
+	constexpr float PullOutHeightAboveRunGroundCm = 1000.f;
+	// The dive starts at most this far out: from a 20+ m cruise that is a dive of about 30 degrees.
+	constexpr float MaxDiveStartDistanceCm = 3600.f;
+	// Dive / (dive + recovery) = 6 / 7: the lowest point lies close to the run's end, so the guns cover the run.
+	constexpr float MinDiveStrength = 6.f;
+	// A long pull-out climbs back gently instead of snapping up over the target.
+	constexpr float MinRecoveryLengthAdditionCm = 2500.f;
+	FAircraftAttackMoveSettings& Settings = M_AircraftMovementSettings.AttackMoveSettings;
+	const float RunGroundZ = FMath::Min(M_StrafeState.NextRunStartLocation.Z, Strafe_GetNextRunEndLocation().Z);
+	const float CruiseHeightAboveRunGround = M_AircraftLandedData.TargetAirborneHeight - RunGroundZ;
+	Settings.DeltaAttackHeight = FMath::Max(Settings.DeltaAttackHeight,
+	                                        CruiseHeightAboveRunGround - PullOutHeightAboveRunGroundCm);
+	// The dive path itself never bottoms out below the pull-out height (AddAttackDivePath clamps to it).
+	Settings.MinDiveHeightAboveTarget = FMath::Max(Settings.MinDiveHeightAboveTarget, PullOutHeightAboveRunGroundCm);
+	Settings.AttackDiveRange.Y = FMath::Max(FMath::Min(Settings.AttackDiveRange.Y, MaxDiveStartDistanceCm),
+	                                        Settings.AttackDiveRange.X * 2.f);
+	Settings.AttackDive_DiveStrength = FMath::Max(Settings.AttackDive_DiveStrength, MinDiveStrength);
+	Settings.AttackDive_RecoveryLengthAddition = FMath::Max(Settings.AttackDive_RecoveryLengthAddition,
+	                                                        MinRecoveryLengthAdditionCm);
 }
 
 void AAircraftMaster::Strafe_OnAttackDiveStarted()
@@ -2764,6 +2986,8 @@ void AAircraftMaster::Strafe_OnAttackDiveStarted()
 	M_StrafeState.ActiveLerpStartLocation = M_StrafeState.NextRunStartLocation;
 	M_StrafeState.ActiveLerpEndLocation = Strafe_GetNextRunEndLocation();
 	M_StrafeState.CurrentLerpTime = 0.f;
+	M_StrafeState.FlightProgressAlpha = 0.f;
+	M_StrafeState.bM_HasDivedThisRun = true;
 	M_StrafeState.bM_IsLerpingStrafePoint = true;
 	M_AircraftAttackData.TargetLocation = M_StrafeState.ActiveLerpStartLocation;
 }
@@ -2835,6 +3059,7 @@ void AAircraftMaster::CarpetBombing(
 	M_CarpetBombingState.EndCarpetLocation = EndCarpetLocation;
 	M_CarpetBombingState.RetreatLocation = RetreatLocation;
 	M_CarpetBombingState.Phase = EAircraftCarpetBombingPhase::MovingToStart;
+	TerrainFollow_CaptureClearanceAboveTarget(StartCarpetLocation);
 	CarpetBombing_MoveToLocation(StartCarpetLocation);
 }
 
@@ -3001,7 +3226,8 @@ void AAircraftMaster::OrderStraightFlightRun(const FVector& PassOverLocation, co
 	M_StraightRunState.bM_HasPassedPoint = false;
 	M_StraightRunState.bM_HoldAtEnd = false;
 	M_StraightRunState.bM_IsActive = true;
-	M_AircraftLandedData.TargetAirborneHeight = GetActorLocation().Z;
+	SetTargetAirborneHeight(GetActorLocation().Z);
+	TerrainFollow_CaptureClearanceAboveTarget(PassOverLocation);
 	SetActorRotation(Direction.Rotation());
 	StraightRun_ApplyFullSpeed();
 }
@@ -3023,13 +3249,16 @@ void AAircraftMaster::StraightRun_ApplyFullSpeed() const
 
 void AAircraftMaster::Tick_StraightRun(const float DeltaTime)
 {
-	// Re-applied every frame so no other system can bend or slow the run; the height stays at the start height.
+	// Re-applied every frame so no other system can bend or slow the run; the height stays at the start height,
+	// which terrain following moves with the ground below.
 	StraightRun_ApplyFullSpeed();
 	const FVector FromStart = GetActorLocation() - M_StraightRunState.StartLocation;
 	const float DistanceAlongRun = FVector::DotProduct(FromStart, M_StraightRunState.Direction);
 	FVector OnLineLocation = M_StraightRunState.StartLocation + M_StraightRunState.Direction * DistanceAlongRun;
 	OnLineLocation.Z = M_StraightRunState.StartLocation.Z;
-	SetActorLocationAndRotation(OnLineLocation, M_StraightRunState.Direction.Rotation());
+	FRotator RunRotation = M_StraightRunState.Direction.Rotation();
+	RunRotation.Pitch = TerrainFollow_GetClimbPitch();
+	SetActorLocationAndRotation(OnLineLocation, RunRotation);
 
 	if (not M_StraightRunState.bM_HasPassedPoint && DistanceAlongRun >= M_StraightRunState.PassOverDistance)
 	{
@@ -3063,7 +3292,8 @@ void AAircraftMaster::AircraftDrop_MoveToDropLocation()
 		M_AircraftDropRequest.ExecuteLocation.X,
 		M_AircraftDropRequest.ExecuteLocation.Y,
 		CruiseZ);
-	M_AircraftLandedData.TargetAirborneHeight = FlightTarget.Z;
+	SetTargetAirborneHeight(FlightTarget.Z);
+	TerrainFollow_CaptureClearanceAboveTarget(M_AircraftDropRequest.ExecuteLocation);
 	M_AircraftMoveData.SetTargetPoint(FlightTarget);
 	StartMoveTo();
 }
@@ -3250,25 +3480,38 @@ void AAircraftMaster::AircraftDrop_SpawnSquad(const ESquadSubtype SquadSubtype, 
 	const TWeakObjectPtr<UEnemyStrategicAIComponent> WeakEnemyStrategicAIComponent(EnemyStrategicAIComponent);
 	const FVector OutsideLocation = AircraftDrop_GetProjectedSquadSpawnLocation(SquadIndex);
 	const bool bWalkOutOfCargoDoor = M_AircraftDropRequest.bSquadsWalkOutOfCargoDoor;
+	const bool bHandPayloadToEnemyAI = M_AircraftDropRequest.bHandPayloadToEnemyAI;
+	const TWeakObjectPtr<AAircraftMaster> WeakAircraft(const_cast<AAircraftMaster*>(this));
 	const FVector SpawnLocation = bWalkOutOfCargoDoor ? AircraftDrop_GetProjectedCargoDoorLocation() : OutsideLocation;
 	AsyncSpawner->AsyncSpawnOptionAtLocation(
 		SquadTrainingOption,
 		SpawnLocation,
 		CallbackOwner,
 		SquadIndex,
-		[WeakEnemyStrategicAIComponent, bWalkOutOfCargoDoor, SpawnLocation, OutsideLocation](
+		[WeakEnemyStrategicAIComponent, WeakAircraft, bWalkOutOfCargoDoor, bHandPayloadToEnemyAI, SpawnLocation,
+			OutsideLocation](
 		const FTrainingOption&, AActor* SpawnedActor, const int32)
 		{
 			if (bWalkOutOfCargoDoor)
 			{
 				AircraftDrop_OrderSquadWalkOut(SpawnedActor, SpawnLocation, OutsideLocation);
 			}
-			if (WeakEnemyStrategicAIComponent.IsValid())
+			// A mission that orders the payload itself listens on the aircraft; with the aircraft already gone
+			// nobody would order the squad, so it goes to the enemy AI after all.
+			const bool bMissionTakesSquad = not bHandPayloadToEnemyAI && WeakAircraft.IsValid();
+			if (WeakEnemyStrategicAIComponent.IsValid() && not bMissionTakesSquad)
 			{
 				WeakEnemyStrategicAIComponent->RegisterDroppedUnitWithBlackboardWhenReady(SpawnedActor);
 			}
+			if (WeakAircraft.IsValid() && IsValid(SpawnedActor))
+			{
+				WeakAircraft->OnAircraftDropSquadReleased.Broadcast(WeakAircraft.Get(), SpawnedActor);
+			}
 		},
-		FRotator::ZeroRotator);
+		FRotator::ZeroRotator,
+		// A later AI player's squads are spawned for it; the human's and the first AI player's keep the owner
+		// of their Blueprint.
+		FRTSUnitOwnerSpawning::GetOwnerOverrideForAIPlayer(M_AircraftDropRequest.OwningPlayer));
 }
 
 FVector AAircraftMaster::AircraftDrop_GetProjectedCargoDoorLocation() const
@@ -3415,6 +3658,11 @@ void AAircraftMaster::AircraftDrop_DetachTank()
 
 void AAircraftMaster::AircraftDrop_RegisterEnemyPayloadUnit(AActor* DroppedUnit) const
 {
+	if (not M_AircraftDropRequest.bHandPayloadToEnemyAI)
+	{
+		// The mission that asked for this drop orders the unit (OnAircraftDropPayloadReleased).
+		return;
+	}
 	UEnemyStrategicAIComponent* EnemyStrategicAIComponent = AircraftDrop_GetEnemyStrategicAIComponent();
 	if (not IsValid(EnemyStrategicAIComponent))
 	{
@@ -3431,7 +3679,9 @@ UEnemyStrategicAIComponent* AAircraftMaster::AircraftDrop_GetEnemyStrategicAICom
 		return nullptr;
 	}
 
-	AEnemyController* EnemyController = FRTS_Statics::GetEnemyController(this);
+	// Dropped units go to the controller of the AI player the drop was made for.
+	AEnemyController* EnemyController = FRTS_Statics::GetEnemyControllerForPlayer(
+		this, M_AircraftDropRequest.OwningPlayer);
 	if (not IsValid(EnemyController))
 	{
 		return nullptr;
@@ -3482,7 +3732,7 @@ FVector AAircraftMaster::AircraftDrop_GetProjectedSquadSpawnLocation(const int32
 	// that is inside the ground, past the landscape edge there is nothing below. Either way the squad falls out of
 	// the world, so it stands on the landscape below the point, or at the drop point when there is none.
 	float GroundZ = 0.0f;
-	if (AircraftDrop_TraceGroundZ(DesiredLocation, GroundZ))
+	if (TraceLandscapeGroundZ(DesiredLocation, GroundZ))
 	{
 		return FVector(DesiredLocation.X, DesiredLocation.Y, GroundZ);
 	}
@@ -3552,7 +3802,7 @@ float AAircraftMaster::AircraftDrop_GetHighestGroundZAlongApproach() const
 	{
 		const float Alpha = static_cast<float>(SampleIndex) / static_cast<float>(SampleCount);
 		float GroundZ = 0.f;
-		if (AircraftDrop_TraceGroundZ(FMath::Lerp(ApproachStart, ApproachEnd, Alpha), GroundZ))
+		if (TraceLandscapeGroundZ(FMath::Lerp(ApproachStart, ApproachEnd, Alpha), GroundZ))
 		{
 			HighestGroundZ = FMath::Max(HighestGroundZ, GroundZ);
 		}
@@ -3560,7 +3810,7 @@ float AAircraftMaster::AircraftDrop_GetHighestGroundZAlongApproach() const
 	return HighestGroundZ;
 }
 
-bool AAircraftMaster::AircraftDrop_TraceGroundZ(const FVector& Location, float& OutGroundZ) const
+bool AAircraftMaster::TraceLandscapeGroundZ(const FVector& Location, float& OutGroundZ) const
 {
 	const UWorld* World = GetWorld();
 	if (not IsValid(World))
@@ -3568,20 +3818,29 @@ bool AAircraftMaster::AircraftDrop_TraceGroundZ(const FVector& Location, float& 
 		return false;
 	}
 
-	const FVector TraceStart(Location.X, Location.Y, Location.Z + AircraftRopeSlingFlight::GroundTraceHalfHeight);
-	const FVector TraceEnd(Location.X, Location.Y, Location.Z - AircraftRopeSlingFlight::GroundTraceHalfHeight);
-	FCollisionQueryParams TraceParams(FName(TEXT("RopeSlingCruiseGroundTrace")), false, this);
+	const FVector TraceStart(Location.X, Location.Y, Location.Z + AircraftGroundTrace::HalfHeight);
+	const FVector TraceEnd(Location.X, Location.Y, Location.Z - AircraftGroundTrace::HalfHeight);
+	FCollisionQueryParams TraceParams(FName(TEXT("AircraftLandscapeGroundTrace")), false, this);
 	if (M_AircraftDropRequest.AttachedTank.IsValid())
 	{
 		TraceParams.AddIgnoredActor(M_AircraftDropRequest.AttachedTank.Get());
 	}
-	FHitResult GroundHit;
-	if (not World->LineTraceSingleByChannel(GroundHit, TraceStart, TraceEnd, COLLISION_TRACE_LANDSCAPE, TraceParams))
+	for (int32 TraceIndex = 0; TraceIndex <= AircraftGroundTrace::MaxSkippedMovableHits; ++TraceIndex)
 	{
-		return false;
+		FHitResult GroundHit;
+		if (not World->LineTraceSingleByChannel(GroundHit, TraceStart, TraceEnd, COLLISION_TRACE_LANDSCAPE,
+		                                        TraceParams))
+		{
+			return false;
+		}
+		if (AircraftGroundTrace::GetIsStaticGroundHit(GroundHit))
+		{
+			OutGroundZ = GroundHit.ImpactPoint.Z;
+			return true;
+		}
+		TraceParams.AddIgnoredActor(GroundHit.GetActor());
 	}
-	OutGroundZ = GroundHit.ImpactPoint.Z;
-	return true;
+	return false;
 }
 
 void AAircraftMaster::AircraftDrop_StartRopeSlingDescent()
@@ -3699,7 +3958,7 @@ void AAircraftMaster::Tick_RopeSlingClimb(const float DeltaTime)
 	{
 		return;
 	}
-	M_AircraftLandedData.TargetAirborneHeight = GetActorLocation().Z;
+	SetTargetAirborneHeight(GetActorLocation().Z);
 	AircraftDrop_OnVtoCompleted();
 }
 
@@ -3724,4 +3983,453 @@ bool AAircraftMaster::AircraftDrop_ShouldEnablePayloadPhysics(const ATankMaster*
 	}
 	// In building form the chassis is hidden without collision; simulating it would let it fall through the world.
 	return NomadicVehicle->GetIsInTruckMode();
+}
+
+// -------------------------------------------------------------
+// ----------------------- Terrain Follow -----------------------
+// -------------------------------------------------------------
+
+void AAircraftMaster::SetTargetAirborneHeight(const float NewTargetAirborneHeight)
+{
+	M_AircraftLandedData.TargetAirborneHeight = NewTargetAirborneHeight;
+	M_TerrainFollow.ResetClearance();
+}
+
+void AAircraftMaster::BeginPlay_InitTerrainFollow()
+{
+	const float SampleInterval = M_AircraftMovementSettings.TerrainFollowSettings.SampleInterval;
+	M_TerrainFollow.SetSamplePhase(FMath::FRandRange(0.f, SampleInterval));
+}
+
+void AAircraftMaster::Tick_TerrainFollow(const float DeltaTime)
+{
+	const FAircraftTerrainFollowSettings& Settings = M_AircraftMovementSettings.TerrainFollowSettings;
+	if (not Settings.bEnabled)
+	{
+		return;
+	}
+	if (not TerrainFollow_GetIsAllowed())
+	{
+		M_TerrainFollow.Suspend();
+		return;
+	}
+	if (M_TerrainFollow.TickSampleTimer(DeltaTime, Settings.SampleInterval))
+	{
+		TerrainFollow_SampleGround();
+	}
+	const float DeltaZ = M_TerrainFollow.AdvanceFlightHeight(
+		DeltaTime, M_AircraftLandedData.TargetAirborneHeight, Settings);
+	if (FMath::IsNearlyZero(DeltaZ))
+	{
+		return;
+	}
+	TerrainFollow_ShiftCruiseHeight(DeltaZ);
+}
+
+bool AAircraftMaster::TerrainFollow_GetIsAllowed() const
+{
+	if (M_StraightRunState.bM_IsActive)
+	{
+		return true;
+	}
+	if (M_LandedState != EAircraftLandingState::Airborne)
+	{
+		return false;
+	}
+	// A slung payload's cruise height is already planned to clear the highest ground on the way in.
+	const bool bIsRopeSlungApproach = M_AircraftDropRequest.bRopeSlungPayload
+		&& M_AircraftDropRequest.State == EAircraftDropRequestState::MovingToDropLocation;
+	if (bIsRopeSlungApproach || AircraftDrop_GetIsRopeSlingFlightActive())
+	{
+		return false;
+	}
+	// Carpet bombs are aimed below the aircraft from the height the run was planned at.
+	const bool bIsCarpetBombingRun = M_CarpetBombingState.Phase == EAircraftCarpetBombingPhase::BombingToEnd
+		|| M_CarpetBombingState.Phase == EAircraftCarpetBombingPhase::BombingToStart;
+	if (bIsCarpetBombingRun)
+	{
+		return false;
+	}
+	// The dive and its recovery aim the guns and bombs: they keep the exact heights of the attack path.
+	const bool bIsAttackDive = M_MovementState == EAircraftMovementState::AttackMove
+		&& M_AircraftAttackData.Path.GetIsFlyingDiveSegment();
+	return not bIsAttackDive;
+}
+
+void AAircraftMaster::TerrainFollow_SampleGround()
+{
+	const FVector AircraftLocation = GetActorLocation();
+	float GroundBelowZ = 0.f;
+	if (not TraceLandscapeGroundZ(AircraftLocation, GroundBelowZ))
+	{
+		// Past the landscape edge there is nothing to follow; keep the current height.
+		return;
+	}
+
+	float HighestGroundZ = GroundBelowZ;
+	const FVector FlightDirection = GetVelocity().GetSafeNormal2D();
+	// At cruise speed at least: an aircraft still speeding up after an order would otherwise look too short ahead.
+	const float LookAheadSpeed = FMath::Max(GetVelocity().Size2D(), M_AircraftMovementSettings.MaxMoveSpeed);
+	const FVector LookAheadOffset = FlightDirection * LookAheadSpeed
+		* M_AircraftMovementSettings.TerrainFollowSettings.LookAheadSeconds;
+	if (not LookAheadOffset.IsNearlyZero())
+	{
+		const int32 SampleCount = AircraftTerrainFollowSampling::LookAheadSamples;
+		for (int32 SampleIndex = 1; SampleIndex <= SampleCount; ++SampleIndex)
+		{
+			const float Alpha = static_cast<float>(SampleIndex) / static_cast<float>(SampleCount);
+			float GroundAheadZ = 0.f;
+			if (TraceLandscapeGroundZ(AircraftLocation + LookAheadOffset * Alpha, GroundAheadZ))
+			{
+				HighestGroundZ = FMath::Max(HighestGroundZ, GroundAheadZ);
+			}
+		}
+	}
+	// Only the first sample after the cruise height was set uses the clearance floor: regular cruise flight keeps
+	// at least the minimum cruise clearance.
+	const FAircraftTerrainFollowSettings& Settings = M_AircraftMovementSettings.TerrainFollowSettings;
+	const float CruiseClearanceFloor = FMath::Max(Settings.MinGroundClearance, Settings.MinCruiseClearance);
+	M_TerrainFollow.OnGroundSampled(GroundBelowZ, HighestGroundZ, M_AircraftLandedData.TargetAirborneHeight,
+	                                CruiseClearanceFloor);
+}
+
+void AAircraftMaster::TerrainFollow_ShiftCruiseHeight(const float DeltaZ)
+{
+	AddActorWorldOffset(FVector(0.f, 0.f, DeltaZ));
+	M_AircraftLandedData.TargetAirborneHeight += DeltaZ;
+	M_StraightRunState.StartLocation.Z += DeltaZ;
+	// The path moves with the aircraft, so homing keeps its shape and the segment progress stays exact.
+	if (M_MovementState == EAircraftMovementState::MovingTo)
+	{
+		M_AircraftMoveData.Path.ShiftHeight(DeltaZ);
+	}
+	else if (M_MovementState == EAircraftMovementState::AttackMove)
+	{
+		M_AircraftAttackData.Path.ShiftHeight(DeltaZ);
+	}
+}
+
+void AAircraftMaster::TerrainFollow_CaptureClearanceAboveTarget(const FVector& TargetLocation,
+                                                              const float MinClearance)
+{
+	float TargetGroundZ = 0.f;
+	if (not TraceLandscapeGroundZ(TargetLocation, TargetGroundZ))
+	{
+		// No landscape at the target: the ground below the aircraft sets the clearance on the next sample.
+		return;
+	}
+	const float ClearanceFloor = FMath::Max(M_AircraftMovementSettings.TerrainFollowSettings.MinGroundClearance,
+	                                        MinClearance);
+	M_TerrainFollow.CaptureClearance(TargetGroundZ, M_AircraftLandedData.TargetAirborneHeight, ClearanceFloor);
+}
+
+float AAircraftMaster::TerrainFollow_GetClimbPitch() const
+{
+	return M_TerrainFollow.GetClimbPitch(GetVelocity().Size2D(),
+	                                     M_AircraftMovementSettings.TerrainFollowSettings.MaxClimbPitch);
+}
+
+bool AAircraftMaster::GetIsFlightModelActive() const
+{
+	return M_AircraftMovementSettings.FlightModelSettings.bEnabled
+		&& not AircraftBankToTurnFlight::GetIsLegacyFlightRequested();
+}
+
+void AAircraftMaster::Tick_FlyPath(FAircraftPath& Path, const bool bIsAttackPath, const float DeltaTime)
+{
+	if (not FlyPath_AdvancePassedPoints(Path, bIsAttackPath))
+	{
+		FlyPath_ContinueAfterPathEnded(DeltaTime);
+		return;
+	}
+	if (bIsAttackPath && not M_AircraftAttackData.bM_IsAttackGround && IsValid(M_AircraftAttackData.TargetActor))
+	{
+		// A target that drives on is followed on the run-in, so the dive planned at its end still finds it ahead.
+		Path.ReaimRunInEnd(GetActorLocation(), M_AircraftAttackData.TargetActor->GetActorLocation());
+	}
+	FlyAlongPath(Path, DeltaTime);
+}
+
+void AAircraftMaster::FlyAlongPath(const FAircraftPath& Path, const float DeltaTime)
+{
+	const bool bIsDiving = Path.GetIsFlyingDiveSegment();
+	const FVector AimPoint = Path.GetLookAheadPoint(GetActorLocation(), GetFlightLookAheadDistance(bIsDiving));
+	TOptional<float> FloorZ = Path.GetFloorZOfCurrentSegment();
+	if (bIsDiving)
+	{
+		FloorZ = FlyPath_GetDiveFloorAboveGroundBelow(FloorZ, DeltaTime);
+	}
+	else
+	{
+		// The next dive samples the ground under it on its first frame, never a sample from an earlier dive.
+		M_DiveGroundFloor.Reset();
+	}
+	const float WantedSpeed = FlyPath_GetWantedSpeed(Path);
+	const bool bIsArriving = WantedSpeed < M_AircraftMovementSettings.MaxMoveSpeed;
+	FlyTowardPoint(AimPoint, WantedSpeed, FloorZ, not bIsDiving, DeltaTime, bIsArriving,
+	               bIsArriving ? FlyPath_GetArrivalDeceleration(Path) : 0.f);
+}
+
+float AAircraftMaster::FlyPath_GetWantedSpeed(const FAircraftPath& Path) const
+{
+	const float CruiseSpeed = M_AircraftMovementSettings.MaxMoveSpeed;
+	const bool bEndsInHover = (M_AircraftReturnData.TargetOwner.IsValid() && M_AircraftReturnData.bNavigatingToSocket)
+		|| M_AircraftDropRequest.State == EAircraftDropRequestState::MovingToDropLocation;
+	if (not bEndsInHover || Path.PathPoints.IsEmpty())
+	{
+		return CruiseSpeed;
+	}
+	// Slows down on the way in so the hover or vertical landing does not start from cruise speed.
+	const FAircraftFlightModelSettings& Settings = M_AircraftMovementSettings.FlightModelSettings;
+	// Along the path, not straight: a pad behind the aircraft is still a whole turn away.
+	const float DistanceToEnd = Path.GetRemainingLength(GetActorLocation());
+	const float BrakingSpeed = FMath::Sqrt(2.f * FlyPath_GetArrivalDeceleration(Path) * DistanceToEnd);
+	return FMath::Clamp(BrakingSpeed, FMath::Min(Settings.MinArrivalSpeed, CruiseSpeed), CruiseSpeed);
+}
+
+float AAircraftMaster::FlyPath_GetArrivalDeceleration(const FAircraftPath& Path) const
+{
+	// A short approach brakes harder than the comfortable rate, so the hover still starts slow.
+	constexpr float MaxArrivalDeceleration = 2500.f;
+	const FAircraftFlightModelSettings& Settings = M_AircraftMovementSettings.FlightModelSettings;
+	const float DistanceToEnd = FMath::Max(Path.GetRemainingLength(GetActorLocation()), 1.f);
+	const float Speed = GetVelocity().Size();
+	const float NeededDeceleration = (Speed * Speed - Settings.MinArrivalSpeed * Settings.MinArrivalSpeed)
+		/ (2.f * DistanceToEnd);
+	return FMath::Clamp(NeededDeceleration, Settings.ArrivalDeceleration,
+	                    FMath::Max(MaxArrivalDeceleration, Settings.ArrivalDeceleration));
+}
+
+TOptional<float> AAircraftMaster::FlyPath_GetDiveFloorAboveGroundBelow(const TOptional<float>& PathFloorZ,
+                                                                    const float DeltaTime)
+{
+	using namespace AircraftDiveGroundFloor;
+	FAircraftDiveGroundFloor& Floor = M_DiveGroundFloor;
+	Floor.SecondsToNextSample -= DeltaTime;
+	if (Floor.SecondsToNextSample <= 0.f)
+	{
+		Floor.SecondsToNextSample = SampleIntervalSeconds;
+		float GroundBelowZ = 0.f;
+		if (TraceLandscapeGroundZ(GetActorLocation(), GroundBelowZ))
+		{
+			Floor.SampledGroundZ = GroundBelowZ;
+			if (not Floor.bM_HasGround)
+			{
+				Floor.GroundZ = GroundBelowZ;
+				Floor.bM_HasGround = true;
+			}
+		}
+	}
+	if (not Floor.bM_HasGround)
+	{
+		return PathFloorZ;
+	}
+	// Between samples the floor slides toward the newest one, so sloped ground does not snap the pitch.
+	Floor.GroundZ = FMath::FInterpConstantTo(Floor.GroundZ, Floor.SampledGroundZ, DeltaTime, MaxFloorChangeSpeed);
+	const float GroundFloorZ = Floor.GroundZ + ClearanceAboveGroundBelow;
+	return PathFloorZ.IsSet() ? FMath::Max(PathFloorZ.GetValue(), GroundFloorZ) : GroundFloorZ;
+}
+
+bool AAircraftMaster::FlyPath_AdvancePassedPoints(FAircraftPath& Path, const bool bIsAttackPath)
+{
+	// Dense bezier curves can put several points behind the aircraft in one frame.
+	constexpr int32 MaxPointsPassedPerFrame = 64;
+	for (int32 PassedCount = 0; PassedCount < MaxPointsPassedPerFrame; ++PassedCount)
+	{
+		const int32 MaxIndex = Path.PathPoints.Num() - 1;
+		if (Path.CurrentPathIndex >= MaxIndex)
+		{
+			RTSFunctionLibrary::ReportError("index out of bounds in AAircraftMaster::FlyPath_AdvancePassedPoints.");
+			return false;
+		}
+		if (not Path.GetShouldAdvancePastTargetPoint(GetActorLocation(),
+		                                             M_AircraftMovementSettings.PathPointAcceptanceRadius))
+		{
+			return true;
+		}
+		++Path.CurrentPathIndex;
+		if (Path.CurrentPathIndex >= MaxIndex)
+		{
+			// The completion may start a new path in this same struct; nothing may touch the old one afterwards.
+			if (bIsAttackPath)
+			{
+				OnAttackMoveCompleted();
+			}
+			else
+			{
+				OnMoveCompleted();
+			}
+			return false;
+		}
+		if (bIsAttackPath)
+		{
+			AttackMove_IssueActionForNewTargetPoint(Path.PathPoints[Path.CurrentPathIndex + 1]);
+		}
+	}
+	return true;
+}
+
+void AAircraftMaster::FlyPath_ContinueAfterPathEnded(const float DeltaTime)
+{
+	if (IsActorBeingDestroyed() || M_LandedState != EAircraftLandingState::Airborne)
+	{
+		return;
+	}
+	if (M_MovementState == EAircraftMovementState::Idle)
+	{
+		if (not IsIdleHover())
+		{
+			Tick_IdleCircling_FlightModel(DeltaTime);
+		}
+		return;
+	}
+	FAircraftPath* NewPath = nullptr;
+	if (M_MovementState == EAircraftMovementState::MovingTo)
+	{
+		NewPath = &M_AircraftMoveData.Path;
+	}
+	else if (M_MovementState == EAircraftMovementState::AttackMove)
+	{
+		NewPath = &M_AircraftAttackData.Path;
+	}
+	if (NewPath == nullptr || not NewPath->PathPoints.IsValidIndex(NewPath->CurrentPathIndex + 1))
+	{
+		return;
+	}
+	// Only aims along the new path; its points are passed from the next frame on.
+	FlyAlongPath(*NewPath, DeltaTime);
+}
+
+float AAircraftMaster::GetFlightLookAheadDistance(const bool bIsDiving) const
+{
+	const FAircraftFlightModelSettings& Settings = M_AircraftMovementSettings.FlightModelSettings;
+	const float Speed = GetVelocity().Size();
+	const float MaxLookAhead = FMath::Max(Settings.MaxPathLookAhead, Settings.MinPathLookAhead);
+	if (bIsDiving)
+	{
+		// A dive is straight with one pitch corner at its bottom: a short look-ahead flies it to its planned depth
+		// instead of rounding the bottom off high (the floor keeps it clear of the ground).
+		return FMath::Clamp(Speed * Settings.DiveLookAheadSeconds, Settings.MinPathLookAhead, MaxLookAhead);
+	}
+	// Much shorter than the turn radius, pure pursuit overshoots the path and banks back.
+	const float TurnRadiusLookAhead = Settings.LookAheadTurnRadiusShare * FAircraftFlightModel::GetTurnRadius(
+		Speed, Settings);
+	return FMath::Clamp(FMath::Max(Speed * Settings.PathLookAheadSeconds, TurnRadiusLookAhead),
+	                    Settings.MinPathLookAhead, MaxLookAhead);
+}
+
+void AAircraftMaster::FlyTowardPoint(const FVector& AimPoint, const float WantedSpeed, const TOptional<float>& FloorZ,
+                                     const bool bHoldAltitude, const float DeltaTime, const bool bIsArriving,
+                                     const float ArrivalDeceleration)
+{
+	if (not EnsureAircraftMovementIsValid())
+	{
+		return;
+	}
+	const FAircraftFlightModelSettings& Settings = M_AircraftMovementSettings.FlightModelSettings;
+	FAircraftFlightInput Input;
+	Input.AimPoint = AimPoint;
+	Input.WantedSpeed = WantedSpeed;
+	Input.ReferenceSpeed = M_AircraftMovementSettings.MaxMoveSpeed;
+	Input.Acceleration = M_AircraftMovementSettings.Acceleration;
+	if (bIsArriving)
+	{
+		// The arrival's braking curve assumes this deceleration.
+		Input.Deceleration = FMath::Max(ArrivalDeceleration, Settings.ArrivalDeceleration);
+	}
+	Input.ClimbPitch = TerrainFollow_GetClimbPitch();
+	Input.FloorZ = FloorZ;
+	Input.bHoldAltitude = bHoldAltitude;
+	Input.DeltaTime = DeltaTime;
+	M_AircraftMovement->TickFlight(Input, Settings);
+}
+
+void AAircraftMaster::PreparePathPlanning(FAircraftPath& Path)
+{
+	using namespace AircraftPathPlanning;
+	if (not GetIsFlightModelActive())
+	{
+		Path.PlanningTurnRadius = 0.f;
+		Path.PreferredTurnSign = 0.f;
+		return;
+	}
+	const FAircraftFlightModelSettings& Settings = M_AircraftMovementSettings.FlightModelSettings;
+	FAircraftFlightModelSettings PlanningSettings = Settings;
+	PlanningSettings.MaxTurnRate = Settings.MaxTurnRate * Settings.PlanningTurnRateShare;
+	Path.PlanningTurnRadius = FAircraftFlightModel::GetTurnRadius(M_AircraftMovementSettings.MaxMoveSpeed,
+	                                                              PlanningSettings);
+	const float YawRate = EnsureAircraftMovementIsValid() ? M_AircraftMovement->GetFlightYawRate() : 0.f;
+	Path.PreferredTurnSign = FMath::Abs(YawRate) >= MinYawRateForPreferredSide ? FMath::Sign(YawRate) : 0.f;
+	Path.DiveRelaxLevel = 0;
+	if (&Path == &M_AircraftAttackData.Path)
+	{
+		// Counts attack plans since the last dive; the dive itself and every new attack order reset it.
+		++M_AttackPlansWithoutDive;
+		Path.DiveRelaxLevel = FMath::Max(0, M_AttackPlansWithoutDive - MaxAttackPlansBeforeRelaxedDive);
+	}
+}
+
+void AAircraftMaster::PostInit_SetAirborneSpawnSpeed() const
+{
+	if (not GetIsFlightModelActive() || not EnsureAircraftMovementIsValid())
+	{
+		return;
+	}
+	// Spawned in the air: already flying at idle speed instead of hanging still and pivoting on the spot.
+	const FVector Forward = GetActorForwardVector().GetSafeNormal2D();
+	M_AircraftMovement->Velocity = Forward * M_AircraftMovementSettings.MaxMoveSpeed
+		* M_AircraftMovementSettings.IdleMovementSpeedMlt;
+}
+
+FRotator AAircraftMaster::GetFlightPlanningRotation() const
+{
+	const FVector FlightDirection = GetVelocity().GetSafeNormal2D();
+	const float Yaw = FlightDirection.IsNearlyZero() ? GetActorRotation().Yaw : FlightDirection.Rotation().Yaw;
+	return FRotator(0.f, Yaw, 0.f);
+}
+
+void AAircraftMaster::InitIdleCircleAlongFlight()
+{
+	using namespace AircraftBankToTurnFlight;
+	const float YawRate = EnsureAircraftMovementIsValid() ? M_AircraftMovement->GetFlightYawRate() : 0.f;
+	const float Roll = GetActorRotation().Roll;
+	float TurnSign = 1.f;
+	if (FMath::Abs(YawRate) >= MinYawRateForIdleSide)
+	{
+		// Keep turning the way the aircraft already turns: no reversal of the bank when the circle starts.
+		TurnSign = FMath::Sign(YawRate);
+	}
+	else if (FMath::Abs(Roll) >= MinRollForIdleSide)
+	{
+		TurnSign = FMath::Sign(Roll);
+	}
+	const FVector Forward = GetFlightPlanningRotation().Vector();
+	const FVector Right(-Forward.Y, Forward.X, 0.f);
+	const float Radius = FMath::Max(M_AircraftMovementSettings.IdleRadius, MinIdleRadius);
+	// The circle touches the flight here, so the aircraft rolls into it without first flying out to its rim.
+	M_AircraftIdleData.CenterPoint = GetActorLocation() + Right * TurnSign * Radius;
+	M_AircraftIdleData.TurnSign = TurnSign;
+	M_AircraftIdleData.GraceTimeRemaining = 0.f;
+}
+
+void AAircraftMaster::Tick_IdleCircling_FlightModel(const float DeltaTime)
+{
+	using namespace AircraftBankToTurnFlight;
+	const float Radius = FMath::Max(M_AircraftMovementSettings.IdleRadius, MinIdleRadius);
+	const float TurnSign = M_AircraftIdleData.TurnSign >= 0.f ? 1.f : -1.f;
+	const FVector Location = GetActorLocation();
+	FVector2D FromCenter(Location.X - M_AircraftIdleData.CenterPoint.X, Location.Y - M_AircraftIdleData.CenterPoint.Y);
+	if (FromCenter.IsNearlyZero())
+	{
+		FromCenter = FVector2D(1.f, 0.f);
+	}
+	const float AngleOnCircle = FMath::Atan2(FromCenter.Y, FromCenter.X);
+	// A positive turn (to the right) runs the angle around the centre up, a left turn down.
+	const float AimAngle = AngleOnCircle + TurnSign * GetFlightLookAheadDistance() / Radius;
+	const FVector AimPoint(
+		M_AircraftIdleData.CenterPoint.X + Radius * FMath::Cos(AimAngle),
+		M_AircraftIdleData.CenterPoint.Y + Radius * FMath::Sin(AimAngle),
+		M_AircraftLandedData.TargetAirborneHeight);
+	const float IdleSpeed = M_AircraftMovementSettings.MaxMoveSpeed * M_AircraftMovementSettings.IdleMovementSpeedMlt;
+	FlyTowardPoint(AimPoint, IdleSpeed, TOptional<float>(), true, DeltaTime);
 }

@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Engine/EngineTypes.h"
 
 class ASquadUnit;
 class UWorld;
@@ -20,10 +21,21 @@ namespace FRTSUnitOwnerSpawning
 	 * @param UnitClass Loaded class of the squad, tank, aircraft or other unit.
 	 * @param Transform Spawn transform, used as given.
 	 * @param OwningPlayer Player the unit belongs to.
+	 * @param CollisionHandling What to do when the spawn spot is occupied; the async spawner nudges units free.
 	 * @return The unit, or null when the class could not be spawned.
 	 */
 	RTS_SURVIVAL_API AActor* SpawnUnitForPlayer(UWorld& World, UClass* UnitClass, const FTransform& Transform,
-	                                            uint8 OwningPlayer);
+	                                            uint8 OwningPlayer,
+	                                            ESpawnActorCollisionHandlingMethod CollisionHandling =
+		                                            ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+
+	/**
+	 * @brief Owner to hand to the async spawner (OwningPlayerOverride) for a unit made for a player.
+	 * @param OwningPlayer Player the unit is meant for.
+	 * @return INDEX_NONE for the human and the first AI player, whose units keep the owner of their Blueprint as
+	 * they always did; the player itself for every later AI player.
+	 */
+	RTS_SURVIVAL_API int32 GetOwnerOverrideForAIPlayer(int32 OwningPlayer);
 
 	/**
 	 * @brief A squad spawns its soldiers after the owner override of SpawnUnitForPlayer is restored, so a soldier can

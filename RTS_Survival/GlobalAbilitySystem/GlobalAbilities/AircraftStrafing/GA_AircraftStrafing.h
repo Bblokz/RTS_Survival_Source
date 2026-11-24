@@ -29,6 +29,11 @@ struct FAircraftStrafingGlobalAbilitySettings
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FAircraftAttackMoveSettings AttackMoveSettings;
+
+	// On: the aircraft keep making attack runs over the target for TotalStrafeTime. Off: one run, then they hunt
+	// nearby enemies on their own.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	bool bRepeatRunsOverTarget = false;
 };
 
 /**
@@ -42,6 +47,18 @@ class RTS_SURVIVAL_API UGA_AircraftStrafing : public UGlobalAbility
 public:
 	virtual void ExecuteAbilityAtLocation(const FVector& TargetLocation) override;
 	virtual void BeginDestroy() override;
+
+	/**
+	 * @brief Changes a COPY of the ability (mission air support), never the data asset template.
+	 * @param AircraftCount Number of aircraft; all use the template's first aircraft class. 0 keeps the template's.
+	 * @param TotalStrafeTime Seconds each aircraft keeps attacking. 0 keeps the template's.
+	 * @param bRepeatRunsOverTarget True keeps every run over the target instead of free hunting after the first.
+	 */
+	void SetMissionStrafeOverrides(const int32 AircraftCount, const float TotalStrafeTime,
+	                               const bool bRepeatRunsOverTarget);
+
+	int32 GetAircraftCount() const { return M_AircraftStrafingSettings.AircraftClasses.Num(); }
+	float GetTotalStrafeTime() const { return M_AircraftStrafingSettings.TotalStrafeTime; }
 
 private:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (AllowPrivateAccess = "true"))

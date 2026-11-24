@@ -100,6 +100,8 @@ public:
      * @param SpawnID
      * @param OnSpawnedCallback The callback function to call when the unit is spawned.
      * @param OptionalRotation
+     * @param OwningPlayerOverride Player the unit is spawned for, set before its BeginPlay; INDEX_NONE keeps the
+     * owner of the unit's Blueprint.
      * @return Whether the request could be made successfully.
      */
 	bool AsyncSpawnOptionAtLocation(
@@ -108,7 +110,8 @@ public:
 		TWeakObjectPtr<UObject> CallbackOwner,
 		const int32 SpawnID,
 		TFunction<void(const FTrainingOption&, AActor* SpawnedActor, const int32 ID)> OnSpawnedCallback, const FRotator
-		& OptionalRotation);
+		& OptionalRotation,
+		const int32 OwningPlayerOverride = INDEX_NONE);
 
 	// Whether AsyncSpawnOptionAtLocation can spawn this option; lets a caller fail before it spawned anything else.
 	bool GetHasClassForTrainingOption(const FTrainingOption& TrainingOption) const
@@ -126,6 +129,8 @@ public:
 	 * @param SpawnID Handed back to the callback.
 	 * @param OnSpawnedCallback Called with the spawned actor, or nullptr when spawning failed.
 	 * @param OptionalRotation The spawn rotation.
+	 * @param OwningPlayerOverride Player the unit is spawned for, set before its BeginPlay; INDEX_NONE keeps the
+	 * owner of the unit's Blueprint.
 	 * @return False when the load could not be started; the callback may have run with nullptr.
 	 */
 	bool AsyncSpawnClassAtLocation(
@@ -135,7 +140,8 @@ public:
 		TWeakObjectPtr<UObject> CallbackOwner,
 		const int32 SpawnID,
 		TFunction<void(const FTrainingOption&, AActor* SpawnedActor, const int32 ID)> OnSpawnedCallback, const FRotator
-		& OptionalRotation);
+		& OptionalRotation,
+		const int32 OwningPlayerOverride = INDEX_NONE);
 
 
 	UFUNCTION(BlueprintCallable, Category = "ReferenceCasts")
@@ -401,13 +407,32 @@ private:
 	 * @param ID The external spawn id to forward to the caller.
 	 * @param SpawnRequestId The internal request id used to find the callback.
 	 * @param SpawnRotation
+	 * @param OwningPlayerOverride Player the unit is spawned for; INDEX_NONE keeps the owner of its Blueprint.
 	 */
 	void OnAsyncSpawnOptionAtLocationComplete(
 		const FSoftObjectPath& AssetPath,
 		const FTrainingOption TrainingOption,
 		const FVector& Location,
 		const int32 ID,
-		const int32 SpawnRequestId, const FRotator& SpawnRotation);
+		const int32 SpawnRequestId, const FRotator& SpawnRotation,
+		const int32 OwningPlayerOverride);
+
+	/**
+	 * @brief Spawns the loaded unit class of AsyncSpawnOptionAtLocation, for the player of the request when it
+	 * names one, so the unit registers, collides and fights as that player from its first frame.
+	 * @param World Game world.
+	 * @param AssetClass Loaded unit class.
+	 * @param Location Spawn location.
+	 * @param SpawnRotation Spawn rotation.
+	 * @param OwningPlayerOverride Player to spawn for; INDEX_NONE keeps the owner of the unit's Blueprint.
+	 * @return The spawned unit with its default controller, or null when spawning failed.
+	 */
+	AActor* SpawnOptionAtLocationForOwner(
+		UWorld& World,
+		UClass* AssetClass,
+		const FVector& Location,
+		const FRotator& SpawnRotation,
+		const int32 OwningPlayerOverride) const;
 
 	bool IsTrainerNotInQueue(const TWeakObjectPtr<UTrainerComponent> TrainerComponent);
 

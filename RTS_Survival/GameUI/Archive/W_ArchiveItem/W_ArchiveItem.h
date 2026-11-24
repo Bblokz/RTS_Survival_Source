@@ -18,6 +18,16 @@ public:
 
 	virtual void NativeOnInitialized() override;
 
+	/**
+	 * @brief Fills the item from Content instead of DT_ArchiveItem; writes the designer's ItemImage, RichTitleText and
+	 * RichDescription widgets by name, so the Blueprint needs no extra graph.
+	 * @param Content Title, description and picture of the entry.
+	 * @return The archive category the entry sorts under.
+	 */
+	ERTSArchiveType SetupCustomArchiveItem(const FArchiveCustomContent& Content);
+
+	inline FName GetCustomContentKey() const { return M_CustomContentKey; }
+
 	inline ERTSArchiveItem GetArchiveItem() const
 	{
 		return M_ArchiveItem;
@@ -45,4 +55,8 @@ private:
 
 	UPROPERTY()
 	ERTSArchiveType M_ActiveSortingType = ERTSArchiveType::None;
+
+	// Set for CustomContent items; the archive dedupes them by it.
+	UPROPERTY()
+	FName M_CustomContentKey;
 };

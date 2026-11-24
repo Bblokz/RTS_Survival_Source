@@ -26,6 +26,341 @@ void FAircraftPath::Reset()
 {
 	PathPoints.Empty();
 	CurrentPathIndex = 0;
+	RunInEndDistanceToTarget = 0.f;
+}
+
+void FAircraftPath::ShiftHeight(const float DeltaZ)
+{
+	for (FAircraftPathPoint& PathPoint : PathPoints)
+	{
+		PathPoint.Location.Z += DeltaZ;
+	}
+}
+
+bool FAircraftPath::GetIsFlyingDiveSegment() const
+{
+	const int32 TargetPointIndex = CurrentPathIndex + 1;
+	if (not PathPoints.IsValidIndex(TargetPointIndex))
+	{
+		return false;
+	}
+	const FAircraftPathPoint& TargetPoint = PathPoints[TargetPointIndex];
+	return TargetPoint.IsDivePoint() || TargetPoint.IsDiveRecoveryPoint();
+}
+
+namespace AircraftTurnRadiusPlanning
+{
+	// Arc points every this many degrees of turn.
+	constexpr float ArcStepDegrees = 8.f;
+	// An end point this close to the turn centre (in radii) cannot be reached by the turn: fly out straight first.
+	constexpr float InsideCircleRadii = 1.05f;
+	constexpr float FlyOutRadii = 1.5f;
+	// Targets further off the nose than this are turned to on the side the aircraft already turns to.
+	constexpr float PreferOwnTurnAboveAngle = 100.f;
+	// The straight run-in toward a dive ends (and the dive is planned) at this share of the maximum dive distance;
+	// closer keeps the target in sight (an attack whose target is no longer visible when the path ends is dropped).
+	constexpr float DiveRunInRangeShare = 0.5f;
+	// Distance (in radii) the aircraft needs beyond the turn itself to roll out and steady the nose before a dive.
+	constexpr float DiveAlignMarginRadii = 0.5f;
+	// Straight run-in after the turn, in radii (one radius is about 0.85 s of flight at the planning turn rate).
+	constexpr float DiveAlignRunInRadii = 0.7f;
+	// The run-in never ends closer to the target than this share above the minimum dive distance.
+	constexpr float MinDiveDistanceMargin = 1.15f;
+	// ... nor closer than this many radii: there a 12 degree heading error is still a dive the turn-onto-target
+	// check allows (0.5 R + 2 R sin 12 = 0.92 R), so a small leftover error does not cost another loop.
+	constexpr float MinRunInEndRadii = 0.95f;
+	// ... and never further out than this share of the maximum dive distance, or the re-plan finds it too far.
+	constexpr float MaxRunInEndRangeShare = 0.8f;
+	// Each relax level widens the dive cone by this (degrees) and lowers the turn-onto-target margin by this share.
+	constexpr float DiveConePerRelaxLevel = 8.f;
+	constexpr float MarginShareLostPerRelaxLevel = 0.35f;
+	// With bank-to-turn flight the leg after the dive recovery is this long, so the climb has ended before the
+	// path does (a short leg handed a still climbing aircraft to the next flight, which overshot cruise height).
+	constexpr float FlightModelPostDiveLegLength = 2500.f;
+	// With bank-to-turn flight a dive is only planned this close to the nose; wider ones started banked in a turn.
+	constexpr float MaxFlightModelDiveAngle = 12.f;
+	constexpr float MinSegmentLength = 50.f;
+}
+
+bool FAircraftPath::GetCanTurnOntoTarget(const float Distance, const float AbsAngleDeg) const
+{
+	using namespace AircraftTurnRadiusPlanning;
+	if (PlanningTurnRadius <= 0.f)
+	{
+		return true;
+	}
+	const float MarginShare = FMath::Max(0.f, 1.f - MarginShareLostPerRelaxLevel * DiveRelaxLevel);
+	// The closest a target this far off the nose can be for a turn at the radius to bring the nose onto it.
+	const float NeededDistance = 2.f * PlanningTurnRadius * FMath::Sin(FMath::DegreesToRadians(AbsAngleDeg))
+		+ DiveAlignMarginRadii * PlanningTurnRadius * MarginShare;
+	return Distance >= NeededDistance;
+}
+
+float FAircraftPath::GetDiveAlignLength() const
+{
+	return PlanningTurnRadius * AircraftTurnRadiusPlanning::DiveAlignRunInRadii;
+}
+
+FVector FAircraftPath::AddFlyOutIfEndInsideTurn(const FVector& StartAirPoint, const FVector& EndAirPoint,
+                                                const FVector& Forward, const float TurnSign)
+{
+	using namespace AircraftTurnRadiusPlanning;
+	const float Radius = PlanningTurnRadius;
+	const FVector2D Forward2D(Forward);
+	const FVector2D Right2D(-Forward.Y, Forward.X);
+	const FVector2D ToEnd = FVector2D(EndAirPoint) - FVector2D(StartAirPoint);
+	// The end in the turn's frame: ahead of the start, and to the turn's side measured from the turn centre.
+	const float EndAhead = FVector2D::DotProduct(ToEnd, Forward2D);
+	const float EndSideFromCenter = FVector2D::DotProduct(ToEnd, Right2D) * TurnSign - Radius;
+	const float NeededFromCenter = Radius * InsideCircleRadii;
+	if (EndAhead * EndAhead + EndSideFromCenter * EndSideFromCenter >= NeededFromCenter * NeededFromCenter)
+	{
+		return StartAirPoint;
+	}
+	// The end lies inside the turn: fly straight out just far enough that it lies on the circle's edge, then turn.
+	const float FlyOut = EndAhead + FMath::Sqrt(FMath::Max(
+		0.f, NeededFromCenter * NeededFromCenter - EndSideFromCenter * EndSideFromCenter));
+	const FVector ArcStart = StartAirPoint + Forward * FMath::Max(FlyOut, MinSegmentLength);
+	PathPoints.Add({ArcStart, 0.f, EAirPathPointType::Regular});
+	return ArcStart;
+}
+
+void FAircraftPath::AddTurnRadiusArc(const FVector& StartAirPoint, const FVector& EndAirPoint,
+                                     const FRotator& StartRotation)
+{
+	using namespace AircraftTurnRadiusPlanning;
+	const float Radius = PlanningTurnRadius;
+	const FVector Forward = FRotator(0.f, StartRotation.Yaw, 0.f).Vector();
+	const FVector2D Forward2D(Forward);
+	const FVector2D Right2D(-Forward.Y, Forward.X);
+	const FVector2D ToEnd = FVector2D(EndAirPoint) - FVector2D(StartAirPoint);
+	if (ToEnd.Size() <= MinSegmentLength)
+	{
+		return;
+	}
+	// Positive cross: the end lies to the right (the yaw increases toward it).
+	const float Cross = Forward2D.X * ToEnd.Y - Forward2D.Y * ToEnd.X;
+	float TurnSign = Cross >= 0.f ? 1.f : -1.f;
+	const float AngleToEnd = FMath::RadiansToDegrees(FMath::Acos(FMath::Clamp(
+		FVector2D::DotProduct(Forward2D, ToEnd.GetSafeNormal()), -1.f, 1.f)));
+	if (not FMath::IsNearlyZero(PreferredTurnSign) && AngleToEnd > PreferOwnTurnAboveAngle)
+	{
+		TurnSign = FMath::Sign(PreferredTurnSign);
+	}
+
+	const FVector ArcStart = AddFlyOutIfEndInsideTurn(StartAirPoint, EndAirPoint, Forward, TurnSign);
+	const FVector2D Center = FVector2D(ArcStart) + Right2D * TurnSign * Radius;
+	const FVector2D CenterToEnd = FVector2D(EndAirPoint) - Center;
+	const float CenterToEndDistance = FMath::Max(CenterToEnd.Size(), Radius * (1.f + KINDA_SMALL_NUMBER));
+	// The straight line to the end leaves the circle where it is tangent; moving round the centre, a right turn
+	// (TurnSign 1) runs the angle up, so that point lies TurnSign x acos(R / d) before the centre-to-end direction.
+	const float AngleCenterToEnd = FMath::Atan2(CenterToEnd.Y, CenterToEnd.X);
+	const float TangentAngle = AngleCenterToEnd - TurnSign * FMath::Acos(Radius / CenterToEndDistance);
+	const FVector2D CenterToStart = FVector2D(ArcStart) - Center;
+	const float StartAngle = FMath::Atan2(CenterToStart.Y, CenterToStart.X);
+	float Sweep = FMath::Fmod(TurnSign * (TangentAngle - StartAngle), 2.f * PI);
+	if (Sweep < 0.f)
+	{
+		Sweep += 2.f * PI;
+	}
+	if (Sweep > 2.f * PI - FMath::DegreesToRadians(ArcStepDegrees))
+	{
+		// Float rounding for an end straight on the nose: no turn, not a full circle.
+		Sweep = 0.f;
+	}
+	const int32 StepCount = FMath::FloorToInt(FMath::RadiansToDegrees(Sweep) / ArcStepDegrees);
+	for (int32 StepIndex = 1; StepIndex <= StepCount; ++StepIndex)
+	{
+		const float Angle = StartAngle + TurnSign * Sweep * static_cast<float>(StepIndex) / StepCount;
+		const FVector ArcPoint(Center.X + Radius * FMath::Cos(Angle), Center.Y + Radius * FMath::Sin(Angle),
+		                       StartAirPoint.Z);
+		PathPoints.Add({ArcPoint, 0.f, EAirPathPointType::Bezier});
+	}
+}
+
+void FAircraftPath::AddTurnRadiusAttackApproach(const FVector& StartAirPoint, const FRotator& StartRotation,
+                                                const FVector& EnemyAirLocation,
+                                                const FAircraftAttackMoveSettings& AttackMoveSettings)
+{
+	using namespace AircraftTurnRadiusPlanning;
+	const int32 PointCountBeforeTurn = PathPoints.Num();
+	const float AlignLength = GetDiveAlignLength();
+	// The run-in ends where a dive is possible with some heading error left: outside the minimum dive distance and
+	// the turn-onto-target margin, but inside the maximum dive distance.
+	const float ClosestRunInEnd = FMath::Min(
+		FMath::Max(AttackMoveSettings.AttackDiveRange.X * MinDiveDistanceMargin, PlanningTurnRadius * MinRunInEndRadii),
+		AttackMoveSettings.AttackDiveRange.Y * MaxRunInEndRangeShare);
+	// After the turn the aircraft needs a steadying run-in and must still be outside the minimum dive distance.
+	const float MinDistanceAfterTurn = ClosestRunInEnd + AlignLength;
+	AddTurnRadiusArc(StartAirPoint, EnemyAirLocation, StartRotation);
+	float DistanceAfterTurn = FVector::Dist2D(PathPoints.Last().Location, EnemyAirLocation);
+	if (DistanceAfterTurn < MinDistanceAfterTurn)
+	{
+		// Too close to turn onto and steady: fly on past the target far enough out, then turn back onto it.
+		PathPoints.SetNum(PointCountBeforeTurn);
+		const FVector Forward = FRotator(0.f, StartRotation.Yaw, 0.f).Vector();
+		const FVector2D ToEnemy = FVector2D(EnemyAirLocation) - FVector2D(StartAirPoint);
+		const float EnemyAhead = FMath::Max(FVector2D::DotProduct(ToEnemy, FVector2D(Forward)), 0.f);
+		// Turning back onto a target that lies X behind leaves a straight line of about X to it (the tangent from the
+		// turn circle), so fly out past it by the whole distance the run-in needs.
+		constexpr float FlyPastMargin = 1.1f;
+		FVector ExtendPoint = StartAirPoint + Forward * (EnemyAhead + MinDistanceAfterTurn * FlyPastMargin);
+		ExtendPoint.Z = StartAirPoint.Z;
+		PathPoints.Add({ExtendPoint, 0.f, EAirPathPointType::Regular});
+		AddTurnRadiusArc(ExtendPoint, EnemyAirLocation, StartRotation);
+		DistanceAfterTurn = FVector::Dist2D(PathPoints.Last().Location, EnemyAirLocation);
+	}
+	const FVector TurnEnd = PathPoints.Last().Location;
+	FVector ToEnemy = EnemyAirLocation - TurnEnd;
+	ToEnemy.Z = 0.f;
+	const FVector DirectionToEnemy = ToEnemy.IsNearlyZero()
+		                                 ? FRotator(0.f, StartRotation.Yaw, 0.f).Vector()
+		                                 : ToEnemy.GetSafeNormal();
+	// Straight run-in: at least the steadying length, up to where the dive starts, never inside the minimum distance.
+	const float ToDiveStart = DistanceAfterTurn - AttackMoveSettings.AttackDiveRange.Y * DiveRunInRangeShare;
+	const float MaxRunIn = FMath::Max(DistanceAfterTurn - ClosestRunInEnd, MinSegmentLength);
+	const float RunInLength = FMath::Min(FMath::Max(ToDiveStart, AlignLength), MaxRunIn);
+	FVector RunInEnd = TurnEnd + DirectionToEnemy * RunInLength;
+	RunInEnd.Z = StartAirPoint.Z;
+	PathPoints.Add({RunInEnd, 0.f, EAirPathPointType::Regular});
+	RunInEndDistanceToTarget = FVector::Dist2D(RunInEnd, EnemyAirLocation);
+	OnPathCompleteCalculateRotations(RunInEnd, StartRotation);
+}
+
+void FAircraftPath::ReaimRunInEnd(const FVector& AircraftLocation, const FVector& TargetLocation)
+{
+	const int32 LastIndex = PathPoints.Num() - 1;
+	if (RunInEndDistanceToTarget <= 0.f || CurrentPathIndex + 1 != LastIndex || LastIndex < 1)
+	{
+		return;
+	}
+	FVector FromTarget = AircraftLocation - TargetLocation;
+	FromTarget.Z = 0.f;
+	if (FromTarget.Size() <= RunInEndDistanceToTarget)
+	{
+		// Already as close as the run-in end: leave it, the segment ends now anyway.
+		return;
+	}
+	FVector& RunInEnd = PathPoints[LastIndex].Location;
+	const float RunInZ = RunInEnd.Z;
+	RunInEnd = TargetLocation + FromTarget.GetSafeNormal() * RunInEndDistanceToTarget;
+	RunInEnd.Z = RunInZ;
+	// The segment now starts at the aircraft, so the look-ahead and the end check follow the new line.
+	PathPoints[CurrentPathIndex].Location = FVector(AircraftLocation.X, AircraftLocation.Y, RunInZ);
+}
+
+namespace AircraftPathFollowing
+{
+	/** @return Distance from Location to the segment Start-End. */
+	float GetDistanceToSegment(const FVector& Location, const FVector& Start, const FVector& End)
+	{
+		return FMath::Sqrt(FMath::PointDistToSegmentSquared(Location, Start, End));
+	}
+
+	/** @return Where along Start-End (0 at Start, 1 at End) the projection of Location lies; unclamped. */
+	float GetAlongSegment(const FVector& Location, const FVector& Start, const FVector& End)
+	{
+		const FVector Segment = End - Start;
+		const float LengthSquared = Segment.SizeSquared();
+		if (LengthSquared <= KINDA_SMALL_NUMBER)
+		{
+			return 1.f;
+		}
+		return FVector::DotProduct(Location - Start, Segment) / LengthSquared;
+	}
+}
+
+bool FAircraftPath::GetShouldAdvancePastTargetPoint(const FVector& Location, const float AcceptanceRadius) const
+{
+	using namespace AircraftPathFollowing;
+	const int32 TargetIndex = CurrentPathIndex + 1;
+	if (not PathPoints.IsValidIndex(CurrentPathIndex) || not PathPoints.IsValidIndex(TargetIndex))
+	{
+		return false;
+	}
+	const FVector& SegmentStart = PathPoints[CurrentPathIndex].Location;
+	const FVector& SegmentEnd = PathPoints[TargetIndex].Location;
+	if (FVector::Dist(Location, SegmentEnd) <= AcceptanceRadius
+		|| GetAlongSegment(Location, SegmentStart, SegmentEnd) >= 1.f)
+	{
+		return true;
+	}
+	const int32 NextIndex = TargetIndex + 1;
+	if (not PathPoints.IsValidIndex(NextIndex))
+	{
+		return false;
+	}
+	// Rounding the corner: the aircraft already flies along the next segment and is closer to it.
+	const FVector& NextEnd = PathPoints[NextIndex].Location;
+	if (GetAlongSegment(Location, SegmentEnd, NextEnd) <= 0.f)
+	{
+		return false;
+	}
+	return GetDistanceToSegment(Location, SegmentEnd, NextEnd) < GetDistanceToSegment(Location, SegmentStart, SegmentEnd);
+}
+
+FVector FAircraftPath::GetLookAheadPoint(const FVector& Location, const float LookAheadDistance) const
+{
+	using namespace AircraftPathFollowing;
+	const int32 TargetIndex = CurrentPathIndex + 1;
+	if (not PathPoints.IsValidIndex(CurrentPathIndex) || not PathPoints.IsValidIndex(TargetIndex))
+	{
+		return PathPoints.IsEmpty() ? Location : PathPoints.Last().Location;
+	}
+	const FVector& SegmentStart = PathPoints[CurrentPathIndex].Location;
+	const FVector& SegmentEnd = PathPoints[TargetIndex].Location;
+	const float Along = FMath::Clamp(GetAlongSegment(Location, SegmentStart, SegmentEnd), 0.f, 1.f);
+	FVector Cursor = FMath::Lerp(SegmentStart, SegmentEnd, Along);
+	float Remaining = FMath::Max(LookAheadDistance, 1.f);
+	for (int32 PointIndex = TargetIndex; PointIndex < PathPoints.Num(); ++PointIndex)
+	{
+		const FVector& Next = PathPoints[PointIndex].Location;
+		const float ToNext = FVector::Dist(Cursor, Next);
+		if (ToNext >= Remaining)
+		{
+			return Cursor + (Next - Cursor) * (Remaining / ToNext);
+		}
+		Remaining -= ToNext;
+		Cursor = Next;
+	}
+	const FVector LastDirection = PathPoints.Num() >= 2
+		                              ? (PathPoints.Last().Location - PathPoints.Last(1).Location).GetSafeNormal()
+		                              : FVector::ZeroVector;
+	return Cursor + LastDirection * Remaining;
+}
+
+float FAircraftPath::GetRemainingLength(const FVector& Location) const
+{
+	using namespace AircraftPathFollowing;
+	const int32 TargetIndex = CurrentPathIndex + 1;
+	if (not PathPoints.IsValidIndex(CurrentPathIndex) || not PathPoints.IsValidIndex(TargetIndex))
+	{
+		return 0.f;
+	}
+	const FVector& SegmentStart = PathPoints[CurrentPathIndex].Location;
+	const FVector& SegmentEnd = PathPoints[TargetIndex].Location;
+	const float Along = FMath::Clamp(GetAlongSegment(Location, SegmentStart, SegmentEnd), 0.f, 1.f);
+	float Remaining = FVector::Dist2D(FMath::Lerp(SegmentStart, SegmentEnd, Along), SegmentEnd);
+	for (int32 PointIndex = TargetIndex + 1; PointIndex < PathPoints.Num(); ++PointIndex)
+	{
+		Remaining += FVector::Dist2D(PathPoints[PointIndex - 1].Location, PathPoints[PointIndex].Location);
+	}
+	return Remaining;
+}
+
+TOptional<float> FAircraftPath::GetFloorZOfCurrentSegment() const
+{
+	const int32 TargetIndex = CurrentPathIndex + 1;
+	if (not PathPoints.IsValidIndex(TargetIndex))
+	{
+		return {};
+	}
+	const FAircraftPathPoint& TargetPoint = PathPoints[TargetIndex];
+	if (not TargetPoint.GetHasFloor())
+	{
+		return {};
+	}
+	return TargetPoint.FloorZ;
 }
 
 void FAircraftPath::CreateMoveToPath(
@@ -67,6 +402,12 @@ void FAircraftPath::AddMoveToPathFromStart(
 	const FAircraftDeadZone& DeadZoneSettings,
 	const bool bIgnoreBezierMaxDistance)
 {
+	if (PlanningTurnRadius > 0.f)
+	{
+		AddTurnRadiusArc(StartAirPoint, EndAirPoint, StartRotation);
+		PathPoints.Add({EndAirPoint, 0.f, EAirPathPointType::Regular});
+		return;
+	}
 	FVector BezierStart = StartAirPoint;
 	float AngleToFirstPoint = 0.f;
 	if (GetIsWithinDeadZone(StartRotation, StartAirPoint, EndAirPoint, DeadZoneSettings, AngleToFirstPoint))
@@ -102,6 +443,11 @@ void FAircraftPath::AddUTurnPathingToEnemy(const FVector& StartLocation, const F
                                            const FDistAbsAngleSign& DistAbsAngle)
 {
 	using DeveloperSettings::GamePlay::Navigation::Aircraft::MoveToAngleBezierSampleDivider;
+	if (PlanningTurnRadius > 0.f)
+	{
+		AddTurnRadiusAttackApproach(StartLocation, StartRotation, EnemyAirLocation, AttackMoveSettings);
+		return;
+	}
 	FVector UTurnEnd;
 	const FVector UTurnStart = GetUTurnPointsInRangeToActor(
 		DistAbsAngle,
@@ -316,6 +662,12 @@ void FAircraftPath::CreateAttackPath(const FVector& StartAirPoint, const FRotato
 			StartAirPoint, EnemyLocation, AttackMoveSettings, EndAirPoint);
 		break;
 	case EDirectAttackDiveResult::TooClose:
+		if (PlanningTurnRadius > 0.f)
+		{
+			// Overflies the target far enough to turn back onto it.
+			AddTurnRadiusAttackApproach(StartAirPoint, StartRotation, EnemyAirLocation, AttackMoveSettings);
+			break;
+		}
 		// Adds offset point and sets rotation for it.
 		AddAttackPathTooClose(StartAirPoint, StartRotation,
 		                      AttackMoveSettings);
@@ -357,6 +709,12 @@ void FAircraftPath::AddAttackPathTooFar(
 	const FDistAbsAngleSign& DistanceAngle, FVector& OutEndAirPoint
 )
 {
+	if (PlanningTurnRadius > 0.f)
+	{
+		AddTurnRadiusAttackApproach(StartAirPoint, StartRotation, EnemyAirLocation, AttackMoveSettings);
+		OutEndAirPoint = PathPoints.Last().Location;
+		return;
+	}
 	// 0) Extreme‐angle guard
 	if (GetIsExtremeAngleToEnemy(DistanceAngle))
 	{
@@ -522,9 +880,19 @@ EDirectAttackDiveResult FAircraftPath::GetIsWithinDirectAttackDiveRange(const FV
 	{
 		return EDirectAttackDiveResult::TooFar;
 	}
-	const bool bIsWithinAngle = (AngleDiffDeg <= AttackMoveSettings.AngleAllowAttackDive);
+	using namespace AircraftTurnRadiusPlanning;
+	const float AllowedDiveAngle = PlanningTurnRadius > 0.f
+		                               ? FMath::Min(AttackMoveSettings.AngleAllowAttackDive,
+		                                            MaxFlightModelDiveAngle + DiveConePerRelaxLevel * DiveRelaxLevel)
+		                               : AttackMoveSettings.AngleAllowAttackDive;
+	const bool bIsWithinAngle = (AngleDiffDeg <= AllowedDiveAngle);
 	if (not bIsWithinAngle)
 	{
+		return EDirectAttackDiveResult::NotWithinAngle;
+	}
+	if (not GetCanTurnOntoTarget(Distance, AngleDiffDeg))
+	{
+		// Within the allowed cone but too close to turn onto in time: the dive would fire banked and off target.
 		return EDirectAttackDiveResult::NotWithinAngle;
 	}
 	return EDirectAttackDiveResult::DivePossible;
@@ -554,12 +922,19 @@ void FAircraftPath::AddAttackDivePath(
 	const float AlphaRaw = DiveStrength / (DiveStrength + RecoveryStrength);
 	const float Alpha = FMath::Clamp(AlphaRaw, 0.001f, 0.999f);
 
-	// Attack point lies along Start->Enemy at alpha, but its Z is forced to the desired dive depth.
+	// Attack point lies along Start->Enemy at alpha, but its Z is forced to the desired dive depth; never lower than
+	// the minimum height above the target (a target on a hill gets a shallower dive) and never above the start.
 	FVector AttackPoint = FMath::Lerp(DiveStartPoint, EnemyLocation, Alpha);
-	AttackPoint.Z = DesiredZ;
+	const float MinDiveHeightAboveTarget = FMath::Max(AttackMoveSettings.MinDiveHeightAboveTarget, 0.f);
+	AttackPoint.Z = FMath::Min(FMath::Max(DesiredZ, EnemyLocation.Z + MinDiveHeightAboveTarget), StartZ);
+	// The bank-to-turn flight may round the bottom of the dive a little low; it never goes below this floor.
+	constexpr float FloorShareOfMinDiveHeight = 0.6f;
+	const float DiveFloorZ = EnemyLocation.Z + MinDiveHeightAboveTarget * FloorShareOfMinDiveHeight;
 
 	const FRotator AttackRot = UKismetMathLibrary::FindLookAtRotation(DiveStartPoint, AttackPoint);
-	PathPoints.Add({AttackPoint, AttackRot.Roll, EAirPathPointType::AttackDive});
+	FAircraftPathPoint AttackDivePoint{AttackPoint, AttackRot.Roll, EAirPathPointType::AttackDive};
+	AttackDivePoint.FloorZ = DiveFloorZ;
+	PathPoints.Add(AttackDivePoint);
 
 	// -------------------------------------------------------------------------
 	// 2) Recovery leg length:
@@ -600,14 +975,19 @@ void FAircraftPath::AddAttackDivePath(
 	OutOfDivePoint.Z = StartZ;
 
 	const FRotator OutOfDiveRot = UKismetMathLibrary::FindLookAtRotation(AttackPoint, OutOfDivePoint);
-	PathPoints.Add({OutOfDivePoint, OutOfDiveRot.Roll, EAirPathPointType::GetOutOfDive});
+	FAircraftPathPoint OutOfDivePathPoint{OutOfDivePoint, OutOfDiveRot.Roll, EAirPathPointType::GetOutOfDive};
+	OutOfDivePathPoint.FloorZ = DiveFloorZ;
+	PathPoints.Add(OutOfDivePathPoint);
 
 	// -------------------------------------------------------------------------
 	// 4) Final post-dive point:
 	//    Step further along the same horizontal direction
 	//    by the global OutOfDivePointOffset and keep Z at StartZ.
 	// -------------------------------------------------------------------------
-	OutFinalLocation = OutOfDivePoint + DiveDirXY * OutOfDivePointOffset;
+	const float PostDiveLegLength = PlanningTurnRadius > 0.f
+		                                ? AircraftTurnRadiusPlanning::FlightModelPostDiveLegLength
+		                                : OutOfDivePointOffset;
+	OutFinalLocation = OutOfDivePoint + DiveDirXY * PostDiveLegLength;
 	OutFinalLocation.Z = StartZ;
 
 	const FRotator PostDiveRotation = UKismetMathLibrary::FindLookAtRotation(OutOfDivePoint, OutFinalLocation);

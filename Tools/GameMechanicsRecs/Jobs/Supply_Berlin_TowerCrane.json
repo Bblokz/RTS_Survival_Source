@@ -1,0 +1,582 @@
+{
+ "JobName": "Supply_Berlin_TowerCrane",
+ "Category": "SupplyPoints",
+ "Fps": 60,
+ "WarmupSeconds": 6.0,
+ "DurationSeconds": 44.0,
+ "Anchor": {
+  "X": 0.0,
+  "Y": 0.0,
+  "Z": 0.0
+ },
+ "AnchorYaw": 0.0,
+ "ClearUnitsRadius": 6000.0,
+ "bKeepVoiceLines": true,
+ "bKeepAnnouncer": false,
+ "bKeepMusic": false,
+ "Events": [
+  {
+   "Time": -3.0,
+   "Type": "Resources",
+   "Tag": "",
+   "Value": 200000
+  },
+  {
+   "Time": -2.6,
+   "Type": "Spawn",
+   "Tag": "HQ",
+   "ClassPath": "/Game/RTS_Survival/Blueprints/GroundVehicles/BaseAndNomadic/ChildBlueprints/SKDFZ-7/Ger_HQ_Truck",
+   "Player": 1,
+   "Offset": {
+    "X": -5200.0,
+    "Y": 2600.0,
+    "Z": 0.0
+   },
+   "Yaw": 0.0,
+   "Count": 1,
+   "Columns": 0,
+   "Spacing": 1200.0
+  },
+  {
+   "Time": -2.5,
+   "Type": "Deploy",
+   "Tag": "HQ",
+   "Settings": {
+    "Yaw": 0,
+    "Instant": 1
+   }
+  },
+  {
+   "Time": -2.0,
+   "Type": "Capture",
+   "Tag": "SP",
+   "Settings": {
+    "CaptureDuration": 4,
+    "SuppliesReadyTime": 1,
+    "TruckLoadingTime": 6
+   },
+   "TargetOffset": {
+    "X": -3400.0,
+    "Y": 2200.0,
+    "Z": 0.0
+   }
+  },
+  {
+   "Time": -1.8,
+   "Type": "Claim",
+   "Tag": "Truck",
+   "ClassPath": "/Game/RTS_Survival/Blueprints/GroundVehicles/SupplyTruck/BP_Ger_OpelSupplyTruck",
+   "Settings": {
+    "ClaimSeconds": 60
+   }
+  },
+  {
+   "Time": -1.5,
+   "Type": "Spawn",
+   "Tag": "GerInf",
+   "ClassPath": "/Game/RTS_Survival/Blueprints/Squads/Ger/Barracks_Infantry/Scavengers/Squad_Ger_Scavengers",
+   "Player": 1,
+   "Offset": {
+    "X": -2500.0,
+    "Y": -900.0,
+    "Z": 0.0
+   },
+   "Yaw": 0.0,
+   "Count": 1,
+   "Columns": 0,
+   "Spacing": 1200.0
+  },
+  {
+   "Time": -1.5,
+   "Type": "Spawn",
+   "Tag": "GerInf",
+   "ClassPath": "/Game/RTS_Survival/Blueprints/Squads/Ger/T2/PanzerGrenadiers/Squad_Ger_PanzerGrenadiers",
+   "Player": 1,
+   "Offset": {
+    "X": -2500.0,
+    "Y": 700.0,
+    "Z": 0.0
+   },
+   "Yaw": 0.0,
+   "Count": 1,
+   "Columns": 0,
+   "Spacing": 1200.0
+  },
+  {
+   "Time": -1.5,
+   "Type": "Spawn",
+   "Tag": "GerVeh",
+   "ClassPath": "/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_ArmoredCar/Puma/Ger_ArmoredCar_Puma",
+   "Player": 1,
+   "Offset": {
+    "X": -3800.0,
+    "Y": -1600.0,
+    "Z": 0.0
+   },
+   "Yaw": 0.0,
+   "Count": 1,
+   "Columns": 0,
+   "Spacing": 1200.0
+  },
+  {
+   "Time": 0.5,
+   "Type": "Move",
+   "Tag": "GerInf",
+   "TargetOffset": {
+    "X": -300.0,
+    "Y": -200.0,
+    "Z": 0.0
+   },
+   "TargetYaw": 0,
+   "Text": "Move"
+  },
+  {
+   "Time": 0.8,
+   "Type": "Move",
+   "Tag": "GerVeh",
+   "TargetOffset": {
+    "X": -1400.0,
+    "Y": -2300.0,
+    "Z": 0.0
+   },
+   "TargetYaw": 20
+  },
+  {
+   "Time": 13.0,
+   "Type": "Voice",
+   "Tag": "GerInf",
+   "Text": "Confirm",
+   "Settings": {
+    "ForceVoice": 1
+   }
+  }
+ ],
+ "Shots": [
+  {
+   "Name": "TheCrane",
+   "Start": 0.0,
+   "End": 4.0,
+   "Rig": "Orbit",
+   "Keys": [
+    {
+     "Time": 0.0,
+     "Pivot": "tag:SP",
+     "Offset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     },
+     "Yaw": 200.0,
+     "Pitch": 24.0,
+     "Distance": 3800.0,
+     "Focal": 24.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 500.0
+     },
+     "VYaw": 0.0,
+     "VPitch": 40.0,
+     "VDistance": 4200.0,
+     "VFocal": 0.0,
+     "VLookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     }
+    },
+    {
+     "Time": 4.0,
+     "Pivot": "tag:SP",
+     "Offset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     },
+     "Yaw": 215.0,
+     "Pitch": 16.0,
+     "Distance": 3200.0,
+     "Focal": 28.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 500.0
+     },
+     "VYaw": 0.0,
+     "VPitch": 30.0,
+     "VDistance": 3600.0,
+     "VFocal": 0.0,
+     "VLookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     }
+    }
+   ],
+   "Ease": "InOut",
+   "PivotLag": 0.7,
+   "Aperture": 0.0,
+   "Shake": 0.0,
+   "bAvoidOcclusion": true,
+   "MinGroundClearance": 350.0
+  },
+  {
+   "Name": "FlagChange",
+   "Start": 4.0,
+   "End": 12.0,
+   "Rig": "Fixed",
+   "Keys": [
+    {
+     "Time": 0.0,
+     "Pivot": "tag:SP",
+     "Offset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     },
+     "Yaw": 126.0,
+     "Pitch": 15.0,
+     "Distance": 2420.0,
+     "Focal": 30.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": -460.0,
+      "Y": -150.0,
+      "Z": 200.0
+     },
+     "VYaw": 0.0,
+     "VPitch": 19.0,
+     "VDistance": 2330.0,
+     "VFocal": 22.0,
+     "VLookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     }
+    },
+    {
+     "Time": 8.0,
+     "Pivot": "tag:SP",
+     "Offset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     },
+     "Yaw": 126.0,
+     "Pitch": 15.0,
+     "Distance": 2420.0,
+     "Focal": 30.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": -460.0,
+      "Y": -150.0,
+      "Z": 200.0
+     },
+     "VYaw": 0.0,
+     "VPitch": 19.0,
+     "VDistance": 2330.0,
+     "VFocal": 22.0,
+     "VLookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     }
+    }
+   ],
+   "Ease": "InOut",
+   "PivotLag": 0.7,
+   "Aperture": 0.0,
+   "Shake": 0.0,
+   "bAvoidOcclusion": true,
+   "MinGroundClearance": 350.0
+  },
+  {
+   "Name": "Secured",
+   "Start": 12.0,
+   "End": 18.0,
+   "Rig": "Orbit",
+   "Keys": [
+    {
+     "Time": 0.0,
+     "Pivot": "tag:SP",
+     "Offset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     },
+     "Yaw": 195.0,
+     "Pitch": 18.0,
+     "Distance": 3200.0,
+     "Focal": 30.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 700.0
+     },
+     "VYaw": 0.0,
+     "VPitch": 24.0,
+     "VDistance": 3400.0,
+     "VFocal": 22.0,
+     "VLookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     }
+    },
+    {
+     "Time": 6.0,
+     "Pivot": "tag:SP",
+     "Offset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     },
+     "Yaw": 215.0,
+     "Pitch": 18.0,
+     "Distance": 2800.0,
+     "Focal": 30.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 700.0
+     },
+     "VYaw": 0.0,
+     "VPitch": 24.0,
+     "VDistance": 3000.0,
+     "VFocal": 22.0,
+     "VLookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     }
+    }
+   ],
+   "Ease": "InOut",
+   "PivotLag": 0.7,
+   "Aperture": 0.0,
+   "Shake": 0.0,
+   "bAvoidOcclusion": true,
+   "MinGroundClearance": 350.0
+  },
+  {
+   "Name": "TruckArrives",
+   "Start": 18.0,
+   "End": 25.0,
+   "Rig": "Follow",
+   "Keys": [
+    {
+     "Time": 0.0,
+     "Pivot": "tag:Truck",
+     "Offset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     },
+     "Yaw": 70.0,
+     "Pitch": 22.0,
+     "Distance": 2600.0,
+     "Focal": 30.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 150.0
+     },
+     "VYaw": 0.0,
+     "VPitch": 26.0,
+     "VDistance": 2500.0,
+     "VFocal": 22.0,
+     "VLookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     }
+    },
+    {
+     "Time": 7.0,
+     "Pivot": "tag:Truck",
+     "Offset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     },
+     "Yaw": 90.0,
+     "Pitch": 22.0,
+     "Distance": 2600.0,
+     "Focal": 30.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 150.0
+     },
+     "VYaw": 0.0,
+     "VPitch": 26.0,
+     "VDistance": 2500.0,
+     "VFocal": 22.0,
+     "VLookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     }
+    }
+   ],
+   "Ease": "InOut",
+   "PivotLag": 0.4,
+   "Aperture": 0.0,
+   "Shake": 0.0,
+   "bAvoidOcclusion": true,
+   "MinGroundClearance": 350.0
+  },
+  {
+   "Name": "Loading",
+   "Start": 25.0,
+   "End": 34.5,
+   "Rig": "Orbit",
+   "Keys": [
+    {
+     "Time": 0.0,
+     "Pivot": "tag:Truck",
+     "Offset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     },
+     "Yaw": 215.0,
+     "Pitch": 34.0,
+     "Distance": 2100.0,
+     "Focal": 32.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 250.0
+     },
+     "VYaw": 0.0,
+     "VPitch": 36.0,
+     "VDistance": 2400.0,
+     "VFocal": 22.0,
+     "VLookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     }
+    },
+    {
+     "Time": 9.5,
+     "Pivot": "tag:Truck",
+     "Offset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     },
+     "Yaw": 250.0,
+     "Pitch": 34.0,
+     "Distance": 2100.0,
+     "Focal": 32.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 250.0
+     },
+     "VYaw": 0.0,
+     "VPitch": 36.0,
+     "VDistance": 2400.0,
+     "VFocal": 22.0,
+     "VLookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     }
+    }
+   ],
+   "Ease": "InOut",
+   "PivotLag": 0.7,
+   "Aperture": 0.0,
+   "Shake": 0.0,
+   "bAvoidOcclusion": true,
+   "MinGroundClearance": 350.0
+  },
+  {
+   "Name": "SuppliesOut",
+   "Start": 34.5,
+   "End": 44.0,
+   "Rig": "Fixed",
+   "Keys": [
+    {
+     "Time": 0.0,
+     "Pivot": "tag:Truck",
+     "Offset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     },
+     "Yaw": 30.0,
+     "Pitch": 18.0,
+     "Distance": 2800.0,
+     "Focal": 30.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 150.0
+     },
+     "VYaw": 0.0,
+     "VPitch": 24.0,
+     "VDistance": 0.0,
+     "VFocal": 22.0,
+     "VLookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     }
+    },
+    {
+     "Time": 9.5,
+     "Pivot": "tag:Truck",
+     "Offset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     },
+     "Yaw": 30.0,
+     "Pitch": 18.0,
+     "Distance": 2800.0,
+     "Focal": 30.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 150.0
+     },
+     "VYaw": 0.0,
+     "VPitch": 24.0,
+     "VDistance": 0.0,
+     "VFocal": 22.0,
+     "VLookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     }
+    }
+   ],
+   "Ease": "InOut",
+   "PivotLag": 0.7,
+   "Aperture": 0.0,
+   "Shake": 0.0,
+   "bAvoidOcclusion": true,
+   "MinGroundClearance": 350.0
+  }
+ ],
+ "MapPath": "/Game/RTS_Survival/Maps/GerMissions/Ger_Berlin",
+ "GameModeClassPath": "/Game/RTS_Survival/Blueprints/GameSettings/RTS_BP_GamemodeBase.RTS_BP_GamemodeBase_C",
+ "HideActorPrefixes": [],
+ "SkyMaterial": "/Game/SkyboxPack_X/Materials/Instances/M_Flowmap_Inst_01.M_Flowmap_Inst_01",
+ "AnchorActor": "BP_SupplyPoint_TowerCrane",
+ "Batch": "trench_supply"
+}

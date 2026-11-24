@@ -16,8 +16,10 @@
 #include "RTS_Survival/Enemy/EnemyWaves/EnemyWaveController.h"
 #include "RTS_Survival/Game/RTSGameInstance/RTSGameInstance.h"
 #include "RTS_Survival/Player/AsyncRTSAssetsSpawner/RTSAsyncSpawner.h"
+#include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 #include "RTS_Survival/Utils/RTS_Statics/SubSystems/EnemyControllerSubsystem/EnemyControllerSubsystem.h"
+#include "RTS_Survival/Utils/UnitSpawning/RTSUnitOwnerSpawning.h"
 
 namespace EnemyControllerFieldConstruction
 {
@@ -55,6 +57,10 @@ namespace EnemyControllerFieldConstruction
 				return;
 			}
 
+			if (EnemyController.IsValid())
+			{
+				EnemyController->LogSpawnedUnitOwnerMismatch(SquadController);
+			}
 			SpawnedSquadControllers.Add(SquadController);
 		}
 
@@ -134,6 +140,39 @@ AEnemyController::AEnemyController(const FObjectInitializer& ObjectInitializer)
 	{
 		M_EnemyRetreatController->InitRetreatController(this);
 	}
+}
+
+int32 AEnemyController::GetControlledPlayer() const
+{
+	return ControlledPlayer;
+}
+
+int32 AEnemyController::GetSpawnOwnerOverride() const
+{
+	return FRTSUnitOwnerSpawning::GetOwnerOverrideForAIPlayer(ControlledPlayer);
+}
+
+bool AEnemyController::GetCanControlUnit(const AActor* Unit) const
+{
+	const int32 UnitOwner = FRTSPlayers::GetOwningPlayerOfActor(Unit);
+	const bool bIsUnitOfOtherAIPlayer = FRTSPlayers::IsValidAIPlayer(UnitOwner) && UnitOwner != ControlledPlayer;
+	return not bIsUnitOfOtherAIPlayer;
+}
+
+void AEnemyController::LogSpawnedUnitOwnerMismatch(const AActor* SpawnedUnit) const
+{
+	if (not IsValid(SpawnedUnit))
+	{
+		return;
+	}
+	const URTSComponent* RTSComponent = SpawnedUnit->FindComponentByClass<URTSComponent>();
+	if (not IsValid(RTSComponent) || RTSComponent->GetOwningPlayer() == ControlledPlayer)
+	{
+		return;
+	}
+	// Not an error: the first AI player's units keep the owner of their Blueprint, as convoys also only log.
+	UE_LOG(LogTemp, Warning, TEXT("Enemy controller of player %d spawned %s, which is owned by player %d."),
+	       ControlledPlayer, *SpawnedUnit->GetName(), RTSComponent->GetOwningPlayer());
 }
 
 UStochasticDecisionTree* AEnemyController::GetStrategicDecisionTree()
@@ -374,6 +413,24 @@ void AEnemyController::CreateSingleRandomPatrolWithAttackMoveWave(
 		ProjectionScale);
 }
 
+int32 AEnemyController::StartWaveFromRequest(const FAttackWaveRequest& Request)
+{
+	if (not GetIsValidWaveController())
+	{
+		return INDEX_NONE;
+	}
+	return M_WaveController->StartWaveFromRequest(Request);
+}
+
+void AEnemyController::StopWave(const int32 WaveID)
+{
+	if (not GetIsValidWaveController())
+	{
+		return;
+	}
+	M_WaveController->StopWave(WaveID);
+}
+
 void AEnemyController::CreateFieldConstructionOrder(
 	const TArray<ASquadController*>& SquadControllers,
 	const TArray<FVector>& ConstructionLocations,
@@ -471,7 +528,7 @@ void AEnemyController::CreateFieldConstructionOrderFromWaveElements(
 			SpawnRequest.SpawnLocation,
 			WeakEnemyController,
 			CurrentSpawnRequestId,
-			OnSpawned, FRotator::ZeroRotator))
+			OnSpawned, FRotator::ZeroRotator, GetSpawnOwnerOverride()))
 		{
 			SpawnContext->RegisterSpawnFailure();
 			SpawnContext->NotifySpawnComplete();
@@ -663,6 +720,61 @@ void AEnemyController::RetreatAllFormations(
 		MaxTimeWaitTillCounterAttack);
 }
 
+bool AEnemyController::RetreatUnitToRallyPoint(AActor* UnitActor, const FVector& RallyLocation)
+{
+	if (not GetIsValidFormationController() || not GetIsValidEnemyRetreatController())
+	{
+		return false;
+	}
+	ICommands* Commands = Cast<ICommands>(UnitActor);
+	if (not Commands)
+	{
+		return false;
+	}
+
+	// The formation would keep ordering the unit back to its waypoints.
+	TArray<ASquadController*> SquadControllers;
+	TArray<ATankMaster*> TankMasters;
+	if (ASquadController* SquadController = Cast<ASquadController>(UnitActor))
+	{
+		SquadControllers.Add(SquadController);
+	}
+	else if (ATankMaster* TankMaster = Cast<ATankMaster>(UnitActor))
+	{
+		TankMasters.Add(TankMaster);
+	}
+	M_FormationController->RemoveUnitsFromAnyFormation(SquadControllers, TankMasters);
+
+	bool bWasProjected = false;
+	const FVector ProjectedRally = RTSFunctionLibrary::GetLocationProjected(this, RallyLocation, true, bWasProjected);
+	const FVector RetreatLocation = bWasProjected ? ProjectedRally : RallyLocation;
+	const bool bIsSquad = Commands->GetIsSquadUnit();
+	const ECommandQueueError CommandError = bIsSquad
+		                                        ? Commands->RetreatToLocation(RetreatLocation, true)
+		                                        : Commands->ReverseUnitToLocation(RetreatLocation, true);
+	if (CommandError != ECommandQueueError::NoError)
+	{
+		return false;
+	}
+
+	FRetreatElement RetreatElement;
+	RetreatElement.Unit = TWeakInterfacePtr<ICommands>(Commands);
+	RetreatElement.RetreatLocation = RetreatLocation;
+	const TArray<FRetreatElement> SquadElements = bIsSquad ? TArray<FRetreatElement>{RetreatElement} : TArray<FRetreatElement>{};
+	const TArray<FRetreatElement> ReverseElements = bIsSquad ? TArray<FRetreatElement>{} : TArray<FRetreatElement>{RetreatElement};
+	// RemoveUnits: the unit disappears at the rally point; the counterattack timers are never used.
+	constexpr float NoCounterattackDelaySeconds = 0.f;
+	constexpr float NoCounterattackTimeoutSeconds = 0.f;
+	M_EnemyRetreatController->StartRetreat(
+		SquadElements,
+		ReverseElements,
+		RetreatLocation,
+		EPostRetreatCounterStrategy::RemoveUnits,
+		NoCounterattackDelaySeconds,
+		NoCounterattackTimeoutSeconds);
+	return true;
+}
+
 void AEnemyController::AddToWaveSupply(const int32 AddSupply)
 {
 	M_Resources.WaveSupply += AddSupply;
@@ -797,6 +909,14 @@ void AEnemyController::AddTrainingComponentToAIBlackboard(UTrainerComponent* Ene
 		RTSFunctionLibrary::ReportError("Provided trainer component for blackboard is not set up as enemy trainer!");
 		return;
 	}
+	if (not GetCanControlUnit(EnemyTrainer->GetOwner()))
+	{
+		// The blackboard's trainers are where this controller spawns the units it trains.
+		RTSFunctionLibrary::ReportError(
+			"Enemy trainer " + EnemyTrainer->GetName() + " belongs to another AI player than player " +
+			FString::FromInt(ControlledPlayer) + "; it is not added to this controller's blackboard.");
+		return;
+	}
 	UEnemyStrategicAIComponent* const StrategicAIComponent = GetEnemyStrategicAIComponent();
 	if (not IsValid(StrategicAIComponent))
 	{
@@ -846,7 +966,7 @@ void AEnemyController::BeginPlay_InitEnemyGlobalAbilities()
 	FVector StartPositionForAbilities = OverrideEnemyStartPosition.IsNearlyZero() ?  GetActorLocation() : OverrideEnemyStartPosition;
 	UGameUnitManager* GameUnitManager = FRTS_Statics::GetGameUnitManager(this);
 	M_EnemyGlobalAbilitiesManager->InitGlobalAbilitiesManager(
-		2,
+		ControlledPlayer,
 		AbilityTypes,
 		nullptr,
 		nullptr,
@@ -862,9 +982,23 @@ void AEnemyController::BeginPlay_InitEnemyGlobalAbilities()
 	}
 }
 
+void AEnemyController::PostInitializeComponents_ValidateControlledPlayer()
+{
+	if (FRTSPlayers::IsValidAIPlayer(ControlledPlayer))
+	{
+		return;
+	}
+	RTSFunctionLibrary::ReportError(
+		"Enemy controller " + GetName() + " has ControlledPlayer " + FString::FromInt(ControlledPlayer) +
+		", which is no AI player (2-4). It plays player " + FString::FromInt(RTSPlayers::FirstAIPlayer) +
+		" instead.");
+	ControlledPlayer = RTSPlayers::FirstAIPlayer;
+}
+
 void AEnemyController::PostInitializeComponents()
 {
 	Super::PostInitializeComponents();
+	PostInitializeComponents_ValidateControlledPlayer();
 
 	// Register this controller with the world subsystem
 	UWorld* World = GetWorld();
@@ -1151,6 +1285,24 @@ bool AEnemyController::GetIsValidEnemyGlobalAbilitiesManager() const
 		TEXT("AEnemyController::GetIsValidEnemyGlobalAbilitiesManager"),
 		this);
 	return false;
+}
+
+void AEnemyController::CopyStrategicDecisionTreeFrom(const UStochasticDecisionTree* Template)
+{
+	if (not IsValid(Template))
+	{
+		RTSFunctionLibrary::ReportError("CopyStrategicDecisionTreeFrom called without a template tree.");
+		return;
+	}
+	Modify();
+	UStochasticDecisionTree* NewTree = DuplicateObject<UStochasticDecisionTree>(Template, this);
+	if (not IsValid(NewTree))
+	{
+		RTSFunctionLibrary::ReportError("Failed to copy the strategic decision tree template.");
+		return;
+	}
+	M_StochasticDecisionTree = NewTree;
+	MarkPackageDirty();
 }
 
 void AEnemyController::OverrideStrategicDecisionTree(const UStochasticDecisionTree* Template)
