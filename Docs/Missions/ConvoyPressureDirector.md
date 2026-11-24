@@ -146,6 +146,88 @@ state. `OnActivated(Slot, SpawnedDefence)` fires when it spawns.
 - **Light counterattack (one unit stronger when convoy 2 escaped):** read `GetEscapedConvoyCount()`, or remember the
   `ConvoyIndex` from `OnEscapedCargo`.
 
+## Ore Mountains setup
+
+`Ger_2ndOreMountains` has one director, `ORE_PressureDirector`, on the Base B knoll. It watches `ORE_Convoy1..6` at
+1 / 3 / 5 stopped convoys. Its responses are filled by `Source/Tools/OreMountainsMission/place_director_responses.py`
+(built 2026-11-23, editor Python, re-runnable).
+
+**Running it:**
+- **In an open editor:** `import place_director_responses as pdr; pdr.run(); pdr.check()`. This does not save.
+- **As a throwaway full-editor job:** `run_director_responses.py`, launched from PowerShell like `run_ore_placement.py`.
+  It rebuilds navigation, runs the script and its check, and saves only when the check passes. It then logs the map size
+  before and after.
+- **Order:** run it **after** `place_convoy_content.py`. That script resets `TierResponses` to empty TODO entries on
+  every run, so a re-run of `run_ore_placement.py` wipes the tiers and this script must run again.
+
+**How a re-run behaves.** Every actor is labelled `ORE_Director_*`, with tag `ORE_Director` and folder
+`OreMountains/Director`. On a re-run the script:
+- updates the actors it finds by label, so the director's references survive;
+- spawns the ones that are missing;
+- deletes `ORE_Director_*` actors that are no longer in the plan;
+- leaves the Ammo and Concrete cargo entries (from `place_convoy_content.py`) untouched.
+
+It aborts when the director or a heap station is missing. Every placement actor has its start on BeginPlay off.
+
+**Units per difficulty.** Wave spawners add their extra units cumulatively:
+- Base: every difficulty.
+- N: Normal and up.
+- H: Hard and up.
+- B: Brutal and Ironman.
+
+| Tier / cargo | What | Units (starter values) |
+|---|---|---|
+| 1, patrols | `ORE_Director_T1_Patrol_East`: patrol from the Base B rear-ramp foot (18200, -1800) along the east flank lane to the radio outpost. `_North`: patrol from south-west of the battery (15200, 9000) through the dead pines between the outpost and the battery. 4 waypoints each; first wave 10 s / 40 s after the tier; once. | Base: Mosin + BA-12/BA-14. N: + Mosin. H: + PTRS (Okhotnik). B: + T-70/BT-7/T-26 |
+| 2, retake squads | The director's own `TargetedAttack` on `ORE_Explore_Station_HN1` and `_HB3`. Spawn points: the east foot of the knoll (14900, -800) and north of the checkpoint (1600, 9800). Retries every 20 s until a station is held. | 2 Mosin + 1 PTRS spread over both points, and 1 BA-12/BA-14 at Base B. **Same on every difficulty** (see below) |
+| 3, ridge raids | `ORE_Director_T3_Raid_Sally`: from the valley floor below Base B (5300, -6800), through the viaduct gap and up the prow sally ramp to the bench and `ORE_HQ_AttackMarker`; 2 waves 300 s apart. `_MainRamp`: from the foothill toe east of the road (7700, 13300), across the Radixite field, up the main ramp and past the refinery to the marker; once, 90 s after the tier. Both show on the minimap. | Sally: Base: 2 Mosin + light tank. N: + PTRS. H: + T-34/76. B: + Maxim + T-34/76. Main ramp: Base: 2 Mosin + armoured car. N: + PTRS + light tank. H: + Mosin. B: + T-34/76 |
+| Fuel cargo | `ORE_Director_Fuel_1..4`: strongpoints (`bSpawnOnBeginPlay` off, no dig-in) with 2 light tank posts each, plus a 3rd post on Brutal. In list order: valley side east of the knoll, the east flank lane, the west ramp foot, behind the knoll. `PlacementActorsPerEscapedConvoy` = 1. | T-70 / BT-7 / T-26 per post |
+
+**Why there are 4 fuel strongpoints.** Fuel can escape with convoys 1, 2, 3 and 6. Convoys 2 and 3 are mixed, and their
+fuel trucks count through `ByCargoType`.
+
+**Stations and `bOnlyHostileTargets` (left on).** `AOreHeapStation` changes the owner of its RTS component:
+- It starts at owner 0, which is neutral. Neutral is not hostile to player 2, so the station is skipped.
+- On capture it becomes the capturer (1, hostile), so it is attacked.
+- When knocked out it becomes `KnockedOutOwner` (2), so it is skipped again.
+
+The script checks owner 0 and `KnockedOutOwner` == 2 on every run. The test also stepped the station through these
+states and read `IsActorHostileToPlayer(Station, 2)`: false, true, false, true.
+
+**Limits:**
+- `FConvoyPressureTargetedAttack.Units` has one list and no per-difficulty lists. The tier 2 squads are therefore the
+  same on every difficulty. Scaling them needs C++.
+- The attack launches once, at the stations held at that moment. A station captured later is not attacked by this tier.
+- **Wave supply.** Every wave unit takes 1 of the enemy controller's wave supply (default 20). It comes back only
+  when the unit dies, including after hand-over to the AI. With everything alive at once, these responses hold:
+
+  | Difficulty | Living wave units |
+  |---|---|
+  | New To RTS | 17 |
+  | Normal | 23 |
+  | Hard | 28 |
+  | Brutal | 35 |
+
+  The counts include both Sally waves. The counterattack stages draw on the same supply. At 0 supply, elements are
+  skipped, and a wave iteration with no unit is spent. A `Once` spawner the director started then never comes back.
+  To raise the supply, call `SetEnemyWaveSupply` (BlueprintCallable on `AEnemyController`) from the Opening stage.
+
+**Test (2026-11-23).** Run headless in the DebugGame commandlet on a file copy of the map in `Maps/Tmp`, with
+`test_director_responses.py`. The copy was deleted afterwards.
+- Two runs kept the same 8 actors.
+- `check()` passed: thresholds, tier lists, the attack's targets, units and spawn points, the Fuel list, start flags
+  off, and no editor label problems.
+- Spawn points and posts are flat to 1.5 m over 8 m, and the sphere overlap check found no colliding actor at any of
+  them.
+- All 24 nav legs found full paths on the default agent: spawn to every patrol point, every raid leg, both tier 2 spawns
+  to both stations' drop-off points.
+
+**Not verified:**
+- A full-editor save of the map and a reload. The test copy was not saved because a second full editor was not started
+  (VRAM was about 10 of 12 GB in use).
+- Vehicle nav agents. The legs were checked on the default agent only. `OreMountainsMap.md` says every ramp passes for
+  all four agents with the same slope limit, so heavy tanks can also use the prow sally ramp.
+- Any behaviour in play.
+
 ## Dormant defences: why slots and not hidden actors
 
 The brief asked for a component that keeps placed defences hidden and inactive until switched on. A placed unit or
