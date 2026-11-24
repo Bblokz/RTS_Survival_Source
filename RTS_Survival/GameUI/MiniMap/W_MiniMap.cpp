@@ -12,6 +12,7 @@
 #include "Rendering/SlateRenderer.h"
 #include "Styling/CoreStyle.h"
 #include "RTS_Survival/FOWSystem/FowManager/FowManager.h"
+#include "RTS_Survival/GameUI/MiniMap/DirectionFinding/MiniMapDirectionFindingPainter.h"
 #include "RTS_Survival/GameUI/MiniMap/CombatPings/RTSCombatPingSettings.h"
 #include "RTS_Survival/GameUI/MiniMap/CombatPings/RTSCombatPingSubsystem.h"
 #include "RTS_Survival/GameUI/MiniMap/MapObjectFilters/RTSMapObjectFilterSettings.h"
@@ -217,7 +218,8 @@ int32 UW_MiniMap::NativePaint(const FPaintArgs& Args,
 		InWidgetStyle,
 		bParentEnabled);
 
-	const int32 FilterLayerId = DrawMapObjectFilters(AllottedGeometry, OutDrawElements, NextLayerId);
+	const int32 WedgeLayerId = DrawDirectionFindingWedges(AllottedGeometry, OutDrawElements, NextLayerId);
+	const int32 FilterLayerId = DrawMapObjectFilters(AllottedGeometry, OutDrawElements, WedgeLayerId);
 	const int32 IconLayerId = DrawMiniMapUnitColorIcons(AllottedGeometry, OutDrawElements, FilterLayerId);
 	const int32 CustomIconLayerId = DrawCustomMiniMapTextureIcons(AllottedGeometry, OutDrawElements, IconLayerId);
 	const int32 TextLayerId = DrawCustomMiniMapText(AllottedGeometry, OutDrawElements, CustomIconLayerId);
@@ -638,6 +640,28 @@ const FSlateBrush* UW_MiniMap::GetCustomMiniMapIconBrush(const EMinimapIconType 
 	}
 
 	return M_CustomMinimapIconBrushes.Find(IconType);
+}
+
+int32 UW_MiniMap::DrawDirectionFindingWedges(const FGeometry& AllottedGeometry,
+                                             FSlateWindowElementList& OutDrawElements,
+                                             const int32 LayerId) const
+{
+	// Most maps have no direction-finding manager; check that first so the validators only run where wedges exist.
+	const UWorld* const World = GetWorld();
+	if (not FMiniMapDirectionFindingPainter::GetHasWedges(World))
+	{
+		return LayerId;
+	}
+	const AFowManager* const FowManager = GetIsValidFowManager();
+	const UImage* const MiniMapImage = GetIsValidMiniMapImg();
+	if (not IsValid(FowManager) || not IsValid(MiniMapImage))
+	{
+		return LayerId;
+	}
+	// Paint space, like AllottedGeometry: the cached (tick space) geometry is in desktop space and is off by the
+	// window position in a windowed game.
+	return FMiniMapDirectionFindingPainter::Paint(World, *FowManager, MiniMapImage->GetPaintSpaceGeometry(),
+	                                              AllottedGeometry, bM_IsTacticalMapView, OutDrawElements, LayerId);
 }
 
 int32 UW_MiniMap::DrawCombatPings(const FGeometry& AllottedGeometry,

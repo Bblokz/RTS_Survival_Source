@@ -16,6 +16,8 @@
 #include "SquadInfoTakeoverContent.h"
 #include "VehicleInfoTakeoverContent.h"
 #include "W_BxpPackUpTakeover.h"
+#include "W_CapturingTrucksTakeover.h"
+#include "W_DocumentTakeover.h"
 #include "W_CameraControlsTakeover.h"
 #include "W_CoverTakeover.h"
 #include "W_NomadicConversionTakeover.h"
@@ -48,6 +50,8 @@ namespace InfoTakeoverSubsystemPrivate
 	const FName DigInArchiveKey(TEXT("InfoTakeover.DigIn"));
 	const FName WallBreachArchiveKey(TEXT("InfoTakeover.WallBreach"));
 	const FName AdrenalineShotArchiveKey(TEXT("InfoTakeover.AdrenalineShot"));
+	const FName CapturingTrucksArchiveKey(TEXT("InfoTakeover.CapturingTrucks"));
+	const TCHAR* const DocumentArchiveKeyPrefix = TEXT("InfoTakeover.Document.");
 }
 
 bool UInfoTakeoverSubsystem::ShouldCreateSubsystem(UObject* Outer) const
@@ -241,6 +245,23 @@ int32 UInfoTakeoverSubsystem::QueueAdrenalineShotTakeover()
 	return QueueWaitedTutorialTakeover(EInfoTakeoverKind::AdrenalineShot);
 }
 
+int32 UInfoTakeoverSubsystem::QueueCapturingTrucksTakeover()
+{
+	return QueueWaitedTutorialTakeover(EInfoTakeoverKind::CapturingTrucks);
+}
+
+int32 UInfoTakeoverSubsystem::QueueDocumentTakeover(const FDocumentTakeoverContent& Content)
+{
+	// Story content, not unit intel: "never show again" does not hide it.
+	FQueuedInfoTakeover QueuedTakeover;
+	QueuedTakeover.Kind = EInfoTakeoverKind::Document;
+	QueuedTakeover.DocumentContent = Content;
+	QueuedTakeover.RequestId = M_NextRequestId++;
+	const int32 RequestId = QueuedTakeover.RequestId;
+	Enqueue(QueuedTakeover);
+	return RequestId;
+}
+
 int32 UInfoTakeoverSubsystem::QueueWaitedTutorialTakeover(const EInfoTakeoverKind Kind)
 {
 	// Game-mechanic field manuals always show: "never show again" only hides unit intel.
@@ -367,6 +388,10 @@ UW_InfoTakeover* UInfoTakeoverSubsystem::CreateTakeoverWidget(const FQueuedInfoT
 		return CreateWallBreachTakeoverWidget();
 	case EInfoTakeoverKind::AdrenalineShot:
 		return CreateAdrenalineShotTakeoverWidget();
+	case EInfoTakeoverKind::CapturingTrucks:
+		return CreateCapturingTrucksTakeoverWidget();
+	case EInfoTakeoverKind::Document:
+		return CreateDocumentTakeoverWidget(QueuedTakeover);
 	default:
 		RTSFunctionLibrary::ReportError(TEXT("Info takeover: buildings have no takeover widget yet."));
 		return nullptr;
@@ -685,6 +710,55 @@ UW_InfoTakeover* UInfoTakeoverSubsystem::CreateAdrenalineShotTakeoverWidget() co
 	return AdrenalineShotTakeover;
 }
 
+UW_InfoTakeover* UInfoTakeoverSubsystem::CreateCapturingTrucksTakeoverWidget() const
+{
+	ACPPController* const PlayerController = FRTS_Statics::GetRTSController(this);
+	if (not IsValid(PlayerController))
+	{
+		return nullptr;
+	}
+	TSubclassOf<UW_CapturingTrucksTakeover> WidgetClass =
+		UInfoTakeoverSettings::Get()->CapturingTrucksTakeoverWidgetClass.LoadSynchronous();
+	if (WidgetClass == nullptr)
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Info takeover: WBP_CapturingTrucksTakeover could not be loaded; showing "
+			"the unstyled C++ widget."));
+		WidgetClass = UW_CapturingTrucksTakeover::StaticClass();
+	}
+	UW_CapturingTrucksTakeover* const CapturingTrucksTakeover = CreateWidget<UW_CapturingTrucksTakeover>(
+		PlayerController, WidgetClass);
+	if (not IsValid(CapturingTrucksTakeover))
+	{
+		return nullptr;
+	}
+	CapturingTrucksTakeover->SetupCapturingTrucks();
+	return CapturingTrucksTakeover;
+}
+
+UW_InfoTakeover* UInfoTakeoverSubsystem::CreateDocumentTakeoverWidget(const FQueuedInfoTakeover& QueuedTakeover) const
+{
+	ACPPController* const PlayerController = FRTS_Statics::GetRTSController(this);
+	if (not IsValid(PlayerController))
+	{
+		return nullptr;
+	}
+	TSubclassOf<UW_DocumentTakeover> WidgetClass =
+		UInfoTakeoverSettings::Get()->DocumentTakeoverWidgetClass.LoadSynchronous();
+	if (WidgetClass == nullptr)
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Info takeover: WBP_DocumentTakeover could not be loaded; showing the "
+			"unstyled C++ widget."));
+		WidgetClass = UW_DocumentTakeover::StaticClass();
+	}
+	UW_DocumentTakeover* const DocumentTakeover = CreateWidget<UW_DocumentTakeover>(PlayerController, WidgetClass);
+	if (not IsValid(DocumentTakeover))
+	{
+		return nullptr;
+	}
+	DocumentTakeover->SetupDocument(QueuedTakeover.DocumentContent);
+	return DocumentTakeover;
+}
+
 void UInfoTakeoverSubsystem::HandleTakeoverClosed(UW_InfoTakeover* ClosedTakeover)
 {
 	if (ClosedTakeover != M_ActiveTakeover)
@@ -761,6 +835,12 @@ void UInfoTakeoverSubsystem::AddToArchive(const FQueuedInfoTakeover& Takeover) c
 		break;
 	case EInfoTakeoverKind::AdrenalineShot:
 		ArchiveContent = MakeAdrenalineShotArchiveContent();
+		break;
+	case EInfoTakeoverKind::CapturingTrucks:
+		ArchiveContent = MakeCapturingTrucksArchiveContent();
+		break;
+	case EInfoTakeoverKind::Document:
+		ArchiveContent = MakeDocumentArchiveContent(Takeover.DocumentContent);
 		break;
 	default:
 		ArchiveContent = MakeArchiveContent(Takeover.VehicleContent);
@@ -937,6 +1017,45 @@ FArchiveCustomContent UInfoTakeoverSubsystem::MakeAdrenalineShotArchiveContent()
 	// The picture is a flipbook atlas; the archive item only takes a still image of a fixed size.
 	ArchiveContent.bHasImage = false;
 	ArchiveContent.SortType = ERTSArchiveType::GameMechanics;
+	return ArchiveContent;
+}
+
+FArchiveCustomContent UInfoTakeoverSubsystem::MakeCapturingTrucksArchiveContent()
+{
+	using namespace InfoTakeoverSubsystemPrivate;
+	FArchiveCustomContent ArchiveContent;
+	ArchiveContent.Key = CapturingTrucksArchiveKey;
+	ArchiveContent.Title = UW_CapturingTrucksTakeover::GetCapturingTrucksTitle();
+	ArchiveContent.Description = UW_CapturingTrucksTakeover::GetCapturingTrucksSummary();
+	// The picture is an animated widget; the archive item only takes a still image.
+	ArchiveContent.bHasImage = false;
+	ArchiveContent.SortType = ERTSArchiveType::GameMechanics;
+	return ArchiveContent;
+}
+
+FArchiveCustomContent UInfoTakeoverSubsystem::MakeDocumentArchiveContent(
+	const FDocumentTakeoverContent& DocumentContent)
+{
+	using namespace InfoTakeoverSubsystemPrivate;
+	FArchiveCustomContent ArchiveContent;
+	const FString KeySuffix = DocumentContent.ArchiveKey.IsNone()
+		                          ? DocumentContent.Title.ToString()
+		                          : DocumentContent.ArchiveKey.ToString();
+	ArchiveContent.Key = FName(DocumentArchiveKeyPrefix + KeySuffix);
+	ArchiveContent.Title = DocumentContent.Title;
+	// The archive keeps the sheet as plain text: intro, heading, then one paragraph per line.
+	TArray<FString> Paragraphs;
+	Paragraphs.Add(DocumentContent.Description.ToString());
+	Paragraphs.Add(DocumentContent.PaperHeading.ToString());
+	for (const FDocumentTakeoverLine& Line : DocumentContent.PaperLines)
+	{
+		Paragraphs.Add(Line.Text.ToString());
+	}
+	Paragraphs.Add(DocumentContent.PaperFooter.ToString());
+	Paragraphs.RemoveAll([](const FString& Paragraph) { return Paragraph.IsEmpty(); });
+	ArchiveContent.Description = FText::FromString(FString::Join(Paragraphs, TEXT("\n\n")));
+	ArchiveContent.bHasImage = false;
+	ArchiveContent.SortType = ERTSArchiveType::Lore;
 	return ArchiveContent;
 }
 
