@@ -1923,7 +1923,7 @@ ECommandQueueError ICommands::Reinforce(const bool bSetUnitToIdle)
 	}
 	if (bSetUnitToIdle)
 	{
-		SetUnitToIdle();
+		SetUnitToIdleForNewOrder();
 	}
 	const ECommandQueueError Error = UnitCommandData->AddAbilityToTCommands(
 		EAbilityID::IdReinforceSquad, FVector::ZeroVector, ActivePoint->GetOwner(), FRotator::ZeroRotator);
@@ -1952,7 +1952,7 @@ bool ICommands::GetForceFinalRotationRegardlessOfReverse()
 
 ECommandQueueError ICommands::StopCommand()
 {
-	SetUnitToIdle();
+	SetUnitToIdleForNewOrder();
 	ExecuteStopCommand();
 	return ECommandQueueError::NoError;
 }
@@ -1974,7 +1974,7 @@ ECommandQueueError ICommands::AttackActor(
 	}
 	if (bSetUnitToIdle)
 	{
-		SetUnitToIdle();
+		SetUnitToIdleForNewOrder();
 	}
 	const ECommandQueueError Error = UnitCommandData->AddAbilityToTCommands(
 		EAbilityID::IdAttack, FVector::ZeroVector, Target, FRotator::ZeroRotator);
@@ -1990,7 +1990,7 @@ ECommandQueueError ICommands::CaptureActor(AActor* CaptureTarget, const bool bSe
 	}
 	if (bSetUnitToIdle)
 	{
-		SetUnitToIdle();
+		SetUnitToIdleForNewOrder();
 	}
 	if (not FCaptureMechanicHelpers::GetValidCaptureInterface(CaptureTarget) || not GetCanCaptureUnits())
 	{
@@ -2090,7 +2090,7 @@ ECommandQueueError ICommands::ResearchTechnology(const ETechnology Technology,
 
 	if (bSetUnitToIdle)
 	{
-		SetUnitToIdle();
+		SetUnitToIdleForNewOrder();
 	}
 
 	return UnitCommandData->AddAbilityToTCommands(
@@ -2124,7 +2124,7 @@ ECommandQueueError ICommands::FieldConstruction(const EFieldConstructionType Fie
 	}
 	if (bSetUnitToIdle)
 	{
-		SetUnitToIdle();
+		SetUnitToIdleForNewOrder();
 	}
 	return UnitCommandData->AddAbilityToTCommands(
 		EAbilityID::IdFieldConstruction,
@@ -2161,7 +2161,7 @@ ECommandQueueError ICommands::ActivateModeAbility(const EModeAbilityType ModeAbi
 
 	if (bSetUnitToIdle)
 	{
-		SetUnitToIdle();
+		SetUnitToIdleForNewOrder();
 	}
 
 	return UnitCommandData->AddAbilityToTCommands(
@@ -2198,7 +2198,7 @@ ECommandQueueError ICommands::DisableModeAbility(const EModeAbilityType ModeAbil
 
 	if (bSetUnitToIdle)
 	{
-		SetUnitToIdle();
+		SetUnitToIdleForNewOrder();
 	}
 
 	return UnitCommandData->AddAbilityToTCommands(
@@ -2224,7 +2224,7 @@ ECommandQueueError ICommands::AttackGround(const FVector& Location, const bool b
 	}
 	if (bSetUnitToIdle)
 	{
-		SetUnitToIdle();
+		SetUnitToIdleForNewOrder();
 	}
 	return UnitCommandData->AddAbilityToTCommands(
 		EAbilityID::IdAttackGround,
@@ -2248,7 +2248,7 @@ ECommandQueueError ICommands::PatrolToLocation(const FVector& Location, const bo
 	}
 	if (bSetUnitToIdle)
 	{
-		SetUnitToIdle();
+		SetUnitToIdleForNewOrder();
 	}
 	const ECommandQueueError Error = UnitCommandData->AddAbilityToTCommands(
 		EAbilityID::IdPatrol, Location, nullptr, FRotator::ZeroRotator);
@@ -2266,7 +2266,7 @@ ECommandQueueError ICommands::MarchToLocation(const FVector& Location, const boo
 	// Scripted order (missions, blueprints): squads do not carry a march button, so the card is not checked.
 	if (bSetUnitToIdle)
 	{
-		SetUnitToIdle();
+		SetUnitToIdleForNewOrder();
 	}
 	return UnitCommandData->AddAbilityToTCommands(
 		EAbilityID::IdMarch, Location, nullptr, FRotator::ZeroRotator);
@@ -2315,7 +2315,7 @@ ECommandQueueError ICommands::RotateTowards(
 	}
 	if (bSetUnitToIdle)
 	{
-		SetUnitToIdle();
+		SetUnitToIdleForNewOrder();
 	}
 	const ECommandQueueError Error = UnitCommandData->AddAbilityToTCommands(
 		EAbilityID::IdRotateTowards, FVector::ZeroVector, nullptr,
@@ -2335,7 +2335,7 @@ ECommandQueueError ICommands::CreateBuildingAtLocation(const FVector Location, c
 	// No ability allowed check as this ability is not part of the command card.
 	if (bSetUnitToIdle)
 	{
-		SetUnitToIdle();
+		SetUnitToIdleForNewOrder();
 	}
 	const ECommandQueueError Error = UnitCommandData->AddAbilityToTCommands(
 		EAbilityID::IdCreateBuilding, Location, nullptr, WorldRotation);
@@ -2360,7 +2360,7 @@ ECommandQueueError ICommands::HarvestResource(
 	}
 	if (bSetUnitToIdle)
 	{
-		SetUnitToIdle();
+		SetUnitToIdleForNewOrder();
 	}
 	ECommandQueueError Error = UnitCommandData->AddAbilityToTCommands(EAbilityID::IdHarvestResource,
 	                                                                  FVector::ZeroVector, TargetResource,
@@ -2383,7 +2383,7 @@ ECommandQueueError ICommands::ReturnCargo(const bool bSetUnitToIdle)
 	}
 	if (bSetUnitToIdle)
 	{
-		SetUnitToIdle();
+		SetUnitToIdleForNewOrder();
 	}
 	ECommandQueueError Error = UnitCommandData->AddAbilityToTCommands(EAbilityID::IdReturnCargo,
 	                                                                  FVector::ZeroVector, nullptr,
@@ -2407,7 +2407,7 @@ ECommandQueueError ICommands::PickupItem(AItemsMaster* TargetItem, const bool bS
 	}
 	if (bSetUnitToIdle)
 	{
-		SetUnitToIdle();
+		SetUnitToIdleForNewOrder();
 	}
 	ECommandQueueError Error = UnitCommandData->AddAbilityToTCommands(EAbilityID::IdPickupItem, FVector::ZeroVector,
 	                                                                  TargetItem,
@@ -2430,7 +2430,7 @@ ECommandQueueError ICommands::DigIn(const bool bSetUnitToIdle)
 	}
 	if (bSetUnitToIdle)
 	{
-		SetUnitToIdle();
+		SetUnitToIdleForNewOrder();
 	}
 	const ECommandQueueError Error = UnitCommandData->AddAbilityToTCommands(
 		EAbilityID::IdDigIn, FVector::ZeroVector, nullptr,
@@ -2453,7 +2453,7 @@ ECommandQueueError ICommands::BreakCover(const bool bSetUnitToIdle)
 	}
 	if (bSetUnitToIdle)
 	{
-		SetUnitToIdle();
+		SetUnitToIdleForNewOrder();
 	}
 	const ECommandQueueError Error = UnitCommandData->AddAbilityToTCommands(
 		EAbilityID::IdBreakCover, FVector::ZeroVector, nullptr,
@@ -2477,7 +2477,7 @@ ECommandQueueError ICommands::EnterCoverAndHold(const bool bSetUnitToIdle)
 	}
 	if (bSetUnitToIdle)
 	{
-		SetUnitToIdle();
+		SetUnitToIdleForNewOrder();
 	}
 	return UnitCommandData->AddAbilityToTCommands(
 		EAbilityID::IdEnterCoverAndHold, FVector::ZeroVector, nullptr,
@@ -2510,7 +2510,7 @@ ECommandQueueError ICommands::SwitchWeapons(const bool bSetUnitToIdle)
 	}
 	if (bSetUnitToIdle)
 	{
-		SetUnitToIdle();
+		SetUnitToIdleForNewOrder();
 	}
 	const ECommandQueueError Error = UnitCommandData->AddAbilityToTCommands(
 		EAbilityID::IdSwitchWeapon, FVector::ZeroVector, nullptr,
@@ -2538,7 +2538,7 @@ ECommandQueueError ICommands::ThrowGrenade(const FVector& Location, const bool b
 	}
 	if (bSetUnitToIdle)
 	{
-		SetUnitToIdle();
+		SetUnitToIdleForNewOrder();
 	}
 	const ECommandQueueError Error = UnitCommandData->AddAbilityToTCommands(
 		EAbilityID::IdThrowGrenade, Location, nullptr,
@@ -2566,7 +2566,7 @@ ECommandQueueError ICommands::CancelThrowingGrenade(const bool bSetUnitToIdle,
 	}
 	if (bSetUnitToIdle)
 	{
-		SetUnitToIdle();
+		SetUnitToIdleForNewOrder();
 	}
 	const ECommandQueueError Error = UnitCommandData->AddAbilityToTCommands(
 		EAbilityID::IdCancelThrowGrenade, FVector::ZeroVector, nullptr,
@@ -2594,7 +2594,7 @@ ECommandQueueError ICommands::AimAbility(const FVector& Location, const bool bSe
 	}
 	if (bSetUnitToIdle)
 	{
-		SetUnitToIdle();
+		SetUnitToIdleForNewOrder();
 	}
 	const ECommandQueueError Error = UnitCommandData->AddAbilityToTCommands(
 		EAbilityID::IdAimAbility, Location, nullptr, FRotator::ZeroRotator, static_cast<int32>(AimAbilityType));
@@ -2620,7 +2620,7 @@ ECommandQueueError ICommands::CancelAimAbility(const bool bSetUnitToIdle, const 
 	}
 	if (bSetUnitToIdle)
 	{
-		SetUnitToIdle();
+		SetUnitToIdleForNewOrder();
 		// Going idle terminated the aim ability: its move to range stopped and the card shows the aim ability again.
 		// A cancel queued now would find no cancel entry and be refused with an error; the cancel is already done.
 		// The refused command used to end the (now empty) queue, which is what tells the unit it is idle.
@@ -2676,7 +2676,7 @@ ECommandQueueError ICommands::FireAttachedWeaponAbility(const FVector& TargetLoc
 
 	if (bSetUnitToIdle)
 	{
-		SetUnitToIdle();
+		SetUnitToIdleForNewOrder();
 	}
 
 	const ECommandQueueError Error = UnitCommandData->AddAbilityToTCommands(
@@ -2716,7 +2716,7 @@ ECommandQueueError ICommands::SwapTurret(const bool bSetUnitToIdle, const ETurre
 
 	if (bSetUnitToIdle)
 	{
-		SetUnitToIdle();
+		SetUnitToIdleForNewOrder();
 	}
 
 	return UnitCommandData->AddAbilityToTCommands(
@@ -2742,7 +2742,7 @@ ECommandQueueError ICommands::FireRockets(const bool bSetUnitToIdle)
 	}
 	if (bSetUnitToIdle)
 	{
-		SetUnitToIdle();
+		SetUnitToIdleForNewOrder();
 	}
 	const ECommandQueueError Error = UnitCommandData->AddAbilityToTCommands(
 		EAbilityID::IdFireRockets, FVector::ZeroVector, nullptr,
@@ -2764,7 +2764,7 @@ ECommandQueueError ICommands::CancelFireRockets(const bool bSetUnitToIdle)
 	}
 	if (bSetUnitToIdle)
 	{
-		SetUnitToIdle();
+		SetUnitToIdleForNewOrder();
 	}
 	const ECommandQueueError Error = UnitCommandData->AddAbilityToTCommands(
 		EAbilityID::IdCancelRocketFire, FVector::ZeroVector, nullptr,
@@ -2821,7 +2821,7 @@ ECommandQueueError ICommands::ConvertToVehicle(const bool bSetUnitToIdle)
 	// No ability allowed check as this ability is not part of the command card.
 	if (bSetUnitToIdle)
 	{
-		SetUnitToIdle();
+		SetUnitToIdleForNewOrder();
 	}
 	const ECommandQueueError Error = UnitCommandData->AddAbilityToTCommands(EAbilityID::IdConvertToVehicle,
 	                                                                        FVector::ZeroVector, nullptr,
@@ -2845,7 +2845,7 @@ ECommandQueueError ICommands::ScavengeObject(AActor* TargetObject, const bool bS
 	}
 	if (bSetUnitToIdle)
 	{
-		SetUnitToIdle();
+		SetUnitToIdleForNewOrder();
 	}
 	const ECommandQueueError Error = UnitCommandData->AddAbilityToTCommands(EAbilityID::IdScavenge, FVector::ZeroVector,
 	                                                                        TargetObject,
@@ -2868,7 +2868,7 @@ ECommandQueueError ICommands::RepairActor(AActor* TargetObject, const bool bSetU
 	}
 	if (bSetUnitToIdle)
 	{
-		SetUnitToIdle();
+		SetUnitToIdleForNewOrder();
 	}
 	const ECommandQueueError Error = UnitCommandData->AddAbilityToTCommands(EAbilityID::IdRepair, FVector::ZeroVector,
 	                                                                        TargetObject,
@@ -2891,7 +2891,7 @@ ECommandQueueError ICommands::ReturnToBase(const bool bSetUnitToIdle)
 	}
 	if (bSetUnitToIdle)
 	{
-		SetUnitToIdle();
+		SetUnitToIdleForNewOrder();
 	}
 	const ECommandQueueError Error = UnitCommandData->AddAbilityToTCommands(
 		EAbilityID::IdReturnToBase, FVector::ZeroVector,
@@ -2915,7 +2915,7 @@ ECommandQueueError ICommands::RetreatToLocation(const FVector& RetreatLocation, 
 	}
 	if (bSetUnitToIdle)
 	{
-		SetUnitToIdle();
+		SetUnitToIdleForNewOrder();
 	}
 	if (UnitCommandData->GetHasCommandInQueue(EAbilityID::IdRetreat))
 	{
@@ -3432,6 +3432,25 @@ void ICommands::SetUnitToIdle()
 	}
 }
 
+void ICommands::SetUnitToIdleForNewOrder()
+{
+	UCommandData* UnitCommandData = GetIsValidCommandData();
+	if (not UnitCommandData)
+	{
+		return;
+	}
+	const bool bHasActiveCommand = UnitCommandData->GetCurrentQueuedCommand() != nullptr;
+	if (not bHasActiveCommand || not GetMustFinishActiveCommandBeforeNewOrder())
+	{
+		SetUnitToIdle();
+		return;
+	}
+	// The running command may not be interrupted: drop (and refund) what waited behind it, so the new order is
+	// appended right after it and runs once it is done. A second order replaces the first held one.
+	UnitCommandData->ClearQueuedCommandsAfterActive();
+	OnNewOrderHeldBehindActiveCommand();
+}
+
 void ICommands::TerminateActiveCommand(const UCommandData* CommandData)
 {
 	if (not CommandData)
@@ -3452,7 +3471,7 @@ void ICommands::PrepareForImmediateMovementCommand(UCommandData* UnitCommandData
 
 	if (not UnitCommandData->GetIsCurrentCommandAMovementCommand())
 	{
-		SetUnitToIdle();
+		SetUnitToIdleForNewOrder();
 		return;
 	}
 
@@ -3565,7 +3584,7 @@ ECommandQueueError ICommands::EnterCargo(AActor* CarrierActor, const bool bSetUn
 
 	if (bSetUnitToIdle)
 	{
-		SetUnitToIdle();
+		SetUnitToIdleForNewOrder();
 	}
 
 	return UnitCommandData->AddAbilityToTCommands(
@@ -3604,7 +3623,7 @@ ECommandQueueError ICommands::ManAbandonedTeamWeapon(AActor* TeamWeaponActor, co
 
 	if (bSetUnitToIdle)
 	{
-		SetUnitToIdle();
+		SetUnitToIdleForNewOrder();
 	}
 
 	return UnitCommandData->AddAbilityToTCommands(
@@ -3625,7 +3644,7 @@ ECommandQueueError ICommands::TowActor(AActor* ActorToTow, const ETowedActorTarg
 
 	if (bSetUnitToIdle)
 	{
-		SetUnitToIdle();
+		SetUnitToIdleForNewOrder();
 	}
 
 	return UnitCommandData->AddAbilityToTCommands(EAbilityID::IdTowActor, FVector::ZeroVector, ActorToTow,
@@ -3653,7 +3672,7 @@ ECommandQueueError ICommands::DetachTow(const bool bSetUnitToIdle)
 
 	if (bSetUnitToIdle)
 	{
-		SetUnitToIdle();
+		SetUnitToIdleForNewOrder();
 	}
 
 	return UnitCommandData->AddAbilityToTCommands(EAbilityID::IdDetachTow, FVector::ZeroVector, nullptr,
@@ -3685,7 +3704,7 @@ ECommandQueueError ICommands::ActivateShield(const bool bSetUnitToIdle)
 
 	if (bSetUnitToIdle)
 	{
-		SetUnitToIdle();
+		SetUnitToIdleForNewOrder();
 	}
 
 	return UnitCommandData->AddAbilityToTCommands(EAbilityID::IdActivateShield);
@@ -3717,7 +3736,7 @@ ECommandQueueError ICommands::RegisterAsBlackboardIdle(const bool bSetUnitToIdle
 
 	if (bSetUnitToIdle)
 	{
-		SetUnitToIdle();
+		SetUnitToIdleForNewOrder();
 	}
 
 	return UnitCommandData->AddAbilityToTCommands(
@@ -3743,7 +3762,7 @@ ECommandQueueError ICommands::ExitCargo(const bool bSetUnitToIdle)
 
 	if (bSetUnitToIdle)
 	{
-		SetUnitToIdle();
+		SetUnitToIdleForNewOrder();
 	}
 
 	return UnitCommandData->AddAbilityToTCommands(

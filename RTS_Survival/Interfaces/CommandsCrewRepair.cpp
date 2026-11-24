@@ -413,7 +413,7 @@ ECommandQueueError ICommands::CrewRepair(const ECrewRepairAbilityType Subtype, c
 	}
 	if (bSetUnitToIdle)
 	{
-		SetUnitToIdle();
+		SetUnitToIdleForNewOrder();
 	}
 	return UnitCommandData->AddAbilityToTCommands(EAbilityID::IdCrewRepair, FVector::ZeroVector, nullptr,
 	                                              FRotator::ZeroRotator, static_cast<int32>(Subtype));

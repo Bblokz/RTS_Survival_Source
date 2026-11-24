@@ -40,8 +40,19 @@ Design history: concept sheets and rough models in `_AssetSource/HQUnloadCrane/`
 - **Unload.** The cargo is split into `TripsPerUnload` (3) chunks. Per trip the trolley runs to the bay, lowers, grabs (the
   pooled crystals (Pz I cargo mesh) or ingots (Pz IV cargo mesh) appear in the jaws), hoists, runs to the bin, lowers and opens. At that moment the chunk is
   credited through the drop-off and taken off the harvester in one step. The load in the air is only visual: if the
-  harvester leaves (new order, dies) or the station goes (pack-up), nothing in flight is credited and the rest stays on
-  board.
+  harvester leaves (dies, is towed or stunned) or the station goes (pack-up), nothing in flight is credited and the rest
+  stays on board.
+- **Unload lock.** From the moment the harvester starts reversing into its bay until its unload ends
+  (`UHarvester::GetIsLockedForUnload`), orders do not interrupt it. Any order given without shift (move, stop, attack,
+  another harvest target, ...) goes through `ICommands::SetUnitToIdleForNewOrder`, which asks
+  `GetMustFinishActiveCommandBeforeNewOrder` (`ATankMaster` -> harvester). While locked, the running harvest or
+  return-cargo command keeps running. The commands queued behind it are dropped and refunded, and the new order is
+  queued right behind it, so a second order replaces the first one that was waiting. A stop only drops the waiting
+  orders, so the harvester goes idle after the unload. The harvester is marked (`HoldNewOrderUntilUnloaded`). When the
+  unload ends for any reason, or docking fails, its next harvest step is replaced by ending the running command
+  (`EndCommandForHeldOrder`), and the queue moves on to the order that waited. Shift-queued orders keep their old
+  meaning (after the harvest command). System resets (`SetUnitToIdle`: towing, stuns, loading) still interrupt at once.
+  Bay-less harvesters at the overflow point are never locked.
 - **End.** Cargo empty: the harvester goes back to harvesting while the empty grab returns. Bin full: it looks for another
   drop-off with what is left. Station gone: same.
 
@@ -63,6 +74,11 @@ both bays docked and both trolleys working at the same time, exactly the cargo c
 bays released. Then a third trip: the HQ packs up while a load is in the air; cargo on board + credited must equal what
 it carried. Logs `RTS_UNLOAD_TEST check=PASS|FAIL` and `RTS_UNLOAD_TEST RESULT`. Pictures (needs rendering, drop
 `-nullrhi`, add `-RenderOffscreen`): `-UnloadStationCapture=<folder>`.
+
+Unload lock (all three stations): every harvester that docks in the first unload gets a move order right away; on the
+HQ the second one gets a move then a stop. Checks: it is locked, the order is held, it keeps unloading, it stays on the
+dock (drift <= 30 cm), and after the unload the move runs (after the stop, nothing does). `-UnloadStationCaptureEvery=2`
+adds the first two views as `seq_NNN` frames every 2 s while a bay is docked, to review the rig frame by frame.
 
 ## Known limits
 

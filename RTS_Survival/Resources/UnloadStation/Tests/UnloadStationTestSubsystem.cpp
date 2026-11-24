@@ -32,6 +32,11 @@ namespace UnloadStationTestPrivate
 	const TCHAR* const ValidateSwitch = TEXT("UnloadStationValidate");
 	const TCHAR* const AnchorSwitch = TEXT("UnloadStationAt=");
 	const TCHAR* const CaptureSwitch = TEXT("UnloadStationCapture=");
+	const TCHAR* const CaptureEverySwitch = TEXT("UnloadStationCaptureEvery=");
+	// Unload lock check: the held move goes this far ahead of the docked harvester; while it waits the harvester may
+	// not drift off the dock by more than the slack below.
+	constexpr float LockMoveDistanceCm = 1800.f;
+	constexpr float MaxLockDriftCm = 30.f;
 	const TCHAR* const TruckSwitch = TEXT("UnloadStationTruck=");
 	const TCHAR* const RefineryPath =
 		TEXT("/Game/RTS_Survival/Blueprints/GroundVehicles/BaseAndNomadic/ChildBlueprints/GerEco/OpelBlitz_Ref/Ger_Refinery_Truck.Ger_Refinery_Truck_C");
@@ -111,6 +116,10 @@ void UUnloadStationTestSubsystem::Tick(const float DeltaTime)
 		M_PhaseStartSeconds = World->GetTimeSeconds();
 		UE_LOG(LogRTSUnloadStationTest, Display, TEXT("RTS_UNLOAD_TEST started map=%s"), *World->GetName());
 	}
+	if (M_Phase == EUnloadStationTestPhase::BothBaysUnloading || M_Phase == EUnloadStationTestPhase::PackUpMidUnload)
+	{
+		TickCaptureSequence();
+	}
 	switch (M_Phase)
 	{
 	case EUnloadStationTestPhase::WaitingForStart:
@@ -162,6 +171,7 @@ void UUnloadStationTestSubsystem::TickWaitingForStart()
 	{
 		M_CaptureRig.Init(*GetWorld(), Capture);
 	}
+	(void)FParse::Value(FCommandLine::Get(), CaptureEverySwitch, M_CaptureEverySeconds);
 	SpawnHQ();
 	Check(M_HQ.IsValid(), TEXT("hq_spawned"));
 	if (not M_HQ.IsValid())
@@ -373,7 +383,12 @@ void UUnloadStationTestSubsystem::TrackHarvester(FUnloadTestHarvester& TestHarve
 			       *TestHarvester.Actor->GetName(), BayIndex, TestHarvester.DockErrorCm,
 			       TestHarvester.DockYawErrorDeg, GetPhaseSeconds());
 		}
+		if (M_Phase == EUnloadStationTestPhase::BothBaysUnloading)
+		{
+			GiveLockOrder(TestHarvester);
+		}
 	}
+	TrackLockedHarvester(TestHarvester, Status);
 	// On a single-bay station the bay-less harvester empties at the overflow point without ever docking.
 	if ((TestHarvester.bWasDocked || GetIsSingleBay()) && GetCargo(TestHarvester) == 0
 		&& Status != EHarvesterAIAction::CraneUnloading)
@@ -384,6 +399,7 @@ void UUnloadStationTestSubsystem::TrackHarvester(FUnloadTestHarvester& TestHarve
 			                                 : FVector::ZeroVector;
 		UE_LOG(LogRTSUnloadStationTest, Display, TEXT("RTS_UNLOAD_TEST unloaded harvester=%s t=%.1f status=%s"),
 		       *TestHarvester.Actor->GetName(), GetPhaseSeconds(), *GetStringHarvesterAIStatus(Status));
+		OnLockedHarvesterFinished(TestHarvester);
 	}
 }
 
@@ -446,6 +462,7 @@ void UUnloadStationTestSubsystem::TickBothBaysUnloading()
 	Check(M_RadixiteStoreChanges >= 3, TEXT("radixite_arrived_in_chunks"),
 	      FString::Printf(TEXT("store_changes=%d"), M_RadixiteStoreChanges));
 	Check(not Station->GetBayHarvester(0) && not Station->GetBayHarvester(1), TEXT("bays_released"));
+	CheckLockResults();
 	CaptureViews(TEXT("after_unload"));
 
 	// Third trip, for the pack-up case: the radixite harvester goes again.
@@ -520,6 +537,7 @@ void UUnloadStationTestSubsystem::TickSingleBayUnloadResults(AResourceUnloadStat
 	Check(M_RadixiteStoreChanges >= 4, TEXT("cargo_arrived_in_chunks"),
 	      FString::Printf(TEXT("store_changes=%d"), M_RadixiteStoreChanges));
 	Check(not Station.GetBayHarvester(0), TEXT("bay_released"));
+	CheckLockResults();
 	CaptureViews(TEXT("after_unload"));
 
 	// Second trip of the crane harvester, for the pack-up case. The other one goes, so its deliveries cannot count.
@@ -682,7 +700,111 @@ void UUnloadStationTestSubsystem::TickSingleBayCaptures(const AResourceUnloadSta
 	}
 }
 
-void UUnloadStationTestSubsystem::CaptureViews(const FString& Label) const
+void UUnloadStationTestSubsystem::GiveLockOrder(FUnloadTestHarvester& TestHarvester)
+{
+	using namespace UnloadStationTestPrivate;
+	ICommands* Commands = Cast<ICommands>(TestHarvester.Actor.Get());
+	const UHarvester* Harvester = TestHarvester.Harvester.Get();
+	if (TestHarvester.bLockOrderGiven || Commands == nullptr || not IsValid(Harvester))
+	{
+		return;
+	}
+	TestHarvester.bLockOrderGiven = true;
+	TestHarvester.bLockOrderIsStop = M_LockOrdersGiven == 1;
+	++M_LockOrdersGiven;
+	Check(Harvester->GetIsLockedForUnload(), TEXT("docked_harvester_is_locked"));
+	// Straight ahead: it reversed in, so its nose points away from the station.
+	const FVector MoveTarget = TestHarvester.Actor->GetActorLocation()
+		+ TestHarvester.Actor->GetActorForwardVector().GetSafeNormal2D() * LockMoveDistanceCm;
+	const ECommandQueueError MoveError = Commands->MoveToLocation(MoveTarget, true, FRotator::ZeroRotator, false);
+	Check(MoveError == ECommandQueueError::NoError, TEXT("lock_move_order_accepted"));
+	if (TestHarvester.bLockOrderIsStop)
+	{
+		(void)Commands->StopCommand();
+	}
+	TestHarvester.bLockOrderHeld = Harvester->MapTest_GetIsHoldingOrder();
+	TestHarvester.bLockKeptUnloading = Harvester->MapTest_GetHarvestStatus() == EHarvesterAIAction::CraneUnloading;
+	UE_LOG(LogRTSUnloadStationTest, Display, TEXT("RTS_UNLOAD_TEST lock_order harvester=%s stop=%d held=%d t=%.1f"),
+	       *TestHarvester.Actor->GetName(), TestHarvester.bLockOrderIsStop ? 1 : 0,
+	       TestHarvester.bLockOrderHeld ? 1 : 0, GetPhaseSeconds());
+}
+
+void UUnloadStationTestSubsystem::TrackLockedHarvester(FUnloadTestHarvester& TestHarvester,
+                                                       const EHarvesterAIAction Status) const
+{
+	if (not TestHarvester.bLockOrderGiven || TestHarvester.bFinished || not TestHarvester.Actor.IsValid())
+	{
+		return;
+	}
+	if (Status != EHarvesterAIAction::CraneUnloading)
+	{
+		return;
+	}
+	const float Drift = FVector::Dist2D(TestHarvester.Actor->GetActorLocation(), TestHarvester.DockedLocation);
+	TestHarvester.MaxDockDriftCm = FMath::Max(TestHarvester.MaxDockDriftCm, Drift);
+}
+
+void UUnloadStationTestSubsystem::OnLockedHarvesterFinished(FUnloadTestHarvester& TestHarvester) const
+{
+	ICommands* Commands = Cast<ICommands>(TestHarvester.Actor.Get());
+	if (not TestHarvester.bLockOrderGiven || Commands == nullptr)
+	{
+		return;
+	}
+	TestHarvester.bHeldMoveRanAfterUnload = Commands->GetActiveCommandID() == EAbilityID::IdMove;
+	UE_LOG(LogRTSUnloadStationTest, Display,
+	       TEXT("RTS_UNLOAD_TEST lock_released harvester=%s move_active=%d drift_cm=%.0f"),
+	       *TestHarvester.Actor->GetName(), TestHarvester.bHeldMoveRanAfterUnload ? 1 : 0,
+	       TestHarvester.MaxDockDriftCm);
+}
+
+void UUnloadStationTestSubsystem::CheckLockResults()
+{
+	using namespace UnloadStationTestPrivate;
+	Check(M_LockOrdersGiven > 0, TEXT("lock_order_given"), FString::Printf(TEXT("orders=%d"), M_LockOrdersGiven));
+	for (const FUnloadTestHarvester& TestHarvester : M_Harvesters)
+	{
+		if (not TestHarvester.bLockOrderGiven)
+		{
+			continue;
+		}
+		const FString Name = FString::Printf(TEXT("%s stop=%d"),
+		                                     TestHarvester.Actor.IsValid() ? *TestHarvester.Actor->GetName() : TEXT("none"),
+		                                     TestHarvester.bLockOrderIsStop ? 1 : 0);
+		Check(TestHarvester.bLockOrderHeld, TEXT("lock_order_held"), Name);
+		Check(TestHarvester.bLockKeptUnloading, TEXT("lock_kept_unloading"), Name);
+		Check(TestHarvester.MaxDockDriftCm <= MaxLockDriftCm, TEXT("lock_stayed_docked"),
+		      FString::Printf(TEXT("%s drift_cm=%.0f"), *Name, TestHarvester.MaxDockDriftCm));
+		// The held move runs once the cargo is gone; after a stop nothing waits, so no move runs.
+		Check(TestHarvester.bHeldMoveRanAfterUnload != TestHarvester.bLockOrderIsStop,
+		      TEXT("held_order_ran_after_unload"),
+		      FString::Printf(TEXT("%s move_active=%d"), *Name, TestHarvester.bHeldMoveRanAfterUnload ? 1 : 0));
+	}
+}
+
+void UUnloadStationTestSubsystem::TickCaptureSequence()
+{
+	if (M_CaptureEverySeconds <= 0.f || not M_CaptureRig.GetIsEnabled() || not M_Station.IsValid() || not M_HQ.IsValid())
+	{
+		return;
+	}
+	bool bAnyBayDocked = false;
+	for (int32 BayIndex = 0; BayIndex < M_Station->GetBayCount(); ++BayIndex)
+	{
+		bAnyBayDocked |= M_Station->GetIsBayDocked(BayIndex);
+	}
+	const float Now = GetWorld()->GetTimeSeconds();
+	if (not bAnyBayDocked || Now - M_LastSequenceCaptureWorldSeconds < M_CaptureEverySeconds)
+	{
+		return;
+	}
+	M_LastSequenceCaptureWorldSeconds = Now;
+	// The first two views: the rig and where the load lands.
+	constexpr int32 SequenceViewCount = 2;
+	CaptureViews(FString::Printf(TEXT("seq_%03d"), M_SequenceFrameIndex++), SequenceViewCount);
+}
+
+void UUnloadStationTestSubsystem::CaptureViews(const FString& Label, const int32 MaxViews) const
 {
 	if (not M_CaptureRig.GetIsEnabled() || not M_HQ.IsValid())
 	{
@@ -700,7 +822,17 @@ void UUnloadStationTestSubsystem::CaptureViews(const FString& Label) const
 		                                             : M_StationKind == EUnloadTestStation::MetalDepot
 		                                             ? UnloadStationTestPrivate::MetalDepotViews
 		                                             : UnloadStationTestPrivate::Views;
-	M_CaptureRig.CaptureViews(*GetWorld(), Frame, Views, Label);
+	if (MaxViews <= 0 || MaxViews >= Views.Num())
+	{
+		M_CaptureRig.CaptureViews(*GetWorld(), Frame, Views, Label);
+		return;
+	}
+	TArray<FB4HowitzerCameraView> FirstViews;
+	for (int32 ViewIndex = 0; ViewIndex < MaxViews; ++ViewIndex)
+	{
+		FirstViews.Add(Views[ViewIndex]);
+	}
+	M_CaptureRig.CaptureViews(*GetWorld(), Frame, FirstViews, Label);
 }
 
 void UUnloadStationTestSubsystem::EnterPhase(const EUnloadStationTestPhase NewPhase)

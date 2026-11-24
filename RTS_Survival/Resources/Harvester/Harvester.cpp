@@ -534,9 +534,11 @@ void UHarvester::TerminateHarvestCommand()
 	case EHarvesterAIAction::CraneUnloading:
 		break;
 	}
-	// A new order mid-unload: the bay is freed; what already landed stays credited, the rest stays on board.
+	// Player orders wait out the unload (GetIsLockedForUnload); this runs mid-unload only for system resets (towing,
+	// stuns) and pack-up. The bay is freed; what already landed stays credited, the rest stays on board.
 	ReleaseUnloadBay();
 	bM_SkipUnloadStationThisTrip = false;
+	bM_EndCommandAfterUnload = false;
 	HarvestDebug("Harvester terminated logic: " + GetStringHarvesterAIStatus(M_HarvestStatus), FColor::Red);
 	ResetHarvesterLocation();
 	M_HarvestStatus = EHarvesterAIAction::NoHarvestingAction;
@@ -678,6 +680,14 @@ void UHarvester::SetupHarvester(
 
 void UHarvester::HarvestAIExecuteAction(const EHarvesterAIAction Action)
 {
+	const bool bStaysLockedForUnload = Action == EHarvesterAIAction::ReverseIntoUnloadBay
+		|| Action == EHarvesterAIAction::CraneUnloading;
+	if (bM_EndCommandAfterUnload && not bStaysLockedForUnload)
+	{
+		// The unload is over (or docking failed): run the order that waited instead of the next harvest step.
+		EndCommandForHeldOrder();
+		return;
+	}
 	M_HarvestStatus = Action;
 	switch (Action)
 	{
@@ -1786,6 +1796,41 @@ void UHarvester::Crane_OnUnloadEnded(const EUnloadEndReason Reason)
 		return;
 	}
 	HarvestAIExecuteAction(EHarvesterAIAction::AsyncFindDropOff);
+}
+
+bool UHarvester::GetIsLockedForUnload() const
+{
+	return M_HarvestStatus == EHarvesterAIAction::ReverseIntoUnloadBay
+		|| M_HarvestStatus == EHarvesterAIAction::CraneUnloading;
+}
+
+void UHarvester::HoldNewOrderUntilUnloaded()
+{
+	if (not GetIsLockedForUnload())
+	{
+		return;
+	}
+	bM_EndCommandAfterUnload = true;
+	HarvestDebug("Order held until the unload is done.", FColor::Yellow);
+}
+
+void UHarvester::EndCommandForHeldOrder()
+{
+	bM_EndCommandAfterUnload = false;
+	const EAbilityID ActiveCommand = M_CommandOwner.IsValid()
+		                                 ? M_CommandOwner->GetActiveCommandID()
+		                                 : EAbilityID::IdNoAbility;
+	// Return cargo does not stop the harvester logic when it terminates, so stop it here for both commands.
+	TerminateHarvestCommand();
+	if (not M_CommandOwner.IsValid())
+	{
+		return;
+	}
+	if (ActiveCommand == EAbilityID::IdHarvestResource || ActiveCommand == EAbilityID::IdReturnCargo)
+	{
+		// Advances the queue to the held order.
+		M_CommandOwner->DoneExecutingCommand(ActiveCommand);
+	}
 }
 
 void UHarvester::MapTest_SetCargo(const ERTSResourceType ResourceType, const int32 Amount)

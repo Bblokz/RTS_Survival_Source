@@ -632,6 +632,13 @@ public:
 	virtual void SetRTSOverlapEvasionEnabled(const bool bEnabled);
 	virtual bool GetIsUnitInCombat()const;
 
+	/**
+	 * @brief Asked when an order arrives that would interrupt the running command (any order given without shift).
+	 * @return True while the running command must finish first; the order then waits right behind it.
+	 * A harvester docked at an unload station returns true until it is unloaded.
+	 */
+	virtual bool GetMustFinishActiveCommandBeforeNewOrder() const { return false; }
+
 
 	/** @brief Sets a simple flag to indicate that this unit has not recieved any player commands yet.
 	 * Will be reset as soon as any order is issued (other than the spawn order)
@@ -1373,6 +1380,12 @@ protected:
 	 */
 	virtual void SetUnitToIdleSpecificLogic() =0;
 
+	/**
+	 * @brief An order was queued behind the running command because GetMustFinishActiveCommandBeforeNewOrder was
+	 * true; the unit must end that command as soon as it may, so the order runs.
+	 */
+	virtual void OnNewOrderHeldBehindActiveCommand() {}
+
 
 	// Util to stop behaviour trees on any IcommandUnit.
 	virtual void StopBehaviourTree() =0;
@@ -1407,6 +1420,13 @@ private:
 	 * @param UnitCommandData Command queue state that still contains the active command being replaced.
 	 */
 	void PrepareForImmediateMovementCommand(UCommandData* UnitCommandData);
+
+	/**
+	 * @brief SetUnitToIdle for an order that replaces the queue (bSetUnitToIdle). When the running command may not be
+	 * interrupted, it keeps running instead and only the commands queued behind it are dropped, so the new order
+	 * waits right behind it. System resets (towing, stuns, loading) call SetUnitToIdle and always interrupt.
+	 */
+	void SetUnitToIdleForNewOrder();
 
 	/**
 	 * @brief Routes active move/reverse termination through replacement hooks before the queue is cleared.

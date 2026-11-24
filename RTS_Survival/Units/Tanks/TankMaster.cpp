@@ -1125,6 +1125,19 @@ void ATankMaster::SetUnitToIdleSpecificLogic()
 	}
 }
 
+bool ATankMaster::GetMustFinishActiveCommandBeforeNewOrder() const
+{
+	return IsValid(M_HarvesterComponent) && M_HarvesterComponent->GetIsLockedForUnload();
+}
+
+void ATankMaster::OnNewOrderHeldBehindActiveCommand()
+{
+	if (IsValid(M_HarvesterComponent))
+	{
+		M_HarvesterComponent->HoldNewOrderUntilUnloaded();
+	}
+}
+
 void ATankMaster::TerminateAttackCommand()
 {
 	for (const auto EachTurret : Turrets)

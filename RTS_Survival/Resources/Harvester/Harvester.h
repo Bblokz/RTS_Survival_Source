@@ -125,6 +125,19 @@ public:
 	/** @brief The unload station ended this harvester's unload; it continues harvesting or finds another drop-off. */
 	void Crane_OnUnloadEnded(EUnloadEndReason Reason);
 
+	/**
+	 * @return True from the moment the harvester starts reversing into an unload bay until its unload ends. Orders
+	 * given then do not interrupt it: they wait behind the running command (see HoldNewOrderUntilUnloaded).
+	 */
+	bool GetIsLockedForUnload() const;
+
+	/**
+	 * @brief An order now waits behind the running harvest or return-cargo command: once the unload is over (or
+	 * docking fails), that command ends instead of going on harvesting, so the order runs.
+	 */
+	void HoldNewOrderUntilUnloaded();
+	bool MapTest_GetIsHoldingOrder() const { return bM_EndCommandAfterUnload; }
+
 	/** @brief Test hook: fill one cargo slot without harvesting. */
 	void MapTest_SetCargo(ERTSResourceType ResourceType, int32 Amount);
 	EHarvesterAIAction MapTest_GetHarvestStatus() const { return M_HarvestStatus; }
@@ -495,6 +508,12 @@ private:
 
 	// Set when the bay route failed for this trip; the old drop-off point is used until the cargo is delivered.
 	bool bM_SkipUnloadStationThisTrip = false;
+
+	// An order arrived while the harvester was locked for its unload; end the running command when the unload is over.
+	bool bM_EndCommandAfterUnload = false;
+
+	/** @brief Ends the running harvest or return-cargo command so the order held during the unload runs. */
+	void EndCommandForHeldOrder();
 
 	FTimerHandle M_ReverseIntoBayTimeout;
 	FTimerHandle M_DockAlignTimer;

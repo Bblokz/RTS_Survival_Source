@@ -13,6 +13,7 @@ class ACPPController;
 class ANomadicVehicle;
 class UHarvester;
 class UResourceDropOff;
+enum EHarvesterAIAction : uint8;
 
 UENUM()
 enum class EUnloadStationTestPhase : uint8
@@ -42,6 +43,15 @@ struct FUnloadTestHarvester
 	FVector DockedLocation = FVector::ZeroVector;
 	// Where it stood when its cargo was gone (the overflow point for a harvester that found no free bay).
 	FVector FinishedLocation = FVector::ZeroVector;
+
+	// Unload lock check: right after docking the harvester gets a move (or a move then a stop); it must stay docked
+	// until its cargo is gone and only then run the held order.
+	bool bLockOrderGiven = false;
+	bool bLockOrderIsStop = false;
+	bool bLockOrderHeld = false;
+	bool bLockKeptUnloading = false;
+	float MaxDockDriftCm = 0.f;
+	bool bHeldMoveRanAfterUnload = false;
 };
 
 /**
@@ -93,7 +103,8 @@ private:
 	int32 GetStored(ERTSResourceType Resource) const;
 	int32 GetCargo(const FUnloadTestHarvester& TestHarvester) const;
 	void StartGameAndUnpause() const;
-	void CaptureViews(const FString& Label) const;
+	/** @param MaxViews Only the first views when > 0 (sequence frames); all views otherwise. */
+	void CaptureViews(const FString& Label, int32 MaxViews = 0) const;
 
 	void EnterPhase(EUnloadStationTestPhase NewPhase);
 	float GetPhaseSeconds() const;
@@ -144,4 +155,21 @@ private:
 	void TickSingleBayUnloadResults(AResourceUnloadStation& Station);
 	void TickSingleBayCaptures(const AResourceUnloadStation& Station);
 	bool GetIsSingleBay() const { return M_StationKind != EUnloadTestStation::HQ; }
+
+	/**
+	 * @brief Orders a just-docked harvester away (a move; on the second docked harvester a move then a stop) to prove
+	 * the unload lock holds the order instead of abandoning the unload.
+	 */
+	void GiveLockOrder(FUnloadTestHarvester& TestHarvester);
+	void TrackLockedHarvester(FUnloadTestHarvester& TestHarvester, EHarvesterAIAction Status) const;
+	void OnLockedHarvesterFinished(FUnloadTestHarvester& TestHarvester) const;
+	void CheckLockResults();
+	// How many docked harvesters got a lock order in the first unload; the second one gets the move + stop variant.
+	int32 M_LockOrdersGiven = 0;
+
+	/** @brief -UnloadStationCaptureEvery=<s>: the first two views every few seconds while a harvester is docked. */
+	void TickCaptureSequence();
+	float M_CaptureEverySeconds = 0.f;
+	float M_LastSequenceCaptureWorldSeconds = -1.f;
+	int32 M_SequenceFrameIndex = 0;
 };

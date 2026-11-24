@@ -784,6 +784,10 @@ protected:
 
 	virtual void SetUnitToIdleSpecificLogic() override;
 
+	/** @return True while the harvester docks or is unloaded at an unload station: new orders wait until it is done. */
+	virtual bool GetMustFinishActiveCommandBeforeNewOrder() const override;
+	virtual void OnNewOrderHeldBehindActiveCommand() override;
+
 	/** @copydoc ICommands::StopBehaviourTree()
 	 * Is the same for all derived classes (they used derive AAITankMaster controllers.
 	 */
