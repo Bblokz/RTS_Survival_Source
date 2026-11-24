@@ -564,6 +564,22 @@ FVector AResourceUnloadStation::GetBayPickWorldLocation(const int32 BayIndex) co
 	return FTransform(GetActorRotation(), GetActorLocation()).TransformPosition(BaySettings[BayIndex].PickPoint);
 }
 
+bool AResourceUnloadStation::GetBayBinWorldLocation(const int32 BayIndex, FVector& OutBinLocation) const
+{
+	if (not M_Bays.IsValidIndex(BayIndex))
+	{
+		return false;
+	}
+	const FUnloadBayState& Bay = M_Bays[BayIndex];
+	const FVector* BinWorld = Bay.BinWorldLocations.Find(Bay.Resource);
+	if (BinWorld == nullptr)
+	{
+		return false;
+	}
+	OutBinLocation = *BinWorld;
+	return true;
+}
+
 // ------------------------------------------------------------------------------------------------------------ trolleys
 
 void AResourceUnloadStation::Tick(const float DeltaSeconds)

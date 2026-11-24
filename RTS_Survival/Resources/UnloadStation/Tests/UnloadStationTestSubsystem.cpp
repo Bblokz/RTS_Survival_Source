@@ -37,6 +37,11 @@ namespace UnloadStationTestPrivate
 	// not drift off the dock by more than the slack below.
 	constexpr float LockMoveDistanceCm = 1800.f;
 	constexpr float MaxLockDriftCm = 30.f;
+	// Rig geometry: how far (2D) the grab may hang from the pick point when it grabs and from the bin socket when it
+	// releases. The HQ's bay L drops from the loop's outer leg (Y -335), about 1.05 m from the radixite socket but well
+	// inside the 2.9 m wide bin (Y -426..-135, build_monorail.py).
+	constexpr float MaxGrabOffPick2DCm = 80.f;
+	constexpr float MaxReleaseOffBin2DCm = 120.f;
 	const TCHAR* const TruckSwitch = TEXT("UnloadStationTruck=");
 	const TCHAR* const RefineryPath =
 		TEXT("/Game/RTS_Survival/Blueprints/GroundVehicles/BaseAndNomadic/ChildBlueprints/GerEco/OpelBlitz_Ref/Ger_Refinery_Truck.Ger_Refinery_Truck_C");
@@ -358,6 +363,15 @@ void UUnloadStationTestSubsystem::TrackHarvester(FUnloadTestHarvester& TestHarve
 		return;
 	}
 	const EHarvesterAIAction Status = Harvester->MapTest_GetHarvestStatus();
+	if (static_cast<uint8>(Status) != TestHarvester.LastLoggedStatus && TestHarvester.Actor.IsValid())
+	{
+		// The route into the bay, step by step: shows where a slow dock waits (approach, reverse, guided slide).
+		TestHarvester.LastLoggedStatus = static_cast<uint8>(Status);
+		const FVector Location = TestHarvester.Actor->GetActorLocation();
+		UE_LOG(LogRTSUnloadStationTest, Display, TEXT("RTS_UNLOAD_TEST status harvester=%s status=%s at=(%.0f,%.0f) t=%.1f"),
+		       *TestHarvester.Actor->GetName(), *GetStringHarvesterAIStatus(Status), Location.X, Location.Y,
+		       GetPhaseSeconds());
+	}
 	if (Status == EHarvesterAIAction::CraneUnloading && not TestHarvester.bWasDocked)
 	{
 		TestHarvester.bWasDocked = true;
@@ -422,6 +436,7 @@ void UUnloadStationTestSubsystem::TickBothBaysUnloading()
 		TickSingleBayUnloadResults(*Station);
 		return;
 	}
+	TickRigGeometry(*Station);
 	bM_SawBothDocked |= Station->GetIsBayDocked(0) && Station->GetIsBayDocked(1);
 	const bool bBothBusy = Station->GetTrolleyPhase(0) != EUnloadTrolleyPhase::Idle
 		&& Station->GetTrolleyPhase(1) != EUnloadTrolleyPhase::Idle;
@@ -463,6 +478,7 @@ void UUnloadStationTestSubsystem::TickBothBaysUnloading()
 	      FString::Printf(TEXT("store_changes=%d"), M_RadixiteStoreChanges));
 	Check(not Station->GetBayHarvester(0) && not Station->GetBayHarvester(1), TEXT("bays_released"));
 	CheckLockResults();
+	CheckRigGeometryResults();
 	CaptureViews(TEXT("after_unload"));
 
 	// Third trip, for the pack-up case: the radixite harvester goes again.
@@ -478,6 +494,7 @@ void UUnloadStationTestSubsystem::TickSingleBayUnloadResults(AResourceUnloadStat
 	using namespace UnloadStationTestPrivate;
 	bM_SawCraneBusy |= Station.GetTrolleyPhase(0) != EUnloadTrolleyPhase::Idle;
 	TickSingleBayCaptures(Station);
+	TickRigGeometry(Station);
 	const int32 StoredRadixite = GetStored(M_TrackedResource);
 	if (StoredRadixite != M_LastStoredRadixite)
 	{
@@ -538,6 +555,7 @@ void UUnloadStationTestSubsystem::TickSingleBayUnloadResults(AResourceUnloadStat
 	      FString::Printf(TEXT("store_changes=%d"), M_RadixiteStoreChanges));
 	Check(not Station.GetBayHarvester(0), TEXT("bay_released"));
 	CheckLockResults();
+	CheckRigGeometryResults();
 	CaptureViews(TEXT("after_unload"));
 
 	// Second trip of the crane harvester, for the pack-up case. The other one goes, so its deliveries cannot count.
@@ -780,6 +798,61 @@ void UUnloadStationTestSubsystem::CheckLockResults()
 		      TEXT("held_order_ran_after_unload"),
 		      FString::Printf(TEXT("%s move_active=%d"), *Name, TestHarvester.bHeldMoveRanAfterUnload ? 1 : 0));
 	}
+}
+
+void UUnloadStationTestSubsystem::TickRigGeometry(const AResourceUnloadStation& Station)
+{
+	if (M_StationKind == EUnloadTestStation::MetalDepot)
+	{
+		return;
+	}
+	M_LastRigPhases.SetNumZeroed(Station.GetBayCount());
+	for (int32 BayIndex = 0; BayIndex < Station.GetBayCount(); ++BayIndex)
+	{
+		const EUnloadTrolleyPhase Phase = Station.GetTrolleyPhase(BayIndex);
+		const bool bEntered = static_cast<uint8>(Phase) != M_LastRigPhases[BayIndex];
+		M_LastRigPhases[BayIndex] = static_cast<uint8>(Phase);
+		if (not bEntered || not Station.GetIsBayDocked(BayIndex))
+		{
+			continue;
+		}
+		const FVector Grab = Station.GetGrabWorldLocation(BayIndex);
+		if (Phase == EUnloadTrolleyPhase::Grabbing)
+		{
+			const FVector Pick = Station.GetBayPickWorldLocation(BayIndex);
+			const float Off2D = FVector::Dist2D(Grab, Pick);
+			M_MaxGrabOffPick2DCm = FMath::Max(M_MaxGrabOffPick2DCm, Off2D);
+			++M_GrabMoments;
+			UE_LOG(LogRTSUnloadStationTest, Display,
+			       TEXT("RTS_UNLOAD_TEST rig_grab bay=%d off_pick_2d_cm=%.0f grab_above_pick_cm=%.0f t=%.1f"),
+			       BayIndex, Off2D, Grab.Z - Pick.Z, GetPhaseSeconds());
+		}
+		FVector Bin;
+		if (Phase == EUnloadTrolleyPhase::Releasing && Station.GetBayBinWorldLocation(BayIndex, Bin))
+		{
+			const float Off2D = FVector::Dist2D(Grab, Bin);
+			M_MaxReleaseOffBin2DCm = FMath::Max(M_MaxReleaseOffBin2DCm, Off2D);
+			++M_ReleaseMoments;
+			UE_LOG(LogRTSUnloadStationTest, Display,
+			       TEXT("RTS_UNLOAD_TEST rig_release bay=%d off_bin_2d_cm=%.0f grab_above_bin_cm=%.0f t=%.1f"),
+			       BayIndex, Off2D, Grab.Z - Bin.Z, GetPhaseSeconds());
+		}
+	}
+}
+
+void UUnloadStationTestSubsystem::CheckRigGeometryResults()
+{
+	using namespace UnloadStationTestPrivate;
+	if (M_StationKind == EUnloadTestStation::MetalDepot)
+	{
+		return;
+	}
+	Check(M_GrabMoments > 0 && M_ReleaseMoments > 0, TEXT("rig_grabbed_and_released"),
+	      FString::Printf(TEXT("grabs=%d releases=%d"), M_GrabMoments, M_ReleaseMoments));
+	Check(M_MaxGrabOffPick2DCm <= MaxGrabOffPick2DCm, TEXT("rig_grabs_over_hopper"),
+	      FString::Printf(TEXT("max_off_cm=%.0f"), M_MaxGrabOffPick2DCm));
+	Check(M_MaxReleaseOffBin2DCm <= MaxReleaseOffBin2DCm, TEXT("rig_releases_over_bin"),
+	      FString::Printf(TEXT("max_off_cm=%.0f"), M_MaxReleaseOffBin2DCm));
 }
 
 void UUnloadStationTestSubsystem::TickCaptureSequence()

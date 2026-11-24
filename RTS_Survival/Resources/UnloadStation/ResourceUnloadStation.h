@@ -88,6 +88,8 @@ public:
 	FVector GetTrolleyWorldLocation(int32 BayIndex) const;
 	FVector GetGrabWorldLocation(int32 BayIndex) const;
 	FVector GetBayPickWorldLocation(int32 BayIndex) const;
+	/** @return False when the bay unloads nothing now or its resource has no bin; else the bin floor (world). */
+	bool GetBayBinWorldLocation(int32 BayIndex, FVector& OutBinLocation) const;
 
 protected:
 	virtual void BeginPlay() override;

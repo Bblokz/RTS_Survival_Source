@@ -52,6 +52,8 @@ struct FUnloadTestHarvester
 	bool bLockKeptUnloading = false;
 	float MaxDockDriftCm = 0.f;
 	bool bHeldMoveRanAfterUnload = false;
+	// Last harvester AI status written to the log (EHarvesterAIAction as uint8).
+	uint8 LastLoggedStatus = MAX_uint8;
 };
 
 /**
@@ -166,6 +168,19 @@ private:
 	void CheckLockResults();
 	// How many docked harvesters got a lock order in the first unload; the second one gets the move + stop variant.
 	int32 M_LockOrdersGiven = 0;
+
+	/**
+	 * @brief Animation geometry: when a bay's grab starts grabbing it must hang over the pick point (the hopper), and
+	 * when it starts releasing over the bay's bin. Trolley and boom stations only (not the depot's elevator).
+	 */
+	void TickRigGeometry(const AResourceUnloadStation& Station);
+	void CheckRigGeometryResults();
+	// Last seen rig phase per bay (EUnloadTrolleyPhase as uint8), to act once on entering a phase.
+	TArray<uint8> M_LastRigPhases;
+	int32 M_GrabMoments = 0;
+	int32 M_ReleaseMoments = 0;
+	float M_MaxGrabOffPick2DCm = 0.f;
+	float M_MaxReleaseOffBin2DCm = 0.f;
 
 	/** @brief -UnloadStationCaptureEvery=<s>: the first two views every few seconds while a harvester is docked. */
 	void TickCaptureSequence();
