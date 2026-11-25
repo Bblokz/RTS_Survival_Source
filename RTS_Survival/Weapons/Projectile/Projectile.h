@@ -290,6 +290,13 @@ public:
 	// Forces the projectile back into its dormant pooled state immediately.
 	void SetProjectileDormant();
 
+	// What the tank shell trail batcher needs to draw this shell in flight.
+	bool GetIsDrawnByTankShellTrailBatcher() const { return bM_IsDrawnByTankShellTrailBatcher; }
+	const FProjectileVfxSettings& GetProjectileVfxSettings() const { return M_ProjectileVfxSettings; }
+	const FVector& GetLaunchLocation() const { return M_ProjectileSpawn; }
+	// Changes on every launch, so a reused pooled projectile is told apart from its previous flight.
+	uint32 GetLaunchSerial() const { return M_ModuleShotActivationId; }
+
 	/**
 	 * @brief Realistic vehicle balance: a big shell that crushes the armor destroys the vehicle in one hit.
 	 * @param PenAtImpact Armor pen left when the shell hits.
@@ -895,6 +902,10 @@ private:
 	FProjectileVfxSettings M_ProjectileVfxSettings;
 
 	void SetupNiagaraWithPrjVfxSettings(const FProjectileVfxSettings& NewSettings);
+	// Decided on every launch: the manager's trail batcher draws this shell and its own Niagara system stays off.
+	bool bM_IsDrawnByTankShellTrailBatcher = false;
+	/** @return Whether a launch with this effect type is drawn by the trail batcher; never for infantry weapons. */
+	bool DecideIsDrawnByTankShellTrailBatcher(const EProjectileNiagaraSystem Type) const;
 	UNiagaraSystem* GetSystemFromType(const EProjectileNiagaraSystem Type);
 	bool GetIsValidProjectileMovement();
 	bool GetIsValidNiagara();

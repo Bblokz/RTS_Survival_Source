@@ -69,7 +69,8 @@ void FSquadUnitRagdoll::StartRagdoll(
 	USkeletalMeshComponent* MeshComponent,
 	USquadUnitAnimInstance* AnimInstance,
 	const FSquadUnitDeathHit& DeathHit,
-	const FVector& InheritedVelocity)
+	const FVector& InheritedVelocity,
+	const bool bCreateDeathEffects)
 {
 	if (not bEnableRagdoll)
 	{
@@ -88,7 +89,10 @@ void FSquadUnitRagdoll::StartRagdoll(
 	StopAnimations(AnimInstance, MeshComponent);
 	SetupPhysicsAndCollision(MeshComponent);
 	ScheduleLaunch(OwningActor, MeshComponent, GetLaunchVelocity(DeathHit), InheritedVelocity);
-	StartRagdoll_CreateEffect(OwningActor);
+	if (bCreateDeathEffects)
+	{
+		StartRagdoll_CreateEffect(OwningActor);
+	}
 
 	bIsRagdollActive = true;
 }

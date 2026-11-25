@@ -48,13 +48,15 @@ struct FSquadUnitRagdoll
 	 * @param AnimInstance Current animation instance driving the mesh; may be nullptr.
 	 * @param DeathHit The killing hit that decides the launch.
 	 * @param InheritedVelocity Velocity of the living soldier, so a running body keeps moving.
+	 * @param bCreateDeathEffects False when the death already spawned its own effects (run over by a vehicle).
 	 */
 	void StartRagdoll(
 		AActor* OwningActor,
 		USkeletalMeshComponent* MeshComponent,
 		USquadUnitAnimInstance* AnimInstance,
 		const FSquadUnitDeathHit& DeathHit,
-		const FVector& InheritedVelocity);
+		const FVector& InheritedVelocity,
+		bool bCreateDeathEffects = true);
 
 	/**
 	 * @brief Ends the simulation but keeps the last pose, so the corpse costs nothing while it sinks away.

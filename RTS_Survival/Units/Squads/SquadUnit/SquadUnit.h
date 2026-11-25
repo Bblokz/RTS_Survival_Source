@@ -479,6 +479,27 @@ public:
 	// Does not trigger any logic on the squad controller, simply strafes to the location.
 	void MoveToEvasionLocation(const FVector& EvasionLocation);
 
+	// ---------------- Run over by hostile vehicles (URTSVehicleCrushSubsystem) ----------------
+
+	/** @return Whether a hostile hull can roll over this soldier: alive on the ground, not riding, hidden or a machine. */
+	bool GetCanBeRunOver() const;
+
+	/**
+	 * @brief Kills this soldier under a vehicle: own scream and crush blood instead of the regular death line and blood.
+	 * @param Vehicle The hull that ran him over.
+	 * @param DriveDirection Ground direction the hull drives in; the body and the blood follow it.
+	 * @param bMayScream False when other soldiers under the same hull already screamed this second.
+	 */
+	void OnRunOverByVehicle(AActor* Vehicle, const FVector& DriveDirection, bool bMayScream);
+
+	/**
+	 * @brief Runs to a spot out of a vehicle's path without touching his or his squad's command.
+	 * Only a soldier that stands still does this: a soldier already walking would abort a move his squad waits for.
+	 * @param DodgeLocation Wanted spot; projected onto the navmesh.
+	 * @return True when the move started.
+	 */
+	bool TryDodgeVehicle(const FVector& DodgeLocation);
+
 	// Called by the CargoSquad component once the unit has entered cargo to ensure it will not move 
 	void Force_TerminateMovement();
 	/** 
@@ -820,6 +841,8 @@ private:
 	EAbilityID M_CombatAbilityBeforeRangeClosing = EAbilityID::IdNoAbility;
 	FAIRequestID M_RangeClosingRequestID = FAIRequestID::InvalidRequest;
 	FAIRequestID M_CoverMoveRequestID = FAIRequestID::InvalidRequest;
+	// The move out of a vehicle's path; it belongs to no command, so its completion reports to nobody.
+	FAIRequestID M_VehicleDodgeRequestID = FAIRequestID::InvalidRequest;
 
 	// Every object the unit's weapon fires through while it holds its cover; given back when it leaves.
 	UPROPERTY()
@@ -1428,4 +1451,11 @@ private:
 
 	// Set when killed at the start of the game to simulate damage on the squad.
 	bool bM_NoDeathVoiceLineOnDeath = false;
+
+	// Set when a vehicle ran him over: the crush blood replaces the regular ragdoll death effects.
+	bool bM_WasRunOver = false;
+
+	void RunOver_PlayScream() const;
+	void RunOver_SpawnBlood(const FVector& DriveDirection) const;
+	bool RunOver_GetMayDodgeNow() const;
 };
