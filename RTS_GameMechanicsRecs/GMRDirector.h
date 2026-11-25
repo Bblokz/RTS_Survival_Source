@@ -53,6 +53,16 @@ struct FGMRPendingExpansion
 	TWeakObjectPtr<AActor> Building;
 };
 
+/** @brief A unit grenade order that waits until the target is within throw range (see Event_Grenade). */
+USTRUCT()
+struct FGMRPendingGrenade
+{
+	GENERATED_BODY()
+
+	FGMREvent Event;
+	double QueuedWorldSeconds = 0.0;
+};
+
 /** @brief New actors of a class get the tag while the claim is open (aircraft a global ability spawns). */
 USTRUCT()
 struct FGMRPendingClaim
@@ -166,6 +176,18 @@ private:
 	FString Event_Clear(const FGMREvent& Event);
 	FString Event_Stance(const FGMREvent& Event);
 	FString Event_Marker(const FGMREvent& Event);
+	// Unit abilities: Grenade queues a throw that fires once the target is in range; Disarm switches turrets off.
+	FString Event_Grenade(const FGMREvent& Event);
+	FString Event_Disarm(const FGMREvent& Event);
+	// Health: sets every unit of the tag (each soldier of a squad) to Value x its max health (0..1).
+	FString Event_Health(const FGMREvent& Event);
+	// Tech: researches ETechnology Text for the player (effects apply to current units).
+	FString Event_Tech(const FGMREvent& Event);
+	void TickPendingGrenades();
+	// True when thrown (or given up); logs GMR_GRENADE and adds a manifest event with the throw frame.
+	bool TryThrowPendingGrenade(const FGMRPendingGrenade& Pending);
+	// Adds a manifest "UnitDied" event (and logs GMR_UNIT_DIED) the first frame a tagged unit is dead.
+	void TickUnitDeaths();
 
 	// Per-frame upkeep of recorded units (fog, owners of late soldiers, health bars), GMRDirectorEvents.cpp.
 	void KeepUnitsReady();
@@ -224,6 +246,11 @@ private:
 	TMap<FString, TWeakObjectPtr<AActor>> M_ShotLiveChoices;
 
 	TArray<FGMRPendingExpansion> M_PendingExpansions;
+	TArray<FGMRPendingGrenade> M_PendingGrenades;
+	// Per tag: which of its units already have a UnitDied manifest event.
+	TMap<FString, TArray<bool>> M_ReportedDeaths;
+	// Soldiers of tagged squads seen alive (with their tag): a manifest "SoldierDied" event when one dies.
+	TMap<TWeakObjectPtr<AActor>, FString> M_TrackedSoldiers;
 
 	UPROPERTY()
 	TArray<FGMRPendingClaim> M_PendingClaims;

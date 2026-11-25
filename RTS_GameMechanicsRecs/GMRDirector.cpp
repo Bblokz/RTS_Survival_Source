@@ -168,6 +168,11 @@ void AGMRDirector::Tick(const float DeltaSeconds)
 		SuppressUnwantedActors();
 		TickInstantDeploys();
 		TickPendingExpansions();
+		TickPendingGrenades();
+		if (M_Phase == EGMRDirectorPhase::Running)
+		{
+			TickUnitDeaths();
+		}
 		TickPendingClaims();
 		LogTrenchProgress();
 	}
@@ -667,6 +672,22 @@ FString AGMRDirector::ExecuteEventByType(const FGMREvent& Event)
 	if (Type.Equals(TEXT("Voice"), ESearchCase::IgnoreCase))
 	{
 		return Event_Voice(Event);
+	}
+	if (Type.Equals(TEXT("Grenade"), ESearchCase::IgnoreCase) || Type.Equals(TEXT("UnitAbility"), ESearchCase::IgnoreCase))
+	{
+		return Event_Grenade(Event);
+	}
+	if (Type.Equals(TEXT("Tech"), ESearchCase::IgnoreCase))
+	{
+		return Event_Tech(Event);
+	}
+	if (Type.Equals(TEXT("Health"), ESearchCase::IgnoreCase))
+	{
+		return Event_Health(Event);
+	}
+	if (Type.Equals(TEXT("Disarm"), ESearchCase::IgnoreCase))
+	{
+		return Event_Disarm(Event);
 	}
 	if (Type.Equals(TEXT("Trench"), ESearchCase::IgnoreCase))
 	{
@@ -1290,7 +1311,10 @@ void AGMRDirector::SampleVoiceLines(const int32 Frame)
 				continue;
 			}
 			const USoundClass* SoundClass = ActiveSound->GetSoundClass();
-			if (SoundClass == nullptr || not SoundClass->GetName().Contains(VoiceLineClassName))
+			const bool bHasVoiceClass = SoundClass != nullptr && SoundClass->GetName().Contains(VoiceLineClassName);
+			// Many unit voice waves (medium tank fire lines, the Vultures) have no sound class: match their folder.
+			const bool bIsInVoiceFolder = ActiveSound->GetSound()->GetPathName().Contains(TEXT("/Sounds/VoiceLines/"));
+			if (not bHasVoiceClass && not bIsInVoiceFolder)
 			{
 				continue;
 			}

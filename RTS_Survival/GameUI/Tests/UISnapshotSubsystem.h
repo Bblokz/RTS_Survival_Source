@@ -55,6 +55,8 @@ private:
 	{
 		EUISnapshotSelection Selection = EUISnapshotSelection::PlayerUnits;
 		FIntPoint Resolution = FIntPoint::ZeroValue;
+		// Ability card mode: index into M_AbilityItems (one unit spawned, selected and hovered per step).
+		int32 AbilityItem = INDEX_NONE;
 	};
 
 	TArray<FSnapshotStep> M_Steps;
@@ -116,6 +118,31 @@ private:
 
 	void SelectPlayerUnits() const;
 	void SelectTrainer() const;
+
+	// Ability card capture for the ability Shorts. -UISnapshotAbilityList=<file> holds one line per capture:
+	// "<Name>|<unit class path>|<EAbilityID name>:<custom type>". Per line the unit (squad or vehicle) is spawned for
+	// the player in front of the camera, selected alone, the card hovered so its description panel shows, and
+	// Saved/UISnapshot/ability_<Name>.png captured at 1920x1080. The older single-unit switches
+	// -UISnapshotAbilitySquad=<class> -UISnapshotHoverAbility=<card> make a one-line list named "single".
+	// Logs UISNAPSHOT_STEP <Name> then UISNAPSHOT_CARD lines with the card's and panel's viewport pixel rectangles.
+	struct FAbilityCardItem
+	{
+		FString Name;
+		FString ClassPath;
+		FString Hover;
+		// Optional ETechnology name researched after the spawn (tech-granted cards, e.g. Tech_Flak88_GroundRole).
+		FString Tech;
+	};
+	void LoadAbilityItems();
+	bool GetIsAbilityCardMode() const;
+	const FAbilityCardItem* GetCurrentAbilityItem() const;
+	void SpawnAbilityUnitForStep();
+	void SelectAbilityUnit();
+	bool HoverAbilityCard() const;
+	void LogAbilityCardRects() const;
+	TArray<FAbilityCardItem> M_AbilityItems;
+	TWeakObjectPtr<AActor> M_AbilityUnit;
+	bool bM_HasSelectedAbilityUnit = false;
 	// -UISnapshotTrainingTab=N: shows that sub section of the selected trainer's training menu.
 	void ShowTrainingTab() const;
 	AActor* FindPlayerTrainer() const;

@@ -19,6 +19,14 @@
 #include "Framework/Application/SlateApplication.h"
 #include "RTS_Survival/GameUI/ActionUI/SelectedUnitInfo/W_SelectedUnitInfo.h"
 #include "RTS_Survival/GameUI/ActionUI/ItemActionUI/W_ItemActionUI.h"
+#include "RTS_Survival/GameUI/ActionUI/ItemActionUI/Description/W_ActionUIDescription.h"
+#include "RTS_Survival/RTSComponents/AbilityComponents/GrenadeComponent/Tests/GrenadeTestHelpers.h"
+#include "RTS_Survival/Units/SquadController.h"
+#include "Misc/FileHelper.h"
+#include "RTS_Survival/Player/PlayerTechManager/PlayerTechManager.h"
+#include "RTS_Survival/TechTree/Technologies/Technologies.h"
+#include "RTS_Survival/Player/Abilities.h"
+#include "Blueprint/SlateBlueprintLibrary.h"
 #include "RTS_Survival/GameUI/TrainingUI/TrainingUIWidget/W_TrainingItem.h"
 #include "RTS_Survival/GameUI/ControlGroups/ControlGroupImage/W_ControlGroupImage.h"
 #include "RTS_Survival/Player/PlayerControlGroupManager/PlayerControlGroupManager.h"
@@ -135,6 +143,15 @@ namespace UISnapshotConstants
 	const FVector PreviewPingOffsets[] = {FVector(-0.32, -0.26, 0.0), FVector(0.3, -0.08, 0.0), FVector(0.06, 0.34, 0.0)};
 	constexpr float PreviewPingAgesAtCapture[] = {0.3f, 0.9f, 1.7f};
 	const TCHAR* const GallerySwitch = TEXT("UISnapshotGallery=");
+	// Ability card capture (ability Shorts): squad class to spawn and select, and the card to hover.
+	const TCHAR* const AbilitySquadSwitch = TEXT("UISnapshotAbilitySquad=");
+	const TCHAR* const HoverAbilitySwitch = TEXT("UISnapshotHoverAbility=");
+	const TCHAR* const AbilityListSwitch = TEXT("UISnapshotAbilityList=");
+	// Ability steps: select the spawned unit after this many seconds (its soldiers exist), capture after the second.
+	constexpr double AbilitySelectAfterSeconds = 1.5;
+	constexpr double AbilityCaptureAfterSeconds = 4.0;
+	const FIntPoint AbilityCardResolution(1920, 1080);
+	const FVector AbilitySquadNavExtent(4000.0, 4000.0, 4000.0);
 	// Campaign map: capture the card menu of the player profile UI instead of a mission HUD.
 	const TCHAR* const WorldCardMenuSwitch = TEXT("UISnapshotWorldCardMenu");
 	const TCHAR* const WorldLayoutSwitch = TEXT("UISnapshotWorldLayout=");
@@ -239,6 +256,23 @@ void UUISnapshotSubsystem::TickSettling()
 {
 	HideGlassPanes();
 	HoldEnergyPreview();
+	if (GetCurrentAbilityItem() != nullptr)
+	{
+		if (not bM_HasSelectedAbilityUnit && GetSecondsInPhase() >= UISnapshotConstants::AbilitySelectAfterSeconds)
+		{
+			SelectAbilityUnit();
+		}
+		if (bM_HasSelectedAbilityUnit)
+		{
+			HoverAbilityCard();
+		}
+		if (GetSecondsInPhase() >= UISnapshotConstants::AbilityCaptureAfterSeconds)
+		{
+			CaptureCurrentStep();
+			EnterPhase(EUISnapshotPhase::WaitingForCapture);
+		}
+		return;
+	}
 	HoverPortrait();
 	MouseHoverTacticalMission();
 	ClickControlGroupSlotOncePerStep();
@@ -276,10 +310,24 @@ double UUISnapshotSubsystem::GetSecondsInPhase() const
 void UUISnapshotSubsystem::BuildSteps()
 {
 	M_Steps.Reset();
+	LoadAbilityItems();
 	TArray<EUISnapshotSelection> Selections = {EUISnapshotSelection::PlayerUnits, EUISnapshotSelection::Trainer};
 	if (GetIsWorldCardMenuMode())
 	{
 		Selections = {EUISnapshotSelection::WorldCardMenu};
+	}
+	if (GetIsAbilityCardMode())
+	{
+		for (int32 Index = 0; Index < M_AbilityItems.Num(); ++Index)
+		{
+			FSnapshotStep Step;
+			Step.Selection = EUISnapshotSelection::PlayerUnits;
+			Step.Resolution = UISnapshotConstants::AbilityCardResolution;
+			Step.AbilityItem = Index;
+			M_Steps.Add(Step);
+		}
+		M_StepIndex = 0;
+		return;
 	}
 	for (const EUISnapshotSelection Selection : Selections)
 	{
@@ -422,6 +470,10 @@ void UUISnapshotSubsystem::HoldEnergyPreview() const
 
 void UUISnapshotSubsystem::HoverPortrait() const
 {
+	if (HoverAbilityCard())
+	{
+		return;
+	}
 	if (HoverControlGroupSlot())
 	{
 		return;
@@ -760,6 +812,11 @@ void UUISnapshotSubsystem::ApplyCurrentStep()
 		// Nothing to select on the campaign map; the menu was opened when the world became ready.
 		return;
 	}
+	if (Step.AbilityItem != INDEX_NONE)
+	{
+		SpawnAbilityUnitForStep();
+		return;
+	}
 	if (Step.Selection == EUISnapshotSelection::PlayerUnits)
 	{
 		AssignControlGroupsOnce();
@@ -791,6 +848,7 @@ void UUISnapshotSubsystem::CaptureCurrentStep() const
 	const FString ScreenshotPath = FPaths::ProjectSavedDir() / TEXT("UISnapshot") / (StepName + TEXT(".png"));
 	LogMapObjectFilterCounts();
 	LogTacticalMapMissionHover();
+	LogAbilityCardRects();
 	FScreenshotRequest::RequestScreenshot(ScreenshotPath, true, false);
 	IConsoleManager::Get().ProcessUserConsoleInput(UISnapshotConstants::ReflectorSnapshotCommand, *GLog, GetWorld());
 	UE_LOG(LogTemp, Display, TEXT("UISNAPSHOT capture %s -> %s"), *StepName, *ScreenshotPath);
@@ -1383,6 +1441,10 @@ FString UUISnapshotSubsystem::GetCurrentStepName() const
 		return TEXT("invalid");
 	}
 	const FSnapshotStep& Step = M_Steps[M_StepIndex];
+	if (M_AbilityItems.IsValidIndex(Step.AbilityItem))
+	{
+		return TEXT("ability_") + M_AbilityItems[Step.AbilityItem].Name;
+	}
 	const TCHAR* SelectionName = TEXT("trainer");
 	if (Step.Selection == EUISnapshotSelection::PlayerUnits)
 	{
@@ -1502,5 +1564,200 @@ void UUISnapshotSubsystem::LogMapObjectFilterCounts() const
 		UE_LOG(LogTemp, Display, TEXT("UISNAPSHOT map filter %s: %d registered, %d discovered, %d dots"),
 		       *UEnum::GetValueAsString(Filter), RegisteredCount, DiscoveredCount,
 		       MapObjectFilters->GetDiscoveredObjectUVs(Filter).Num());
+	}
+}
+
+void UUISnapshotSubsystem::LoadAbilityItems()
+{
+	M_AbilityItems.Reset();
+	FString ListPath;
+	if (FParse::Value(FCommandLine::Get(), UISnapshotConstants::AbilityListSwitch, ListPath))
+	{
+		TArray<FString> Lines;
+		if (not FFileHelper::LoadFileToStringArray(Lines, *ListPath))
+		{
+			UE_LOG(LogTemp, Warning, TEXT("UISNAPSHOT cannot read ability list %s"), *ListPath);
+		}
+		for (const FString& Line : Lines)
+		{
+			TArray<FString> Parts;
+			const int32 Count = Line.TrimStartAndEnd().ParseIntoArray(Parts, TEXT("|"));
+			if (Count >= 3)
+			{
+				M_AbilityItems.Add({Parts[0], Parts[1], Parts[2], Count >= 4 ? Parts[3] : FString()});
+			}
+		}
+		UE_LOG(LogTemp, Display, TEXT("UISNAPSHOT ability list %s: %d units"), *ListPath, M_AbilityItems.Num());
+		return;
+	}
+	FString ClassPath;
+	if (FParse::Value(FCommandLine::Get(), UISnapshotConstants::AbilitySquadSwitch, ClassPath))
+	{
+		FString Hover;
+		FParse::Value(FCommandLine::Get(), UISnapshotConstants::HoverAbilitySwitch, Hover);
+		M_AbilityItems.Add({TEXT("single"), ClassPath, Hover});
+	}
+}
+
+bool UUISnapshotSubsystem::GetIsAbilityCardMode() const
+{
+	return not M_AbilityItems.IsEmpty();
+}
+
+const UUISnapshotSubsystem::FAbilityCardItem* UUISnapshotSubsystem::GetCurrentAbilityItem() const
+{
+	if (not M_Steps.IsValidIndex(M_StepIndex) || not M_AbilityItems.IsValidIndex(M_Steps[M_StepIndex].AbilityItem))
+	{
+		return nullptr;
+	}
+	return &M_AbilityItems[M_Steps[M_StepIndex].AbilityItem];
+}
+
+void UUISnapshotSubsystem::SpawnAbilityUnitForStep()
+{
+	bM_HasSelectedAbilityUnit = false;
+	const FAbilityCardItem* const AbilityItem = GetCurrentAbilityItem();
+	if (AbilityItem == nullptr || not GetIsValidPlayerController())
+	{
+		return;
+	}
+	if (ASquadController* const OldSquad = Cast<ASquadController>(M_AbilityUnit.Get()))
+	{
+		for (ASquadUnit* const Soldier : OldSquad->GetSquadUnitsChecked())
+		{
+			Soldier->Destroy();
+		}
+	}
+	if (M_AbilityUnit.IsValid())
+	{
+		M_AbilityUnit->Destroy();
+	}
+	M_PlayerController->SelectUnitsFromMarquee({}, {}, {});
+	UWorld& World = *GetWorld();
+	const APawn* const CameraPawn = M_PlayerController->GetPawn();
+	FVector Spot = IsValid(CameraPawn) ? CameraPawn->GetActorLocation() : FVector::ZeroVector;
+	FGrenadeTestHelpers::DropToGround(World, Spot);
+	FGrenadeTestHelpers::ProjectOntoNavMesh(World, Spot, UISnapshotConstants::AbilitySquadNavExtent);
+	M_AbilityUnit = FGrenadeTestHelpers::SpawnUnitForPlayer(
+		World, *AbilityItem->ClassPath, FTransform(FRotator::ZeroRotator, Spot), UISnapshotConstants::PlayerOwnerIndex);
+	if (M_AbilityUnit.IsValid())
+	{
+		M_PlayerController->FocusCameraOnActor(M_AbilityUnit.Get());
+	}
+	if (not AbilityItem->Tech.IsEmpty() && IsValid(M_PlayerController->GetPlayerTechManager()))
+	{
+		const int64 TechValue = StaticEnum<ETechnology>()->GetValueByNameString(AbilityItem->Tech);
+		if (TechValue != INDEX_NONE)
+		{
+			M_PlayerController->GetPlayerTechManager()->OnTechResearched(static_cast<ETechnology>(TechValue));
+		}
+	}
+	UE_LOG(LogTemp, Display, TEXT("UISNAPSHOT ability unit %s %s at %s -> %s"), *AbilityItem->Name,
+	       *AbilityItem->ClassPath, *Spot.ToCompactString(),
+	       M_AbilityUnit.IsValid() ? *M_AbilityUnit->GetName() : TEXT("FAILED"));
+}
+
+void UUISnapshotSubsystem::SelectAbilityUnit()
+{
+	bM_HasSelectedAbilityUnit = true;
+	if (not GetIsValidPlayerController() || not M_AbilityUnit.IsValid())
+	{
+		return;
+	}
+	if (ASquadController* const Squad = Cast<ASquadController>(M_AbilityUnit.Get()))
+	{
+		M_PlayerController->SelectUnitsFromMarquee(Squad->GetSquadUnitsChecked(), {}, {});
+		return;
+	}
+	if (ASelectablePawnMaster* const Pawn = Cast<ASelectablePawnMaster>(M_AbilityUnit.Get()))
+	{
+		M_PlayerController->SelectUnitsFromMarquee({}, {}, {Pawn});
+	}
+}
+
+bool UUISnapshotSubsystem::HoverAbilityCard() const
+{
+	const FAbilityCardItem* const AbilityItem = GetCurrentAbilityItem();
+	if (not FSlateApplication::IsInitialized() || AbilityItem == nullptr)
+	{
+		return false;
+	}
+	const FString Wanted = AbilityItem->Hover;
+	FString AbilityName;
+	FString CustomTypeText = TEXT("0");
+	if (not Wanted.Split(TEXT(":"), &AbilityName, &CustomTypeText))
+	{
+		AbilityName = Wanted;
+	}
+	const UEnum* const AbilityEnum = StaticEnum<EAbilityID>();
+	const int64 AbilityValue = IsValid(AbilityEnum) ? AbilityEnum->GetValueByNameString(AbilityName) : INDEX_NONE;
+	const int32 CustomType = FCString::Atoi(*CustomTypeText);
+	TArray<UUserWidget*> Items;
+	UWidgetBlueprintLibrary::GetAllWidgetsOfClass(GetWorld(), Items, UW_ItemActionUI::StaticClass(), false);
+	for (UUserWidget* const Widget : Items)
+	{
+		const UW_ItemActionUI* const Item = Cast<UW_ItemActionUI>(Widget);
+		if (not IsValid(Item) || not Item->IsVisible() || not IsValid(Item->WidgetTree)
+			|| static_cast<int64>(Item->GetAbility()) != AbilityValue || Item->GetCustomType() != CustomType)
+		{
+			continue;
+		}
+		const UWidget* const Button = Item->WidgetTree->FindWidget(UISnapshotConstants::ActionButtonName);
+		if (not IsValid(Button) || Button->GetCachedGeometry().GetLocalSize().IsNearlyZero())
+		{
+			continue;
+		}
+		MoveSlateCursorTo(Button->GetCachedGeometry().GetAbsolutePositionAtCoordinates(FVector2D(0.5, 0.5)));
+		return true;
+	}
+	UE_LOG(LogTemp, Warning, TEXT("UISNAPSHOT no visible action card %s (value %lld) custom %d"), *AbilityName,
+	       AbilityValue, CustomType);
+	return true;
+}
+
+void UUISnapshotSubsystem::LogAbilityCardRects() const
+{
+	const FAbilityCardItem* const AbilityItem = GetCurrentAbilityItem();
+	if (AbilityItem == nullptr)
+	{
+		return;
+	}
+	UE_LOG(LogTemp, Display, TEXT("UISNAPSHOT_STEP %s"), *AbilityItem->Name);
+	auto LogRect = [this](const TCHAR* Label, const UWidget& Widget)
+	{
+		const FGeometry& Geometry = Widget.GetCachedGeometry();
+		FVector2D PixelTopLeft;
+		FVector2D ViewportTopLeft;
+		FVector2D PixelBottomRight;
+		FVector2D ViewportBottomRight;
+		USlateBlueprintLibrary::AbsoluteToViewport(GetWorld(), FVector2D(Geometry.GetAbsolutePosition()), PixelTopLeft,
+		                                           ViewportTopLeft);
+		USlateBlueprintLibrary::AbsoluteToViewport(GetWorld(),
+		                                           FVector2D(Geometry.LocalToAbsolute(Geometry.GetLocalSize())),
+		                                           PixelBottomRight, ViewportBottomRight);
+		UE_LOG(LogTemp, Display, TEXT("UISNAPSHOT_CARD %s %s x=%.0f y=%.0f w=%.0f h=%.0f"), Label, *Widget.GetName(),
+		       PixelTopLeft.X, PixelTopLeft.Y, PixelBottomRight.X - PixelTopLeft.X,
+		       PixelBottomRight.Y - PixelTopLeft.Y);
+	};
+	TArray<UUserWidget*> Widgets;
+	UWidgetBlueprintLibrary::GetAllWidgetsOfClass(GetWorld(), Widgets, UW_ActionUIDescription::StaticClass(), false);
+	for (const UUserWidget* const Widget : Widgets)
+	{
+		if (IsValid(Widget) && Widget->IsVisible() && not Widget->GetCachedGeometry().GetLocalSize().IsNearlyZero())
+		{
+			LogRect(TEXT("panel"), *Widget);
+		}
+	}
+	Widgets.Reset();
+	UWidgetBlueprintLibrary::GetAllWidgetsOfClass(GetWorld(), Widgets, UW_ItemActionUI::StaticClass(), false);
+	for (const UUserWidget* const Widget : Widgets)
+	{
+		const UW_ItemActionUI* const Item = Cast<UW_ItemActionUI>(Widget);
+		if (IsValid(Item) && Item->IsVisible() && not Item->GetCachedGeometry().GetLocalSize().IsNearlyZero())
+		{
+			UE_LOG(LogTemp, Display, TEXT("UISNAPSHOT_CARD item %s custom=%d"),
+			       *UEnum::GetValueAsString(Item->GetAbility()), Item->GetCustomType());
+			LogRect(TEXT("card"), *Item);
+		}
 	}
 }

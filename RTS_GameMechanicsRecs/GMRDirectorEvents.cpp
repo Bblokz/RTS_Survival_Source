@@ -34,6 +34,11 @@
 #include "RTS_Survival/GlobalAbilitySystem/GlobalAbilitiesManager/GlobalAbilitiesManager.h"
 #include "RTS_Survival/GlobalAbilitySystem/GlobalAbilityType/EGlobalAbilityType.h"
 #include "RTS_Survival/Interfaces/Commands.h"
+#include "RTS_Survival/RTSComponents/AbilityComponents/GrenadeComponent/GrenadeAbilityTypes/GrenadeAbilityTypes.h"
+#include "RTS_Survival/RTSComponents/AbilityComponents/ApplyBehaviourAbilityComponent/BehaviourAbilityTypes/BehaviourAbilityTypes.h"
+#include "RTS_Survival/RTSComponents/AbilityComponents/AimAbilityComponent/AimAbilityTypes/AimAbilityTypes.h"
+#include "RTS_Survival/RTSComponents/AbilityComponents/ModeAbilityComponent/ModeAbilityTypes.h"
+#include "RTS_Survival/RTSComponents/AbilityComponents/FieldConstructionAbilityComponent/FieldConstructionTypes/FieldConstructionTypes.h"
 #include "RTS_Survival/Navigation/CoverFinder/CoverFinderTypes.h"
 #include "RTS_Survival/Navigation/CoverFinder/CoverFinderWorldSubsystem.h"
 #include "RTS_Survival/Player/CPPController.h"
@@ -42,6 +47,9 @@
 #include "RTS_Survival/Player/RTSCheatManager/RTSCheatManager.h"
 #include "RTS_Survival/Player/SquadMovePreview/SquadMovePreviewComponent.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
+#include "RTS_Survival/RTSComponents/HealthComponent.h"
+#include "RTS_Survival/Player/PlayerTechManager/PlayerTechManager.h"
+#include "RTS_Survival/TechTree/Technologies/Technologies.h"
 #include "RTS_Survival/RTSComponents/RTSTargetAcquisition/RTSEngagementStance/RTSAggroBehaviour.h"
 #include "RTS_Survival/SupplyPoints/SupplyPoint.h"
 #include "RTS_Survival/SupplyPoints/SupplyPointSubsystem.h"
@@ -51,6 +59,7 @@
 #include "RTS_Survival/Units/Tanks/WheeledTank/BaseTruck/NomadicVehicle.h"
 #include "RTS_Survival/Units/TeamWeapons/TeamWeapon.h"
 #include "RTS_Survival/Utils/UnitSpawning/RTSUnitOwnerSpawning.h"
+#include "RTS_Survival/Weapons/Turret/CPPTurretsMaster.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogGMREvents, Log, All);
 
@@ -62,6 +71,9 @@ namespace GMRDirectorEventsPrivate
 	constexpr float DefaultResourceAmount = 100000.f;
 	constexpr double ExpansionTimeoutSeconds = 20.0;
 	constexpr float DefaultClaimSeconds = 25.f;
+	// Grenade events: the Vultures AT stick grenade reaches 800, so 790 throws as soon as the target is in reach.
+	constexpr float DefaultGrenadeRange = 790.f;
+	constexpr float DefaultGrenadeTimeoutSeconds = 25.f;
 	constexpr float DefaultDigSecondsPerMetre = 0.5f;
 	constexpr float AnchorSearchRadius = 2500.f;
 	constexpr float TrenchLengthSlack = 1.6f;
@@ -1202,4 +1214,315 @@ FString AGMRDirector::Event_Capture(const FGMREvent& Event)
 	}
 	return FString::Printf(TEXT("supply point %s owner=%d at %.0f m"), *Nearest->GetName(), Nearest->GetOwningPlayer(),
 	                       NearestDistance / 100.f);
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// Unit abilities
+
+namespace GMRAbilityPrivate
+{
+	/** Event Text is "<Kind>:<Subtype>" (no kind = Grenade). Kinds: Grenade, Behaviour, Mode, Aim, Rockets, Field. */
+	void SplitAbilityText(const FString& Text, FString& OutKind, FString& OutSubtype)
+	{
+		if (not Text.Split(TEXT(":"), &OutKind, &OutSubtype))
+		{
+			OutKind = TEXT("Grenade");
+			OutSubtype = Text;
+		}
+	}
+
+	const TCHAR* GetSubtypeEnumPath(const FString& Kind)
+	{
+		if (Kind.Equals(TEXT("Grenade"))) return TEXT("/Script/RTS_Survival.EGrenadeAbilityType");
+		if (Kind.Equals(TEXT("Behaviour"))) return TEXT("/Script/RTS_Survival.EBehaviourAbilityType");
+		if (Kind.Equals(TEXT("Mode"))) return TEXT("/Script/RTS_Survival.EModeAbilityType");
+		if (Kind.Equals(TEXT("Aim"))) return TEXT("/Script/RTS_Survival.EAimAbilityType");
+		if (Kind.Equals(TEXT("Field"))) return TEXT("/Script/RTS_Survival.EFieldConstructionType");
+		if (Kind.Equals(TEXT("Attached"))) return TEXT("/Script/RTS_Survival.EAttachWeaponAbilitySubType");
+		return nullptr;
+	}
+
+	FString GetQueueErrorName(const ECommandQueueError Error)
+	{
+		const UEnum* const Enum = StaticEnum<ECommandQueueError>();
+		return Enum != nullptr ? Enum->GetNameStringByValue(static_cast<int64>(Error)) : TEXT("?");
+	}
+}
+
+FString AGMRDirector::Event_Grenade(const FGMREvent& Event)
+{
+	using namespace GMRDirectorEventsPrivate;
+	FString Kind;
+	FString Subtype;
+	GMRAbilityPrivate::SplitAbilityText(Event.Text, Kind, Subtype);
+	const bool bRockets = Kind.Equals(TEXT("Rockets")) || Kind.Equals(TEXT("Shield")) || Kind.Equals(TEXT("DigIn"))
+		|| Kind.Equals(TEXT("Repair")) || Kind.Equals(TEXT("Heal"));
+	const TCHAR* const EnumPath = GMRAbilityPrivate::GetSubtypeEnumPath(Kind);
+	if (not bRockets && (EnumPath == nullptr || GetEnumValue(EnumPath, Subtype) == INDEX_NONE))
+	{
+		return TEXT("unknown ability ") + Event.Text;
+	}
+	FGMRPendingGrenade& Pending = M_PendingGrenades.AddDefaulted_GetRef();
+	Pending.Event = Event;
+	Pending.QueuedWorldSeconds = GetWorld()->GetTimeSeconds();
+	return TEXT("queued ") + Event.Text;
+}
+
+void AGMRDirector::TickPendingGrenades()
+{
+	for (int32 Index = M_PendingGrenades.Num() - 1; Index >= 0; --Index)
+	{
+		if (TryThrowPendingGrenade(M_PendingGrenades[Index]))
+		{
+			M_PendingGrenades.RemoveAt(Index);
+		}
+	}
+}
+
+bool AGMRDirector::TryThrowPendingGrenade(const FGMRPendingGrenade& Pending)
+{
+	using namespace GMRDirectorEventsPrivate;
+	const FGMREvent& Event = Pending.Event;
+	const int32 Frame = GetTimelineFrame();
+	FString Kind;
+	FString Subtype;
+	GMRAbilityPrivate::SplitAbilityText(Event.Text, Kind, Subtype);
+	auto LogResult = [this, &Event, Frame](const FString& Result)
+	{
+		FGMRManifestEvent& Logged = M_Manifest.Events.AddDefaulted_GetRef();
+		Logged.Frame = Frame;
+		// "GrenadeThrow" stays the manifest type of every unit ability order (ability_post reads it).
+		Logged.Type = TEXT("GrenadeThrow");
+		Logged.Tag = Event.Tag;
+		Logged.Result = Result;
+		UE_LOG(LogGMREvents, Display, TEXT("GMR_GRENADE frame=%d tag=%s type=%s result=%s"), Frame, *Event.Tag,
+		       *Event.Text, *Result);
+	};
+	const TArray<AActor*> Throwers = GetEventUnits(Event);
+	if (Throwers.IsEmpty())
+	{
+		LogResult(TEXT("no live throwers"));
+		return true;
+	}
+	const float Range = Event.GetSetting(TEXT("Range"), DefaultGrenadeRange);
+	const bool bTimedOut = GetWorld()->GetTimeSeconds() - Pending.QueuedWorldSeconds
+		> Event.GetSetting(TEXT("Timeout"), DefaultGrenadeTimeoutSeconds);
+	FVector Aim = GetGroundLocation(AnchorToWorld(Event.TargetOffset), false);
+	float Distance = 0.f;
+	AActor* TargetActor = nullptr;
+	if (not Event.TargetTag.IsEmpty())
+	{
+		const TArray<AActor*> Targets = GetLiveTaggedUnits(Event.TargetTag);
+		if (Targets.IsEmpty())
+		{
+			LogResult(TEXT("no live target"));
+			return true;
+		}
+		AActor* const Target = Targets[0];
+		TargetActor = Target;
+		Distance = FVector::Dist2D(Target->GetActorLocation(), Throwers[0]->GetActorLocation());
+		if (Distance > Range && not bTimedOut)
+		{
+			return false;
+		}
+		// Leads a driving target a little so the volley lands on the hull rather than behind it.
+		Aim = Target->GetActorLocation() + Target->GetVelocity() * Event.GetSetting(TEXT("Lead"), 0.f);
+	}
+	const TCHAR* const EnumPath = GMRAbilityPrivate::GetSubtypeEnumPath(Kind);
+	const int64 SubtypeValue = EnumPath != nullptr ? GetEnumValue(EnumPath, Subtype) : 0;
+	int32 Ordered = 0;
+	FString LastError;
+	for (AActor* const Thrower : Throwers)
+	{
+		ICommands* const Commands = Cast<ICommands>(Thrower);
+		if (Commands == nullptr)
+		{
+			continue;
+		}
+		ECommandQueueError Error = ECommandQueueError::CommandDataInvalid;
+		if (Kind.Equals(TEXT("Grenade")))
+		{
+			Error = Commands->ThrowGrenade(Aim, true, static_cast<EGrenadeAbilityType>(SubtypeValue));
+		}
+		else if (Kind.Equals(TEXT("Behaviour")))
+		{
+			Error = Commands->ActivateBehaviourAbility(static_cast<EBehaviourAbilityType>(SubtypeValue), true);
+		}
+		else if (Kind.Equals(TEXT("Mode")))
+		{
+			Error = Commands->ActivateModeAbility(static_cast<EModeAbilityType>(SubtypeValue), true);
+		}
+		else if (Kind.Equals(TEXT("Aim")))
+		{
+			Error = Commands->AimAbility(Aim, true, static_cast<EAimAbilityType>(SubtypeValue));
+		}
+		else if (Kind.Equals(TEXT("Attached")))
+		{
+			Error = Commands->FireAttachedWeaponAbility(Aim, true, static_cast<EAttachWeaponAbilitySubType>(SubtypeValue));
+		}
+		else if (Kind.Equals(TEXT("Rockets")))
+		{
+			Error = Commands->FireRockets(true);
+		}
+		else if (Kind.Equals(TEXT("Shield")))
+		{
+			Error = Commands->ActivateShield(true);
+		}
+		else if (Kind.Equals(TEXT("DigIn")))
+		{
+			Error = Commands->DigIn(true);
+		}
+		else if (Kind.Equals(TEXT("Repair")) && IsValid(TargetActor))
+		{
+			Error = Commands->RepairActor(TargetActor, true);
+		}
+		else if (Kind.Equals(TEXT("Heal")) && IsValid(TargetActor))
+		{
+			Error = Commands->HealTarget(TargetActor, true);
+		}
+		else if (Kind.Equals(TEXT("Field")))
+		{
+			Error = Commands->FieldConstruction(static_cast<EFieldConstructionType>(SubtypeValue), true, Aim,
+			                                    FRotator(0.f, Event.TargetYaw + M_Job.AnchorYaw, 0.f), nullptr);
+		}
+		if (Error == ECommandQueueError::NoError)
+		{
+			++Ordered;
+		}
+		else
+		{
+			LastError = GMRAbilityPrivate::GetQueueErrorName(Error);
+		}
+	}
+	if (Ordered > 0)
+	{
+		PlayUnitVoiceLine(Throwers[0], Event.Voice, true);
+	}
+	const FString ErrorText = LastError.IsEmpty() ? FString() : TEXT(" error=") + LastError;
+	LogResult(FString::Printf(TEXT("ordered %d/%d at %.0f cm%s voice=%s%s"), Ordered, Throwers.Num(), Distance,
+	                          bTimedOut ? TEXT(" (timed out)") : TEXT(""), *Event.Voice, *ErrorText));
+	return true;
+}
+
+void AGMRDirector::TickUnitDeaths()
+{
+	const int32 Frame = GetTimelineFrame();
+	for (TPair<FString, FGMRTaggedUnits>& Pair : M_TaggedUnits)
+	{
+		TArray<bool>& Reported = M_ReportedDeaths.FindOrAdd(Pair.Key);
+		Reported.SetNum(Pair.Value.Units.Num());
+		for (int32 Index = 0; Index < Pair.Value.Units.Num(); ++Index)
+		{
+			AActor* const Unit = Pair.Value.Units[Index].Get();
+			if (Reported[Index] || (IsValid(Unit) && not Unit->IsActorBeingDestroyed() && Unit->IsUnitAlive()))
+			{
+				continue;
+			}
+			Reported[Index] = true;
+			FGMRManifestEvent& Logged = M_Manifest.Events.AddDefaulted_GetRef();
+			Logged.Frame = Frame;
+			Logged.Type = TEXT("UnitDied");
+			Logged.Tag = Pair.Key;
+			Logged.Result = FString::Printf(TEXT("index %d"), Index);
+			UE_LOG(LogGMREvents, Display, TEXT("GMR_UNIT_DIED frame=%d tag=%s index=%d"), Frame, *Pair.Key, Index);
+		}
+		// Squads: every soldier separately (the squad itself only dies with its last soldier).
+		for (const TWeakObjectPtr<AActor>& Weak : Pair.Value.Units)
+		{
+			ASquadController* const Squad = Cast<ASquadController>(Weak.Get());
+			if (not IsValid(Squad))
+			{
+				continue;
+			}
+			for (ASquadUnit* const Soldier : Squad->GetSquadUnitsChecked())
+			{
+				if (IsValid(Soldier) && Soldier->IsUnitAlive())
+				{
+					M_TrackedSoldiers.FindOrAdd(Soldier) = Pair.Key;
+				}
+			}
+		}
+	}
+	for (auto It = M_TrackedSoldiers.CreateIterator(); It; ++It)
+	{
+		AActor* const Soldier = It->Key.Get();
+		if (IsValid(Soldier) && not Soldier->IsActorBeingDestroyed() && Soldier->IsUnitAlive())
+		{
+			continue;
+		}
+		FGMRManifestEvent& Logged = M_Manifest.Events.AddDefaulted_GetRef();
+		Logged.Frame = Frame;
+		Logged.Type = TEXT("SoldierDied");
+		Logged.Tag = It->Value;
+		UE_LOG(LogGMREvents, Display, TEXT("GMR_SOLDIER_DIED frame=%d tag=%s"), Frame, *It->Value);
+		It.RemoveCurrent();
+	}
+}
+
+FString AGMRDirector::Event_Tech(const FGMREvent& Event)
+{
+	using namespace GMRDirectorEventsPrivate;
+	const int64 TechValue = GetEnumValue(TEXT("/Script/RTS_Survival.ETechnology"), Event.Text);
+	if (TechValue == INDEX_NONE || not GetIsValidPlayerController())
+	{
+		return TEXT("unknown technology ") + Event.Text;
+	}
+	UPlayerTechManager* const TechManager = M_PlayerController->GetPlayerTechManager();
+	if (not IsValid(TechManager))
+	{
+		return TEXT("no tech manager");
+	}
+	// Applies the effect to the player's current units (e.g. Tech_Flak88_GroundRole adds the mode to Flak 88 squads).
+	TechManager->OnTechResearched(static_cast<ETechnology>(TechValue));
+	return TEXT("researched ") + Event.Text;
+}
+
+FString AGMRDirector::Event_Health(const FGMREvent& Event)
+{
+	const float Fraction = FMath::Clamp(Event.Value, 0.01f, 1.f);
+	int32 Changed = 0;
+	auto Apply = [Fraction, &Changed](AActor* Actor)
+	{
+		UHealthComponent* const Health = IsValid(Actor) ? Actor->FindComponentByClass<UHealthComponent>() : nullptr;
+		if (IsValid(Health))
+		{
+			Health->SetCurrentHealth(Health->GetMaxHealth() * Fraction);
+			++Changed;
+		}
+	};
+	for (AActor* const Unit : GetEventUnits(Event))
+	{
+		if (ASquadController* const Squad = Cast<ASquadController>(Unit))
+		{
+			for (ASquadUnit* const Soldier : Squad->GetSquadUnitsChecked())
+			{
+				Apply(Soldier);
+			}
+			continue;
+		}
+		Apply(Unit);
+	}
+	return FString::Printf(TEXT("health %.2f on %d"), Fraction, Changed);
+}
+
+FString AGMRDirector::Event_Disarm(const FGMREvent& Event)
+{
+	int32 Disabled = 0;
+	for (AActor* const Unit : GetEventUnits(Event))
+	{
+		const ATankMaster* const Tank = Cast<ATankMaster>(Unit);
+		if (not IsValid(Tank))
+		{
+			continue;
+		}
+		for (ACPPTurretsMaster* const Turret : Tank->GetTurrets())
+		{
+			if (IsValid(Turret))
+			{
+				Turret->DisableTurret();
+				++Disabled;
+			}
+		}
+	}
+	return FString::Printf(TEXT("disabled %d turrets"), Disabled);
 }

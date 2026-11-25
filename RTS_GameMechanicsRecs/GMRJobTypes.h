@@ -194,6 +194,11 @@ struct FGMREvent
 	UPROPERTY()
 	FString Text;
 
+	// ERTSVoiceLine name played (forced) on the first unit when an event whose Text holds something else, such as
+	// Grenade, carries out its order; the command line a player would hear.
+	UPROPERTY()
+	FString Voice;
+
 	// Index-based selection inside the tag (-1 = all units of the tag).
 	UPROPERTY()
 	int32 Index = -1;

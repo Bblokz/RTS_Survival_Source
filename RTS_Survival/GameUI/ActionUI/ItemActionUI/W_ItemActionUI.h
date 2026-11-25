@@ -50,6 +50,9 @@ class RTS_SURVIVAL_API UW_ItemActionUI : public UUserWidget
 	GENERATED_BODY()
 
 public:
+	EAbilityID GetAbility() const { return M_Ability; }
+	int32 GetCustomType() const { return M_CustomType; }
+
 	/**
 	 * @brief Sets this action UI item to use the new provided ability.
 	 * Will adjust slate in derived blueprint.
