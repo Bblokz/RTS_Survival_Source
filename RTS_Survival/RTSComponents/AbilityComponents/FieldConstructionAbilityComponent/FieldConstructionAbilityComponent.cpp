@@ -691,6 +691,13 @@ void UFieldConstructionAbilityComponent::AddEquipmentToSquad()
 		{
 			continue;
 		}
+		if (not SquadUnit->GetMesh()->DoesSocketExist(FieldConstructionEquipmentSettings.FieldConstructSocketName))
+		{
+			// Each skeleton the squad AnimBP runs on needs the socket, or the equipment would sit at the unit's feet.
+			RTSFunctionLibrary::ReportError("Field construction equipment socket " +
+				FieldConstructionEquipmentSettings.FieldConstructSocketName.ToString() +
+				" is missing on the mesh of " + SquadUnit->GetName());
+		}
 
 		UStaticMeshComponent* EquipmentMesh = NewObject<UStaticMeshComponent>(SquadUnit);
 		if (not IsValid(EquipmentMesh))
@@ -809,10 +816,16 @@ void UFieldConstructionAbilityComponent::PlayConstructionAnimation() const
 		SquadUnit->SetActorRotation(LookAtRotation);
 
 		USquadUnitAnimInstance* AnimInstance = SquadUnit->GetAnimBP_SquadUnit();
-		if (AnimInstance)
+		if (not AnimInstance)
 		{
-			AnimInstance->PlayWeldingMontage();
+			continue;
 		}
+		if (FieldConstructionEquipmentSettings.WorkAnimation == EFieldConstructionWorkAnimation::Shovelling)
+		{
+			AnimInstance->PlayShovellingMontage();
+			continue;
+		}
+		AnimInstance->PlayWeldingMontage();
 	}
 }
 

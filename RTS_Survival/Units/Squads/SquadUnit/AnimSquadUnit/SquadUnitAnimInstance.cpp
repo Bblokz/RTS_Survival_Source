@@ -625,6 +625,8 @@ UAnimMontage* FAimPositionMontages::GetMiscFullBodyMontage(const ESquadAimPositi
 		return Welding;
 	case ESquadAimPositionMontage::Misc_Grenade:
 		return GrenadePullAndThrow;
+	case ESquadAimPositionMontage::Misc_Shovelling:
+		return Shovelling;
 	default:
 		break;
 	}
@@ -842,6 +844,28 @@ void USquadUnitAnimInstance::PlayWeldingMontage()
 	CancelCoverAnimation();
 	UAnimMontage* SelectedMontage = AimPositionMontages.GetMiscFullBodyMontage(ESquadAimPositionMontage::Misc_Welding);
 	StartMontage(SelectedMontage, false);
+}
+
+void USquadUnitAnimInstance::PlayShovellingMontage()
+{
+	UAnimMontage* ShovelMontage = AimPositionMontages.GetMiscFullBodyMontage(
+		ESquadAimPositionMontage::Misc_Shovelling);
+	if (not IsValid(ShovelMontage))
+	{
+		RTSFunctionLibrary::ReportError("No shovelling montage set on anim blueprint " + GetName() +
+			"\n Falling back to welding. At function: USquadUnitAnimInstance::PlayShovellingMontage");
+		PlayWeldingMontage();
+		return;
+	}
+	CancelCoverAnimation();
+	StartMontage(ShovelMontage, false);
+	if (not Montage_IsPlaying(ShovelMontage))
+	{
+		return;
+	}
+	// Linking the section onto itself keeps the unit digging; the field construction stops all montages when done.
+	const FName LoopSectionName = ShovelMontage->GetSectionName(0);
+	Montage_SetNextSection(LoopSectionName, LoopSectionName, ShovelMontage);
 }
 
 void USquadUnitAnimInstance::StartParachuteDescentAnimation(UAnimMontage* ParachuteMontage)
@@ -1897,8 +1921,9 @@ void USquadUnitAnimInstance::SetMovementStateWithSpeed(const float& MovementSpee
 		ClearTeamWeaponCrewAnimationRuntime(true);
 	}
 
-	// Aim position transitions share the FullBody slot with the crew montages and must not interrupt them.
-	const bool bAllowAimPositionTransitions = not GetIsTeamWeaponCrewAnimationActive();
+	// Aim position transitions share the FullBody slot with the crew and shovelling montages and must not interrupt them.
+	const bool bAllowAimPositionTransitions = not GetIsTeamWeaponCrewAnimationActive() &&
+		not GetIsShovellingMontagePlaying();
 	if (FMath::IsNearlyZero(MovementSpeed))
 	{
 		// In this case we just started aiming while idle and can choose a random aim position.

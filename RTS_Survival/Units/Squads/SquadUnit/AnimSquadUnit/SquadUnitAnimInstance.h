@@ -251,6 +251,11 @@ struct FAimPositionMontages
 	
 	UPROPERTY(EditDefaultsOnly,BlueprintReadOnly, Category = "Misc Full Body Montages")
 	UAnimMontage* GrenadePullAndThrow = nullptr;
+
+	// Digging clip for field constructions that are dug in, such as mines. Played looping on the FullBody slot
+	// until the construction completes; the shovel itself is the construction's equipment mesh.
+	UPROPERTY(EditDefaultsOnly,BlueprintReadOnly, Category = "Misc Full Body Montages")
+	UAnimMontage* Shovelling = nullptr;
 };
 
 /**
@@ -819,6 +824,17 @@ public:
 	void PlayGrenadeThrowMontage(const float MontageTime);
 
 	void PlayWeldingMontage();
+
+	/**
+	 * @brief Loops the shovelling montage until something stops all montages, so the digging lasts exactly as long
+	 * as the field construction. Falls back to welding when no shovelling montage is set.
+	 */
+	void PlayShovellingMontage();
+
+	bool GetIsShovellingMontagePlaying() const
+	{
+		return IsValid(AimPositionMontages.Shovelling) && Montage_IsPlaying(AimPositionMontages.Shovelling);
+	}
 
 	/**
 	 * @brief Loops the hanging-in-the-harness montage while a paratrooper descends; the montage's first section

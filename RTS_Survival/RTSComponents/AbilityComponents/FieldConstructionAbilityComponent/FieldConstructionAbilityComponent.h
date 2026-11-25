@@ -65,10 +65,22 @@ struct FFieldConstructionAbilitySettings
 	TObjectPtr<UNiagaraSystem> OnCompletionEffect;
 };
 
+// The work animation the squad loops while it builds; set it together with the matching equipment mesh.
+UENUM(BlueprintType)
+enum class EFieldConstructionWorkAnimation : uint8
+{
+	Welding,
+	// Digging with a shovel, for constructions that are dug in such as mines.
+	Shovelling
+};
+
 USTRUCT(Blueprintable)
 struct FFieldConstructionEquipmentData
 {
 	GENERATED_BODY()
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Effect")
+	EFieldConstructionWorkAnimation WorkAnimation = EFieldConstructionWorkAnimation::Welding;
 
 	// The equipment that the scavenger uses.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Effect")
