@@ -95,6 +95,21 @@ Progress bar (all three stations): every docked harvester must show the bar whil
 reaches at least 0.6, and it is hidden once the harvester is empty (`unload_progress_*` checks); the health bar holding
 it is visible the whole time (`unload_health_bar_shown`).
 
+More switches:
+- `-UnloadStationHarvester=PzI` uses the Pz I harvester instead of the Pz IV.
+- `-UnloadStationAhead=<cm>` starts the harvesters further out (default 2600). Further out, the
+  `docked_without_stall` check (16 s) fails on the longer drive only.
+- Mission maps work too: the test unlocks a mission's locked pause (takeovers). For example, the Intro HQ spot with
+  harvesters starting below the hilltop:
+  `/Game/RTS_Survival/Maps/GerMissions/Ger_IntroMission ... -UnloadStationHarvester=PzI -UnloadStationAt=1450,300 -UnloadStationAhead=7000`.
+
+**Approach height (fixed 2026-11-25).** The dock transform takes the harvester's own height. On Ger_IntroMission the HQ
+stands on a hilltop, so a harvester coming up from a field got an approach point below the plateau. Most likely its
+navmesh query (50 x 50 x 250 cm) then found nothing (the play log only showed the bay reserved and released in the
+same frame; the old code logged no reason), `MoveToLocation` failed and the harvester fell back to the old instant drop-off. Now `GetApproachLocation` uses the station's height and the harvester projects
+the point onto its own agent's navmesh (`GetUnloadApproachOnNavMesh`, 150 x 150 x 800 cm). If a move still fails, the
+log has `RTS_HARVESTER ... no path to unload bay` with the approach point and the move result.
+
 ## Known limits
 
 - During the guided slide the tracks do not animate (the harvester is moved, not driven).

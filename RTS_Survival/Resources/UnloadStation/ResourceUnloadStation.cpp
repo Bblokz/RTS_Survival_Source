@@ -433,7 +433,12 @@ FVector AResourceUnloadStation::GetApproachLocation(const int32 BayIndex, const 
 	{
 		return GetActorLocation();
 	}
-	return Dock.GetLocation() + Dock.GetRotation().GetForwardVector() * BaySettings[BayIndex].ApproachDistance;
+	FVector Approach = Dock.GetLocation() + Dock.GetRotation().GetForwardVector() * BaySettings[BayIndex].ApproachDistance;
+	// The dock takes the harvester's height, which is far off while it still drives up from a field below the station
+	// (Ger_IntroMission's hilltop HQ): the approach is at the station's height instead; the harvester projects it onto
+	// its navmesh.
+	Approach.Z = GetActorLocation().Z;
+	return Approach;
 }
 
 void AResourceUnloadStation::OnHarvesterDocked(const int32 BayIndex, UHarvester& Harvester, UResourceDropOff& DropOff,

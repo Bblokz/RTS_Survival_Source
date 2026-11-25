@@ -637,6 +637,8 @@ private:
 	/** @return True when the drop-off has a crane with a free bay and this harvester now heads for it. */
 	bool TryStartUnloadStationRoute();
 	void HarvestAIAction_MoveToUnloadBayApproach();
+	/** @return The bay approach moved onto this harvester's navmesh; Approach itself when nothing is found near it. */
+	FVector GetUnloadApproachOnNavMesh(const FVector& Approach) const;
 	void OnMoveToUnloadBayApproachFinished(FAIRequestID RequestID, const FPathFollowingResult& Result);
 	void HarvestAIAction_ReverseIntoUnloadBay();
 	void OnReverseIntoUnloadBayFinished(FAIRequestID RequestID, const FPathFollowingResult& Result);

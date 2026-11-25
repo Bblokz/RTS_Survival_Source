@@ -58,6 +58,10 @@ namespace UnloadStationTestPrivate
 		TEXT("/Game/RTS_Survival/Blueprints/GroundVehicles/BaseAndNomadic/ChildBlueprints/SKDFZ-7/Ger_HQ_Truck.Ger_HQ_Truck_C");
 	const TCHAR* const HarvesterPath =
 		TEXT("/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Medium/PanzerIV/Harvester/Ger_Harvester_PanzerIV.Ger_Harvester_PanzerIV_C");
+	// -UnloadStationHarvester=PzI runs the test with the Panzer I harvester (the Intro mission's) instead.
+	const TCHAR* const HarvesterSwitch = TEXT("UnloadStationHarvester=");
+	const TCHAR* const PanzerIHarvesterPath =
+		TEXT("/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Light/Panzer1/Ger_Harvester_Panzer1.Ger_Harvester_Panzer1_C");
 	const FVector2D DefaultAnchor(16796.f, -15808.f);
 	constexpr uint8 TestPlayer = 1;
 	constexpr float StartDelaySeconds = 3.f;
@@ -129,6 +133,11 @@ void UUnloadStationTestSubsystem::Tick(const float DeltaTime)
 	{
 		TickCaptureSequence();
 	}
+	// Mission maps (e.g. Ger_IntroMission) pause the game for briefings and takeovers at any time.
+	if (M_Phase != EUnloadStationTestPhase::WaitingForStart)
+	{
+		StartGameAndUnpause();
+	}
 	switch (M_Phase)
 	{
 	case EUnloadStationTestPhase::WaitingForStart:
@@ -197,7 +206,8 @@ void UUnloadStationTestSubsystem::SpawnHQ()
 	UWorld* World = GetWorld();
 	FVector2D Anchor = DefaultAnchor;
 	FString AnchorText;
-	if (FParse::Value(FCommandLine::Get(), AnchorSwitch, AnchorText))
+	// Not stopping on separators: the value itself is "X,Y".
+	if (FParse::Value(FCommandLine::Get(), AnchorSwitch, AnchorText, /*bShouldStopOnSeparator=*/false))
 	{
 		FString X, Y;
 		if (AnchorText.Split(TEXT(","), &X, &Y))
@@ -266,7 +276,10 @@ void UUnloadStationTestSubsystem::TickWaitingForStation()
 	EmptyStores();
 	const FVector Forward = M_HQ->GetActorForwardVector();
 	const FVector Right = M_HQ->GetActorRightVector();
-	const FVector Base = M_HQ->GetActorLocation() + Forward * HarvesterAheadCm;
+	// -UnloadStationAhead=<cm> starts the harvesters further out, e.g. down a hill below the HQ.
+	float AheadCm = HarvesterAheadCm;
+	(void)FParse::Value(FCommandLine::Get(), TEXT("UnloadStationAhead="), AheadCm);
+	const FVector Base = M_HQ->GetActorLocation() + Forward * AheadCm;
 	for (const float Side : {-HarvesterSideCm, HarvesterSideCm})
 	{
 		FUnloadTestHarvester TestHarvester;
@@ -276,7 +289,11 @@ void UUnloadStationTestSubsystem::TickWaitingForStation()
 			                          : nullptr;
 		M_Harvesters.Add(TestHarvester);
 	}
-	Check(M_Harvesters[0].Harvester.IsValid() && M_Harvesters[1].Harvester.IsValid(), TEXT("harvesters_spawned"));
+	// Heights matter: a harvester coming up from below the station must still find the bay approach.
+	Check(M_Harvesters[0].Harvester.IsValid() && M_Harvesters[1].Harvester.IsValid(), TEXT("harvesters_spawned"),
+	      FString::Printf(TEXT("hq_z=%.0f harvester_z=%.0f,%.0f"), M_HQ->GetActorLocation().Z,
+	                      M_Harvesters[0].Actor.IsValid() ? M_Harvesters[0].Actor->GetActorLocation().Z : 0.f,
+	                      M_Harvesters[1].Actor.IsValid() ? M_Harvesters[1].Actor->GetActorLocation().Z : 0.f));
 	EnterPhase(EUnloadStationTestPhase::WaitingForHarvesters);
 }
 
@@ -296,7 +313,10 @@ AActor* UUnloadStationTestSubsystem::SpawnHarvester(const FVector& Location) con
 {
 	using namespace UnloadStationTestPrivate;
 	UWorld* World = GetWorld();
-	UClass* HarvesterClass = LoadClass<AActor>(nullptr, HarvesterPath);
+	FString HarvesterKind;
+	(void)FParse::Value(FCommandLine::Get(), HarvesterSwitch, HarvesterKind);
+	const bool bUsePanzerI = HarvesterKind.Equals(TEXT("PzI"), ESearchCase::IgnoreCase);
+	UClass* HarvesterClass = LoadClass<AActor>(nullptr, bUsePanzerI ? PanzerIHarvesterPath : HarvesterPath);
 	FVector Ground;
 	if (not IsValid(World) || not IsValid(HarvesterClass)
 		|| not GlobalAbilityHelpers::TryFindGroundLocation(this, Location, Ground))
@@ -716,6 +736,11 @@ void UUnloadStationTestSubsystem::StartGameAndUnpause() const
 	if (IsValid(Controller) && Controller->GetIsGameOnPause())
 	{
 		Controller->PauseGame(ERTSPauseGameOptions::ForceUnpause);
+		// Still paused: a mission takeover locked the pause (Ger_IntroMission); headless nobody closes it.
+		if (Controller->GetIsGameOnPause())
+		{
+			Controller->PauseAndLockGame(false);
+		}
 	}
 }
 

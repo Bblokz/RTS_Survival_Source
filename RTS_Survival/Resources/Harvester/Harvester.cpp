@@ -1975,6 +1975,26 @@ namespace HarvesterUnloadPrivate
 	constexpr float MinGuidedSlideSeconds = 0.35f;
 	constexpr float DockAlignTickSeconds = 0.02f;
 	const FName CargoSocketNames[] = {FName(TEXT("Crystals")), FName(TEXT("Cargo"))};
+	// The approach comes at the station's height; this box finds the navmesh under or over it (station origins are not
+	// always on the ground) without jumping to another level of the terrain far away.
+	const FVector ApproachProjectionExtent(150.f, 150.f, 800.f);
+}
+
+FVector UHarvester::GetUnloadApproachOnNavMesh(const FVector& Approach) const
+{
+	const UNavigationSystemV1* NavSystem = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld());
+	if (not IsValid(NavSystem) || not IsValid(M_AIController))
+	{
+		return Approach;
+	}
+	const ANavigationData* NavData = NavSystem->GetNavDataForProps(M_AIController->GetNavAgentPropertiesRef(), Approach);
+	FNavLocation Projected;
+	if (NavSystem->ProjectPointToNavigation(Approach, Projected, HarvesterUnloadPrivate::ApproachProjectionExtent,
+	                                        NavData))
+	{
+		return Projected.Location;
+	}
+	return Approach;
 }
 
 FVector UHarvester::GetCargoWorldLocation() const
@@ -2157,7 +2177,7 @@ void UHarvester::HarvestAIAction_MoveToUnloadBayApproach()
 		AbandonUnloadStation(true);
 		return;
 	}
-	const FVector Approach = M_UnloadStation->GetApproachLocation(M_UnloadBayIndex, *this);
+	const FVector Approach = GetUnloadApproachOnNavMesh(M_UnloadStation->GetApproachLocation(M_UnloadBayIndex, *this));
 	M_CurrentDropOffMoveGoal = Approach;
 	const EPathFollowingRequestResult::Type MoveResult = M_AIController->MoveToLocation(
 		Approach, ApproachAcceptanceRadius);
@@ -2175,6 +2195,9 @@ void UHarvester::HarvestAIAction_MoveToUnloadBayApproach()
 		return;
 	}
 	HarvestDebug("No path to the unload bay; use the old drop-off point.", FColor::Orange);
+	UE_LOG(LogRTSHarvester, Log, TEXT("RTS_HARVESTER %s no path to unload bay %d approach=%s from=%s result=%d"),
+	       *GetNameSafe(GetOwner()), M_UnloadBayIndex, *Approach.ToCompactString(),
+	       *GetHarvesterLocation().ToCompactString(), static_cast<int32>(MoveResult));
 	AbandonUnloadStation(true);
 }
 
@@ -2197,6 +2220,9 @@ void UHarvester::OnMoveToUnloadBayApproachFinished(FAIRequestID RequestID, const
 		return;
 	}
 	HarvestDebug("Did not reach the unload bay approach; use the old drop-off point.", FColor::Orange);
+	UE_LOG(LogRTSHarvester, Log, TEXT("RTS_HARVESTER %s did not reach unload bay %d approach=%s at=%s"),
+	       *GetNameSafe(GetOwner()), M_UnloadBayIndex, *M_CurrentDropOffMoveGoal.ToCompactString(),
+	       *GetHarvesterLocation().ToCompactString());
 	AbandonUnloadStation(true);
 }
 
