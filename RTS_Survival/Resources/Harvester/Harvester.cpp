@@ -26,6 +26,7 @@
 #include "RTS_Survival/GameUI/Pooled_AnimatedVerticalText/Pooling/AnimatedTextWidgetPoolManager/AnimatedTextWidgetPoolManager.h"
 #include "RTS_Survival/Utils/RTSRichTextConverters/FRTSRichTextConverter.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
+#include "RTS_Survival/RTSComponents/RTSOptimizer/RTSOptimizer.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogRTSHarvester, Log, All);
 
@@ -504,7 +505,13 @@ void UHarvester::FinishReturnCargoCommand() const
 
 void UHarvester::OnHarvestAnimationFinished()
 {
+	if (M_HarvestStatus != EHarvesterAIAction::PlayHarvestAnimation)
+	{
+		// A montage that ended after the harvester moved on (watchdog, new command); nothing to finish.
+		return;
+	}
 	StopHarvestAnimationWatchdog();
+	SetOwnerKeepsMontagesTicking(false);
 	const EResourceValidation Validation = GetCanHarvestResource();
 	if (Validation == EResourceValidation::IsValidForHarvest)
 	{
@@ -540,6 +547,7 @@ void UHarvester::TerminateHarvestCommand()
 		break;
 	case EHarvesterAIAction::PlayHarvestAnimation:
 		StopHarvestAnimationWatchdog();
+		SetOwnerKeepsMontagesTicking(false);
 		if (GetIsValidOwnerHarvesterInterface())
 		{
 			M_IOwnerHarvesterInterface->Execute_StopHarvesterAnimation(GetOwner());
@@ -971,8 +979,23 @@ void UHarvester::HarvestAIAction_PlayHarvesterAnimation()
 	{
 		RotateTowardsTargetLocation(TargetResource->GetResourceLocationNotThreadSafe());
 	}
+	SetOwnerKeepsMontagesTicking(true);
 	M_IOwnerHarvesterInterface->Execute_PlayHarvesterAnimation(GetOwner());
 	StartHarvestAnimationWatchdog();
+}
+
+void UHarvester::SetOwnerKeepsMontagesTicking(const bool bKeepTicking) const
+{
+	const AActor* Owner = GetOwner();
+	if (not IsValid(Owner))
+	{
+		return;
+	}
+	// Not every harvester owner is optimised; without an optimizer its meshes always tick.
+	if (URTSOptimizer* Optimizer = Owner->FindComponentByClass<URTSOptimizer>())
+	{
+		Optimizer->SetKeepMontagesTicking(bKeepTicking);
+	}
 }
 
 void UHarvester::StartHarvestAnimationWatchdog()
@@ -1003,11 +1026,14 @@ void UHarvester::OnHarvestAnimationWatchdog()
 	{
 		return;
 	}
+	++M_HarvestWatchdogFinishCount;
 	if (not bM_HasLoggedHarvestWatchdog)
 	{
 		bM_HasLoggedHarvestWatchdog = true;
+		// Safety net only: the optimizer keeps the montage ticking off-screen, and the Blueprint wires OnCompleted only,
+		// so an interrupted or failed montage ends up here.
 		UE_LOG(LogRTSHarvester, Warning, TEXT("RTS_HARVESTER harvest animation of %s never reported its end; the "
-			       "watchdog finishes it (check the Blueprint's montage OnCompleted path). hidden=%d"),
+			       "watchdog finishes it (montage interrupted or failed to play?). hidden=%d"),
 		       *GetNameSafe(GetOwner()), IsValid(GetOwner()) && GetOwner()->IsHidden() ? 1 : 0);
 	}
 	OnHarvestAnimationFinished();

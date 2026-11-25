@@ -58,6 +58,21 @@ bool URTSOptimizer::GetIsInFOV() const
 	return M_PreviousOptimizationDistance == ERTSOptimizationDistance::InFOV;
 }
 
+void URTSOptimizer::SetKeepMontagesTicking(const bool bKeepTicking)
+{
+	if (bM_KeepMontagesTicking == bKeepTicking)
+	{
+		return;
+	}
+	bM_KeepMontagesTicking = bKeepTicking;
+	// In view and close out of view the skeletons tick anyway; only the far settings depend on this flag.
+	if (M_PreviousOptimizationDistance != ERTSOptimizationDistance::OutFOVFar)
+	{
+		return;
+	}
+	UpdateSkeletonsForOutFovFar();
+}
+
 
 void URTSOptimizer::BeginPlay()
 {
@@ -216,10 +231,23 @@ void URTSOptimizer::OutFovFarUpdateComponents()
 		EachTicking.TickingComponent->SetComponentTickInterval(EachTicking.FarOutFovInterval);
 	}
 
-	for (auto EachSkeleton : M_SkeletalMeshComponents)
+	UpdateSkeletonsForOutFovFar();
+}
+
+void URTSOptimizer::UpdateSkeletonsForOutFovFar()
+{
+	for (const FSkeletonOptimizationSettings& EachSkeleton : M_SkeletalMeshComponents)
 	{
 		if (not EachSkeleton.Skeleton)
 		{
+			continue;
+		}
+		if (bM_KeepMontagesTicking)
+		{
+			// Not rendered out here, so only montages advance; their end events still fire.
+			EachSkeleton.Skeleton->VisibilityBasedAnimTickOption =
+				EVisibilityBasedAnimTickOption::OnlyTickMontagesWhenNotRendered;
+			EachSkeleton.Skeleton->SetComponentTickEnabled(true);
 			continue;
 		}
 		EachSkeleton.Skeleton->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::OnlyTickPoseWhenRendered;

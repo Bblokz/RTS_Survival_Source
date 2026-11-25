@@ -178,6 +178,8 @@ public:
 	void MapTest_SetCargo(ERTSResourceType ResourceType, int32 Amount);
 	EHarvesterAIAction MapTest_GetHarvestStatus() const { return M_HarvestStatus; }
 	UResourceDropOff* MapTest_GetTargetDropOff() const { return M_TargetDropOff.Get(); }
+	/** @return How often the watchdog had to end a harvest animation (0 when montages end on their own). */
+	int32 MapTest_GetWatchdogFinishCount() const { return M_HarvestWatchdogFinishCount; }
 
 	/**
 	 * @brief Keeps this harvester working with no player order (AI harvesters): finds the nearest non-empty field of
@@ -525,9 +527,14 @@ private:
 	// (montage interrupted, mesh not ticking), the harvester would stand at the field forever: finish it from here.
 	FTimerHandle M_HarvestAnimationWatchdog;
 	bool bM_HasLoggedHarvestWatchdog = false;
+	int32 M_HarvestWatchdogFinishCount = 0;
 	void StartHarvestAnimationWatchdog();
 	void StopHarvestAnimationWatchdog();
 	void OnHarvestAnimationWatchdog();
+
+	// Far from the camera the owner's URTSOptimizer stops its skeletal meshes, so the harvest montage would never end.
+	// While the montage plays the optimizer keeps montages ticking.
+	void SetOwnerKeepsMontagesTicking(const bool bKeepTicking) const;
 
 	/** @brief Every retry interval: an idle autonomous harvester returns its cargo or looks for the nearest field. */
 	void TickAutonomousHarvest();

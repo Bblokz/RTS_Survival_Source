@@ -93,6 +93,14 @@ public:
 	ERTSOptimizationDistance GetCurrentOptimizationDistance() const;
 	bool GetIsInFOV() const;
 
+	/**
+	 * @brief Far out of view the owner's skeletal meshes stop ticking, which freezes montages. Gameplay that waits for a
+	 * montage to end (a harvester's harvest montage) turns this on while it plays, so the montage still advances and
+	 * fires its end; only montages tick then, the anim graph does not.
+	 * @param bKeepTicking True while such a montage plays.
+	 */
+	void SetKeepMontagesTicking(const bool bKeepTicking);
+
 protected:
 	// Called when the game starts
 	virtual void BeginPlay() override;
@@ -135,6 +143,12 @@ private:
 	float M_OptimizeInterval = 0.f;
 
 	ERTSOptimizationDistance M_PreviousOptimizationDistance = ERTSOptimizationDistance::None;
+
+	// Set by SetKeepMontagesTicking: far out of view, skeletons keep ticking their montages instead of stopping.
+	bool bM_KeepMontagesTicking = false;
+
+	// Far-out-of-view skeleton settings; respects bM_KeepMontagesTicking.
+	void UpdateSkeletonsForOutFovFar();
 
 	ERTSOptimizationDistance GetOptimizationDistanceToCamera() const;
 
