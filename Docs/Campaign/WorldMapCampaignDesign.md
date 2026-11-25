@@ -564,11 +564,25 @@ session (`Saved/WorldMapUIDesigns/MissionObjects/<Mission>/pick.md`).
   `PieceRoot` scene component. `PieceRoot` has yaw 90 because the models have their front on +Y and the map camera
   looks along +X.
 - **Game meshes used as they are:** Berlin's flak tower (`SM_BF_FlakTower_Damaged`) and the Reichstag (the instanced
-  meshes of `BP_ReichstagRuin_B2`, without decals, forecourt and ramp) keep their level materials. The Oder-Warthe
-  concrete is `MI_OW_Werk_Peilturm_Concrete`. The Ore Mountains tank is `SM_PzIV_H_TrainingPreview` in plain dark
+  meshes of `BP_ReichstagRuin_B2`, without decals, forecourt and ramp). The Reichstag keeps its level materials; the
+  tower's concrete slot is overridden on the piece (see Concrete). The Ore Mountains tank is `SM_PzIV_H_TrainingPreview` in plain dark
   yellow: the UVs of that one-slot preview mesh do not fit the tank camo texture.
 - **Materials:** three shared masters in `Story/Shared`: `M_WorldPiece_PBR` (base colour, normal, ORM),
   `M_WorldPiece_Albedo`, `M_WorldPiece_Flat`.
+- **Concrete (2026-11-25):** all concrete on the pieces is `Story/Shared/M_WorldPiece_Concrete`, built by
+  `concrete_lib.py`. It uses the Sooted Fortress base colour, normal and ORM textures in a box projection (no mesh
+  UVs), with pour and panel joints in relief, colour variation, rain streaks and ground grime. Every size is a
+  parameter in object centimetres.
+  - **Why not the bunker material:** `M_BF_SootedFortress_Procedural` has fixed sizes for a real bunker (noise every
+    13 to 140 cm, pours of at least 35 cm). On a 60 cm piece that is one blotch; on the shrunk flak tower it is noise.
+  - **Instances:** `MI_WP_Ore_CastConcrete` (headwall, cap slab, wing walls), `MI_WP_OW_CastConcrete` (tower, annexes,
+    casemate, dragon's teeth), `MI_WP_Berlin_TowerConcrete` (the flak tower; its lengths are 1 / tower scale larger,
+    because that mesh is real size).
+  - **Setting:** texture once per 45 cm of piece, pours of 12 cm, panels of 26 cm (`CONCRETE_LOOK` in
+    `build_pieces.py`), picked from four in one picture (`concrete_variants.py`, `run_lineup.ps1 -Variants 1`).
+  - **Not concrete:** Pripyat and Lake Vygozero have none; the Reichstag is stone and was left.
+  - **Saving:** the shared editor keeps the piece assets open, and headless saves then fail. `wait_editor_free.ps1`
+    waits for it; this change was saved through the editor itself (three assets).
 - **Briefing text:** description and objectives come from the mission design docs, without late reveals. Rewards are
   empty and the "on defeat" text is still the stand-in of `BP_MissionWorldObject`.
 - **Rebuild:** `Source/Tools/WorldMapPieces` (`build_pieces.py` headless import and Blueprint build,
