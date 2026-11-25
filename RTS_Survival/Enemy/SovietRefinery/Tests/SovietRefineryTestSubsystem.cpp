@@ -26,6 +26,7 @@
 #include "RTS_Survival/Resources/ResourceComponent/ResourceComponent.h"
 #include "RTS_Survival/Resources/ResourceDropOff/ResourceDropOff.h"
 #include "RTS_Survival/Resources/UnloadStation/SkeletalCraneUnloadStation.h"
+#include "RTS_Survival/RTSComponents/HealthComponent.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 #include "RTS_Survival/Utils/UnitSpawning/RTSUnitOwnerSpawning.h"
 
@@ -100,6 +101,7 @@ void USovietRefineryTestSubsystem::Tick(const float DeltaTime)
 	{
 		TrackCrane(Test);
 		TrackHarvesters(Test);
+		TrackTrainingBar(Test);
 	}
 	switch (M_Phase)
 	{
@@ -265,6 +267,7 @@ void USovietRefineryTestSubsystem::TickWaitingForHarvesters()
 			bAllEnemyOwned &= FRTSPlayers::GetOwningPlayerOfActor(Harvester) == EnemyPlayer;
 		}
 		Check(bAllEnemyOwned, TEXT("harvesters_owned_by_ai"), Test.Design);
+		CheckTrainingBarResults(Test);
 	}
 	if (not bAllTrained)
 	{
@@ -472,6 +475,40 @@ void USovietRefineryTestSubsystem::TrackHarvestAnimationLength(FSovietRefineryUn
 	Test.LongestHarvestAnimationSeconds = FMath::Max(Test.LongestHarvestAnimationSeconds, Length);
 	UE_LOG(LogSovietRefineryTest, Display, TEXT("RTS_SOVREF_TEST harvest_animation design=%s unit=%s length=%.1fs"),
 	       *Test.Design, *HarvesterName, Length);
+}
+
+void USovietRefineryTestSubsystem::TrackTrainingBar(FSovietRefineryUnderTest& Test) const
+{
+	const USovietRefineryComponent* Refinery = Test.Refinery.Get();
+	float Fill = 0.f;
+	if (not IsValid(Refinery) || not Refinery->MapTest_GetTrainingProgress(Fill))
+	{
+		return;
+	}
+	Test.bSawTrainingBar = true;
+	Test.MaxTrainingFill = FMath::Max(Test.MaxTrainingFill, Fill);
+	const UHealthComponent* HealthComponent = Test.Building.IsValid()
+		                                          ? Test.Building->FindComponentByClass<UHealthComponent>()
+		                                          : nullptr;
+	const ESlateVisibility BarVisibility = IsValid(HealthComponent)
+		                                       ? HealthComponent->GetHealthBarVisibility()
+		                                       : ESlateVisibility::Hidden;
+	Test.bSawHealthBarHiddenWhileTraining |= BarVisibility == ESlateVisibility::Hidden
+		|| BarVisibility == ESlateVisibility::Collapsed;
+}
+
+void USovietRefineryTestSubsystem::CheckTrainingBarResults(const FSovietRefineryUnderTest& Test)
+{
+	// With TestTrainSeconds the bar must get most of the way before the harvester spawns.
+	constexpr float MinTrainingFillSeen = 0.6f;
+	float Fill = 0.f;
+	const bool bShowsNow = Test.Refinery.IsValid() && Test.Refinery->MapTest_GetTrainingProgress(Fill);
+	Check(Test.bSawTrainingBar, TEXT("training_bar_shown"), Test.Design);
+	Check(Test.MaxTrainingFill >= MinTrainingFillSeen, TEXT("training_bar_filled"),
+	      FString::Printf(TEXT("%s max_fill=%.2f"), *Test.Design, Test.MaxTrainingFill));
+	Check(not bShowsNow, TEXT("training_bar_hidden_when_full"), Test.Design);
+	Check(Test.bSawTrainingBar && not Test.bSawHealthBarHiddenWhileTraining, TEXT("training_health_bar_shown"),
+	      Test.Design);
 }
 
 void USovietRefineryTestSubsystem::TrackHarvesters(FSovietRefineryUnderTest& Test)

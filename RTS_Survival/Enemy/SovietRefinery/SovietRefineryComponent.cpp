@@ -13,6 +13,8 @@
 #include "RTS_Survival/Enemy/StrategicAI/Component/EnemyStrategicAIComponent.h"
 #include "RTS_Survival/FOWSystem/FowComponent/FowComp.h"
 #include "RTS_Survival/Game/Players/RTSPlayers.h"
+#include "RTS_Survival/GameUI/Healthbar/W_HealthBar.h"
+#include "RTS_Survival/RTSComponents/HealthComponent.h"
 #include "RTS_Survival/GameUI/TrainingUI/TrainingOptions/TrainingOptions.h"
 #include "RTS_Survival/Player/AsyncRTSAssetsSpawner/RTSAsyncSpawner.h"
 #include "RTS_Survival/Resources/Harvester/Harvester.h"
@@ -104,6 +106,7 @@ void USovietRefineryComponent::BeginPlay()
 
 void USovietRefineryComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	StopTrainingProgressBar();
 	if (UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().ClearAllTimersForObject(this);
@@ -477,6 +480,7 @@ void USovietRefineryComponent::HarvesterThink()
 	bM_IsTrainingHarvester = true;
 	GetWorld()->GetTimerManager().SetTimer(M_HarvesterTrainTimer, this, &USovietRefineryComponent::OnHarvesterTrained,
 	                                       HarvesterTrainSeconds, false);
+	StartTrainingProgressBar();
 	UE_LOG(LogSovietRefinery, Log, TEXT("SOVREF_HARVESTER training refinery=%s alive=%d max=%d seconds=%.1f"),
 	       *GetOwnerNameForLog(), GetAliveHarvesterCount(), GetMaxHarvesters(), HarvesterTrainSeconds);
 }
@@ -484,6 +488,7 @@ void USovietRefineryComponent::HarvesterThink()
 void USovietRefineryComponent::OnHarvesterTrained()
 {
 	bM_IsTrainingHarvester = false;
+	StopTrainingProgressBar();
 	ARTSAsyncSpawner* AsyncSpawner = FRTS_Statics::GetAsyncSpawner(this);
 	const FTransform Exit = GetHarvesterExitTransform();
 	FVector SpawnLocation;
@@ -605,3 +610,152 @@ FString USovietRefineryComponent::GetOwnerNameForLog() const
 {
 	return GetNameSafe(GetOwner());
 }
+
+// ------------------------------------------------------------------------------------- training bar (health bar)
+
+namespace SovietRefineryTrainingBar
+{
+	// Seconds between bar refreshes; a 45 s training moves the bar about 0.2% per refresh.
+	constexpr float RefreshInterval = 0.1f;
+}
+
+void USovietRefineryComponent::StartTrainingProgressBar()
+{
+	UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		return;
+	}
+	StopTrainingProgressBar();
+	M_TrainingBar.bIsActive = true;
+	M_TrainingBar.Fill = 0.f;
+
+	// The player sees how long until the next harvester rolls out without hovering the refinery; the bar's own
+	// visibility settings return once it is trained.
+	const AActor* Owner = GetOwner();
+	if (UHealthComponent* HealthComponent = IsValid(Owner) ? Owner->FindComponentByClass<UHealthComponent>() : nullptr)
+	{
+		HealthComponent->SetHealthBarForcedVisible(true);
+		M_TrainingBar.ForcedHealthComponent = HealthComponent;
+	}
+
+	const TWeakObjectPtr<USovietRefineryComponent> WeakThis(this);
+	FTimerDelegate RefreshDelegate;
+	RefreshDelegate.BindLambda([WeakThis]()
+	{
+		if (not WeakThis.IsValid())
+		{
+			return;
+		}
+		WeakThis->OnTrainingProgressBarRefresh();
+	});
+	World->GetTimerManager().SetTimer(M_TrainingBar.RefreshTimer, RefreshDelegate,
+	                                  SovietRefineryTrainingBar::RefreshInterval, /*bLoop=*/true);
+	OnTrainingProgressBarRefresh();
+}
+
+void USovietRefineryComponent::StopTrainingProgressBar()
+{
+	if (const UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(M_TrainingBar.RefreshTimer);
+	}
+	if (UHealthComponent* HealthComponent = M_TrainingBar.ForcedHealthComponent.Get())
+	{
+		HealthComponent->SetHealthBarForcedVisible(false);
+	}
+	M_TrainingBar.ForcedHealthComponent.Reset();
+	M_TrainingBar.bIsActive = false;
+	M_TrainingBar.Fill = 0.f;
+	if (not M_TrainingBar.bIsShown)
+	{
+		return;
+	}
+	M_TrainingBar.bIsShown = false;
+	if (const UW_HealthBar* HealthWidget = M_TrainingBar.HealthWidget.Get())
+	{
+		HealthWidget->SetActionProgressVisible(false);
+	}
+}
+
+void USovietRefineryComponent::OnTrainingProgressBarRefresh()
+{
+	if (not M_TrainingBar.bIsActive)
+	{
+		StopTrainingProgressBar();
+		return;
+	}
+	M_TrainingBar.Fill = FMath::Max(M_TrainingBar.Fill, GetTrainingProgressFill());
+
+	// May be null for a while: the health component can create its widget later (e.g. when it first shows).
+	const UW_HealthBar* HealthWidget = GetTrainingProgressHealthWidget();
+	if (not IsValid(HealthWidget))
+	{
+		return;
+	}
+	if (not M_TrainingBar.bIsShown)
+	{
+		M_TrainingBar.bIsShown = true;
+		HealthWidget->SetActionProgressVisible(true);
+	}
+	HealthWidget->SetActionProgress(M_TrainingBar.Fill);
+}
+
+float USovietRefineryComponent::GetTrainingProgressFill() const
+{
+	const UWorld* World = GetWorld();
+	if (not IsValid(World) || not bM_IsTrainingHarvester)
+	{
+		return 0.f;
+	}
+	const FTimerManager& TimerManager = World->GetTimerManager();
+	const float Rate = TimerManager.GetTimerRate(M_HarvesterTrainTimer);
+	if (Rate <= 0.f)
+	{
+		return 0.f;
+	}
+	return FMath::Clamp(TimerManager.GetTimerElapsed(M_HarvesterTrainTimer) / Rate, 0.f, 1.f);
+}
+
+UW_HealthBar* USovietRefineryComponent::GetTrainingProgressHealthWidget()
+{
+	if (UW_HealthBar* CachedWidget = M_TrainingBar.HealthWidget.Get())
+	{
+		return CachedWidget;
+	}
+
+	// The cached widget is gone (or never resolved); a new one starts with its bar collapsed.
+	M_TrainingBar.bIsShown = false;
+	const AActor* Owner = GetOwner();
+	const UHealthComponent* HealthComponent = IsValid(Owner) ? Owner->FindComponentByClass<UHealthComponent>() : nullptr;
+	if (not IsValid(HealthComponent))
+	{
+		return nullptr;
+	}
+	UW_HealthBar* HealthWidget = HealthComponent->GetHealthBarWidget();
+	if (not IsValid(HealthWidget))
+	{
+		return nullptr;
+	}
+	if (not HealthWidget->GetHasActionProgressBar())
+	{
+		if (not M_TrainingBar.bHasReportedMissingBar)
+		{
+			M_TrainingBar.bHasReportedMissingBar = true;
+			RTSFunctionLibrary::ReportWarning(TEXT("Soviet refinery: the health widget ") +
+				HealthWidget->GetClass()->GetName() + TEXT(" has no ActionProgressBar; harvester training is not shown for ")
+				+ GetOwnerNameForLog() + TEXT(". Use W_BpHealthBar_Refinery."));
+		}
+		return nullptr;
+	}
+	M_TrainingBar.HealthWidget = HealthWidget;
+	return HealthWidget;
+}
+
+#if RTS_WITH_MAP_TESTS
+bool USovietRefineryComponent::MapTest_GetTrainingProgress(float& OutFill) const
+{
+	OutFill = M_TrainingBar.Fill;
+	return M_TrainingBar.bIsShown;
+}
+#endif

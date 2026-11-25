@@ -17,6 +17,21 @@ class UStaticMeshComponent;
 class UMeshComponent;
 class UEnemyStrategicAIComponent;
 class USceneComponent;
+class UW_HealthBar;
+class UHealthComponent;
+
+/** Harvester training progress shown in the refinery's health bar (UW_HealthBar::ActionProgressBar). */
+struct FSovietRefineryTrainingBarState
+{
+	FTimerHandle RefreshTimer;
+	TWeakObjectPtr<UW_HealthBar> HealthWidget;
+	// The refinery's health component, kept visible (SetHealthBarForcedVisible) while a harvester trains.
+	TWeakObjectPtr<UHealthComponent> ForcedHealthComponent;
+	float Fill = 0.f;
+	bool bIsActive = false;
+	bool bIsShown = false;
+	bool bHasReportedMissingBar = false;
+};
 
 /** One stock fill or level bar mesh on the refinery, found by its component tag. */
 USTRUCT()
@@ -91,6 +106,8 @@ public:
 	void MapTest_SetMaxHarvestersOverride(const int32 Max) { M_MapTest_MaxHarvestersOverride = Max; }
 	void MapTest_AddStock(ERTSResourceType Resource, int32 Amount);
 	void MapTest_RunConversionNow() { ConvertStock(); }
+	/** @return Whether the harvester training bar shows now; OutFill is its fill (0..1). */
+	bool MapTest_GetTrainingProgress(float& OutFill) const;
 #endif
 
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType,
@@ -196,6 +213,9 @@ private:
 	bool bM_IsSpawningHarvester = false;
 	int32 M_SpawnRequestID = 0;
 
+	// Health bar progress while a harvester trains; from the training start until it is trained or the refinery ends.
+	FSovietRefineryTrainingBarState M_TrainingBar;
+
 	float M_TrainingPointRemainder = 0.f;
 	float M_BuildingPointRemainder = 0.f;
 	int32 M_TotalTrainingPoints = 0;
@@ -223,6 +243,14 @@ private:
 	void PruneHarvesters();
 	void OnHarvesterTrained();
 	void OnHarvesterSpawned(AActor* SpawnedActor);
+	/** @brief Shows the health bar's ActionProgressBar so the player sees when the next harvester rolls out. */
+	void StartTrainingProgressBar();
+	void StopTrainingProgressBar();
+	void OnTrainingProgressBarRefresh();
+	/** @return Elapsed share of the harvester training timer (0..1); 0 when no training runs. */
+	float GetTrainingProgressFill() const;
+	/** @return The owner's health widget when it has an ActionProgressBar; null while it does not exist yet. */
+	UW_HealthBar* GetTrainingProgressHealthWidget();
 	ERTSResourceType PickResourceForNewHarvester() const;
 	void SendHarvesterToWork(AActor* Harvester, ERTSResourceType Resource) const;
 	FTransform GetHarvesterExitTransform() const;

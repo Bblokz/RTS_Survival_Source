@@ -45,6 +45,10 @@ struct FSovietRefineryUnderTest
 	bool bCapturedLowering = false;
 	bool bCapturedCarry = false;
 	bool bCapturedRelease = false;
+	// Harvester training bar in the refinery's health bar, sampled every frame while it shows.
+	bool bSawTrainingBar = false;
+	bool bSawHealthBarHiddenWhileTraining = false;
+	float MaxTrainingFill = 0.f;
 	float MaxJawOffPick2DCm = 0.f;
 	// Last logged harvester AI status per harvester name.
 	TMap<FString, uint8> HarvesterStatus;
@@ -90,6 +94,8 @@ private:
 	int32 GetDelivered(const FSovietRefineryUnderTest& Test, ERTSResourceType Resource) const;
 	void TrackCrane(FSovietRefineryUnderTest& Test);
 	void TrackHarvesters(FSovietRefineryUnderTest& Test);
+	void TrackTrainingBar(FSovietRefineryUnderTest& Test) const;
+	void CheckTrainingBarResults(const FSovietRefineryUnderTest& Test);
 	void TrackHarvestAnimationLength(FSovietRefineryUnderTest& Test, const FString& HarvesterName,
 	                                 EHarvesterAIAction OldStatus, EHarvesterAIAction NewStatus) const;
 	void CaptureCrane(const FSovietRefineryUnderTest& Test, const FString& Label) const;

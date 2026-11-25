@@ -122,6 +122,10 @@ A copy of SovietCrane_1 reworked for runtime posing from C++ (`UPoseableMeshComp
     `FEnemyAIMissionSettings::MaxHarvestersPerRefinery` (default 2), always spawned for the refinery's own player, and
     calls `UHarvester::StartAutonomousHarvest` (radixite first, then alternating). Same-owner harvesters within 60 m
     are adopted when it starts.
+  - shows the training in its health bar (added 2026-11-25): while a Breaker trains, the amber `ActionProgressBar`
+    of `W_BpHealthBar_Refinery` fills with the train timer, and the health bar is kept visible
+    (`UHealthComponent::SetHealthBarForcedVisible`). The bar hides when the Breaker is trained; the health bar then
+    follows its normal settings again. Not yet checked in game: how the bar looks on a refinery hidden by fog.
 - `ASkeletalCraneUnloadStation` (`Resources/UnloadStation/`): one bay, SK_SovRef_Crane posed through a
   `UPoseableMeshComponent`. The slew is solved from the rig (tip bearing), the luff by bisection on the reach, and the
   hoist from the tip height. The grab turns to line its jaws up with the docked hull. Three trips per unload, about
@@ -135,6 +139,8 @@ A copy of SovietCrane_1 reworked for runtime posing from C++ (`UPoseableMeshComp
 - `BP_SovRefCraneStation_A1` / `_G2`.
 - Both are built by `Source/Tools/SovietRefinery/ue_build_refinery_bps.py` from `Build/<D>/layout.json` and
   `Build/Crane/crane_rig.json`, and the script is idempotent.
+- Health bar: both use `W_BpHealthBar_Refinery` (`W_BpHealthBar` + `ActionProgressBar` on the converter bar's spot),
+  set by `Source/Tools/SovietRefinery/ue_make_refinery_healthbar.py` (headless, idempotent).
 - Breaker: subtype pins set to `Tank_T34_Harvester` (SetUnitSubtype and `BP_GetTankDataOfPlayer`), and it has a row in
   `RTS_BP_RTSAsyncSpawner` → SetupMediumRusVehicles.
 
@@ -143,6 +149,8 @@ A copy of SovietCrane_1 reworked for runtime posing from C++ (`UPoseableMeshComp
 - It checks the crane rig and drops, N harvesters trained and owned by the AI, a forced 300 radixite + 150 metal trip
   (crane trips, exact amounts, grab within 70 cm of the hopper), natural delivery, conversion, and that your
   resources stay untouched.
+- Training bar checks: `training_bar_shown`, `training_bar_filled` (at least 0.6 seen), `training_bar_hidden_when_full`
+  and `training_health_bar_shown`.
 - Pictures are saved to `Saved/SovietRefineryTest/<time>/`. The test takes the AI's actors out of the fog for the
   pictures only.
 
