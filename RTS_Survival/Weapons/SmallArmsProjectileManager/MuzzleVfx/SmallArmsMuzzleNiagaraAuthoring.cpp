@@ -105,9 +105,27 @@ namespace SmallArmsMuzzleNiagaraAuthoring
 		{TEXT("Smoke_Puff"), TEXT("Smoke"), TEXT("Puff.hlsl"), 2, nullptr, SmokeMaterialPath, 2}
 	};
 
+	/**
+	 * @brief Which system the authoring step works on: the muzzle system or the tank shell trail system, which
+	 * share the same shot arrays and node wiring.
+	 */
+	struct FMuzzleAuthoringProfile
+	{
+		TConstArrayView<FMuzzleLayer> Layers;
+		// Folder with Common.hlsl and the layer files, relative to the project folder.
+		const TCHAR* HlslFolder;
+		// Group prefixes: every group gets User.<Group>Offset and User.<Group>Count.
+		TArray<const TCHAR*> Groups;
+		// Optional file whose Style section is put in front of the layer code (the tunable values of the look).
+		FString StyleFile;
+	};
+
+	const FMuzzleAuthoringProfile MuzzleProfile = {Layers, HlslFolder, {TEXT("Flash"), TEXT("Smoke")}, FString()};
+	const FMuzzleAuthoringProfile* ActiveProfile = &MuzzleProfile;
+
 	const FMuzzleLayer* FindLayer(const FString& EmitterName)
 	{
-		for (const FMuzzleLayer& Layer : Layers)
+		for (const FMuzzleLayer& Layer : ActiveProfile->Layers)
 		{
 			if (EmitterName == Layer.EmitterName)
 			{
@@ -125,7 +143,7 @@ namespace SmallArmsMuzzleNiagaraAuthoring
 	 */
 	bool ReadHlslSections(const FString& FileName, TMap<FString, FString>& OutSections)
 	{
-		const FString FilePath = FPaths::Combine(FPaths::ProjectDir(), HlslFolder, FileName);
+		const FString FilePath = FPaths::Combine(FPaths::ProjectDir(), ActiveProfile->HlslFolder, FileName);
 		FString FileText;
 		if (not FFileHelper::LoadFileToString(FileText, *FilePath))
 		{
@@ -177,9 +195,20 @@ namespace SmallArmsMuzzleNiagaraAuthoring
 			UE_LOG(LogRTSMuzzleVfxAuthoring, Error, TEXT("RTS_MUZZLE_VFX_AUTHORING %s needs sections Shape and Place"), Layer.HlslFile);
 			return false;
 		}
-		OutHlsl.Spawn = GeneratedHeader + Common[TEXT("SpawnBegin")] + LayerSections[TEXT("Shape")]
+		FString Style;
+		if (not ActiveProfile->StyleFile.IsEmpty())
+		{
+			TMap<FString, FString> StyleSections;
+			if (not ReadHlslSections(ActiveProfile->StyleFile, StyleSections) || not StyleSections.Contains(TEXT("Style")))
+			{
+				UE_LOG(LogRTSMuzzleVfxAuthoring, Error, TEXT("RTS_MUZZLE_VFX_AUTHORING %s needs a section Style"), *ActiveProfile->StyleFile);
+				return false;
+			}
+			Style = StyleSections[TEXT("Style")];
+		}
+		OutHlsl.Spawn = GeneratedHeader + Common[TEXT("SpawnBegin")] + Style + LayerSections[TEXT("Shape")]
 			+ Common[TEXT("SpawnEnd")] + Common[TEXT("ReadShot")] + LayerSections[TEXT("Place")];
-		OutHlsl.Update = GeneratedHeader + Common[TEXT("UpdateBegin")] + Common[TEXT("ReadShot")]
+		OutHlsl.Update = GeneratedHeader + Common[TEXT("UpdateBegin")] + Style + Common[TEXT("ReadShot")]
 			+ LayerSections[TEXT("Place")];
 		return true;
 	}
@@ -213,7 +242,7 @@ namespace SmallArmsMuzzleNiagaraAuthoring
 	{
 		EnsureUserParameter(System, FNiagaraVariable(GetFloat4ArrayType(), TEXT("User.ShotPositionAndScale")));
 		EnsureUserParameter(System, FNiagaraVariable(GetFloat4ArrayType(), TEXT("User.ShotDirection")));
-		for (const TCHAR* GroupName : {TEXT("Flash"), TEXT("Smoke")})
+		for (const TCHAR* GroupName : ActiveProfile->Groups)
 		{
 			SetUserIntParameter(System, FString(GroupName) + TEXT("Offset"), 0, false);
 			SetUserIntParameter(System, FString(GroupName) + TEXT("Count"), 0, false);
@@ -748,7 +777,7 @@ namespace SmallArmsMuzzleNiagaraAuthoring
 	// Adds the layers the system does not have yet and gives the others the renderer of the Layers table again.
 	void AddMissingLayerEmitters(UNiagaraSystem& System)
 	{
-		for (const FMuzzleLayer& Layer : Layers)
+		for (const FMuzzleLayer& Layer : ActiveProfile->Layers)
 		{
 			const FNiagaraEmitterHandle* ExistingHandle = FindEmitterHandle(System, Layer.EmitterName);
 			if (ExistingHandle == nullptr)
@@ -772,10 +801,18 @@ namespace SmallArmsMuzzleNiagaraAuthoring
 		PatchMuzzleNiagaraSystem(false);
 	}
 
+	void PatchNiagaraSystemAsset(UNiagaraSystem* System, const bool bAddMissingEmitters);
+
 	void PatchMuzzleNiagaraSystem(const bool bAddMissingEmitters)
 	{
 		const URTSWeaponVFXSettings* Settings = URTSWeaponVFXSettings::Get();
-		UNiagaraSystem* System = Settings != nullptr ? Settings->SmallArmsMuzzleNiagaraSystem.LoadSynchronous() : nullptr;
+		PatchNiagaraSystemAsset(
+			Settings != nullptr ? Settings->SmallArmsMuzzleNiagaraSystem.LoadSynchronous() : nullptr, bAddMissingEmitters);
+	}
+
+	// Patches the system with the layers and HLSL of ActiveProfile.
+	void PatchNiagaraSystemAsset(UNiagaraSystem* System, const bool bAddMissingEmitters)
+	{
 		if (System == nullptr)
 		{
 			UE_LOG(LogRTSMuzzleVfxAuthoring, Error, TEXT("RTS_MUZZLE_VFX_AUTHORING RESULT FAIL system not found"));
@@ -812,6 +849,36 @@ namespace SmallArmsMuzzleNiagaraAuthoring
 		TEXT("RTS.MuzzleVfx.BuildNiagaraSystem"),
 		TEXT("Adds every missing Flash_/Smoke_ layer emitter (Minimal template, SpawnPerFrame bound to its user spawn count, renderer), then patches and saves the small arms muzzle Niagara system."),
 		FConsoleCommandDelegate::CreateStatic(&BuildMuzzleNiagaraSystem));
+
+	// ------------------------------------------------------------------------------------------------------------
+	// The tank shell trail system of UTankShellTrailBatcher is built with the same steps from its own HLSL folder.
+	// ------------------------------------------------------------------------------------------------------------
+
+	const TCHAR* TankShellHlslFolder = TEXT("Source/RTS_Survival/Weapons/SmallArmsProjectileManager/TankShellTrail/TankShellHlsl");
+	const TCHAR* TankShellStyleFile = TEXT("Style.hlsl");
+
+	const FMuzzleLayer TankShellLayers[] = {
+		{TEXT("Smoke_Trail"), TEXT("Smoke"), TEXT("Smoke.hlsl"), 1, nullptr, SmokeMaterialPath, 2},
+		{TEXT("Tracer_Core"), TEXT("Tracer"), TEXT("Tracer.hlsl"), 1, nullptr, GlowMaterialPath, 1},
+		{TEXT("Glow_Head"), TEXT("Glow"), TEXT("Glow.hlsl"), 1, nullptr, GlowMaterialPath, 1}
+	};
+
+	void BuildTankShellTrailSystem()
+	{
+		const FMuzzleAuthoringProfile TankShellProfile = {
+			TankShellLayers, TankShellHlslFolder, {TEXT("Tracer"), TEXT("Glow"), TEXT("Smoke")}, TankShellStyleFile
+		};
+		const URTSWeaponVFXSettings* Settings = URTSWeaponVFXSettings::Get();
+		ActiveProfile = &TankShellProfile;
+		PatchNiagaraSystemAsset(
+			Settings != nullptr ? Settings->TankShellTrailNiagaraSystem.LoadSynchronous() : nullptr, true);
+		ActiveProfile = &MuzzleProfile;
+	}
+
+	FAutoConsoleCommand BuildTankShellTrailSystemCommand(
+		TEXT("RTS.TankShellTrail.BuildNiagaraSystem"),
+		TEXT("Adds every missing Tracer_/Glow_/Smoke_ layer emitter, then patches the tank shell trail Niagara system from TankShellHlsl/*.hlsl and saves it."),
+		FConsoleCommandDelegate::CreateStatic(&BuildTankShellTrailSystem));
 }
 
 #endif // WITH_EDITOR
