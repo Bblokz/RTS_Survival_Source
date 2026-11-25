@@ -9,7 +9,9 @@ param(
 	[string]$Map = '/Game/RTS_Survival/Maps/UnitTests/RTS_ToCopySmall',
 	[string]$Configuration = 'DebugGame',
 	[switch]$NoCapture,
-	[string]$OutputDirectory = ''
+	[string]$OutputDirectory = '',
+	# Extra command-line arguments, e.g. '-LogCmds=LogAnimMontage Verbose'.
+	[string[]]$ExtraArgs = @()
 )
 
 $Engine = 'D:\UnrealEngine\UE5.5_ReleaseBranch\UnrealEngine\Engine\Binaries\Win64'
@@ -29,6 +31,7 @@ if ($NoCapture) {
 	$Arguments += @('-RenderOffscreen', "-SovietRefineryCapture=$OutputDirectory")
 }
 if ($At -ne '') { $Arguments += "-SovietRefineryAt=$At" }
+foreach ($Extra in $ExtraArgs) { $Arguments += if ($Extra -match '\s') { '"' + $Extra + '"' } else { $Extra } }
 
 Write-Output "== soviet refinery test -> $Log"
 $Process = Start-Process -FilePath $Exe -ArgumentList $Arguments -PassThru -WindowStyle Hidden
