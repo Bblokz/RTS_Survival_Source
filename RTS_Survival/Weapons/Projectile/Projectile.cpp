@@ -1932,6 +1932,16 @@ void AProjectile::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	StopDescentSound();
 }
 
+void AProjectile::FellOutOfWorld(const UDamageType& DamageType)
+{
+	if (not M_ProjectilePoolSettings.ProjectileManager.IsValid())
+	{
+		Super::FellOutOfWorld(DamageType);
+		return;
+	}
+	SetProjectileDormant();
+}
+
 void AProjectile::BeginDestroy()
 {
 	Super::BeginDestroy();

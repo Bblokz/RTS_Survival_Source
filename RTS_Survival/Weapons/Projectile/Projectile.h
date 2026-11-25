@@ -316,6 +316,10 @@ protected:
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void BeginDestroy() override;
 
+	// A pooled shell that drops below the kill height goes back to the pool; the engine default would destroy it
+	// and leave its pool slot active forever.
+	virtual void FellOutOfWorld(const UDamageType& DamageType) override;
+
 	// Obtains reference to the projectile movement component.
 	virtual void PostInitializeComponents() override;
 

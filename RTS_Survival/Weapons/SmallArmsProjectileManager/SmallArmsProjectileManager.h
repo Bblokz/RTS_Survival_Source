@@ -171,6 +171,8 @@ private:
 	UPROPERTY()
 	TSubclassOf<AProjectile> M_TankProjectileClass;
 
+	// Visible to the garbage collector: a projectile the engine destroyed becomes null here instead of a dangling pointer.
+	UPROPERTY()
 	FSoA_TankProjectilesPool M_TankProjectilesPool;
 
 	void OnTankProjectileDormant(const int32 Index);
