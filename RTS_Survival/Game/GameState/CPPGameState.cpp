@@ -10664,7 +10664,7 @@ void ACPPGameState::InitAllGameSquadData()
 	SquadData.VisionRadius = InfantryVisionRadius;
 	SquadData.Cost = FUnitCost({
 		{ERTSResourceType::Resource_Radixite, EliteRusCyborgFedrovRadixiteCost},
-		{ERTSResourceType::Resource_Metal, EliteRusCyborgFedrovRadixiteCost}
+		{ERTSResourceType::Resource_Metal, EliteRusCyborgFedrovMetalCost}
 	});
 	SquadData.Abilities = BasicSquadAbilities;
 	SquadData.ExperienceLevels = GetTier2InfantryExpLevels();
