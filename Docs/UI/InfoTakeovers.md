@@ -630,6 +630,84 @@ UnrealEditor-Win64-DebugGame-Cmd.exe RTS_Survival.uproject -run=pythonscript \
   gone). The clip uses the exit camera only: the approach at double speed (every 4th frame of 40-96), then every 2nd
   frame of 98-236.
 
+## Capturing trucks takeover (field manual)
+
+Built 2026-11-23 for the Ore Mountains mission (convoy 1, when the first escort dies; see
+`Campaign/OreMountainsMission.md`, "Capturing convoy trucks", and `Missions/SurrenderingCargoTruck.md`). One page titled
+"Capturing Trucks" under the kind label "CONVOYS - CAPTURE OR DESTROY", and UNDERSTOOD. The layout is the clip field
+manuals' (description, a picture card on the left, three facts on the right), but the picture is a looping diagram
+instead of a clip:
+
+- **Left card, the diagram (plain UMG, built in C++, no texture):** a top-down road with a stopped olive truck, its
+  20 m ring (red outline), its health bar with a red 60 % mark, and the Vultures squad icon
+  (`T_Ger_Squad_VultureHazmats`) walking into the ring. Over the truck sits the **real scuttle plate**
+  (`UW_SurrenderingTruckCountdown`, the class the trucks show in the world) counting down from SCUTTLING 12; when the
+  squad is inside the ring (7 s) the plate is swapped for a green SURRENDERED tag for 2.5 s, then it loops. It runs on
+  Slate's real-time delta from `NativeTick`, so it plays while the takeover pauses the game.
+  - There is no clip because no truck Blueprint of `ASurrenderingCargoTruck` exists yet to film, and no Soviet truck
+    portrait exists to show. When the truck Blueprint is in, a clip can replace the diagram (derive from
+    `UW_ClipInfoTakeover`, keep `MakeFacts`).
+- **Right card:** COUNTDOWN (12 seconds to scuttle: the last escort dies, every truck stops, its crew starts the
+  countdown), CAPTURE (a squad within 20 m; vehicles cannot take it, under 60 % health it only scuttles) and CAPTURE OR
+  DESTROY (a captured truck drives itself to the mine adit and pays 2.5 times its cargo; a destroyed one drops a cache
+  to scavenge).
+- **The numbers are hardcoded text** mirroring the `ASurrenderingCargoTruck` defaults: `CountdownSeconds` 12,
+  `Captors` SquadsOnly, `CaptorSearchRadius` 2000 cm, `MinHealthFractionToSurrender` 0.6, `CapturedCargoMultiplier`
+  2.5. Change `UW_CapturingTrucksTakeover::MakeFacts` and `GetCapturingTrucksSummary` when a truck Blueprint or the
+  defaults change them.
+
+**Mission node:** `Show Capturing Trucks Takeover` (`UAsyncShowCapturingTrucksTakeover`, kind
+`EInfoTakeoverKind::CapturingTrucks`), with the pin **On Closed (Was Shown)**; self is filled in. Same contract as the
+other field manual nodes (queues, waits for the start screen and cinematics, ignores "never show again", fires once
+after close with the game unpaused). Archived under Game Mechanics ("Capturing Trucks", key
+`InfoTakeover.CapturingTrucks`), without a picture.
+
+**Assets:** `GameUI/InfoTakeover/CapturingTrucks/WBP_CapturingTrucksTakeover` (`UW_CapturingTrucksTakeover`, a copy of
+`WBP_SpacedArmourTakeover`, so it is on the Rotsignal skin), made by
+`Source/Tools/InfoTakeover/OreMission/create_ore_takeovers.py` (headless DebugGame-Cmd, `-run=pythonscript`). It is in
+`Style/build_takeover_style.py`'s list.
+
+## Document takeover (captured papers) and the Ore manifest
+
+Built 2026-11-23. A generic takeover for a document the player finds: the typed kind label, title and intro on the
+panel, then a **paper sheet** under them (aged cream paper with a thin edge, dark typewriter ink): a heading, an
+optional subheading, a rule, the lines, optional small print, and an optional red **rubber stamp** tilted over the
+sheet's top right. A line with `bIsMarked` is drawn in red ink on a faint red band. The sheet uses plain `UTextBlock`s
+in ink colours, not the panel's bone-on-metal typewriter text (unreadable on paper, and it parses `<>` as tags), so the
+sheet appears at once and only the title and intro type. It has no picture and no glass panes.
+
+All text comes from `FDocumentTakeoverContent` (`InfoTakeoverTypes.h`): `KindLabel` (empty hides it), `Title`,
+`Description` (the typed intro; rich text tags work), `PaperHeading`, `PaperSubheading`, `PaperLines`
+(`FDocumentTakeoverLine`: `Text`, `bIsMarked`), `PaperFooter`, `StampText` (empty: no stamp) and `ArchiveKey`.
+
+**Mission nodes** (both `UAsyncShowInfoTakeoverBase` subclasses, kind `EInfoTakeoverKind::Document`, pin **On Closed
+(Was Shown)**, self filled in):
+
+| Node | Input | Use |
+| --- | --- | --- |
+| `Show Document Takeover` | `Document` (`FDocumentTakeoverContent`; split the pin or make the struct) | Any found document; text written on the node. |
+| `Show Ore Manifest Takeover` | none | The Ore Mountains radio outpost manifest; text fixed in C++ (`UAsyncShowOreManifestTakeover::MakeOreManifest`). |
+
+- Documents are story content, not unit intel: they show while "never show again" is ticked, have no checkbox, and
+  queue and wait like the field manuals.
+- Archived under **Lore**, keyed `InfoTakeover.Document.<ArchiveKey>` (the title when the key is empty), once per key.
+  The archive text is the intro, the heading and one paragraph per line and footer.
+
+**The Ore manifest** (`MakeOreManifest`, 2026-11-23): kind label "RADIO OUTPOST - CAPTURED DOCUMENT", title "Convoy
+Manifest", intro "Found on the radio operator's desk, translated from the Russian. Most of it is routine. One column is
+not." The sheet: CONVOY MANIFEST, "Wismut yard, valley road west. Columns for the western outposts.", six columns
+following the convoy line-up (fuel; supply with the weighbridge inspection; shells, ammo trucks turn off for the battery;
+supply with rifle squads riding; **column 5 marked: supply and one armoured truck, cargo SEALED, do not inspect, do not
+open, destination Berlin**; heavy escort for the knoll), the footer "Questions about column 5 are not to be sent over
+the radio." and the stamp BERLIN. Archive key `OreManifest`.
+- **Lore rules** (`OreMountainsMission.md`, "Act 1 clues" and the intercept rules): it never says why Berlin, mentions
+  no cryo and nothing about where Radixite comes from. Keep it that way when editing the text.
+- The lead wires it into `Mission_Ore_RadioOutpost` (guards dead -> manifest -> mark convoy 5 / start RecoverCases from
+  On Closed).
+
+**Assets:** `GameUI/InfoTakeover/Document/WBP_DocumentTakeover` (`UW_DocumentTakeover`, a copy of
+`WBP_SpacedArmourTakeover`), made by the same `create_ore_takeovers.py`; in `build_takeover_style.py`'s list.
+
 ## The library
 
 `Content/RTS_Survival/Blueprints/GameUI/InfoTakeover/DT_VehicleInfoTakeovers`, one row (`FVehicleInfoTakeoverEntry`)
@@ -880,6 +958,8 @@ Archive item!" pop-up with the picture:
 | `UW_WespeBarrageTakeover`, `UAsyncShowWespeBarrageTakeover` | The Wespe Barrage field manual (two-camera clip, three facts) and its node. |
 | `UW_DigInTakeover`, `UAsyncShowDigInTakeover` | The Dig In field manual (two-camera clip, three facts) and its node. |
 | `UW_WallBreachTakeover`, `UAsyncShowWallBreachTakeover` | The Wall Breach field manual (Tiger through a Soviet wall clip, three facts) and its node. |
+| `UW_CapturingTrucksTakeover`, `UAsyncShowCapturingTrucksTakeover` | The capturing trucks field manual (looping UMG diagram with the real scuttle plate, three facts) and its node. |
+| `UW_DocumentTakeover`, `UAsyncShowDocumentTakeover`, `UAsyncShowOreManifestTakeover` | The generic captured-document takeover (paper sheet, marked lines, stamp; text in `FDocumentTakeoverContent`), its node with the text on the node, and the Ore manifest node. |
 | `UW_VehicleInfoTakeover` | The vehicle body, and the squad body (`SetupSquad`). Blueprint child `WBP_VehicleInfoTakeover` holds `M_Style`; its skin is copied from `BP_W_UnitVariantSelectionMenu`. |
 | `UPauseSafeProtoRichTextBlock` | Proto's typewriter driven on real time. Proto uses world timers, which stop while the game is paused. |
 | `UInfoTakeoverSubsystem` | Queue, setting check, library lookup. |
@@ -1002,3 +1082,21 @@ DebugGame, `RTS_ToCopySmall`, 720p: PASS (104 frame changes in 10 s while paused
 Run with `-WallBreachTakeoverValidate` (`WALL_BREACH_TAKEOVER`, `UWallBreachTakeoverValidateSubsystem`) for the Wall
 Breach takeover; same checks as the Dig In run. Result on 2026-11-16, DebugGame, `RTS_ToCopySmall`, 720p: PASS (101
 frame changes in 10 s while paused). Screenshots in `Saved/InfoTakeover/WallBreach/720p/`.
+
+Run with `-OreTakeoversValidate` (`ORE_TAKEOVERS`, `UOreTakeoversValidateSubsystem`) for the two Ore Mountains
+takeovers, best through `Source/Tools/InfoTakeover/OreMission/run_validate.sh` (DebugGame, `-game -RenderOffscreen`,
+`RTS_ToCopySmall`, 1280 x 720, log `Saved/Logs/OreTakeoversValidate.log`). The run:
+- calls `Show Capturing Trucks Takeover` while the start-game screen waits and checks nothing opens before start;
+- checks the Blueprint child (not the unstyled C++ widget) opened, paused, without the never-show box, with its
+  diagram built; samples the diagram's countdown every tick while paused (at least 4 different values and the
+  SURRENDERED tag must show); shots `CapturingTrucks_0_typing`, `_diagram_countdown` (3 s), `_diagram_surrendered`
+  (8 s), `_1_done` (after the typewriter), `_2_after_close`;
+- presses UNDERSTOOD: On Closed once, shown, unpaused;
+- turns unit intel off and calls `Show Ore Manifest Takeover`: it must still open (Blueprint child, paused, no box)
+  with 6 sheet lines and the stamp; shots `OreManifest_0_typing`, `_1_done`, `_2_after_close`; On Closed once,
+  unpaused;
+- restores the setting and quits.
+
+Screenshots go to `Saved/InfoTakeover/OreTakeovers/<height>p/`. Result on 2026-11-23, DebugGame, `RTS_ToCopySmall`,
+720p: PASS (6 countdown values and the surrendered tag seen while paused; manifest 6 lines + stamp). The 16-unit gap
+under the paper sheet was added after that run (layout only, compiled, not re-shot).

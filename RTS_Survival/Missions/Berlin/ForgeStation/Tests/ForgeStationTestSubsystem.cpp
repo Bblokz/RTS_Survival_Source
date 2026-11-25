@@ -52,7 +52,7 @@ namespace ForgeStationTestPrivate
 	constexpr int32 LocalPlayer = 1;
 	const TCHAR* WorkMontagePath =
 		TEXT("/Game/RTS_Survival/Blueprints/Squads/SquadUnits/Anims/AimPosMontages/Scavenge_infMontage");
-	const TCHAR* ForcesFolder = TEXT("/Game/RTS_Survival/Blueprints/Missions/GerCampaign/Berlin/");
+	const TCHAR* ForcesFolder = TEXT("/Game/RTS_Survival/Maps/GerMissions/Berlin/DataAssets/");
 	const TCHAR* ShotsSwitch = TEXT("ForgeStationShots");
 	// Shot times: the vent of the first sedation cycle is about 22-28 s of game time (test seconds + 3).
 	// Shots come after the player unit was moved near (55 s), so the fog of war shows the enemy buildings.

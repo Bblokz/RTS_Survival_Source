@@ -67,6 +67,16 @@ namespace EnemyFormationConstants
 #endif
 }
 
+namespace EnemyFormationAlarmConvergeConstants
+{
+	// A formation that arrived and met nobody searches this long at the alarm location before it returns.
+	constexpr float ArrivedWithoutCombatLingerSeconds = 30.f;
+	// Cap on reaching the alarm location without any combat: this plus the travel time at the slow speed below.
+	constexpr float BaseMaxSecondsWithoutCombat = 60.f;
+	// Roughly walking infantry; slower units are covered by the base seconds above.
+	constexpr float AssumedSlowUnitSpeedCmPerSecond = 250.f;
+}
+
 UEnemyFormationController::UEnemyFormationController()
 {
 	PrimaryComponentTick.bCanEverTick = false;
@@ -786,6 +796,12 @@ void UEnemyFormationController::CheckFormations()
 
 		UpdateFormationUnitMovementProgress(*Formation, WayLoc, WayDir, NavSys);
 
+		if (Formation->M_AlarmConvergeState.bM_IsConverging)
+		{
+			HandleAlarmConvergeFormation(*Formation);
+			continue;
+		}
+
 		if (Formation->bIsRandomPatrolWithAttackMoveFormation)
 		{
 			HandleRandomPatrolWithAttackMoveFormation(*Formation);
@@ -1343,19 +1359,30 @@ void UEnemyFormationController::TryMoveFormationUnitToRandomGuardLocation(
 
 void UEnemyFormationController::TryAdvanceRandomPatrolFormation(FFormationData& Formation)
 {
-	FFormationData::FRandomPatrolWithAttackMoveState& PatrolState = Formation.M_RandomPatrolWithAttackMoveState;
 	const int32 NextPatrolPointIndex = GetRandomNextPatrolPointIndex(Formation);
-	if (not PatrolState.M_PatrolPoints.IsValidIndex(NextPatrolPointIndex))
+	if (not Formation.M_RandomPatrolWithAttackMoveState.M_PatrolPoints.IsValidIndex(NextPatrolPointIndex))
+	{
+		return;
+	}
+	MoveRandomPatrolFormationToPatrolPoint(Formation, NextPatrolPointIndex);
+}
+
+void UEnemyFormationController::MoveRandomPatrolFormationToPatrolPoint(
+	FFormationData& Formation,
+	const int32 PatrolPointIndex)
+{
+	FFormationData::FRandomPatrolWithAttackMoveState& PatrolState = Formation.M_RandomPatrolWithAttackMoveState;
+	if (not PatrolState.M_PatrolPoints.IsValidIndex(PatrolPointIndex))
 	{
 		return;
 	}
 
-	PatrolState.M_CurrentPatrolPointIndex = NextPatrolPointIndex;
+	PatrolState.M_CurrentPatrolPointIndex = PatrolPointIndex;
 	PatrolState.bM_IsGuardingCurrentPatrolPoint = false;
 	PatrolState.M_CurrentGuardIteration = 0;
 
-	const FVector NextPatrolLocation = PatrolState.M_PatrolPoints[NextPatrolPointIndex];
-	const FRotator NextPatrolDirection = GetRandomPatrolDirectionForPoint(Formation, NextPatrolPointIndex);
+	const FVector NextPatrolLocation = PatrolState.M_PatrolPoints[PatrolPointIndex];
+	const FRotator NextPatrolDirection = GetRandomPatrolDirectionForPoint(Formation, PatrolPointIndex);
 	Formation.FormationWaypoints = {NextPatrolLocation};
 	Formation.FormationWaypointDirections = {NextPatrolDirection};
 	Formation.CurrentWaypointIndex = 0;
@@ -1364,14 +1391,257 @@ void UEnemyFormationController::TryAdvanceRandomPatrolFormation(FFormationData& 
 	ShippingTest_RecordPatrolPointAdvance(Formation);
 #endif
 
-	for (FFormationUnitData& EachUnit : Formation.FormationUnits)
+	MoveAllFormationUnitsToWaypoint(Formation, NextPatrolLocation, NextPatrolDirection);
+}
+
+void UEnemyFormationController::MoveAllFormationUnitsToWaypoint(
+	FFormationData& Formation,
+	const FVector& WaypointLocation,
+	const FRotator& WaypointDirection)
+{
+	// Index loop: a unit's order can run callbacks; re-check the bounds every step.
+	for (int32 UnitIndex = 0; UnitIndex < Formation.FormationUnits.Num(); ++UnitIndex)
 	{
+		FFormationUnitData& EachUnit = Formation.FormationUnits[UnitIndex];
 		if (not EachUnit.IsValidFormationUnit())
 		{
 			continue;
 		}
-		MoveUnitToWayPoint(EachUnit, NextPatrolLocation, NextPatrolDirection, Formation.FormationID);
+		MoveUnitToWayPoint(EachUnit, WaypointLocation, WaypointDirection, Formation.FormationID);
 	}
+}
+
+// ------------------------------------------------------------------
+// Alarm convergence
+// ------------------------------------------------------------------
+
+int32 UEnemyFormationController::ConvergePatrolFormationsOnLocation(
+	const TArray<AActor*>& Units,
+	const FVector& ConvergeLocation,
+	const float CombatSecondsBeforeReturn)
+{
+	TSet<const AActor*> UnitsToSend;
+	for (const AActor* Unit : Units)
+	{
+		if (IsValid(Unit))
+		{
+			UnitsToSend.Add(Unit);
+		}
+	}
+	if (UnitsToSend.IsEmpty())
+	{
+		return 0;
+	}
+
+	int32 UnitsSent = 0;
+	// Snapshot the keys: ordering units may run callbacks that touch the formation map.
+	TArray<int32> FormationIDs;
+	M_ActiveFormations.GenerateKeyArray(FormationIDs);
+	for (const int32 FormationID : FormationIDs)
+	{
+		FFormationData* Formation = M_ActiveFormations.Find(FormationID);
+		if (not Formation || not Formation->bIsRandomPatrolWithAttackMoveFormation)
+		{
+			continue;
+		}
+		const int32 MatchingUnitCount = GetCountOfFormationUnitsIn(*Formation, UnitsToSend);
+		if (MatchingUnitCount <= 0)
+		{
+			continue;
+		}
+		StartAlarmConvergeForFormation(*Formation, ConvergeLocation, CombatSecondsBeforeReturn);
+		UnitsSent += MatchingUnitCount;
+	}
+	return UnitsSent;
+}
+
+int32 UEnemyFormationController::GetCountOfFormationUnitsIn(
+	const FFormationData& Formation,
+	const TSet<const AActor*>& Units) const
+{
+	int32 MatchingUnitCount = 0;
+	for (const FFormationUnitData& FormationUnit : Formation.FormationUnits)
+	{
+		const AActor* FormationActor = Cast<AActor>(FormationUnit.Unit.GetObject());
+		if (IsValid(FormationActor) && Units.Contains(FormationActor))
+		{
+			++MatchingUnitCount;
+		}
+	}
+	return MatchingUnitCount;
+}
+
+void UEnemyFormationController::StartAlarmConvergeForFormation(
+	FFormationData& Formation,
+	const FVector& ConvergeLocation,
+	const float CombatSecondsBeforeReturn)
+{
+	using namespace EnemyFormationAlarmConvergeConstants;
+	const UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		return;
+	}
+	FVector FormationLocation = ConvergeLocation;
+	const bool bHasFormationLocation = GetFormationAverageLocation(Formation, FormationLocation);
+	const float DistanceToConverge = bHasFormationLocation ? FVector::Dist2D(FormationLocation, ConvergeLocation) : 0.f;
+
+	FFormationData::FAlarmConvergeState& ConvergeState = Formation.M_AlarmConvergeState;
+	ConvergeState.M_ConvergeLocation = ConvergeLocation;
+	ConvergeState.M_CombatSecondsBeforeReturn = FMath::Max(CombatSecondsBeforeReturn, 0.f);
+	ConvergeState.M_MaxSecondsWithoutCombat = BaseMaxSecondsWithoutCombat
+		+ DistanceToConverge / AssumedSlowUnitSpeedCmPerSecond;
+	ConvergeState.M_StartTimeSeconds = World->GetTimeSeconds();
+	ConvergeState.M_FirstCombatTimeSeconds = -1.f;
+	ConvergeState.M_AllArrivedTimeSeconds = -1.f;
+	// Set before ordering: MoveUnitToWayPoint then gives unit attack-move orders (GetShouldUseUnitAttackMove).
+	ConvergeState.bM_IsConverging = true;
+
+	// The patrol point is kept; guarding there starts over once the formation returns.
+	Formation.M_RandomPatrolWithAttackMoveState.bM_IsGuardingCurrentPatrolPoint = false;
+	Formation.M_RandomPatrolWithAttackMoveState.M_CurrentGuardIteration = 0;
+
+	const FRotator ConvergeDirection(0.f, (ConvergeLocation - FormationLocation).Rotation().Yaw, 0.f);
+	Formation.FormationWaypoints = {ConvergeLocation};
+	Formation.FormationWaypointDirections = {ConvergeDirection};
+	Formation.CurrentWaypointIndex = 0;
+	for (FFormationUnitData& FormationUnit : Formation.FormationUnits)
+	{
+		UnbindFormationUnitMovementCallback(FormationUnit);
+	}
+	MoveAllFormationUnitsToWaypoint(Formation, ConvergeLocation, ConvergeDirection);
+}
+
+void UEnemyFormationController::HandleAlarmConvergeFormation(FFormationData& Formation)
+{
+	const UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		return;
+	}
+	if (UpdateAlarmConvergeTimers(Formation, World->GetTimeSeconds()))
+	{
+		ReturnAlarmConvergeFormationToPatrol(Formation);
+		return;
+	}
+	// No guard or help orders while converging: both are plain moves that would cancel the attack-move.
+	HandleFormationIdleUnits(
+		Formation,
+		Formation.FormationWaypoints[Formation.CurrentWaypointIndex],
+		Formation.FormationWaypointDirections[Formation.CurrentWaypointIndex]);
+}
+
+bool UEnemyFormationController::UpdateAlarmConvergeTimers(
+	FFormationData& Formation,
+	const float CurrentTimeSeconds) const
+{
+	using namespace EnemyFormationAlarmConvergeConstants;
+	FFormationData::FAlarmConvergeState& ConvergeState = Formation.M_AlarmConvergeState;
+	// The unit combat flag lapses a few seconds after the last shot, so the first combat is latched once.
+	if (ConvergeState.M_FirstCombatTimeSeconds < 0.f && GetIsAnyFormationUnitInCombat(Formation))
+	{
+		ConvergeState.M_FirstCombatTimeSeconds = CurrentTimeSeconds;
+	}
+	if (ConvergeState.M_FirstCombatTimeSeconds >= 0.f)
+	{
+		return CurrentTimeSeconds - ConvergeState.M_FirstCombatTimeSeconds >= ConvergeState.M_CombatSecondsBeforeReturn;
+	}
+	if (ConvergeState.M_AllArrivedTimeSeconds < 0.f && GetDoAllFormationUnitsReachedWaypoint(Formation))
+	{
+		ConvergeState.M_AllArrivedTimeSeconds = CurrentTimeSeconds;
+	}
+	if (ConvergeState.M_AllArrivedTimeSeconds >= 0.f)
+	{
+		return CurrentTimeSeconds - ConvergeState.M_AllArrivedTimeSeconds >= ArrivedWithoutCombatLingerSeconds;
+	}
+	// A unit that cannot reach the location must not keep the formation there forever.
+	return CurrentTimeSeconds - ConvergeState.M_StartTimeSeconds >= ConvergeState.M_MaxSecondsWithoutCombat;
+}
+
+void UEnemyFormationController::ReturnAlarmConvergeFormationToPatrol(FFormationData& Formation)
+{
+	// Cleared first so the return orders are plain moves: the formation breaks off instead of fighting on.
+	Formation.M_AlarmConvergeState.bM_IsConverging = false;
+	for (FFormationUnitData& FormationUnit : Formation.FormationUnits)
+	{
+		UnbindFormationUnitMovementCallback(FormationUnit);
+	}
+	const int32 ClosestPatrolPointIndex = GetClosestPatrolPointIndex(Formation);
+	if (not Formation.M_RandomPatrolWithAttackMoveState.M_PatrolPoints.IsValidIndex(ClosestPatrolPointIndex))
+	{
+		RTSFunctionLibrary::ReportError("Patrol formation " + FString::FromInt(Formation.FormationID) +
+			" has no patrol point to return to after the alarm."
+			"\n At UEnemyFormationController::ReturnAlarmConvergeFormationToPatrol");
+		return;
+	}
+	MoveRandomPatrolFormationToPatrolPoint(Formation, ClosestPatrolPointIndex);
+}
+
+bool UEnemyFormationController::GetIsAnyFormationUnitInCombat(const FFormationData& Formation) const
+{
+	for (const FFormationUnitData& FormationUnit : Formation.FormationUnits)
+	{
+		if (GetIsFormationUnitInCombat(FormationUnit))
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
+int32 UEnemyFormationController::GetClosestPatrolPointIndex(const FFormationData& Formation) const
+{
+	const TArray<FVector>& PatrolPoints = Formation.M_RandomPatrolWithAttackMoveState.M_PatrolPoints;
+	FVector FormationLocation = FVector::ZeroVector;
+	if (not GetFormationAverageLocation(Formation, FormationLocation))
+	{
+		return Formation.M_RandomPatrolWithAttackMoveState.M_CurrentPatrolPointIndex;
+	}
+	int32 ClosestIndex = INDEX_NONE;
+	float ClosestDistanceSquared = TNumericLimits<float>::Max();
+	for (int32 PointIndex = 0; PointIndex < PatrolPoints.Num(); ++PointIndex)
+	{
+		const float DistanceSquared = FVector::DistSquared2D(FormationLocation, PatrolPoints[PointIndex]);
+		if (DistanceSquared < ClosestDistanceSquared)
+		{
+			ClosestDistanceSquared = DistanceSquared;
+			ClosestIndex = PointIndex;
+		}
+	}
+	return ClosestIndex;
+}
+
+bool UEnemyFormationController::GetFormationAverageLocation(
+	const FFormationData& Formation,
+	FVector& OutAverageLocation) const
+{
+	FVector LocationSum = FVector::ZeroVector;
+	int32 ValidUnitCount = 0;
+	for (const FFormationUnitData& FormationUnit : Formation.FormationUnits)
+	{
+		if (not FormationUnit.IsValidFormationUnit())
+		{
+			continue;
+		}
+		LocationSum += FormationUnit.Unit->GetOwnerLocation();
+		++ValidUnitCount;
+	}
+	if (ValidUnitCount <= 0)
+	{
+		return false;
+	}
+	OutAverageLocation = LocationSum / ValidUnitCount;
+	return true;
+}
+
+void UEnemyFormationController::UnbindFormationUnitMovementCallback(FFormationUnitData& FormationUnit) const
+{
+	if (not FormationUnit.IsValidFormationUnit() || not FormationUnit.MovementCompleteHandle.IsValid())
+	{
+		return;
+	}
+	FormationUnit.Unit->OnUnitIdleAndNoNewCommandsDelegate.Remove(FormationUnit.MovementCompleteHandle);
+	FormationUnit.MovementCompleteHandle.Reset();
 }
 
 int32 UEnemyFormationController::GetRandomNextPatrolPointIndex(const FFormationData& Formation) const
@@ -1860,12 +2130,17 @@ bool UEnemyFormationController::EnsureFormationRequestIsValid(
 
 bool UEnemyFormationController::GetShouldUseUnitAttackMove(const int32 FormationID) const
 {
-	if (not bM_UseUnitAttackMoveOrders)
+	const FFormationData* Formation = M_ActiveFormations.Find(FormationID);
+	if (Formation == nullptr)
 	{
 		return false;
 	}
-	const FFormationData* Formation = M_ActiveFormations.Find(FormationID);
-	return Formation != nullptr and Formation->bIsAttackMoveFormation;
+	// A patrol answering an alarm fights whatever it meets on the way, in every game mode.
+	if (Formation->M_AlarmConvergeState.bM_IsConverging)
+	{
+		return true;
+	}
+	return bM_UseUnitAttackMoveOrders and Formation->bIsAttackMoveFormation;
 }
 
 void UEnemyFormationController::MoveUnitToWayPoint(FFormationUnitData& FormationUnit, const FVector& WaypointLocation,

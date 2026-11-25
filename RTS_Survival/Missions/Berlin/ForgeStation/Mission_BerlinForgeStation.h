@@ -6,6 +6,7 @@
 #include "RTS_Survival/Game/Difficulty/GameDifficulty.h"
 #include "RTS_Survival/GameUI/Archive/ArchiveItemTypes/ArchiveItemTypes.h"
 #include "RTS_Survival/GameUI/Portrait/RTSPortraitTypes.h"
+#include "RTS_Survival/Missions/Berlin/ForgeStation/BerlinForgeStation.h"
 #include "RTS_Survival/Missions/MissionClasses/MissionBase/MissionBase.h"
 
 #include "Mission_BerlinForgeStation.generated.h"
@@ -35,6 +36,29 @@ struct FBerlinForgeStationLines
 	// Berlin_ReinforcementsInbound: plays when the drop starts.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Lines")
 	TObjectPtr<USoundBase> ReinforcementsLine = nullptr;
+};
+
+/** Intercepted radio of the station's hazmat crew (Russian, English subtitles); each plays once, empty slots are skipped. */
+USTRUCT(BlueprintType)
+struct FBerlinForgeStationCrewLines
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, Category = "Crew Lines")
+	ERTSPortraitTypes Portrait = ERTSPortraitTypes::SovietHazmat;
+
+	// Berlin_ForgeCrew_Sighted: calm work chatter when the plate appears, before the advisor's sighted line.
+	// Skipped when the garrison is already fighting.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Crew Lines")
+	TObjectPtr<USoundBase> SightedLine = nullptr;
+
+	// Berlin_ForgeCrew_Engaged: the first guard or crew comes into combat.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Crew Lines")
+	TObjectPtr<USoundBase> EngagedLine = nullptr;
+
+	// Berlin_ForgeCrew_TargetLost: the first counted target (rig, cryo block or command bunker) is destroyed.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Crew Lines")
+	TObjectPtr<USoundBase> FirstTargetLostLine = nullptr;
 };
 
 /**
@@ -97,6 +121,9 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Forge Station")
 	FBerlinForgeStationLines Lines;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Forge Station")
+	FBerlinForgeStationCrewLines CrewLines;
+
 	// The crater intel; a Lore entry with its own text (CustomContent).
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Forge Station")
 	FArchiveCustomContent CraterIntel;
@@ -113,6 +140,16 @@ private:
 	bool bM_HasStartedTracking = false;
 	bool bM_HasLaunchedReinforcements = false;
 	bool bM_HasAddedArchiveEntry = false;
+	bool bM_HasPlayedCrewEngagedLine = false;
+	bool bM_HasPlayedCrewTargetLostLine = false;
+
+	UFUNCTION()
+	void OnGarrisonEngaged(AEnemyStrongpoint* Strongpoint);
+
+	UFUNCTION()
+	void OnStationTargetDestroyed(ABerlinForgeStation* Station, EForgeStationPartRole Role);
+
+	void PlayCrewLine(USoundBase* Line) const;
 
 	bool GetIsValidStation() const;
 	bool TrySetUpGarrison();

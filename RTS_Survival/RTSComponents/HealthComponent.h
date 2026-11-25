@@ -117,6 +117,14 @@ public:
 	virtual void OnHideAllGameUI(const bool bHide) override;
 	void HideHealthBar();
 
+	/**
+	 * @brief Keeps the health bar shown whatever the visibility settings say (a harvester being unloaded shows its
+	 * progress there). Hiding all game UI and a permanently invisible bar still win.
+	 * @param bForceVisible False gives the bar back to the normal settings (selected, damaged, ...).
+	 */
+	void SetHealthBarForcedVisible(bool bForceVisible);
+	bool GetIsHealthBarForcedVisible() const { return bM_IsHealthBarForcedVisible; }
+
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="Debugging")
 	void DebugHealthComponentAtLocation(const FVector Location) const;
 
@@ -442,6 +450,9 @@ private:
 
 	UPROPERTY()
 	bool bM_IsHealthBarWidgetInitialized = false;
+
+	// Set by SetHealthBarForcedVisible: ShouldDisplayHealthForPercentage then always shows the bar.
+	bool bM_IsHealthBarForcedVisible = false;
 
 	// Remains set after permanent removal so delayed visibility updates cannot recreate or reveal the widget.
 	UPROPERTY(Transient)

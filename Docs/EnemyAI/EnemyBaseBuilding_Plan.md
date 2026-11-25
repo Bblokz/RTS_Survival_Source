@@ -241,7 +241,7 @@ Because it is a component on the BXP, the player can use it too (e.g. for buildi
 - A second base or forward outposts later in the match.
 - A skirmish test map: an almost empty landscape, AI start point only; a 20-minute watch run with periodic captures.
 
-**Phase 4: harvesting (later)**
+**Phase 4: harvesting (later)** (decisions picked 2026-11-24, see [EnemyHarvestEconomy.md](EnemyHarvestEconomy.md))
 - AI harvesters feed `AddBuildingPoints(…, Harvest)` (and training).
 - The site score gains "near resources"; refinery and storage slots become economy rather than dressing.
 

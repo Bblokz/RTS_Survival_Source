@@ -11,7 +11,7 @@ When the enemy fires an air global ability, the Advisor (announcer portrait, wit
 | Warning | Abilities | Lines |
 |---|---|---|
 | ScoutAircraft | GA_SovietReconFlight | EnemyAir_Scout_01..03 |
-| AttackAircraft | GA_2xPE2Strafing, GA_4xPE2Strafing | EnemyAir_Attack_01..04 |
+| AttackAircraft | GA_2xPE2Strafing, GA_4xPE2Strafing, GA_2xIl2Strafing | EnemyAir_Attack_01..04 |
 | ParatrooperPlane | GA_SovietParatroopers | EnemyAir_Paratroopers_01..05 |
 | Bombers | GA_HeavyCarpet_PE8_500Gr / 1000Gr / 3000Gr | EnemyAir_Bombers_01..03 |
 

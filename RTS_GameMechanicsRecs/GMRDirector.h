@@ -191,6 +191,8 @@ private:
 
 	// Per-frame upkeep of recorded units (fog, owners of late soldiers, health bars), GMRDirectorEvents.cpp.
 	void KeepUnitsReady();
+	// Shows pre-placed actors the fog of war hid (enemy base buildings), every few frames.
+	void RevealFogHiddenActors() const;
 	void PrepareNewUnit(AActor* Unit);
 	void TickPendingExpansions();
 	bool TryStartExpansion(FGMRPendingExpansion& Pending);

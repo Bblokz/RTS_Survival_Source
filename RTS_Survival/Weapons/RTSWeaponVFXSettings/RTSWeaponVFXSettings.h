@@ -81,6 +81,21 @@ public:
 	UPROPERTY(EditAnywhere, Config, Category="Small Arms Muzzle VFX")
 	TMap<ESmallArmsMuzzleClass, FSmallArmsMuzzleProfile> SmallArmsMuzzleProfiles;
 
+	/**
+	 * The one Niagara system that draws every tank shell in flight: tracer streak, halo and lingering smoke trail.
+	 * Emitters are named Tracer_<Layer> / Glow_<Layer> / Smoke_<Layer>; built by RTS.TankShellTrail.BuildNiagaraSystem.
+	 */
+	UPROPERTY(EditAnywhere, Config, Category="Tank Shell Trail VFX")
+	TSoftObjectPtr<UNiagaraSystem> TankShellTrailNiagaraSystem;
+
+	// Off: tank shells fall back to the shell effect on each pooled projectile.
+	UPROPERTY(EditAnywhere, Config, Category="Tank Shell Trail VFX")
+	bool bUseTankShellTrailVfx = true;
+
+	// Trail samples above this amount in one frame are not drawn; keeps a huge fight from flooding the system.
+	UPROPERTY(EditAnywhere, Config, Category="Tank Shell Trail VFX", meta=(ClampMin="1", UIMin="1"))
+	int32 MaxTankShellTrailSamplesPerFrame = 6000;
+
 	/** @return The profile of a muzzle class; the built-in default when the map has no entry for it. */
 	FSmallArmsMuzzleProfile GetSmallArmsMuzzleProfile(const ESmallArmsMuzzleClass MuzzleClass) const;
 

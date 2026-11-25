@@ -13,6 +13,7 @@ class ACPPController;
 class UMissionBase;
 class UPlayerCameraController;
 class UPlayerPortraitManager;
+class UW_HoldToSkip;
 class UW_MissionCameraTour;
 class UW_Portrait;
 
@@ -84,6 +85,10 @@ private:
 	UPROPERTY()
 	TObjectPtr<UW_MissionCameraTour> M_Widget;
 
+	// Only while a skippable tour holds the screen (FMissionCameraTourSettings::bAllowSkipping).
+	UPROPERTY()
+	TObjectPtr<UW_HoldToSkip> M_SkipWidget;
+
 	TArray<FMissionCameraTourShot> M_Shots;
 	FMissionCameraTourSettings M_Settings;
 	int32 M_ID = 0;
@@ -128,6 +133,30 @@ private:
 	void TickRunning();
 	bool TryTakeScreen();
 	bool CachePlayerPose();
+
+	/** Plays Settings.StartSound; with a transcript its words show in the cinematic subtitle strip at the top. */
+	void PlayStartSound() const;
+
+	/** Lifts the fog along every shot with a RevealRadius (and the blend into it), for the whole tour plus a margin. */
+	void RevealShotAreas() const;
+
+	/**
+	 * @brief Reveals a strip from From to To with overlapping vision bubbles, so a moving shot never looks into fog.
+	 * @param From Start of the strip.
+	 * @param To End of the strip.
+	 * @param Radius Bubble radius; also the spacing of the bubbles.
+	 * @param Seconds How long each bubble stays.
+	 */
+	void RevealAlongPath(const FVector& From, const FVector& To, const float Radius, const float Seconds) const;
+
+	bool GetIsValidSkipWidget(const bool bReportError = true) const;
+
+	void CreateSkipWidget();
+	void RemoveSkipWidget();
+
+	// Hold-to-skip finished: the clock jumps to the end of the shots, so the next tick eases back to the player.
+	UFUNCTION()
+	void HandleSkipHoldCompleted();
 
 	// Shot timeline: start second of each shot, then the return, then the end.
 	float GetShotStartSeconds(const int32 ShotIndex) const;

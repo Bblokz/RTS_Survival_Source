@@ -121,6 +121,21 @@ void UWorldCampaignProgressManager::AddResearchedTechnology(const ETechnology Te
 	OnTechnologyResearched.Broadcast(Technology);
 }
 
+bool UWorldCampaignProgressManager::GetIsTechNodeBought(const FName TechNodeId) const
+{
+	return M_ProgressState.BoughtTechNodeIds.Contains(TechNodeId);
+}
+
+void UWorldCampaignProgressManager::AddBoughtTechNode(const FName TechNodeId)
+{
+	if (TechNodeId.IsNone())
+	{
+		return;
+	}
+
+	M_ProgressState.BoughtTechNodeIds.AddUnique(TechNodeId);
+}
+
 EWorldCampaignBuilding UWorldCampaignProgressManager::GetBuildingOnNode(const FName BuildNodeId) const
 {
 	return M_ProgressState.GetBuildingOnNode(BuildNodeId);

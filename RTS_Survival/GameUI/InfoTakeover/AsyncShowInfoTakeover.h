@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "InfoTakeoverTypes.h"
 #include "Kismet/BlueprintAsyncActionBase.h"
 
 #include "AsyncShowInfoTakeover.generated.h"
@@ -351,4 +352,92 @@ public:
 protected:
 	virtual int32 QueueTakeover(UInfoTakeoverSubsystem& InfoTakeoverSubsystem) const override;
 	virtual FString GetNodeName() const override { return TEXT("Show Adrenaline Shot Takeover"); }
+};
+
+/**
+ * @brief Mission node that pauses the game with the capturing trucks field manual (scuttle countdown, a squad within
+ * 20 m, the 60 % health rule, capture versus destroy) and continues from On Closed once the player pressed UNDERSTOOD.
+ */
+UCLASS()
+class RTS_SURVIVAL_API UAsyncShowCapturingTrucksTakeover : public UAsyncShowInfoTakeoverBase
+{
+	GENERATED_BODY()
+
+public:
+	/**
+	 * @brief Shows the capturing trucks takeover and waits for it to close.
+	 * @param WorldContextObject The mission (or any object in the game world); filled in as self.
+	 * @return The node; On Closed fires once the player closed it; field manuals ignore "never show again".
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Mission|Info Takeover",
+		meta = (BlueprintInternalUseOnly = "true", DefaultToSelf = "WorldContextObject",
+			HidePin = "WorldContextObject", DisplayName = "Show Capturing Trucks Takeover"))
+	static UAsyncShowCapturingTrucksTakeover* ShowCapturingTrucksTakeover(UObject* WorldContextObject);
+
+protected:
+	virtual int32 QueueTakeover(UInfoTakeoverSubsystem& InfoTakeoverSubsystem) const override;
+	virtual FString GetNodeName() const override { return TEXT("Show Capturing Trucks Takeover"); }
+};
+
+/**
+ * @brief Mission node that pauses the game with a captured paper document whose text is written on the node (split
+ * the Document pin), and continues from On Closed once the player pressed UNDERSTOOD. Archived under Lore.
+ */
+UCLASS()
+class RTS_SURVIVAL_API UAsyncShowDocumentTakeover : public UAsyncShowInfoTakeoverBase
+{
+	GENERATED_BODY()
+
+public:
+	/**
+	 * @brief Shows a document takeover with the given text and waits for it to close.
+	 * @param WorldContextObject The mission (or any object in the game world); filled in as self.
+	 * @param Document Title, typed intro, the sheet's heading, lines (marked ones in red), footer, stamp, archive key.
+	 * @return The node; On Closed fires once the player closed it; documents ignore "never show again".
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Mission|Info Takeover",
+		meta = (BlueprintInternalUseOnly = "true", DefaultToSelf = "WorldContextObject",
+			HidePin = "WorldContextObject", DisplayName = "Show Document Takeover"))
+	static UAsyncShowDocumentTakeover* ShowDocumentTakeover(UObject* WorldContextObject,
+	                                                        const FDocumentTakeoverContent& Document);
+
+protected:
+	virtual int32 QueueTakeover(UInfoTakeoverSubsystem& InfoTakeoverSubsystem) const override;
+	virtual FString GetNodeName() const override { return TEXT("Show Document Takeover"); }
+
+private:
+	UPROPERTY()
+	FDocumentTakeoverContent M_Document;
+};
+
+/**
+ * @brief Mission node for the Ore Mountains radio outpost: pauses the game with the captured convoy manifest (the
+ * columns of the week, one armoured truck of sealed cases stamped for Berlin) and continues from On Closed once the
+ * player pressed UNDERSTOOD. The text is fixed in C++ (MakeOreManifest) so it obeys the mission's lore rules.
+ */
+UCLASS()
+class RTS_SURVIVAL_API UAsyncShowOreManifestTakeover : public UAsyncShowInfoTakeoverBase
+{
+	GENERATED_BODY()
+
+public:
+	/**
+	 * @brief Shows the Ore Mountains convoy manifest and waits for it to close.
+	 * @param WorldContextObject The mission (or any object in the game world); filled in as self.
+	 * @return The node; On Closed fires once the player closed it; documents ignore "never show again".
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Mission|Info Takeover",
+		meta = (BlueprintInternalUseOnly = "true", DefaultToSelf = "WorldContextObject",
+			HidePin = "WorldContextObject", DisplayName = "Show Ore Manifest Takeover"))
+	static UAsyncShowOreManifestTakeover* ShowOreManifestTakeover(UObject* WorldContextObject);
+
+	/**
+	 * @return The manifest's text. Lore rules (OreMountainsMission.md): never say why Berlin, no cryo, nothing about
+	 * where Radixite comes from.
+	 */
+	static FDocumentTakeoverContent MakeOreManifest();
+
+protected:
+	virtual int32 QueueTakeover(UInfoTakeoverSubsystem& InfoTakeoverSubsystem) const override;
+	virtual FString GetNodeName() const override { return TEXT("Show Ore Manifest Takeover"); }
 };

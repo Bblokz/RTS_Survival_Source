@@ -116,6 +116,22 @@ light vehicles out, and F keeps infantry out.
     building, so their "no path" says nothing about the pumps.
 - **Not tested:** tanks crushing the trees, shells hitting them, or the rendering cost of about 800 tree actors.
 
+## North backdrop and horizon skirt (2026-11-24)
+
+The dry Vygozero lakebed and the Svarog crater (owner pick: concept C "Radixite scar") lie past the north play edge.
+One mesh, `FL_Backdrop`, also skirts the other three edges. Details, numbers and checks are in
+[FrozenLakeMission.md](FrozenLakeMission.md), "Build status: Svarog crater and dry lakebed".
+
+- Rebuild:
+  1. `python fl_backdrop_gen.py`;
+  2. back up the umap;
+  3. run `run_backdrop_build.py` headless.
+- Run the generator again after any `fl_terrain_gen.py` change, then rerun the job. It imports the whole height file,
+  with the north margin lowered and the play area unchanged.
+- `step_trees` skips trees north of `TREE_MAX_X` (305 m), where the margin is now lakebed.
+- Night captures: anything darker than about a third of the snow's brightness goes black after the night tonemap.
+  So the bed is lifted to a pale silt (`BedBrightness`).
+
 ## Night (2026-11-17, owner: a moonlit night map, dark but units still readable)
 
 `fl_map_build.step_night()` sets the night (values in `NIGHT`), and `step_lighting()` restores the day.

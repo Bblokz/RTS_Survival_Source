@@ -5,6 +5,7 @@
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/WorldCampaign/CampaignProgress/WorldCampaignProgressManager.h"
 #include "RTS_Survival/WorldCampaign/CampaignTech/WorldCampaignTechRules.h"
+#include "RTS_Survival/WorldCampaign/CampaignTech/WorldCampaignTechWheel.h"
 
 #define LOCTEXT_NAMESPACE "WorldCampaignTechManager"
 
@@ -103,6 +104,73 @@ bool UWorldCampaignTechManager::GetIsTechnologyResearched(const ETechnology Tech
 		return false;
 	}
 	return M_ProgressManager->GetIsTechnologyResearched(Technology);
+}
+
+bool UWorldCampaignTechManager::TryBuyWheelNode(const FName NodeId, FText& OutFailReason)
+{
+	if (not GetCanBuyWheelNode(NodeId, OutFailReason))
+	{
+		return false;
+	}
+
+	const FWorldTechWheelNode* const Node = GetWheel().FindNode(NodeId);
+	if (Node == nullptr || not M_ProgressManager->TrySpendResources(Node->Cost))
+	{
+		OutFailReason = WorldCampaignTechWheel::GetNodeBuyBlockText(EWorldTechWheelBuyBlock::CannotAfford, Node);
+		return false;
+	}
+
+	const ETechnology Technology = Node->GetIsTechnologyNode() ? Node->Technology : ETechnology::Tech_NONE;
+	M_ProgressManager->AddBoughtTechNode(NodeId);
+	if (Technology != ETechnology::Tech_NONE)
+	{
+		M_ProgressManager->AddResearchedTechnology(Technology);
+		OnTechnologyPurchased.Broadcast(Technology, M_ProgressManager->GetResources());
+	}
+	OnWheelNodeBought.Broadcast(NodeId);
+	return true;
+}
+
+bool UWorldCampaignTechManager::GetCanBuyWheelNode(const FName NodeId, FText& OutFailReason) const
+{
+	OutFailReason = FText::GetEmpty();
+	if (not GetIsValidProgressManager())
+	{
+		OutFailReason = LOCTEXT("NoCampaignWheel", "No campaign is running.");
+		return false;
+	}
+
+	const FWorldTechWheel& Wheel = GetWheel();
+	const FWorldCampaignProgressState& ProgressState = M_ProgressManager->GetProgressState();
+	const EWorldTechWheelBuyBlock Block = WorldCampaignTechWheel::GetNodeBuyBlock(
+		Wheel, NodeId, ProgressState.BoughtTechNodeIds, ProgressState.ResearchedTechnologies, ProgressState.Resources);
+	if (Block == EWorldTechWheelBuyBlock::None)
+	{
+		return true;
+	}
+
+	OutFailReason = WorldCampaignTechWheel::GetNodeBuyBlockText(Block, Wheel.FindNode(NodeId));
+	return false;
+}
+
+EWorldTechWheelNodeState UWorldCampaignTechManager::GetWheelNodeState(const FName NodeId) const
+{
+	if (not GetIsValidProgressManager())
+	{
+		return EWorldTechWheelNodeState::Locked;
+	}
+	return WorldCampaignTechWheel::GetNodeState(GetWheel(), NodeId,
+	                                            M_ProgressManager->GetProgressState().BoughtTechNodeIds);
+}
+
+TArray<FWorldTechWheelNode> UWorldCampaignTechManager::GetWheelNodes() const
+{
+	return GetWheel().Nodes;
+}
+
+const FWorldTechWheel& UWorldCampaignTechManager::GetWheel() const
+{
+	return UWorldCampaignTechSettings::GetWheel();
 }
 
 bool UWorldCampaignTechManager::GetIsValidProgressManager() const

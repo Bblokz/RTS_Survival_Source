@@ -14,7 +14,7 @@
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 
 UGameResourceManager::UGameResourceManager(const FObjectInitializer& ObjectInitializer)
-	: M_ResourceDropOffsPlayer(),
+	: M_ResourceDropOffs(),
 	  M_MapResources()
 {
 	M_UpdateDropOffDataInterval = DeveloperSettings::Async::GameThreadUpdateAsyncWithResourceDropOffsInterval;
@@ -54,14 +54,9 @@ void UGameResourceManager::RegisterResourceDropOff(
 	const bool bRegister,
 	const int8 OwningPlayer)
 {
-	if (OwningPlayer != 1)
-	{
-		RTSFunctionLibrary::ReportError("Enemy ResourceDropOffs not supported yet!"
-			"\n See UGameResourceManager::RegisterResourceDropOff");
-		return;
-	}
-
-	if (bRegister && not M_ResourceDropOffsPlayer.Contains(ResourceDropOff))
+	constexpr int8 HumanPlayer = 1;
+	const int32 RegisteredIndex = FindRegisteredDropOffIndex(ResourceDropOff);
+	if (bRegister && RegisteredIndex == INDEX_NONE)
 	{
 		if (not ResourceDropOff.IsValid())
 		{
@@ -69,19 +64,61 @@ void UGameResourceManager::RegisterResourceDropOff(
 								"\n See UGameResourceManager::RegisterResourceDropOff");
 			return;
 		}
-		M_ResourceDropOffsPlayer.Add(ResourceDropOff);
-		RegisterDropOffWithPlayerResourceManager(bRegister, ResourceDropOff);
+		FRegisteredResourceDropOff NewEntry;
+		NewEntry.DropOff = ResourceDropOff;
+		NewEntry.OwningPlayer = OwningPlayer;
+		M_ResourceDropOffs.Add(NewEntry);
+		// Only the human's drop-offs hold the human's resources; an AI drop-off keeps its stock to itself.
+		if (OwningPlayer == HumanPlayer)
+		{
+			RegisterDropOffWithPlayerResourceManager(bRegister, ResourceDropOff);
+		}
+		return;
 	}
-	else if (not bRegister && M_ResourceDropOffsPlayer.Contains(ResourceDropOff))
+	if (not bRegister && RegisteredIndex != INDEX_NONE)
 	{
-		M_ResourceDropOffsPlayer.Remove(ResourceDropOff);
-		RegisterDropOffWithPlayerResourceManager(bRegister, ResourceDropOff);
+		const int8 RegisteredOwner = M_ResourceDropOffs[RegisteredIndex].OwningPlayer;
+		M_ResourceDropOffs.RemoveAt(RegisteredIndex);
+		// As before AI drop-offs were supported: the human's storage only shrinks when the drop-off still reports
+		// player 1. During BeginDestroy its owner actor is gone and it reports 0, which leaves the storage as it was.
+		if (RegisteredOwner == HumanPlayer && OwningPlayer == HumanPlayer)
+		{
+			RegisterDropOffWithPlayerResourceManager(bRegister, ResourceDropOff);
+		}
 	}
+}
+
+int32 UGameResourceManager::FindRegisteredDropOffIndex(const TWeakObjectPtr<UResourceDropOff>& DropOff) const
+{
+	return M_ResourceDropOffs.IndexOfByPredicate([&DropOff](const FRegisteredResourceDropOff& Entry)
+	{
+		return Entry.DropOff == DropOff;
+	});
 }
 
 TArray<TWeakObjectPtr<UResourceDropOff>> UGameResourceManager::GetCopyOfResourceDropOffs() const
 {
-	return M_ResourceDropOffsPlayer;
+	TArray<TWeakObjectPtr<UResourceDropOff>> DropOffs;
+	DropOffs.Reserve(M_ResourceDropOffs.Num());
+	for (const FRegisteredResourceDropOff& Entry : M_ResourceDropOffs)
+	{
+		DropOffs.Add(Entry.DropOff);
+	}
+	return DropOffs;
+}
+
+TArray<TWeakObjectPtr<UResourceDropOff>> UGameResourceManager::GetCopyOfResourceDropOffsOfPlayer(
+	const int8 OwningPlayer) const
+{
+	TArray<TWeakObjectPtr<UResourceDropOff>> DropOffs;
+	for (const FRegisteredResourceDropOff& Entry : M_ResourceDropOffs)
+	{
+		if (Entry.OwningPlayer == OwningPlayer)
+		{
+			DropOffs.Add(Entry.DropOff);
+		}
+	}
+	return DropOffs;
 }
 
 TArray<TWeakObjectPtr<UResourceComponent>> UGameResourceManager::GetCopyOfMapResources() const
@@ -191,13 +228,14 @@ void UGameResourceManager::ShutDownAsyncResourceThread()
 void UGameResourceManager::UpdateDropOffDataOnAsyncThread()
 {
 	TArray<FAsyncDropOffData> DropOffDataCollection;
-	for (auto EachDropOff : M_ResourceDropOffsPlayer)
+	for (const FRegisteredResourceDropOff& Entry : M_ResourceDropOffs)
 	{
+		const TWeakObjectPtr<UResourceDropOff>& EachDropOff = Entry.DropOff;
 		if (EachDropOff.IsValid())
 		{
 			FAsyncDropOffData DropOffData;
 			DropOffData.DropOff = EachDropOff;
-			DropOffData.OwningPlayer = 1;
+			DropOffData.OwningPlayer = Entry.OwningPlayer;
 			DropOffData.DropOffLocation = EachDropOff->GetDropOffLocationNotThreadSafe();
 			DropOffData.ResourceDropOffCapacity = EachDropOff->GetResourceDropOffCapacity();
 			DropOffData.bIsActiveDropOff = EachDropOff->GetIsDropOffActive();
@@ -260,15 +298,10 @@ void UGameResourceManager::RegisterDropOffWithPlayerResourceManager(const bool b
 
 void UGameResourceManager::CleanUpInvalidResourcesAndDropOffs()
 {
-	TArray<TWeakObjectPtr<UResourceDropOff>> M_ValidDropOffs;
-	for (auto EachDropOff : M_ResourceDropOffsPlayer)
+	M_ResourceDropOffs.RemoveAll([](const FRegisteredResourceDropOff& Entry)
 	{
-		if (EachDropOff.IsValid())
-		{
-			M_ValidDropOffs.Add(EachDropOff);
-		}
-	}
-	M_ResourceDropOffsPlayer = M_ValidDropOffs;
+		return not Entry.DropOff.IsValid();
+	});
 	TArray<TWeakObjectPtr<UResourceComponent>> M_ValidResources;
 	for (auto EachResource : M_MapResources)
 	{

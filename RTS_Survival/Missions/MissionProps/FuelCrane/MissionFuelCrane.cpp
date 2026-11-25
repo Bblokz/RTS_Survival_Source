@@ -257,6 +257,7 @@ void AMissionFuelCrane::StartUnloading(AActor* Truck)
 	M_Carry.TargetSourceIndex = INDEX_NONE;
 	bM_SourcesAreTruckCargo = false;
 	bM_DependsOnTruck = false;
+	bM_IsUnloadingOnce = false;
 	M_Truck = Truck;
 
 	bool bHasSources = false;
@@ -296,6 +297,59 @@ void AMissionFuelCrane::StartUnloading(AActor* Truck)
 	bM_FinishCycleThenStop = false;
 	SetActorTickEnabled(true);
 	BeginPhase(M_Carry.bIsCarrying ? EMissionFuelCranePhase::SlewToDrop : EMissionFuelCranePhase::SlewToPickup);
+}
+
+bool AMissionFuelCrane::StartUnloadingTruckOnce(AActor* Truck)
+{
+	if (not GetIsValidRig() or not RTSFunctionLibrary::RTSIsValid(Truck))
+	{
+		return false;
+	}
+	if (M_StackPieces.Num() == 0)
+	{
+		BeginPlay_CreatePiecePools();
+		BeginPlay_InitStackGround();
+	}
+	// Drop whatever the previous run held (a crane-owned pile stays hidden; a previous truck keeps its state).
+	for (UStaticMeshComponent* Piece : M_PilePieces)
+	{
+		if (IsValid(Piece))
+		{
+			Piece->SetVisibility(false);
+		}
+	}
+	M_SourcePieces.Reset();
+	M_Carry.TargetSourceIndex = INDEX_NONE;
+	bM_SourcesAreTruckCargo = false;
+	bM_DependsOnTruck = false;
+	M_Truck = Truck;
+	if (not GatherTruckCargoPieces(Truck))
+	{
+		UE_LOG(LogRTS, Warning, TEXT("%s: truck %s has no cargo within %.0f cm; one-shot unload refused."),
+		       *GetName(), *Truck->GetName(), MaxTrolleyRadius);
+		M_Truck.Reset();
+		return false;
+	}
+	bM_IsUnloadingOnce = true;
+	bM_IsUnloading = true;
+	bM_FinishCycleThenStop = false;
+	SetActorTickEnabled(true);
+	BeginPhase(M_Carry.bIsCarrying ? EMissionFuelCranePhase::SlewToDrop : EMissionFuelCranePhase::SlewToPickup);
+	return true;
+}
+
+void AMissionFuelCrane::OnOneShotTruckEmptied()
+{
+	AActor* const EmptiedTruck = M_Truck.Get();
+	// The pieces stay hidden: the truck drives off empty, and EndPlay must not put them back.
+	M_SourcePieces.Reset();
+	bM_SourcesAreTruckCargo = false;
+	bM_DependsOnTruck = false;
+	M_Truck.Reset();
+	bM_IsUnloadingOnce = false;
+	// Hoist off the stack and stop.
+	bM_FinishCycleThenStop = true;
+	OnTruckCargoEmptied.Broadcast(EmptiedTruck);
 }
 
 void AMissionFuelCrane::StopUnloading()
@@ -575,7 +629,7 @@ bool AMissionFuelCrane::UsePileAt(const FTransform& PileFrame, const bool bTrace
 
 int32 AMissionFuelCrane::ChooseNextSourcePiece()
 {
-	if (CountVisibleSources() == 0)
+	if (CountVisibleSources() == 0 and not bM_IsUnloadingOnce)
 	{
 		RefillSources();
 	}
@@ -652,6 +706,7 @@ void AMissionFuelCrane::OnTruckLost()
 	M_Truck.Reset();
 	M_SourcePieces.Reset();
 	M_Carry.TargetSourceIndex = INDEX_NONE;
+	bM_IsUnloadingOnce = false;
 	bM_FinishCycleThenStop = true;
 	if (M_Carry.bIsCarrying)
 	{
@@ -878,6 +933,11 @@ void AMissionFuelCrane::StartSlewToPickup()
 	if (M_Carry.TargetSourceIndex == INDEX_NONE)
 	{
 		// Nothing reachable left (e.g. the truck rolled away): park at travel height and stop.
+		if (bM_IsUnloadingOnce)
+		{
+			// A one-shot unload still ends (and reports) with what it could reach.
+			OnOneShotTruckEmptied();
+		}
 		bM_FinishCycleThenStop = true;
 		StartHoist(EMissionFuelCranePhase::HoistFromDrop);
 		return;
@@ -998,6 +1058,11 @@ void AMissionFuelCrane::PlaceCarriedCargoOnStack()
 	M_Carry.TargetSourceIndex = INDEX_NONE;
 	if (CountVisibleSources() == 0)
 	{
+		if (bM_IsUnloadingOnce)
+		{
+			OnOneShotTruckEmptied();
+			return;
+		}
 		// Truck emptied: reload it while the hook is away at the stack.
 		RefillSources();
 	}

@@ -201,3 +201,76 @@ int32 UAsyncShowAdrenalineShotTakeover::QueueTakeover(UInfoTakeoverSubsystem& In
 {
 	return InfoTakeoverSubsystem.QueueAdrenalineShotTakeover();
 }
+
+UAsyncShowCapturingTrucksTakeover* UAsyncShowCapturingTrucksTakeover::ShowCapturingTrucksTakeover(
+	UObject* WorldContextObject)
+{
+	return CreateNode<UAsyncShowCapturingTrucksTakeover>(WorldContextObject);
+}
+
+int32 UAsyncShowCapturingTrucksTakeover::QueueTakeover(UInfoTakeoverSubsystem& InfoTakeoverSubsystem) const
+{
+	return InfoTakeoverSubsystem.QueueCapturingTrucksTakeover();
+}
+
+UAsyncShowDocumentTakeover* UAsyncShowDocumentTakeover::ShowDocumentTakeover(UObject* WorldContextObject,
+                                                                             const FDocumentTakeoverContent& Document)
+{
+	UAsyncShowDocumentTakeover* const Node = CreateNode<UAsyncShowDocumentTakeover>(WorldContextObject);
+	Node->M_Document = Document;
+	return Node;
+}
+
+int32 UAsyncShowDocumentTakeover::QueueTakeover(UInfoTakeoverSubsystem& InfoTakeoverSubsystem) const
+{
+	return InfoTakeoverSubsystem.QueueDocumentTakeover(M_Document);
+}
+
+UAsyncShowOreManifestTakeover* UAsyncShowOreManifestTakeover::ShowOreManifestTakeover(UObject* WorldContextObject)
+{
+	return CreateNode<UAsyncShowOreManifestTakeover>(WorldContextObject);
+}
+
+int32 UAsyncShowOreManifestTakeover::QueueTakeover(UInfoTakeoverSubsystem& InfoTakeoverSubsystem) const
+{
+	return InfoTakeoverSubsystem.QueueDocumentTakeover(MakeOreManifest());
+}
+
+FDocumentTakeoverContent UAsyncShowOreManifestTakeover::MakeOreManifest()
+{
+	// The columns follow the convoy line-up (OreMountainsMission.md, "Convoy line-up" and "Flow"): fuel, the
+	// weighbridge, the ammo split, the hunters, the disguised case convoy (5) and the heavy column to the knoll.
+	// Lore rules: the sheet never says why Berlin, mentions no cryo and nothing about where Radixite comes from.
+	FDocumentTakeoverContent Manifest;
+	Manifest.KindLabel = NSLOCTEXT("OreManifestTakeover", "KindLabel", "RADIO OUTPOST  -  CAPTURED DOCUMENT");
+	Manifest.Title = NSLOCTEXT("OreManifestTakeover", "Title", "Convoy Manifest");
+	Manifest.Description = NSLOCTEXT("OreManifestTakeover", "Description",
+	                                 "Found on the radio operator's desk, translated from the Russian. Most of it is "
+	                                 "routine. One column is not.");
+	Manifest.PaperHeading = NSLOCTEXT("OreManifestTakeover", "PaperHeading", "CONVOY MANIFEST");
+	Manifest.PaperSubheading = NSLOCTEXT("OreManifestTakeover", "PaperSubheading",
+	                                     "Wismut yard, valley road west. Columns for the western outposts.");
+	const TArray<FText> RoutineColumns = {
+		NSLOCTEXT("OreManifestTakeover", "Column1", "Column 1:  fuel. Light escort."),
+		NSLOCTEXT("OreManifestTakeover", "Column2", "Column 2:  supply. Halt for inspection at the weighbridge."),
+		NSLOCTEXT("OreManifestTakeover", "Column3", "Column 3:  shells. Ammunition trucks turn off for the battery."),
+		NSLOCTEXT("OreManifestTakeover", "Column4", "Column 4:  supply, with rifle squads riding in the trucks."),
+	};
+	for (const FText& ColumnText : RoutineColumns)
+	{
+		FDocumentTakeoverLine& Line = Manifest.PaperLines.AddDefaulted_GetRef();
+		Line.Text = ColumnText;
+	}
+	FDocumentTakeoverLine& SealedLine = Manifest.PaperLines.AddDefaulted_GetRef();
+	SealedLine.Text = NSLOCTEXT("OreManifestTakeover", "Column5",
+	                            "Column 5:  supply, and one armoured truck. Cargo SEALED. Do not inspect. Do not open. "
+	                            "Destination: Berlin.");
+	SealedLine.bIsMarked = true;
+	FDocumentTakeoverLine& HeavyLine = Manifest.PaperLines.AddDefaulted_GetRef();
+	HeavyLine.Text = NSLOCTEXT("OreManifestTakeover", "Column6", "Column 6:  heavy escort for the knoll.");
+	Manifest.PaperFooter = NSLOCTEXT("OreManifestTakeover", "PaperFooter",
+	                                 "Questions about column 5 are not to be sent over the radio.");
+	Manifest.StampText = NSLOCTEXT("OreManifestTakeover", "Stamp", "BERLIN");
+	Manifest.ArchiveKey = FName(TEXT("OreManifest"));
+	return Manifest;
+}

@@ -120,7 +120,8 @@ def schedule_defaults(g, node_id):
 
 def arrival():
     g = Graph()
-    g.row([('evStart', 'ev.BP_OnMissionStart', None), ('intro', 'fn.Self.ShowBerlinLocationIntro', None)])
+    g.row([('evStart', 'ev.BP_OnMissionStart', None), ('setUpTraining', 'fn.Self.SetUpReichstagTraining', None),
+           ('intro', 'fn.Self.ShowBerlinLocationIntro', None)])
     g.end_row()
     g.row([('evIntroDone', 'ev.BP_OnLocationIntroFinished', None),
            ('playCrater', 'fn.Self.PlayAdvisorLine', None),
@@ -163,8 +164,9 @@ def arrival():
     g.row([('evDeployed', 'ev.BP_OnCallBackNomadicVehicle', None),
            ('completeDeployed', 'fn.MissionBase.OnMissionComplete', None)])
     g.end_row()
-    g.comment('Briefing: location intro, crater line, wait, Zoo tower tour with the Leitturm line',
-              ['evStart', 'intro', 'evIntroDone', 'playCrater', 'schedCrater', 'evCraterDone', 'tour',
+    g.comment('Reichstag base training for the difficulty (DA_Berlin_ReichstagTraining); briefing: location intro, '
+              'crater line, wait, Zoo tower tour with the Leitturm line',
+              ['evStart', 'setUpTraining', 'intro', 'evIntroDone', 'playCrater', 'schedCrater', 'evCraterDone', 'tour',
                'getCrater', 'getCraterSecs'])
     g.comment('After the tour: stay-quiet line, then watch the HQ', ['evTourDone', 'playQuiet', 'callTryHQ', 'getQuiet'])
     g.comment('Find the HQ every second (a glider brings one after MaxHQSearchAttempts); complete once it is deployed',
@@ -258,6 +260,7 @@ def stay_undetected():
 def response_force():
     g = Graph()
     g.row([('evStart', 'ev.BP_OnMissionStart', None), ('alarmLine', 'fn.Self.PlayAlarmLine', None),
+           ('reichstagAttacks', 'fn.Self.StartReichstagAttacks', None),
            ('sabotage', 'fn.Self.ApplyRailYardSabotage', None),
            ('sched', 'fn.MissionBase.ScheduleSingleCallback', None),
            ('evHold', 'ev.CustomEvent', {'custom_name': 'OnHoldOver', 'no_chain': True}),
@@ -265,8 +268,9 @@ def response_force():
     g.wire('sabotage.HoldSeconds', 'sched.DelaySeconds')
     g.wire('evHold.OutputDelegate', 'sched.Callback')
     g.end_row()
-    g.comment('Alarm line, hold (longer if the rail yard was sabotaged), complete: Counterattack starts on this',
-              ['evStart', 'alarmLine', 'sabotage', 'sched', 'evHold', 'complete'])
+    g.comment('Alarm line, the Reichstag base starts sending groups at the HQ, hold (longer if the rail yard was '
+              'sabotaged), complete: Counterattack starts on this',
+              ['evStart', 'alarmLine', 'reichstagAttacks', 'sabotage', 'sched', 'evHold', 'complete'])
     return g
 
 
@@ -382,12 +386,88 @@ def demeter_pod():
     return g
 
 
+def patrols():
+    g = Graph()
+    g.row([('evStart', 'ev.BP_OnMissionStart', None), ('load', 'fn.Self.LoadPatrolForces', None),
+           ('brFound', 'k2.Branch', None), ('schedStart', 'fn.MissionBase.ScheduleSingleCallback', None),
+           ('evDue', 'ev.CustomEvent', {'custom_name': 'OnPatrolsDue', 'no_chain': True}),
+           ('start', 'fn.Self.StartPatrols', None),
+           ('schedCheck', 'fn.MissionBase.ScheduleRepeatedCallback', None),
+           ('setTask', 'var.set.PatrolCheckTaskId', None)])
+    g.wire('load.bFound', 'brFound.Condition')
+    g.getters('schedStart', [('getDelay', var('PatrolStartDelaySeconds'), 'DelaySeconds', 'PatrolStartDelaySeconds')])
+    g.wire('evDue.OutputDelegate', 'schedStart.Callback')
+    for pin, value in (('TotalCalls', 1), ('InitialDelaySeconds', 1), ('bFireBeforeFirstInterval', False),
+                       ('bRepeatForever', True)):
+        g.default('schedCheck', pin, value)
+    g.getters('schedCheck', [('getCheck', var('PatrolCheckSeconds'), 'IntervalSeconds', 'PatrolCheckSeconds')])
+    g.wire('schedCheck.ReturnValue', 'setTask.PatrolCheckTaskId')
+    bx, by = g.pos['brFound']
+    # Below-left of the branch, clear of the delay getter under the scheduler.
+    g._place('failNoForces', 'fn.MissionBase.OnMissionFailed', bx - 130, by + height('k2.Branch') + 40)
+    g.wire('brFound.else', 'failNoForces.execute')
+    g.end_row()
+    g.row([('evCheck', 'ev.CustomEvent', {'custom_name': 'OnPatrolCheck'}),
+           ('refresh', 'fn.Self.RefreshPatrols', None), ('brGone', 'k2.Branch', None),
+           ('cancel', 'fn.MissionBase.CancelScheduledCallback', None),
+           ('complete', 'fn.MissionBase.OnMissionComplete', None)])
+    g.wire('evCheck.OutputDelegate', 'schedCheck.Callback')
+    g.wire('refresh.bAllGone', 'brGone.Condition')
+    g.getters('cancel', [('getTask', var('PatrolCheckTaskId'), 'TaskID', 'PatrolCheckTaskId')])
+    g.end_row()
+    g.comment('Pick the difficulty data asset (none set: the bonus fails), wait, send the patrols out (wave supply, '
+              'fallback watch, every BerlinPatrol_* spawner), then count them every PatrolCheckSeconds',
+              ['evStart', 'load', 'brFound', 'failNoForces', 'schedStart', 'getDelay', 'evDue', 'start', 'schedCheck',
+               'getCheck', 'setTask'])
+    g.comment('Each count: units left in the plate text; all patrol units dead or gone: stop counting, complete',
+              ['evCheck', 'refresh', 'brGone', 'cancel', 'getTask', 'complete'])
+    return g
+
+
+def supply_point():
+    g = Graph()
+    g.row([('evStart', 'ev.BP_OnMissionStart', None), ('find', 'fn.Self.FindSupplyPoint', None),
+           ('held', 'fn.Self.IsSupplyPointHeld', None), ('brHeld', 'k2.Branch', None),
+           ('rewardNow', 'fn.Self.GiveSupplyPointReward', None),
+           ('completeNow', 'fn.MissionBase.OnMissionComplete', None)])
+    g.wire('held.bHeld', 'brHeld.Condition')
+    bx, by = g.pos['brHeld']
+    g.row([('tour', 'fn.Self.PlaySupplyPointTour', None),
+           ('schedCheck', 'fn.MissionBase.ScheduleRepeatedCallback', None),
+           ('setTask', 'var.set.CaptureCheckTaskId', None)], x=bx + 220, y=by + 170)
+    g.wire('brHeld.else', 'tour.execute')
+    for pin, value in (('TotalCalls', 1), ('InitialDelaySeconds', 1), ('bFireBeforeFirstInterval', False),
+                       ('bRepeatForever', True)):
+        g.default('schedCheck', pin, value)
+    g.getters('schedCheck', [('getCheck', var('CaptureCheckSeconds'), 'IntervalSeconds', 'CaptureCheckSeconds')])
+    g.wire('schedCheck.ReturnValue', 'setTask.CaptureCheckTaskId')
+    g.end_row()
+    g.row([('evCheck', 'ev.CustomEvent', {'custom_name': 'OnCaptureCheck'}),
+           ('heldNow', 'fn.Self.IsSupplyPointHeld', None), ('brCaptured', 'k2.Branch', None),
+           ('cancel', 'fn.MissionBase.CancelScheduledCallback', None),
+           ('reward', 'fn.Self.GiveSupplyPointReward', None),
+           ('complete', 'fn.MissionBase.OnMissionComplete', None)])
+    g.wire('evCheck.OutputDelegate', 'schedCheck.Callback')
+    g.wire('heldNow.bHeld', 'brCaptured.Condition')
+    g.getters('cancel', [('getTask', var('CaptureCheckTaskId'), 'TaskID', 'CaptureCheckTaskId')])
+    g.end_row()
+    g.comment('140 s in (time trigger): already held? reward + complete at once. Otherwise the skippable crane tour '
+              'with the Advisor explaining supply points, then check every CaptureCheckSeconds',
+              ['evStart', 'find', 'held', 'brHeld', 'rewardNow', 'completeNow', 'tour', 'schedCheck', 'getCheck',
+               'setTask'])
+    g.comment('Each check: held by the player? stop checking, three armoured cars flown in at the HQ, complete',
+              ['evCheck', 'heldNow', 'brCaptured', 'cancel', 'getTask', 'reward', 'complete'])
+    return g
+
+
 GRAPHS = {
     'Mission_Berlin_Arrival': arrival, 'Mission_Berlin_ReachLeitturm': reach_leitturm,
     'Mission_Berlin_HoldRelay': hold_relay, 'Mission_Berlin_StayUndetected': stay_undetected,
     'Mission_Berlin_ResponseForce': response_force, 'Mission_Berlin_StopRunners': stop_runners,
     'Mission_Berlin_CellarPeople': cellar_people, 'Mission_Berlin_RailYard': rail_yard,
     'Mission_Berlin_RaidReichstag': raid_reichstag, 'Mission_Berlin_DemeterPod': demeter_pod,
+    'Mission_Berlin_Patrols': patrols,
+    'Mission_Berlin_SupplyPoint': supply_point,
 }
 
 

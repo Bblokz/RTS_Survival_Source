@@ -19,6 +19,8 @@ class UW_WespeBarrageTakeover;
 class UW_DigInTakeover;
 class UW_WallBreachTakeover;
 class UW_AdrenalineShotTakeover;
+class UW_CapturingTrucksTakeover;
+class UW_DocumentTakeover;
 class UW_VehicleInfoTakeover;
 
 /**
@@ -95,4 +97,12 @@ public:
 	// WBP_AdrenalineShotTakeover: the Blueprint child that carries the style for the Adrenaline Shot field manual.
 	UPROPERTY(EditAnywhere, Config, Category = "Tutorials")
 	TSoftClassPtr<UW_AdrenalineShotTakeover> AdrenalineShotTakeoverWidgetClass;
+
+	// WBP_CapturingTrucksTakeover: the Blueprint child that carries the style for the capturing trucks field manual.
+	UPROPERTY(EditAnywhere, Config, Category = "Tutorials")
+	TSoftClassPtr<UW_CapturingTrucksTakeover> CapturingTrucksTakeoverWidgetClass;
+
+	// WBP_DocumentTakeover: the Blueprint child that carries the style for captured documents (the Ore manifest).
+	UPROPERTY(EditAnywhere, Config, Category = "Documents")
+	TSoftClassPtr<UW_DocumentTakeover> DocumentTakeoverWidgetClass;
 };

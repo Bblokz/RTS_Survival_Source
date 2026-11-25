@@ -283,7 +283,8 @@ commander ability, enemy turn summary) still have to be designed and built.
 - Rank goes up one step per mission won. Tier II at 2, III at 5, IV at 9.
 - All numbers: start with 200 radixite and 2 blueprints; enemy budget 10 per turn; freeze stages cost 30, 40, 50,
   60, 70 points and there are five; building prices and effects; tech prices; commander values.
-- A division or convoy is fought on the next enemy procedural map and gives no reward.
+- A division or convoy is fought on the next enemy procedural map and gives no reward. (2026-11-24: with the map
+  source set to HandmadeMaps it is fought on a handmade field map instead; see `EnemyItemMaps_Plan.md`.)
 - Convoys add a fortification (bunkers, minefields or AA battery) to their target on arrival.
 - Pinned missions count toward the minimum mission spacing only, so far story places cannot block side missions.
 - Oder-Warthe is pinned about 42 km east of Miedzyrzecz and Lake Vygozero about 31 km south-west of the lake,
@@ -339,7 +340,7 @@ built in the game.
 |---|---|---|
 | Campaign bar | **Top strip** (1A): turn, rank, tier pips, missions to the next tier, radixite, blueprints | Use the resource icons the game already has. |
 | Build node menu | **Card row** (2A): a panel above the site with one card per building | Same: real resource icons for the prices. |
-| Tech tree | **Wheel web** (flat, sheet 9; the instrument version on sheet 8 was rejected): HQ in the centre, five branches outward, small nodes between the technologies, bridge nodes between neighbouring branches | Path-of-Exile-like web with later connections. The flat wheel type is preferred; "analog" was meant for the colours only (cream, the blue arc colour, red, black faces). |
+| Tech tree | **Wheel web, big badges on branch colours** (sheet 13): HQ in the centre, five branches as coloured sectors, the real hexagon technology icons at about 86 px (rim 104 px), cream paths, minor nodes as small pips, bridge nodes between neighbouring branches | Flat wheel, not an instrument panel (sheet 8 rejected). Big badges and paths of 10C on the branch-coloured background of 10B. |
 | Commander | **Portrait and button** (4A), bottom-left | |
 | Enemy status | **A small bar that shows only the freeze progress in percent**, smaller than the sketched options | No alert gauge, no point split, no enemy turn dialog. |
 | Enemy pieces and countries | **On the map** (6B): dashed arrow and tag on each enemy piece, liberation bar under each country name | |
@@ -349,5 +350,254 @@ Open after these picks:
 
 - The single blueprint is drawn with the construction blueprint icon. That icon choice is not confirmed.
 - A web needs many more nodes than the 24 technologies. The small nodes and their bonuses are not designed.
-- The owner has not yet confirmed the recoloured flat wheel on sheet 9.
 - With no alert gauge and no enemy turn dialog, the player sees the enemy's reaction only as pieces on the map.
+
+### Tech wheel details (picked 2026-11-24)
+
+- **Icons:** the 25 German technology icons in `Content/RTS_Survival/Textures/GameUI/TechTree/GerTech` (hexagon
+  badges). Sketch copies are in `Saved/WorldMapUIDesigns/tech`.
+- **Cross-branch requirements:** the path says how a technology is reached. A technology can also need one specific
+  technology from any other branch. That is shown three ways on the node:
+  1. an outline in the colour of its own branch (every technology has this);
+  2. a second, outer outline in the colour of the branch the needed technology is in;
+  3. a key badge on the corner with the needed technology's icon, a red mark until it is owned and a green tick after.
+  Selecting the node draws a dotted chord across the wheel to the needed technology.
+- **Branch colours:** infantry green, light armour blue, heavy armour red, support purple, economy yellow.
+- **Not decided:** which technology sits where, the small nodes and their bonuses, and which technologies carry a
+  cross-branch requirement. The placement in the sketches is a first guess, and the Air branch was renamed Support
+  there because its icons are anti-air and utility upgrades.
+- **Code follow-up:** `FWorldCampaignTechDefinition::Prerequisites` already allows any technology as a prerequisite.
+  The wheel needs to tell a path neighbour from a cross-branch requirement, which the data does not do yet.
+
+## 12. World map UI build (2026-11-24)
+
+The picks of section 11 are built in C++ as self-building widgets (no Blueprint, no new asset), in the manner of the
+deck builder. Status of checks is at the end of this section.
+
+### Where it lives
+
+| Part | Folder under `WorldCampaign/WorldMapUI` | Main class |
+|---|---|---|
+| Shared look and colours | `CampaignHUD` | `FWorldCampaignUILook`, `WorldCampaignUIColors` |
+| Everything drawn over the map | `CampaignHUD` | `UW_WorldCampaignHUD` |
+| Top strip | `CampaignHUD` | `UW_WorldCampaignBar` |
+| Build site card row | `BuildSites` | `UW_WorldBuildSitePanel`, `UW_WorldBuildCard` |
+| Arrows, tags and country bars on the map | `MapTags` | `UW_WorldMapTags`, `UW_WorldMapArrowLayer` |
+| Commander portrait and ability button | `CommanderPanel` | `UW_WorldCommanderPanel` |
+| Tech wheel page | `TechWheel` | `UW_WorldTechWheel`, `UW_TechWheelPaintLayer` |
+| Tech wheel data and rules | `WorldCampaign/CampaignTech` | `FWorldTechWheel`, `WorldCampaignTechWheel`, `UWorldCampaignTechManager::TryBuyWheelNode` |
+
+### How it is hooked up
+
+- `UW_WorldMenu` creates the HUD and the tech wheel page (`bUseCampaignHUD`, on by default). The HUD is added to the
+  viewport above the world menu; the tech wheel is a page of `FullUISwitcher`, like the deck builder.
+- With the HUD on, the Blueprint header (five buttons and the turn box) is collapsed. Its jobs moved to the strip:
+  ARMY opens the deck builder, TECHNOLOGY the tech wheel, ARCHIVE the archive. The Command Perks button is gone,
+  because perks were removed from the design.
+- The HUD is hidden while a full-screen page is open.
+- `AWorldPlayerController`: a click on a build site opens the card row; any other map click or a right click closes
+  it; while the commander ability waits for a target, the next map click picks that target and a right click cancels;
+  the enemy turn blocks the ability and closes the cards; the start of a player turn refreshes the panel.
+
+### What each part shows
+
+- **Top strip:** turn, rank, four tier pips with the tier number, missions to the next tier, the freeze as a small bar
+  with its percentage and a tick per stage, radixite and blueprints with the real icons and their income per turn
+  from supply depots, and the three page buttons.
+- **Build site cards:** one card per building the rules allow, with its effect text written from the real numbers
+  and its price; unaffordable cards are dimmed; a locked site says what opens it; a built site shows what stands
+  there. The plate follows the site on screen.
+- **Map tags:** a dashed arrow from each moving enemy piece to its destination with a tag (strength and turns away,
+  or CONVOY and when it arrives); each country that has targets gets its name with a liberation bar.
+- **Commander:** round portrait, name plate, one ability button (lit when ready, grey with the turns left when
+  cooling down), a passive plate, and hover plates with the descriptions. Abilities that need a target ask for one.
+- **Tech wheel:** the flat wheel of sheet 13 with the real technology icons, branch-coloured sectors, cream paths,
+  pips for minor nodes, a branch outline on every technology, and for a cross-branch requirement a second outline,
+  a key badge and a chord to the needed technology. The side panel explains the selected node and buys it.
+
+### Tech wheel content (first version, to be reviewed)
+
+- 61 nodes: the HQ, 24 technologies and 36 minor nodes. Minor nodes cost 40 radixite and do nothing yet.
+- Technology prices in blueprints: 1 for the first step of a branch, 2, 2, 3 for the next three and 4 for the rim.
+- Four cross-branch requirements as examples: Tungsten 8.8 needs Harvester Capacity, Flak 88 Ground Role needs Track
+  Improvements, Panzerjaeger needs Spall Liners, Flame Damage needs Scavenging Reward.
+- The Support branch has no rim technology (its rim slot is a minor node), because only 24 technologies exist.
+- Names follow the sketches; the descriptions on the side panel were written for the wheel and need a review.
+- Icons are referenced by path from `UWorldCampaignTechSettings` (the game's own icon data is only in Blueprints).
+
+### Decisions made while building
+
+- The build site marker on the map is a small plain cylinder, coloured by state. A Blueprint can replace it.
+- Locked technology icons are darkened, not greyed: a UMG image tint cannot desaturate.
+- The commander ability button shows a ring-and-dot glyph, because no map ability icons exist.
+- Country names sit at the mean position of the anchors in that country, since several country meshes span the map.
+- Only enemy pieces with a move order or a reaction target get a tag; the two starting divisions get none.
+
+### Checked and not checked
+
+Checked:
+
+- DebugGame editor build compiles and links (2026-11-24 13:54).
+- Offscreen run with `-WorldCampaignUICapture -RTSWorldCampaignSaveSlot=<name>` (class
+  `UWorldCampaignUICaptureSubsystem`): nine pictures in `Saved/WorldCampaignUICapture`, no crash, no assertion.
+  The pictures show the top strip, the card row before and after building a supply depot, the commander plate with
+  its hover text, the tech wheel (plain, with a cross-branch node selected, after buying a node) and the map after
+  one enemy turn.
+- Automation tests `RTS.WorldCampaign.*`: 52 of 52 pass (2026-11-24, DebugGame, headless).
+- By reading the code: every full-screen HUD layer is hit-test invisible outside its plates, so map clicks pass;
+  the deck builder, the archive and the tech wheel each have their own way back to the map.
+- The capture log has no error from the new widgets. It does list content gaps: `WorldData` has no base difficulty
+  for the pinned missions (Berlin, Ore Mountains, Oder-Warthe, Frozen Lake, Ural Shield) and no strength entry
+  for the supply convoy.
+
+Not checked:
+
+- Anything done with the mouse: clicks on cards and wheel nodes, picking a target for the commander ability, clicks
+  that should or should not pass through the plates to the map. The capture drives the widgets through code.
+- A real mission launched from the map and the return to it with this UI.
+- The Development build (only DebugGame was built) and cooked builds (technology icons are referenced by path).
+- The build site marker on the map: in the capture the chosen site lies just outside the picture.
+
+Known rough spots:
+
+- Tech wheel: names no longer sit on icons, but a few sit a short way from their node (Autoloader, Long-Range
+  Calibration, Barricades), because the nodes are packed; it goes away when the node placement is redone.
+- The enemy piece tag reads "+15 %" (the strength it adds); it shows no turns-away line for pieces without a
+  destination.
+- A thin cyan line runs from the piece south-east of the HQ into open ground in every map picture. Nothing in the
+  UI or country look code draws it; its source is not found.
+- The country tag keep-out box around the HQ has a fixed size, so it can be off at other zoom levels.
+
+### Polish round (2026-11-24, evening)
+
+- Top strip: all seven cells in the same metal frame, rank insignia inside the RANK cell, regular gaps, freeze
+  track as a trough with a rim and stage ticks.
+- Commander plate: ability button moved clear of the portrait and the passive tag; name plate, tag and hover texts
+  share one plate style.
+- Map tags: a country tag under the top strip is hidden whole, a tag on the HQ is lifted above it, overlapping tags
+  are nudged or hidden, the liberation bar is a trough. Maths in `WorldMapTagsMath`.
+- Build site panel: opaque backing, plate sized to the cards shown (one card when built), kept below the top strip
+  and on screen, "BUILT" as a state plate, same footer line on every card.
+- Tech wheel: names placed by `TechWheelLabelPlacement` (least overlap out of twelve spots around the node) on a
+  dark plate above the icons; header resources in metal cells; "reached through" hidden when nothing reaches.
+- The capture has a ninth picture: freeze bar part filled and the ability button on cooldown.
+- Checked: DebugGame build 18:10, `RTS.WorldCampaign.*` 69 of 69 pass, nine pictures looked at. Still not checked:
+  mouse input, a real mission, Development and cooked builds.
+
+### Mission names and build site hover (2026-11-24, night)
+
+- **Mission names.** `WorldCampaignMissionNames` (next to `AWorldMissionObject`) names a mission: its entry in
+  `UWorldCampaignMapContentSettings::MissionNames` (config, `+MissionNames=(Mission=...,DisplayName=NSLOCTEXT(...))`)
+  first, else the `DisplayName` of the pinned place that holds it. A mission with neither keeps the title of its
+  Blueprint.
+- The name shows in two places: as the title of the briefing panel (inside the rich text style of the title it
+  replaces) and on a small dark plate under the mission piece on the map (`UW_WorldMapTags`). The plate is hidden for
+  a mission the fog hides or the player won, and mission names win over country names when two would overlap.
+- Story missions still spawn the stand-in mission Blueprint, so their description, objectives and rewards in the
+  briefing panel are still those of the stand-in. Only the title is right.
+- **Map pieces per mission.** Five concept drawings per hand-made mission are in
+  `Saved/WorldMapUIDesigns/MissionObjects/<Mission>/` (`overview.png`, `pick.md` once picked). A picked piece goes in
+  as a Blueprint child of `AWorldMissionObject` in `UWorldCampaignSettings::MissionObjectClassByType`.
+- **Build site hover.** The site whose cards are open stays lit, and a site behind the cards no longer lights up
+  under the cursor (`AWorldPlayerController::Tick_UpdateHoveredBuildNode`, `UW_WorldCampaignHUD::GetOpenBuildSite`).
+- A country name is lifted above a mission piece and its plate, as it is above the HQ.
+- The capture holds the camera (`SetIsCameraMovementDisabled`): an offscreen run reads the real desktop cursor, and a
+  cursor at a screen edge scrolls the camera off the map.
+- Checked: DebugGame build 21:47, `RTS.WorldCampaign.*` 71 of 71 pass, capture pictures 01 (BERLIN and ORE MOUNTAINS
+  plates, GERMANY above them; the six story missions under fog have no plate) and 02 (open site lit). Not seen in
+  any picture: the briefing panel title, and the cursor on the cards.
+
+## 13. Country look (2026-11-24)
+
+Owner picks: liberation as a moving front, border tells the state, staff-map fill. Border thickness approved 2026-11-24.
+
+- **Fill** (`M_CountryStaffMap`): occupied ground is dark red with diagonal hatching, free ground is clean blue. Up to 8 front points (cleared anchors) push the free ground outward over 2.5 s; a cream line marks the front.
+- **Border band**: drawn inside the fill from a per-country edge-distance picture (`WorldCountryEdgeDistance`, built once at runtime from the fill mesh triangles). Solid red = occupied, solid blue = free, moving red and cream dashes = contested, grey = no targets. Brighter while the cursor is over the country. Width is `Border Band Width` on the regulator (14 map units; 0 turns it off). The thin outline mesh repeats the colour.
+- **Known limit**: dashes are a world-space checker, not laid along the border, so their length varies with border direction.
+- **Code**: `WorldCountryOccupation/WorldCountryStaffMapLook.cpp`, `WorldCountryEdgeDistance.h/.cpp`, hover in `AWorldPlayerController::Tick_UpdateHoveredCountry`.
+- **Tools**: `Source/Tools/WorldCampaign/create_country_look_materials.py` rebuilds both materials; `run_country_look_capture.ps1` (`-WorldCountryLookCapture`) writes seven pictures to `Saved/WorldCountryLookCapture`.
+- **Status**: built and captured in the isolated DeckTest copy only; main DebugGame and Development DLLs need a rebuild.
+
+### Colour pick 2026-11-24: steel and cream (sheet 14A)
+
+The owner rejected the light-blue neon accent: the game's UI is scratched gunmetal with glass, in the manner of
+Company of Heroes. Of three versions (`Saved/WorldMapUIDesigns/sheet_14A-C.png`, `build_ui_sheets7.py`, drawn with
+the Frontstahl skin parts) the owner picked A, steel and cream: no colour accent; lit lamps, the selected rim and the
+ready ability button are cream; the freeze bar is frosted white; owned and good values are a muted olive
+(`WorldCampaignUIColors::Accent`, `Reach`, `Freeze`, `Good`). The campaign widgets no longer read the deck builder's
+cyan `AccentColor`. Red stays for the enemy, and the tech wheel keeps its branch colours.
+
+Built the same day from the skin's own textures (`FWorldCampaignUILook::MetalCell`, `BoltedPanel`, `RoundBezel`):
+a metal cell behind each value of the top strip, the bolted gunmetal frame on the build site panel, and a bezel and
+glass dome on the ability button. The frame, the dome and its bezel are the campaign's own textures in
+`/Game/RTS_Survival/Textures/GameUI/WorldCampaign` (`T_Campaign_BoltedPanel`, a half-size copy of the skin panel so
+its corners draw at 37 units, `T_Campaign_GlassDome`, `T_Campaign_GlassBezel`), made by
+`Source/Tools/WorldCampaign/make_campaign_hud_art.py` and imported by `run_import_campaign_hud_art.ps1`. The dome is
+grey-scale and the button tints it per state.
+
+## 14. Build site markers (2026-11-24)
+
+Owner pick: design 6, hex plate (sheets `Saved/WorldMapUIDesigns/site_*.png`).
+
+- `AWorldBuildNode` shows a hex plate on a flat plane: grey rim, hatched centre and lock while locked; yellow rim, glow and plus while open; gunmetal rim, the building's sign and a green lamp once built.
+- The plate is drawn by one material, `M_BuildSiteHexPlate` (`Source/Tools/WorldCampaign/create_build_site_materials.py` rebuilds it); no mesh or sign texture of its own.
+- `Hex Plate Width` on the node sets the size (57.6 map units; owner asked for 20% over the sketch's 48). The old cylinder is hidden but stays as the click target; it shows again when the material is missing.
+- Hover: `AWorldPlayerController::Tick_UpdateHoveredBuildNode` calls `SetIsHovered` on the site under the cursor trace; the plate brightens and gets a cream outline.
+- Capture steps 08 to 10 of `run_country_look_capture.ps1` show the sites.
+
+### Story mission map pieces (2026-11-25)
+
+The five story missions the map can launch have their own map piece. The owner picked each design in its drawing
+session (`Saved/WorldMapUIDesigns/MissionObjects/<Mission>/pick.md`).
+
+| Mission | Piece | Blueprint (under `WorldCampaign/MapObjects/Missions/Story/`) |
+|---|---|---|
+| Ore Mountains | Stollenmund: fortified adit in a crag, the game's Panzer IV H in front | `OreMountains/BP_Mission_OreMountains` |
+| Berlin | The level's damaged flak tower and Reichstag ruin in small, on a cut-corner base | `Berlin/BP_Mission_Berlin` |
+| Oder-Warthe Line | Peilturm with an H aerial on the roof | `OderWarthe/BP_Mission_OderWarthe` |
+| Pripyat Marshes | Hangar Island with the Me 410 | `Pripyat/BP_Mission_Pripyat` |
+| Lake Vygozero | A Forge heavy tank going through the ice | `FrozenLake/BP_Mission_FrozenLake` |
+
+- **Registration:** `MissionObjectClassByType` in `Config/DefaultGame.ini`. Pripyat uses the old `ME410UnlockMission`
+  value, so that entry now points at the new Blueprint; `BP_Mission_ME410` is no longer used but still exists.
+- **Structure:** each Blueprint is a child of `BP_MissionWorldObject` with static mesh components under one
+  `PieceRoot` scene component. `PieceRoot` has yaw 90 because the models have their front on +Y and the map camera
+  looks along +X.
+- **Game meshes used as they are:** Berlin's flak tower (`SM_BF_FlakTower_Damaged`) and the Reichstag (the instanced
+  meshes of `BP_ReichstagRuin_B2`, without decals, forecourt and ramp). The Reichstag keeps its level materials; the
+  tower's concrete slot is overridden on the piece (see Concrete). The Ore Mountains tank is `SM_PzIV_H_TrainingPreview` in plain dark
+  yellow: the UVs of that one-slot preview mesh do not fit the tank camo texture.
+- **Materials:** three shared masters in `Story/Shared`: `M_WorldPiece_PBR` (base colour, normal, ORM),
+  `M_WorldPiece_Albedo`, `M_WorldPiece_Flat`.
+- **Concrete (2026-11-25):** all concrete on the pieces is `Story/Shared/M_WorldPiece_Concrete`, built by
+  `concrete_lib.py`. It uses the Sooted Fortress base colour, normal and ORM textures in a box projection (no mesh
+  UVs), with pour and panel joints in relief, colour variation, rain streaks and ground grime. Every size is a
+  parameter in object centimetres.
+  - **Why not the bunker material:** `M_BF_SootedFortress_Procedural` has fixed sizes for a real bunker (noise every
+    13 to 140 cm, pours of at least 35 cm). On a 60 cm piece that is one blotch; on the shrunk flak tower it is noise.
+  - **Instances:** `MI_WP_Ore_CastConcrete` (headwall, cap slab, wing walls), `MI_WP_OW_CastConcrete` (tower, annexes,
+    casemate, dragon's teeth), `MI_WP_Berlin_TowerConcrete` (the flak tower; its lengths are 1 / tower scale larger,
+    because that mesh is real size).
+  - **Setting:** texture once per 45 cm of piece, pours of 12 cm, panels of 26 cm (`CONCRETE_LOOK` in
+    `build_pieces.py`), picked from four in one picture (`concrete_variants.py`, `run_lineup.ps1 -Variants 1`).
+  - **Not concrete:** Pripyat and Lake Vygozero have none; the Reichstag is stone and was left.
+  - **Saving:** the shared editor keeps the piece assets open, and headless saves then fail. `wait_editor_free.ps1`
+    waits for it; this change was saved through the editor itself (three assets).
+- **Briefing text:** description and objectives come from the mission design docs, without late reveals. Rewards are
+  empty and the "on defeat" text is still the stand-in of `BP_MissionWorldObject`.
+- **Rebuild:** `Source/Tools/WorldMapPieces` (`build_pieces.py` headless import and Blueprint build,
+  `lineup_capture.py` line-up pictures, `check_pieces.py`). The models and textures are in the drawing folders under
+  `Saved/`, which git does not track.
+- **Checked:** all five spawn beside the HQ piece at about its footprint (`Saved/WorldMapPieces/lineup_*.png`); the
+  game capture shows the Berlin and Ore Mountains pieces with their name plates; the log has no class fallback
+  warning for the five missions.
+- **Not checked / open:**
+  - Oder-Warthe, Pripyat and Lake Vygozero in the running game: they start under fog.
+  - In the campaign level the pieces look dim and brown, like the HQ piece. Their true colours were only seen
+    under a neutral test light (`Saved/WorldMapPieces/story_pieces_neutral_light.png`).
+  - The flak tower and Reichstag materials turn to a noisy pattern at this size; the real tower mesh at the same
+    scale shows the same.
+  - Clicking a piece, the outline, and the briefing panel with the new texts.
+  - The aerial does not turn.
+  - Decided (owner, 2026-11-25): the Lake Vygozero tank stays an IS-3, although the mission spawns a Shield IS-2.
+  - The Pripyat piece has a base colour texture only. The flak tower mesh has 75,000 triangles.

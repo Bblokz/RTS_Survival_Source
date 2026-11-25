@@ -54,6 +54,7 @@ DECLARE_MULTICAST_DELEGATE_TwoParams(FOnAircraftDropPayloadReleased, AAircraftMa
                                      ATankMaster* /*ReleasedTank*/);
 DECLARE_MULTICAST_DELEGATE_TwoParams(FOnAircraftDropSquadReleased, AAircraftMaster* /*Aircraft*/,
                                      AActor* /*ReleasedSquad*/);
+DECLARE_MULTICAST_DELEGATE_OneParam(FOnAircraftDropLanded, AAircraftMaster* /*Aircraft*/);
 
 UCLASS()
 class AAircraftMaster : public ASelectablePawnMaster, public IExperienceInterface, public IRTSUnit
@@ -200,6 +201,15 @@ public:
 	// Fired once per squad of a landed squad drop, the moment the squad has spawned at the aircraft (before its
 	// walk out of the cargo door). Not fired when the aircraft is already gone by the time the squad spawns.
 	FOnAircraftDropSquadReleased OnAircraftDropSquadReleased;
+
+	// Fired once per landed (not rope-slung) drop, when the aircraft touched down and released its payload.
+	FOnAircraftDropLanded OnAircraftDropLanded;
+
+	/**
+	 * @brief A landed drop takes off now instead of waiting out HowLongStayLanded (the payload decides when it is done,
+	 * e.g. ASovietAirSupplyPad once its cargo is stored). Does nothing unless the drop is landed and waiting.
+	 */
+	void EndAircraftDropStayLanded();
 
 	/**
 	 * @brief While held, a straight run keeps flying past its end point instead of destroying itself, so payload that
@@ -815,6 +825,9 @@ private:
 		bool bM_IsRetreatingToDestroy = false;
 		// Keeps attacking the authored target instead of switching to aggro after the first run.
 		bool bM_RepeatRunsOverTarget = false;
+		// Off for a guns-only strafe: no bombs at any pull-out for the rest of this aircraft's life (not reset with the
+		// runtime, so the hunting after the strafe stays guns-only too).
+		bool bM_DropBombsAtPullOut = true;
 		FTimerHandle StrafeTimerHandle;
 
 		void ResetRuntime()

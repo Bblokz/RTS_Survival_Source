@@ -21,6 +21,7 @@ but it is an `ADestructableEnvActor`: the player can right-click attack it and i
 | Function | Notes |
 |---|---|
 | `StartUnloading(AActor* Truck)` | Starts or restarts the loop. Call it once the truck has parked. `Truck` may be null. |
+| `StartUnloadingTruckOnce(AActor* Truck)` | One-shot mode for the [fuel delivery depot](FuelDeliveryDepot.md): lifts the truck's own reachable cargo once, never refills it, then hoists and goes idle. `OnTruckCargoEmptied` (native) fires when the last piece lands. Returns false (no fallback pile) when no cargo is in reach. |
 | `StopUnloading()` | Freezes the crane in place. A piece on the hook stays on the hook. |
 | `GetIsUnloading()` | True while the loop runs. |
 | `GetUnloadedCount()` | Pieces placed on the stack since BeginPlay. The count only goes up. |

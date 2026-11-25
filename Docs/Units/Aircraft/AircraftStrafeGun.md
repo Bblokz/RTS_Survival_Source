@@ -189,6 +189,35 @@ gun sounds are made when the weapon is set up, and the strafe QA spawns every ai
 | Il-2 (Sturmovik), Pe-2 (both) | MG 15, 4 sockets | MG, 4-gun loops. Wired 2026-11-22: each Blueprint's `Setup4xMG` macro was never called; it now runs at the end of `BP_BeginplayInitAircraft` and fires from W1-W4 on the frame mesh (Il-2 wing leading edges at 2.5 m and 3 m out, Pe-2 nose) instead of the shared Stuka rig |
 | Pe-8 (all), Ju 390 (all) | MG 15 (unused) | Their `Setup4xMG` macro is still never called: bombers and transports stay gunless on purpose |
 
+## Enemy Soviet strafes (2026-11-24)
+
+The strategic AI (light/medium air strike bucket), the survival air raids and the attack-aircraft warnings listed
+`GA_2xPE2Strafing` and `GA_4xPE2Strafing`, but `DA_GlobalAbilitySystem` had no template for them, so they never ran.
+`Source/Tools/SovietStrafing/author_soviet_strafing.py` (headless DebugGame, under the data asset lock) now authors:
+
+| Ability | Aircraft | Cooldown |
+| --- | --- | --- |
+| `GA_2xPE2Strafing` | 2x `Rus_PE2_Aircraft_Recon` | 210 s |
+| `GA_4xPE2Strafing` | 4x `Rus_PE2_Aircraft_Recon` | 300 s |
+| `GA_2xIl2Strafing` (new enum value, same hooks as the Pe-2 strafes) | 2x `Rus_Aircraft_Sturmovic` | 240 s |
+
+Each is a copy of the 2x Bf 110 strafe (length, time, dive settings) with no resource costs (enemy abilities, as the
+Pe-8 carpet bombing), the Soviet beacon marker and, for now, the Pe-2 recon icon.
+
+**Guns only:** both airframes carry bombs (Pe-2 250 kg, Il-2 500 kg), and a strafe drops them at every pull-out. The new
+`FAircraftStrafingGlobalAbilitySettings::bDropBombsAtPullOut` (default on, so the Ju 87 strafes keep bombing) is off
+for these three: `AAircraftMaster` skips the pull-out bomb release for that aircraft's whole life.
+
+**Ownership:** strafe abilities spawn aircraft with the Blueprint's owner (`GlobalAbilityHelpers::SpawnAircraftAtLocation`
+sets none), so Soviet aircraft are enemy-owned. To test them, put the targets on player 1:
+`-AircraftStrafeAbility=GA_2xIl2Strafing -AircraftStrafeClassMarker=Sturmovic -AircraftStrafeTargets=Infantry
+-AircraftStrafeTargetOwner=1`. Results 2026-11-24 (no bombs dropped):
+- 2x Pe-2: 284 rounds, 6 near misses, 73 damage.
+- 2x Il-2: 204 rounds, 14 near misses, 168 damage.
+
+After the first pass the aircraft hunt on their own: only 42 of the Il-2's rounds landed within 25 m of the squads,
+and most of the rest hit the map's other player units.
+
 | Asset (`/Game/RTS_Survival/Sounds/WeaponSounds/AircraftGuns`) | What |
 | --- | --- |
 | `DA_AircraftGunAudio` | `UAircraftGunAudioDataAsset`: MG set, cannon set, cannon calibre range, attenuation and concurrency. Set in RTS Audio Settings (`AircraftGunAudioData`) |

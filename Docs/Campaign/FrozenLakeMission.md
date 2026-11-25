@@ -533,6 +533,99 @@ shows where they will run:
 - a fresh-load compile check;
 - any test in a game (the owner tests).
 
+### Build status: Svarog crater and dry lakebed (2026-11-24)
+
+The owner picked concept **C "Radixite scar"** from four mock-ups (`Saved/FrozenLake/shots/skirt/FL_crater_concepts.jpg`).
+It is built and saved in `Ger_FrozenLake`. Pictures of the result: `Saved/FrozenLake/shots/skirt/FL_crater_built.jpg`.
+
+**What is out there:**
+- **The dry lakebed.** Just past the north blockers (x 310-328 m, ragged), an old shore bank drops from the land to
+  the bed, about 3.5 m below the ice. The bank is dark at its top, so there is no hard line where the mesh meets the
+  landscape. The bed is pale, cracked silt that falls slowly to the north.
+- **The Svarog crater.** It is 320 m wide, centred 620 m north and 30 m west. The rim stands about 30 m over the bed,
+  and the bowl is 24 m deep. The rim and the inner wall are black glass. Burnt ground and burnt rays run out from it.
+- **The vein glows.** Amber Radixite fissures run from the crater floor over the bed toward the dam.
+- **The canal.** The spillway canal no longer ends in a wall.
+  - Its water plane (z -70) ends on a low sill at x 302 m.
+  - Past the sill, the dry cut drops down the bank and runs over the bed into the crater.
+  - It glows amber all the way, as in the picked mock-up: one fissure runs along it.
+- **The horizon skirt.** The same mesh rings the whole map. East, west and south it continues the landscape's edge
+  and fades to dark, burnt bog. The map had no skirt before.
+
+**Backdrop only:**
+- One static mesh actor, `FL_Backdrop` (folder `FrozenLake/Backdrop`), with about 98,000 triangles. It is Nanite.
+- It has no collision, no navigation, no shadow and no distance field. It is hidden in scene captures, so the
+  minimap does not show it.
+- It uses one lit material, `M_FL_Backdrop` / `MI_FL_Backdrop`: 399 pixel instructions and 10 texture samples.
+  - It reuses textures: the Megascans arid soil (cracks, made grey), the burnt forest floor and the sulphur-rock normal.
+  - One mask texture holds scorch, glass, glow and wet.
+  - It gets darker with distance from the landscape, so it ends in the night, not in a line.
+- Assets are in `/Game/RTS_Survival/Blueprints/Environment/FrozenLake/Backdrop/`.
+
+**What changed in the map:**
+- The landscape margin past the north blockers is lowered under the mesh. The canal is cut through it.
+- Nothing inside the play area changed. Traces at 491 points matched the map from before to within 0.01 cm.
+- The 85 margin trees on the new bed were removed. `step_trees` now skips trees north of 305 m.
+- The navmesh was rebuilt before the save. After a fresh load, all four agents path from the HQ to the Shield HQ
+  and from the N spawn to the HQ.
+- Backup: `Saved/FrozenLake/backup/Ger_FrozenLake_2026-11-24_prebackdrop.umap`.
+
+**Tools** (`Source/Tools/FrozenLakeMap/`, re-runnable):
+- `fl_backdrop_gen.py`: offline. It writes the mesh, the mask and the landscape heights to `Saved/FrozenLake/backdrop/C/`.
+  Concepts A, B and D are kept in it as the alternatives that were not picked.
+- `fl_backdrop_build.py`: the editor step (`build_material()`, `place()`).
+- `fl_map_build.shot_tour()`: a capture of a camera-tour pose, mirroring `ApplyPose`.
+- `run_backdrop_build.py`: the headless job that places the backdrop, rebuilds the navmesh and saves.
+- Run the generator again after any `fl_terrain_gen.py` change. The backdrop heights start from `FL_height.raw`.
+
+**Camera tour shot "The dam and the Svarog crater"** (`Mission_FL_01_Arrival.LakeTourShots[1]`, changed 2026-11-24):
+- The first guess looked south, past vertical, at pump 3. The focus also ended outside the camera square, and a focus
+  out there is refused, not clamped.
+- The tour pitch is added to the camera arm's -70 degrees, and a positive value is flatter.
+- The new shot:
+  - focus (245, -70) m to (275, -60) m;
+  - yaw -8 to +4;
+  - pitch +26 to +30;
+  - arm 200 to 240 m;
+  - 7 s;
+  - **RevealRadius 270 m**.
+- The reveal is needed because the fog of war copies its edge row past the map edge. Unexplored, the whole backdrop
+  is black.
+  - 270 m lifts the north edge from y -329 to +209 m. The east 84 m of the edge stays fogged, so the far right of the
+    frame past the edge stays black.
+  - The Shield HQ centre is 9 m outside the reveal. During the tour it reveals:
+    - the west part of the HQ yard;
+    - the N spawn;
+    - the AI's Radixite;
+    - pump 3;
+    - most of the north half.
+  - This is the owner's call. A smaller radius shows less of the backdrop.
+- Set by `run_set_tour_shots.py` (headless) from `fl_stages.py`. `build_fl_stages.py` sets the same value over UECP,
+  but it needs a UECP editor, and a new one would take other sessions' UECP calls.
+- `verify_tour_shots.py` checked it after a fresh load. The map's own `Missions[0]` instance holds the new shot.
+- **The other two shots** (fixed 2026-11-24, from the same pitch mistake; framing checked with captures):
+  - **Shot 1, "The Forge drill rig":**
+    - it runs up the black-ice vein from the player's side to the rig;
+    - focus (-40, -60) m to the rig, yaw 40 to 20, pitch +10 to +20, arm 90 m;
+    - reveal 100 m, which shows the rig garrison.
+  - **Shot 3, "The landing shore":**
+    - it runs from the reveal spot back to the landing shore, with the ice edge at the top of the frame;
+    - focus (-98, -109) m to (-185, -185) m, yaw 40 to 45, pitch +8 to +18, arm 80 to 100 m;
+    - reveal 90 m.
+  - Backup of the Blueprint from before: `Saved/FrozenLake/backup/Mission_FL_01_Arrival_2026-11-24_preshots13.uasset`.
+- Checked in code that nothing clamps the tour's pitch or arm each frame:
+  - the camera controller's tick only moves the camera and edge-scrolls;
+  - the zoom limits apply only to mouse-wheel zoom;
+  - the camera pawn Blueprint has no clamp;
+  - the player controller clamps pitch (`GetCameraPitchLimit`) only behind a Gate that the rotate button opens.
+
+**Not checked:**
+- The look in a running game. The amber fissures are 20-50 times brighter than the moonlit ground, so expect heavy
+  bloom in game. `GlowStrength` on `MI_FL_Backdrop` (default 5) is the knob. The pictures are editor captures with the night exposure copied, and the real game may
+  look brighter or darker.
+- The fog-of-war reveal in a game.
+- The tour as a whole in a game: the blends between shots and the fog-of-war reveals.
+
 ## Code TODOs
 
 Everything that has to exist before or while the stages are scripted. Checked against the code on 2026-11-22.
@@ -591,7 +684,10 @@ Everything that has to exist before or while the stages are scripted. Checked ag
 - [ ] The "Thin Ice" field-manual takeover with a recorded clip.
 - [ ] Voice lines: announcer, Scavenger, Forge radio (hazmat portrait, broken transmitter).
 - [ ] Steam Niagara on open water; amber vein glow in flooded zones.
-- [ ] The Svarog crater rim and the dry lakebed beyond the dam on the horizon skirt.
+- [x] The Svarog crater rim and the dry lakebed beyond the dam on the horizon skirt. Built 2026-11-24, concept C
+  "Radixite scar"; see "Build status: Svarog crater and dry lakebed".
+- [x] Camera tour shots 1 and 3 (`LakeTourShots[0]` and `[2]`) fixed 2026-11-24: they looked past vertical and had
+  no reveal. See "Build status: Svarog crater and dry lakebed".
 - [ ] Shore metal nodes in place of the scrap yard / wreck-bay metal. Wrecks become cover only.
 - [ ] Zone 4 Radixite upwelling (decision 25): a north-east vein branch and a crystal heave (C05 style) in the sketch,
   `fl_ice_gen.py` and the map.

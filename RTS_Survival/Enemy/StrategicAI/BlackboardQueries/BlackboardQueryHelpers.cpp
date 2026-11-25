@@ -1,9 +1,21 @@
 #include "BlackboardQueryHelpers.h"
 
 #include "RTS_Survival/Enemy/StrategicAI/StrategicAIBlackboard.h"
+#include "RTS_Survival/Enemy/StrategicAI/StrategicAIHelpers.h"
 
 namespace
 {
+	/** @return Whether the entry is a live unit the AI may count and send; harvesters never are. */
+	bool GetIsCombatPoolEntry(const FBlackboardIdleUnitEntry& Entry)
+	{
+		if (not Entry.IsValid())
+		{
+			return false;
+		}
+		return not FStrategicAIHelpers::GetIsHarvesterUnit(Entry.UnitType, Entry.UnitSubtypeRaw)
+			&& not FStrategicAIHelpers::GetIsExcludedFromEnemyUnitPools(Entry.Get());
+	}
+
 	bool HasAtLeastXUnitsOfType(
 		const FStrategicAIBlackboard& Blackboard,
 		const int32 MinUnits,
@@ -12,7 +24,7 @@ namespace
 		int32 FoundUnits = 0;
 		for (const FBlackboardIdleUnitEntry& EachIdleUnit : Blackboard.IdleDirectControlUnits)
 		{
-			if (not EachIdleUnit.IdleUnit.IsValid())
+			if (not GetIsCombatPoolEntry(EachIdleUnit))
 			{
 				continue;
 			}
@@ -42,7 +54,7 @@ namespace
 		int32 FoundUnits = 0;
 		for (const FBlackboardIdleUnitEntry& EachIdleUnit : Blackboard.IdleDirectControlUnits)
 		{
-			if (not EachIdleUnit.IdleUnit.IsValid())
+			if (not GetIsCombatPoolEntry(EachIdleUnit))
 			{
 				continue;
 			}
@@ -75,7 +87,7 @@ bool BlackboardQueries::HasAtLeastXTanks(const FStrategicAIBlackboard& Blackboar
 	int32 FoundUnits = 0;
 	for (const FBlackboardIdleUnitEntry& EachIdleUnit : Blackboard.IdleDirectControlUnits)
 	{
-		if (not EachIdleUnit.IdleUnit.IsValid())
+		if (not GetIsCombatPoolEntry(EachIdleUnit))
 		{
 			continue;
 		}
@@ -105,7 +117,7 @@ bool BlackboardQueries::HasAtLeastAnyXTanks(const FStrategicAIBlackboard& Blackb
 	int32 FoundUnits = 0;
 	for (const FBlackboardIdleUnitEntry& EachIdleUnit : Blackboard.IdleDirectControlUnits)
 	{
-		if (not EachIdleUnit.IdleUnit.IsValid())
+		if (not GetIsCombatPoolEntry(EachIdleUnit))
 		{
 			continue;
 		}
@@ -129,7 +141,7 @@ bool BlackboardQueries::HasAtLeastAnyXIdleUnits(const FStrategicAIBlackboard& Bl
 	int32 FoundUnits = 0;
 	for (const FBlackboardIdleUnitEntry& EachIdleUnit : Blackboard.IdleDirectControlUnits)
 	{
-		if (not EachIdleUnit.IdleUnit.IsValid())
+		if (not GetIsCombatPoolEntry(EachIdleUnit))
 		{
 			continue;
 		}
@@ -231,7 +243,7 @@ bool BlackboardQueries::HasAtLeastXAircraft(const FStrategicAIBlackboard& Blackb
 	int32 FoundUnits = 0;
 	for (const FBlackboardIdleUnitEntry& EachIdleUnit : Blackboard.IdleDirectControlUnits)
 	{
-		if (not EachIdleUnit.IdleUnit.IsValid())
+		if (not GetIsCombatPoolEntry(EachIdleUnit))
 		{
 			continue;
 		}
@@ -262,7 +274,7 @@ bool BlackboardQueries::HasAtLeastXSquads(const FStrategicAIBlackboard& Blackboa
 	int32 FoundUnits = 0;
 	for (const FBlackboardIdleUnitEntry& EachIdleUnit : Blackboard.IdleDirectControlUnits)
 	{
-		if (not EachIdleUnit.IdleUnit.IsValid())
+		if (not GetIsCombatPoolEntry(EachIdleUnit))
 		{
 			continue;
 		}
@@ -343,7 +355,7 @@ TArray<FVector> BlackboardQueries::GetRandomLocationsOfIdleUnits(
 
 	for (int32 IdleUnitIndex = 0; IdleUnitIndex < Blackboard.IdleDirectControlUnits.Num(); ++IdleUnitIndex)
 	{
-		if (not Blackboard.IdleDirectControlUnits[IdleUnitIndex].IsValid())
+		if (not GetIsCombatPoolEntry(Blackboard.IdleDirectControlUnits[IdleUnitIndex]))
 		{
 			continue;
 		}

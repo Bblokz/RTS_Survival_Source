@@ -36,6 +36,8 @@ cannot reach a material's World Position Offset pin.
 Verified 2026-11-22 with `run_station_test.ps1 -Pictures` on Development: RESULT PASS, 0 failed checks. The icon was
 DFStation_DirectorOfShield, then DFStation_GerStrikeDivision. No truck came.
 
+Placed in `Ger_OderWarthe` on 2026-11-24 (all five, `OW_D_DF_s<N>_Station`, on flattened pads; see
+`Source/Docs/Campaign/OderWartheMap.md`, "The Oder-Warthe kit").
+
 Not done:
-- Not placed in the map (the main session swaps the placeholders).
 - The enemy retake is not exercised.

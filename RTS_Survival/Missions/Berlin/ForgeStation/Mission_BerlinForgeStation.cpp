@@ -58,7 +58,10 @@ void UMission_BerlinForgeStation::OnMissionStart()
 	// Ticks from the start (before the trigger): the garrison is set up and dead targets are noticed early.
 	MissionState.bTickOnMission = true;
 	M_Station = ABerlinForgeStation::FindForgeStation(this);
-	GetIsValidStation();
+	if (GetIsValidStation())
+	{
+		M_Station->OnTargetDestroyed.AddUniqueDynamic(this, &UMission_BerlinForgeStation::OnStationTargetDestroyed);
+	}
 	TrySetUpGarrison();
 }
 
@@ -93,6 +96,7 @@ bool UMission_BerlinForgeStation::TrySetUpGarrison()
 	{
 		return true;
 	}
+	Strongpoint->OnGarrisonEngaged.AddUniqueDynamic(this, &UMission_BerlinForgeStation::OnGarrisonEngaged);
 	if (IsValid(M_Forces))
 	{
 		Strongpoint->SetPostUnitOverrides(M_Forces->ForgeStation.Garrison);
@@ -132,9 +136,37 @@ UBerlinMissionForcesData* UMission_BerlinForgeStation::LoadForcesForDifficulty(
 
 void UMission_BerlinForgeStation::OnMissionStartedNative()
 {
-	// The plate is up: the trigger fired.
+	// The plate is up: the trigger fired. The portrait manager queues, so the crew chatter plays before the advisor.
+	// Calm chatter makes no sense once the crew is already fighting.
+	if (not bM_HasPlayedCrewEngagedLine)
+	{
+		PlayCrewLine(CrewLines.SightedLine);
+	}
 	PlayLine(Lines.SightedLine);
 	StartTargetTracking();
+}
+
+void UMission_BerlinForgeStation::OnGarrisonEngaged(AEnemyStrongpoint* Strongpoint)
+{
+	if (bM_HasPlayedCrewEngagedLine || MissionState.bIsMissionComplete)
+	{
+		return;
+	}
+	bM_HasPlayedCrewEngagedLine = true;
+	PlayCrewLine(CrewLines.EngagedLine);
+}
+
+void UMission_BerlinForgeStation::OnStationTargetDestroyed(ABerlinForgeStation* Station,
+                                                           const EForgeStationPartRole Role)
+{
+	if (bM_HasPlayedCrewTargetLostLine || MissionState.bIsMissionComplete)
+	{
+		return;
+	}
+	bM_HasPlayedCrewTargetLostLine = true;
+	// The first loss means a fight: the engaged line would only repeat the alarm after it.
+	bM_HasPlayedCrewEngagedLine = true;
+	PlayCrewLine(CrewLines.FirstTargetLostLine);
 }
 
 void UMission_BerlinForgeStation::StartTargetTracking()
@@ -271,4 +303,13 @@ void UMission_BerlinForgeStation::PlayLine(USoundBase* Line) const
 		return;
 	}
 	PlayPortrait(Lines.Portrait, Line);
+}
+
+void UMission_BerlinForgeStation::PlayCrewLine(USoundBase* Line) const
+{
+	if (not IsValid(Line))
+	{
+		return;
+	}
+	PlayPortrait(CrewLines.Portrait, Line);
 }

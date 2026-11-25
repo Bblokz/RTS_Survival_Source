@@ -202,6 +202,11 @@ struct FEnemyWaveSpawnerPatrolSettings
 	// Guarding at each patrol point and how the patrol helps its units in combat.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Patrol")
 	FRandomPatrolWithAttackMoveSettings Patrol;
+
+	// On: once the last vehicle of a spawned patrol is destroyed, its infantry gives up and runs to the enemy fallback
+	// rally point (UEnemyFallbackSubsystem; needs a running fallback watch, e.g. Berlin's runners to the Reichstag).
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Patrol")
+	bool bInfantryFleesWhenVehiclesLost = false;
 };
 
 /** Shows each spawned wave on the minimap as one group icon that follows its living units. */

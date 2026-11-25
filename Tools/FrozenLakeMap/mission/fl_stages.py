@@ -136,14 +136,23 @@ ARRIVAL = {
     'array_vars': [{'variable_name': 'LakeTourShots', 'variable_type': 'struct', 'sub_type': 'MissionCameraTourShot',
                     'is_array': True, 'category': 'FrozenLake|Tour', 'instance_editable': True}],
     'cdo': {'LakeTourShots': '('
-            '(FocusStart=(X=-4000.0,Y=-6000.0,Z=0.0),FocusEnd=(X=0.0,Y=0.0,Z=0.0),YawStart=-130.0,YawEnd=-100.0,'
-            'PitchStart=-55.0,PitchEnd=-45.0,Seconds=7.0,BlendInSeconds=1.5,Title=INVTEXT("The Forge drill rig")),'
-            '(FocusStart=(X=20000.0,Y=-7000.0,Z=0.0),FocusEnd=(X=30000.0,Y=-6000.0,Z=0.0),YawStart=170.0,'
-            'YawEnd=180.0,PitchStart=-30.0,PitchEnd=-22.0,Seconds=6.0,BlendInSeconds=1.5,'
-            'Title=INVTEXT("The dam and the Svarog crater")),'
-            '(FocusStart=(X=-9769.0,Y=-10850.0,Z=0.0),FocusEnd=(X=-18000.0,Y=-18000.0,Z=0.0),YawStart=40.0,'
-            'YawEnd=45.0,PitchStart=-60.0,PitchEnd=-55.0,Seconds=6.0,BlendInSeconds=1.5,'
-            'Title=INVTEXT("The landing shore")))'},
+            # Shots 1 and 3 checked 2026-11-24 with captures (fl_map_build.shot_tour). Shot 1 runs up the black-ice
+            # vein from the player's side to the rig; shot 3 runs from the reveal spot back to the landing shore,
+            # the ice edge at the top of the frame. Each reveals its own area (rig garrison included).
+            '(FocusStart=(X=-4000.0,Y=-6000.0,Z=0.0),FocusEnd=(X=0.0,Y=0.0,Z=0.0),YawStart=40.0,YawEnd=20.0,'
+            'PitchStart=10.0,PitchEnd=20.0,ArmLengthStart=9000.0,ArmLengthEnd=9000.0,Seconds=7.0,BlendInSeconds=1.5,'
+            'RevealRadius=10000.0,Title=INVTEXT("The Forge drill rig")),'
+            # Checked 2026-11-24 against the built backdrop (fl_backdrop_build.py). Pitch is added to the -70 arm
+            # (positive = flatter), so +26..+30 looks north over the dam; the long arm reaches the crater (x 460-780 m).
+            # The fog of war copies its edge row past the map edge, so the reveal must cover the north edge
+            # (27000 lifts y -329..+209 m of it; the Shield HQ centre is 9 m outside). Both foci are inside the 293 m camera
+            # square (a focus outside it is refused, not clamped).
+            '(FocusStart=(X=24500.0,Y=-7000.0,Z=0.0),FocusEnd=(X=27500.0,Y=-6000.0,Z=0.0),YawStart=-8.0,'
+            'YawEnd=4.0,PitchStart=26.0,PitchEnd=30.0,ArmLengthStart=20000.0,ArmLengthEnd=24000.0,Seconds=7.0,'
+            'BlendInSeconds=1.5,RevealRadius=27000.0,Title=INVTEXT("The dam and the Svarog crater")),'
+            '(FocusStart=(X=-9769.0,Y=-10850.0,Z=0.0),FocusEnd=(X=-18500.0,Y=-18500.0,Z=180.0),YawStart=40.0,'
+            'YawEnd=45.0,PitchStart=8.0,PitchEnd=18.0,ArmLengthStart=8000.0,ArmLengthEnd=10000.0,Seconds=6.0,'
+            'BlendInSeconds=1.5,RevealRadius=9000.0,Title=INVTEXT("The landing shore")))'},
     'functions': {
         'ShowFrozenLakeLocationIntro': ([], [], [
             {'op': 'call', 'func': 'ShowLocationIntro',

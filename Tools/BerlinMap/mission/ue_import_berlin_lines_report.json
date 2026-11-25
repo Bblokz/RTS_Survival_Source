@@ -1,0 +1,14 @@
+{
+ "sound_class": "/Game/RTS_Survival/Sounds/Settings/SoundClasses/RTS_SClass_CinematicAndTransmissions.RTS_SClass_CinematicAndTransmissions",
+ "items": [
+  {
+   "asset": "/Game/RTS_Survival/Sounds/VoiceLines/GerFaction/Anouncer/AAAGerMissions/Berlin/Berlin_Cinematic_SupplyPoint.Berlin_Cinematic_SupplyPoint",
+   "saved": true,
+   "duration": 28.306,
+   "sound_class": "/Game/RTS_Survival/Sounds/Settings/SoundClasses/RTS_SClass_CinematicAndTransmissions.RTS_SClass_CinematicAndTransmissions",
+   "source": [
+    "D:/Blender/BlenderProjects/BlenderTanks/VoiceLines/Announcer/AAAGerMissions/Berlin/Berlin_Cinematic_SupplyPoint.wav"
+   ]
+  }
+ ]
+}

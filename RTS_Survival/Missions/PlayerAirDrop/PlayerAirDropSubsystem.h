@@ -61,6 +61,13 @@ public:
 
 	static UPlayerAirDropSubsystem* Get(const UObject* WorldContextObject);
 
+	// Blueprint access for mission stages (rewards flown in for the player).
+	UFUNCTION(BlueprintPure, Category = "Mission|Air Drop", meta = (WorldContext = "WorldContextObject"))
+	static UPlayerAirDropSubsystem* GetPlayerAirDropSubsystem(const UObject* WorldContextObject)
+	{
+		return Get(WorldContextObject);
+	}
+
 	int32 GetRunningAbilityCount() const { return M_RunningAbilities.Num(); }
 
 private:

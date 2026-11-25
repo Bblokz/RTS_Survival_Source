@@ -26,6 +26,8 @@
 #include "NiagaraSystem.h"
 #include "RTS_Survival/Behaviours/Derived/BehaviourVehicleStunned/BehVehicleStunned.h"
 #include "RTS_Survival/GameUI/Pooled_AnimatedVerticalText/Pooling/WorldSubSystem/AnimatedTextWorldSubsystem.h"
+#include "RTS_Survival/Weapons/SmallArmsProjectileManager/TankShellTrail/TankShellTrailBatcher.h"
+#include "RTS_Survival/Weapons/InfantryWeapon/InfantryWeaponMaster.h"
 #include "RTS_Survival/Game/Players/RTSPlayers.h"
 #include "RTS_Survival/Utils/AOE/FRTS_AOE.h"
 #include "RTS_Survival/Utils/CollisionSetup/RTSPlayerCollision.h"
@@ -2908,8 +2910,34 @@ void AProjectile::ProjectileHitPropagateNotification(const bool bBounced)
 	}
 }
 
+bool AProjectile::DecideIsDrawnByTankShellTrailBatcher(const EProjectileNiagaraSystem Type) const
+{
+	if (Type != EProjectileNiagaraSystem::TankShell || not M_ProjectilePoolSettings.ProjectileManager.IsValid())
+	{
+		return false;
+	}
+	// Infantry projectiles keep the shell effect they had (the weapon state is created inside the weapon actor); barrage shells have no weapon state and count as guns.
+	if (IsValid(M_ProjectileOwner) && M_ProjectileOwner->GetTypedOuter<AInfantryWeaponMaster>() != nullptr)
+	{
+		return false;
+	}
+	const UTankShellTrailBatcher* TrailBatcher = M_ProjectilePoolSettings.ProjectileManager->GetTankShellTrailBatcher();
+	return IsValid(TrailBatcher) && TrailBatcher->GetIsDrawingTankShells();
+}
+
 void AProjectile::SetupNiagaraWithPrjVfxSettings(const FProjectileVfxSettings& NewSettings)
 {
+	bM_IsDrawnByTankShellTrailBatcher = DecideIsDrawnByTankShellTrailBatcher(NewSettings.ProjectileNiagaraSystem);
+	if (bM_IsDrawnByTankShellTrailBatcher)
+	{
+		// The trail batcher draws this shell; the restart just activated the shell's own system, stop it again.
+		if (GetIsValidNiagara())
+		{
+			M_NiagaraComponent->DeactivateImmediate();
+		}
+		M_ProjectileVfxSettings = NewSettings;
+		return;
+	}
 	if (UNiagaraSystem* System = GetSystemFromType(NewSettings.ProjectileNiagaraSystem))
 	{
 		const bool bSetSystemCauseInvalid = !IsValid(M_NiagaraComponent->GetAsset());

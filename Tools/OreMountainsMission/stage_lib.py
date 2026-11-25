@@ -12,7 +12,7 @@ from layout_eventgraphs import Graph, var  # noqa: F401  (re-exported for the st
 _berlin_height = _layout.height
 # Real heights (px) of Ore nodes taller than the Berlin estimate, so the next row and its comment never overlap.
 _TALL = {'IsCasesStageEnding': 165, 'TriggerVictory': 140, 'GetHasMissionClassCompleted': 110,
-         'DispatcherBind': 120, 'ScheduleSingle': 170, 'PlayAdvisorLine': 135, 'TrackTaggedTargets': 140}
+         'DispatcherBind': 120, 'PlayPortrait': 185, 'ScheduleSingle': 170, 'PlayAdvisorLine': 135, 'TrackTaggedTargets': 140}
 
 
 def _ore_height(handle):
@@ -46,10 +46,24 @@ def create_stage(name, parent_class):
     return path
 
 
+def own_var_names(path):
+    skeleton = ue.a('get_blueprint_skeleton', blueprint_path=path)
+    return {v.get('name') for v in skeleton.get('variables', [])} if isinstance(skeleton, dict) else set()
+
+
+def remove_own_vars(path, names):
+    for name in names:
+        if name in own_var_names(path):
+            log(f'remove var {name}', ue.a('delete_variable', blueprint_path=path, variable_name=name))
+
+
 def add_vars(path, variables):
-    """variables: (name, type, default or None, category, instance_editable[, tooltip])."""
+    """variables: (name, type, default or None, category, instance_editable[, tooltip]); existing ones are kept."""
+    have = own_var_names(path)
     items = []
     for v in variables:
+        if v[0] in have:
+            continue
         name, vtype, default, category, editable = v[:5]
         item = {'variable_name': name, 'variable_type': vtype, 'category': category, 'instance_editable': editable}
         if default is not None:
@@ -107,3 +121,26 @@ def ensure_vars(path, variables):
     skeleton = ue.a('get_blueprint_skeleton', blueprint_path=path)
     have = {v.get('name') for v in skeleton.get('variables', [])} if isinstance(skeleton, dict) else set()
     add_vars(path, [v for v in variables if v[0] not in have])
+
+
+_berlin_end_row = Graph.end_row
+
+
+def _end_row_with_param_events(self):
+    """Custom events with parameters grow ~30 px per pin; make the row's bottom cover them before the next row."""
+    for node in self.nodes:
+        params = node.get('params')
+        if params and node['id'] in self.pos:
+            self.bottom = max(self.bottom, self.pos[node["id"]][1] + 90 + 40 * len(params))
+    _berlin_end_row(self)
+
+
+Graph.end_row = _end_row_with_param_events
+
+
+def remove_functions(path, names):
+    skeleton = ue.a('get_blueprint_skeleton', blueprint_path=path)
+    have = {f.get('name') for f in skeleton.get('functions', [])} if isinstance(skeleton, dict) else set()
+    for name in names:
+        if name in have:
+            log(f'remove function {name}', ue.a('delete_function', blueprint_path=path, function_name=name))

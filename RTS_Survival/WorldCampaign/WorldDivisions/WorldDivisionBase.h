@@ -128,6 +128,17 @@ public:
 	const FText& GetStrengthReasonText() const { return M_StrengthReasonText; }
 	float GetInfluenceAreaRadius() const { return M_InfluenceAreaRadius; }
 	ERTSRadiusType GetHoverRadiusType() const { return M_HoverRadiusType; }
+
+	/** @brief End of the pending move order; only meaningful while GetHasPendingMoveOrder is true. */
+	FVector GetPendingTargetLocation() const { return M_PendingTargetLocation; }
+
+	/** @brief Points of the pending move order; those from GetNextPathPointIndex on are still ahead of the piece. */
+	const TArray<FVector>& GetPendingPathPoints() const { return M_PathPoints; }
+
+	int32 GetNextPathPointIndex() const { return M_CurrentPathPointIndex; }
+
+	/** @brief XY distance one turn of movement consumes from the pending path. */
+	float GetDistanceTravelledPerTurn() const { return M_DistanceTravelledPerTurn; }
 	UWorldDivisionMovementComponent* GetWorldDivisionMovementComponent() const { return M_MovementComponent; }
 	FWorldDivisionStrengthChangedDelegate& OnDivisionStrengthChanged() { return M_OnDivisionStrengthChanged; }
 

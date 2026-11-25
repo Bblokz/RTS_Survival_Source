@@ -9,7 +9,8 @@ def _post(port, body):
     request = (f'POST /mcp HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nContent-Type: application/json\r\n'
                f'Accept: application/json, text/event-stream\r\nAuthorization: Bearer {token}\r\n'
                f'Content-Length: {len(body)}\r\nConnection: close\r\n\r\n').encode('utf-8') + body
-    sock = socket.create_connection(('127.0.0.1', port), timeout=900)
+    # UECP_HOST=::1 picks an editor that is the only one on the IPv6 loopback when two share a port.
+    sock = socket.create_connection((os.environ.get('UECP_HOST', '127.0.0.1'), port), timeout=900)
     sock.sendall(request)
     chunks = []
     while True:

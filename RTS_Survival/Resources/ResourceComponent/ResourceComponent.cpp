@@ -81,38 +81,14 @@ void UResourceComponent::RegisterOccupiedLocation(
 }
 
 
-int32 UResourceComponent::HarvestResource(const int32 MaxAmountHarvesterCapacity)
+int32 UResourceComponent::HarvestResource(const int32 MaxAmountHarvesterCapacity, const int32 YieldMultiplier)
 {
 	if (StillContainsResources())
 	{
-		int32 AmountHarvested = 0;
-		if (TotalAmount >= AmountPerHarvest)
-		{
-			// We can harvest the amount that is standard on this resource
-			if (MaxAmountHarvesterCapacity >= AmountPerHarvest)
-			{
-				TotalAmount -= AmountPerHarvest;
-				AmountHarvested = AmountPerHarvest;
-			}
-			else
-			{
-				// We can only harvest a part of the standard amount.
-				TotalAmount -= MaxAmountHarvesterCapacity;
-				AmountHarvested = MaxAmountHarvesterCapacity;
-			}
-		}
-		else if (MaxAmountHarvesterCapacity >= TotalAmount)
-		{
-			// We cannot harvest AmountPerHarvest as there is not enough, but we can take all that is left.
-			AmountHarvested = TotalAmount;
-			TotalAmount = 0;
-		}
-		else
-		{
-			// What is left is more than the harvester can take, take as much the harvester can store.
-			TotalAmount -= MaxAmountHarvesterCapacity;
-			AmountHarvested = MaxAmountHarvesterCapacity;
-		}
+		// The standard yield of one cut, capped by what the harvester can store and by what is left.
+		const int32 StandardYield = AmountPerHarvest * FMath::Max(1, YieldMultiplier);
+		const int32 AmountHarvested = FMath::Max(0, FMath::Min3(StandardYield, MaxAmountHarvesterCapacity, TotalAmount));
+		TotalAmount -= AmountHarvested;
 		if (M_ResourceOwner && IsValid(M_ResourceOwner.GetObject()))
 		{
 			const int32 PercentageResourcesFilled = M_OriginalTotalAmount > 0

@@ -159,3 +159,10 @@ real time: a screenshot can stall the game for seconds, but the audio and the su
 `Source/Tools/PortraitSubtitles/cinematic_overlay_test.py` does the same with `LS_FirstMission_FuelDepot`: it plays
 the sequence with `ShowForSequence` and logs the sequence time of every screenshot. `shot showui` sometimes captures
 the bare 3D view without any UI; that's a capture quirk, not the overlay.
+
+## Camera tours (2026-11-24)
+
+A mission camera tour's `StartSound` plays on its own audio component. When the line has a row in
+`DT_CinematicTranscripts`, `UW_CinematicOverlay::ShowForVoiceLine` shows the top subtitle strip (no countdown) and follows
+the component's playback position. The strip stays until the line ends, also over the HUD after a skip, and sits above
+the tour's cinema bars (Z order 7). A line without a row plays as before, with no strip.

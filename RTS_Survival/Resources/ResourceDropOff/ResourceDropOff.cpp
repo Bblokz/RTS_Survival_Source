@@ -16,6 +16,7 @@
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/RTSBlueprintFunctionLibrary.h"
 #include "RTS_Survival/Utils/RTSRichTextConverters/FRTSRichTextConverter.h"
+#include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 
 
 // Sets default values for this component's properties
@@ -61,10 +62,11 @@ int32 UResourceDropOff::DropOffResourcesFromCrane(const ERTSResourceType Resourc
 int32 UResourceDropOff::AddDroppedOffResources(const ERTSResourceType ResourceType, const int32 Amount)
 {
 	const int32 AmountLeft = M_ResourceDropOffCapacity[ResourceType].AddResource(Amount);
-	if (GetIsValidPlayerResourceManager())
+	// An AI player's drop-off keeps the delivery in its cargo slots only: that is its stockpile.
+	if (UPlayerResourceManager* HumanResourceManager = GetHumanPlayerResourceManager())
 	{
 		// Update player resource system without affecting the DropOffs as we will store the resources locally.
-		M_PlayerResourceManager->DropOffNoVisualUpdate_AddResource(ResourceType, Amount - AmountLeft);
+		HumanResourceManager->DropOffNoVisualUpdate_AddResource(ResourceType, Amount - AmountLeft);
 	}
 	UpdateDropOffVisuals(ResourceType);
 	return AmountLeft;
@@ -127,10 +129,10 @@ void UResourceDropOff::AddExpansionStorage(const ERTSResourceType ResourceType, 
 		return;
 	}
 	CargoSlot->MaxCapacity += ExtraCapacity;
-	if (GetIsValidPlayerResourceManager())
+	if (UPlayerResourceManager* HumanResourceManager = GetHumanPlayerResourceManager())
 	{
 		constexpr int32 NoResourcesLost = 0;
-		M_PlayerResourceManager->OnDropOffStorageChanged(this, ResourceType, ExtraCapacity, NoResourcesLost);
+		HumanResourceManager->OnDropOffStorageChanged(this, ResourceType, ExtraCapacity, NoResourcesLost);
 	}
 	UpdateDropOffVisuals(ResourceType);
 }
@@ -150,9 +152,9 @@ void UResourceDropOff::RemoveExpansionStorage(const ERTSResourceType ResourceTyp
 	CargoSlot->MaxCapacity -= CapacityRemoved;
 	const int32 ResourcesLost = FMath::Max(0, CargoSlot->CurrentAmount - CargoSlot->MaxCapacity);
 	CargoSlot->CurrentAmount -= ResourcesLost;
-	if (GetIsValidPlayerResourceManager())
+	if (UPlayerResourceManager* HumanResourceManager = GetHumanPlayerResourceManager())
 	{
-		M_PlayerResourceManager->OnDropOffStorageChanged(this, ResourceType, -CapacityRemoved, ResourcesLost);
+		HumanResourceManager->OnDropOffStorageChanged(this, ResourceType, -CapacityRemoved, ResourcesLost);
 	}
 	UpdateDropOffVisuals(ResourceType);
 }
@@ -328,7 +330,11 @@ void UResourceDropOff::BeginPlay()
 		IsValid(NewPlayerController))
 	{
 		M_PlayerResourceManager = NewPlayerController->GetPlayerResourceManager();
-		(void)GetIsValidPlayerResourceManager();
+		// Only the human's drop-offs need it; an AI drop-off never touches the human's resources.
+		if (GetIsOwnedByHumanPlayer())
+		{
+			(void)GetIsValidPlayerResourceManager();
+		}
 	}
 }
 
@@ -380,7 +386,9 @@ void UResourceDropOff::InitResourceDropOff(
 		}
 		else
 		{
-			if (!GetName().Contains("ResourceDropOff"))
+			// AI buildings (the Soviet refinery is an ABuildingExpansion) have no storage visuals on purpose.
+			bM_HasNoStorageVisualsOwner = not GetIsOwnedByHumanPlayer() || GetName().Contains("ResourceDropOff");
+			if (not bM_HasNoStorageVisualsOwner)
 			{
 				RTSFunctionLibrary::ReportFailedCastError("Owner", "IResourceStorageOwner", "InitResourceDropOff");
 			}
@@ -388,6 +396,46 @@ void UResourceDropOff::InitResourceDropOff(
 	}
 	// After initialization
 	RegisterWithGameResourceManager();
+	BindToOwnerOwningPlayerChanges();
+}
+
+void UResourceDropOff::MapTest_InitResourceDropOff(
+	const TMap<ERTSResourceType, int32>& MaxDropOffPerResource,
+	UMeshComponent* OwnerMeshComponent,
+	const FName DropOffSocketName)
+{
+	InitResourceDropOff(MaxDropOffPerResource, OwnerMeshComponent, DropOffSocketName);
+}
+
+void UResourceDropOff::BindToOwnerOwningPlayerChanges()
+{
+	const AActor* Owner = GetOwner();
+	URTSComponent* OwnerRTSComponent = IsValid(Owner) ? Owner->FindComponentByClass<URTSComponent>() : nullptr;
+	if (not IsValid(OwnerRTSComponent))
+	{
+		return;
+	}
+	OwnerRTSComponent->OnOwningPlayerChanged.RemoveAll(this);
+	OwnerRTSComponent->OnOwningPlayerChanged.AddUObject(this, &UResourceDropOff::OnOwnerOwningPlayerChanged);
+}
+
+void UResourceDropOff::OnOwnerOwningPlayerChanged(const uint8 OldOwningPlayer, const uint8 NewOwningPlayer)
+{
+	UGameResourceManager* GameResourceManager = GetGameResourceManager();
+	if (not IsValid(GameResourceManager))
+	{
+		return;
+	}
+	// Re-register so harvesters of the new owner find it and the human's storage gains or loses it.
+	GameResourceManager->RegisterResourceDropOff(this, false, static_cast<int8>(OldOwningPlayer));
+	GameResourceManager->RegisterResourceDropOff(this, true, static_cast<int8>(NewOwningPlayer));
+}
+
+UGameResourceManager* UResourceDropOff::GetGameResourceManager() const
+{
+	const UWorld* World = GetWorld();
+	const ACPPGameState* CPPGameState = IsValid(World) ? World->GetGameState<ACPPGameState>() : nullptr;
+	return IsValid(CPPGameState) ? CPPGameState->GetGameResourceManager() : nullptr;
 }
 
 void UResourceDropOff::RegisterWithGameResourceManager()
@@ -488,6 +536,10 @@ void UResourceDropOff::UpdateDropOffVisuals(const ERTSResourceType ResourceTypeC
 	}
 	if (not M_ResourceStorageOwner.IsValid())
 	{
+		if (bM_HasNoStorageVisualsOwner || not GetIsOwnedByHumanPlayer())
+		{
+			return;
+		}
 		RTSFunctionLibrary::ReportError("DropOff is not able to update visuals as the owner is not valid!"
 			"\n ResourceDropOff: " + GetName());
 		return;
@@ -498,7 +550,7 @@ void UResourceDropOff::UpdateDropOffVisuals(const ERTSResourceType ResourceTypeC
 
 void UResourceDropOff::CreateTextOfDropOff(const ERTSResourceType ResourceType, const int32 Amount) const
 {
-	if (Amount <= 0 || not GetIsValidOwnerMeshComponent())
+	if (Amount <= 0 || not GetIsOwnedByHumanPlayer() || not GetIsValidOwnerMeshComponent())
 	{
 		return;
 	}
@@ -508,7 +560,8 @@ void UResourceDropOff::CreateTextOfDropOff(const ERTSResourceType ResourceType, 
 void UResourceDropOff::CreateTextOfDropOffAt(const ERTSResourceType ResourceType, const int32 Amount,
                                              const FVector& Location) const
 {
-	if (Amount <= 0)
+	// The "+ amount" pop-up is the human's income feedback; AI deliveries stay silent.
+	if (Amount <= 0 || not GetIsOwnedByHumanPlayer())
 	{
 		return;
 	}
@@ -526,6 +579,29 @@ void UResourceDropOff::CreateTextOfDropOffAt(const ERTSResourceType ResourceType
 	                                                                     BaseText, Location, false, 0.f,
 	                                                                     Justify,
 	                                                                     Settings);
+}
+
+bool UResourceDropOff::GetIsOwnedByHumanPlayer() const
+{
+	constexpr uint8 HumanPlayer = 1;
+	// Quiet on purpose (called per delivery): without an RTS component a drop-off counts as the human's, as at
+	// registration (GetOwningPlayer reports that case once).
+	const AActor* Owner = GetOwner();
+	const URTSComponent* OwnerRTSComp = IsValid(Owner) ? Owner->FindComponentByClass<URTSComponent>() : nullptr;
+	return not IsValid(OwnerRTSComp) || OwnerRTSComp->GetOwningPlayer() == HumanPlayer;
+}
+
+UPlayerResourceManager* UResourceDropOff::GetHumanPlayerResourceManager()
+{
+	if (not GetIsOwnedByHumanPlayer())
+	{
+		return nullptr;
+	}
+	if (not IsValid(M_PlayerResourceManager))
+	{
+		M_PlayerResourceManager = FRTS_Statics::GetPlayerResourceManager(this);
+	}
+	return GetIsValidPlayerResourceManager() ? M_PlayerResourceManager.Get() : nullptr;
 }
 
 bool UResourceDropOff::GetIsValidPlayerResourceManager() const

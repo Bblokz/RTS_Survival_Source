@@ -111,6 +111,8 @@ struct FUnloadBayState
 	ERTSResourceType Resource = ERTSResourceType::Resource_None;
 	bool bIsDocked = false;
 	int32 ChunkAmount = 0;
+	// World time of docking; measures the unload for GetExpectedUnloadSeconds.
+	double DockedWorldSeconds = 0.0;
 	// Rail distance of the bay's grab stop, and per resource the trolley offset (cm from the bay) of its bin stop.
 	float BayRailDistance = 0.f;
 	TMap<ERTSResourceType, float> BinOffsets;

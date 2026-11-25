@@ -321,6 +321,8 @@ class RTS_SURVIVAL_API ACPPController : public APlayerController
 	friend class RTS_SURVIVAL_API UPlayerProfileLoader;
 	friend class RTS_SURVIVAL_API UPlayerResourceManager;
 	friend class UMissionCinematicTakeOverSession;
+	// Skippable camera tours show the same hold-to-skip prompt (M_HoldToSkipWidgetClass).
+	friend class UMissionCameraTourSession;
 	// The global ability test runner (RTS_SurvivalShippingGlobalAbilityTests only) reads the pause lock and cinematic state.
 	friend struct FAllGlobalAbilitiesTestAccess;
 	// Map test that selects an apartment and presses its Exit Cargo button the way a click would.

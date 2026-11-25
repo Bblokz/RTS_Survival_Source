@@ -2,6 +2,8 @@
 
 #include "EnemyAirDrop.h"
 
+#include "EnemyAirDropSettings.h"
+
 #include "EngineUtils.h"
 #include "Engine/Texture2D.h"
 #include "RTS_Survival/Enemy/EnemyController/EnemyController.h"
@@ -104,6 +106,11 @@ AEnemyAirDrop::AEnemyAirDrop()
 void AEnemyAirDrop::BeginPlay()
 {
 	Super::BeginPlay();
+	if (IsValid(SettingsAsset))
+	{
+		SettingsAsset->BuildUnits(Units);
+		Timing.FirstDropDelay = SettingsAsset->DelaySeconds;
+	}
 	if (Timing.bStartOnBeginPlay)
 	{
 		StartAirDrop();
@@ -541,6 +548,7 @@ void AEnemyAirDrop::HandleCargoUnitReleased(UGA_AircraftDrop* Ability, AActor* U
 	if (IsValid(Unit))
 	{
 		OnUnitDelivered.Broadcast(this, Unit);
+		OnUnitLanded.Broadcast(this, Unit);
 	}
 }
 
@@ -617,7 +625,7 @@ UTexture2D* AEnemyAirDrop::GetEditorSpriteTexture() const
 
 bool AEnemyAirDrop::GetHasAnyUnitEntry() const
 {
-	return not Units.BaseUnits.IsEmpty() || not Units.ExtraUnitsNormal.IsEmpty() || not Units.ExtraUnitsHard.IsEmpty()
+	return IsValid(SettingsAsset) || not Units.BaseUnits.IsEmpty() || not Units.ExtraUnitsNormal.IsEmpty() || not Units.ExtraUnitsHard.IsEmpty()
 		|| not Units.ExtraUnitsBrutal.IsEmpty();
 }
 

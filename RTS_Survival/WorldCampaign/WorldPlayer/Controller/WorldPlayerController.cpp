@@ -30,6 +30,8 @@
 #include "WorldCameraController/WorldCameraController.h"
 #include "WorldPlayerProfileAndUIManager/WorldProfileAndUIManager.h"
 #include "RTS_Survival/WorldCampaign/WorldMapUI/W_WorldMenu.h"
+#include "RTS_Survival/WorldCampaign/WorldMapUI/CampaignHUD/W_WorldCampaignHUD.h"
+#include "RTS_Survival/WorldCampaign/WorldMapUI/CommanderPanel/W_WorldCommanderPanel.h"
 #include "RTS_Survival/WorldCampaign/WorldMapUI/AsyncWorldGeneration/W_AsyncWorldGeneration.h"
 #include "RTS_Survival/WorldCampaign/SaveAndState/WorldStateAndSaveManager/WorldStateAndSaveManager.h"
 #include "RTS_Survival/WorldCampaign/WorldDifficulty/WorldStrategicSupportArea.h"
@@ -61,6 +63,9 @@ namespace WorldPlayerAsyncGenerationUIConstants
 namespace WorldPlayerOperationMapConstants
 {
 	constexpr int32 EnemyProceduralMapSeedOffset = 23017;
+	// Each handmade pool gets its own shuffle so two pools of equal length do not run in step.
+	constexpr int32 HandmadeEnemyItemMapSeedOffset = 52361;
+	constexpr int32 HandmadeFieldMapSeedOffset = 71993;
 
 	// Same tag the generator puts on every anchor it spawns, including the anchors of a restored campaign.
 	const FName GeneratedAnchorTag(TEXT("WC_GeneratedAnchor"));
@@ -72,6 +77,28 @@ namespace WorldPlayerOperationMapConstants
 		uint32 OperationSeedHash = HashCombine(GetTypeHash(CampaignSeed), GetTypeHash(SourceAnchorKey));
 		OperationSeedHash = HashCombine(OperationSeedHash, GetTypeHash(OperationTypeValue));
 		return static_cast<int32>(OperationSeedHash & static_cast<uint32>(MAX_int32));
+	}
+
+	void ReportMissingStoryLevel(const EMapEnemyItem ItemType)
+	{
+		RTSFunctionLibrary::ReportError(FString::Printf(
+			TEXT("%s has no story level yet: set it in FWorldOperationMapSettings::StoryEnemyItemMaps on the world ")
+			TEXT("controller. It is a story place and does not use the handmade enemy item maps."),
+			*UEnum::GetValueAsString(ItemType)));
+	}
+
+	// The division's units as it has them now; a handmade field map spawns exactly these.
+	FWorldMissionEnemyArmy BuildEnemyArmyForDivision(const AWorldDivisionBase& EnemyDivision)
+	{
+		const FWorldDivisionSaveData DivisionSaveData = EnemyDivision.BuildWorldDivisionSaveData();
+		FWorldMissionEnemyArmy EnemyArmy;
+		EnemyArmy.DivisionType = DivisionSaveData.DivisionType;
+		EnemyArmy.Vehicles = DivisionSaveData.TankSubtypes;
+		EnemyArmy.Squads = DivisionSaveData.SquadSubtypes;
+		EnemyArmy.ConvoyTruckCount = EnemyDivision.GetIsSupplyConvoy()
+			                             ? FMath::Max(0, EnemyDivision.GetRemainingEntryCount())
+			                             : 0;
+		return EnemyArmy;
 	}
 
 	// A division has no map item type of its own; the operation map is told the enemy item it resembles most.
@@ -294,6 +321,8 @@ void AWorldPlayerController::Tick(float DeltaTime)
 
 	if (bM_IsWorldPlayerInputDisabled)
 	{
+		// No cursor hover while the map takes no input; the site with open cards stays lit.
+		Tick_UpdateHoveredBuildNode(nullptr);
 		return;
 	}
 
@@ -306,6 +335,97 @@ void AWorldPlayerController::Tick(float DeltaTime)
 	const bool bHit = GetHitResultUnderCursor(ECC_Visibility, false, HitResultCursorProjection);
 	AActor* HitActor = bHit ? HitResultCursorProjection.GetActor() : nullptr;
 	M_PlayerWorldOutliner->OnPlayerTick(HitActor, HitResultCursorProjection.Location);
+	Tick_UpdateHoveredCountry();
+	Tick_UpdateHoveredBuildNode(HitActor);
+}
+
+void AWorldPlayerController::Tick_UpdateHoveredBuildNode(AActor* ActorUnderCursor)
+{
+	const UW_WorldCampaignHUD* const CampaignHUD = GetCampaignHUD();
+	AWorldBuildNode* const PanelBuildNode = IsValid(CampaignHUD) ? CampaignHUD->GetOpenBuildSite() : nullptr;
+	// The cursor trace ignores widgets, so without this a site behind the build cards would light up under them.
+	const bool bIsCursorOnBuildCards = IsValid(CampaignHUD) && CampaignHUD->GetIsCursorOverBuildSitePanel();
+	AWorldBuildNode* const BuildNodeUnderCursor = bIsCursorOnBuildCards
+		                                              ? nullptr
+		                                              : Cast<AWorldBuildNode>(ActorUnderCursor);
+	AWorldBuildNode* const PreviousHoveredNode = M_HoveredBuildNode.Get();
+	AWorldBuildNode* const PreviousPanelNode = M_PanelLitBuildNode.Get();
+	if (PreviousHoveredNode == BuildNodeUnderCursor && PreviousPanelNode == PanelBuildNode)
+	{
+		return;
+	}
+
+	M_HoveredBuildNode = BuildNodeUnderCursor;
+	M_PanelLitBuildNode = PanelBuildNode;
+	for (AWorldBuildNode* const PreviousNode : {PreviousHoveredNode, PreviousPanelNode})
+	{
+		const bool bStaysLit = PreviousNode == BuildNodeUnderCursor || PreviousNode == PanelBuildNode;
+		if (IsValid(PreviousNode) && not bStaysLit)
+		{
+			PreviousNode->SetIsHovered(false);
+		}
+	}
+	for (AWorldBuildNode* const LitNode : {BuildNodeUnderCursor, PanelBuildNode})
+	{
+		if (IsValid(LitNode))
+		{
+			LitNode->SetIsHovered(true);
+		}
+	}
+}
+
+void AWorldPlayerController::Tick_UpdateHoveredCountry()
+{
+	if (not M_WorldGenerator.IsValid())
+	{
+		return;
+	}
+
+	UWorldCountryOccupationRegulator* CountryRegulator =
+		M_WorldGenerator->FindComponentByClass<UWorldCountryOccupationRegulator>();
+	if (not IsValid(CountryRegulator))
+	{
+		return;
+	}
+
+	// Country meshes have no collision, so the cursor is projected onto the map plane instead of traced.
+	FVector CursorOrigin;
+	FVector CursorDirection;
+	const bool bHasCursorRay = DeprojectMousePositionToWorld(CursorOrigin, CursorDirection)
+		&& not FMath::IsNearlyZero(CursorDirection.Z);
+	const float DistanceToMapPlane = bHasCursorRay ? -CursorOrigin.Z / CursorDirection.Z : -1.f;
+	const bool bIsCursorOverMap = DistanceToMapPlane > 0.f;
+	const FVector MapLocation = CursorOrigin + CursorDirection * FMath::Max(DistanceToMapPlane, 0.f);
+	CountryRegulator->SetHoveredCountryAtMapLocation(FVector2D(MapLocation), bIsCursorOverMap);
+}
+
+UW_WorldCampaignHUD* AWorldPlayerController::GetCampaignHUD() const
+{
+	if (not M_WorldProfileAndUIManager.IsValid())
+	{
+		return nullptr;
+	}
+
+	const UW_WorldMenu* WorldMenu = M_WorldProfileAndUIManager->GetWorldMenu();
+	return IsValid(WorldMenu) ? WorldMenu->GetCampaignHUD() : nullptr;
+}
+
+bool AWorldPlayerController::PrimaryClick_CommanderTargetPicking()
+{
+	const UW_WorldCampaignHUD* CampaignHUD = GetCampaignHUD();
+	UW_WorldCommanderPanel* CommanderPanel = IsValid(CampaignHUD) ? CampaignHUD->GetCommanderPanel() : nullptr;
+	if (not IsValid(CommanderPanel) || not CommanderPanel->GetIsPickingTarget())
+	{
+		return false;
+	}
+
+	FHitResult HitUnderCursor;
+	const bool bHit = GetHitResultUnderCursor(ECC_Visibility, false, HitUnderCursor);
+	FText FailReason;
+	// A click while picking is always used up; the panel shows the reason for a wrong target itself.
+	CommanderPanel->TryUseAbilityOnPickedActor(bHit ? HitUnderCursor.GetActor() : nullptr, HitUnderCursor.Location,
+	                                           FailReason);
+	return true;
 }
 
 void AWorldPlayerController::PrimaryClick()
@@ -313,6 +433,17 @@ void AWorldPlayerController::PrimaryClick()
 	if (bM_IsWorldPlayerInputDisabled)
 	{
 		return;
+	}
+
+	if (PrimaryClick_CommanderTargetPicking())
+	{
+		return;
+	}
+
+	// Any map click closes the build cards; clicking a build site opens them again below.
+	if (UW_WorldCampaignHUD* CampaignHUD = GetCampaignHUD())
+	{
+		CampaignHUD->CloseBuildSite();
 	}
 
 	switch (M_PrimaryClickContext)
@@ -331,6 +462,18 @@ void AWorldPlayerController::SecondaryClick()
 	if (bM_IsWorldPlayerInputDisabled)
 	{
 		return;
+	}
+
+	UW_WorldCampaignHUD* CampaignHUD = GetCampaignHUD();
+	if (not IsValid(CampaignHUD))
+	{
+		return;
+	}
+
+	CampaignHUD->CloseBuildSite();
+	if (UW_WorldCommanderPanel* CommanderPanel = CampaignHUD->GetCommanderPanel())
+	{
+		CommanderPanel->CancelTargetPicking();
 	}
 }
 
@@ -357,6 +500,12 @@ void AWorldPlayerController::PlayerTurn()
 	{
 		bM_IsStartOfNewPlayerTurn = false;
 		PlayerTurn_ApplyStartOfNewTurn();
+	}
+
+	if (UW_WorldCampaignHUD* CampaignHUD = GetCampaignHUD())
+	{
+		CampaignHUD->SetIsInputBlocked(false);
+		CampaignHUD->RefreshAtTurnStart();
 	}
 
 	M_WorldGenerator->AdjustDifficultyPercentagesForStrategicSupport(M_SelectedDifficulty.DifficultyLevel);
@@ -391,6 +540,10 @@ void AWorldPlayerController::EnemyTurn()
 	}
 
 	BP_OnEnemyTurnStarted();
+	if (UW_WorldCampaignHUD* CampaignHUD = GetCampaignHUD())
+	{
+		CampaignHUD->SetIsInputBlocked(true);
+	}
 	M_WorldGenerator->AdjustDifficultyPercentagesForStrategicSupport(M_SelectedDifficulty.DifficultyLevel);
 	if (GetIsValidWorldBuildNodeManager())
 	{
@@ -502,7 +655,12 @@ bool AWorldPlayerController::PrimaryClick_Regular()
 	if (ClickedActor->IsA(AWorldBuildNode::StaticClass()))
 	{
 		CollapseMissionMapItemDesc();
-		BP_OnBuildNodeClicked(Cast<AWorldBuildNode>(ClickedActor));
+		AWorldBuildNode* ClickedBuildNode = Cast<AWorldBuildNode>(ClickedActor);
+		if (UW_WorldCampaignHUD* CampaignHUD = GetCampaignHUD())
+		{
+			CampaignHUD->OpenBuildSite(ClickedBuildNode);
+		}
+		BP_OnBuildNodeClicked(ClickedBuildNode);
 		return true;
 	}
 	CollapseMissionMapItemDesc();
@@ -834,23 +992,21 @@ void AWorldPlayerController::LaunchOperationAgainstDivision(AWorldDivisionBase* 
 		return;
 	}
 
+	if (not GetIsValidWorldStateAndSaveManager())
+	{
+		return;
+	}
+
+	// The pick moves a saved cursor before BeginCampaignOperation saves; a failed launch puts it back.
+	const FWorldOperationMapCursorSnapshot CursorsBeforeLaunch =
+		M_WorldStateAndSaveManager->CaptureOperationMapCursors();
 	TSoftObjectPtr<UWorld> EnemyMap;
-	if (not TryGetEnemyMap(EnemyMap))
+	if (not TryPickEnemyOperationMap(EWorldOperationTarget::EnemyDivision, EnemyDivision->GetDivisionKey(), EnemyMap)
+		|| not PopulateWorldMissionContextForDivision(EnemyDivision)
+		|| not BeginCampaignOperation(EWorldOperationTarget::EnemyDivision, FGuid(), EMapMission::None,
+		                              EnemyDivision->GetDivisionKey()))
 	{
-		return;
-	}
-
-	if (not PopulateWorldMissionContextForDivision(EnemyDivision))
-	{
-		return;
-	}
-
-	const int32 PreviousMapIndex = M_WorldStateAndSaveManager->GetEnemyObjectProceduralMapIndex();
-	M_WorldStateAndSaveManager->AdvanceEnemyObjectProceduralMapIndex(M_ShuffledEnemyObjectProceduralMaps.Num());
-	if (not BeginCampaignOperation(EWorldOperationTarget::EnemyDivision, FGuid(), EMapMission::None,
-	                               EnemyDivision->GetDivisionKey()))
-	{
-		M_WorldStateAndSaveManager->SetEnemyObjectProceduralMapIndex(PreviousMapIndex);
+		M_WorldStateAndSaveManager->RestoreOperationMapCursors(CursorsBeforeLaunch);
 		return;
 	}
 
@@ -870,6 +1026,7 @@ bool AWorldPlayerController::PopulateWorldMissionContextForDivision(const AWorld
 	WorldMissionContext.EnemyObjectType = WorldPlayerOperationMapConstants::GetEnemyItemProxyForDivision(
 		EnemyDivision->GetDivisionType());
 	WorldMissionContext.SourceDivisionKey = EnemyDivision->GetDivisionKey();
+	WorldMissionContext.EnemyArmy = WorldPlayerOperationMapConstants::BuildEnemyArmyForDivision(*EnemyDivision);
 	WorldMissionContext.OperationSeed = WorldPlayerOperationMapConstants::BuildOperationSeed(
 		M_CampaignSettings.GenerationSeed,
 		WorldMissionContext.SourceDivisionKey,
@@ -940,11 +1097,27 @@ void AWorldPlayerController::OnCommanderDamageDivisionRequested(const FGuid& Div
 	}
 }
 
+void AWorldPlayerController::ShuffleOperationMapPool(const TArray<TSoftObjectPtr<UWorld>>& SourceMaps,
+                                                     const int32 ShuffleSeed,
+                                                     TArray<TSoftObjectPtr<UWorld>>& OutShuffledMaps)
+{
+	OutShuffledMaps = SourceMaps;
+	FRandomStream RandomStream(ShuffleSeed);
+	CampaignGenerationHelper::DeterministicShuffle(OutShuffledMaps, RandomStream);
+}
+
 void AWorldPlayerController::InitializeOperationMapsForCampaignSeed(const int32 WorldGenerationSeed)
 {
-	M_ShuffledEnemyObjectProceduralMaps = M_WorldOperationMapSettings.EnemyObjectProceduralMaps;
-	FRandomStream RandomStream(WorldGenerationSeed + WorldPlayerOperationMapConstants::EnemyProceduralMapSeedOffset);
-	CampaignGenerationHelper::DeterministicShuffle(M_ShuffledEnemyObjectProceduralMaps, RandomStream);
+	ShuffleOperationMapPool(M_WorldOperationMapSettings.EnemyObjectProceduralMaps,
+	                        WorldGenerationSeed + WorldPlayerOperationMapConstants::EnemyProceduralMapSeedOffset,
+	                        M_ShuffledEnemyObjectProceduralMaps);
+	// The handmade cursors need no repair here: the pick wraps an out-of-range cursor to the start.
+	ShuffleOperationMapPool(M_WorldOperationMapSettings.HandmadeEnemyItemMaps,
+	                        WorldGenerationSeed + WorldPlayerOperationMapConstants::HandmadeEnemyItemMapSeedOffset,
+	                        M_ShuffledHandmadeEnemyItemMaps);
+	ShuffleOperationMapPool(M_WorldOperationMapSettings.HandmadeFieldMaps,
+	                        WorldGenerationSeed + WorldPlayerOperationMapConstants::HandmadeFieldMapSeedOffset,
+	                        M_ShuffledHandmadeFieldMaps);
 
 	if (not GetIsValidWorldStateAndSaveManager())
 	{
@@ -1003,23 +1176,21 @@ void AWorldPlayerController::LaunchEnemyMap(AWorldEnemyObject* EnemyMapObject)
 		return;
 	}
 
+	if (not GetIsValidWorldStateAndSaveManager())
+	{
+		return;
+	}
+
+	// The pick moves a saved cursor before BeginCampaignOperation saves; a failed launch puts it back.
+	const FWorldOperationMapCursorSnapshot CursorsBeforeLaunch =
+		M_WorldStateAndSaveManager->CaptureOperationMapCursors();
 	TSoftObjectPtr<UWorld> EnemyMap;
-	if (not TryGetEnemyMap(EnemyMap))
+	if (not TryPickEnemyItemOperationMap(*EnemyMapObject, EnemyMap)
+		|| not PopulateWorldMissionContextForEnemyMap(EnemyMapObject)
+		|| not BeginCampaignOperation(EWorldOperationTarget::EnemyItem, EnemyMapObject->GetAnchorKey(),
+		                              EMapMission::None))
 	{
-		return;
-	}
-
-	if (not PopulateWorldMissionContextForEnemyMap(EnemyMapObject))
-	{
-		return;
-	}
-
-	const int32 PreviousMapIndex = M_WorldStateAndSaveManager->GetEnemyObjectProceduralMapIndex();
-	M_WorldStateAndSaveManager->AdvanceEnemyObjectProceduralMapIndex(M_ShuffledEnemyObjectProceduralMaps.Num());
-	if (not BeginCampaignOperation(EWorldOperationTarget::EnemyItem, EnemyMapObject->GetAnchorKey(),
-	                               EMapMission::None))
-	{
-		M_WorldStateAndSaveManager->SetEnemyObjectProceduralMapIndex(PreviousMapIndex);
+		M_WorldStateAndSaveManager->RestoreOperationMapCursors(CursorsBeforeLaunch);
 		return;
 	}
 
@@ -1183,6 +1354,78 @@ bool AWorldPlayerController::TryGetEnemyMap(TSoftObjectPtr<UWorld>& OutEnemyMap)
 	RTSFunctionLibrary::ReportError(
 		FString::Printf(TEXT("Enemy object procedural map at shuffled index %d is not configured."), EnemyMapIndex));
 	return false;
+}
+
+bool AWorldPlayerController::TryPickEnemyOperationMap(const EWorldOperationTarget OperationTarget,
+                                                      const FGuid& TargetKey,
+                                                      TSoftObjectPtr<UWorld>& OutOperationMap)
+{
+	if (M_WorldOperationMapSettings.EnemyOperationMapSource == EWorldEnemyOperationMapSource::HandmadeMaps)
+	{
+		return TryPickHandmadeOperationMap(OperationTarget, TargetKey, OutOperationMap);
+	}
+
+	// Procedural maps keep the old rule: one list for items and divisions, the next map on every launch.
+	if (not TryGetEnemyMap(OutOperationMap))
+	{
+		return false;
+	}
+
+	M_WorldStateAndSaveManager->AdvanceEnemyObjectProceduralMapIndex(M_ShuffledEnemyObjectProceduralMaps.Num());
+	return true;
+}
+
+bool AWorldPlayerController::TryPickEnemyItemOperationMap(const AWorldEnemyObject& EnemyMapObject,
+                                                          TSoftObjectPtr<UWorld>& OutOperationMap)
+{
+	const EMapEnemyItem ItemType = EnemyMapObject.GetEnemyItemType();
+	const TSoftObjectPtr<UWorld>* StoryMap = M_WorldOperationMapSettings.StoryEnemyItemMaps.Find(ItemType);
+	const bool bHasStoryMap = StoryMap != nullptr && not StoryMap->IsNull();
+	switch (WorldOperationMapPool::GetEnemyItemMapRoute(ItemType, bHasStoryMap,
+	                                                    M_WorldOperationMapSettings.EnemyOperationMapSource))
+	{
+	case EWorldEnemyItemMapRoute::StoryMap:
+		OutOperationMap = *StoryMap;
+		return true;
+	case EWorldEnemyItemMapRoute::Refuse:
+		WorldPlayerOperationMapConstants::ReportMissingStoryLevel(ItemType);
+		return false;
+	default:
+		return TryPickEnemyOperationMap(EWorldOperationTarget::EnemyItem, EnemyMapObject.GetAnchorKey(),
+		                                OutOperationMap);
+	}
+}
+
+bool AWorldPlayerController::TryPickHandmadeOperationMap(const EWorldOperationTarget OperationTarget,
+                                                         const FGuid& TargetKey,
+                                                         TSoftObjectPtr<UWorld>& OutOperationMap)
+{
+	if (not GetIsValidWorldStateAndSaveManager())
+	{
+		return false;
+	}
+
+	const bool bIsDivisionOperation = OperationTarget == EWorldOperationTarget::EnemyDivision;
+	const TArray<TSoftObjectPtr<UWorld>>& ShuffledMaps = bIsDivisionOperation
+		                                                     ? M_ShuffledHandmadeFieldMaps
+		                                                     : M_ShuffledHandmadeEnemyItemMaps;
+	FWorldOperationMapPoolState& PoolState = bIsDivisionOperation
+		                                         ? M_WorldStateAndSaveManager->GetHandmadeFieldMapPool()
+		                                         : M_WorldStateAndSaveManager->GetHandmadeEnemyItemMapPool();
+	const TCHAR* PoolName = bIsDivisionOperation ? TEXT("HandmadeFieldMaps") : TEXT("HandmadeEnemyItemMaps");
+	const bool bWasTargetRemembered = PoolState.MapByTargetKey.Contains(TargetKey);
+	if (not WorldOperationMapPool::TryPickMapForTarget(PoolState, TargetKey, ShuffledMaps, OutOperationMap))
+	{
+		RTSFunctionLibrary::ReportError(FString::Printf(
+			TEXT("No handmade operation map is set in FWorldOperationMapSettings::%s on the world controller."),
+			PoolName));
+		return false;
+	}
+
+	UE_LOG(LogTemp, Display, TEXT("RTS_WORLDCAMPAIGN_OPERATION_MAP pool=%s target=%s map=%s retry=%d nextIndex=%d"),
+	       PoolName, *TargetKey.ToString(), *OutOperationMap.ToSoftObjectPath().ToString(),
+	       bWasTargetRemembered ? 1 : 0, PoolState.NextMapIndex);
+	return true;
 }
 
 void AWorldPlayerController::OpenOperationMap(const TSoftObjectPtr<UWorld>& OperationMap) const
@@ -1553,6 +1796,7 @@ void AWorldPlayerController::OnGeneratedCampaignAsyncWorkFinished()
 	}
 	M_WorldStateAndSaveManager->CacheCurrentWorldState(*M_WorldGenerator.Get());
 	M_WorldStateAndSaveManager->ResetEnemyObjectProceduralMapIndex();
+	M_WorldStateAndSaveManager->ResetHandmadeOperationMapPools();
 	InitializeOperationMapsForCampaignSeed(M_WorldStateAndSaveManager->GetWorldGenerationSeed());
 	const FPlayerProfileSaveData PlayerProfileSaveData =
 		M_WorldProfileAndUIManager->OnSetupUIForNewCampaign(M_PlayerFaction);

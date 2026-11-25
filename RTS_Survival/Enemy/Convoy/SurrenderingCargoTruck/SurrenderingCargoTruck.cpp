@@ -1,4 +1,4 @@
-// Copyright (C) Bas Blokzijl - All rights reserved.
+﻿// Copyright (C) Bas Blokzijl - All rights reserved.
 
 #include "SurrenderingCargoTruck.h"
 
@@ -389,6 +389,10 @@ void ASurrenderingCargoTruck::StartScuttleCountdown()
 	       CountdownSeconds);
 	OnScuttleCountdownStarted.Broadcast(this, CountdownSeconds);
 	BP_OnScuttleCountdownStarted(CountdownSeconds);
+	if (USurrenderingTruckSubsystem* Subsystem = USurrenderingTruckSubsystem::Get(this))
+	{
+		Subsystem->BroadcastScuttleCountdownStarted(this);
+	}
 }
 
 void ASurrenderingCargoTruck::HoldInPlace()

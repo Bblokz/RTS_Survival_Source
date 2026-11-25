@@ -7,6 +7,8 @@ Run in the editor with the map open (run_wire_ore_stages.py sends it over UECP),
 import unreal
 
 STAGE_DIR = '/Game/RTS_Survival/Blueprints/Missions/GerCampaign/OreMountains/'
+# The map's data assets live next to the level (owner, 2026-11-24).
+DATA_DIR = '/Game/RTS_Survival/Maps/GerMissions/Ger_2ndOreMountains/'
 
 STAGES = [
     ('Mission_Ore_Opening', None),
@@ -19,18 +21,22 @@ STAGES = [
     ('Mission_Ore_Convoy5_Cases', ('after', 'Mission_Ore_Convoy4_Hunters')),
     ('Mission_Ore_HeavyCounterattack', ('after', 'Mission_Ore_Convoy5_Cases')),
     ('Mission_Ore_Convoy6_Heavy', ('after', 'Mission_Ore_Convoy5_Cases')),
-    ('Mission_Ore_RadioOutpost', ('after', 'Mission_Ore_Opening')),
+    # 2026-11-24 owner: the opening was overwhelming; the outpost bonus waits for convoy 1, Base B for convoy 2.
+    ('Mission_Ore_RadioOutpost', ('after', 'Mission_Ore_Convoy1_FuelRun')),
     ('Mission_Ore_RecoverCases', ('after', 'Mission_Ore_RadioOutpost', ['Mission_Ore_Convoy4_Hunters'])),
-    ('Mission_Ore_DestroyBaseB', ('after', 'Mission_Ore_Opening')),
+    # 2026-11-24 owner (intro tours): the 8:39 starts are staggered; Base B waits for the light counterattack.
+    ('Mission_Ore_DestroyBaseB', ('after', 'Mission_Ore_LightCounterattack')),
     ('Mission_Ore_BaseA', ('near', (2010.0, 24120.0, 1400.0), 9000.0)),
     ('Mission_Ore_Battery', ('near', (18760.0, 13400.0, 950.0), 9000.0)),
+    # 2026-11-24 owner: KV-3 air drop at the west end of the ridge, timed from convoy 3 finishing (DA_Ore_KV3AirDrop).
+    ('Mission_Ore_KV3Drop', ('after', 'Mission_Ore_Convoy3_AmmoSplit')),
     ('Mission_Ore_Ending', ('after', 'Mission_Ore_DestroyBaseB')),
 ]
 
 # Per-instance properties (the Intro map showed a data asset equal to the CDO value coming back empty on load).
 INSTANCE_ASSETS = {
-    'Mission_Ore_LightCounterattack': {'settings': STAGE_DIR + 'DA_Ore_LightCounterattack'},
-    'Mission_Ore_HeavyCounterattack': {'settings': STAGE_DIR + 'DA_Ore_HeavyCounterattack'},
+    'Mission_Ore_LightCounterattack': {'settings': DATA_DIR + 'DA_Ore_LightCounterattack'},
+    'Mission_Ore_HeavyCounterattack': {'settings': DATA_DIR + 'DA_Ore_HeavyCounterattack'},
 }
 
 

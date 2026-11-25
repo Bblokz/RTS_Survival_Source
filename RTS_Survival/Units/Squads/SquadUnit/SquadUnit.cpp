@@ -3966,6 +3966,12 @@ void ASquadUnit::OnMoveCompleted(FAIRequestID RequestID, EPathFollowingResult::T
 		OnMoveCompleted_Cover(Result);
 		return;
 	}
+	if (M_VehicleDodgeRequestID.IsValid() && RequestID.GetID() == M_VehicleDodgeRequestID.GetID())
+	{
+		// Out of a vehicle's way (or cut short by a new order): no command waits for this move.
+		M_VehicleDodgeRequestID = FAIRequestID::InvalidRequest;
+		return;
+	}
 	const bool bIsWalkingPlannedMove = M_ActiveCommand == EAbilityID::IdMove &&
 		M_PlayerPlannedPosition.Type != ESquadPlannedPositionType::None && M_PlannedMoveRequestID.IsValid();
 	if (bIsWalkingPlannedMove && RequestID.GetID() != M_PlannedMoveRequestID.GetID())
@@ -4472,7 +4478,9 @@ void ASquadUnit::UnitDies_OnDeathMontageFinished()
 	const FVector InheritedVelocity = GetVelocity();
 	UnitDies_ReleaseBodyForRagdoll();
 	UnitDies_SetCountsAsSimulatingRagdoll(true);
-	M_RagdollSettings.StartRagdoll(this, GetMesh(), AnimBp_SquadUnit, M_DeathHit, InheritedVelocity);
+	// A run-over soldier already got the crush blood; the regular death effects would put bullet blood on top.
+	M_RagdollSettings.StartRagdoll(this, GetMesh(), AnimBp_SquadUnit, M_DeathHit, InheritedVelocity,
+	                               not bM_WasRunOver);
 	UnitDies_ScheduleCorpseSink();
 }
 

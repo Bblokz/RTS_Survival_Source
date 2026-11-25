@@ -53,6 +53,10 @@ static FString GetStringHarvesterAIStatus(EHarvesterAIAction Status)
 		return "ReverseIntoUnloadBay";
 	case EHarvesterAIAction::CraneUnloading:
 		return "CraneUnloading";
+	case EHarvesterAIAction::UnstuckTowardsResource:
+		return "UnstuckTowardsResource";
+	case EHarvesterAIAction::UnstuckTowardsDropOff:
+		return "UnstuckTowardsDropOff";
 	default:
 		return "Unknown";
 	}

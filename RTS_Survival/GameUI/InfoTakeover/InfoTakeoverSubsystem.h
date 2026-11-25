@@ -44,6 +44,10 @@ struct FQueuedInfoTakeover
 	UPROPERTY()
 	FSquadInfoTakeoverContent SquadContent;
 
+	// Document takeovers only: the caller's text.
+	UPROPERTY()
+	FDocumentTakeoverContent DocumentContent;
+
 	// Set when a caller waits for the close (OnTakeoverRequestFinished); INDEX_NONE for fire-and-forget takeovers.
 	UPROPERTY()
 	int32 RequestId = INDEX_NONE;
@@ -176,6 +180,21 @@ public:
 	 */
 	int32 QueueBxpPackUpTakeover();
 
+	/**
+	 * @brief Queues the capturing trucks field manual (scuttle countdown, the squad and health rules, capture versus
+	 * destroy), waited on like the camera controls takeover.
+	 * @return The request id that OnTakeoverRequestFinished reports exactly once; field manuals show even while unit intel is off.
+	 */
+	int32 QueueCapturingTrucksTakeover();
+
+	/**
+	 * @brief Queues a captured document (paper sheet with the caller's text), waited on like the camera controls
+	 * takeover. Documents are story content: they show even while unit intel is off and are archived under Lore.
+	 * @param Content Title, intro, the sheet's heading, lines and stamp, and the archive key.
+	 * @return The request id that OnTakeoverRequestFinished reports exactly once.
+	 */
+	int32 QueueDocumentTakeover(const FDocumentTakeoverContent& Content);
+
 	// Fires once per queued request id: closed, skipped (broken widget) or cancelled.
 	FOnInfoTakeoverRequestFinished OnTakeoverRequestFinished;
 
@@ -246,6 +265,8 @@ private:
 	UW_InfoTakeover* CreateDigInTakeoverWidget() const;
 	UW_InfoTakeover* CreateWallBreachTakeoverWidget() const;
 	UW_InfoTakeover* CreateAdrenalineShotTakeoverWidget() const;
+	UW_InfoTakeover* CreateCapturingTrucksTakeoverWidget() const;
+	UW_InfoTakeover* CreateDocumentTakeoverWidget(const FQueuedInfoTakeover& QueuedTakeover) const;
 
 	/**
 	 * @brief Queues a field manual takeover that a mission node waits on; shared by every tutorial kind.
@@ -275,5 +296,7 @@ private:
 	static FArchiveCustomContent MakeDigInArchiveContent();
 	static FArchiveCustomContent MakeWallBreachArchiveContent();
 	static FArchiveCustomContent MakeAdrenalineShotArchiveContent();
+	static FArchiveCustomContent MakeCapturingTrucksArchiveContent();
+	static FArchiveCustomContent MakeDocumentArchiveContent(const FDocumentTakeoverContent& DocumentContent);
 	const UDataTable* GetTrainingOptionsTable();
 };

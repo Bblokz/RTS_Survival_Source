@@ -1262,6 +1262,34 @@ protected:
 	UFUNCTION(BlueprintImplementableEvent, Category = "Mission|AirDelivery")
 	void BP_OnAirDeliveredHQOutOfGlider(ANomadicVehicle* NomadicVehicle, const int32 ID);
 
+	/**
+	 * @brief Flies a player vehicle (a harvester, a tank) in under a cargo plane on ropes, like
+	 * DeliverPlayerNomadicByCargoPlane, and sets it down on the spot. A blue smoke beacon marks the spot until it is down.
+	 * @param VehicleSubtype The vehicle to deliver; the player's faction must have a class for it.
+	 * @param DropLocation Where it is set down; the ground below it is used. Pick open, flat ground.
+	 * @param DropRotation Only the yaw is used.
+	 * @param ID Handed back in BP_OnAirDeliveredVehicleLanded.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|AirDelivery")
+	void DeliverPlayerVehicleByCargoPlane(const ETankSubtype VehicleSubtype, const FVector DropLocation,
+	                                      const FRotator DropRotation, const int32 ID = 0);
+
+	/**
+	 * @brief DeliverPlayerVehicleByCargoPlane for a training option, so a faction pick such as
+	 * GetPlayerLightMediumTank_PZIII_J_Or_PZIV_F1 can be flown in straight from its node. Tanks only.
+	 * @param Vehicle A tank training option (UNType_Tank); anything else is reported and ignored.
+	 * @param DropLocation Where it is set down; the ground below it is used.
+	 * @param DropRotation Only the yaw is used.
+	 * @param ID Handed back in BP_OnAirDeliveredVehicleLanded.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|AirDelivery")
+	void DeliverPlayerTrainingOptionByCargoPlane(const FTrainingOption& Vehicle, const FVector DropLocation,
+	                                             const FRotator DropRotation, const int32 ID = 0);
+
+	// The vehicle of DeliverPlayerVehicleByCargoPlane is on the ground; null when the delivery failed.
+	UFUNCTION(BlueprintImplementableEvent, Category = "Mission|AirDelivery")
+	void BP_OnAirDeliveredVehicleLanded(ATankMaster* Vehicle, const ETankSubtype VehicleSubtype, const int32 ID);
+
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void MoveCamera(FMovePlayerCamera CameraMove);
 

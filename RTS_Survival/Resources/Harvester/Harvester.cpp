@@ -18,11 +18,36 @@
 #include "RTS_Survival/Resources/ResourceComponent/ResourceComponent.h"
 #include "RTS_Survival/Resources/UnloadStation/ResourceUnloadStation.h"
 #include "RTS_Survival/Resources/UnloadStation/UnloadStationTypes.h"
+#include "RTS_Survival/RTSComponents/RTSComponent.h"
+#include "RTS_Survival/RTSComponents/HealthComponent.h"
+#include "RTS_Survival/GameUI/Healthbar/W_HealthBar.h"
 #include "RTS_Survival/Units/Tanks/TrackedTank/PathFollowingComponent/TrackPathFollowingComponent.h"
 #include "TimerManager.h"
 #include "RTS_Survival/GameUI/Pooled_AnimatedVerticalText/Pooling/AnimatedTextWidgetPoolManager/AnimatedTextWidgetPoolManager.h"
 #include "RTS_Survival/Utils/RTSRichTextConverters/FRTSRichTextConverter.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
+#include "RTS_Survival/RTSComponents/RTSOptimizer/RTSOptimizer.h"
+
+DEFINE_LOG_CATEGORY_STATIC(LogRTSHarvester, Log, All);
+
+namespace HarvesterWatchdogPrivate
+{
+	// Longest harvest montage in the project at play rate 1 (Pz I, Pz IV, T-34 Breaker: 10 s), with slack.
+	constexpr float NominalHarvestMontageSeconds = 12.f;
+	constexpr float WatchdogSlackSeconds = 6.f;
+}
+
+namespace HarvesterAutonomousPrivate
+{
+	// How often an idle autonomous (AI) harvester looks again for a field, or for a drop-off for its cargo.
+	constexpr float AutonomousHarvestRetrySeconds = 10.f;
+	// The first attempt after StartAutonomousHarvest; short so a harvester that just spawned starts at once, but late
+	// enough for BeginPlay and the async resource data to be in place.
+	constexpr float AutonomousHarvestFirstAttemptSeconds = 0.5f;
+	// Nearest fields asked from the async thread; blacklisted and fully occupied ones are skipped.
+	constexpr int32 AutonomousResourceCandidates = 8;
+	constexpr uint8 HumanPlayer = 1;
+}
 
 // Sets default values for this component's properties
 UHarvester::UHarvester()
@@ -68,7 +93,7 @@ void UHarvester::UpgradeCapacityForResource(const int32 ExtraCapacity, const ERT
 			return;
 		}
 
-		CargoSlot->MaxCapacity += ExtraCapacity;
+		CargoSlot->MaxCapacity += ExtraCapacity * HarvesterYield::CargoCapacityMultiplier;
 		return;
 	}
 }
@@ -275,6 +300,11 @@ void UHarvester::OnCargoNotFullAfterHarvesting()
 
 void UHarvester::SetupPlayerResourceManagerReference(const UWorld* World)
 {
+	// Player controller 0 is the human; an AI harvester has nothing to do with the human's resources.
+	if (not GetIsOwnedByHumanPlayer())
+	{
+		return;
+	}
 	APlayerController* PlayerController = UGameplayStatics::GetPlayerController(this, 0);
 	if (!IsValid(PlayerController))
 	{
@@ -356,7 +386,8 @@ bool UHarvester::GetIsHarvesterIdle() const
 
 void UHarvester::CheckHarvesterIdle()
 {
-	if (!GetIsHarvesterIdle())
+	// The autonomous loop runs its own idle check (TickAutonomousHarvest) and must not switch resource type.
+	if (GetIsHarvestingAutonomously() || !GetIsHarvesterIdle())
 	{
 		return;
 	}
@@ -474,6 +505,13 @@ void UHarvester::FinishReturnCargoCommand() const
 
 void UHarvester::OnHarvestAnimationFinished()
 {
+	if (M_HarvestStatus != EHarvesterAIAction::PlayHarvestAnimation)
+	{
+		// A montage that ended after the harvester moved on (watchdog, new command); nothing to finish.
+		return;
+	}
+	StopHarvestAnimationWatchdog();
+	SetOwnerKeepsMontagesTicking(false);
 	const EResourceValidation Validation = GetCanHarvestResource();
 	if (Validation == EResourceValidation::IsValidForHarvest)
 	{
@@ -508,6 +546,8 @@ void UHarvester::TerminateHarvestCommand()
 		}
 		break;
 	case EHarvesterAIAction::PlayHarvestAnimation:
+		StopHarvestAnimationWatchdog();
+		SetOwnerKeepsMontagesTicking(false);
 		if (GetIsValidOwnerHarvesterInterface())
 		{
 			M_IOwnerHarvesterInterface->Execute_StopHarvesterAnimation(GetOwner());
@@ -603,6 +643,8 @@ void UHarvester::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	{
 		World->GetTimerManager().ClearTimer(M_CheckHarvesterIdleTimer);
 		World->GetTimerManager().ClearTimer(M_BlacklistClearTimer);
+		World->GetTimerManager().ClearTimer(M_AutonomousHarvestTimer);
+		World->GetTimerManager().ClearTimer(M_HarvestAnimationWatchdog);
 	}
 }
 
@@ -619,7 +661,7 @@ void UHarvester::SetupHarvester(
 		{
 			FHarvesterCargoSlot CargoSlot;
 			CargoSlot.ResourceType = ResourceType;
-			CargoSlot.MaxCapacity = MaxCargoPerResource[ResourceType];
+			CargoSlot.MaxCapacity = MaxCargoPerResource[ResourceType] * HarvesterYield::CargoCapacityMultiplier;
 			CargoSlot.CurrentAmount = 0;
 			M_CargoSpace.Add(ResourceType, CargoSlot);
 		}
@@ -855,6 +897,9 @@ void UHarvester::HarvestAIAction_MoveToTargetResource()
 
 void UHarvester::OnUnableToMoveToResource(const ECannotMoveToResource Reason)
 {
+	UE_LOG(LogRTSHarvester, Log, TEXT("RTS_HARVESTER %s cannot use field %s: %s"), *GetNameSafe(GetOwner()),
+	       TargetResource.IsValid() ? *GetNameSafe(TargetResource->GetOwner()) : TEXT("None"),
+	       *Global_GetCannotMoveToResourceAsString(Reason));
 	if constexpr (DeveloperSettings::Debugging::GHarvestResources_Compile_DebugSymbols)
 	{
 		const FString ReasonString = Global_GetCannotMoveToResourceAsString(Reason);
@@ -882,6 +927,8 @@ void UHarvester::OnMoveToTargetResourceFinished(FAIRequestID RequestID, const FP
 	}
 	if (!GetIsTargetResourceHarvestable())
 	{
+		UE_LOG(LogRTSHarvester, Log, TEXT("RTS_HARVESTER %s reached field %s but it is gone or empty"),
+		       *GetNameSafe(GetOwner()), TargetResource.IsValid() ? *GetNameSafe(TargetResource->GetOwner()) : TEXT("None"));
 		HarvestDebug("Resource not valid or empty, find new one!", FColor::Cyan);
 		HarvestAIExecuteAction(EHarvesterAIAction::AsyncFindResource);
 		return;
@@ -932,7 +979,64 @@ void UHarvester::HarvestAIAction_PlayHarvesterAnimation()
 	{
 		RotateTowardsTargetLocation(TargetResource->GetResourceLocationNotThreadSafe());
 	}
+	SetOwnerKeepsMontagesTicking(true);
 	M_IOwnerHarvesterInterface->Execute_PlayHarvesterAnimation(GetOwner());
+	StartHarvestAnimationWatchdog();
+}
+
+void UHarvester::SetOwnerKeepsMontagesTicking(const bool bKeepTicking) const
+{
+	const AActor* Owner = GetOwner();
+	if (not IsValid(Owner))
+	{
+		return;
+	}
+	// Not every harvester owner is optimised; without an optimizer its meshes always tick.
+	if (URTSOptimizer* Optimizer = Owner->FindComponentByClass<URTSOptimizer>())
+	{
+		Optimizer->SetKeepMontagesTicking(bKeepTicking);
+	}
+}
+
+void UHarvester::StartHarvestAnimationWatchdog()
+{
+	UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		return;
+	}
+	using namespace HarvesterWatchdogPrivate;
+	const float Seconds = NominalHarvestMontageSeconds / FMath::Max(HarvestingAnimationPlayRate, 0.05f)
+		+ WatchdogSlackSeconds;
+	World->GetTimerManager().SetTimer(M_HarvestAnimationWatchdog, this, &UHarvester::OnHarvestAnimationWatchdog,
+	                                  Seconds, false);
+}
+
+void UHarvester::StopHarvestAnimationWatchdog()
+{
+	if (const UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(M_HarvestAnimationWatchdog);
+	}
+}
+
+void UHarvester::OnHarvestAnimationWatchdog()
+{
+	if (M_HarvestStatus != EHarvesterAIAction::PlayHarvestAnimation)
+	{
+		return;
+	}
+	++M_HarvestWatchdogFinishCount;
+	if (not bM_HasLoggedHarvestWatchdog)
+	{
+		bM_HasLoggedHarvestWatchdog = true;
+		// Safety net only: the optimizer keeps the montage ticking off-screen, and the Blueprint wires OnCompleted only,
+		// so an interrupted or failed montage ends up here.
+		UE_LOG(LogRTSHarvester, Warning, TEXT("RTS_HARVESTER harvest animation of %s never reported its end; the "
+			       "watchdog finishes it (montage interrupted or failed to play?). hidden=%d"),
+		       *GetNameSafe(GetOwner()), IsValid(GetOwner()) && GetOwner()->IsHidden() ? 1 : 0);
+	}
+	OnHarvestAnimationFinished();
 }
 
 void UHarvester::HarvestAIAction_AsyncGetResource()
@@ -1016,10 +1120,11 @@ void UHarvester::HarvestAIAction_AsyncGetDropOff()
 	}
 
 	TWeakObjectPtr<UHarvester> WeakThis(this);
+	// Only drop-offs of the harvester's own player: an AI harvester delivers to its own refinery.
 	M_GameResourceManager->AsyncRequestClosestDropOffs(
 		GetHarvesterLocation(),
 		8,
-		1,
+		GetOwningPlayer(),
 		GetDropOffAmount(),
 		M_TargetResourceType,
 		[WeakThis](const TArray<TWeakObjectPtr<UResourceDropOff>>& DropOffs)
@@ -1293,7 +1398,8 @@ void UHarvester::HarvestAIAction_HarvestTargetResource()
 		return;
 	}
 
-	const int32 AmountHarvested = TargetResource->HarvestResource(SpaceLeftForTargetResource());
+	const int32 AmountHarvested = TargetResource->HarvestResource(SpaceLeftForTargetResource(),
+	                                                               HarvesterYield::HarvestYieldMultiplier);
 	if (AmountHarvested > 0)
 	{
 		OnHarvestedAddReturnCargoAbility();
@@ -1649,7 +1755,8 @@ bool UHarvester::ConsumeTeleportAllowanceOrBlacklist(const EHarvesterAIAction Ac
 
 void UHarvester::OnNoDropOffsFound_DisplayMessage()
 {
-	if(not GetWorld())
+	// The message is feedback for the human about his own harvesters.
+	if(not GetWorld() || not GetIsOwnedByHumanPlayer())
 	{
 		return;
 	}
@@ -1673,6 +1780,170 @@ void UHarvester::OnNoDropOffsFound_DisplayMessage()
 				Settings);
 		}
 	}
+}
+
+uint8 UHarvester::GetOwningPlayer() const
+{
+	const AActor* Owner = GetOwner();
+	const URTSComponent* OwnerRTSComponent = IsValid(Owner) ? Owner->FindComponentByClass<URTSComponent>() : nullptr;
+	if (not IsValid(OwnerRTSComponent))
+	{
+		RTSFunctionLibrary::ReportError("Harvester owner has no RTS component; treated as owned by player 1."
+			"\n Harvester: " + GetName());
+		return HarvesterAutonomousPrivate::HumanPlayer;
+	}
+	return OwnerRTSComponent->GetOwningPlayer();
+}
+
+bool UHarvester::GetIsOwnedByHumanPlayer() const
+{
+	const AActor* Owner = GetOwner();
+	const URTSComponent* OwnerRTSComponent = IsValid(Owner) ? Owner->FindComponentByClass<URTSComponent>() : nullptr;
+	// Quiet: without an RTS component the harvester behaves as before (the human's).
+	return not IsValid(OwnerRTSComponent)
+		|| OwnerRTSComponent->GetOwningPlayer() == HarvesterAutonomousPrivate::HumanPlayer;
+}
+
+void UHarvester::StartAutonomousHarvest(const ERTSResourceType ResourceType)
+{
+	using namespace HarvesterAutonomousPrivate;
+	if (ResourceType == ERTSResourceType::Resource_None)
+	{
+		RTSFunctionLibrary::ReportError("StartAutonomousHarvest called without a resource type."
+			"\n Harvester: " + GetName());
+		return;
+	}
+	// Before SetupHarvester (Blueprint BeginPlay) the cargo slots are not known yet; the tick checks again.
+	if (not M_CargoSpace.IsEmpty() && not M_CargoSpace.Contains(ResourceType))
+	{
+		RTSFunctionLibrary::ReportError("StartAutonomousHarvest: this harvester has no cargo slot for "
+			+ Global_GetResourceTypeAsString(ResourceType) + "\n Harvester: " + GetName());
+		return;
+	}
+	UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		return;
+	}
+	M_AutonomousResourceType = ResourceType;
+	bM_AutonomousStartPending = true;
+	World->GetTimerManager().SetTimer(M_AutonomousHarvestTimer, this, &UHarvester::TickAutonomousHarvest,
+	                                  AutonomousHarvestRetrySeconds, true, AutonomousHarvestFirstAttemptSeconds);
+}
+
+void UHarvester::StopAutonomousHarvest()
+{
+	M_AutonomousResourceType = ERTSResourceType::Resource_None;
+	bM_AutonomousStartPending = false;
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(M_AutonomousHarvestTimer);
+	}
+}
+
+void UHarvester::TickAutonomousHarvest()
+{
+	if (not GetIsHarvestingAutonomously() || not GetIsValidCommandOwner())
+	{
+		return;
+	}
+	if (not M_CargoSpace.IsEmpty() && not M_CargoSpace.Contains(M_AutonomousResourceType))
+	{
+		RTSFunctionLibrary::ReportError("Autonomous harvest stopped: no cargo slot for "
+			+ Global_GetResourceTypeAsString(M_AutonomousResourceType) + "\n Harvester: " + GetName());
+		StopAutonomousHarvest();
+		return;
+	}
+	if (not bM_AutonomousStartPending && not GetIsHarvesterIdle())
+	{
+		return;
+	}
+	if (GetResourceTypeOfMostFullCargo() != ERTSResourceType::Resource_None)
+	{
+		// Deliver what is on board first (also cargo of another type); the next idle tick looks for a field again.
+		bM_AutonomousStartPending = false;
+		M_CommandOwner->ReturnCargo(true);
+		return;
+	}
+	AutonomousHarvest_AsyncFindResource();
+}
+
+void UHarvester::AutonomousHarvest_AsyncFindResource()
+{
+	if (not IsValid(M_GameResourceManager))
+	{
+		// Not set up yet (called before BeginPlay); the next tick tries again.
+		return;
+	}
+	TWeakObjectPtr<UHarvester> WeakThis(this);
+	M_GameResourceManager->AsyncRequestClosestResource(
+		GetHarvesterLocation(),
+		HarvesterAutonomousPrivate::AutonomousResourceCandidates,
+		M_AutonomousResourceType,
+		[WeakThis](const TArray<TWeakObjectPtr<UResourceComponent>>& Resources)
+		{
+			if (UHarvester* This = WeakThis.Get())
+			{
+				This->AsyncOnReceiveResourceForAutonomous(Resources);
+			}
+		}
+	);
+	HarvestDebug("AUTONOMOUS: started async request to find the closest field", FColor::Green);
+}
+
+void UHarvester::AsyncOnReceiveResourceForAutonomous(const TArray<TWeakObjectPtr<UResourceComponent>>& Resources)
+{
+	if (not GetIsHarvestingAutonomously() || not GetIsValidCommandOwner())
+	{
+		return;
+	}
+	if (not bM_AutonomousStartPending && not GetIsHarvesterIdle())
+	{
+		return;
+	}
+	for (const TWeakObjectPtr<UResourceComponent>& Resource : Resources)
+	{
+		if (not Resource.IsValid() || M_ResourceBlacklist.Contains(Resource))
+		{
+			continue;
+		}
+		if (Resource->GetResourceType() != M_AutonomousResourceType || not Resource->StillContainsResources()
+			|| Resource->IsResourceFullyOccupiedByHarvesters())
+		{
+			continue;
+		}
+		// The normal harvest command: when this field runs dry the state machine moves on to the next nearest one.
+		const ECommandQueueError Error = M_CommandOwner->HarvestResource(Resource->GetOwner(), true);
+		if (Error != ECommandQueueError::NoError)
+		{
+			RTSFunctionLibrary::ReportError("Autonomous harvester could not be ordered to harvest (error "
+				+ FString::FromInt(static_cast<int32>(Error)) + "); is IdHarvestResource on its command card?"
+				"\n Harvester: " + GetName());
+			return;
+		}
+		bM_AutonomousStartPending = false;
+		return;
+	}
+	HarvestDebug("AUTONOMOUS: no field found, retry later", FColor::Orange);
+}
+
+bool UHarvester::GetIsValidCommandOwner()
+{
+	if (M_CommandOwner.IsValid())
+	{
+		return true;
+	}
+	M_CommandOwner = Cast<ICommands>(GetOwner());
+	if (M_CommandOwner.IsValid())
+	{
+		return true;
+	}
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+		this,
+		"M_CommandOwner",
+		"UHarvester::GetIsValidCommandOwner",
+		this);
+	return false;
 }
 
 void UHarvester::BeginPlay_SetupAnimatedTextWidgetPoolManager()
@@ -1786,6 +2057,7 @@ int32 UHarvester::Crane_DeliverChunk(const int32 ChunkAmount, const FVector& Tex
 
 void UHarvester::Crane_OnUnloadEnded(const EUnloadEndReason Reason)
 {
+	StopUnloadProgressBar();
 	// The station already freed the bay.
 	M_UnloadStation.Reset();
 	M_UnloadBayIndex = INDEX_NONE;
@@ -2097,6 +2369,8 @@ void UHarvester::OnDockedAtUnloadBay()
 	}
 	M_HarvestStatus = EHarvesterAIAction::CraneUnloading;
 	HarvestDebug("Docked in unload bay " + FString::FromInt(M_UnloadBayIndex), FColor::Green);
+	// Before the station call: a station that cannot take the cargo ends the unload at once, which stops the bar.
+	StartUnloadProgressBar();
 	M_UnloadStation->OnHarvesterDocked(M_UnloadBayIndex, *this, *M_TargetDropOff, M_TargetResourceType,
 	                                   GetCraneCargoAmount());
 }
@@ -2148,6 +2422,7 @@ void UHarvester::AbandonUnloadStation(const bool bUseOldDropOffPoint)
 
 void UHarvester::ReleaseUnloadBay()
 {
+	StopUnloadProgressBar();
 	if (M_UnloadBayIndex == INDEX_NONE)
 	{
 		M_UnloadStation.Reset();
@@ -2175,4 +2450,159 @@ bool UHarvester::GetIsValidUnloadStation() const
 	}
 	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(this, "M_UnloadStation", "GetIsValidUnloadStation", this);
 	return false;
+}
+
+// ===== unload progress bar (health bar ActionProgressBar) =====
+
+namespace HarvesterUnloadProgressBar
+{
+	// Seconds between bar refreshes (the bar is small on screen; 20 Hz reads as smooth).
+	constexpr float RefreshInterval = 0.05f;
+	// The time estimate alone never fills the bar: the last part waits for the last credited load.
+	constexpr float MaxTimeEstimateFill = 0.97f;
+}
+
+void UHarvester::StartUnloadProgressBar()
+{
+	UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		return;
+	}
+	StopUnloadProgressBar();
+	M_UnloadProgress.bIsActive = true;
+	M_UnloadProgress.InitialCargo = GetCraneCargoAmount();
+	M_UnloadProgress.StartSeconds = World->GetTimeSeconds();
+	M_UnloadProgress.ExpectedSeconds = M_UnloadStation.IsValid() ? M_UnloadStation->GetExpectedUnloadSeconds() : 0.f;
+	M_UnloadProgress.Fill = 0.f;
+
+	// The player sees how long the unload takes without selecting the harvester; the bar's own settings return after.
+	const AActor* Owner = GetOwner();
+	if (UHealthComponent* HealthComponent = IsValid(Owner) ? Owner->FindComponentByClass<UHealthComponent>() : nullptr)
+	{
+		HealthComponent->SetHealthBarForcedVisible(true);
+		M_UnloadProgress.ForcedHealthComponent = HealthComponent;
+	}
+
+	TWeakObjectPtr<UHarvester> WeakThis(this);
+	FTimerDelegate RefreshDelegate;
+	RefreshDelegate.BindLambda([WeakThis]()
+	{
+		if (not WeakThis.IsValid())
+		{
+			return;
+		}
+		WeakThis->OnUnloadProgressBarRefresh();
+	});
+	World->GetTimerManager().SetTimer(M_UnloadProgress.RefreshTimer, RefreshDelegate,
+	                                  HarvesterUnloadProgressBar::RefreshInterval, /*bLoop=*/true);
+	OnUnloadProgressBarRefresh();
+}
+
+void UHarvester::StopUnloadProgressBar()
+{
+	if (const UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(M_UnloadProgress.RefreshTimer);
+	}
+	if (UHealthComponent* HealthComponent = M_UnloadProgress.ForcedHealthComponent.Get())
+	{
+		HealthComponent->SetHealthBarForcedVisible(false);
+	}
+	M_UnloadProgress.ForcedHealthComponent.Reset();
+	M_UnloadProgress.bIsActive = false;
+	M_UnloadProgress.Fill = 0.f;
+	if (not M_UnloadProgress.bIsShown)
+	{
+		return;
+	}
+	M_UnloadProgress.bIsShown = false;
+	if (UW_HealthBar* HealthWidget = M_UnloadProgress.HealthWidget.Get())
+	{
+		HealthWidget->SetActionProgressVisible(false);
+	}
+}
+
+void UHarvester::OnUnloadProgressBarRefresh()
+{
+	if (not M_UnloadProgress.bIsActive)
+	{
+		StopUnloadProgressBar();
+		return;
+	}
+	M_UnloadProgress.Fill = FMath::Max(M_UnloadProgress.Fill, GetUnloadProgressFill());
+
+	// May be null for a while: the health component can create its widget later (e.g. when it first shows).
+	UW_HealthBar* HealthWidget = GetUnloadProgressHealthWidget();
+	if (not IsValid(HealthWidget))
+	{
+		return;
+	}
+	if (not M_UnloadProgress.bIsShown)
+	{
+		M_UnloadProgress.bIsShown = true;
+		HealthWidget->SetActionProgressVisible(true);
+	}
+	HealthWidget->SetActionProgress(M_UnloadProgress.Fill);
+}
+
+float UHarvester::GetUnloadProgressFill() const
+{
+	float CargoFill = 0.f;
+	if (M_UnloadProgress.InitialCargo > 0)
+	{
+		const float CargoLeft = static_cast<float>(GetCraneCargoAmount()) / M_UnloadProgress.InitialCargo;
+		CargoFill = 1.f - FMath::Clamp(CargoLeft, 0.f, 1.f);
+	}
+
+	float TimeFill = 0.f;
+	const UWorld* World = GetWorld();
+	if (IsValid(World) && M_UnloadProgress.ExpectedSeconds > 0.f)
+	{
+		const double Elapsed = World->GetTimeSeconds() - M_UnloadProgress.StartSeconds;
+		TimeFill = FMath::Min(static_cast<float>(Elapsed / M_UnloadProgress.ExpectedSeconds),
+		                      HarvesterUnloadProgressBar::MaxTimeEstimateFill);
+	}
+	return FMath::Clamp(FMath::Max(CargoFill, TimeFill), 0.f, 1.f);
+}
+
+UW_HealthBar* UHarvester::GetUnloadProgressHealthWidget()
+{
+	if (UW_HealthBar* CachedWidget = M_UnloadProgress.HealthWidget.Get())
+	{
+		return CachedWidget;
+	}
+
+	// The cached widget is gone (or never resolved); a new one starts with its bar collapsed.
+	M_UnloadProgress.bIsShown = false;
+	const AActor* Owner = GetOwner();
+	const UHealthComponent* HealthComponent = IsValid(Owner) ? Owner->FindComponentByClass<UHealthComponent>() : nullptr;
+	if (not IsValid(HealthComponent))
+	{
+		return nullptr;
+	}
+	UW_HealthBar* HealthWidget = HealthComponent->GetHealthBarWidget();
+	if (not IsValid(HealthWidget))
+	{
+		return nullptr;
+	}
+	if (not HealthWidget->GetHasActionProgressBar())
+	{
+		if (not M_UnloadProgress.bHasReportedMissingBar)
+		{
+			M_UnloadProgress.bHasReportedMissingBar = true;
+			RTSFunctionLibrary::ReportWarning(TEXT("Harvester: the health widget ") + HealthWidget->GetClass()->GetName()
+				+ TEXT(" has no ActionProgressBar; unload progress is not shown for ") + Owner->GetName()
+				+ TEXT(". Use W_BpHealthBar_Harvester."));
+		}
+		return nullptr;
+	}
+	M_UnloadProgress.HealthWidget = HealthWidget;
+	return HealthWidget;
+}
+
+bool UHarvester::MapTest_GetUnloadProgress(float& OutFill) const
+{
+	OutFill = M_UnloadProgress.Fill;
+	return M_UnloadProgress.bIsShown;
 }

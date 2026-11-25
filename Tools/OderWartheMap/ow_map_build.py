@@ -147,7 +147,7 @@ def step_strip():
             "NavMeshBoundsVolume", "RecastNavMesh", "BP_MissionManager_C", "WorldSettings", "BlockingVolume",
             "AbstractNavData", "WorldDataLayers", "DirectionalLight", "SkyLight", "ExponentialHeightFog",
             "PostProcessVolume", "SkyAtmosphere", "VolumetricCloud", "Landscape", "LandscapeGizmoActiveActor",
-            "DefaultPhysicsVolume", "GameplayDebuggerPlayerManager", "Brush")
+            "DefaultPhysicsVolume", "GameplayDebuggerPlayerManager", "Brush", "DirectionFindingManager")
     kept, removed = [], []
     for actor in all_actors():
         name = actor.get_class().get_name()
@@ -859,3 +859,64 @@ def clear_orphans():
             count += 1
     log("orphans removed %d" % count)
     return count
+
+# ---- direction finding (2026-11-24) ----------------------------------------------------------------------------------
+DF_MANAGER_LABEL = PREFIX + "DirectionFindingManager"
+DF_STATION_LABEL = PREFIX + "D_DF_%s_Station"
+DF_WERK_LABEL = PREFIX + "M_Werk_%s_Bunkers"
+# Command post target spots in the Werk frame (cm, X = the Werk's front; add the Werk actor's transform), per design,
+# from Source/Docs/Campaign/OderWartheWerkTargets.md. The rail gate takes the tunnel portal's own transform.
+DF_TARGET_SPOTS = {
+    "7c": {"porch": ((1580.0, -120.0, 5.0), 0.0), "jammer": ((-3000.0, 1600.0, 31.0), 0.0)},
+    "10": {"porch": ((-2480.0, -80.0, 1039.0), 180.0), "jammer": ((-1600.0, 200.0, 987.0), 0.0)},
+    "8b": {"porch": ((-1680.0, -480.0, 605.0), 180.0), "jammer": ((-2000.0, 1000.0, 406.0), 0.0)},
+}
+
+
+def _werk_spot(werk_actor, local, local_yaw):
+    loc = werk_actor.get_actor_transform().transform_location(unreal.Vector(*local))
+    yaw = werk_actor.get_actor_rotation().yaw + local_yaw
+    return unreal.Transform(loc, unreal.Rotator(0.0, 0.0, yaw), unreal.Vector(1.0, 1.0, 1.0))
+
+
+def step_direction_finding():
+    """The ADirectionFindingManager of the mission: one actor (kept by step_strip), its five stations (OW_D_DF_s<N>_Station
+    from step_dress) in DF order and the five Werke with their command post target spots. Run after step_dress."""
+    require_map()
+    actors = by_label()
+    stations = []
+    for fid in ("s1", "s2", "s3", "s4", "s5"):
+        station = actors.get(DF_STATION_LABEL % fid)
+        if station is None:
+            raise RuntimeError("missing station %s (run step_dress first)" % (DF_STATION_LABEL % fid))
+        stations.append(station)
+    werke = []
+    for fid in sorted(LAYOUT["werks"]):
+        spec = LAYOUT["werks"][fid]
+        werk_actor = actors.get(DF_WERK_LABEL % fid)
+        if werk_actor is None:
+            raise RuntimeError("missing Werk %s (run step_dress first)" % (DF_WERK_LABEL % fid))
+        spots = DF_TARGET_SPOTS[spec["design"]]
+        tx, ty = spec["tunnel"]
+        werk = unreal.DirectionFindingWerk()
+        werk.set_editor_property("werk_id", fid.upper())
+        werk.set_editor_property("centre", werk_actor.get_actor_location())
+        werk.set_editor_property("radius_cm", float(spec["top_r"]))
+        werk.set_editor_property("command_porch_transform", _werk_spot(werk_actor, *spots["porch"]))
+        werk.set_editor_property("jammer_transform", _werk_spot(werk_actor, *spots["jammer"]))
+        werk.set_editor_property("rail_gate_transform", unreal.Transform(
+            unreal.Vector(tx, ty, ground_z(tx, ty)), unreal.Rotator(0.0, 0.0, spec["yaw"] + 180.0),
+            unreal.Vector(1.0, 1.0, 1.0)))
+        werke.append(werk)
+    manager = actors.get(DF_MANAGER_LABEL)
+    if manager is None:
+        cls = unreal.load_class(None, "/Script/RTS_Survival.DirectionFindingManager")
+        start = feature("start")["points"][0]
+        manager = actors_sub().spawn_actor_from_class(cls, unreal.Vector(start[0], start[1], ground_z(*start) + 1500.0),
+                                                      unreal.Rotator(0.0, 0.0, 0.0))
+        manager.set_actor_label(DF_MANAGER_LABEL)
+        manager.set_folder_path(FOLDER + "Mission")
+    manager.set_editor_property("stations", stations)
+    manager.set_editor_property("werke", werke)
+    log("direction finding: %d stations, %d Werke on %s" % (len(stations), len(werke), manager.get_actor_label()))
+    return manager

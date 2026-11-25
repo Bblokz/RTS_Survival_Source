@@ -10,6 +10,7 @@
 #include "RTS_Survival/Types/MovePlayerCameraTypes.h"
 #include "RTS_Survival/WorldCampaign/CampaignGeneration/Enums/Enum_MapMission.h"
 #include "RTS_Survival/WorldCampaign/CampaignGeneration/Enums/Turn/WorldTurnType.h"
+#include "RTS_Survival/WorldCampaign/WorldPlayer/OperationMaps/WorldOperationMapPool.h"
 #include "WorldCameraController/WorldCameraController.h"
 #include "PlayerTurnContext/FPlayerTurnContext.h"
 #include "WorldPrimaryClickContext/WorldPrimaryClickContext.h"
@@ -28,6 +29,7 @@ class UWorldCampaignTechManager;
 class UWorldCommanderMapKit;
 class UWorldBuildNodeManager;
 class AWorldBuildNode;
+class UW_WorldCampaignHUD;
 class UWorldDivisionManager;
 class UWorldProfileAndUIManager;
 class UPlayerResourceManager;
@@ -55,6 +57,24 @@ struct FWorldOperationMapSettings
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "World Campaign|Operations")
 	TArray<TSoftObjectPtr<UWorld>> EnemyObjectProceduralMaps;
+
+	// Which list enemy item and division operations open. ProceduralMaps keeps the old behaviour.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "World Campaign|Operations")
+	EWorldEnemyOperationMapSource EnemyOperationMapSource = EWorldEnemyOperationMapSource::ProceduralMaps;
+
+	// Handmade maps with a hand-placed enemy base; the enemy item type fills its signature slots.
+	// Can be filled while the source is still ProceduralMaps; only read when it is HandmadeMaps.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "World Campaign|Operations")
+	TArray<TSoftObjectPtr<UWorld>> HandmadeEnemyItemMaps;
+
+	// Handmade field-battle maps without a base, for operations against divisions and convoys.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "World Campaign|Operations")
+	TArray<TSoftObjectPtr<UWorld>> HandmadeFieldMaps;
+
+	// Fixed levels for enemy items that are story places (EnemyHQ, EnemyWall); they never use a pool when set. With
+	// HandmadeMaps selected, an EnemyHQ or EnemyWall without a level here cannot be attacked.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "World Campaign|Operations")
+	TMap<EMapEnemyItem, TSoftObjectPtr<UWorld>> StoryEnemyItemMaps;
 };
 
 /**
@@ -186,6 +206,22 @@ protected:
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaTime) override;
 
+	/** Tells the country regulator which country lies under the cursor, so it can be highlighted. */
+	void Tick_UpdateHoveredCountry();
+
+	/**
+	 * Brightens the build site under the cursor and the one whose cards are open, and dims a site that is neither
+	 * any more.
+	 */
+	void Tick_UpdateHoveredBuildNode(AActor* ActorUnderCursor);
+
+	UPROPERTY()
+	TWeakObjectPtr<AWorldBuildNode> M_HoveredBuildNode;
+
+	// The site whose build cards are open; it stays lit while the cursor is elsewhere.
+	UPROPERTY()
+	TWeakObjectPtr<AWorldBuildNode> M_PanelLitBuildNode;
+
 	/** @brief called on single Primary click */
 	UFUNCTION(BlueprintCallable)
 	void PrimaryClick();
@@ -247,6 +283,29 @@ private:
 	bool TryGetMissionMap(EMapMission MissionType, TSoftObjectPtr<UWorld>& OutMissionMap) const;
 	bool TryGetEnemyMap(TSoftObjectPtr<UWorld>& OutEnemyMap);
 
+	/**
+	 * @brief Picks the level for an enemy item or division operation from the configured map source and moves that
+	 * source's saved cursor; the caller restores the cursors when the launch fails afterwards.
+	 * @param OperationTarget EnemyItem or EnemyDivision; selects the handmade item pool or field pool.
+	 * @param TargetKey Anchor key of the item or key of the division; a retry with the same key gets the same map.
+	 * @param OutOperationMap The level to open.
+	 * @return false when the source has no usable map (an error is reported).
+	 */
+	bool TryPickEnemyOperationMap(EWorldOperationTarget OperationTarget, const FGuid& TargetKey,
+	                              TSoftObjectPtr<UWorld>& OutOperationMap);
+	bool TryPickHandmadeOperationMap(EWorldOperationTarget OperationTarget, const FGuid& TargetKey,
+	                                 TSoftObjectPtr<UWorld>& OutOperationMap);
+
+	/**
+	 * @brief Finds the level for an attack on an enemy map item: its story level (EnemyHQ, EnemyWall) or a pool pick.
+	 * @param EnemyMapObject The attacked item.
+	 * @param OutOperationMap The level to open.
+	 * @return false when the attack cannot go anywhere (an error is reported).
+	 */
+	bool TryPickEnemyItemOperationMap(const AWorldEnemyObject& EnemyMapObject, TSoftObjectPtr<UWorld>& OutOperationMap);
+	static void ShuffleOperationMapPool(const TArray<TSoftObjectPtr<UWorld>>& SourceMaps, int32 ShuffleSeed,
+	                                    TArray<TSoftObjectPtr<UWorld>>& OutShuffledMaps);
+
 	/** Adds what only the campaign knows (tier cap, bought tech, the deck) to an operation's mission context. */
 	void FillCampaignFieldsOnMissionContext(FWorldMissionContext& WorldMissionContext) const;
 
@@ -266,6 +325,15 @@ private:
 
 	/** Runs what happens once at the start of each new player turn: cooldowns and income. */
 	void PlayerTurn_ApplyStartOfNewTurn();
+
+	/** The campaign widgets drawn over the map, or nullptr while the world menu is not built yet. */
+	UW_WorldCampaignHUD* GetCampaignHUD() const;
+
+	/**
+	 * @brief While the commander ability waits for a target, a map click picks that target and nothing else.
+	 * @return true when the click was used for target picking.
+	 */
+	bool PrimaryClick_CommanderTargetPicking();
 
 	/** Connects the commander map ability's effect requests to the systems that carry them out. */
 	void BeginPlay_BindCommanderMapKit();
@@ -466,6 +534,13 @@ private:
 
 	UPROPERTY()
 	TArray<TSoftObjectPtr<UWorld>> M_ShuffledEnemyObjectProceduralMaps;
+
+	// Shuffled once per campaign seed; the saved pool cursors index into these.
+	UPROPERTY()
+	TArray<TSoftObjectPtr<UWorld>> M_ShuffledHandmadeEnemyItemMaps;
+
+	UPROPERTY()
+	TArray<TSoftObjectPtr<UWorld>> M_ShuffledHandmadeFieldMaps;
 
 	FTimerHandle M_AsyncWorldGenerationProgressTimerHandle;
 	float M_AsyncWorldGenerationProgressElapsedSeconds = 0.f;

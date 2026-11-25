@@ -1729,6 +1729,11 @@ void AAircraftMaster::AttackMove_IssueActionForNewTargetPoint(const FAircraftPat
 		break;
 	case EAirPathPointType::GetOutOfDive:
 		Strafe_OnDiveRecoveryStarted();
+		if (not M_StrafeState.bM_DropBombsAtPullOut)
+		{
+			// Guns-only strafe (UGA_AircraftStrafing setting): the bombs stay on board.
+			break;
+		}
 		if (M_AircraftAttackData.bM_IsAttackGround)
 		{
 			StartBombThrowingAtLocation(M_AircraftAttackData.TargetLocation);
@@ -2731,6 +2736,7 @@ void AAircraftMaster::StrafeLocation(const FStrafeAircraftSettings& StrafeAircra
 	M_StrafeState.bM_IsFirstAttackRun = true;
 	M_StrafeState.bM_IsRetreatingToDestroy = false;
 	M_StrafeState.bM_RepeatRunsOverTarget = StrafeAircraftSettings.bRepeatRunsOverTarget;
+	M_StrafeState.bM_DropBombsAtPullOut = StrafeAircraftSettings.bDropBombsAtPullOut;
 
 	M_AircraftAttackData.TargetActor = nullptr;
 	M_AircraftAttackData.TargetLocation = M_StrafeState.StrafeStartLocation;
@@ -3340,6 +3346,7 @@ void AAircraftMaster::AircraftDrop_OnLanded()
 	AircraftDrop_DetachTank();
 	AircraftDrop_SpawnSquads();
 	AircraftDrop_PlayDropOffSound();
+	OnAircraftDropLanded.Broadcast(this);
 
 	UWorld* World = GetWorld();
 	if (not IsValid(World))
@@ -3378,6 +3385,19 @@ void AAircraftMaster::AircraftDrop_OnLanded()
 		},
 		SafeStayLandedTime,
 		false);
+}
+
+void AAircraftMaster::EndAircraftDropStayLanded()
+{
+	if (M_AircraftDropRequest.State != EAircraftDropRequestState::LandedWaiting)
+	{
+		return;
+	}
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(M_AircraftDropStayLandedTimerHandle);
+	}
+	AircraftDrop_OnStayLandedFinished();
 }
 
 void AAircraftMaster::AircraftDrop_OnStayLandedFinished()

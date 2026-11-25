@@ -11,8 +11,23 @@ class FGetAsyncResource;
 enum class ERTSResourceType : uint8;
 class RTS_SURVIVAL_API UResourceComponent;
 class RTS_SURVIVAL_API UResourceDropOff;
+
+/** A registered drop-off and the player it was registered for; harvesters only find drop-offs of their own player. */
+USTRUCT()
+struct FRegisteredResourceDropOff
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	TWeakObjectPtr<UResourceDropOff> DropOff;
+
+	// Owner at registration. Only drop-offs of player 1 are known to the human's UPlayerResourceManager.
+	int8 OwningPlayer = 0;
+};
+
 /**
- * 
+ * @brief Lives on the game state; every resource field and drop-off of any player registers here, and harvesters ask
+ * it (on the async thread) for the closest field of a type and the closest drop-off of their own player.
  */
 UCLASS()
 class RTS_SURVIVAL_API UGameResourceManager : public UActorComponent
@@ -32,19 +47,24 @@ public:
 
 	/**	
 	 * @brief Either adds or removes the provided resource drop off from the map resources.
+	 * Drop-offs of every player register; only those of player 1 also count for the human's resource storage.
 	 * @param ResourceDropOff The resource drop off to add or remove.
 	 * @param bRegister Whether to add or remove the resource drop off.
-	 * @param OwningPlayer
+	 * @param OwningPlayer The drop-off's owner now; when removing, the human's storage only changes if this and the
+	 * owner it registered with are both 1.
 	 */
 	void RegisterResourceDropOff(
 		const TWeakObjectPtr<UResourceDropOff>& ResourceDropOff,
 		bool bRegister, const int8 OwningPlayer);
 
 	/** 
-	 * @brief Copies the current drop-offs into an array and returns it. 
+	 * @brief Copies the current drop-offs of all players into an array and returns it. 
 	 *  ONLY USE ON GAME THREAD
 	 */
 	TArray<TWeakObjectPtr<UResourceDropOff>> GetCopyOfResourceDropOffs() const;
+
+	/** @return The drop-offs registered for this player. ONLY USE ON GAME THREAD. */
+	TArray<TWeakObjectPtr<UResourceDropOff>> GetCopyOfResourceDropOffsOfPlayer(int8 OwningPlayer) const;
 
 	TArray<TWeakObjectPtr<UResourceComponent>> GetCopyOfMapResources() const;
 
@@ -95,9 +115,11 @@ private:
 	float M_UpdateResourcesDataInterval;
 	
 	
-	// Contains all the components of units that are able to have resources dropped off.
+	// Contains all the components of units (of any player) that are able to have resources dropped off.
 	UPROPERTY()
-	TArray<TWeakObjectPtr<UResourceDropOff>> M_ResourceDropOffsPlayer;
+	TArray<FRegisteredResourceDropOff> M_ResourceDropOffs;
+
+	int32 FindRegisteredDropOffIndex(const TWeakObjectPtr<UResourceDropOff>& DropOff) const;
 
 	UPROPERTY()
 	TArray<TWeakObjectPtr<UResourceComponent>> M_MapResources;

@@ -15,6 +15,8 @@ URTSWeaponVFXSettings::URTSWeaponVFXSettings()
 		TEXT("/Game/RTS_Survival/ImpactSfxVfx/MuzzleVfx/NS_SmallArmsMuzzle.NS_SmallArmsMuzzle"));
 	AircraftStrafeImpactNiagaraSystem = FSoftObjectPath(
 		TEXT("/Game/RTS_Survival/ImpactSfxVfx/StrafeImpacts/NS_AircraftStrafeImpacts.NS_AircraftStrafeImpacts"));
+	TankShellTrailNiagaraSystem = FSoftObjectPath(
+		TEXT("/Game/RTS_Survival/ImpactSfxVfx/TankShellTrail/NS_TankShellTrail.NS_TankShellTrail"));
 	// The launch effects the infantry weapons were given before the batcher; see BPF_ImpactHelpers.
 	SmallArmsLaunchEffectsToBatch = {
 		TSoftObjectPtr<UNiagaraSystem>(FSoftObjectPath(TEXT(

@@ -9,6 +9,7 @@
 #include "WorldBuildNode.generated.h"
 
 class UMaterialInstanceDynamic;
+class UMaterialInterface;
 class USceneComponent;
 class UStaticMeshComponent;
 struct FWorldBuildNodeDefinition;
@@ -16,7 +17,8 @@ struct FWorldBuildNodeDefinition;
 /**
  * @brief A place inside a country where the player can put up one building. Hand-place it in the campaign level
  * (set the id and country) or let UWorldBuildNodeManager spawn it from the BuildNodes config; the manager drives its
- * state. A plain cylinder shows the state when no Blueprint look is set up.
+ * state. A hex plate drawn on a flat plane shows the state (lock, plus or the building's sign); the plain cylinder
+ * is the fallback when the plate material is missing, and stays as the click target either way.
  */
 UCLASS()
 class RTS_SURVIVAL_API AWorldBuildNode : public AActor
@@ -50,6 +52,10 @@ public:
 	/** Stores the building and marks the node Built; ignored when a building already stands here. */
 	void SetBuilding(EWorldCampaignBuilding NewBuilding);
 
+	/** Brightens the plate while the cursor is over the node. */
+	UFUNCTION(BlueprintCallable, Category = "World Campaign|Build Node")
+	void SetIsHovered(bool bIsHovered);
+
 protected:
 	virtual void BeginPlay() override;
 
@@ -65,6 +71,12 @@ private:
 	void UpdateDefaultVisual() const;
 	FLinearColor GetDefaultVisualColor() const;
 	bool GetIsValidDefaultVisualMesh() const;
+	bool GetIsValidHexPlateMesh() const;
+
+	/** Puts the hex plate material on the plate; without the material the cylinder keeps showing the state. */
+	void BeginPlay_InitHexPlate();
+	void UpdateHexPlate() const;
+	float GetHexPlateSignIndex() const;
 
 	UPROPERTY(VisibleAnywhere, Category = "World Campaign|Build Node")
 	TObjectPtr<USceneComponent> M_RootSceneComponent;
@@ -75,6 +87,23 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UMaterialInstanceDynamic> M_DefaultVisualMaterial;
+
+	// Flat plane just above the ground that the hex plate material draws on.
+	UPROPERTY(VisibleAnywhere, Category = "World Campaign|Build Node")
+	TObjectPtr<UStaticMeshComponent> M_HexPlateMesh;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInstanceDynamic> M_HexPlateMaterial;
+
+	/** Built by Source/Tools/WorldCampaign/create_build_site_materials.py. */
+	UPROPERTY(EditAnywhere, Category = "World Campaign|Build Node",
+		meta = (AllowPrivateAccess = "true", DisplayName = "Hex Plate Material"))
+	TSoftObjectPtr<UMaterialInterface> M_HexPlateMaterialAsset;
+
+	/** Width of the plate across its flat sides, in map units. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Build Node",
+		meta = (AllowPrivateAccess = "true", ClampMin = "10.0", ClampMax = "200.0", DisplayName = "Hex Plate Width"))
+	float M_HexPlateWidth = 57.6f;
 
 	/** Stable id used in saves; must be unique on the map. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Build Node",

@@ -4,6 +4,7 @@
 
 #include "RTS_Survival/WorldCampaign/StrengthTypes/WorldFortificationModificationsComponent.h"
 #include "RTS_Survival/WorldCampaign/StrengthTypes/WorldStrengthEstimationComponent.h"
+#include "RTS_Survival/WorldCampaign/WorldMapObjects/Objects/WorldMissionObject/WorldCampaignMissionNames.h"
 
 AWorldMissionObject::AWorldMissionObject()
 {
@@ -15,6 +16,11 @@ void AWorldMissionObject::InitializeForAnchorWithMissionType(AAnchorPoint* Ancho
 {
 	AWorldMapObject::InitializeForAnchor(AnchorPoint);
 	M_MissionType = MissionType;
+}
+
+FText AWorldMissionObject::GetMissionDisplayName() const
+{
+	return WorldCampaignMissionNames::GetMissionDisplayName(M_MissionType);
 }
 
 FEnemyOrMissionMapItemUIData AWorldMissionObject::GetMapItemUIData() const
@@ -52,6 +58,13 @@ void AWorldMissionObject::AddStrategicSupportReason(
 FEnemyOrMissionMapItemUIData AWorldMissionObject::BuildMapItemUIData() const
 {
 	FEnemyOrMissionMapItemUIData UIData = M_MapItemUIData;
+	// A story mission can stand in on another mission's Blueprint, so its own name wins over the authored title.
+	const FText MissionName = GetMissionDisplayName();
+	if (not MissionName.IsEmpty())
+	{
+		UIData.TitleText = WorldCampaignMissionNames::MakeMissionTitleText(M_MapItemUIData.TitleText, MissionName);
+	}
+
 	if (const UWorldStrengthEstimationComponent* StrengthEstimationComponent = GetWorldStrengthEstimationComponent())
 	{
 		UIData.SetStrengthEstimation(StrengthEstimationComponent->GetStrengthEstimationMessage());

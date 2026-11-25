@@ -22,6 +22,8 @@ struct FResultMineLocations;
 struct FEnemyBasePointCoreBuildings;
 struct FEnemyBasePointSatelliteBuildings;
 struct FStrategicAIRequester;
+class AActor;
+enum class EAllUnitType : uint8;
 
 /**
  * Builds the strategic AI results on the async thread.
@@ -80,6 +82,25 @@ namespace FStrategicAIHelpers
 	 * @return True when the snapshot represents a hazmat engineer.
 	 */
 	bool GetIsHazmatEngineer(const FAsyncDetailedUnitState&);
+
+	/**
+	 * @brief Harvesters work the economy (StartAutonomousHarvest) and never join attack, defend, idle or retreat pools.
+	 * @param UnitType The unit's type.
+	 * @param UnitSubtypeRaw The unit's subtype as stored in snapshots and blackboard entries.
+	 * @return True for harvester tank subtypes (Pz I, Pz IV, T-34 Breaker) and the harvester unit type.
+	 */
+	bool GetIsHarvesterUnit(EAllUnitType UnitType, int32 UnitSubtypeRaw);
+
+	/** @return True when the snapshot is a harvester (async-thread safe, subtype only). */
+	bool GetIsHarvester(const FAsyncDetailedUnitState& UnitState);
+
+	/**
+	 * @brief Game-thread check used by every enemy unit pool: true for a unit that carries a UHarvester component or
+	 * has a harvester subtype. Such units are never handed to the strategic AI or direct control.
+	 * @param UnitActor The unit to test.
+	 * @return True when the unit must stay out of the enemy AI's unit pools.
+	 */
+	bool GetIsExcludedFromEnemyUnitPools(const AActor* UnitActor);
 
 	/**
 	 * @brief Builds flank locations for combat-active player heavy tanks in the async strategic AI batch.

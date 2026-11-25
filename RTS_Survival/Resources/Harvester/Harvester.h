@@ -28,11 +28,45 @@ class UResourceComponent;
 class UPlayerResourceManager;
 class UAsyncFindClosestDropOff;
 class AResourceUnloadStation;
+class UW_HealthBar;
+class UHealthComponent;
 enum class EUnloadEndReason : uint8;
+
+/**
+ * Harvester economy bonus (2026-11-24): the crane unload takes ~37 s, so harvesters carry and cut three times as much.
+ * Applied in code on top of the Blueprint values (SetupHarvester cargo, tech capacity upgrades, the resource's
+ * AmountPerHarvest), so every harvester gets it without data edits.
+ */
+namespace HarvesterYield
+{
+	// Cargo capacity multiplier on SetupHarvester's MaxCargoPerResource and on capacity upgrades.
+	constexpr int32 CargoCapacityMultiplier = 3;
+	// Multiplier on the resource's AmountPerHarvest for every harvest operation (saw cut).
+	constexpr int32 HarvestYieldMultiplier = 3;
+}
+
+/** Unload progress shown in the owner's health bar (UW_HealthBar::ActionProgressBar) while a crane unloads it. */
+struct FHarvesterUnloadProgressState
+{
+	FTimerHandle RefreshTimer;
+	TWeakObjectPtr<UW_HealthBar> HealthWidget;
+	// The owner's health component, kept visible (SetHealthBarForcedVisible) while the unload runs.
+	TWeakObjectPtr<UHealthComponent> ForcedHealthComponent;
+	int32 InitialCargo = 0;
+	double StartSeconds = 0.0;
+	float ExpectedSeconds = 0.f;
+	// Never goes down while one unload runs.
+	float Fill = 0.f;
+	bool bIsActive = false;
+	bool bIsShown = false;
+	bool bHasReportedMissingBar = false;
+};
 
 
 /**
  * @brief Component used by harvester units to run harvesting commands and manage their resource cargo.
+ * Works for every player: drop-offs are searched among those of the owner's player (URTSComponent). AI harvesters
+ * run without orders through StartAutonomousHarvest.
  * @note SetupHarvester: call in Blueprint to configure supported resources, cargo capacity, and the owner's mesh.
  */
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent), Blueprintable, BlueprintType)
@@ -137,10 +171,35 @@ public:
 	 */
 	void HoldNewOrderUntilUnloaded();
 	bool MapTest_GetIsHoldingOrder() const { return bM_EndCommandAfterUnload; }
+	/** @return Whether the unload progress bar shows now; OutFill is its fill (0..1). */
+	bool MapTest_GetUnloadProgress(float& OutFill) const;
 
 	/** @brief Test hook: fill one cargo slot without harvesting. */
 	void MapTest_SetCargo(ERTSResourceType ResourceType, int32 Amount);
 	EHarvesterAIAction MapTest_GetHarvestStatus() const { return M_HarvestStatus; }
+	UResourceDropOff* MapTest_GetTargetDropOff() const { return M_TargetDropOff.Get(); }
+	/** @return How often the watchdog had to end a harvest animation (0 when montages end on their own). */
+	int32 MapTest_GetWatchdogFinishCount() const { return M_HarvestWatchdogFinishCount; }
+
+	/**
+	 * @brief Keeps this harvester working with no player order (AI harvesters): finds the nearest non-empty field of
+	 * the type, runs the normal harvest command on it, moves on to the next nearest field when one runs dry, and
+	 * while there is no field (or no drop-off for its cargo) tries again every AutonomousHarvestRetrySeconds.
+	 * Safe to call before BeginPlay. A later player order ends it only for that order: once idle it resumes.
+	 * @param ResourceType The resource to harvest; must be one of the harvester's cargo slots.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="Harvester")
+	void StartAutonomousHarvest(ERTSResourceType ResourceType);
+
+	/** @brief Stops the autonomous loop; the running harvest command (if any) goes on until it ends. */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="Harvester")
+	void StopAutonomousHarvest();
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="Harvester")
+	bool GetIsHarvestingAutonomously() const { return M_AutonomousResourceType != ERTSResourceType::Resource_None; }
+
+	/** @return The owning player of the harvester unit (its RTS component); 1 when it has none. */
+	uint8 GetOwningPlayer() const;
 
 protected:
 	// Called when the game starts
@@ -451,6 +510,40 @@ private:
 	// Will try to find resources of the previously targeted resource type if possible or execute return cargo
 	// if the harvester does have cargo.
 	void CheckHarvesterIdle();
+
+	/* ---- Autonomous harvest (AI harvesters, StartAutonomousHarvest) ---- */
+
+	// The resource the autonomous loop keeps harvesting; Resource_None when the loop is off. Kept apart from
+	// M_TargetResourceType, which the harvest state machine resets and overwrites (return cargo, drop-off order).
+	ERTSResourceType M_AutonomousResourceType = ERTSResourceType::Resource_None;
+
+	// Set by StartAutonomousHarvest: the next attempt starts harvesting even when the unit runs another command.
+	bool bM_AutonomousStartPending = false;
+
+	FTimerHandle M_AutonomousHarvestTimer;
+
+	/* ---- Harvest animation watchdog ---- */
+	// The owner's Blueprint reports the end of the harvest montage (OnHarvestAnimationFinished). If that never comes
+	// (montage interrupted, mesh not ticking), the harvester would stand at the field forever: finish it from here.
+	FTimerHandle M_HarvestAnimationWatchdog;
+	bool bM_HasLoggedHarvestWatchdog = false;
+	int32 M_HarvestWatchdogFinishCount = 0;
+	void StartHarvestAnimationWatchdog();
+	void StopHarvestAnimationWatchdog();
+	void OnHarvestAnimationWatchdog();
+
+	// Far from the camera the owner's URTSOptimizer stops its skeletal meshes, so the harvest montage would never end.
+	// While the montage plays the optimizer keeps montages ticking.
+	void SetOwnerKeepsMontagesTicking(const bool bKeepTicking) const;
+
+	/** @brief Every retry interval: an idle autonomous harvester returns its cargo or looks for the nearest field. */
+	void TickAutonomousHarvest();
+	void AutonomousHarvest_AsyncFindResource();
+	void AsyncOnReceiveResourceForAutonomous(const TArray<TWeakObjectPtr<UResourceComponent>>& Resources);
+	bool GetIsValidCommandOwner();
+
+	/** @return Whether this harvester belongs to the human (player 1); only then it shows the human's feedback. */
+	bool GetIsOwnedByHumanPlayer() const;
 	bool GetIsHarvesterIdle() const;
 	void IdleHarvester_AsyncFindTargetResource();
 	// If a valid resource was found and the harvester is still idle then we issue a command through the
@@ -505,6 +598,18 @@ private:
 	TWeakObjectPtr<AResourceUnloadStation> M_UnloadStation;
 
 	int32 M_UnloadBayIndex = INDEX_NONE;
+
+	// Health bar progress while the crane unloads; from docking until the unload ends or the bay is released.
+	FHarvesterUnloadProgressState M_UnloadProgress;
+
+	/** @brief Shows the health bar's ActionProgressBar and refreshes it until StopUnloadProgressBar. */
+	void StartUnloadProgressBar();
+	void StopUnloadProgressBar();
+	void OnUnloadProgressBarRefresh();
+	/** @return The fill from the cargo already credited and the time against the station's expected unload time. */
+	float GetUnloadProgressFill() const;
+	/** @return The owner's health widget when it has an ActionProgressBar; null while it does not exist yet. */
+	UW_HealthBar* GetUnloadProgressHealthWidget();
 
 	// Set when the bay route failed for this trip; the old drop-off point is used until the cargo is delivered.
 	bool bM_SkipUnloadStationThisTrip = false;

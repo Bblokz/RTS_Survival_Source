@@ -1,6 +1,6 @@
 // Copyright (C) Bas Blokzijl - All rights reserved.
 
-// The air delivery part of UMissionBase: nomadic trucks flown in and built on the spot.
+// The air delivery part of UMissionBase: nomadic trucks flown in and built on the spot, and vehicles set down.
 
 #include "MissionBase.h"
 
@@ -44,6 +44,49 @@ void UMissionBase::DeliverPlayerHQByMammutGlider(const FVector BuildLocation, co
 	Order.bBuildOnLanding = bBuildOnLanding;
 	Order.Settings = AirDeliverySettings;
 	AirDelivery_Start(Order, ID);
+}
+
+void UMissionBase::DeliverPlayerVehicleByCargoPlane(const ETankSubtype VehicleSubtype, const FVector DropLocation,
+                                                    const FRotator DropRotation, const int32 ID)
+{
+	UWorld* World = GetWorld();
+	UNomadicAirDeliverySubsystem* DeliverySubsystem = IsValid(World)
+		                                                  ? World->GetSubsystem<UNomadicAirDeliverySubsystem>()
+		                                                  : nullptr;
+	if (not IsValid(DeliverySubsystem))
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Mission found no UNomadicAirDeliverySubsystem for a vehicle air delivery."));
+		return;
+	}
+	FNomadicAirDeliveryOrder Order;
+	Order.Method = ENomadicAirDeliveryMethod::CargoPlaneRopes;
+	Order.VehicleSubtype = VehicleSubtype;
+	Order.BuildLocation = DropLocation;
+	Order.BuildRotation = DropRotation;
+	Order.bBuildOnLanding = false;
+	Order.Settings = AirDeliverySettings;
+	TWeakObjectPtr<UMissionBase> WeakThis(this);
+	const FOnAirDeliveredVehicleLanded OnVehicleLanded = FOnAirDeliveredVehicleLanded::CreateLambda(
+		[WeakThis, VehicleSubtype, ID](ATankMaster* Vehicle)
+		{
+			if (WeakThis.IsValid())
+			{
+				WeakThis->BP_OnAirDeliveredVehicleLanded(Vehicle, VehicleSubtype, ID);
+			}
+		});
+	DeliverySubsystem->StartVehicleDelivery(Order, OnVehicleLanded);
+}
+
+void UMissionBase::DeliverPlayerTrainingOptionByCargoPlane(const FTrainingOption& Vehicle, const FVector DropLocation,
+                                                           const FRotator DropRotation, const int32 ID)
+{
+	if (Vehicle.UnitType != EAllUnitType::UNType_Tank)
+	{
+		RTSFunctionLibrary::ReportError(TEXT("DeliverPlayerTrainingOptionByCargoPlane needs a tank option, got ")
+			+ Vehicle.GetTrainingName());
+		return;
+	}
+	DeliverPlayerVehicleByCargoPlane(static_cast<ETankSubtype>(Vehicle.SubtypeValue), DropLocation, DropRotation, ID);
 }
 
 void UMissionBase::AirDelivery_Start(const FNomadicAirDeliveryOrder& Order, const int32 ID)

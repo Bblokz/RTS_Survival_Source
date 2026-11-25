@@ -77,6 +77,31 @@ struct FFormationData
 		bool bM_IsGuardingCurrentPatrolPoint = false;
 	} M_RandomPatrolWithAttackMoveState;
 
+	// Runtime state while a random patrol formation answers an alarm
+	// (UEnemyFormationController::ConvergePatrolFormationsOnLocation); the patrol state above is kept for the return.
+	struct FAlarmConvergeState
+	{
+		// Where the formation attack-moves to.
+		FVector M_ConvergeLocation = FVector::ZeroVector;
+
+		// Seconds after the first combat before the formation breaks off and returns to its patrol loop.
+		float M_CombatSecondsBeforeReturn = 0.f;
+
+		// Seconds the formation may take to arrive while it meets no enemy; scaled by its distance at the start.
+		float M_MaxSecondsWithoutCombat = 0.f;
+
+		float M_StartTimeSeconds = -1.f;
+
+		// Latched once: the first formation check in which any unit was in combat; negative until then.
+		float M_FirstCombatTimeSeconds = -1.f;
+
+		// The first formation check in which every unit had arrived; negative until then.
+		float M_AllArrivedTimeSeconds = -1.f;
+
+		// While true the formation check runs the convergence instead of the patrol, with unit attack-move orders.
+		bool bM_IsConverging = false;
+	} M_AlarmConvergeState;
+
 	FVector GetFormationUnitLocation();
 
 private:

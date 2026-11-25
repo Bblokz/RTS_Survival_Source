@@ -17,6 +17,8 @@ class UW_EnemyOrMissionMapItem;
 class UW_RewardCardsViewer;
 class UW_CardMenu;
 class UW_DeckBuilderMenu;
+class UW_WorldCampaignHUD;
+class UW_WorldTechWheel;
 class AWorldPlayerController;
 struct FPlayerCardSaveData;
 struct FEnemyOrMissionMapItemUIData;
@@ -77,6 +79,12 @@ public:
 	/** @return Null while the old Blueprint card menu is in use. */
 	UW_DeckBuilderMenu* GetDeckBuilderMenu() const;
 
+	/** @return The campaign widgets drawn over the map; null when bUseCampaignHUD is off. */
+	UW_WorldCampaignHUD* GetCampaignHUD() const { return M_CampaignHUD; }
+
+	/** @return The tech wheel page; null when bUseCampaignHUD is off. */
+	UW_WorldTechWheel* GetTechWheel() const { return M_TechWheel; }
+
 protected:
 	// The card menu the Army Layout button opens: the deck builder, or (off) the old Blueprint card menu.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Card Menu")
@@ -85,6 +93,11 @@ protected:
 	// Left empty the C++ deck builder is used as it is; pick a Blueprint child of it to override its art.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Card Menu")
 	TSubclassOf<UW_DeckBuilderMenu> DeckBuilderMenuClass;
+
+	// The C++ campaign HUD (top strip, map tags, commander panel, build cards, tech wheel page). When on, it replaces
+	// the Blueprint header, which is collapsed; off leaves the Blueprint header and tech tree page as they were.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Campaign HUD")
+	bool bUseCampaignHUD = true;
 
 	UFUNCTION(BlueprintImplementableEvent)
 	void BP_OnMissionClicked(const FEnemyOrMissionMapItemUIData& InData);
@@ -134,6 +147,17 @@ private:
 	void InitMenu_InitPerkUI();
 	void InitMenu_InitCardMenu();
 	void InitMenu_InitDeckBuilder();
+	void InitMenu_InitCampaignHUD();
+	void HandleTechWheelCloseRequested();
+
+	UPROPERTY()
+	TObjectPtr<UW_WorldCampaignHUD> M_CampaignHUD;
+
+	UPROPERTY()
+	TObjectPtr<UW_WorldTechWheel> M_TechWheel;
+
+	// Page of the tech wheel in FullUISwitcher; added at runtime like the deck builder.
+	int32 M_TechWheelSwitcherIndex = INDEX_NONE;
 
 	/** Shows the deck builder with the campaign's current cards, or the old card menu when it is not in use. */
 	void ShowCardMenu();

@@ -5,6 +5,7 @@
 #include "EngineUtils.h"
 #include "Engine/Texture2D.h"
 #include "RTS_Survival/Enemy/EnemyController/EnemyController.h"
+#include "RTS_Survival/Enemy/Fallback/EnemyFallbackSubsystem.h"
 #include "RTS_Survival/Enemy/MissionPlacement/EnemyPlacementShapesComponent.h"
 #include "RTS_Survival/GameUI/MiniMap/CustomIcons/UnitGroupMiniMapMarker.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
@@ -394,11 +395,119 @@ void AEnemyWaveSpawner::HandleWaveUnitsSpawned(const int32 WaveId, const TArray<
 		return;
 	}
 	M_SpawnedWaveCount++;
+	for (AActor* SpawnedUnit : SpawnedUnits)
+	{
+		if (IsValid(SpawnedUnit))
+		{
+			M_SpawnedUnits.Add(SpawnedUnit);
+		}
+	}
 	if (Minimap.bShowOnMinimap)
 	{
 		AddMinimapMarker(SpawnedUnits);
 	}
+	if (GetIsPatrol() && PatrolSettings.bInfantryFleesWhenVehiclesLost)
+	{
+		WatchPatrolForVehicleLoss(SpawnedUnits);
+	}
 	OnWaveUnitsSpawned.Broadcast(this, SpawnedUnits);
+}
+
+void AEnemyWaveSpawner::SetUnits(const FEnemyWaveSpawnerUnits& NewUnits)
+{
+	if (bM_IsRunning)
+	{
+		RTSFunctionLibrary::ReportError("SetUnits on wave spawner " + SpawnerId.ToString() +
+			" while it runs; the new units apply from the next wave.");
+	}
+	Units = NewUnits;
+}
+
+int32 AEnemyWaveSpawner::GetLivingSpawnedUnitCount() const
+{
+	int32 LivingCount = 0;
+	for (const TWeakObjectPtr<AActor>& SpawnedUnit : M_SpawnedUnits)
+	{
+		if (UEnemyFallbackSubsystem::GetIsUnitActorAlive(SpawnedUnit.Get()))
+		{
+			++LivingCount;
+		}
+	}
+	return LivingCount;
+}
+
+int32 AEnemyWaveSpawner::ConvergeOnAlarm(const FVector AlarmLocation, const float CombatSecondsBeforeReturn)
+{
+	if (not GetIsPatrol())
+	{
+		RTSFunctionLibrary::ReportError("ConvergeOnAlarm on wave spawner " + GetName() +
+			", which is an attack wave; only patrol waves answer an alarm.");
+		return 0;
+	}
+	const TArray<AActor*> UnitsToSend = GetLivingNotFleeingSpawnedUnits();
+	if (UnitsToSend.IsEmpty())
+	{
+		// Not spawned yet, or every unit is dead or fleeing: nothing to send.
+		return 0;
+	}
+	if (not GetIsValidEnemyController())
+	{
+		return 0;
+	}
+	return M_EnemyController->ConvergePatrolFormationsOnLocation(UnitsToSend, AlarmLocation,
+	                                                              CombatSecondsBeforeReturn);
+}
+
+int32 AEnemyWaveSpawner::ConvergeAllPatrolsOnAlarm(const UObject* WorldContextObject, const FVector AlarmLocation,
+                                                   const float CombatSecondsBeforeReturn)
+{
+	const UWorld* World = IsValid(WorldContextObject) ? WorldContextObject->GetWorld() : nullptr;
+	if (not IsValid(World))
+	{
+		RTSFunctionLibrary::ReportError("ConvergeAllPatrolsOnAlarm needs a valid world context.");
+		return 0;
+	}
+	int32 UnitsSent = 0;
+	for (TActorIterator<AEnemyWaveSpawner> It(World); It; ++It)
+	{
+		AEnemyWaveSpawner* Spawner = *It;
+		if (not IsValid(Spawner) || not Spawner->GetIsPatrol())
+		{
+			continue;
+		}
+		UnitsSent += Spawner->ConvergeOnAlarm(AlarmLocation, CombatSecondsBeforeReturn);
+	}
+	return UnitsSent;
+}
+
+TArray<AActor*> AEnemyWaveSpawner::GetLivingNotFleeingSpawnedUnits() const
+{
+	const UEnemyFallbackSubsystem* FallbackSubsystem = UEnemyFallbackSubsystem::GetEnemyFallbackSubsystem(this);
+	TArray<AActor*> LivingUnits;
+	for (const TWeakObjectPtr<AActor>& SpawnedUnit : M_SpawnedUnits)
+	{
+		AActor* UnitActor = SpawnedUnit.Get();
+		if (not UEnemyFallbackSubsystem::GetIsUnitActorAlive(UnitActor))
+		{
+			continue;
+		}
+		if (IsValid(FallbackSubsystem) && FallbackSubsystem->GetIsFleeing(UnitActor))
+		{
+			continue;
+		}
+		LivingUnits.Add(UnitActor);
+	}
+	return LivingUnits;
+}
+
+void AEnemyWaveSpawner::WatchPatrolForVehicleLoss(const TArray<AActor*>& SpawnedUnits) const
+{
+	UEnemyFallbackSubsystem* FallbackSubsystem = UEnemyFallbackSubsystem::GetEnemyFallbackSubsystem(this);
+	if (not IsValid(FallbackSubsystem))
+	{
+		return;
+	}
+	FallbackSubsystem->WatchVehicleEscortedGroup(SpawnedUnits);
 }
 
 void AEnemyWaveSpawner::HandleWaveEnded(const int32 WaveId)

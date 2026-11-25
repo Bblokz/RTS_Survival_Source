@@ -3,8 +3,11 @@
 #include "MissionCameraTourSession.h"
 
 #include "Blueprint/SlateBlueprintLibrary.h"
+#include "Components/AudioComponent.h"
 #include "Kismet/GameplayStatics.h"
+#include "RTS_Survival/GameUI/CinematicOverlay/W_CinematicOverlay.h"
 #include "RTS_Survival/GameUI/CameraTour/W_MissionCameraTour.h"
+#include "RTS_Survival/GameUI/HoldToConfirm/W_HoldToSkip.h"
 #include "RTS_Survival/GameUI/Portrait/PortraitWidget/W_Portrait.h"
 #include "RTS_Survival/Player/PortraitManager/PortraitManager.h"
 #include "RTS_Survival/Missions/MissionClasses/MissionBase/MissionBase.h"
@@ -24,6 +27,9 @@ namespace MissionCameraTourSessionPrivate
 	constexpr float CaptionFadeOutSeconds = 0.6f;
 	// Below this downward slope the camera looks almost level and the ground-point correction would explode.
 	constexpr float MinDownwardForwardZ = 0.1f;
+	// The fog stays lifted this long after the tour, so the player still sees the place as the view returns.
+	constexpr float RevealMarginSeconds = 4.f;
+	constexpr int32 SkipWidgetZOrder = 0;
 
 	float EaseInOutSine(const float Alpha)
 	{
@@ -275,17 +281,122 @@ bool UMissionCameraTourSession::TryTakeScreen()
 	M_Widget = UW_MissionCameraTour::ShowTour(M_PlayerController.Get(), M_Settings.bShowLetterbox,
 	                                          M_Settings.LetterboxHeightFraction);
 	HostPortraitOnTour(HudPortraitPlace);
-	if (M_Settings.StartSound != nullptr)
-	{
-		UGameplayStatics::PlaySound2D(M_Mission.Get(), M_Settings.StartSound);
-	}
+	PlayStartSound();
 	const UWorld* const World = GetTickableGameObjectWorld();
 	M_StartRealSeconds = World != nullptr ? World->GetRealTimeSeconds() : 0.0;
 	M_BlendFromPose = M_PlayerPose;
 	M_LastAppliedPose = M_PlayerPose;
 	bM_IsWaitingForScreen = false;
 	bM_IsRunning = true;
+	RevealShotAreas();
+	if (M_Settings.bAllowSkipping)
+	{
+		CreateSkipWidget();
+	}
 	return true;
+}
+
+void UMissionCameraTourSession::PlayStartSound() const
+{
+	if (M_Settings.StartSound == nullptr || not M_Mission.IsValid())
+	{
+		return;
+	}
+	// On its own audio component, so the subtitle strip can follow the playback; the strip keeps the component alive
+	// and stays until the line ends, also when the tour is skipped first.
+	UAudioComponent* const VoiceLine = UGameplayStatics::CreateSound2D(M_Mission.Get(), M_Settings.StartSound);
+	const UW_CinematicOverlay* const Overlay = IsValid(VoiceLine) && GetIsValidPlayerController(false)
+		                                           ? UW_CinematicOverlay::ShowForVoiceLine(
+			                                           M_PlayerController.Get(), VoiceLine,
+			                                           M_PlayerController->M_CinematicOverlayWidgetClass)
+		                                           : nullptr;
+	if (Overlay == nullptr)
+	{
+		// No transcript: nothing holds the component, so play it the fire-and-forget way.
+		if (IsValid(VoiceLine))
+		{
+			VoiceLine->DestroyComponent();
+		}
+		UGameplayStatics::PlaySound2D(M_Mission.Get(), M_Settings.StartSound);
+		return;
+	}
+	VoiceLine->Play();
+}
+
+void UMissionCameraTourSession::RevealShotAreas() const
+{
+	if (not M_Mission.IsValid())
+	{
+		return;
+	}
+	const float RevealSeconds = GetTotalSeconds() + MissionCameraTourSessionPrivate::RevealMarginSeconds;
+	for (int32 ShotIndex = 0; ShotIndex < M_Shots.Num(); ++ShotIndex)
+	{
+		const FMissionCameraTourShot& Shot = M_Shots[ShotIndex];
+		if (Shot.RevealRadius <= 0.f)
+		{
+			continue;
+		}
+		// The blend in from the previous shot crosses ground too.
+		if (ShotIndex > 0)
+		{
+			RevealAlongPath(M_Shots[ShotIndex - 1].FocusEnd, Shot.FocusStart, Shot.RevealRadius, RevealSeconds);
+		}
+		RevealAlongPath(Shot.FocusStart, Shot.FocusEnd, Shot.RevealRadius, RevealSeconds);
+	}
+}
+
+void UMissionCameraTourSession::RevealAlongPath(const FVector& From, const FVector& To, const float Radius,
+                                                const float Seconds) const
+{
+	// Bubbles one radius apart overlap, so the whole strip the camera passes over is lifted.
+	const float PathLength = FVector::Dist2D(From, To);
+	const int32 StepCount = FMath::Max(1, FMath::CeilToInt(PathLength / Radius));
+	for (int32 Step = 0; Step <= StepCount; ++Step)
+	{
+		M_Mission->RevealAreaForSeconds(FMath::Lerp(From, To, static_cast<float>(Step) / StepCount), Radius, Seconds);
+	}
+}
+
+void UMissionCameraTourSession::CreateSkipWidget()
+{
+	if (not GetIsValidPlayerController() || not M_PlayerController->GetIsValidHoldToSkipWidgetClass())
+	{
+		return;
+	}
+	M_SkipWidget = CreateWidget<UW_HoldToSkip>(M_PlayerController.Get(), M_PlayerController->M_HoldToSkipWidgetClass);
+	if (not GetIsValidSkipWidget())
+	{
+		return;
+	}
+	// The prompt hears Space through its own input preprocessor, so the game keeps its input mode.
+	M_SkipWidget->AddToViewport(MissionCameraTourSessionPrivate::SkipWidgetZOrder);
+	M_SkipWidget->OnHoldCompleted.AddDynamic(this, &UMissionCameraTourSession::HandleSkipHoldCompleted);
+}
+
+void UMissionCameraTourSession::RemoveSkipWidget()
+{
+	// Only skippable tours ever have the prompt, so a missing one is no error here.
+	if (not GetIsValidSkipWidget(false))
+	{
+		M_SkipWidget = nullptr;
+		return;
+	}
+	M_SkipWidget->OnHoldCompleted.RemoveDynamic(this, &UMissionCameraTourSession::HandleSkipHoldCompleted);
+	M_SkipWidget->StopHold();
+	M_SkipWidget->RemoveFromParent();
+	M_SkipWidget = nullptr;
+}
+
+void UMissionCameraTourSession::HandleSkipHoldCompleted()
+{
+	RemoveSkipWidget();
+	const UWorld* const World = GetTickableGameObjectWorld();
+	if (not bM_IsRunning || bM_IsReturning || World == nullptr)
+	{
+		return;
+	}
+	M_StartRealSeconds = World->GetRealTimeSeconds() - GetShotsTotalSeconds();
 }
 
 bool UMissionCameraTourSession::CachePlayerPose()
@@ -432,6 +543,7 @@ void UMissionCameraTourSession::CompleteSession(const EMissionCameraTourEnd EndR
 	bM_IsRunning = false;
 	bM_IsWaitingForScreen = false;
 	M_CurrentShotIndex = INDEX_NONE;
+	RemoveSkipWidget();
 
 	if (bHeldScreen)
 	{
@@ -506,6 +618,20 @@ bool UMissionCameraTourSession::GetIsValidCameraController(const bool bReportErr
 	{
 		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
 			this, TEXT("M_CameraController"), TEXT("UMissionCameraTourSession::GetIsValidCameraController"), this);
+	}
+	return false;
+}
+
+bool UMissionCameraTourSession::GetIsValidSkipWidget(const bool bReportError) const
+{
+	if (IsValid(M_SkipWidget))
+	{
+		return true;
+	}
+	if (bReportError)
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this, TEXT("M_SkipWidget"), TEXT("UMissionCameraTourSession::GetIsValidSkipWidget"), this);
 	}
 	return false;
 }

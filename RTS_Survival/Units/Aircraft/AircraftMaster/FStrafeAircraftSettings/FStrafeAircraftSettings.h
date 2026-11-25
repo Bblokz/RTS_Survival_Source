@@ -45,4 +45,8 @@ struct FStrafeAircraftSettings
 	// aircraft hunts nearby enemies on its own (aggressive stance) for the rest of the time.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	bool bRepeatRunsOverTarget = false;
+
+	// On: an aircraft that carries bombs drops them as it pulls out of each attack dive. Off: guns only.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	bool bDropBombsAtPullOut = true;
 };

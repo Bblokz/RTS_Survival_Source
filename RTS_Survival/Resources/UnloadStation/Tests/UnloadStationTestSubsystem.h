@@ -54,6 +54,14 @@ struct FUnloadTestHarvester
 	bool bLockKeptUnloading = false;
 	float MaxDockDriftCm = 0.f;
 	bool bHeldMoveRanAfterUnload = false;
+	// Unload progress bar in the health widget: shown while the crane unloads, never going down, hidden afterwards.
+	bool bSawProgressShown = false;
+	bool bProgressWentDown = false;
+	bool bProgressHiddenAfterUnload = false;
+	float LastProgressFill = 0.f;
+	float MaxProgressFill = 0.f;
+	// The health bar (which holds the progress bar) must be up the whole unload, selected or not.
+	bool bSawHealthBarHiddenWhileUnloading = false;
 	// Last harvester AI status written to the log (EHarvesterAIAction as uint8).
 	uint8 LastLoggedStatus = MAX_uint8;
 };
@@ -168,6 +176,8 @@ private:
 	void TrackLockedHarvester(FUnloadTestHarvester& TestHarvester, EHarvesterAIAction Status) const;
 	void OnLockedHarvesterFinished(FUnloadTestHarvester& TestHarvester) const;
 	void CheckLockResults();
+	/** @brief Every docked harvester showed a rising unload progress bar that was hidden once it was empty. */
+	void CheckUnloadProgressResults();
 	// How many docked harvesters got a lock order in the first unload; the second one gets the move + stop variant.
 	int32 M_LockOrdersGiven = 0;
 

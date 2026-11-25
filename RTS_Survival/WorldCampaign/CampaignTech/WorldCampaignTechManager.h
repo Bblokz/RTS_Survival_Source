@@ -5,12 +5,15 @@
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
 #include "RTS_Survival/WorldCampaign/CampaignTech/WorldCampaignTechSettings.h"
+#include "RTS_Survival/WorldCampaign/CampaignTech/WorldCampaignTechWheel.h"
 #include "WorldCampaignTechManager.generated.h"
 
 class UWorldCampaignProgressManager;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnWorldCampaignTechPurchased, ETechnology, Technology,
                                              const FWorldMapResources&, ResourcesLeft);
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnWorldTechWheelNodeBought, FName, NodeId);
 
 /**
  * @brief Added to the world player controller next to UWorldCampaignProgressManager. The tech tree UI asks it what
@@ -64,6 +67,41 @@ public:
 
 	UPROPERTY(BlueprintAssignable, Category = "World Campaign|Tech")
 	FOnWorldCampaignTechPurchased OnTechnologyPurchased;
+
+	// --- Tech wheel: the campaign's authority for what can be bought ---
+
+	/**
+	 * @brief Buys a tech wheel node in one step: checks path and key, pays, stores the node and, for a technology
+	 * node, researches its technology for the campaign.
+	 * @param NodeId Node to buy.
+	 * @param OutFailReason Player-facing reason when nothing was bought.
+	 * @return true when the node is now bought.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "World Campaign|Tech Wheel")
+	bool TryBuyWheelNode(FName NodeId, FText& OutFailReason);
+
+	/**
+	 * @brief Same checks as TryBuyWheelNode without buying, for the research button.
+	 * @param NodeId Node to check.
+	 * @param OutFailReason Player-facing reason when it cannot be bought.
+	 * @return true when TryBuyWheelNode would succeed now.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "World Campaign|Tech Wheel")
+	bool GetCanBuyWheelNode(FName NodeId, FText& OutFailReason) const;
+
+	/** Bought (the start node always is), reachable through a bought neighbour, or locked. */
+	UFUNCTION(BlueprintPure, Category = "World Campaign|Tech Wheel")
+	EWorldTechWheelNodeState GetWheelNodeState(FName NodeId) const;
+
+	/** A copy of every node of the campaign's wheel. */
+	UFUNCTION(BlueprintPure, Category = "World Campaign|Tech Wheel")
+	TArray<FWorldTechWheelNode> GetWheelNodes() const;
+
+	/** The wheel the campaign uses, without copying. */
+	const FWorldTechWheel& GetWheel() const;
+
+	UPROPERTY(BlueprintAssignable, Category = "World Campaign|Tech Wheel")
+	FOnWorldTechWheelNodeBought OnWheelNodeBought;
 
 protected:
 	virtual void BeginPlay() override;

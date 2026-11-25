@@ -98,3 +98,20 @@ Cost (`get_statistics`, same run): 380 pixel-shader instructions, 11 texture sam
 - `MaterialEditingLibrary.delete_all_material_expressions` leaves about half of the nodes behind per call: loop until the count is 0.
 - An exclusive-open lock test on the .umap from inside the editor that has it loaded always says locked (its own linker). Test from outside that no other UnrealEditor process runs, then judge by the save result and the file time.
 - Headless `-game` recorder runs of other sessions on Ger_Berlin hold the .umap: the save needs a moment with none running.
+
+## Ger_FrozenLake (one mesh ring, north backdrop) — 2026-11-24
+
+Tools: `Source/Tools/FrozenLakeMap/fl_backdrop_gen.py`, `fl_backdrop_build.py` and `run_backdrop_build.py`. Details are
+in `Source/Docs/Campaign/FrozenLakeMission.md`, "Build status: Svarog crater and dry lakebed".
+
+- **No skirt before.** The landscape is a complete 756 m square. The camera square is ±293 m, so the gameplay camera
+  never sees the end. The camera tour can.
+- **One mesh, not planes.** `FL_Backdrop` rings the whole landscape and is built with the north backdrop: the dry
+  lakebed and the Svarog crater.
+  - East, west and south it continues the landscape edge height, tucked 30 cm under it, and eases to z 150 over 40 m.
+    It is painted as burnt bog there.
+  - Cells hidden under the landscape are left out.
+  - The MapSkirt tools were not needed: the edge is one plateau (1.2-2.3 m) with no void inside the square.
+- **Fog of war past the edge.** `MPP_FogOfWar_01` samples its render targets with a clamp sampler. Ground past the map
+  edge therefore gets the fog state of the nearest edge texel: black unless that edge is explored or revealed. A tour
+  shot that shows a backdrop needs a `RevealRadius` that covers the edge it looks across.

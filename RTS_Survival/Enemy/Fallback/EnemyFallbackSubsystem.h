@@ -58,6 +58,20 @@ struct FEnemyFallbackSquadTrack
 	double FirstLossSeconds = -1.0;
 };
 
+/** A spawned group whose infantry gives up once its last vehicle is gone (patrols with bInfantryFleesWhenVehiclesLost). */
+USTRUCT()
+struct FEnemyFallbackEscortedGroup
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	TArray<TWeakObjectPtr<AActor>> Vehicles;
+
+	// Squad controllers of the group.
+	UPROPERTY()
+	TArray<TWeakObjectPtr<AActor>> Squads;
+};
+
 /**
  * @brief Makes beaten enemy squads give up and run to a rally point, where they disappear; a mission raises the alarm
  * when one arrives. A mission starts it with StartFallbackWatch, can push any unit with ForceUnitToFallBack (patrol
@@ -87,6 +101,17 @@ public:
 	 */
 	UFUNCTION(BlueprintCallable, Category = "Enemy|Fallback")
 	bool ForceUnitToFallBack(AActor* Unit);
+
+	/**
+	 * @brief Watches a spawned group (vehicles escorting infantry): once its last vehicle is destroyed, the squads still
+	 * alive run to the rally point. Checked while the fallback watch runs; a group without vehicles is ignored.
+	 * @param Units The spawned units; squad men resolve to their squad.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Enemy|Fallback")
+	void WatchVehicleEscortedGroup(const TArray<AActor*>& Units);
+
+	/** @return Whether a unit (squad controller, squad man or vehicle) still lives: squads with a living man, vehicles not dying. */
+	static bool GetIsUnitActorAlive(const AActor* UnitActor);
 
 	/** @return Whether the actor (a squad controller, one of its men, or a vehicle) is running to the rally point. */
 	UFUNCTION(BlueprintPure, Category = "Enemy|Fallback")
@@ -121,11 +146,18 @@ private:
 	// Units sent to the rally point (squad controllers and vehicles).
 	TArray<TWeakObjectPtr<AActor>> M_FleeingUnits;
 
+	// Groups whose infantry runs when their vehicles are gone; dropped once that happened or the group is wiped out.
+	UPROPERTY()
+	TArray<FEnemyFallbackEscortedGroup> M_EscortedGroups;
+
 	int32 M_TotalFledCount = 0;
 	bool bM_IsWatching = false;
 	FTimerHandle M_CheckTimerHandle;
 
 	void CheckSquads();
+	void CheckEscortedGroups();
+	// @return True when the group is done (its infantry was sent off, or nothing of it is left to watch).
+	bool CheckOneEscortedGroup(const FEnemyFallbackEscortedGroup& Group);
 	void CheckOneSquad(ASquadController* Squad, const double NowSeconds);
 	bool GetShouldSquadFallBack(const ASquadController* Squad, FEnemyFallbackSquadTrack& Track,
 	                            const double NowSeconds) const;

@@ -389,7 +389,8 @@ def werks():
 
 
 # ---- stations, outposts, guards -------------------------------------------------------------------------------------
-STATION_KIND = {"s1": "Loop", "s2": "Adcock", "s3": "Loop", "s4": "Adcock", "s5": "Adcock"}
+STATION_KIND = {"s1": "Loop", "s2": "Adcock", "s3": "Loop", "s4": "Adcock", "s5": "Adcock"}   # old kit placeholders
+DF_STATION_BP = "/Game/RTS_Survival/Blueprints/Environment/OderWarthe/Stations/BP_OW_DFStation"
 
 
 def stations():
@@ -400,8 +401,11 @@ def stations():
         # face the hut door towards the nearest track / the player's ridge
         start = fpoints("start")[0]
         yaw = bearing_yaw(start[0] - x, start[1] - y)
-        name = "SM_OW_DFStation_" + kind
-        if not piece("DF_" + kind, name, x, y, yaw, collision=True):
+        # 2026-11-24: the capturable BP_OW_DFStation (design F) replaces the kit placeholders; its pivot is the capture
+        # centre and +X its open yard, so it faces the start like the old hut door; ow_terrain_gen flattens a pad under it
+        if DF_STATION_BP:
+            bp("DF_%s_Station" % fid, DF_STATION_BP, x, y, yaw, 0.0, "Stations")
+        elif not piece("DF_" + kind, "SM_OW_DFStation_" + kind, x, y, yaw, collision=True):
             path = pry("radiomast_island")
             if path:
                 inst("Standin_DFMast", path, x, y, yaw, 0.55, -20.0, True)

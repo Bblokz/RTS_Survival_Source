@@ -18,7 +18,9 @@ enum class EMissionTriggerType : uint8
     // A player unit came near a place (e.g. UForgeStationSightedTrigger).
     PlayerUnitsNear UMETA(DisplayName = "Player Units Near"),
     // An enemy unit started to flee to its rally point (UEnemyFleeingMissionTrigger, UEnemyFallbackSubsystem).
-    EnemyFleeing UMETA(DisplayName = "Enemy Fleeing")
+    EnemyFleeing UMETA(DisplayName = "Enemy Fleeing"),
+    // The game has run for a number of seconds (UTimeElapsedMissionTrigger).
+    TimeElapsed UMETA(DisplayName = "Time Elapsed")
 };
 
 UCLASS(Abstract, Blueprintable, EditInlineNew)

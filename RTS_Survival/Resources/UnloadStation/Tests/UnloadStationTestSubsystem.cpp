@@ -21,6 +21,7 @@
 #include "RTS_Survival/Resources/ResourceDropOff/ResourceDropOff.h"
 #include "RTS_Survival/Resources/ResourceTypes/ResourceTypes.h"
 #include "RTS_Survival/Resources/UnloadStation/ResourceUnloadStation.h"
+#include "RTS_Survival/RTSComponents/HealthComponent.h"
 #include "RTS_Survival/Units/Tanks/WheeledTank/BaseTruck/NomadicVehicle.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 #include "RTS_Survival/Utils/UnitSpawning/RTSUnitOwnerSpawning.h"
@@ -407,6 +408,25 @@ void UUnloadStationTestSubsystem::TrackHarvester(FUnloadTestHarvester& TestHarve
 		}
 	}
 	TrackLockedHarvester(TestHarvester, Status);
+	if (Status == EHarvesterAIAction::CraneUnloading)
+	{
+		float Fill = 0.f;
+		if (Harvester->MapTest_GetUnloadProgress(Fill))
+		{
+			TestHarvester.bSawProgressShown = true;
+			TestHarvester.bProgressWentDown |= Fill + KINDA_SMALL_NUMBER < TestHarvester.LastProgressFill;
+			TestHarvester.LastProgressFill = Fill;
+			TestHarvester.MaxProgressFill = FMath::Max(TestHarvester.MaxProgressFill, Fill);
+			const UHealthComponent* HealthComponent = TestHarvester.Actor.IsValid()
+				                                          ? TestHarvester.Actor->FindComponentByClass<UHealthComponent>()
+				                                          : nullptr;
+			const ESlateVisibility BarVisibility = IsValid(HealthComponent)
+				                                       ? HealthComponent->GetHealthBarVisibility()
+				                                       : ESlateVisibility::Hidden;
+			TestHarvester.bSawHealthBarHiddenWhileUnloading |= BarVisibility == ESlateVisibility::Hidden
+				|| BarVisibility == ESlateVisibility::Collapsed;
+		}
+	}
 	// On a single-bay station the bay-less harvester empties at the overflow point without ever docking.
 	if ((TestHarvester.bWasDocked || GetIsSingleBay()) && GetCargo(TestHarvester) == 0
 		&& Status != EHarvesterAIAction::CraneUnloading)
@@ -418,6 +438,8 @@ void UUnloadStationTestSubsystem::TrackHarvester(FUnloadTestHarvester& TestHarve
 		UE_LOG(LogRTSUnloadStationTest, Display, TEXT("RTS_UNLOAD_TEST unloaded harvester=%s t=%.1f status=%s"),
 		       *TestHarvester.Actor->GetName(), GetPhaseSeconds(), *GetStringHarvesterAIStatus(Status));
 		OnLockedHarvesterFinished(TestHarvester);
+		float FillAfter = 0.f;
+		TestHarvester.bProgressHiddenAfterUnload = not Harvester->MapTest_GetUnloadProgress(FillAfter);
 	}
 }
 
@@ -482,6 +504,7 @@ void UUnloadStationTestSubsystem::TickBothBaysUnloading()
 	      FString::Printf(TEXT("store_changes=%d"), M_RadixiteStoreChanges));
 	Check(not Station->GetBayHarvester(0) && not Station->GetBayHarvester(1), TEXT("bays_released"));
 	CheckLockResults();
+	CheckUnloadProgressResults();
 	CheckRigGeometryResults();
 	CaptureViews(TEXT("after_unload"));
 
@@ -559,6 +582,7 @@ void UUnloadStationTestSubsystem::TickSingleBayUnloadResults(AResourceUnloadStat
 	      FString::Printf(TEXT("store_changes=%d"), M_RadixiteStoreChanges));
 	Check(not Station.GetBayHarvester(0), TEXT("bay_released"));
 	CheckLockResults();
+	CheckUnloadProgressResults();
 	CheckRigGeometryResults();
 	CaptureViews(TEXT("after_unload"));
 
@@ -803,6 +827,25 @@ void UUnloadStationTestSubsystem::CheckLockResults()
 		Check(TestHarvester.bHeldMoveRanAfterUnload != TestHarvester.bLockOrderIsStop,
 		      TEXT("held_order_ran_after_unload"),
 		      FString::Printf(TEXT("%s move_active=%d"), *Name, TestHarvester.bHeldMoveRanAfterUnload ? 1 : 0));
+	}
+}
+
+void UUnloadStationTestSubsystem::CheckUnloadProgressResults()
+{
+	for (const FUnloadTestHarvester& TestHarvester : M_Harvesters)
+	{
+		if (not TestHarvester.bWasDocked)
+		{
+			continue;
+		}
+		const FString Name = TestHarvester.Actor.IsValid() ? TestHarvester.Actor->GetName() : TEXT("none");
+		Check(TestHarvester.bSawProgressShown, TEXT("unload_progress_shown"), Name);
+		Check(not TestHarvester.bProgressWentDown, TEXT("unload_progress_never_drops"), Name);
+		// Three loads land over ~37 s: two of three credited plus the time estimate reach well past half.
+		Check(TestHarvester.MaxProgressFill >= 0.6f, TEXT("unload_progress_filled"),
+		      FString::Printf(TEXT("%s max_fill=%.2f"), *Name, TestHarvester.MaxProgressFill));
+		Check(TestHarvester.bProgressHiddenAfterUnload, TEXT("unload_progress_hidden_after"), Name);
+		Check(not TestHarvester.bSawHealthBarHiddenWhileUnloading, TEXT("unload_health_bar_shown"), Name);
 	}
 }
 

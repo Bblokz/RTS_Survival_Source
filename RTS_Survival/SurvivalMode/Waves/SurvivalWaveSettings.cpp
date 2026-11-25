@@ -401,7 +401,7 @@ void USurvivalWaveSettings::InitDefaultWaveKinds()
 	AirRaid.MinMinute = 8.f;
 	AirRaid.BudgetMultiplier = 0.6f;
 	AirRaid.GlobalAbilities = {
-		EGlobalAbility::GA_2xPE2Strafing, EGlobalAbility::GA_4xPE2Strafing,
+		EGlobalAbility::GA_2xPE2Strafing, EGlobalAbility::GA_4xPE2Strafing, EGlobalAbility::GA_2xIl2Strafing,
 		EGlobalAbility::GA_HeavyCarpet_PE8_500Gr, EGlobalAbility::GA_HeavyCarpet_PE8_1000Gr
 	};
 	AirRaid.GlobalAbilityCasts = 1;

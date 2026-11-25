@@ -52,7 +52,13 @@ enum class EInfoTakeoverKind : uint8
 	DigIn,
 	// How medium and heavy tanks drive through Soviet concrete walls, with a short in-game clip; opened by the Show
 	// Wall Breach Takeover node.
-	WallBreach
+	WallBreach,
+	// How convoy trucks surrender (scuttle countdown, a squad within 20 m, the 60 % health rule) and capture versus
+	// destroy; opened by the Show Capturing Trucks Takeover node.
+	CapturingTrucks,
+	// A captured paper document (title, typed intro, the sheet's lines and an optional stamp) whose text the caller
+	// gives; opened by the Show Document Takeover and Show Ore Manifest Takeover nodes.
+	Document
 };
 
 namespace InfoTakeoverKinds
@@ -126,6 +132,66 @@ struct FSquadInfoTakeoverEntry : public FTableRowBase
 	// The squad controller or solo infantry unit this entry was written for; a reference only, not used by the node.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Squad Info")
 	TSoftClassPtr<AActor> ReferenceSquadClass;
+};
+
+/** One line on the paper of a document takeover. */
+USTRUCT(BlueprintType)
+struct FDocumentTakeoverLine
+{
+	GENERATED_BODY()
+
+	// Plain text (no rich text tags); long lines wrap.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Document", meta = (MultiLine = true))
+	FText Text;
+
+	// Drawn in red ink on a faint red band, as if someone marked it on the sheet.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Document")
+	bool bIsMarked = false;
+};
+
+/**
+ * @brief Everything a document takeover shows: the typed title and intro on the panel, and a paper sheet under them
+ * with its own heading, lines and an optional rubber stamp. Written by the caller (a mission node or C++ preset).
+ */
+USTRUCT(BlueprintType)
+struct FDocumentTakeoverContent
+{
+	GENERATED_BODY()
+
+	// The small red label over the title, e.g. "RADIO OUTPOST  -  CAPTURED DOCUMENT"; empty hides it.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Document")
+	FText KindLabel;
+
+	// The typewritten title; also the archive entry's title.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Document")
+	FText Title;
+
+	// Typed under the title, before the sheet. Rich text tags of the body style set work.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Document", meta = (MultiLine = true))
+	FText Description;
+
+	// The heading printed at the top of the sheet.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Document")
+	FText PaperHeading;
+
+	// A smaller line under the heading (office, route, date); empty hides it.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Document")
+	FText PaperSubheading;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Document")
+	TArray<FDocumentTakeoverLine> PaperLines;
+
+	// Small print at the foot of the sheet (a signature, a note); empty hides it.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Document", meta = (MultiLine = true))
+	FText PaperFooter;
+
+	// A red rubber stamp across the sheet's top right corner, e.g. "BERLIN"; empty draws none.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Document")
+	FText StampText;
+
+	// Archived under Lore once per key; empty uses the title.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Document")
+	FName ArchiveKey;
 };
 
 /** The thinnest plate of one hull side, as the widget names it. */

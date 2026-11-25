@@ -15,6 +15,7 @@ class UNiagaraComponent;
 class UTraceImpactVfxBatcher;
 class USmallArmsMuzzleVfxBatcher;
 class UAircraftStrafeImpactBatcher;
+class UTankShellTrailBatcher;
 class UBulletFlyByAudioSubsystem;
 struct FSoA_SmallArmsProjectilesPool;
 
@@ -52,6 +53,10 @@ public:
 
 	// Draws the dirt spurts, debris, dust and sparks of every aircraft strafe gun with one Niagara system.
 	UAircraftStrafeImpactBatcher* GetAircraftStrafeImpactBatcher() const { return M_AircraftStrafeImpactBatcher; }
+
+	// Draws the tracer and smoke trail of every tank shell in flight with one Niagara system.
+	UTankShellTrailBatcher* GetTankShellTrailBatcher() const { return M_TankShellTrailBatcher; }
+	const FSoA_TankProjectilesPool& GetTankProjectilesPool() const { return M_TankProjectilesPool; }
 
 protected:
 	// Called when the game starts or when spawned
@@ -108,6 +113,9 @@ private:
 
 	UPROPERTY()
 	TObjectPtr<UAircraftStrafeImpactBatcher> M_AircraftStrafeImpactBatcher;
+
+	UPROPERTY()
+	TObjectPtr<UTankShellTrailBatcher> M_TankShellTrailBatcher;
 
 	bool EnsureSystemIsValid(TObjectPtr<UNiagaraSystem> System) const;
 	bool EnsureWorldIsValid();

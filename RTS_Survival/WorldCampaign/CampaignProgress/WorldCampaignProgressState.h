@@ -240,6 +240,10 @@ struct RTS_SURVIVAL_API FWorldCampaignProgressState
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame)
 	TArray<ETechnology> ResearchedTechnologies;
 
+	/** Nodes bought on the tech wheel, minor nodes included; a technology node also adds to ResearchedTechnologies. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame)
+	TArray<FName> BoughtTechNodeIds;
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame)
 	TArray<FWorldBuildNodeSaveData> Buildings;
 

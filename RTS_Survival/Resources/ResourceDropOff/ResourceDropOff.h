@@ -11,6 +11,7 @@
 
 
 class UPlayerResourceManager;
+class UGameResourceManager;
 class IResourceStorageOwner;
 class UMeshComponent;
 class AResourceUnloadStation;
@@ -18,6 +19,8 @@ class AResourceUnloadStation;
 
 /**
  * @brief Attach to resource-storage actors so harvesters can find safe delivery locations and deposit cargo.
+ * Owned by player 1 it holds the human's resources (credited to the player resource manager); owned by any other
+ * player its cargo slots are that player's own stockpile and the human is never credited or debited.
  * @note InitResourceDropOff: call in Blueprint to configure the supported resources, building mesh, and drop-off socket.
  */
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
@@ -126,6 +129,18 @@ public:
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	inline void SetIsDropOffActive(const bool IsActive) { bIsDropOffActive = IsActive; }
 
+	/** @return The owning player of the owner's RTS component (1 = the human, assumed when there is none). */
+	int8 GetOwningPlayer() const;
+
+	/** @return Whether deliveries here count for the human player (owner 1). */
+	bool GetIsOwnedByHumanPlayer() const;
+
+	/** @brief Test hook: InitResourceDropOff for a drop-off added to an actor at runtime. */
+	void MapTest_InitResourceDropOff(
+		const TMap<ERTSResourceType, int32>& MaxDropOffPerResource,
+		UMeshComponent* OwnerMeshComponent,
+		FName DropOffSocketName);
+
 protected:
 	virtual void BeginPlay() override;
 
@@ -151,10 +166,24 @@ private:
 
 	TWeakInterfacePtr<IResourceStorageOwner> M_ResourceStorageOwner;
 
+	// The human's resource manager; only used while this drop-off is owned by player 1.
 	UPROPERTY()
 	TObjectPtr<UPlayerResourceManager> M_PlayerResourceManager;
 
-	int8 GetOwningPlayer() const;
+	/**
+	 * @return The human's resource manager when this drop-off is owned by player 1 (repairing the reference once),
+	 * null without an error for any other owner.
+	 */
+	UPlayerResourceManager* GetHumanPlayerResourceManager();
+
+	// Set at init when the owner does not implement IResourceStorageOwner on purpose (an AI building such as the Soviet
+	// refinery, or a component named ResourceDropOff); storage visuals are then skipped without an error.
+	bool bM_HasNoStorageVisualsOwner = false;
+
+	/** @brief Moves the registration in the game resource manager along when the owner's RTS component changes player. */
+	void OnOwnerOwningPlayerChanged(uint8 OldOwningPlayer, uint8 NewOwningPlayer);
+	void BindToOwnerOwningPlayerChanges();
+	UGameResourceManager* GetGameResourceManager() const;
 
 	float M_DropOffTextZOffset = 100;
 

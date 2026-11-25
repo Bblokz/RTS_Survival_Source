@@ -288,10 +288,36 @@ void AGMRDirector::PrepareNewUnit(AActor* Unit)
 	}
 }
 
+void AGMRDirector::RevealFogHiddenActors() const
+{
+	// Pre-placed enemies (base buildings, pits, towers) are no recorded units: the fog would keep them hidden for
+	// the whole take although the fog itself is switched off.
+	constexpr uint64 RevealEveryFrames = 20;
+	if (not M_Job.bDisableFogOfWar || GFrameCounter % RevealEveryFrames != 0)
+	{
+		return;
+	}
+	const FName HiddenByFogTag = DeveloperSettings::GamePlay::FoW::TagUnitHiddenByFog;
+	for (TActorIterator<AActor> It(GetWorld()); It; ++It)
+	{
+		if (not It->Tags.Contains(HiddenByFogTag))
+		{
+			continue;
+		}
+		if (UFowComp* const Fow = It->FindComponentByClass<UFowComp>())
+		{
+			Fow->StopFowParticipation();
+		}
+		It->Tags.Remove(HiddenByFogTag);
+		It->SetActorHiddenInGame(false);
+	}
+}
+
 void AGMRDirector::KeepUnitsReady()
 {
 	using namespace GMRDirectorEventsPrivate;
 	const FName InEnemyVisionTag = DeveloperSettings::GamePlay::FoW::TagUnitInEnemyVision;
+	RevealFogHiddenActors();
 	for (TPair<FString, FGMRTaggedUnits>& Pair : M_TaggedUnits)
 	{
 		for (const TWeakObjectPtr<AActor>& Weak : Pair.Value.Units)

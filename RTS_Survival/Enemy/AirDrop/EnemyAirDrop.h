@@ -11,6 +11,7 @@
 #include "EnemyAirDrop.generated.h"
 
 class AEnemyAirDrop;
+class UEnemyAirDropSettings;
 class UGlobalAbility;
 class UGlobalAbilitiesManager;
 class UGA_AircraftDrop;
@@ -21,6 +22,8 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnEnemyAirDropDropEvent, AEnemyAir
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnEnemyAirDropFinished, AEnemyAirDrop*, AirDrop);
 // A vehicle or squad of a cargo plane drop was released on the ground (squads: spawned at the landed aircraft).
 DECLARE_MULTICAST_DELEGATE_TwoParams(FOnEnemyAirDropUnitDelivered, AEnemyAirDrop* /*AirDrop*/, AActor* /*Unit*/);
+// Blueprint twin of FOnEnemyAirDropUnitDelivered, for mission stages.
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnEnemyAirDropUnitLanded, AEnemyAirDrop*, AirDrop, AActor*, Unit);
 
 /** How the units of a placed air drop arrive; also picks the shape drawn above each landing point. */
 UENUM(BlueprintType)
@@ -256,6 +259,10 @@ public:
 	// Each vehicle and squad a cargo plane of this air drop releases (not parachuted squads).
 	FOnEnemyAirDropUnitDelivered OnUnitDelivered;
 
+	// The same moment for Blueprints: a mission can order the landed unit, track it, or show it.
+	UPROPERTY(BlueprintAssignable, Category = "Air Drop")
+	FOnEnemyAirDropUnitLanded OnUnitLanded;
+
 	virtual FColor GetPlacementColor() const override;
 	virtual FString GetConfigurationProblem() const override;
 
@@ -283,6 +290,11 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Air Drop|Units")
 	FEnemyAirDropUnits Units;
+
+	// Optional: when set, Units and Timing.FirstDropDelay come from this asset at BeginPlay (tune the drop in the
+	// asset, next to the map's other data assets, instead of on the placed actor).
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Air Drop|Units")
+	TObjectPtr<UEnemyAirDropSettings> SettingsAsset = nullptr;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Air Drop|Delivery")
 	FEnemyAirDropDeliverySettings Delivery;
