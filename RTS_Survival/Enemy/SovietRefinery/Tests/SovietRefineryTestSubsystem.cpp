@@ -368,6 +368,12 @@ void USovietRefineryTestSubsystem::TickNaturalHarvest()
 	for (FSovietRefineryUnderTest& Test : M_Refineries)
 	{
 		Check(Test.bNaturalDone, TEXT("refinery_receives_natural_deliveries"), Test.Design);
+		// Far from the camera the montage must still end by itself, without the harvester's watchdog.
+		Check(Test.HarvestAnimationCount > 0 && Test.HarvestWatchdogFinishes == 0,
+		      TEXT("harvest_montage_ends_on_its_own"),
+		      FString::Printf(TEXT("%s animation_spans=%d longest_span=%.1fs watchdog_finishes=%d"), *Test.Design,
+		                      Test.HarvestAnimationCount, Test.LongestHarvestAnimationSeconds,
+		                      Test.HarvestWatchdogFinishes));
 		USovietRefineryComponent* Refinery = Test.Refinery.Get();
 		if (IsValid(Refinery))
 		{
@@ -441,6 +447,33 @@ void USovietRefineryTestSubsystem::TrackCrane(FSovietRefineryUnderTest& Test)
 	Test.LastPhase = PhaseValue;
 }
 
+void USovietRefineryTestSubsystem::TrackHarvestAnimationLength(FSovietRefineryUnderTest& Test,
+                                                               const FString& HarvesterName,
+                                                               const EHarvesterAIAction OldStatus,
+                                                               const EHarvesterAIAction NewStatus) const
+{
+	const float Now = GetWorld()->GetTimeSeconds();
+	if (NewStatus == EHarvesterAIAction::PlayHarvestAnimation)
+	{
+		Test.HarvestAnimationStartSeconds.Add(HarvesterName, Now);
+		return;
+	}
+	if (OldStatus != EHarvesterAIAction::PlayHarvestAnimation)
+	{
+		return;
+	}
+	float StartSeconds = 0.f;
+	if (not Test.HarvestAnimationStartSeconds.RemoveAndCopyValue(HarvesterName, StartSeconds))
+	{
+		return;
+	}
+	const float Length = Now - StartSeconds;
+	++Test.HarvestAnimationCount;
+	Test.LongestHarvestAnimationSeconds = FMath::Max(Test.LongestHarvestAnimationSeconds, Length);
+	UE_LOG(LogSovietRefineryTest, Display, TEXT("RTS_SOVREF_TEST harvest_animation design=%s unit=%s length=%.1fs"),
+	       *Test.Design, *HarvesterName, Length);
+}
+
 void USovietRefineryTestSubsystem::TrackHarvesters(FSovietRefineryUnderTest& Test)
 {
 	const USovietRefineryComponent* Refinery = Test.Refinery.Get();
@@ -456,12 +489,19 @@ void USovietRefineryTestSubsystem::TrackHarvesters(FSovietRefineryUnderTest& Tes
 		{
 			continue;
 		}
+		int32& WatchdogFinishes = Test.HarvesterWatchdogFinishes.FindOrAdd(Actor->GetName(), 0);
+		if (Harvester->MapTest_GetWatchdogFinishCount() > WatchdogFinishes)
+		{
+			Test.HarvestWatchdogFinishes += Harvester->MapTest_GetWatchdogFinishCount() - WatchdogFinishes;
+			WatchdogFinishes = Harvester->MapTest_GetWatchdogFinishCount();
+		}
 		const EHarvesterAIAction Status = Harvester->MapTest_GetHarvestStatus();
 		uint8& Last = Test.HarvesterStatus.FindOrAdd(Actor->GetName(), MAX_uint8);
 		if (static_cast<uint8>(Status) == Last)
 		{
 			continue;
 		}
+		TrackHarvestAnimationLength(Test, Actor->GetName(), static_cast<EHarvesterAIAction>(Last), Status);
 		Last = static_cast<uint8>(Status);
 		int32 Cargo = 0;
 		ERTSResourceType CargoType = ERTSResourceType::Resource_None;

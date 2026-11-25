@@ -8,6 +8,7 @@
 
 #include "SovietRefineryTestSubsystem.generated.h"
 
+enum EHarvesterAIAction : uint8;
 class ASkeletalCraneUnloadStation;
 class USovietRefineryComponent;
 class UHarvester;
@@ -47,6 +48,14 @@ struct FSovietRefineryUnderTest
 	float MaxJawOffPick2DCm = 0.f;
 	// Last logged harvester AI status per harvester name.
 	TMap<FString, uint8> HarvesterStatus;
+	// World time each harvester entered its harvest animation. One span can hold several back-to-back montages (the
+	// harvester goes straight from one harvest step into the next), so spans are logged, not checked.
+	TMap<FString, float> HarvestAnimationStartSeconds;
+	int32 HarvestAnimationCount = 0;
+	float LongestHarvestAnimationSeconds = 0.f;
+	// Harvest animations the harvester's watchdog had to end; must stay 0 (montages end on their own).
+	TMap<FString, int32> HarvesterWatchdogFinishes;
+	int32 HarvestWatchdogFinishes = 0;
 };
 
 /**
@@ -81,6 +90,8 @@ private:
 	int32 GetDelivered(const FSovietRefineryUnderTest& Test, ERTSResourceType Resource) const;
 	void TrackCrane(FSovietRefineryUnderTest& Test);
 	void TrackHarvesters(FSovietRefineryUnderTest& Test);
+	void TrackHarvestAnimationLength(FSovietRefineryUnderTest& Test, const FString& HarvesterName,
+	                                 EHarvesterAIAction OldStatus, EHarvesterAIAction NewStatus) const;
 	void CaptureCrane(const FSovietRefineryUnderTest& Test, const FString& Label) const;
 	int32 GetPlayerResource(ERTSResourceType Resource) const;
 	void StartGameAndUnpause() const;

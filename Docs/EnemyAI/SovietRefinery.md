@@ -147,8 +147,15 @@ A copy of SovietCrane_1 reworked for runtime posing from C++ (`UPoseableMeshComp
   pictures only.
 
 **Gotchas**
-- The Breaker Blueprint's default owner is player 1 (it was copied from the Pz I harvester).
-  `GetOwnerOverrideForAIPlayer(2)` returns "no override", so always pass the owner explicitly. A hand-placed Breaker
-  needs its owner set on the instance.
+- The Breaker Blueprint defaults to owner 2, like the other `Rus_` vehicles (fixed 2026-11-25; it had been copied
+  from the Pz I with owner 1). Its RTS component is inherited from `RTS_BP_TrackedTankMaster`, so the value lives in
+  the Breaker's own component override. For AI player 3 or 4, set the owner on the placed instance.
+  `GetOwnerOverrideForAIPlayer(2)` returns "no override", so the refinery passes the owner explicitly.
+- Harvest montages far from the camera: `URTSOptimizer` stops ticking the skeletal meshes of far units, which froze
+  the harvest montage (it never reached OnCompleted). Since 2026-11-25 `UHarvester` calls
+  `URTSOptimizer::SetKeepMontagesTicking` while the montage plays. This fixes every harvester, not only the Breaker.
+  The harvester's watchdog (12 s / play rate + 6 s) stays as a safety net for an interrupted montage: the harvester
+  Blueprints wire OnCompleted only. The test checks `harvest_montage_ends_on_its_own` (harvest animations seen, and
+  `UHarvester::MapTest_GetWatchdogFinishCount` stays 0).
 - RTS_ToCopySmall has no metal fields and no ground past X ≈ 25000.
 - Enemy actors are fog-hidden from test cameras; the crane station is not a unit and always shows.

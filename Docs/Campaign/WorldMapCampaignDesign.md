@@ -544,3 +544,46 @@ Owner pick: design 6, hex plate (sheets `Saved/WorldMapUIDesigns/site_*.png`).
 - `Hex Plate Width` on the node sets the size (57.6 map units; owner asked for 20% over the sketch's 48). The old cylinder is hidden but stays as the click target; it shows again when the material is missing.
 - Hover: `AWorldPlayerController::Tick_UpdateHoveredBuildNode` calls `SetIsHovered` on the site under the cursor trace; the plate brightens and gets a cream outline.
 - Capture steps 08 to 10 of `run_country_look_capture.ps1` show the sites.
+
+### Story mission map pieces (2026-11-25)
+
+The five story missions the map can launch have their own map piece. The owner picked each design in its drawing
+session (`Saved/WorldMapUIDesigns/MissionObjects/<Mission>/pick.md`).
+
+| Mission | Piece | Blueprint (under `WorldCampaign/MapObjects/Missions/Story/`) |
+|---|---|---|
+| Ore Mountains | Stollenmund: fortified adit in a crag, the game's Panzer IV H in front | `OreMountains/BP_Mission_OreMountains` |
+| Berlin | The level's damaged flak tower and Reichstag ruin in small, on a cut-corner base | `Berlin/BP_Mission_Berlin` |
+| Oder-Warthe Line | Peilturm with an H aerial on the roof | `OderWarthe/BP_Mission_OderWarthe` |
+| Pripyat Marshes | Hangar Island with the Me 410 | `Pripyat/BP_Mission_Pripyat` |
+| Lake Vygozero | A Forge heavy tank going through the ice | `FrozenLake/BP_Mission_FrozenLake` |
+
+- **Registration:** `MissionObjectClassByType` in `Config/DefaultGame.ini`. Pripyat uses the old `ME410UnlockMission`
+  value, so that entry now points at the new Blueprint; `BP_Mission_ME410` is no longer used but still exists.
+- **Structure:** each Blueprint is a child of `BP_MissionWorldObject` with static mesh components under one
+  `PieceRoot` scene component. `PieceRoot` has yaw 90 because the models have their front on +Y and the map camera
+  looks along +X.
+- **Game meshes used as they are:** Berlin's flak tower (`SM_BF_FlakTower_Damaged`) and the Reichstag (the instanced
+  meshes of `BP_ReichstagRuin_B2`, without decals, forecourt and ramp) keep their level materials. The Oder-Warthe
+  concrete is `MI_OW_Werk_Peilturm_Concrete`. The Ore Mountains tank is `SM_PzIV_H_TrainingPreview` in plain dark
+  yellow: the UVs of that one-slot preview mesh do not fit the tank camo texture.
+- **Materials:** three shared masters in `Story/Shared`: `M_WorldPiece_PBR` (base colour, normal, ORM),
+  `M_WorldPiece_Albedo`, `M_WorldPiece_Flat`.
+- **Briefing text:** description and objectives come from the mission design docs, without late reveals. Rewards are
+  empty and the "on defeat" text is still the stand-in of `BP_MissionWorldObject`.
+- **Rebuild:** `Source/Tools/WorldMapPieces` (`build_pieces.py` headless import and Blueprint build,
+  `lineup_capture.py` line-up pictures, `check_pieces.py`). The models and textures are in the drawing folders under
+  `Saved/`, which git does not track.
+- **Checked:** all five spawn beside the HQ piece at about its footprint (`Saved/WorldMapPieces/lineup_*.png`); the
+  game capture shows the Berlin and Ore Mountains pieces with their name plates; the log has no class fallback
+  warning for the five missions.
+- **Not checked / open:**
+  - Oder-Warthe, Pripyat and Lake Vygozero in the running game: they start under fog.
+  - In the campaign level the pieces look dim and brown, like the HQ piece. Their true colours were only seen
+    under a neutral test light (`Saved/WorldMapPieces/story_pieces_neutral_light.png`).
+  - The flak tower and Reichstag materials turn to a noisy pattern at this size; the real tower mesh at the same
+    scale shows the same.
+  - Clicking a piece, the outline, and the briefing panel with the new texts.
+  - The aerial does not turn.
+  - Decided (owner, 2026-11-25): the Lake Vygozero tank stays an IS-3, although the mission spawns a Shield IS-2.
+  - The Pripyat piece has a base colour texture only. The flak tower mesh has 75,000 triangles.
