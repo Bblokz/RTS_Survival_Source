@@ -35,9 +35,7 @@ void UDestroyEnemyItemSiteMission::TickMission(const float DeltaTime)
 	}
 
 	const AEnemyItemSiteDirector* SiteDirector = M_SiteDirector.Get();
-	const EEnemyItemSiteObjectiveState ObjectiveState = EnemyItemSiteRules::GetObjectiveState(
-		SiteDirector->GetIsSiteBuilt(), SiteDirector->GetSpawnedVictoryTargetCount(),
-		SiteDirector->GetVictoryTargets().Num());
+	const EEnemyItemSiteObjectiveState ObjectiveState = SiteDirector->GetObjectiveState();
 	switch (ObjectiveState)
 	{
 	case EEnemyItemSiteObjectiveState::NoTargets:
@@ -48,6 +46,9 @@ void UDestroyEnemyItemSiteMission::TickMission(const float DeltaTime)
 		break;
 	case EEnemyItemSiteObjectiveState::AllTargetsDestroyed:
 		OnMissionComplete();
+		break;
+	case EEnemyItemSiteObjectiveState::EnemyEscaped:
+		FailOnEnemyEscape();
 		break;
 	default:
 		break;
@@ -107,7 +108,8 @@ void UDestroyEnemyItemSiteMission::ReportSiteWithoutTargets(const AEnemyItemSite
 
 	bM_HasReportedNoTargets = true;
 	const FString Remedy = SiteDirector.GetSiteContext().bIsDivisionOperation
-		                       ? TEXT("The division army spawned no unit; see the earlier division army errors.")
+		                       ? TEXT("The division army spawned no unit, or its convoy route started no convoy; see ")
+		                         TEXT("the earlier errors.")
 		                       : TEXT("Give the map signature slots with a victory target for this item type.");
 	RTSFunctionLibrary::ReportError(
 		"DestroyEnemyItemSiteMission " + GetName() + ": the site spawned no victory target, so this mission cannot "
@@ -125,6 +127,21 @@ void UDestroyEnemyItemSiteMission::OnMissionComplete()
 	if (bTriggerVictoryOnComplete)
 	{
 		ScheduleVictory();
+	}
+}
+
+void UDestroyEnemyItemSiteMission::FailOnEnemyEscape()
+{
+	// The owner's rule for convoy battles: one truck that gets away loses the operation.
+	OnMissionFailed();
+	if (not bTriggerDefeatOnEnemyEscape)
+	{
+		return;
+	}
+
+	if (AMissionManager* MissionManager = GetMissionManagerChecked())
+	{
+		MissionManager->TriggerDefeat(ERTSDefeatType::LostMainObjective);
 	}
 }
 

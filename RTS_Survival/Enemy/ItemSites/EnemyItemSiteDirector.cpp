@@ -3,9 +3,11 @@
 #include "EnemyItemSiteDirector.h"
 
 #include "EngineUtils.h"
+#include "EnemyConvoyBattleTracker.h"
 #include "EnemyDivisionArmySpawner.h"
 #include "EnemyItemSignatureSlot.h"
 #include "EnemyItemStrengthSlot.h"
+#include "RTS_Survival/Enemy/Convoy/ConvoyRouteActor/EnemyConvoyRoute.h"
 #include "RTS_Survival/Enemy/EnemyController/EnemyController.h"
 #include "RTS_Survival/Enemy/MissionPlacement/EnemyPlacementShapesComponent.h"
 #include "RTS_Survival/Enemy/MissionPlacement/EnemyPlacementTypes.h"
@@ -28,6 +30,7 @@ AEnemyItemSiteDirector::AEnemyItemSiteDirector()
 {
 	TestContext.ItemType = EMapEnemyItem::Airfield;
 	M_ArmySpawner = CreateDefaultSubobject<UEnemyDivisionArmySpawner>(TEXT("DivisionArmySpawner"));
+	M_ConvoyBattleTracker = CreateDefaultSubobject<UEnemyConvoyBattleTracker>(TEXT("ConvoyBattleTracker"));
 }
 
 bool AEnemyItemSiteDirector::GetIsValidArmySpawner() const
@@ -38,6 +41,18 @@ bool AEnemyItemSiteDirector::GetIsValidArmySpawner() const
 	}
 
 	RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, "M_ArmySpawner", "GetIsValidArmySpawner", this);
+	return false;
+}
+
+bool AEnemyItemSiteDirector::GetIsValidConvoyBattleTracker() const
+{
+	if (IsValid(M_ConvoyBattleTracker))
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, "M_ConvoyBattleTracker",
+	                                                      "GetIsValidConvoyBattleTracker", this);
 	return false;
 }
 
@@ -80,6 +95,13 @@ bool AEnemyItemSiteDirector::BuildSite(const FEnemyItemSiteContext& SiteContext)
 	{
 		// A field map has no signature slots; strength slots still switch on (a supporting division's dug-in guns).
 		BuildSite_ActivateStrengthSlots();
+		bM_IsConvoyRouteBattle = GetShouldDriveConvoyRoute();
+		if (bM_IsConvoyRouteBattle)
+		{
+			BuildSite_StartConvoyBattle();
+			return true;
+		}
+
 		BuildSite_SpawnDivisionArmy();
 		return true;
 	}
@@ -110,6 +132,45 @@ void AEnemyItemSiteDirector::BuildSite_SpawnDivisionArmy()
 	// Bound first: an empty army answers at once, inside StartSpawningArmy.
 	M_ArmySpawner->OnArmySpawned.AddUObject(this, &AEnemyItemSiteDirector::OnDivisionArmySpawned);
 	M_ArmySpawner->StartSpawningArmy(M_SiteContext.Army, ArmySettings, GetEnemyPlayer());
+}
+
+bool AEnemyItemSiteDirector::GetShouldDriveConvoyRoute() const
+{
+	if (M_SiteContext.Army.DivisionType != EWorldFieldDivisions::SovietSupplyConvoy)
+	{
+		return false;
+	}
+
+	if (IsValid(ArmySettings.ConvoyRoute))
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportError(FString::Printf(
+		TEXT("Enemy site %s: a supply convoy is attacked but ArmySettings.ConvoyRoute is not set, so its trucks park ")
+		TEXT("at the start instead of driving. Place an AEnemyConvoyRoute (Start On Begin Play off) and set it."),
+		*GetName()));
+	return false;
+}
+
+void AEnemyItemSiteDirector::BuildSite_StartConvoyBattle()
+{
+	if (not GetIsValidConvoyBattleTracker())
+	{
+		FinishBuildingSite();
+		return;
+	}
+
+	if (M_SiteContext.Army.ConvoyTruckCount <= 0)
+	{
+		RTSFunctionLibrary::ReportError(FString::Printf(
+			TEXT("Enemy site %s: the attacked supply convoy has no trucks, so no convoy drives and the field map ")
+			TEXT("cannot be won. Opened directly? Set TestContext.Army.ConvoyTruckCount."), *GetName()));
+	}
+
+	// Bound first: a route that cannot start answers at once, inside StartConvoyBattle.
+	M_ConvoyBattleTracker->OnBattleReady.AddUObject(this, &AEnemyItemSiteDirector::FinishBuildingSite);
+	M_ConvoyBattleTracker->StartConvoyBattle(ArmySettings.ConvoyRoute, M_SiteContext.Army.ConvoyTruckCount);
 }
 
 void AEnemyItemSiteDirector::OnDivisionArmySpawned(const int32 SpawnedUnitCount)
@@ -236,6 +297,11 @@ TArray<AActor*> AEnemyItemSiteDirector::GetVictoryTargets() const
 		return GetSignatureTargets();
 	}
 
+	if (bM_IsConvoyRouteBattle)
+	{
+		return GetIsValidConvoyBattleTracker() ? M_ConvoyBattleTracker->GetLivingTrucks() : TArray<AActor*>();
+	}
+
 	return GetIsValidArmySpawner() ? M_ArmySpawner->GetLivingUnits() : TArray<AActor*>();
 }
 
@@ -246,7 +312,26 @@ int32 AEnemyItemSiteDirector::GetSpawnedVictoryTargetCount() const
 		return M_SpawnedSignatureTargetCount;
 	}
 
+	if (bM_IsConvoyRouteBattle)
+	{
+		return GetIsValidConvoyBattleTracker() ? M_ConvoyBattleTracker->GetSpawnedTruckCount() : 0;
+	}
+
 	return GetIsValidArmySpawner() ? M_ArmySpawner->GetSpawnedUnitCount() : 0;
+}
+
+EEnemyItemSiteObjectiveState AEnemyItemSiteDirector::GetObjectiveState() const
+{
+	if (bM_IsConvoyRouteBattle)
+	{
+		// Decided from truck fates: an escaped truck is removed, so the living count alone would read it as a win.
+		return GetIsValidConvoyBattleTracker()
+			       ? EnemyItemSiteRules::GetConvoyBattleObjectiveState(M_ConvoyBattleTracker->GetBattleState())
+			       : EEnemyItemSiteObjectiveState::NoTargets;
+	}
+
+	return EnemyItemSiteRules::GetObjectiveState(bM_IsSiteBuilt, GetSpawnedVictoryTargetCount(),
+	                                             GetVictoryTargets().Num());
 }
 
 void AEnemyItemSiteDirector::OnEnemyAIReady(AEnemyController* EnemyController, const ERTSGameDifficulty Difficulty)
@@ -264,7 +349,7 @@ void AEnemyItemSiteDirector::OnEnemyAIReady(AEnemyController* EnemyController, c
 	}
 
 	ApplyProfileToEnemyAI(*EnemyController);
-	if (M_SiteContext.bIsDivisionOperation && GetIsValidArmySpawner())
+	if (M_SiteContext.bIsDivisionOperation && not bM_IsConvoyRouteBattle && GetIsValidArmySpawner())
 	{
 		M_ArmySpawner->SetEnemyController(EnemyController);
 	}
@@ -305,6 +390,12 @@ bool AEnemyItemSiteDirector::GetNeedsEnemyAIDecisionTree() const
 	if (not M_SiteContext.bIsDivisionOperation)
 	{
 		return true;
+	}
+
+	// A convoy on a route drives and fights by its definition, not by the decision tree.
+	if (bM_IsConvoyRouteBattle)
+	{
+		return false;
 	}
 
 	return ArmySettings.GetOrdersForDivision(M_SiteContext.Army.DivisionType)

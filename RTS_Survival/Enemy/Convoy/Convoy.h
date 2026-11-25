@@ -352,6 +352,8 @@ private:
 	double GetNow() const;
 
 	// ---------------- Spawning (ConvoySpawning.cpp)
+	// The definition's column for the guard tier with the start's truck count; members are built in this order.
+	TArray<FConvoyTruckSpec> GetStartTruckColumn() const;
 	void BuildMembersFromDefinition();
 	void AddMember(EConvoyUnitRole MemberRole, EConvoyStation Station, const FString& UnitName);
 	void AssignSlots();

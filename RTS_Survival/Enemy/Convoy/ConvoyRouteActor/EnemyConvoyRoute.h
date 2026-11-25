@@ -339,6 +339,16 @@ public:
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Convoy Route")
 	void StartRoute();
 
+	/**
+	 * @brief Runs one convoy of TruckCount trucks, whatever the timing's repeat says: the world map convoy a field
+	 * battle is fought against. Turn Start On Begin Play off, or the route also runs on every other battle.
+	 * @param TruckCount Trucks of the convoy (the definition's trucks repeated or cut to this count).
+	 * @return False (reported) when the route already runs or TruckCount is not positive.
+	 */
+	bool StartSingleConvoy(const int32 TruckCount);
+
+	bool GetStartsOnBeginPlay() const { return Timing.bStartOnBeginPlay; }
+
 	/** @brief No new convoys start; driving convoys carry on and the route finishes once they are done. */
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Convoy Route")
 	void StopRoute();
@@ -573,6 +583,9 @@ private:
 	ERTSGameDifficulty M_Difficulty = ERTSGameDifficulty::Normal;
 	FTimerHandle M_NextConvoyTimerHandle;
 
+	// Set by StartSingleConvoy for its run: the truck count of that one convoy; 0 for a normal run.
+	int32 M_SingleConvoyTruckCount = 0;
+
 	int32 M_StartedConvoyCount = 0;
 	// Convoys started since the last StartRoute; picks the guard tier step and ends a fixed count.
 	int32 M_ConvoysThisRun = 0;
@@ -588,6 +601,7 @@ private:
 	bool bM_HasLaunchedLastConvoy = false;
 
 	// ----- Launch -----
+	void BeginRun();
 	void LaunchConvoy();
 	bool GetIsOwningBuildingAlive() const;
 	bool TryGetBuiltRoute(FConvoyRoute& OutRoute);

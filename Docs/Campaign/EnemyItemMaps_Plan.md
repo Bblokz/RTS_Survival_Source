@@ -104,7 +104,8 @@ Each step is testable alone.
 2. **Enemy start marker, signature slots, site director, item profiles** (C++ + data assets), with the debug override.
    **C++ built 2026-11-24, see section 5b.** The director doubles as the enemy start marker.
 3. **Generic objective** for item maps and field maps. **Built 2026-11-24, see sections 5c and 5d.**
-4. **Division army spawning** on field maps. **C++ built 2026-11-24, see section 5d.**
+4. **Division army spawning** on field maps. **C++ built 2026-11-24, see section 5d.** Supply convoys drive a
+   placed route: **C++ built 2026-11-25, see section 5e.**
 5. **First maps** (owner): two or three item maps and one or two field maps; each item map checked with every item
    type through the debug override.
 6. **Airfield content**: parked aircraft, enemy air abilities.
@@ -233,14 +234,51 @@ the losses twice.
   `ProfileByDivision` show in the Development editor after a rebuild.
 
 **Open (owner decisions):**
-- **Convoys** spawn as a parked group at the enemy start for now; the trucks (and nothing else) are the army.
+- **Convoys** park at the enemy start only when the director has no `ArmySettings.ConvoyRoute`.
   **Owner pick 2026-11-24: B, drive a placed route** (an `AEnemyConvoyRoute` on the field map, with the convoy
-  system's escorts, stops and caches). Not built yet. The escape rule (what the operation reports when trucks reach
-  the exit) is still open: the answer was unclear.
+  system's escorts, stops and caches). **Escape rule (owner 2026-11-25): any escape = defeat** (one truck at the
+  exit or one branch truck delivered loses the battle; win when every truck is destroyed or captured). C++ built
+  2026-11-25, see 5e.
 - **Supporting divisions** (other enemy divisions in range) only add strength percentage, which can switch on
   strength slots. Their units do not spawn.
 - **A lost or withdrawn field battle** leaves the world division at full roster; the units the player killed are not
   taken off it.
+
+## 5e. Convoy route battles as built (2026-11-25)
+
+Owner picks: convoys drive a placed `AEnemyConvoyRoute` (B), and **any escape = defeat**.
+
+- **Setup on a field map:** place an `AEnemyConvoyRoute` (route points, definition, escort tiers, optional stop,
+  branch, ambush zones, hunters) with **Start On Begin Play off**, and set it as the director's
+  `ArmySettings.ConvoyRoute`. Tank and infantry battles on the same map leave the route idle. Without a route a convoy
+  battle is reported and the trucks park at the start (step 4 behaviour).
+- **The convoy:** `AEnemyConvoyRoute::StartSingleConvoy(TruckCount)` runs exactly one convoy, whatever the route's
+  repeat settings, after the route's `FirstConvoyDelay` and once the enemy AI is ready. The truck count is the world
+  map convoy's remaining trucks: `FConvoyStartParams::TruckCountOverride` cuts the definition's column from the back
+  or repeats it in order (`UConvoyDefinition::ResizeTruckColumn`). Escorts are the route's guard tier for the
+  difficulty. Cargo per truck stays the definition's share. The convoy drives and fights by its definition; it needs
+  no decision tree.
+- **Win and loss** (`EnemyItemSiteRules::GetConvoyBattleObjectiveState`, from truck fates, not living units, because
+  escaped trucks are removed too):
+  - one truck escaped at the exit or delivered on a branch: `EnemyEscaped`, checked first, also while the convoy
+    still drives;
+  - the convoy finished as `TrucksDestroyed` or `TrucksStopped` (captured trucks count as stopped) with at least one
+    spawned truck: win;
+  - aborted, no truck spawned, or the route started no convoy (bad drive path, broken definition, route already
+    running): never a win, reported;
+  - before the column formed: waiting, so zero trucks during spawning is not a win.
+- **Mission:** `UDestroyEnemyItemSiteMission` asks the director (`GetObjectiveState`). On `EnemyEscaped` it fails and
+  calls `TriggerDefeat(LostMainObjective)` (turn `bTriggerDefeatOnEnemyEscape` off to react in Blueprint). The defeat
+  screen offers retry (same map, same convoy) or withdraw, which reports the defeat to the world map. The victory
+  targets shown are the living convoy trucks.
+- **Code:** `UEnemyConvoyBattleTracker` (component on the director) starts the route and records the convoy's
+  outcome; the route's `OnConvoyCargoOutcome` gives the final truck fates. Log line
+  `RTS_ENEMY_CONVOY_BATTLE finished owner= outcome= trucks= escaped= branchDelivered=`.
+- **Tests:** `RTS.EnemyItemSites.ConvoyBattleRules`, `RTS.EnemyItemSites.ConvoyTruckColumn`,
+  `RTS.EnemyItemSites.ConvoyRouteSite` (no route: reported and parked; idle route: running and waiting; running
+  route: failed, never a win).
+- **Not run in a level:** a real convoy on a field map, the escape defeat screen, and a win by capture. No field map
+  has a route yet.
 
 ## 6. Not checked
 

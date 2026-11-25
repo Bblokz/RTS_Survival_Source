@@ -422,6 +422,11 @@ struct FConvoyStartParams
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Convoy")
 	int32 GuardTierIndex = 0;
 
+	// Trucks in the column; 0 = the definition's column for the guard tier. Fewer drop trucks from the back, more
+	// repeat the column's trucks in order (a world map convoy that lost trucks keeps its remaining count).
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Convoy", meta = (ClampMin = "0"))
+	int32 TruckCountOverride = 0;
+
 	// Multiplies the whole cargo (difficulty, campaign tuning).
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Convoy", meta = (ClampMin = "0"))
 	float CargoMultiplier = 1.f;

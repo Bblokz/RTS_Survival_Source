@@ -167,6 +167,35 @@ namespace EnemyItemSiteRules
 			       : EEnemyItemSiteObjectiveState::AllTargetsDestroyed;
 	}
 
+	EEnemyItemSiteObjectiveState GetConvoyBattleObjectiveState(const FEnemyConvoyBattleState& Battle)
+	{
+		// Checked first: an escaped truck is removed, which must never read as one more truck gone.
+		const bool bAnyTruckEscaped = Battle.EscapedTruckCount > 0 || Battle.BranchDeliveredTruckCount > 0
+			|| Battle.Outcome == EConvoyOutcome::Escaped;
+		if (bAnyTruckEscaped)
+		{
+			return EEnemyItemSiteObjectiveState::EnemyEscaped;
+		}
+
+		if (Battle.bHasConvoyFinished)
+		{
+			const bool bPlayerStoppedTrucks = Battle.Outcome == EConvoyOutcome::TrucksDestroyed
+				|| Battle.Outcome == EConvoyOutcome::TrucksStopped;
+			return bPlayerStoppedTrucks && Battle.SpawnedTruckCount > 0
+				       ? EEnemyItemSiteObjectiveState::AllTargetsDestroyed
+				       : EEnemyItemSiteObjectiveState::NoTargets;
+		}
+
+		if (Battle.bHasRouteFailed)
+		{
+			return EEnemyItemSiteObjectiveState::NoTargets;
+		}
+
+		return Battle.bHasConvoySpawned
+			       ? EEnemyItemSiteObjectiveState::InProgress
+			       : EEnemyItemSiteObjectiveState::WaitingForSite;
+	}
+
 	int32 BuildArmySpawnList(const FWorldMissionEnemyArmy& Army,
 	                         const FEnemyPlacementUnit& ConvoyTruck,
 	                         TArray<FEnemyPlacementUnit>& OutUnits)

@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Engine/DataAsset.h"
+#include "RTS_Survival/Enemy/Convoy/ConvoyTypes.h"
 #include "RTS_Survival/Enemy/EnemyAIBehaviour/EnemyAIBehaviour.h"
 #include "RTS_Survival/Enemy/MissionPlacement/EnemyPlacementTypes.h"
 #include "RTS_Survival/Game/RTSGameInstance/WorldMissionContext/WorldMissionEnemyArmy.h"
@@ -11,6 +12,7 @@
 #include "RTS_Survival/WorldCampaign/StrengthTypes/WorldStrengthContribution.h"
 #include "EnemyItemSiteTypes.generated.h"
 
+class AEnemyConvoyRoute;
 class UStochasticDecisionTree;
 struct FWorldMissionContext;
 
@@ -122,7 +124,12 @@ struct RTS_SURVIVAL_API FEnemyDivisionArmySettings
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Division Army")
 	EEnemyDivisionArmyOrders DefaultOrders = EEnemyDivisionArmyOrders::EnemyAIControl;
 
-	// Spawned once per truck of a supply convoy (the world map only counts its trucks).
+	// Supply convoys drive this placed route with the world map's truck count; win when every truck is destroyed or
+	// captured, lose when one escapes. Turn the route's Start On Begin Play off. Unset: the trucks park at the start.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Division Army")
+	TObjectPtr<AEnemyConvoyRoute> ConvoyRoute = nullptr;
+
+	// Spawned once per truck of a supply convoy when no ConvoyRoute is set (the world map only counts its trucks).
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Division Army")
 	FEnemyPlacementUnit ConvoyTruck;
 
@@ -197,7 +204,29 @@ enum class EEnemyItemSiteObjectiveState : uint8
 	// The site is built but spawned no victory target; the objective cannot complete.
 	NoTargets,
 	InProgress,
-	AllTargetsDestroyed
+	AllTargetsDestroyed,
+	// A convoy truck escaped (exit or branch destination): the operation is lost.
+	EnemyEscaped
+};
+
+/** What a convoy route battle knows about its one convoy; the director fills it, the rules decide the objective. */
+USTRUCT()
+struct RTS_SURVIVAL_API FEnemyConvoyBattleState
+{
+	GENERATED_BODY()
+
+	// The route started the convoy (its units may still be spawning).
+	bool bHasConvoyStarted = false;
+	// Every unit spawned and the column formed; before that zero trucks is no win.
+	bool bHasConvoySpawned = false;
+	bool bHasConvoyFinished = false;
+	// The route ended without starting a convoy (bad drive path, broken definition); reported by the route.
+	bool bHasRouteFailed = false;
+	EConvoyOutcome Outcome = EConvoyOutcome::None;
+	// Trucks that spawned, from the finished convoy's outcome (trucks that never spawned are left out).
+	int32 SpawnedTruckCount = 0;
+	int32 EscapedTruckCount = 0;
+	int32 BranchDeliveredTruckCount = 0;
 };
 
 /**
@@ -243,6 +272,14 @@ namespace EnemyItemSiteRules
 	 */
 	RTS_SURVIVAL_API EEnemyItemSiteObjectiveState GetObjectiveState(bool bIsSiteBuilt, int32 SpawnedTargetCount,
 	                                                                int32 LivingTargetCount);
+
+	/**
+	 * @brief The owner's convoy rule: any escaped or branch-delivered truck loses; the win needs the finished convoy
+	 * to have lost every spawned truck to the player. Decided from truck fates, as escaped trucks are removed too.
+	 * @param Battle The convoy's state.
+	 * @return EnemyEscaped, AllTargetsDestroyed, NoTargets (route failed, aborted or no truck spawned), or waiting.
+	 */
+	RTS_SURVIVAL_API EEnemyItemSiteObjectiveState GetConvoyBattleObjectiveState(const FEnemyConvoyBattleState& Battle);
 
 	/**
 	 * @brief Turns a division's roster into the units a field map spawns: vehicles, then squads, then one truck per

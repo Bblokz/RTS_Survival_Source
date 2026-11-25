@@ -11,6 +11,8 @@
 #include "GameFramework/Controller.h"
 #include "GameFramework/Info.h"
 #include "GameFramework/Pawn.h"
+#include "RTS_Survival/Enemy/Convoy/ConvoyDefinition.h"
+#include "RTS_Survival/Enemy/Convoy/ConvoyRouteActor/EnemyConvoyRoute.h"
 #include "RTS_Survival/Enemy/ItemSites/EnemyItemSignatureSlot.h"
 #include "RTS_Survival/Enemy/ItemSites/EnemyItemSiteDirector.h"
 #include "RTS_Survival/Enemy/ItemSites/EnemyItemSiteTypes.h"
@@ -370,6 +372,155 @@ bool FEnemyDivisionArmySiteTest::RunTest(const FString& Parameters)
 	                                                ArmyDirector->GetVictoryTargets().Num()),
 	          EEnemyItemSiteObjectiveState::WaitingForSite);
 	TestFalse(TEXT("A second build does nothing"), ArmyDirector->BuildSite(TankDivision));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEnemyConvoyBattleRulesTest, "RTS.EnemyItemSites.ConvoyBattleRules",
+                                 EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEnemyConvoyBattleRulesTest::RunTest(const FString& Parameters)
+{
+	using namespace EnemyItemSiteRules;
+	FEnemyConvoyBattleState Battle;
+	TestEqual(TEXT("Not started: waiting"), GetConvoyBattleObjectiveState(Battle),
+	          EEnemyItemSiteObjectiveState::WaitingForSite);
+
+	Battle.bHasConvoyStarted = true;
+	TestEqual(TEXT("Still spawning: waiting, never a win"), GetConvoyBattleObjectiveState(Battle),
+	          EEnemyItemSiteObjectiveState::WaitingForSite);
+
+	Battle.bHasConvoySpawned = true;
+	TestEqual(TEXT("Driving: in progress"), GetConvoyBattleObjectiveState(Battle),
+	          EEnemyItemSiteObjectiveState::InProgress);
+
+	FEnemyConvoyBattleState OneEscaped = Battle;
+	OneEscaped.EscapedTruckCount = 1;
+	TestEqual(TEXT("One live escape loses at once"), GetConvoyBattleObjectiveState(OneEscaped),
+	          EEnemyItemSiteObjectiveState::EnemyEscaped);
+
+	FEnemyConvoyBattleState BranchDelivered = Battle;
+	BranchDelivered.BranchDeliveredTruckCount = 1;
+	TestEqual(TEXT("A delivered branch truck loses"), GetConvoyBattleObjectiveState(BranchDelivered),
+	          EEnemyItemSiteObjectiveState::EnemyEscaped);
+
+	FEnemyConvoyBattleState Finished = Battle;
+	Finished.bHasConvoyFinished = true;
+	Finished.SpawnedTruckCount = 4;
+	Finished.Outcome = EConvoyOutcome::TrucksDestroyed;
+	TestEqual(TEXT("Every truck destroyed wins"), GetConvoyBattleObjectiveState(Finished),
+	          EEnemyItemSiteObjectiveState::AllTargetsDestroyed);
+
+	Finished.Outcome = EConvoyOutcome::TrucksStopped;
+	TestEqual(TEXT("Destroyed or captured wins"), GetConvoyBattleObjectiveState(Finished),
+	          EEnemyItemSiteObjectiveState::AllTargetsDestroyed);
+
+	FEnemyConvoyBattleState MostlyKilled = Finished;
+	MostlyKilled.Outcome = EConvoyOutcome::Escaped;
+	MostlyKilled.EscapedTruckCount = 1;
+	TestEqual(TEXT("Three of four killed and one escaped still loses"), GetConvoyBattleObjectiveState(MostlyKilled),
+	          EEnemyItemSiteObjectiveState::EnemyEscaped);
+
+	FEnemyConvoyBattleState AllBranch = Finished;
+	AllBranch.Outcome = EConvoyOutcome::Escaped;
+	TestEqual(TEXT("Escaped outcome with no exit truck (all on the branch) loses"),
+	          GetConvoyBattleObjectiveState(AllBranch), EEnemyItemSiteObjectiveState::EnemyEscaped);
+
+	FEnemyConvoyBattleState Aborted = Finished;
+	Aborted.Outcome = EConvoyOutcome::Aborted;
+	TestEqual(TEXT("Aborted is no win"), GetConvoyBattleObjectiveState(Aborted),
+	          EEnemyItemSiteObjectiveState::NoTargets);
+
+	FEnemyConvoyBattleState NothingSpawned = Finished;
+	NothingSpawned.SpawnedTruckCount = 0;
+	TestEqual(TEXT("No spawned truck is no win"), GetConvoyBattleObjectiveState(NothingSpawned),
+	          EEnemyItemSiteObjectiveState::NoTargets);
+
+	FEnemyConvoyBattleState RouteFailed;
+	RouteFailed.bHasRouteFailed = true;
+	TestEqual(TEXT("A route that started nothing is no win"), GetConvoyBattleObjectiveState(RouteFailed),
+	          EEnemyItemSiteObjectiveState::NoTargets);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEnemyConvoyTruckColumnTest, "RTS.EnemyItemSites.ConvoyTruckColumn",
+                                 EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEnemyConvoyTruckColumnTest::RunTest(const FString& Parameters)
+{
+	constexpr float FrontTruckMark = 100.f;
+	constexpr float RearTruckMark = 200.f;
+	TArray<FConvoyTruckSpec> Column;
+	Column.AddDefaulted_GetRef().CalibratedCruiseSpeedCms = FrontTruckMark;
+	Column.AddDefaulted_GetRef().CalibratedCruiseSpeedCms = RearTruckMark;
+
+	TestEqual(TEXT("No override keeps the column"), UConvoyDefinition::ResizeTruckColumn(Column, 0).Num(), 2);
+
+	const TArray<FConvoyTruckSpec> Shortened = UConvoyDefinition::ResizeTruckColumn(Column, 1);
+	TestEqual(TEXT("A convoy that lost trucks is shorter"), Shortened.Num(), 1);
+	TestEqual(TEXT("It keeps the front truck"), Shortened[0].CalibratedCruiseSpeedCms, FrontTruckMark);
+
+	const TArray<FConvoyTruckSpec> Lengthened = UConvoyDefinition::ResizeTruckColumn(Column, 5);
+	TestEqual(TEXT("More trucks than authored"), Lengthened.Num(), 5);
+	TestEqual(TEXT("They repeat the column in order"), Lengthened[2].CalibratedCruiseSpeedCms, FrontTruckMark);
+	TestEqual(TEXT("Up to the last one"), Lengthened[3].CalibratedCruiseSpeedCms, RearTruckMark);
+
+	TestEqual(TEXT("An empty column stays empty"),
+	          UConvoyDefinition::ResizeTruckColumn(TArray<FConvoyTruckSpec>(), 3).Num(), 0);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEnemyConvoyRouteSiteTest, "RTS.EnemyItemSites.ConvoyRouteSite",
+                                 EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEnemyConvoyRouteSiteTest::RunTest(const FString& Parameters)
+{
+	using namespace EnemyItemSiteTestData;
+	FScopedTestWorld TestWorld;
+	if (not TestTrue(TEXT("Test world created"), TestWorld.Initialize()))
+	{
+		return false;
+	}
+
+	UWorld* World = TestWorld.World.Get();
+	FEnemyItemSiteContext Convoy;
+	Convoy.bIsDivisionOperation = true;
+	Convoy.Army.DivisionType = EWorldFieldDivisions::SovietSupplyConvoy;
+	Convoy.Army.ConvoyTruckCount = 3;
+
+	// Without a route the convoy is reported and parks at the start (units pending: no async spawner here).
+	RTSFunctionLibrary::PushModalDialogSuppression();
+	AddExpectedError(TEXT("ConvoyRoute is not set"), EAutomationExpectedErrorFlags::Contains, 1);
+	AEnemyItemSiteDirector* ParkedDirector = World->SpawnActor<AEnemyItemSiteDirector>();
+	ParkedDirector->BuildSite(Convoy);
+	RTSFunctionLibrary::PopModalDialogSuppression();
+	TestFalse(TEXT("No route: no route battle"), ParkedDirector->GetIsConvoyRouteBattle());
+	TestEqual(TEXT("The parked trucks are pending"), ParkedDirector->GetObjectiveState(),
+	          EEnemyItemSiteObjectiveState::WaitingForSite);
+
+	// With an idle route the convoy waits for the enemy AI to launch: running, not built, not a win.
+	AEnemyConvoyRoute* Route = World->SpawnActor<AEnemyConvoyRoute>();
+	AEnemyItemSiteDirector* RouteDirector = World->SpawnActor<AEnemyItemSiteDirector>();
+	RouteDirector->ArmySettings.ConvoyRoute = Route;
+	TestTrue(TEXT("The convoy battle starts"), RouteDirector->BuildSite(Convoy));
+	TestTrue(TEXT("It is a route battle"), RouteDirector->GetIsConvoyRouteBattle());
+	TestTrue(TEXT("The route runs"), Route->GetIsRouteRunning());
+	TestFalse(TEXT("Not built before the column formed"), RouteDirector->GetIsSiteBuilt());
+	TestEqual(TEXT("Waiting, not a win"), RouteDirector->GetObjectiveState(),
+	          EEnemyItemSiteObjectiveState::WaitingForSite);
+	TestEqual(TEXT("No truck yet"), RouteDirector->GetVictoryTargets().Num(), 0);
+
+	// A route that already runs (Start On Begin Play left on) cannot carry the battle: reported, never a win.
+	AEnemyConvoyRoute* RunningRoute = World->SpawnActor<AEnemyConvoyRoute>();
+	RunningRoute->StartRoute();
+	RTSFunctionLibrary::PushModalDialogSuppression();
+	AddExpectedError(TEXT("cannot start a single convoy"), EAutomationExpectedErrorFlags::Contains, 1);
+	AEnemyItemSiteDirector* FailedDirector = World->SpawnActor<AEnemyItemSiteDirector>();
+	FailedDirector->ArmySettings.ConvoyRoute = RunningRoute;
+	FailedDirector->BuildSite(Convoy);
+	RTSFunctionLibrary::PopModalDialogSuppression();
+	TestTrue(TEXT("A failed route is built at once"), FailedDirector->GetIsSiteBuilt());
+	TestEqual(TEXT("And can never be won"), FailedDirector->GetObjectiveState(),
+	          EEnemyItemSiteObjectiveState::NoTargets);
 	return true;
 }
 

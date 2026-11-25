@@ -8,14 +8,15 @@
 #include "EnemyItemSiteDirector.generated.h"
 
 class AEnemyItemSiteDirector;
+class UEnemyConvoyBattleTracker;
 class UEnemyDivisionArmySpawner;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnEnemyItemSiteBuilt, AEnemyItemSiteDirector*, SiteDirector);
 
 /**
  * @brief Place one at the enemy start of every handmade enemy map. On an item map it fills the signature and strength
- * slots for the attacked item; on a field map it spawns the attacked division's army. It sets up the enemy AI, and the
- * mission reads GetIsSiteBuilt and GetVictoryTargets. See Source/Docs/Campaign/EnemyItemMaps_Plan.md.
+ * slots for the attacked item; on a field map it spawns the attacked division's army, or drives a supply convoy along
+ * ArmySettings.ConvoyRoute. It sets up the enemy AI; the mission reads GetObjectiveState and GetVictoryTargets.
  */
 UCLASS(Blueprintable)
 class RTS_SURVIVAL_API AEnemyItemSiteDirector : public AEnemyPlacementActor
@@ -54,6 +55,14 @@ public:
 
 	UFUNCTION(BlueprintPure, NotBlueprintable, Category = "Enemy Item Site")
 	int32 GetSpawnedVictoryTargetCount() const;
+
+	// Win, loss (a convoy truck escaped) or still running; zero living targets before the site is built is no win.
+	UFUNCTION(BlueprintPure, NotBlueprintable, Category = "Enemy Item Site")
+	EEnemyItemSiteObjectiveState GetObjectiveState() const;
+
+	// True on a field map whose supply convoy drives ArmySettings.ConvoyRoute (its trucks are the victory targets).
+	UFUNCTION(BlueprintPure, NotBlueprintable, Category = "Enemy Item Site")
+	bool GetIsConvoyRouteBattle() const { return bM_IsConvoyRouteBattle; }
 
 	UFUNCTION(BlueprintPure, NotBlueprintable, Category = "Enemy Item Site")
 	int32 GetActivatedStrengthSlotCount() const { return M_ActivatedStrengthSlotCount; }
@@ -102,6 +111,9 @@ private:
 	TObjectPtr<UEnemyDivisionArmySpawner> M_ArmySpawner;
 
 	UPROPERTY()
+	TObjectPtr<UEnemyConvoyBattleTracker> M_ConvoyBattleTracker;
+
+	UPROPERTY()
 	TArray<TWeakObjectPtr<AActor>> M_SignatureTargets;
 
 	int32 M_SpawnedSignatureTargetCount = 0;
@@ -109,13 +121,18 @@ private:
 	// Set when BuildSite runs; the site only counts as built once a division army has finished spawning too.
 	bool bM_HasStartedSite = false;
 	bool bM_IsSiteBuilt = false;
+	// Decided in BuildSite: a supply convoy with a route drives it instead of spawning as a parked army.
+	bool bM_IsConvoyRouteBattle = false;
 
 	bool GetIsValidArmySpawner() const;
+	bool GetIsValidConvoyBattleTracker() const;
 	void BuildSiteFromMissionContext();
 	void BuildSite_FillSignatureSlots();
 	void BuildSite_ActivateStrengthSlots();
 	void BuildSite_ReportMissingSignatureTargets() const;
 	void BuildSite_SpawnDivisionArmy();
+	bool GetShouldDriveConvoyRoute() const;
+	void BuildSite_StartConvoyBattle();
 	void OnDivisionArmySpawned(int32 SpawnedUnitCount);
 	void FinishBuildingSite();
 	void ApplyProfileToEnemyAI(AEnemyController& EnemyController) const;

@@ -10,9 +10,9 @@
 class AEnemyItemSiteDirector;
 
 /**
- * @brief The win condition of a handmade enemy map: add it to the map's Missions; it completes when every victory
- * target the AEnemyItemSiteDirector spawned is dead (the signature buildings of an item map, the division army of a
- * field map) and then calls TriggerVictory, which reports the win to the world map. See EnemyItemMaps_Plan.md (D4).
+ * @brief The win condition of a handmade enemy map: add it to the map's Missions. It completes when the
+ * AEnemyItemSiteDirector's victory targets are dead (signature buildings, division army, convoy trucks) and calls
+ * TriggerVictory; it fails with TriggerDefeat when a convoy truck escapes. See EnemyItemMaps_Plan.md (D4, 5e).
  */
 UCLASS(Blueprintable, EditInlineNew)
 class RTS_SURVIVAL_API UDestroyEnemyItemSiteMission : public UMissionBase
@@ -28,6 +28,10 @@ public:
 	// Off for a mission Blueprint that wants to play lines first and call TriggerVictory itself.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mission|Enemy Item Site")
 	bool bTriggerVictoryOnComplete = true;
+
+	// Off for a mission Blueprint that wants to react to an escaped convoy itself (the mission still fails).
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mission|Enemy Item Site")
+	bool bTriggerDefeatOnEnemyEscape = true;
 
 	// Time between the last target dying and the victory screen, so the last explosion is seen.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mission|Enemy Item Site", meta = (ClampMin = "0.0"))
@@ -56,4 +60,5 @@ private:
 	void StartTrackingTargets(const AEnemyItemSiteDirector& SiteDirector);
 	void ReportSiteWithoutTargets(const AEnemyItemSiteDirector& SiteDirector);
 	void ScheduleVictory();
+	void FailOnEnemyEscape();
 };

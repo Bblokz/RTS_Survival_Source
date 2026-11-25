@@ -61,6 +61,17 @@ public:
 	/** @return Trucks of the column for a tier, front to back, one entry per truck. */
 	TArray<FConvoyTruckSpec> GetTruckColumn(int32 TierIndex) const;
 
+	/** @return The tier's column resized to TruckCountOverride (0 keeps it); what a started convoy spawns. */
+	TArray<FConvoyTruckSpec> GetTruckColumnForStart(int32 TierIndex, int32 TruckCountOverride) const;
+
+	/**
+	 * @brief Shortens or lengthens a truck column so a convoy can carry an exact truck count from elsewhere.
+	 * @param Column Trucks front to back.
+	 * @param TruckCount Wanted trucks; 0 or less keeps the column.
+	 * @return The first TruckCount trucks, or the column repeated in order until it has TruckCount trucks.
+	 */
+	static TArray<FConvoyTruckSpec> ResizeTruckColumn(const TArray<FConvoyTruckSpec>& Column, int32 TruckCount);
+
 	/** @return Enemy training points of the tier's escort (the guard cost the cargo scales with). */
 	int32 GetGuardTrainingPoints(int32 TierIndex) const;
 

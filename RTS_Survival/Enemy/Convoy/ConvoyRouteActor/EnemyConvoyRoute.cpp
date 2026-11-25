@@ -90,6 +90,28 @@ void AEnemyConvoyRoute::StartRoute()
 	{
 		return;
 	}
+	M_SingleConvoyTruckCount = 0;
+	BeginRun();
+}
+
+bool AEnemyConvoyRoute::StartSingleConvoy(const int32 TruckCount)
+{
+	if (bM_IsRunning || TruckCount <= 0)
+	{
+		RTSFunctionLibrary::ReportError(FString::Printf(
+			TEXT("Convoy route %s cannot start a single convoy of %d trucks: %s"), *GetName(), TruckCount,
+			bM_IsRunning
+				? TEXT("it already runs (turn Start On Begin Play off for routes a field battle starts).")
+				: TEXT("a convoy needs at least one truck.")));
+		return false;
+	}
+	M_SingleConvoyTruckCount = TruckCount;
+	BeginRun();
+	return true;
+}
+
+void AEnemyConvoyRoute::BeginRun()
+{
 	bM_IsRunning = true;
 	bM_HasLaunchedLastConvoy = false;
 	bM_HasBuiltRoute = false;
@@ -258,6 +280,7 @@ FConvoyStartParams AEnemyConvoyRoute::BuildStartParams(const int32 ConvoyIndex) 
 	// The convoy drives for the AI player this route is placed for.
 	Params.OwningPlayer = GetEnemyPlayer();
 	Params.GuardTierIndex = GetGuardTierIndex(ConvoyIndex);
+	Params.TruckCountOverride = M_SingleConvoyTruckCount;
 	Params.CargoMultiplier = Escort.CargoMultiplier;
 	Params.bShowOnMinimap = bShowOnMinimap;
 	const FString IdBase = RouteId.IsNone() ? GetName() : RouteId.ToString();
@@ -271,7 +294,8 @@ void AEnemyConvoyRoute::TrackStartedConvoy(AConvoy* Convoy, const int32 GuardTie
 	Tally.Convoy = Convoy;
 	Tally.ConvoyId = Convoy->GetConvoyId();
 	Tally.ConvoyIndex = ConvoyIndex;
-	Tally.TruckCount = Definition->GetTruckColumn(GuardTierIndex).Num();
+	Tally.TruckCount = Definition->GetTruckColumnForStart(GuardTierIndex,
+	                                                      Convoy->GetStartParams().TruckCountOverride).Num();
 	Tally.EventHandle = Convoy->OnConvoyEventNative.AddUObject(this, &AEnemyConvoyRoute::HandleConvoyEvent);
 	Tally.BehaviourHandle = Convoy->OnBehaviourEventNative.AddUObject(this,
 	                                                                  &AEnemyConvoyRoute::HandleConvoyBehaviourEvent);
@@ -280,6 +304,10 @@ void AEnemyConvoyRoute::TrackStartedConvoy(AConvoy* Convoy, const int32 GuardTie
 
 bool AEnemyConvoyRoute::GetHasMoreConvoysToStart() const
 {
+	if (M_SingleConvoyTruckCount > 0)
+	{
+		return false;
+	}
 	switch (Timing.Repeat)
 	{
 	case EEnemyWaveSpawnerRepeat::Once:

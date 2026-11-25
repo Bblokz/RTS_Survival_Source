@@ -47,10 +47,15 @@ namespace
 	}
 }
 
+TArray<FConvoyTruckSpec> AConvoy::GetStartTruckColumn() const
+{
+	return M_Definition->GetTruckColumnForStart(M_Params.GuardTierIndex, M_Params.TruckCountOverride);
+}
+
 void AConvoy::BuildMembersFromDefinition()
 {
 	M_Members.Reset();
-	const TArray<FConvoyTruckSpec> TruckColumn = M_Definition->GetTruckColumn(M_Params.GuardTierIndex);
+	const TArray<FConvoyTruckSpec> TruckColumn = GetStartTruckColumn();
 	for (const FConvoyTruckSpec& Truck : TruckColumn)
 	{
 		AddMember(EConvoyUnitRole::Truck, EConvoyStation::Lead, Truck.TrainingOption.GetDisplayName());
@@ -167,7 +172,7 @@ void AConvoy::AssignStationSlots(const EConvoyStation Station, const float RowSt
 
 void AConvoy::SpawnMembers()
 {
-	const TArray<FConvoyTruckSpec> TruckColumn = M_Definition->GetTruckColumn(M_Params.GuardTierIndex);
+	const TArray<FConvoyTruckSpec> TruckColumn = GetStartTruckColumn();
 	const FConvoyGuardTier* Tier = M_Definition->GetGuardTier(M_Params.GuardTierIndex);
 	int32 MemberIndex = 0;
 	M_PendingSpawns = M_Members.Num();
@@ -275,7 +280,7 @@ void AConvoy::SetupSpawnedMember(FConvoyMember& Member, AActor* SpawnedActor)
 	Member.State = EConvoyMemberState::Station;
 	Member.NominalSpeed = ReadNominalSpeed(Member);
 	Member.CalibratedSpeed = Member.NominalSpeed;
-	const TArray<FConvoyTruckSpec> TruckColumn = M_Definition->GetTruckColumn(M_Params.GuardTierIndex);
+	const TArray<FConvoyTruckSpec> TruckColumn = GetStartTruckColumn();
 	// Trucks are the first members, in column order.
 	if (Member.Role == EConvoyUnitRole::Truck and TruckColumn.IsValidIndex(Member.MemberId)
 		and TruckColumn[Member.MemberId].CalibratedCruiseSpeedCms > 0.f)

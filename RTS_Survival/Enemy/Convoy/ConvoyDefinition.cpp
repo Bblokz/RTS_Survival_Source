@@ -137,6 +137,28 @@ TArray<FConvoyTruckSpec> UConvoyDefinition::GetTruckColumn(const int32 TierIndex
 	return Column;
 }
 
+TArray<FConvoyTruckSpec> UConvoyDefinition::GetTruckColumnForStart(const int32 TierIndex,
+                                                                   const int32 TruckCountOverride) const
+{
+	return ResizeTruckColumn(GetTruckColumn(TierIndex), TruckCountOverride);
+}
+
+TArray<FConvoyTruckSpec> UConvoyDefinition::ResizeTruckColumn(const TArray<FConvoyTruckSpec>& Column,
+                                                              const int32 TruckCount)
+{
+	if (TruckCount <= 0 or Column.IsEmpty())
+	{
+		return Column;
+	}
+	TArray<FConvoyTruckSpec> Resized;
+	Resized.Reserve(TruckCount);
+	for (int32 TruckIndex = 0; TruckIndex < TruckCount; ++TruckIndex)
+	{
+		Resized.Add(Column[TruckIndex % Column.Num()]);
+	}
+	return Resized;
+}
+
 int32 UConvoyDefinition::GetGuardTrainingPoints(const int32 TierIndex) const
 {
 	const FConvoyGuardTier* Tier = GetGuardTier(TierIndex);
