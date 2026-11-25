@@ -226,6 +226,12 @@ void ARTSShortsDirector::Tick(const float DeltaSeconds)
 	{
 		ForceSoundsNonSpatialized();
 	}
+	if (GetIsCommanderShowcase())
+	{
+		// The commander screen has its own controller (no ACPPController, stage or units): its own walk.
+		TickCommanderShowcase();
+		return;
+	}
 	switch (M_Phase)
 	{
 	case ERTSShortsDirectorPhase::WaitingForController: TickWaitingForController();

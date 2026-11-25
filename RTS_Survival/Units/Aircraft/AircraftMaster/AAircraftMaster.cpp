@@ -2943,7 +2943,11 @@ void AAircraftMaster::Strafe_StartAttackRun()
 
 	M_StrafeState.bM_HasDivedThisRun = false;
 	Strafe_ApplyDiveProfile();
-	M_AircraftAttackData.TargetLocation = AttackRunEndLocation;
+	// The dive is planned at the run's start, the point the player marked. Planned at the run's end, the guns (35
+	// degrees below the nose, one short burst per dive) opened up 20-30 m past the target and every pass missed what
+	// was marked: Horten and Ju 87 previews, 2026-11-24. The burst still carries on along the run from the start.
+	(void)AttackRunEndLocation;
+	M_AircraftAttackData.TargetLocation = WeaponStartLocation;
 	StartAttackGround();
 	M_AircraftAttackData.TargetLocation = WeaponStartLocation;
 }

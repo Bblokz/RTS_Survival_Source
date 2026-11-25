@@ -53,6 +53,7 @@ namespace AbilityPreviewDirectorConstants
 	const TCHAR* const StrafeLengthName = TEXT("StrafeLength");
 	const TCHAR* const CarpetLengthName = TEXT("CarpetBombingLength");
 	const TCHAR* const TotalStrafeTimeName = TEXT("TotalStrafeTime");
+	const TCHAR* const RepeatRunsName = TEXT("bRepeatRunsOverTarget");
 
 	/** A float inside one of the ability's settings structs; null when the ability has no such setting. */
 	float* FindAbilitySettingsFloat(UGlobalAbility& Ability, const TCHAR* SettingsName, const TCHAR* FloatName)
@@ -213,6 +214,15 @@ void AAbilityPreviewDirector::ShortenForPreview(UGlobalAbility& AbilityCopy) con
 	{
 		return;
 	}
+	// After their first run, mission strafers hunt on their own; over the preview's few targets they found nothing to
+	// dive on and circled until the cap (one Ju 87 run in 25 s). Keep every run over the targets instead.
+	if (const FStructProperty* const Settings = FindFProperty<FStructProperty>(AbilityCopy.GetClass(), StrafeSettingsName))
+	{
+		if (const FBoolProperty* const RepeatRuns = FindFProperty<FBoolProperty>(Settings->Struct, RepeatRunsName))
+		{
+			RepeatRuns->SetPropertyValue_InContainer(Settings->ContainerPtrToValuePtr<void>(&AbilityCopy), true);
+		}
+	}
 	if (*TotalStrafeTime > M_MaxPreviewStrafeSeconds)
 	{
 		UE_LOG(LogRTSAbilityPreview, Display, TEXT("RTS_ABILITY_PREVIEW strafe time %.0f s shortened to %.0f s"),
@@ -333,6 +343,16 @@ void AAbilityPreviewDirector::SpawnPreviewTargets(UGlobalAbility& AbilityCopy, c
 	if (TargetKind == EAbilityPreviewTargetKind::None)
 	{
 		return;
+	}
+	const float StrafeLength = AbilityPreviewDirectorConstants::GetStrafeRunLength(AbilityCopy);
+	if (StrafeLength > 0.f && (TargetKind == EAbilityPreviewTargetKind::MediumVehicles
+		|| TargetKind == EAbilityPreviewTargetKind::MediumVehiclesAndInfantry))
+	{
+		// A strafe against tanks is a bombing strafe: the tanks stand where its bombs come down (see the header).
+		const FVector TowardsAircraft = ApproachDirection.GetSafeNormal2D();
+		const float ShownLength = FMath::Min(StrafeLength, M_MaxStripLength);
+		AttackStart = GetGroundPoint(GroundCentre - TowardsAircraft * (M_BombStrafeTargetsFrom * ShownLength));
+		AttackEnd = GetGroundPoint(GroundCentre - TowardsAircraft * (M_BombStrafeTargetsTo * ShownLength));
 	}
 	M_PreviewTargets->SpawnTargets(TargetKind, AttackStart, AttackEnd);
 }

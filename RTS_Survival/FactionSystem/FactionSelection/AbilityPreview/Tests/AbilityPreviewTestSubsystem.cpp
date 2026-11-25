@@ -129,7 +129,8 @@ namespace AbilityPreviewTestPrivate
 	bool GetIsSoldierHitRequired(const EAbilityPreviewTargetKind Kind)
 	{
 		return Kind == EAbilityPreviewTargetKind::InfantrySpread
-			|| Kind == EAbilityPreviewTargetKind::LightVehiclesAndInfantry;
+			|| Kind == EAbilityPreviewTargetKind::LightVehiclesAndInfantry
+			|| Kind == EAbilityPreviewTargetKind::MediumVehiclesAndInfantry;
 	}
 
 	/** The targets the user asked for per aircraft ability; abilities not listed must spawn none or any kind. */
@@ -148,6 +149,7 @@ namespace AbilityPreviewTestPrivate
 		case EGlobalAbility::GA_Ju87Strafing:
 		case EGlobalAbility::GA_3xJu87Strafing:
 		case EGlobalAbility::GA_Me410Airstrike:
+			return EAbilityPreviewTargetKind::MediumVehiclesAndInfantry;
 		case EGlobalAbility::GA_HeavyCarpet_Ju390B_250Gr:
 			return EAbilityPreviewTargetKind::MediumVehicles;
 		default:

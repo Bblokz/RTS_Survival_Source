@@ -26,7 +26,10 @@ enum class EAbilityPreviewTargetKind : uint8
 	// beaten zone shows across them.
 	InfantrySpread,
 	// Cannon aircraft with splash: light vehicles on the line and squads on its flanks.
-	LightVehiclesAndInfantry
+	LightVehiclesAndInfantry,
+	// Bombing strafes (Ju 87s, Me 410): T-34s where the bombs land with squads round them, so the machine guns of the
+	// later passes have soldiers to hit (user, 2026-11-24).
+	MediumVehiclesAndInfantry
 };
 
 USTRUCT(BlueprintType)

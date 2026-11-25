@@ -55,6 +55,9 @@ namespace AbilityPreviewTargetsPrivate
 	// Cannon aircraft: vehicles close to the line as before, squads on the opposite flank, close enough that the
 	// passes at the vehicles also rake the soldiers.
 	const TArray<float> VehiclesAndInfantrySideOffsetsCm = {200.f, -450.f, -200.f, 450.f, 200.f, -450.f};
+	// Bombing strafes: tanks on the line (at 13, 17 and 21 m of the run, where the bombs land) between squads standing
+	// 4.5-6.5 m either side of it.
+	const TArray<float> MediumVehiclesAndInfantrySideOffsetsCm = {450.f, 0.f, -450.f, 0.f, 650.f, 0.f, -650.f};
 	// The preview's strafe lines are about 15 m: too short for 6-7 units to stand apart.
 	constexpr float SpreadSetMinLineLengthCm = 2400.f;
 
@@ -85,6 +88,9 @@ UAbilityPreviewTargetsComponent::UAbilityPreviewTargetsComponent()
 	M_TargetSets.Add(EAbilityPreviewTargetKind::InfantrySpread,
 	                 MakeSet({MosinSquad, SvtSquad, MosinSquad, SvtSquad, MosinSquad, SvtSquad, MosinSquad},
 	                         InfantrySpreadSideOffsetsCm, SpreadSetMinLineLengthCm));
+	M_TargetSets.Add(EAbilityPreviewTargetKind::MediumVehiclesAndInfantry,
+	                 MakeSet({MosinSquad, T3476, SvtSquad, T3485, MosinSquad, T3476, SvtSquad},
+	                         MediumVehiclesAndInfantrySideOffsetsCm));
 	M_TargetSets.Add(EAbilityPreviewTargetKind::LightVehiclesAndInfantry,
 	                 MakeSet({T70, MosinSquad, BA11, SvtSquad, T26, MosinSquad}, VehiclesAndInfantrySideOffsetsCm,
 	                         SpreadSetMinLineLengthCm));
@@ -100,9 +106,9 @@ UAbilityPreviewTargetsComponent::UAbilityPreviewTargetsComponent()
 	// Bombers: the Ju 87 and Me 410 strafe and drop bombs. The incendiary Ju 87 is not among them: its canisters are
 	// "deadly to infantry, harmless to tanks", so it gets infantry.
 	M_AbilityTargetKinds.Add(EGlobalAbility::GA_GerIncendiaryJu87, EAbilityPreviewTargetKind::Infantry);
-	M_AbilityTargetKinds.Add(EGlobalAbility::GA_Ju87Strafing, EAbilityPreviewTargetKind::MediumVehicles);
-	M_AbilityTargetKinds.Add(EGlobalAbility::GA_3xJu87Strafing, EAbilityPreviewTargetKind::MediumVehicles);
-	M_AbilityTargetKinds.Add(EGlobalAbility::GA_Me410Airstrike, EAbilityPreviewTargetKind::MediumVehicles);
+	M_AbilityTargetKinds.Add(EGlobalAbility::GA_Ju87Strafing, EAbilityPreviewTargetKind::MediumVehiclesAndInfantry);
+	M_AbilityTargetKinds.Add(EGlobalAbility::GA_3xJu87Strafing, EAbilityPreviewTargetKind::MediumVehiclesAndInfantry);
+	M_AbilityTargetKinds.Add(EGlobalAbility::GA_Me410Airstrike, EAbilityPreviewTargetKind::MediumVehiclesAndInfantry);
 	M_AbilityTargetKinds.Add(EGlobalAbility::GA_HeavyCarpet_Ju390B_250Gr, EAbilityPreviewTargetKind::MediumVehicles);
 }
 

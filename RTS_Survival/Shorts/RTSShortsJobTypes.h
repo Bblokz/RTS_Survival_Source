@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "RTS_Survival/GlobalAbilitySystem/GlobalAbilityType/EGlobalAbilityType.h"
+#include "RTS_Survival/GlobalAbilitySystem/RTSCommanders/RTSCommander.h"
 #include "RTS_Survival/Units/Enums/Enum_UnitType.h"
 
 #include "RTSShortsJobTypes.generated.h"
@@ -1607,6 +1608,64 @@ struct FRTSShortsSegment
 };
 
 /**
+ * @brief Commander showcase job (RTSShortsCommanderShowcase.cpp): runs on RTS_FactionSelection with the faction game
+ * mode, walks to the commander screen, selects the commander and opens every kit ability's preview in turn. Each
+ * preview stays until its ability finished plus SecondsAfterFinished, then BACK; the manifest gets one segment per
+ * kit slot with the open, executed, finished and closed frames. The job's Segments are only the slot time budget.
+ */
+USTRUCT()
+struct FRTSShortsCommanderShowcase
+{
+	GENERATED_BODY()
+
+	/** NoCommander: the job is not a showcase. */
+	UPROPERTY()
+	ERTSCommander Commander = ERTSCommander::NoCommander;
+
+	/** Kit slots to preview, in this order; empty previews every slot of the kit. */
+	UPROPERTY()
+	TArray<int32> Slots;
+
+	/** World seconds a finished ability stays on screen before BACK (the preview itself would wait 6 s). */
+	UPROPERTY()
+	float SecondsAfterFinished = 3.f;
+
+	/** World seconds in the hangar between closing one preview and opening the next. */
+	UPROPERTY()
+	float SecondsBetweenPreviews = 0.6f;
+
+	/**
+	 * Stills run (with bRender false, a 16:9 window and the UI): screenshots of the commander screen (kit scrolled to
+	 * the top and to the end) and of every ability card into OutputDir, then the process exits. No render.
+	 */
+	UPROPERTY()
+	bool bStills = false;
+
+	/**
+	 * > 0: the preview camera's horizontal field of view during a render. The preview camera is 62 degrees, which
+	 * the game applies to the long axis of a portrait screen (a tight, ground-filling view), but Movie Render Queue
+	 * applies horizontally: at 1080x1920 that showed the sky and units a third of the size (take 1, 2026-11-24).
+	 */
+	UPROPERTY()
+	float CameraFieldOfView = 40.f;
+
+	/**
+	 * Stills run: seconds on the commander screen before its screenshot. The portraits and list icons load
+	 * asynchronously; after 1.5 s the Field Commander's were still blank (2026-11-24).
+	 */
+	UPROPERTY()
+	float StillsSettleSeconds = 5.f;
+
+	/** Diagnostics: record every aircraft gun round per preview (Saved/AircraftStrafeQA/<Job>_slot<N>.csv). */
+	UPROPERTY()
+	bool bRecordStrafeShots = false;
+
+	/** Stills run: seconds after the preview opened before the card screenshot (the camera cut and fade are done). */
+	UPROPERTY()
+	float StillCardDelaySeconds = 1.2f;
+};
+
+/**
  * @brief A whole short: output location, render settings and the ordered segments.
  */
 USTRUCT()
@@ -1733,6 +1792,10 @@ struct FRTSShortsJob
 	/** Diagnostic: play known cues through the different playback paths at fixed frames of segment 0 (see director). */
 	UPROPERTY()
 	bool bAudioProbe = false;
+
+	/** Commander showcase (see FRTSShortsCommanderShowcase); Commander NoCommander for every other job. */
+	UPROPERTY()
+	FRTSShortsCommanderShowcase CommanderShowcase;
 
 	UPROPERTY()
 	TArray<FRTSShortsSegment> Segments;
@@ -1865,6 +1928,52 @@ struct FRTSShortsManifestSegment
 
 	UPROPERTY()
 	int32 StopOrderFrame = -1;
+
+	/** Commander showcase: the kit ability (enum name), its card text and the template class (strike or delivery). */
+	UPROPERTY()
+	FString ShowcaseAbility;
+
+	UPROPERTY()
+	int32 ShowcaseSlot = -1;
+
+	UPROPERTY()
+	FString ShowcaseTitle;
+
+	UPROPERTY()
+	FString ShowcaseTier;
+
+	UPROPERTY()
+	FString ShowcaseDescription;
+
+	UPROPERTY()
+	FString ShowcaseAbilityClass;
+
+	/** Output frames: preview opened (camera cut), ability executed, ability finished, BACK pressed. */
+	UPROPERTY()
+	int32 ShowcaseOpenFrame = -1;
+
+	UPROPERTY()
+	int32 ShowcaseExecuteFrame = -1;
+
+	UPROPERTY()
+	int32 ShowcaseFinishedFrame = -1;
+
+	UPROPERTY()
+	int32 ShowcaseCloseFrame = -1;
+
+	/**
+	 * Output frames each attack dive began and ended (any aircraft of the preview diving at its target, guns firing;
+	 * the bombs fall just after). The edit keeps these at normal speed and speeds up the flying between the runs.
+	 */
+	UPROPERTY()
+	TArray<int32> ShowcaseAttackStartFrames;
+
+	UPROPERTY()
+	TArray<int32> ShowcaseAttackEndFrames;
+
+	/** after_finished, or the preview's own close reason when it closed by itself (timeout). */
+	UPROPERTY()
+	FString ShowcaseCloseReason;
 
 	UPROPERTY()
 	bool bSkipped = false;

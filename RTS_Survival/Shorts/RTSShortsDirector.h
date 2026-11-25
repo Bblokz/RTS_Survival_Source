@@ -470,6 +470,41 @@ struct FRTSShortsConvoyState
 
 /** Phases of one shorts run; the director advances through them in order. */
 UENUM()
+enum class ERTSShortsShowcaseStep : uint8
+{
+	Boot,
+	WaitForStart,
+	StillsScrollKit,
+	StillsKitEnd,
+	OpenPreview,
+	Running,
+	BetweenPreviews,
+	Done
+};
+
+/** Job.CommanderShowcase running (RTSShortsCommanderShowcase.cpp): where the walk through the kit is. */
+struct FRTSShortsShowcaseState
+{
+	ERTSShortsShowcaseStep Step = ERTSShortsShowcaseStep::Boot;
+	TWeakObjectPtr<class AFactionPlayerController> Controller;
+	TWeakObjectPtr<class UW_CommanderSelectionMenu> Menu;
+	TArray<int32> Slots;
+	int32 SlotListIndex = 0;
+	double NextActionWorldSeconds = 0.0;
+	double StepStartWorldSeconds = 0.0;
+	double FinishedWorldSeconds = -1.0;
+	double StillsStartWorldSeconds = 0.0;
+	bool bLaunchRequested = false;
+	bool bVariantsConfirmed = false;
+	bool bSoundMixPushed = false;
+	bool bStillCardTaken = false;
+	// Render only: the preview camera slid sideways so the preview's target units are in the middle of the 9:16 frame.
+	TWeakObjectPtr<class UCameraComponent> FocusedCamera;
+	FVector CameraRelativeBeforeFocus = FVector::ZeroVector;
+	bool bCameraFocusDone = false;
+	bool bWasAttacking = false;
+};
+
 enum class ERTSShortsDirectorPhase : uint8
 {
 	WaitingForController,
@@ -511,6 +546,24 @@ protected:
 	virtual void Tick(float DeltaSeconds) override;
 
 private:
+	// Job.CommanderShowcase (RTSShortsCommanderShowcase.cpp): the commander screen and every kit ability's preview.
+	bool GetIsCommanderShowcase() const { return M_Job.CommanderShowcase.Commander != ERTSCommander::NoCommander; }
+	void TickCommanderShowcase();
+	bool EnsureShowcaseCommanderScreen(double Now);
+	void FillShowcaseManifest();
+	void OpenShowcasePreview(int32 Frame, double Now);
+	void TickShowcasePreview(int32 Frame, double Now);
+	void CloseShowcasePreview(int32 Frame, double Now, const FString& Reason);
+	void FinishCommanderShowcase(int32 Frame);
+	int32 GetShowcaseFrame(double Now) const;
+	void TakeShowcaseStill(const FString& Name) const;
+	void ScrollShowcaseKitToEnd() const;
+	void ApplyShowcaseCameraFieldOfView() const;
+	void FocusShowcaseCameraOnTargets(double Now);
+	void RestoreShowcaseCamera();
+	void TrackShowcaseAttackRuns(int32 Frame);
+	FRTSShortsShowcaseState M_Showcase;
+
 	void TickWaitingForController();
 	void TickWaitingForStartDialog();
 	void TickSpawningUnits();

@@ -130,6 +130,15 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "Ability Preview|Targets", meta = (ClampMin = "0.1", ClampMax = "1"))
 	float M_StrafeTargetsAlongRun = 0.55f;
 
+	// Strafes that bomb (the Ju 87s: medium-vehicle targets) release over the run and their bombs land well past the
+	// target: about 21 m, 1.05 of the shown run, in the 2026-11-24 renders, past the 0.55-run line above, so every bomb
+	// missed the T-34s. Their tanks stand from this share of the shown run to the one below instead.
+	UPROPERTY(EditAnywhere, Category = "Ability Preview|Targets", meta = (ClampMin = "0", ClampMax = "2"))
+	float M_BombStrafeTargetsFrom = 0.45f;
+
+	UPROPERTY(EditAnywhere, Category = "Ability Preview|Targets", meta = (ClampMin = "0.1", ClampMax = "2"))
+	float M_BombStrafeTargetsTo = 1.25f;
+
 	// Glider drops: once the delivered tank is this far from the landed glider (or after the timeout below) the glider
 	// is hidden and the camera pans to where the tank stops; the return countdown starts after the pan.
 	UPROPERTY(EditAnywhere, Category = "Ability Preview|Glider", meta = (ClampMin = "0"))
