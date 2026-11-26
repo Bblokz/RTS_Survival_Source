@@ -25,6 +25,12 @@
 #include "RTS_Survival/WorldCampaign/WorldMapUI/MapObjects/W_EnemyMapItem/StrengthEstimation/DataAndUtils/RTSStrengthEstimationTypes.h"
 #include "RTS_Survival/WorldCampaign/WorldPlayer/Controller/WorldPlayerController.h"
 
+namespace WorldDivisionManagerConstants
+{
+	// A division handed out by ReleaseDivisionForDeferredDestroy is destroyed after this long at the latest.
+	constexpr float ReleasedDivisionLifeSpanSeconds = 30.f;
+}
+
 namespace
 {
 	constexpr int32 PlayerOwner = WorldDivisionOwners::PlayerOwner;
@@ -234,10 +240,31 @@ AWorldDivisionBase* UWorldDivisionManager::FindDivisionByKey(const FGuid& Divisi
 
 bool UWorldDivisionManager::RemoveDivisionByKey(const FGuid& DivisionKey)
 {
+	// Not IsValid: the unregistered actor was just destroyed.
+	return UnregisterDivisionByKey(DivisionKey, EWorldDivisionUnregisterMode::DestroyActor) != nullptr;
+}
+
+AWorldDivisionBase* UWorldDivisionManager::ReleaseDivisionForDeferredDestroy(const FGuid& DivisionKey)
+{
+	AWorldDivisionBase* WorldDivision = UnregisterDivisionByKey(DivisionKey, EWorldDivisionUnregisterMode::KeepActor);
+	if (not IsValid(WorldDivision))
+	{
+		return nullptr;
+	}
+
+	// The husk is only scenery now: it takes no cursor trace, and it cannot outlive a caller that forgets it.
+	WorldDivision->SetActorEnableCollision(false);
+	WorldDivision->SetLifeSpan(WorldDivisionManagerConstants::ReleasedDivisionLifeSpanSeconds);
+	return WorldDivision;
+}
+
+AWorldDivisionBase* UWorldDivisionManager::UnregisterDivisionByKey(const FGuid& DivisionKey,
+                                                                   const EWorldDivisionUnregisterMode Mode)
+{
 	AWorldDivisionBase* WorldDivision = FindDivisionByKey(DivisionKey);
 	if (not IsValid(WorldDivision))
 	{
-		return false;
+		return nullptr;
 	}
 
 	/*
@@ -253,13 +280,16 @@ bool UWorldDivisionManager::RemoveDivisionByKey(const FGuid& DivisionKey)
 	{
 		MovementComponent->OnMovementFinished().RemoveAll(this);
 	}
-	WorldDivision->Destroy();
+	if (Mode == EWorldDivisionUnregisterMode::DestroyActor)
+	{
+		WorldDivision->Destroy();
+	}
 
 	RefreshDivisionInfluence(M_CurrentGameDifficulty);
 	CacheDivisionSaveState();
 	M_OnDivisionRemoved.Broadcast(DivisionKey, LastLocation);
 	TryFinishMovementPassIfIdle();
-	return true;
+	return WorldDivision;
 }
 
 int32 UWorldDivisionManager::ApplyDamageToEnemyDivisionsInRadius(const FVector& Center,

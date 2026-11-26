@@ -7,8 +7,11 @@
 #include "RTS_Survival/WorldCampaign/WorldDivisions/WorldDivisionBase.h"
 #include "WorldTankDivision.generated.h"
 
+class UWorldDivisionTankFormation;
+
 /**
- * @brief World division whose damage removes whole tank subtype entries from its roster.
+ * @brief World division whose damage removes whole tank subtype entries from its roster. Its formation component
+ * shows one small tank per roster entry.
  */
 UCLASS(Blueprintable)
 class RTS_SURVIVAL_API AWorldTankDivision : public AWorldDivisionBase
@@ -16,7 +19,11 @@ class RTS_SURVIVAL_API AWorldTankDivision : public AWorldDivisionBase
 	GENERATED_BODY()
 
 public:
+	AWorldTankDivision();
+
 	virtual void PostInitializeComponents() override;
+
+	UWorldDivisionTankFormation* GetTankFormation() const { return M_TankFormation; }
 
 	/**
 	 * @brief Removes whole tank entries from the roster and updates current division strength.
@@ -33,6 +40,8 @@ public:
 	virtual int32 GetRemainingEntryCount() const override { return M_TankSubtypes.Num(); }
 
 protected:
+	virtual void BeginPlay() override;
+
 	/**
 	 * @brief Writes tank composition into generic world division save data.
 	 * @param OutDivisionSaveData Save data being assembled by the base class.
@@ -51,6 +60,12 @@ private:
 	TArray<ETankSubtype> M_TankSubtypes;
 
 	int32 M_StartingTankCount = 0;
+
+	// Draws the roster as small tanks; rebuilt whenever the roster is set or restored.
+	UPROPERTY()
+	TObjectPtr<UWorldDivisionTankFormation> M_TankFormation = nullptr;
+
+	bool GetIsValidTankFormation() const;
 
 	/**
 	 * @brief Recalculates current strength from remaining tanks versus starting tank count.

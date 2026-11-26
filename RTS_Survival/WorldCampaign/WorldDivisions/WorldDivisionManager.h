@@ -20,6 +20,14 @@ struct FWorldEnemyReactionPieceSetup;
 DECLARE_MULTICAST_DELEGATE_TwoParams(FOnWorldDivisionRemoved, const FGuid& /*DivisionKey*/,
                                      const FVector& /*LastLocation*/);
 
+/** What happens to the actor of a division that leaves the manager. */
+enum class EWorldDivisionUnregisterMode : uint8
+{
+	DestroyActor,
+	// The caller owns the actor from now on and destroys it later.
+	KeepActor
+};
+
 /**
  * @brief Controller-owned runtime system for spawning, moving, saving, and applying world divisions.
  */
@@ -129,6 +137,16 @@ public:
 	bool RemoveDivisionByKey(const FGuid& DivisionKey);
 
 	/**
+	 * @brief Takes a division off the map's books like RemoveDivisionByKey, but leaves its actor standing so a show
+	 * (the battery fire mission) can still blow it up. The actor no longer takes clicks and destroys itself after a
+	 * while if the caller does not.
+	 * @param DivisionKey Key of the piece.
+	 * @return The released actor for the caller to destroy, or nullptr when no piece has this key.
+	 * @note Refreshes influence and the division save cache; the caller saves the campaign.
+	 */
+	AWorldDivisionBase* ReleaseDivisionForDeferredDestroy(const FGuid& DivisionKey);
+
+	/**
 	 * @brief Weakens every enemy division and convoy within an XY radius, e.g. for an airfield or battery strike.
 	 * A piece that loses its last tank, squad or truck is removed.
 	 * @param Center Strike centre in world space.
@@ -189,6 +207,15 @@ private:
 	 */
 	bool CacheRuntimeReferences(AWorldPlayerController* WorldPlayerController,
 	                            AGeneratorWorldCampaign* WorldGenerator);
+
+	/**
+	 * @brief The one way a piece leaves the manager: stops its movement, unregisters it, refreshes influence and the
+	 * save cache and tells the listeners.
+	 * @param DivisionKey Key of the piece.
+	 * @param Mode Whether the actor is destroyed here or handed to the caller.
+	 * @return The unregistered actor (pending kill in DestroyActor mode), or nullptr when no piece has this key.
+	 */
+	AWorldDivisionBase* UnregisterDivisionByKey(const FGuid& DivisionKey, EWorldDivisionUnregisterMode Mode);
 
 	/**
 	 * @brief Removes live division actors and clears manager registration before reinitializing.
