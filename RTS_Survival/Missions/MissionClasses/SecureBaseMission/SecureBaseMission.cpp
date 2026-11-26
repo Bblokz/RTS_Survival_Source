@@ -6,6 +6,7 @@
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
 #include "GameFramework/Pawn.h"
+#include "RTS_Survival/GameUI/InfoTakeover/InfoTakeoverSubsystem.h"
 #include "RTS_Survival/GlobalAbilitySystem/DevSettings/GlobalAbilitySetDataAsset.h"
 #include "RTS_Survival/GlobalAbilitySystem/DevSettings/RTSGlobalAbilitySettings.h"
 #include "RTS_Survival/GlobalAbilitySystem/GlobalAbilities/AircraftStrafing/GA_AircraftStrafing.h"
@@ -824,10 +825,38 @@ void USecureBaseMission::TryShowIntelSquadTakeover()
 	}
 	if (Squad == nullptr)
 	{
+		if (bShouldStopPolling)
+		{
+			// The squad never stood on the map; the field manual still teaches crushing.
+			QueueWallBreachManualAfterIntel();
+		}
 		return;
 	}
 	bM_HasShownIntelSquadTakeover = true;
+	// Returns false while the player has unit intel turned off; the field manual shows regardless.
 	ShowSquadInfoTakeover(Squad, AssaultResponse.IntelSquadLibraryEntry);
+	// Queued behind the squad intel, so it opens as soon as that one closes.
+	QueueWallBreachManualAfterIntel();
+}
+
+void USecureBaseMission::QueueWallBreachManualAfterIntel()
+{
+	if (not AssaultResponse.bShowWallBreachManualAfterIntelSquad || bM_HasQueuedWallBreachManual)
+	{
+		return;
+	}
+	UWorld* const World = GetWorld();
+	UInfoTakeoverSubsystem* const InfoTakeovers = World != nullptr
+		                                              ? World->GetSubsystem<UInfoTakeoverSubsystem>()
+		                                              : nullptr;
+	if (InfoTakeovers == nullptr)
+	{
+		RTSFunctionLibrary::ReportError("Secure base mission " + GetName()
+			+ ": no info takeover subsystem; the crushing field manual cannot open.");
+		return;
+	}
+	bM_HasQueuedWallBreachManual = true;
+	InfoTakeovers->QueueWallBreachTakeover();
 }
 
 AActor* USecureBaseMission::FindLivingIntelSquad() const

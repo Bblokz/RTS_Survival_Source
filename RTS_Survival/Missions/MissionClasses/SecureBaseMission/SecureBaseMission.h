@@ -211,6 +211,13 @@ struct FSecureBaseAssaultResponse
 		meta = (EditCondition = "bEnabled", ClampMin = "0.0"))
 	float IntelSquadDelaySeconds = 8.f;
 
+	// On: the crushing field manual (walls, then running over infantry) opens right after the squad intel; it waits
+	// in the takeover queue while the squad intel holds the screen. It also opens when the squad never showed up or
+	// the player turned unit intel off. Needs IntelSquadSubtype and IntelSquadLibraryEntry.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Assault Response|Squad Intel",
+		meta = (EditCondition = "bEnabled"))
+	bool bShowWallBreachManualAfterIntelSquad = false;
+
 	// Ability the player keeps after the strike (charges, cooldown, no cost); GA_None grants nothing.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Assault Response|Granted Ability",
 		meta = (EditCondition = "bEnabled"))
@@ -299,6 +306,10 @@ public:
 	/** @return True once the intel squad's info takeover was requested. */
 	UFUNCTION(BlueprintPure, NotBlueprintable, Category = "Secure Base|Assault Response")
 	bool GetHasShownIntelSquadTakeover() const { return bM_HasShownIntelSquadTakeover; }
+
+	/** @return True once the crushing field manual was queued after the squad intel. */
+	UFUNCTION(BlueprintPure, NotBlueprintable, Category = "Secure Base|Assault Response")
+	bool GetHasQueuedWallBreachManual() const { return bM_HasQueuedWallBreachManual; }
 
 	/** @return True once AssaultResponse.GrantedAbility was handed to the player. */
 	UFUNCTION(BlueprintPure, NotBlueprintable, Category = "Secure Base|Assault Response")
@@ -453,6 +464,7 @@ private:
 	bool bM_HasAssaultResponseStarted = false;
 	bool bM_HasAirSupportLaunched = false;
 	bool bM_HasShownIntelSquadTakeover = false;
+	bool bM_HasQueuedWallBreachManual = false;
 	bool bM_HasGrantedAbility = false;
 	// Polls after IntelSquadDelaySeconds until a squad of IntelSquadSubtype stands (its drop may still be landing).
 	int32 M_IntelSquadPollsLeft = 0;
@@ -467,6 +479,8 @@ private:
 	// After the strike took off: the intel squad takeover and the granted ability follow on their own delays.
 	void ScheduleFollowUpsAfterAirSupport();
 	void TryShowIntelSquadTakeover();
+	// Once, after the squad intel was queued (or the search for the squad gave up).
+	void QueueWallBreachManualAfterIntel();
 	AActor* FindLivingIntelSquad() const;
 	void GrantAbilityToPlayer();
 

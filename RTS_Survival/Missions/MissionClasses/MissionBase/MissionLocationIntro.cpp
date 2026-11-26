@@ -5,27 +5,13 @@
 #include "MissionBase.h"
 
 #include "MissionLocationIntroSession.h"
+#include "RTS_Survival/GameUI/LocationIntro/W_LocationIntro.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 
 namespace MissionLocationIntroPrivate
 {
 	// Used when the duration pin is left at zero.
 	constexpr float DefaultDurationSeconds = 7.f;
-	// The texts stay fully shown at least this long between typing out and the fade.
-	constexpr float MinFullyShownSeconds = 1.f;
-	// Matches W_LocationIntro's pause between the date and the time line.
-	constexpr float TimeLineDelaySeconds = 0.25f;
-
-	/** @return The shortest intro in which the date and time finish typing and stay readable before the fade. */
-	float GetMinDurationSeconds(const FLocationIntroTexts& Texts, const FLocationIntroPresentation& Presentation)
-	{
-		const float LettersPerSecond = FMath::Max(1.f, Presentation.TypewriterLettersPerSecond);
-		const int32 TypedLetters = Texts.Date.ToString().Len() + Texts.TimeOfDay.ToString().Len();
-		const float TypingSeconds = TypedLetters / LettersPerSecond + TimeLineDelaySeconds;
-		const float TypedSeconds = Presentation.DateStartSeconds + TypingSeconds;
-		const float LocationSeconds = Presentation.LocationStartSeconds + MinFullyShownSeconds;
-		return FMath::Max(TypedSeconds, LocationSeconds) + MinFullyShownSeconds + Presentation.FadeOutSeconds;
-	}
 }
 
 bool UMissionBase::ShowLocationIntro(const FText& Location,
@@ -61,7 +47,8 @@ bool UMissionBase::ShowLocationIntro(const FText& Location,
 	Request.PanSettings = PanSettings;
 	using namespace MissionLocationIntroPrivate;
 	const float RequestedSeconds = DurationSeconds > 0.f ? DurationSeconds : DefaultDurationSeconds;
-	Request.DurationSeconds = FMath::Max(RequestedSeconds, GetMinDurationSeconds(Request.Texts, Presentation));
+	Request.DurationSeconds = FMath::Max(RequestedSeconds,
+	                                     UW_LocationIntro::GetMinDurationSeconds(Request.Texts, Presentation));
 	Request.ID = ID;
 
 	UMissionLocationIntroSession* const Session = NewObject<UMissionLocationIntroSession>(this);

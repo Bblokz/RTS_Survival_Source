@@ -14,6 +14,7 @@ class UMissionBase;
 class UPlayerCameraController;
 class UPlayerPortraitManager;
 class UW_HoldToSkip;
+class UW_LocationIntro;
 class UW_MissionCameraTour;
 class UW_Portrait;
 
@@ -89,8 +90,16 @@ private:
 	UPROPERTY()
 	TObjectPtr<UW_HoldToSkip> M_SkipWidget;
 
+	// Only while the opening title (Settings.OpeningTitle) shows.
+	UPROPERTY()
+	TObjectPtr<UW_LocationIntro> M_TitleWidget;
+
 	TArray<FMissionCameraTourShot> M_Shots;
 	FMissionCameraTourSettings M_Settings;
+	// Length of the opening title on the tour clock; 0 without a title.
+	float M_TitleSeconds = 0.f;
+	// Highest shot whose voice line was handed to the portrait; lines play once, in shot order.
+	int32 M_LastVoicedShotIndex = INDEX_NONE;
 	int32 M_ID = 0;
 
 	// The player's view when the tour took the screen; the tour eases back to it.
@@ -133,6 +142,18 @@ private:
 	void TickRunning();
 	bool TryTakeScreen();
 	bool CachePlayerPose();
+
+	/** Lengthens every shot with a voice line so the line (after its delay) ends inside the shot. */
+	void FitShotsToVoiceLines();
+
+	/** Shows the opening title card when the settings ask for one; the tour clock drives it. */
+	void ShowOpeningTitle();
+	void UpdateOpeningTitle(const float ElapsedSeconds);
+	// Removes the title at once (fade from black included); safe to call without one.
+	void CloseOpeningTitle();
+
+	/** Hands the current shot's voice line to the portrait once its delay has passed. */
+	void TryPlayShotVoiceLine(const int32 ShotIndex, const float ShotElapsedSeconds);
 
 	/** Plays Settings.StartSound; with a transcript its words show in the cinematic subtitle strip at the top. */
 	void PlayStartSound() const;

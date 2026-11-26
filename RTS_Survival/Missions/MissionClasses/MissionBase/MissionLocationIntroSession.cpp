@@ -6,6 +6,7 @@
 #include "RTS_Survival/GameUI/LocationIntro/W_LocationIntro.h"
 #include "RTS_Survival/Missions/MissionClasses/MissionBase/MissionBase.h"
 #include "RTS_Survival/Player/CPPController.h"
+#include "RTS_Survival/Player/StartGameControl/PlayerStartGameControl.h"
 #include "RTS_Survival/Player/Camera/CameraController/PlayerCameraController.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
@@ -123,6 +124,14 @@ bool UMissionLocationIntroSession::TryTakeScreen()
 		return false;
 	}
 	if (not M_PlayerController->GetCanStartScreenTakeover())
+	{
+		return false;
+	}
+	// The start-game screen pauses the game without the lock; a cinematic started behind it would play unseen on its
+	// real-time clock. Waiting here costs no wait time: the paused game does not tick this session.
+	const UPlayerStartGameControl* const StartGameControl = M_PlayerController->FindComponentByClass<
+		UPlayerStartGameControl>();
+	if (IsValid(StartGameControl) && StartGameControl->GetIsWaitingForPlayerToStart())
 	{
 		return false;
 	}
