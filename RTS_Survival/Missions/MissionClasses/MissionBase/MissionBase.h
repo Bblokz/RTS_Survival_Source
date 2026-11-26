@@ -31,6 +31,7 @@ enum class ERTSAudioType : uint8;
 struct FSeededChoices;
 class ADestructableEnvActor;
 enum class ERTSPortraitTypes : uint8;
+enum class ERTSResourceType : uint8;
 enum class EBuildingExpansionType : uint8;
 enum class EAircraftSubtype : uint8;
 class AEnemyController;
@@ -1076,6 +1077,9 @@ protected:
 	// Native twin of BP_OnCameraTourFinished for C++ mission classes; runs right before it.
 	virtual void OnCameraTourFinishedNative(const int32 ID, const bool bWasShown) {}
 
+	// Native twin of BP_OnCameraTourShotStarted; runs right before it.
+	virtual void OnCameraTourShotStartedNative(const int32 ID, const int32 ShotIndex) {}
+
 	// Called by cpp function in base do NOT CALL DIRECTLY.
 	UFUNCTION(BlueprintImplementableEvent)
 	void BP_OnMissionComplete();
@@ -1182,6 +1186,33 @@ protected:
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|Spawn")
 	void SpawnTowedTeamWeapon(const ETankSubtype TankSubtype, const ESquadSubtype SquadSubtype,
 	                          const FVector SpawnLocation);
+
+	/**
+	 * @brief Drives the player's start force along a road, e.g. up to the base in an arrival cinematic. Each unit gets
+	 * the route as queued moves; at the last point the units fan out in rows of three across the road.
+	 * @param GatherCentre Player vehicles and squads within GatherRadius of it are ordered.
+	 * @param GatherRadius Radius around GatherCentre (cm).
+	 * @param Route Waypoints in driving order; the last one is where the column ends up.
+	 * @param EndSpacing Distance between the units around the last point (cm).
+	 * @return How many units were ordered; 0 when none stood near GatherCentre or the route is empty.
+	 */
+	/**
+	 * @brief A small mission reward: adds the resource straight to the player's stock (up to their storage) and shows
+	 * how much arrived as a notification.
+	 * @param Resource The resource to add.
+	 * @param Amount How much to add.
+	 * @return False when the player's storage could not take all of it (or there is no resource manager).
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|Resources")
+	bool GivePlayerResources(const ERTSResourceType Resource, const int32 Amount);
+
+	/** @return True once the player's deck units (and the HQ) have spawned; a start without a deck counts too. */
+	UFUNCTION(BlueprintPure, NotBlueprintable, Category = "Mission|Units")
+	bool GetHasPlayerProfileLoaded() const;
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|Units")
+	int32 MovePlayerUnitsAlongRoute(const FVector GatherCentre, const float GatherRadius,
+	                                const TArray<FVector>& Route, const float EndSpacing = 800.f);
 
 	/**
 	 * @brief Spawns vehicle + squad, waits for squad load and cargo entry, then optionally orders vehicle move.
@@ -1369,6 +1400,11 @@ protected:
 	// Not fired when the tour is cut short by the mission failing or being cleaned up.
 	UFUNCTION(BlueprintImplementableEvent, Category = "Mission|Camera")
 	void BP_OnCameraTourFinished(const int32 ID, const bool bWasShown);
+
+	// A shot of the camera tour of PlayCameraTour came on screen (0 = the first). Shots a skip jumps over never fire,
+	// so anything the world needs (units released, gates opened) must also run from BP_OnCameraTourFinished.
+	UFUNCTION(BlueprintImplementableEvent, Category = "Mission|Camera")
+	void BP_OnCameraTourShotStarted(const int32 ID, const int32 ShotIndex);
 
 	/**
 	 * @brief Lifts the fog of war for the player over a circle for a while, like a recon flight's vision bubble.
@@ -1620,6 +1656,8 @@ private:
 	void OnCameraTourSessionEnded(const UMissionCameraTourSession* Session, const int32 ID,
 	                              const EMissionCameraTourEnd EndReason);
 	void CameraTour_ReportFinishedNextFrame(const int32 ID, const bool bWasShown);
+	// Called by the running tour session when one of its shots comes on screen.
+	void OnCameraTourShotStarted(const UMissionCameraTourSession* Session, const int32 ID, const int32 ShotIndex);
 
 	// Tracks actor validity transitions so each tracked element increments at most once.
 	UPROPERTY()

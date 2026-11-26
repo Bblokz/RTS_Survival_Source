@@ -67,6 +67,10 @@ public:
 	TArray<int32> GetCandidateWerke() const;
 
 	int32 GetHeldWedgeCount() const;
+	bool GetIsWerkEliminated(const int32 WerkIndex) const
+	{
+		return M_WerkEliminated.IsValidIndex(WerkIndex) && M_WerkEliminated[WerkIndex];
+	}
 	int32 GetCommandPostIndex() const { return M_CommandPostIndex; }
 	int32 GetStationCount() const { return M_StationLocations.Num(); }
 	const FDirectionFindingWedge* GetWedge(const int32 StationIndex) const;

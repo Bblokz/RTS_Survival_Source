@@ -5,6 +5,8 @@
 #include "CoreMinimal.h"
 #include "DirectionFindingTypes.generated.h"
 
+class USoundBase;
+
 class AActor;
 
 /** The three kinds of command post transmission the player's stations can hear; each narrows the bearings. */
@@ -84,6 +86,16 @@ struct FDirectionFindingSettings
 };
 
 /** Colours of the bearing wedges on the minimap and the tactical map. */
+/** The intercepted radio lines of one burst kind; a heard burst plays one of them at random on the intercept portrait. */
+USTRUCT(BlueprintType)
+struct FDirectionFindingIntercepts
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Intercepts")
+	TArray<TSoftObjectPtr<USoundBase>> Lines;
+};
+
 USTRUCT(BlueprintType)
 struct FDirectionFindingLook
 {

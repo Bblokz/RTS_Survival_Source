@@ -106,6 +106,17 @@ void UMissionBase::OnCameraTourSessionEnded(const UMissionCameraTourSession* Ses
 	}
 }
 
+void UMissionBase::OnCameraTourShotStarted(const UMissionCameraTourSession* Session, const int32 ID,
+                                            const int32 ShotIndex)
+{
+	if (M_ActiveCameraTourSession != Session)
+	{
+		return;
+	}
+	OnCameraTourShotStartedNative(ID, ShotIndex);
+	BP_OnCameraTourShotStarted(ID, ShotIndex);
+}
+
 void UMissionBase::CameraTour_ReportFinishedNextFrame(const int32 ID, const bool bWasShown)
 {
 	UWorld* const World = GetWorld();

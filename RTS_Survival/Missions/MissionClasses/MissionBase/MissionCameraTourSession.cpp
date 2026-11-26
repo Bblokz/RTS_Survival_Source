@@ -8,10 +8,12 @@
 #include "RTS_Survival/GameUI/CinematicOverlay/W_CinematicOverlay.h"
 #include "RTS_Survival/GameUI/CameraTour/W_MissionCameraTour.h"
 #include "RTS_Survival/GameUI/HoldToConfirm/W_HoldToSkip.h"
+#include "RTS_Survival/GameUI/LocationIntro/W_LocationIntro.h"
 #include "RTS_Survival/GameUI/Portrait/PortraitWidget/W_Portrait.h"
 #include "RTS_Survival/Player/PortraitManager/PortraitManager.h"
 #include "RTS_Survival/Missions/MissionClasses/MissionBase/MissionBase.h"
 #include "RTS_Survival/Player/CPPController.h"
+#include "RTS_Survival/Player/StartGameControl/PlayerStartGameControl.h"
 #include "RTS_Survival/Player/Camera/CameraController/PlayerCameraController.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
@@ -29,7 +31,13 @@ namespace MissionCameraTourSessionPrivate
 	constexpr float MinDownwardForwardZ = 0.1f;
 	// The fog stays lifted this long after the tour, so the player still sees the place as the view returns.
 	constexpr float RevealMarginSeconds = 4.f;
-	constexpr int32 SkipWidgetZOrder = 0;
+	// Above the tour widget (W_MissionCameraTour, 6) and the voice-line subtitle strip (7): the prompt sits at the
+	// bottom of the screen, where the tour's cinema bar would otherwise cover it.
+	constexpr int32 SkipWidgetZOrder = 8;
+	// Opening title length when its DurationSeconds is left at 0.
+	constexpr float DefaultTitleSeconds = 7.f;
+	// A shot's voice line ends at least this long before the shot does.
+	constexpr float VoiceLineTailSeconds = 0.4f;
 
 	float EaseInOutSine(const float Alpha)
 	{
@@ -73,6 +81,7 @@ bool UMissionCameraTourSession::StartSession(UMissionBase* MissionOwner, const T
 	}
 	M_Settings = Settings;
 	M_Settings.ReturnSeconds = FMath::Max(0.f, M_Settings.ReturnSeconds);
+	FitShotsToVoiceLines();
 	M_ID = ID;
 	M_PlayerController = FRTS_Statics::GetRTSController(MissionOwner);
 	M_CameraController = FRTS_Statics::GetPlayerCameraController(MissionOwner);
@@ -154,9 +163,15 @@ void UMissionCameraTourSession::TickRunning()
 		if (ShotIndex != M_CurrentShotIndex)
 		{
 			EnterShot(ShotIndex);
+			// The mission hears of the shot in Blueprint, which may end the tour there and then.
+			if (not bM_IsRunning)
+			{
+				return;
+			}
 		}
 		const FMissionCameraTourShot& Shot = M_Shots[ShotIndex];
 		const float ShotElapsed = ElapsedSeconds - GetShotStartSeconds(ShotIndex);
+		TryPlayShotVoiceLine(ShotIndex, ShotElapsed);
 		const FTourPose ShotPose = GetShotPose(Shot, EaseInOutSine(ShotElapsed / Shot.Seconds));
 		const float BlendAlpha = EaseInOutSine(GetPhase(ShotElapsed, 0.f, Shot.BlendInSeconds));
 		ApplyPose(BlendPoses(M_BlendFromPose, ShotPose, BlendAlpha));
@@ -171,6 +186,7 @@ void UMissionCameraTourSession::TickRunning()
 		ApplyPose(BlendPoses(M_BlendFromPose, M_PlayerPose, ReturnAlpha));
 	}
 	UpdateWidget(ElapsedSeconds);
+	UpdateOpeningTitle(ElapsedSeconds);
 
 	if (ElapsedSeconds >= GetTotalSeconds())
 	{
@@ -263,6 +279,14 @@ bool UMissionCameraTourSession::TryTakeScreen()
 	{
 		return false;
 	}
+	// The start-game screen pauses the game without the lock; a cinematic started behind it would play unseen on its
+	// real-time clock. Waiting here costs no wait time: the paused game does not tick this session.
+	const UPlayerStartGameControl* const StartGameControl = M_PlayerController->FindComponentByClass<
+		UPlayerStartGameControl>();
+	if (IsValid(StartGameControl) && StartGameControl->GetIsWaitingForPlayerToStart())
+	{
+		return false;
+	}
 	// A MoveCamera move places the pawn every frame until it ends; the tour starts after it.
 	if (GetIsValidCameraController() && M_CameraController->GetIsMovingOverTime())
 	{
@@ -281,6 +305,7 @@ bool UMissionCameraTourSession::TryTakeScreen()
 	M_Widget = UW_MissionCameraTour::ShowTour(M_PlayerController.Get(), M_Settings.bShowLetterbox,
 	                                          M_Settings.LetterboxHeightFraction);
 	HostPortraitOnTour(HudPortraitPlace);
+	ShowOpeningTitle();
 	PlayStartSound();
 	const UWorld* const World = GetTickableGameObjectWorld();
 	M_StartRealSeconds = World != nullptr ? World->GetRealTimeSeconds() : 0.0;
@@ -294,6 +319,97 @@ bool UMissionCameraTourSession::TryTakeScreen()
 		CreateSkipWidget();
 	}
 	return true;
+}
+
+void UMissionCameraTourSession::FitShotsToVoiceLines()
+{
+	for (FMissionCameraTourShot& Shot : M_Shots)
+	{
+		if (Shot.VoiceLine == nullptr)
+		{
+			continue;
+		}
+		Shot.VoiceLineDelaySeconds = FMath::Max(0.f, Shot.VoiceLineDelaySeconds);
+		const float LineSeconds = Shot.VoiceLine->GetDuration();
+		// Looping or procedural sounds report a huge duration; those keep the authored length.
+		if (LineSeconds <= 0.f || LineSeconds >= INDEFINITELY_LOOPING_DURATION)
+		{
+			continue;
+		}
+		const float NeededSeconds = Shot.VoiceLineDelaySeconds + LineSeconds
+			+ MissionCameraTourSessionPrivate::VoiceLineTailSeconds;
+		Shot.Seconds = FMath::Max(Shot.Seconds, NeededSeconds);
+	}
+}
+
+void UMissionCameraTourSession::ShowOpeningTitle()
+{
+	const FMissionCameraTourOpeningTitle& Title = M_Settings.OpeningTitle;
+	if (not Title.bShowTitle || not GetIsValidPlayerController(false))
+	{
+		return;
+	}
+	FLocationIntroPresentation Presentation = Title.Presentation;
+	// One set of bars: the title's sit exactly under the tour's, so its own fade-out never shows.
+	Presentation.bShowLetterbox = M_Settings.bShowLetterbox;
+	Presentation.LetterboxHeightFraction = M_Settings.LetterboxHeightFraction;
+	const float RequestedSeconds = Title.DurationSeconds > 0.f
+		                               ? Title.DurationSeconds
+		                               : MissionCameraTourSessionPrivate::DefaultTitleSeconds;
+	M_TitleSeconds = FMath::Max(RequestedSeconds, UW_LocationIntro::GetMinDurationSeconds(Title.Texts, Presentation));
+	M_TitleWidget = UW_LocationIntro::ShowIntro(M_PlayerController.Get(), Title.Texts, Presentation, M_TitleSeconds);
+	if (M_TitleWidget == nullptr)
+	{
+		M_TitleSeconds = 0.f;
+		return;
+	}
+	if (Presentation.IntroSound != nullptr && M_Mission.IsValid())
+	{
+		UGameplayStatics::PlaySound2D(M_Mission.Get(), Presentation.IntroSound);
+	}
+}
+
+void UMissionCameraTourSession::UpdateOpeningTitle(const float ElapsedSeconds)
+{
+	if (not IsValid(M_TitleWidget))
+	{
+		return;
+	}
+	if (bM_IsReturning || ElapsedSeconds >= M_TitleSeconds)
+	{
+		CloseOpeningTitle();
+		return;
+	}
+	M_TitleWidget->SetElapsedSeconds(ElapsedSeconds);
+}
+
+void UMissionCameraTourSession::CloseOpeningTitle()
+{
+	if (IsValid(M_TitleWidget))
+	{
+		M_TitleWidget->CloseIntro();
+	}
+	M_TitleWidget = nullptr;
+}
+
+void UMissionCameraTourSession::TryPlayShotVoiceLine(const int32 ShotIndex, const float ShotElapsedSeconds)
+{
+	if (ShotIndex <= M_LastVoicedShotIndex || not M_Shots.IsValidIndex(ShotIndex))
+	{
+		return;
+	}
+	const FMissionCameraTourShot& Shot = M_Shots[ShotIndex];
+	if (Shot.VoiceLine == nullptr)
+	{
+		M_LastVoicedShotIndex = ShotIndex;
+		return;
+	}
+	if (ShotElapsedSeconds < Shot.VoiceLineDelaySeconds || not M_Mission.IsValid())
+	{
+		return;
+	}
+	M_LastVoicedShotIndex = ShotIndex;
+	M_Mission->PlayPortrait(Shot.VoiceLinePortrait, Shot.VoiceLine);
 }
 
 void UMissionCameraTourSession::PlayStartSound() const
@@ -391,6 +507,7 @@ void UMissionCameraTourSession::RemoveSkipWidget()
 void UMissionCameraTourSession::HandleSkipHoldCompleted()
 {
 	RemoveSkipWidget();
+	CloseOpeningTitle();
 	const UWorld* const World = GetTickableGameObjectWorld();
 	if (not bM_IsRunning || bM_IsReturning || World == nullptr)
 	{
@@ -450,6 +567,10 @@ void UMissionCameraTourSession::EnterShot(const int32 ShotIndex)
 	if (GetIsValidWidget(false) && M_Shots.IsValidIndex(ShotIndex))
 	{
 		M_Widget->SetCaption(M_Shots[ShotIndex].Title, M_Shots[ShotIndex].Subtitle);
+	}
+	if (M_Mission.IsValid())
+	{
+		M_Mission->OnCameraTourShotStarted(this, M_ID, ShotIndex);
 	}
 }
 
@@ -544,6 +665,7 @@ void UMissionCameraTourSession::CompleteSession(const EMissionCameraTourEnd EndR
 	bM_IsWaitingForScreen = false;
 	M_CurrentShotIndex = INDEX_NONE;
 	RemoveSkipWidget();
+	CloseOpeningTitle();
 
 	if (bHeldScreen)
 	{
