@@ -87,6 +87,15 @@ public:
 	bool GetIsCameraOvertakeActive() const;
 	FVector GetCurrentCameraLocation() const;
 
+	/** @return Length of the camera arm, or 0 when the camera carrier has no spring arm. */
+	float GetZoomDistance() const;
+
+	/**
+	 * @brief Sets the camera arm for scripted framing; works while player camera input is disabled.
+	 * @param ZoomDistance Wanted arm length; clamped to the same limits as the player's zoom.
+	 */
+	void SetZoomDistance(float ZoomDistance);
+
 	/**
 	 * @brief Registers an additional cached boundary evaluated by every world-camera XY move.
 	 * @param BoundaryRegistrationParams Defines the boundary actor, ID and blocked-side settings.

@@ -28,6 +28,7 @@ class UWorldEnemyTurnDirector;
 class UWorldCampaignTechManager;
 class UWorldCommanderMapKit;
 class UWorldBuildNodeManager;
+class UWorldBatteryFireDirector;
 class AWorldBuildNode;
 class UW_WorldCampaignHUD;
 class UWorldDivisionManager;
@@ -193,6 +194,35 @@ public:
 	UFUNCTION(BlueprintPure, Category = "World Campaign|Build Nodes")
 	UWorldBuildNodeManager* GetWorldBuildNodeManager() const { return M_WorldBuildNodeManager; }
 
+	UFUNCTION(BlueprintPure, Category = "World Campaign|Battery Fire")
+	UWorldBatteryFireDirector* GetWorldBatteryFireDirector() const { return M_WorldBatteryFireDirector; }
+
+	/** @return The fog manager, or nullptr before the map is set up; quiet, since a map may have no fog. */
+	AWorldFowManager* GetWorldFowManager() const { return M_WorldFowManager.Get(); }
+
+	/** @return The unidentified mission (fog hint: marker or piece seen through fog) under the cursor, or nullptr. */
+	AWorldMissionObject* GetHoveredUnknownMission() const { return M_HoveredUnknownMission.Get(); }
+
+	/**
+	 * @brief Starts picking a target for a battery's fire mission: ends any other pick, closes the build cards and
+	 * routes the next map click to the battery fire director.
+	 * @param BuildNode The built battery that will fire.
+	 * @param OutFailReason Player-facing reason when picking cannot start.
+	 * @return true when the next map click picks the target.
+	 */
+	bool BeginBatteryFireTargetPicking(AWorldBuildNode* BuildNode, FText& OutFailReason);
+
+	void CancelBatteryFireTargetPicking();
+
+	/**
+	 * @brief Blocks every map click, the camera input and the campaign widgets while a scripted show plays on the
+	 * map, and gives them back afterwards.
+	 * @param bIsBlocked true at the start of the show, false at its end.
+	 */
+	void SetIsInputBlockedForMapShow(bool bIsBlocked);
+
+	bool GetIsWorldPlayerInputDisabled() const { return bM_IsWorldPlayerInputDisabled; }
+
 	void ShowAsyncWorldGenerationWidget();
 	void HideAsyncWorldGenerationWidget();
 	void UpdateAsyncWorldGenerationWidget_AnchorPlacementStarted();
@@ -215,8 +245,14 @@ protected:
 	 */
 	void Tick_UpdateHoveredBuildNode(AActor* ActorUnderCursor);
 
+	/** Remembers the unidentified mission the cursor trace hit, by its plain marker or its piece seen through fog. */
+	void Tick_UpdateHoveredUnknownMission(const UPrimitiveComponent* ComponentUnderCursor);
+
 	UPROPERTY()
 	TWeakObjectPtr<AWorldBuildNode> M_HoveredBuildNode;
+
+	UPROPERTY()
+	TWeakObjectPtr<AWorldMissionObject> M_HoveredUnknownMission;
 
 	// The site whose build cards are open; it stays lit while the cursor is elsewhere.
 	UPROPERTY()
@@ -334,6 +370,12 @@ private:
 	 * @return true when the click was used for target picking.
 	 */
 	bool PrimaryClick_CommanderTargetPicking();
+
+	/**
+	 * @brief While a battery waits for its target, a map click picks that target and nothing else.
+	 * @return true when the click was used for target picking.
+	 */
+	bool PrimaryClick_BatteryFireTargetPicking();
 
 	/** Connects the commander map ability's effect requests to the systems that carry them out. */
 	void BeginPlay_BindCommanderMapKit();
@@ -497,6 +539,10 @@ private:
 	UPROPERTY()
 	TObjectPtr<UWorldBuildNodeManager> M_WorldBuildNodeManager = nullptr;
 	bool GetIsValidWorldBuildNodeManager() const;
+
+	UPROPERTY()
+	TObjectPtr<UWorldBatteryFireDirector> M_WorldBatteryFireDirector = nullptr;
+	bool GetIsValidWorldBatteryFireDirector() const;
 
 	UPROPERTY()
 	TObjectPtr<UWorldDivisionManager> M_WorldDivisionManager = nullptr;

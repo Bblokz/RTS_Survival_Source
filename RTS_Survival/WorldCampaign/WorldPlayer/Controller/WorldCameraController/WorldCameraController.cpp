@@ -189,6 +189,22 @@ FVector UWorldCameraController::GetCurrentCameraLocation() const
 	return CameraCarrier->GetActorLocation();
 }
 
+float UWorldCameraController::GetZoomDistance() const
+{
+	// Quiet on purpose: a carrier without a spring arm zooms by moving, and has no arm length to report.
+	return M_SpringArmComponent.IsValid() ? M_SpringArmComponent->TargetArmLength : 0.f;
+}
+
+void UWorldCameraController::SetZoomDistance(const float ZoomDistance)
+{
+	if (not M_SpringArmComponent.IsValid())
+	{
+		return;
+	}
+
+	M_SpringArmComponent->TargetArmLength = FMath::Clamp(ZoomDistance, M_MinZoom, M_MaxZoom);
+}
+
 
 bool UWorldCameraController::RegisterAdditionalCameraBoundary(
 	const FCameraBoundaryRegistrationParams& BoundaryRegistrationParams)

@@ -16,6 +16,7 @@ class UTechWheelNodeButton;
 class UTextBlock;
 class UTexture2D;
 class UVerticalBox;
+class UW_TechWheelEffectPanel;
 class UW_TechWheelPaintLayer;
 class UWorldCampaignTechManager;
 struct FSlateFontInfo;
@@ -115,7 +116,7 @@ struct FTechWheelProgressSnapshot
 };
 
 /**
- * @brief The full-screen TECHNOLOGY page of the world map (UI sketch sheet 13): the tech wheel on the left, the
+ * @brief The full-screen TECHTREE page of the world map (UI sketch sheet 13): the tech wheel on the left, the
  * selected node's details and the research button on the right. Created by the campaign HUD, which calls
  * InitTechWheel once, RefreshFromCampaign whenever the page is shown, and switches pages on OnCloseRequested.
  * Builds its own widget tree; buying goes through UWorldCampaignTechManager::TryBuyWheelNode.
@@ -194,6 +195,7 @@ private:
 	void RefreshNodes(const FTechWheelProgressSnapshot& Snapshot);
 	void RefreshDetailPanel(const FTechWheelProgressSnapshot& Snapshot);
 	void RefreshDetailPanel_Header(const FWorldTechWheelNode& Node);
+	void RefreshDetailPanel_Effect(const FWorldTechWheelNode& Node);
 	void RefreshDetailPanel_Reached(const FWorldTechWheelNode& Node, const FTechWheelProgressSnapshot& Snapshot);
 	void RefreshDetailPanel_Key(const FWorldTechWheelNode& Node, const FTechWheelProgressSnapshot& Snapshot);
 	void RefreshDetailPanel_Price(const FWorldTechWheelNode& Node, const FTechWheelProgressSnapshot& Snapshot);
@@ -244,6 +246,10 @@ private:
 	UPROPERTY()
 	TObjectPtr<UCanvasPanel> M_ScreenCanvas;
 
+	// Affected units and weapon changes of the selected technology; fills the free height of the detail panel.
+	UPROPERTY()
+	TObjectPtr<UW_TechWheelEffectPanel> M_EffectPanel;
+
 	UPROPERTY()
 	TObjectPtr<UW_TechWheelPaintLayer> M_UnderPaintLayer;
 
@@ -259,9 +265,6 @@ private:
 
 	UPROPERTY()
 	FTechWheelDetailWidgets M_Detail;
-
-	UPROPERTY()
-	TObjectPtr<UTextBlock> M_CountText;
 
 	UPROPERTY()
 	TObjectPtr<UTextBlock> M_RadixiteText;

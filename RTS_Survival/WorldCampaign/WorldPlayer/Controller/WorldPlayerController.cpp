@@ -14,6 +14,7 @@
 #include "RTS_Survival/Player/PlayerResourceManager/PlayerResourceManager.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
+#include "RTS_Survival/WorldCampaign/BatteryFire/WorldBatteryFireDirector.h"
 #include "RTS_Survival/WorldCampaign/CampaignGeneration/GenerationHelpers/WorldCampaignGenerationHelper.h"
 #include "RTS_Survival/WorldCampaign/CampaignGeneration/GeneratorWorldCampaign/GeneratorWorldCampaign.h"
 #include "RTS_Survival/WorldCampaign/CampaignProgress/WorldCampaignProgressManager.h"
@@ -128,6 +129,7 @@ AWorldPlayerController::AWorldPlayerController()
 	M_WorldCampaignTechManager = CreateDefaultSubobject<UWorldCampaignTechManager>(TEXT("WorldCampaignTechManager"));
 	M_WorldCommanderMapKit = CreateDefaultSubobject<UWorldCommanderMapKit>(TEXT("WorldCommanderMapKit"));
 	M_WorldBuildNodeManager = CreateDefaultSubobject<UWorldBuildNodeManager>(TEXT("WorldBuildNodeManager"));
+	M_WorldBatteryFireDirector = CreateDefaultSubobject<UWorldBatteryFireDirector>(TEXT("WorldBatteryFireDirector"));
 	M_WorldDivisionManager = CreateDefaultSubobject<UWorldDivisionManager>(TEXT("WorldDivisionManager"));
 	M_PlayerResourceManager = CreateDefaultSubobject<UPlayerResourceManager>(TEXT("PlayerResourceManager"));
 	M_WorldPlayerAudioController = CreateDefaultSubobject<UWorldPlayerAudioController>(TEXT("WorldPlayerAudioController"));
@@ -323,6 +325,7 @@ void AWorldPlayerController::Tick(float DeltaTime)
 	{
 		// No cursor hover while the map takes no input; the site with open cards stays lit.
 		Tick_UpdateHoveredBuildNode(nullptr);
+		Tick_UpdateHoveredUnknownMission(nullptr);
 		return;
 	}
 
@@ -337,6 +340,16 @@ void AWorldPlayerController::Tick(float DeltaTime)
 	M_PlayerWorldOutliner->OnPlayerTick(HitActor, HitResultCursorProjection.Location);
 	Tick_UpdateHoveredCountry();
 	Tick_UpdateHoveredBuildNode(HitActor);
+	Tick_UpdateHoveredUnknownMission(bHit ? HitResultCursorProjection.GetComponent() : nullptr);
+}
+
+void AWorldPlayerController::Tick_UpdateHoveredUnknownMission(const UPrimitiveComponent* ComponentUnderCursor)
+{
+	// The plain marker or the real piece seen through the fog: both belong to the mission and both are unidentified.
+	AWorldMissionObject* const MissionUnderCursor =
+		IsValid(ComponentUnderCursor) ? Cast<AWorldMissionObject>(ComponentUnderCursor->GetOwner()) : nullptr;
+	const bool bIsUnidentified = IsValid(MissionUnderCursor) && MissionUnderCursor->GetIsUnidentifiedUnderFog();
+	M_HoveredUnknownMission = bIsUnidentified ? MissionUnderCursor : nullptr;
 }
 
 void AWorldPlayerController::Tick_UpdateHoveredBuildNode(AActor* ActorUnderCursor)
@@ -428,9 +441,67 @@ bool AWorldPlayerController::PrimaryClick_CommanderTargetPicking()
 	return true;
 }
 
+bool AWorldPlayerController::PrimaryClick_BatteryFireTargetPicking()
+{
+	// Quiet check: the director is a default subobject, and this runs on every click.
+	if (not IsValid(M_WorldBatteryFireDirector) || not M_WorldBatteryFireDirector->GetIsPickingTarget())
+	{
+		return false;
+	}
+
+	FHitResult HitUnderCursor;
+	const bool bHit = GetHitResultUnderCursor(ECC_Visibility, false, HitUnderCursor);
+	FText FailReason;
+	// A click while picking is always used up; the prompt shows the reason for a wrong target.
+	M_WorldBatteryFireDirector->TryFireOnPickedActor(bHit ? HitUnderCursor.GetActor() : nullptr, FailReason);
+	return true;
+}
+
+bool AWorldPlayerController::BeginBatteryFireTargetPicking(AWorldBuildNode* BuildNode, FText& OutFailReason)
+{
+	if (bM_IsWorldPlayerInputDisabled || not IsValid(BuildNode) || not GetIsValidWorldBatteryFireDirector())
+	{
+		return false;
+	}
+
+	CollapseMissionMapItemDesc();
+	if (UW_WorldCampaignHUD* CampaignHUD = GetCampaignHUD())
+	{
+		CampaignHUD->CloseBuildSite();
+		if (UW_WorldCommanderPanel* CommanderPanel = CampaignHUD->GetCommanderPanel())
+		{
+			CommanderPanel->CancelTargetPicking();
+		}
+	}
+
+	return M_WorldBatteryFireDirector->BeginTargetPicking(BuildNode->GetBuildNodeId(), OutFailReason);
+}
+
+void AWorldPlayerController::CancelBatteryFireTargetPicking()
+{
+	if (IsValid(M_WorldBatteryFireDirector))
+	{
+		M_WorldBatteryFireDirector->CancelTargetPicking();
+	}
+}
+
+void AWorldPlayerController::SetIsInputBlockedForMapShow(const bool bIsBlocked)
+{
+	SetIsWorldPlayerInputDisabled(bIsBlocked);
+	if (UW_WorldCampaignHUD* CampaignHUD = GetCampaignHUD())
+	{
+		CampaignHUD->SetIsInputBlocked(bIsBlocked);
+	}
+}
+
 void AWorldPlayerController::PrimaryClick()
 {
 	if (bM_IsWorldPlayerInputDisabled)
+	{
+		return;
+	}
+
+	if (PrimaryClick_BatteryFireTargetPicking())
 	{
 		return;
 	}
@@ -464,6 +535,7 @@ void AWorldPlayerController::SecondaryClick()
 		return;
 	}
 
+	CancelBatteryFireTargetPicking();
 	UW_WorldCampaignHUD* CampaignHUD = GetCampaignHUD();
 	if (not IsValid(CampaignHUD))
 	{
@@ -530,6 +602,18 @@ void AWorldPlayerController::PlayerTurn_ApplyStartOfNewTurn()
 	{
 		M_WorldBuildNodeManager->ApplyStartOfPlayerTurnIncome();
 	}
+
+	if (GetIsValidWorldBatteryFireDirector() && GetIsValidWorldStateAndSaveManager())
+	{
+		M_WorldBatteryFireDirector->HandleNewPlayerTurn(M_WorldStateAndSaveManager->GetCurrentTurn());
+	}
+
+	// Enemy pieces moved in the enemy turn: an opening around an unidentified mission must not show one that now
+	// stands next to it. Quiet: a map may have no fog manager.
+	if (AWorldFowManager* const WorldFowManager = M_WorldFowManager.Get())
+	{
+		WorldFowManager->RefreshWorldFow();
+	}
 }
 
 void AWorldPlayerController::EnemyTurn()
@@ -540,6 +624,7 @@ void AWorldPlayerController::EnemyTurn()
 	}
 
 	BP_OnEnemyTurnStarted();
+	CancelBatteryFireTargetPicking();
 	if (UW_WorldCampaignHUD* CampaignHUD = GetCampaignHUD())
 	{
 		CampaignHUD->SetIsInputBlocked(true);
@@ -2420,6 +2505,21 @@ bool AWorldPlayerController::GetIsValidWorldBuildNodeManager() const
 		TEXT("GetIsValidWorldBuildNodeManager"),
 		this
 	);
+	return false;
+}
+
+bool AWorldPlayerController::GetIsValidWorldBatteryFireDirector() const
+{
+	if (IsValid(M_WorldBatteryFireDirector))
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+		this,
+		TEXT("M_WorldBatteryFireDirector"),
+		TEXT("AWorldPlayerController::GetIsValidWorldBatteryFireDirector"),
+		this);
 	return false;
 }
 
