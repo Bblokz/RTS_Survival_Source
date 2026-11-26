@@ -912,3 +912,31 @@ Owner: "unseen missions should reveal their real piece through the fog". The pla
   to an opening 308 units.
 - **Not checked:** anything on screen: how clear and how wide the opening looks (one mask pixel is about 37 units),
   whether the ground and country fill inside it give anything away, the hover tag on the piece.
+- **Fog over unseen missions thinned, not opened (2026-11-26):** the owner did not want the fog fully removed over
+  missions the player is not next to. New setting `MissionOpeningStrength` (0 to 1) in `UWorldFogHintSettings`;
+  `AWorldFowManager::StampCircle` takes a strength. The owner picked 0.25 from 0.25 / 0.45 / 0.65 side by side
+  (`Saved/WorldMapPieces/fog_strength_sheet.png`); set in `Config/DefaultGame.ini` (C++ default 0.45).
+  Idea under discussion: a tall landmark beside each scripted mission that stands above the fog.
+- **Mission landmarks (2026-11-26):** every scripted mission has one tall landmark (300 to 400 units) beside its
+  piece, so its top stands above the fog (about 160 units) and shows where the mission is while it is still unknown.
+  The owner picked each from five drawings (`Saved/WorldMapUIDesigns/MissionLandmarks/<Mission>/pick.md`):
+  Ore Mountains twin-wheel headframe, Berlin red banner, Oder-Warthe jammer mast, Pripyat Phytophage spire,
+  Lake Vygozero Forge vein derrick, Moscow Kremlin gate tower, Freeze Engine frost stack, Svarog Line shield gun
+  tower. Meshes: `MapObjects/Missions/Landmarks/<Name>/SM_WorldLandmark_<Name>` (import:
+  `Source/Tools/WorldMapPieces/build_landmarks.py`, which also makes `M_WorldPiece_PBREmissive`).
+  `AWorldMissionObject::CreateLandmark` adds the mesh at runtime from `UWorldFogHintSettings::MissionLandmarks`
+  (mission type to mesh and offset behind / right); no Blueprint is edited. The component has the tag
+  `WorldLandmark`, no collision, and the fog code never hides it. Open: the landmarks are small and dark at the
+  default camera distance (no light of their own above the fog); only three were seen in a capture.
+
+### Worn roads (2026-11-26)
+
+The roads were one flat colour on a translucent engine plane; the map's exposure blew that out to a glowing band.
+`BP_WorldConnectionRenderer` now uses `MI_WorldRoad_Worn` (parent `M_WorldRoad_Worn`, in `MapObjects/General/Materials`):
+a lit, masked surface without emission. Asphalt is projected top-down in world space; across the road it has two tank
+ruts, a dark earth verge and a ragged edge; noise adds dust patches. Road width 32 (was 20), height above ground 8 (was 5,
+under the country fill at 6). The vector parameter `Color` still tints it, so `FogRoadBrightness` works for roads above
+the fog; `FogRoadOpacity` and the road sort priority do nothing on this masked material.
+Build and tune: `Source/Tools/WorldMapPieces/build_road.py` (`ROAD_LOOK`); `WORLDROAD_REVERT=1` puts the old road back.
+The red, green and cyan lines seen in DebugGame are division pathing debug lines
+(`GWorldCampaign_DivisionPathing_Compile_DebugSymbols`), not part of the map look.

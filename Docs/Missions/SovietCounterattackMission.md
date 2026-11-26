@@ -105,6 +105,12 @@ the arrival cinematic is over (finished, skipped, timed out, or never played), `
   projected onto the navmesh, with `CargoPlaneAbility` (`GA_GerPzIIIFlak41Drop`: Ju 390B, one aircraft per vehicle, 1000 apart).
   Every German tank drop template uses the same aircraft and hang offset (-250), so heavy and light tanks share it.
   Vehicles spawn from the training option = the regular (non-variant) unit.
+  Building footprints (2026-11-26): every aircraft, the first one included, sets its vehicle down at least
+  `BuildingClearanceRadius` (800) from any building, building expansion or placed building preview. This goes through
+  `FPlayerAirDropPayload::BuildingClearanceRadius`, then `UGA_AircraftDrop::SetBuildingClearanceRadius`, then
+  `FBuildingFreeDropSpots`, which overlaps the building placement channel and also checks nomadics that are still
+  unfolding. A built-over offset point moves to the nearest clear navmesh spot (rings around it), and the minimap ping uses
+  that same spot. The player's own aircraft drop abilities and enemy air drops leave the clearance at 0 and are unchanged.
   - Breakthrough Doctrine (any non-Strike faction): 2 x `Tank_TigerH1`, 3 x `Tank_PzII_Luchs`.
   - Strike Division: 2 x `Tank_PantherD`, 2 x `Tank_PzIII_AA`.
 - a reinforcements ping on the minimap at the landing point for `MiniMapPingSeconds` (8 s).

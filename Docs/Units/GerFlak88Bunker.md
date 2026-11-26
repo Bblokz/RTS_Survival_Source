@@ -72,6 +72,30 @@ MSYS_NO_PATHCONV=1 UnrealEditor-Win64-DebugGame-Cmd.exe RTS_Survival.uproject /G
 
 Leave out `-GerPitCapture` (and use `-NullRHI`) for a quick run without pictures. Build the DebugGame editor target first if the Development editor is open (Live Coding blocks a Development build).
 
+## Abandoned bunker (capture object)
+
+`/Game/RTS_Survival/Blueprints/Environment/CaptureObjects/GerBunkers/BP_CaptureGerBunker_Flak88` is a capture object a designer can place in a level. It shows only the bunker: no Flak 88, no rounds in the lockers or the Zellenblock, and the camo nets hidden. A pure white capture border runs round it. When player 1 captures it, it is replaced by a full `Ger_BXP_Flak88Bunker`: the gun, rounds and nets come back.
+
+![Top view: the abandoned bunker in its white capture border](GerFlak88BunkerCapture_Top.png)
+
+![The abandoned bunker at an RTS camera angle, headless editor render](GerFlak88BunkerCapture_Rts.png)
+
+It is a data-only child of `BP_CaptureGerPit_Base`, so it works like the abandoned pits ([GerPitCapture.md](GerPitCapture.md)):
+- `PitMeshAsset` is `SM_BF_Flak88Bunker`. The base also puts this mesh on the BXP it spawns.
+- `PitMaterialOverrides` = `[None, None, M_CaptureHiddenSection]` hides the camo net slot (slot 2) on the capture actor only.
+- No gun, props or dirt decals.
+- The border is `Materials/MI_GerBunkerCapture_Border_Flak88`, an instance of `M_GerPitCapture_BorderDecal` with `RingColor` and `ChevronColor` pure white. It is a rounded box. The ring centre line is 665 x 860 cm (half size), about 65 cm outside the concrete footprint (X -600..600, Y -803..785).
+- The four capture points are 60 cm outside the ring: ±725 cm on X and ±920 cm on Y.
+- Capture needs 4 units for 25 seconds, the same as the Flak 88 pit. The progress text is "Recrewing the abandoned bunker...".
+
+The build script is `Saved/AgentScripts/GerPitCapture/ue_flak88bunker_capture_build.py`. Run it in the live editor; it is idempotent. The preview render is `flak88bunker_capture_preview.py` (`run_ue.sh flak88bunker_capture_preview.py <log>`). The Flakvierling bunker has the same capture object, `BP_CaptureGerBunker_Flakvierling`.
+
+Verified on 2026-11-26 with `flak88bunker_capture_headless_test.py`, a headless PIE run (-nullrhi, DebugGame-Cmd, RTS_ToCopySmall). In game, the abandoned bunker has the net slot on `M_CaptureHiddenSection`, no gun, no rounds and the white border. After `BP_OnCapturedByPlayer(1)`, a player-1 `Ger_BXP_Flak88Bunker` stands in its place, with the camo net, visible `Rounds` and the Flak 88 turret (`RTS_BP_EmbTurret_GerPit_Flak88`).
+
+Not verified:
+- the 50 % damaged-mesh swap on a captured bunker. `GameplayStatics.ApplyDamage` did not change the mesh, and is probably not the game's damage path.
+- a real capture by units walking to the four points.
+
 ## Not done
 
 It is not in the HQ's build menu, and it shares `BTX_GerFlak88Pit` with the Flak 88 pit. Its own expansion type, data, footprint rules, async spawner mapping and training slot are C++ (the rail Pak bunker is the pattern; see [GerFlakvierlingBunker.md](GerFlakvierlingBunker.md#not-done)). Until then it must be placed in a level by hand.

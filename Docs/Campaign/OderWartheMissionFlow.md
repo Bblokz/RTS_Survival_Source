@@ -357,7 +357,7 @@ Positions in metres (map X north, Y east), from `Saved/OderWarthe/terrain/OW_lay
 | A12 | Advisor | M05 starts | "Next post is across the Packlitz dam, on the forester's hill. Take it and we get a second bearing." (recorded 2026-11-25) |
 | A13 | Advisor | Bonus "Take all five listening posts" appears | "Hold all five posts at once and he has nowhere left to hide." |
 | A14 | Advisor | Bonus "Collapse a tunnel mouth" appears | "Their columns come out of the tunnel mouths. Collapse one with heavy guns and that bunker sends no more." |
-| A15 | Advisor | Bonus "Destroy the radio truck" appears (Hard+, not built yet) | "A radio truck on the roads behind their line is sending false bearings. Find it and burn it." |
+| A15 | Advisor | Bonus "Destroy the radio truck" appears (Hard+, built 2026-11-26, section 15) | "A radio truck on the roads behind their line is sending false bearings. Find it and burn it." |
 | I_* | Shield operator / Starik (Russian, subtitled intercept) | Every heard burst (`ADirectionFindingManager.InterceptLines`) | Routine (operator): "All posts: report readiness." / "Signal clear. Continue on schedule." Reply (operator): "Received. Hold your position." / "Understood. Reinforcements when ready." Attack order (Starik): "Column, forward. Take the ridge." / "All crews to the dams. We attack." |
 | A11 | Advisor | First wave leaves its tunnel mouth (M04) | "Enemy column leaving the bunker line. Watch the causeways." Later waves (M05): A11_B "Another column off the bunker line." / A11_C "They're coming out of the bunkers again. Watch the causeways." (recorded 2026-11-25) |
 | A4 | Advisor | First reply burst | "Every time we hit them, someone reports to the command post, and the command post answers." |
@@ -616,6 +616,39 @@ Owner picks 2026-11-25:
   - a timed wave firing (first interval 180 / 150 / 120 s; the run ended sooner);
   - A4's outpost reply lesson (the outposts are not in the map yet).
 - **Open:**
-  - the radio-truck bonus (route, decoy bursts; A15 recorded);
+  - the radio-truck bonus: built 2026-11-26, section 15;
   - what happens to the rail gate if the command Werk's tunnel mouth collapses before the fix (section 10.8).
+
+## 15. Decoy radio truck and its bonus: built (2026-11-26)
+
+Owner picks 2026-11-26:
+- a fixed decoy spot (its wedges stay put and cross over empty ground);
+- the truck drives with a BA-12 escort, waits 30 s at the Werke it passes, then parks for good at the spot and
+  transmits from there.
+
+- **`ADecoyRadioTruck`** (`Missions/OderWarthe/`, placed by `ow_map_build.step_decoy_truck`, also in `c_build2.py`):
+  - On Hard and up, once the player pressed Start, it spawns `Rus_ArmoredCar_ZilRadio` (as `Tank_ZilFuel`) and a
+    BA-12 behind Werk 2.
+  - The route is the tracks behind the line: Werk 2 (30 s), DF 4, the Lubow dam, Werk 4 (30 s), the Hochwald ford.
+  - It parks at the hidden spot (225, 5) m. A search found this spot at least 13 degrees off every Werk as seen from
+    every station, so the decoy never points at a bunker group.
+  - Parked, it calls `ADirectionFindingManager::ActivateDecoy`. When the truck dies it calls `DeactivateDecoy` and
+    raises `OnRadioTruckDestroyed`.
+  - Its difficulty check waits for Start: behind the start screen the difficulty is not final yet.
+- **Decoy wedges:**
+  - A second solver aims every held station at the spot.
+  - A decoy wedge opens as wide as the station's real wedge and narrows with the same bursts. Wedges and overlap are
+    drawn exactly like the real ones.
+  - The decoy never counts toward the fix, and the fix removes it.
+- **Bonus `Mission_OW_BonusRadioTruck`** ("Destroy the radio truck"):
+  - It plays A15 and completes on `OnRadioTruckDestroyed`.
+  - Its trigger (after M04) has `MinimumDifficulty` Hard, a new option on `UMissionClassCompletedMissionTrigger`.
+    Below Hard the stage never starts, so no plate appears.
+- **Checked (PIE on Hard, DebugGame; `pie_decoy_check.py`):**
+  - The truck and escort spawned and drove the route; it was at (176, 275) and then (209, 221) on the way.
+  - It parked at (222, 7) and transmitted, and the decoy turned on.
+  - The minimap showed two real and two decoy wedges with both overlaps shaded.
+  - Damage killed the truck: the decoy went off and the bonus completed.
+  - On Normal the truck correctly does not spawn.
+- **Not checked:** the truck and escort fighting player units, and how the decoy reads to a player.
 

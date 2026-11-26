@@ -53,6 +53,12 @@ on the shared turret meshes, so every T-34E / KV-1 (L-11) variant can mount a gu
 
 ![T-34E with the PTRS gunner](EmbInfantryTurret_T34E_PTRS.png)
 
+Mount settings added 2026-11-26 for field modification kits: `RequiredTechnology` (mount only when that kit is
+researched), `UnmountOnTechnology`, `RequestMount()` / `Unmount()`, `TurretClassesWithoutMount` and mount mesh
+`TankTurretThenHullMesh` (turret meshes first, then the hull). German hosts with a permanent gunner: Pz IV H
+StandardPlus and Pz IV F1 Spotter (cupola), Brummbär LateWar (2, hull), E25 Assault (2, hull), Flakvierling bunker.
+The MG 42 hatch gunner kit and its 20 hosts: `FieldKit_TurretMG42Gunner.md`.
+
 ## Test
 
 ```
