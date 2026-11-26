@@ -44,6 +44,10 @@ struct FWorldConnectionRibbonStyle
 
 	UPROPERTY()
 	bool bAllowDecals = true;
+
+	/** Order among translucent meshes; above the fog cloud's (0) the ribbon draws over the fog, below it under. */
+	UPROPERTY()
+	int32 TranslucencySortPriority = 0;
 };
 
 /**
@@ -65,6 +69,17 @@ public:
 	 * @param Style Art style and final solved width for this ribbon.
 	 */
 	void BuildRibbon(const TArray<FVector>& WorldPathPoints, const FWorldConnectionRibbonStyle& Style);
+
+	/** @return Number of ribbon pieces; one between every two path points. */
+	int32 GetSegmentCount() const { return M_SplineMeshes.Num(); }
+
+	/** @return World location halfway one ribbon piece; the ribbon's own location for an unknown piece. */
+	FVector GetSegmentMidpoint(int32 SegmentIndex) const;
+
+	/** Shows or hides one ribbon piece; the fog hints use it to hide a dim road where the fog is open. */
+	void SetIsSegmentShown(int32 SegmentIndex, bool bIsShown);
+
+	void SetTranslucencySortPriority(int32 NewSortPriority);
 
 private:
 	void ClearSplineMeshes();

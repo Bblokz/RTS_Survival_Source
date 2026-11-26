@@ -13,8 +13,28 @@ class AConnection;
 class AGeneratorWorldCampaign;
 class AWorldPlayerController;
 class AWorldConnectionRibbon;
+class AWorldFowManager;
 class UStaticMesh;
+class UMaterialInstanceDynamic;
 class UMaterialInterface;
+
+/** The road of one solved edge and its dim copy above the fog, kept so a fog pass only has to switch them. */
+USTRUCT()
+struct FWorldFogRoadRibbon
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	TWeakObjectPtr<AConnection> Connection = nullptr;
+
+	// The road on the ground; pushed below the fog while its connection is fully hidden.
+	UPROPERTY()
+	TObjectPtr<AWorldConnectionRibbon> RoadRibbon = nullptr;
+
+	// The dim copy above the fog; shown piece by piece where the fog is closed.
+	UPROPERTY()
+	TObjectPtr<AWorldConnectionRibbon> FogRibbon = nullptr;
+};
 
 /**
  * @brief Spawned by the world player controller after the campaign graph exists to draw art-directed,
@@ -26,6 +46,8 @@ class UMaterialInterface;
  *   3. Greedily curve each edge (freely, bounded by Curviness) and relax the curve back toward its
  *      straight baseline until it clears every finalized edge (width-aware) and the boundary polygon.
  *   4. Spawn one AWorldConnectionRibbon per solved path, attached to its owning AConnection.
+ *   5. With UWorldFogHintSettings::bShowRoadsUnderFog: spawn a dim copy of every road above the fog cloud and
+ *      show it, on every fog pass, where the fog hides the road.
  *
  * The connection graph is already planar (the generator forbids crossing centerlines), so the straight
  * baseline is always a valid fallback and the relaxation loop is guaranteed to terminate.
@@ -109,8 +131,36 @@ private:
 		TArray<FVector>& OutPath,
 		FSolvedEdge& OutSolved) const;
 
-	void SpawnRibbon(const FRibbonEdge& Edge, const TArray<FVector>& WorldPath);
+	AWorldConnectionRibbon* SpawnRibbon(const FRibbonEdge& Edge, const TArray<FVector>& WorldPath);
+	AWorldConnectionRibbon* SpawnRibbonActor();
 	void ClearRibbons();
+
+	/** Finds the fog cloud and manager, makes the dim road material and listens for fog passes. */
+	void SetupFogRoads();
+
+	/** @return The road material with its colour dimmed for roads under fog; nullptr without a road material. */
+	UMaterialInstanceDynamic* CreateFogRoadMaterial();
+
+	/**
+	 * @brief Spawns the dim copy of one road above the fog and remembers both for the fog passes.
+	 * @param Edge Solved edge the road belongs to.
+	 * @param WorldPath Solved path of the road on the ground.
+	 * @param RoadRibbon The road on the ground; may be nullptr when it could not be spawned.
+	 */
+	void SpawnFogRoadRibbon(const FRibbonEdge& Edge, const TArray<FVector>& WorldPath, AWorldConnectionRibbon* RoadRibbon);
+
+	/** Shows every dim road piece the fog hides and hides the rest; runs after each fog pass. */
+	void RefreshFogRoads();
+
+	/**
+	 * @brief Switches the pieces of one dim road and the draw order of its road on the ground.
+	 * @param FogRoadRibbon Road and dim copy of one edge.
+	 * @param FowManager Fog manager whose mask tells where the fog is open; nullptr means open everywhere.
+	 * @return Number of dim pieces that are shown now.
+	 */
+	int32 RefreshFogRoadRibbon(const FWorldFogRoadRibbon& FogRoadRibbon, const AWorldFowManager* FowManager) const;
+
+	void UnbindFromFowManager();
 
 	FWorldConnectionRibbonStyle BuildStyleForEdge(const FRibbonEdge& Edge) const;
 
@@ -141,6 +191,25 @@ private:
 
 	UPROPERTY()
 	TArray<TObjectPtr<AWorldConnectionRibbon>> M_Ribbons;
+
+	// One entry per road while roads are shown under fog; empty otherwise.
+	UPROPERTY()
+	TArray<FWorldFogRoadRibbon> M_FogRoadRibbons;
+
+	UPROPERTY()
+	TObjectPtr<UMaterialInstanceDynamic> M_FogRoadMaterial;
+
+	// Spawned by the controller before this renderer; not valid on a map without fog.
+	UPROPERTY()
+	TWeakObjectPtr<AWorldFowManager> M_WorldFowManager;
+
+	FDelegateHandle M_FowRefreshedHandle;
+
+	// World Z of the top of the fog cloud; the dim roads lie just above it.
+	float M_FogTopZ = 0.f;
+
+	// The setting is on and the map has a fog cloud.
+	bool bM_DrawsFogRoads = false;
 
 	// --- Art direction ---
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Connection Spline|Art", meta = (AllowPrivateAccess = "true"))

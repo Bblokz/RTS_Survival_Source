@@ -3,16 +3,30 @@
 #include "WorldConnectionSplineRenderer.h"
 
 #include "EngineUtils.h"
+#include "Engine/StaticMesh.h"
 #include "Engine/World.h"
+#include "Materials/MaterialInstanceDynamic.h"
+#include "Materials/MaterialInterface.h"
 #include "WorldConnectionRibbon.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/WorldCampaign/CampaignGeneration/GeneratorWorldCampaign/GeneratorWorldCampaign.h"
+#include "RTS_Survival/WorldCampaign/WorldFow/WorldFogHintRules.h"
+#include "RTS_Survival/WorldCampaign/WorldFow/WorldFogHintSettings.h"
+#include "RTS_Survival/WorldCampaign/WorldFow/WorldFowCloud.h"
+#include "RTS_Survival/WorldCampaign/WorldFow/WorldFowManager.h"
+#include "RTS_Survival/WorldCampaign/WorldFow/WorldMapFowComponent.h"
+#include "RTS_Survival/WorldCampaign/WorldPlayer/Controller/WorldPlayerController.h"
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/AnchorPoint/AnchorPoint.h"
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/Boundary/WorldSplineBoundary.h"
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/Connection/Connection.h"
 
+DEFINE_LOG_CATEGORY_STATIC(LogRTSWorldFogRoads, Log, All);
+
 namespace WorldConnectionSplineConstants
 {
+	// Draw order of a road the player can see: the engine default, as before the fog hints.
+	constexpr int32 DefaultRoadSortPriority = 0;
+	constexpr int32 RoadMaterialIndex = 0;
 	// Two endpoints closer than this (in cm) are treated as the same node for adjacency skipping.
 	constexpr float SharedEndpointToleranceSquared = 25.f * 25.f;
 	// Below this amplitude a curve is effectively a straight line, so we skip the mirrored direction.
@@ -48,6 +62,8 @@ void AWorldConnectionSplineRenderer::RebuildConnectionSplines()
 void AWorldConnectionSplineRenderer::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	ClearRibbons();
+	UnbindFromFowManager();
+	M_WorldFowManager.Reset();
 	M_WorldPlayerController.Reset();
 	M_WorldGenerator.Reset();
 
@@ -80,6 +96,8 @@ void AWorldConnectionSplineRenderer::BuildAndDrawAllConnections()
 		return;
 	}
 
+	SetupFogRoads();
+
 	if (not bM_UniformWidth)
 	{
 		ClampEdgeWidthsAtNodes(Edges);
@@ -111,10 +129,167 @@ void AWorldConnectionSplineRenderer::BuildAndDrawAllConnections()
 
 		FRibbonEdge FinalEdge = Edge;
 		FinalEdge.Width = SolvedEdge.HalfWidth * 2.f;
-		SpawnRibbon(FinalEdge, WorldPath);
+		AWorldConnectionRibbon* const RoadRibbon = SpawnRibbon(FinalEdge, WorldPath);
+		if (bM_DrawsFogRoads)
+		{
+			SpawnFogRoadRibbon(FinalEdge, WorldPath, RoadRibbon);
+		}
 
 		FinalizedEdges.Add(MoveTemp(SolvedEdge));
 	}
+
+	RefreshFogRoads();
+}
+
+void AWorldConnectionSplineRenderer::SetupFogRoads()
+{
+	UnbindFromFowManager();
+	M_FogRoadMaterial = nullptr;
+	// Quiet on purpose: a map without a fog cloud or fog manager hides no road, so it needs no dim copies.
+	M_WorldFowManager = M_WorldPlayerController.IsValid() ? M_WorldPlayerController->GetWorldFowManager() : nullptr;
+	bM_DrawsFogRoads = UWorldFogHintSettings::Get()->bShowRoadsUnderFog && M_WorldFowManager.IsValid()
+		&& AWorldFowCloud::TryGetFogTopZ(GetWorld(), M_FogTopZ);
+	if (not bM_DrawsFogRoads)
+	{
+		return;
+	}
+
+	M_FogRoadMaterial = CreateFogRoadMaterial();
+	M_FowRefreshedHandle = M_WorldFowManager->OnWorldFowRefreshed.AddUObject(
+		this, &AWorldConnectionSplineRenderer::RefreshFogRoads);
+}
+
+void AWorldConnectionSplineRenderer::UnbindFromFowManager()
+{
+	if (M_WorldFowManager.IsValid() && M_FowRefreshedHandle.IsValid())
+	{
+		M_WorldFowManager->OnWorldFowRefreshed.Remove(M_FowRefreshedHandle);
+	}
+
+	M_FowRefreshedHandle.Reset();
+}
+
+UMaterialInstanceDynamic* AWorldConnectionSplineRenderer::CreateFogRoadMaterial()
+{
+	UMaterialInterface* RoadMaterial = M_RibbonMaterial;
+	if (not IsValid(RoadMaterial) && IsValid(M_RibbonMesh))
+	{
+		RoadMaterial = M_RibbonMesh->GetMaterial(WorldConnectionSplineConstants::RoadMaterialIndex);
+	}
+
+	if (not IsValid(RoadMaterial))
+	{
+		return nullptr;
+	}
+
+	UMaterialInstanceDynamic* const FogRoadMaterial = UMaterialInstanceDynamic::Create(RoadMaterial, this);
+	const UWorldFogHintSettings* const Settings = UWorldFogHintSettings::Get();
+	FLinearColor RoadColor = FLinearColor::White;
+	if (not RoadMaterial->GetVectorParameterValue(FHashedMaterialParameterInfo(Settings->RoadColorParameterName), RoadColor))
+	{
+		RTSFunctionLibrary::ReportError(FString::Printf(
+			TEXT("WorldConnectionSplineRenderer: road material %s has no vector parameter %s; roads under fog are not dimmed."),
+			*RoadMaterial->GetName(), *Settings->RoadColorParameterName.ToString()));
+		return FogRoadMaterial;
+	}
+
+	FogRoadMaterial->SetVectorParameterValue(
+		Settings->RoadColorParameterName,
+		WorldFogHintRules::GetFogRoadColor(RoadColor, Settings->FogRoadBrightness, Settings->FogRoadOpacity));
+	return FogRoadMaterial;
+}
+
+void AWorldConnectionSplineRenderer::SpawnFogRoadRibbon(const FRibbonEdge& Edge, const TArray<FVector>& WorldPath,
+                                                        AWorldConnectionRibbon* RoadRibbon)
+{
+	const UWorldFogHintSettings* const Settings = UWorldFogHintSettings::Get();
+	TArray<FVector> FogRoadPath;
+	WorldFogHintRules::BuildFogRoadPath(WorldPath, M_FogTopZ + Settings->HeightAboveFog,
+	                                    Settings->FogRoadSegmentLength, FogRoadPath);
+	if (FogRoadPath.Num() < 2)
+	{
+		return;
+	}
+
+	AWorldConnectionRibbon* const FogRibbon = SpawnRibbonActor();
+	if (not IsValid(FogRibbon))
+	{
+		return;
+	}
+
+	FWorldConnectionRibbonStyle FogRoadStyle = BuildStyleForEdge(Edge);
+	FogRoadStyle.Width = FMath::Max(FogRoadStyle.Width * Settings->FogRoadWidthScale, KINDA_SMALL_NUMBER);
+	FogRoadStyle.Material = IsValid(M_FogRoadMaterial) ? M_FogRoadMaterial.Get() : FogRoadStyle.Material.Get();
+	FogRoadStyle.TranslucencySortPriority = Settings->FogRoadSortPriority;
+	FogRoadStyle.bCastShadow = false;
+	FogRoadStyle.bAllowDecals = false;
+	FogRibbon->BuildRibbon(FogRoadPath, FogRoadStyle);
+
+	FWorldFogRoadRibbon FogRoadRibbon;
+	FogRoadRibbon.Connection = Edge.OwningConnection;
+	FogRoadRibbon.RoadRibbon = RoadRibbon;
+	FogRoadRibbon.FogRibbon = FogRibbon;
+	M_FogRoadRibbons.Add(FogRoadRibbon);
+}
+
+void AWorldConnectionSplineRenderer::RefreshFogRoads()
+{
+	if (not bM_DrawsFogRoads)
+	{
+		return;
+	}
+
+	int32 SegmentCount = 0;
+	int32 ShownSegmentCount = 0;
+	const AWorldFowManager* const FowManager = M_WorldFowManager.Get();
+	for (const FWorldFogRoadRibbon& FogRoadRibbon : M_FogRoadRibbons)
+	{
+		SegmentCount += IsValid(FogRoadRibbon.FogRibbon) ? FogRoadRibbon.FogRibbon->GetSegmentCount() : 0;
+		ShownSegmentCount += RefreshFogRoadRibbon(FogRoadRibbon, FowManager);
+	}
+
+	UE_LOG(LogRTSWorldFogRoads, Display,
+	       TEXT("RTS_WORLDFOGHINTS roads=%d fogRoadPieces=%d shown=%d fogTopZ=%.1f dimMaterial=%s"),
+	       M_FogRoadRibbons.Num(), SegmentCount, ShownSegmentCount, M_FogTopZ,
+	       IsValid(M_FogRoadMaterial) ? TEXT("yes") : TEXT("no"));
+}
+
+int32 AWorldConnectionSplineRenderer::RefreshFogRoadRibbon(const FWorldFogRoadRibbon& FogRoadRibbon,
+                                                          const AWorldFowManager* FowManager) const
+{
+	// A connection without a fog component is never hidden, so its road needs no dim copy.
+	const AConnection* const Connection = FogRoadRibbon.Connection.Get();
+	const UWorldMapFowComponent* const FowComponent = IsValid(Connection) ? Connection->GetFowComponent() : nullptr;
+	const EWorldMapFowState ConnectionState = IsValid(FowComponent)
+		                                          ? FowComponent->GetCurrentFowState()
+		                                          : EWorldMapFowState::Visible;
+	const UWorldFogHintSettings* const Settings = UWorldFogHintSettings::Get();
+	if (IsValid(FogRoadRibbon.RoadRibbon))
+	{
+		// A fully hidden road must never shine through the fog next to its dim copy; any other road draws as before.
+		FogRoadRibbon.RoadRibbon->SetTranslucencySortPriority(
+			ConnectionState == EWorldMapFowState::NotVisible
+				? Settings->RoadBelowFogSortPriority
+				: WorldConnectionSplineConstants::DefaultRoadSortPriority);
+	}
+
+	AWorldConnectionRibbon* const FogRibbon = FogRoadRibbon.FogRibbon;
+	if (not IsValid(FogRibbon))
+	{
+		return 0;
+	}
+
+	int32 ShownSegmentCount = 0;
+	for (int32 SegmentIndex = 0; SegmentIndex < FogRibbon->GetSegmentCount(); ++SegmentIndex)
+	{
+		const bool bIsFogOpen = not IsValid(FowManager)
+			|| FowManager->GetIsFogDrawnOpenAt(FogRibbon->GetSegmentMidpoint(SegmentIndex));
+		const bool bIsShown = WorldFogHintRules::GetShowsRoadUnderFog(ConnectionState, bIsFogOpen,
+		                                                              Settings->bShowRoadsUnderFog);
+		FogRibbon->SetIsSegmentShown(SegmentIndex, bIsShown);
+		ShownSegmentCount += bIsShown ? 1 : 0;
+	}
+	return ShownSegmentCount;
 }
 
 bool AWorldConnectionSplineRenderer::GatherEdges(TArray<FRibbonEdge>& OutEdges) const
@@ -441,17 +616,36 @@ void AWorldConnectionSplineRenderer::SolveEdge(
 	OutSolved.HalfWidth = ChosenHalfWidth;
 }
 
-void AWorldConnectionSplineRenderer::SpawnRibbon(const FRibbonEdge& Edge, const TArray<FVector>& WorldPath)
+AWorldConnectionRibbon* AWorldConnectionSplineRenderer::SpawnRibbon(const FRibbonEdge& Edge,
+                                                                   const TArray<FVector>& WorldPath)
 {
 	if (WorldPath.Num() < 2)
 	{
-		return;
+		return nullptr;
 	}
 
+	AWorldConnectionRibbon* Ribbon = SpawnRibbonActor();
+	if (not IsValid(Ribbon))
+	{
+		return nullptr;
+	}
+
+	// Attach to the owning connection so the ribbon inherits its fog-of-war reveal corridor and lifecycle.
+	if (AConnection* OwningConnection = Edge.OwningConnection.Get())
+	{
+		Ribbon->AttachToActor(OwningConnection, FAttachmentTransformRules::KeepWorldTransform);
+	}
+
+	Ribbon->BuildRibbon(WorldPath, BuildStyleForEdge(Edge));
+	return Ribbon;
+}
+
+AWorldConnectionRibbon* AWorldConnectionSplineRenderer::SpawnRibbonActor()
+{
 	UWorld* World = GetWorld();
 	if (not IsValid(World))
 	{
-		return;
+		return nullptr;
 	}
 
 	UClass* RibbonClass = M_RibbonClass ? M_RibbonClass.Get() : AWorldConnectionRibbon::StaticClass();
@@ -466,17 +660,12 @@ void AWorldConnectionSplineRenderer::SpawnRibbon(const FRibbonEdge& Edge, const 
 	AWorldConnectionRibbon* Ribbon = World->SpawnActor<AWorldConnectionRibbon>(RibbonClass, FTransform::Identity, SpawnParameters);
 	if (not IsValid(Ribbon))
 	{
-		return;
+		return nullptr;
 	}
 
-	// Attach to the owning connection so the ribbon inherits its fog-of-war reveal corridor and lifecycle.
-	if (AConnection* OwningConnection = Edge.OwningConnection.Get())
-	{
-		Ribbon->AttachToActor(OwningConnection, FAttachmentTransformRules::KeepWorldTransform);
-	}
-
-	Ribbon->BuildRibbon(WorldPath, BuildStyleForEdge(Edge));
+	// Every ribbon, road or dim copy, is destroyed with the others in ClearRibbons.
 	M_Ribbons.Add(Ribbon);
+	return Ribbon;
 }
 
 void AWorldConnectionSplineRenderer::ClearRibbons()
@@ -490,6 +679,7 @@ void AWorldConnectionSplineRenderer::ClearRibbons()
 	}
 
 	M_Ribbons.Reset();
+	M_FogRoadRibbons.Reset();
 }
 
 FWorldConnectionRibbonStyle AWorldConnectionSplineRenderer::BuildStyleForEdge(const FRibbonEdge& Edge) const

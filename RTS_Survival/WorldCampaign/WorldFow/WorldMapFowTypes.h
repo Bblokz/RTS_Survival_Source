@@ -14,6 +14,27 @@ enum class EWorldMapFowState : uint8
 	POIVisible UMETA(DisplayName = "POI Visible")
 };
 
+/** How a mission the fog fully hides is hinted at (UWorldFogHintSettings). */
+UENUM(BlueprintType)
+enum class EWorldUnknownMissionLook : uint8
+{
+	/** A plain grey puck above the fog; nothing of the piece shows. */
+	PlainMarker UMETA(DisplayName = "Plain Marker"),
+	/** A small opening in the fog cloud shows the real piece at its place on the map. */
+	RealPiece UMETA(DisplayName = "Real Piece")
+};
+
+/** What a mission looks like for one fog pass; decided by WorldFogHintRules, applied by the fog manager. */
+enum class EWorldMissionFogPresentation : uint8
+{
+	/** The piece as its fog state alone leaves it: seen where the fog is open, covered where it is closed. */
+	AsFogState,
+	/** Unidentified: the piece is hidden and the plain marker stands above the fog. */
+	PlainMarker,
+	/** Unidentified: the piece is seen through an opening in the fog that changes nothing else. */
+	RealPieceThroughFog
+};
+
 USTRUCT(BlueprintType)
 struct FWorldMapFowStateSettings
 {

@@ -82,9 +82,48 @@ void AWorldConnectionRibbon::BuildRibbon(const TArray<FVector>& WorldPathPoints,
 		SplineMesh->SetCastShadow(Style.bCastShadow);
 		SplineMesh->bCastDynamicShadow = Style.bCastShadow;
 		SplineMesh->SetReceivesDecals(Style.bAllowDecals);
+		SplineMesh->SetTranslucentSortPriority(Style.TranslucencySortPriority);
 		FRTS_CollisionSetup::SetupSplineNoCollision(SplineMesh);
 
 		M_SplineMeshes.Add(SplineMesh);
+	}
+}
+
+FVector AWorldConnectionRibbon::GetSegmentMidpoint(const int32 SegmentIndex) const
+{
+	if (not IsValid(M_Spline) || SegmentIndex < 0 || SegmentIndex + 1 >= M_Spline->GetNumberOfSplinePoints())
+	{
+		return GetActorLocation();
+	}
+
+	constexpr float HalfValue = 0.5f;
+	const FVector SegmentStart = M_Spline->GetLocationAtSplinePoint(SegmentIndex, ESplineCoordinateSpace::World);
+	const FVector SegmentEnd = M_Spline->GetLocationAtSplinePoint(SegmentIndex + 1, ESplineCoordinateSpace::World);
+	return (SegmentStart + SegmentEnd) * HalfValue;
+}
+
+void AWorldConnectionRibbon::SetIsSegmentShown(const int32 SegmentIndex, const bool bIsShown)
+{
+	if (not M_SplineMeshes.IsValidIndex(SegmentIndex) || not IsValid(M_SplineMeshes[SegmentIndex]))
+	{
+		return;
+	}
+
+	USplineMeshComponent* const SplineMesh = M_SplineMeshes[SegmentIndex];
+	if (SplineMesh->IsVisible() != bIsShown)
+	{
+		SplineMesh->SetVisibility(bIsShown);
+	}
+}
+
+void AWorldConnectionRibbon::SetTranslucencySortPriority(const int32 NewSortPriority)
+{
+	for (const TObjectPtr<USplineMeshComponent>& SplineMesh : M_SplineMeshes)
+	{
+		if (IsValid(SplineMesh))
+		{
+			SplineMesh->SetTranslucentSortPriority(NewSortPriority);
+		}
 	}
 }
 
