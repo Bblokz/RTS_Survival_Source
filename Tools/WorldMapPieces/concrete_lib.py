@@ -138,8 +138,14 @@ def _binary(material, node_class, a, b, x, y, a_output="", b_output=""):
 
 
 def ensure_concrete_material():
-    """Builds M_WorldPiece_Concrete from scratch on every run, so this file is the source of the graph."""
-    material, _is_new = lib._new_material("M_WorldPiece_Concrete")
+    """Builds M_WorldPiece_Concrete once. An existing material is kept as it is, unless the environment variable
+    WORLDPIECES_REBUILD_CONCRETE is 1: clearing the old graph crashed the editor once (assertion !IsRooted in
+    DeleteAllMaterialExpressions), so only do that on purpose, after a change to the graph in this file."""
+    import os
+    material, is_new = lib._new_material("M_WorldPiece_Concrete")
+    if not is_new and os.environ.get("WORLDPIECES_REBUILD_CONCRETE", "") != "1":
+        lib.log("concrete material kept as it is")
+        return material
     # One call leaves about half of the nodes behind (it removes from the list it walks), so repeat until empty.
     for _attempt in range(12):
         if library.get_num_material_expressions(material) == 0:

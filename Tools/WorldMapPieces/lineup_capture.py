@@ -39,6 +39,40 @@ VARIANT_MESHES = [
     (STORY + "OreMountains/SM_WorldPiece_OreMountains", (1.0, 1.0, 1.0), (3,), "Model"),
     (GAME + "Environment/Berlin/FlakTower/SM_BF_FlakTower_Damaged", (0.0152, 0.0152, 0.019), (0,), "Tower"),
 ]
+# WORLDPIECES_LIGHTTEST=1: each of the five pieces gets a test spot light of another strength (candelas) that only
+# lights the piece (lighting channel 1), to pick the strength of the light in the piece Blueprints.
+LIGHT_TEST = os.environ.get("WORLDPIECES_LIGHTTEST", "") == "1"
+# Four light rigs on four copies of two pieces (Ore Mountains row, Berlin row). The light of the Blueprint is hidden.
+# key / rim: (offset from the pivot, candelas, colour); the map camera is at -X, +Y is to its right.
+WARM, COOL, WHITE = (1.0, 0.90, 0.76), (0.55, 0.72, 1.0), (1.0, 1.0, 1.0)
+KEY_AT, FILL_AT, RIM_AT = (-200.0, -260.0, 380.0), (-250.0, 0.0, 420.0), (230.0, 200.0, 260.0)
+# Each rig: list of (offset, candelas, colour, specular scale, casts shadows).
+LIGHT_RIGS = [
+    [(KEY_AT, 250.0, WARM, 0.15, True), (FILL_AT, 60.0, WHITE, 0.0, False)],
+    [(KEY_AT, 400.0, WARM, 0.15, True), (FILL_AT, 60.0, WHITE, 0.0, False)],
+    [(KEY_AT, 400.0, WARM, 0.15, True), (FILL_AT, 120.0, WHITE, 0.0, False)],
+    [(KEY_AT, 600.0, WARM, 0.15, True), (FILL_AT, 80.0, WHITE, 0.0, False), (RIM_AT, 100.0, COOL, 0.3, False)],
+]
+if LIGHT_TEST:
+    PIECES = [STORY + "OreMountains/BP_Mission_OreMountains"] * 4 + [STORY + "Berlin/BP_Mission_Berlin"] * 4
+# WORLDPIECES_ENEMY=1: the eight enemy prototypes on Soviet ground (red hatching), four to a row, and in a third row a
+# mission piece for size and the item of WORLDPIECES_MARKING_ITEM on the three plinth versions A, B and C.
+SHOW_ENEMY = os.environ.get("WORLDPIECES_ENEMY", "") == "1"
+ENEMY = "/Game/RTS_Survival/WorldCampaign/MapObjects/Enemy/Prototypes/"
+ENEMY_ITEMS = ["HQ", "Wall", "Factory", "Airfield", "Barracks", "SupplyDepot", "ResearchFacility",
+               "FortifiedCheckpoint"]
+MARKING_ITEM = os.environ.get("WORLDPIECES_MARKING_ITEM", "") or "Factory"
+if SHOW_ENEMY:
+    PIECES = [ENEMY + "%s/BP_EnemyProto_%s" % (item, item) for item in ENEMY_ITEMS]
+    PIECES += [STORY + "FrozenLake/BP_Mission_FrozenLake"]
+    PIECES += [ENEMY + "%s/BP_EnemyProto_%s" % (MARKING_ITEM, MARKING_ITEM)] * 3
+    if not ON_TEST_MAP:
+        ORIGIN = unreal.Vector(1900.0, -7500.0, 0.0)
+# WORLDPIECES_TANKS=1: the eight division tank pieces (front row) and their wrecks (back row) at 1/12 size, under
+# the neutral light. Pictures: tanks_*.png
+SHOW_TANKS = os.environ.get("WORLDPIECES_TANKS", "") == "1"
+TANK_FOLDER = "/Game/RTS_Survival/WorldCampaign/Divisions/TankPieces/"
+TANK_NAMES = ["T26", "BT7", "T34_76", "T34_85", "IS1", "IS2", "IS3", "KV1"]
 SPACING = 300.0
 MAP_PITCH = -70.0
 
@@ -67,6 +101,20 @@ class Lineup:
         if hit is not None:
             ground = hit.to_tuple()[4].z
         self.log("ground z %.1f" % ground)
+        if SHOW_TANKS:
+            self.shots = []
+            for row, stem in enumerate(("SM_DivisionTank_", "SM_DivisionTankWreck_")):
+                for column, name in enumerate(TANK_NAMES):
+                    location = engine.Vector(row * 160.0, (column - 3.5) * 110.0, ground + 1.0)
+                    actor = actors.spawn_actor_from_class(engine.StaticMeshActor, location,
+                                                          engine.Rotator(pitch=0.0, yaw=180.0, roll=0.0))
+                    actor.static_mesh_component.set_static_mesh(engine.load_asset(TANK_FOLDER + stem + name))
+                    actor.set_actor_scale3d(engine.Vector(0.083, 0.083, 0.083))
+            centre = engine.Vector(80.0, 0.0, ground + 10.0)
+            self.shots.append(("tanks_map", self.camera(centre, MAP_PITCH, 0.0, 900.0), 55.0))
+            self.shots.append(("tanks_low", self.camera(centre, -30.0, 0.0, 900.0), 55.0))
+            self.spawn_neutral_light(actors, ground)
+            return
         if SHOW_VARIANTS:
             self.spawn_variants(actors, ground)
             self.spawn_neutral_light(actors, ground)
@@ -75,10 +123,46 @@ class Lineup:
         for index, path in enumerate(PIECES):
             column, row = index % 3, index // 3
             location = engine.Vector(ORIGIN.x + column * SPACING, ORIGIN.y + row * SPACING, ground + 1.0)
+            if LIGHT_TEST or SHOW_ENEMY:
+                location = engine.Vector(ORIGIN.x + (index // 4) * SPACING * 1.4, ORIGIN.y + (index % 4) * SPACING,
+                                         ground + 1.0)
+            if not engine.EditorAssetLibrary.does_asset_exist(path):
+                self.log("missing %s" % path)
+                self.centres.append(location)
+                continue
             piece_class = engine.load_object(None, path + "." + path.split("/")[-1] + "_C")
             actor = actors.spawn_actor_from_class(piece_class, location)
             self.log("spawned %s: %s" % (path.split("/")[-1], actor is not None))
             self.centres.append(location)
+            if SHOW_ENEMY and index >= 9 and actor is not None:
+                letter = "ABC"[index - 9]
+                base = engine.load_asset(ENEMY + "Base/SM_WorldPiece_EnemyBase_" + letter)
+                for component in actor.get_components_by_class(engine.StaticMeshComponent):
+                    if component.get_name().startswith("PieceBase"):
+                        component.set_static_mesh(base)
+                        for slot, material in enumerate(base.static_materials):
+                            component.set_material(slot, material.material_interface)
+                        component.set_lighting_channels(True, True, False)
+                self.log("marking %s on %s" % (letter, MARKING_ITEM))
+            if LIGHT_TEST and actor is not None:
+                for component in actor.get_components_by_class(engine.SpotLightComponent):
+                    component.set_visibility(False)
+                for offset, candelas, colour, specular, shadows in LIGHT_RIGS[index % 4]:
+                    spot_location = engine.Vector(location.x + offset[0], location.y + offset[1],
+                                                  location.z + offset[2])
+                    aim = engine.MathLibrary.find_look_at_rotation(
+                        spot_location, engine.Vector(location.x, location.y, location.z + 40.0))
+                    light = actors.spawn_actor_from_class(engine.SpotLight, spot_location, aim).light_component
+                    light.set_mobility(engine.ComponentMobility.MOVABLE)
+                    light.set_editor_property("intensity_units", engine.LightUnits.CANDELAS)
+                    light.set_intensity(candelas)
+                    light.set_light_color(engine.LinearColor(colour[0], colour[1], colour[2], 1.0))
+                    light.set_outer_cone_angle(24.0)
+                    light.set_inner_cone_angle(14.0)
+                    light.set_attenuation_radius(900.0)
+                    light.set_cast_shadows(shadows)
+                    light.set_specular_scale(specular)
+                    light.set_lighting_channels(False, True, False)
         middle = engine.Vector(ORIGIN.x + SPACING, ORIGIN.y + SPACING * 0.5, ground)
         # The map camera looks along +X at 70 degrees down; a close shot, a map-distance shot and a low side shot.
         self.shots = [
@@ -87,6 +171,23 @@ class Lineup:
             ("lineup_side", self.camera(middle, -25.0, 0.0, 1300.0), 35.0),
             ("lineup_back", self.camera(middle, -35.0, 180.0, 1500.0), 35.0),
         ]
+        if SHOW_ENEMY:
+            self.shots = []
+            for row in range(3):
+                centre = engine.Vector(ORIGIN.x + row * SPACING * 1.4, ORIGIN.y + SPACING * 1.5, ground + 30.0)
+                self.shots.append(("enemy_row%d" % row, self.camera(centre, MAP_PITCH, 0.0, 1500.0), 44.0))
+                self.shots.append(("enemy_low_row%d" % row, self.camera(centre, -35.0, 0.0, 1500.0), 44.0))
+            overall = engine.Vector(ORIGIN.x + SPACING * 1.4, ORIGIN.y + SPACING * 1.5, ground)
+            self.shots.append(("enemy_mapsize", self.camera(overall, MAP_PITCH, 0.0, 3000.0), 50.0))
+            if ON_TEST_MAP:
+                self.spawn_neutral_light(actors, ground)
+            return
+        if LIGHT_TEST:
+            for row in range(2):
+                centre = engine.Vector(ORIGIN.x + row * SPACING * 1.4, ORIGIN.y + SPACING * 1.5, ground + 30.0)
+                self.shots = self.shots if row else []
+                self.shots.append(("lighttest_row%d" % row, self.camera(centre, MAP_PITCH, 0.0, 1500.0), 44.0))
+            return
         for index in range(1, 6):
             self.shots.append(("piece_%d" % index, self.camera(self.centres[index], -45.0, 0.0, 620.0), 30.0))
         if ON_TEST_MAP:

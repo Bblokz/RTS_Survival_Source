@@ -19,6 +19,17 @@ MISSION_PARENT_CLASS_PATH = ("/Game/RTS_Survival/WorldCampaign/MapObjects/Missio
                              "BP_MissionWorldObject.BP_MissionWorldObject_C")
 PIECE_COMPONENT_PREFIX = "Piece"
 FRONT_TO_CAMERA_YAW = 90.0
+# The campaign level lights its pieces dim and from behind. Each story piece carries its own two spot lights. They are
+# on lighting channel 1 only, and only the piece's own meshes are on that channel, so the map and the other pieces are
+# not lit by them. A first try (one white light of 250 cd from the camera's side) was flat and washed the colours out.
+# Now: a warm key from the front left that casts shadows, and a weak fill from the camera's side without highlights.
+# Picked from four strengths in one picture (lineup_capture.py, WORLDPIECES_LIGHTTEST=1).
+# (component name, offset from the pivot, candelas, colour, specular scale, casts shadows); the camera is at -X.
+PIECE_LIGHTS = [
+    ("Light", (-200.0, -260.0, 380.0), 400.0, (1.0, 0.90, 0.76), 0.15, True),
+    ("FillLight", (-250.0, 0.0, 420.0), 60.0, (1.0, 1.0, 1.0), 0.0, False),
+]
+PIECE_LIGHT_AIM_HEIGHT = 40.0
 OUT_DIR = os.path.join(unreal.Paths.project_saved_dir(), "WorldMapPieces")
 
 LINES = []
@@ -370,9 +381,10 @@ def read_instanced_layout(blueprint_path):
     return layout
 
 
-def build_mission_blueprint(folder, name, components, ui_texts=None):
+def build_mission_blueprint(folder, name, components, ui_texts=None, parent_class_path=None):
     """
-    Creates (or updates) a child of BP_MissionWorldObject whose look is a set of mesh components.
+    Creates (or updates) a child of BP_MissionWorldObject (or of parent_class_path) whose look is a set of mesh
+    components.
 
     components: list of dicts: name, kind (mesh by default, scene, instanced), mesh (asset), location (x,y,z),
     rotation (pitch,yaw,roll), scale (float or (x,y,z)), optional parent (name of an earlier component), materials
@@ -383,7 +395,8 @@ def build_mission_blueprint(folder, name, components, ui_texts=None):
         blueprint = unreal.load_asset(path)
     else:
         factory = unreal.BlueprintFactory()
-        factory.set_editor_property("parent_class", unreal.load_object(None, MISSION_PARENT_CLASS_PATH))
+        factory.set_editor_property("parent_class", unreal.load_object(
+            None, parent_class_path or MISSION_PARENT_CLASS_PATH))
         blueprint = asset_tools.create_asset(name, folder, unreal.Blueprint, factory)
 
     subsystem = unreal.get_engine_subsystem(unreal.SubobjectDataSubsystem)
@@ -401,11 +414,19 @@ def build_mission_blueprint(folder, name, components, ui_texts=None):
             scene_root_handle = handle
 
     classes = {"mesh": unreal.StaticMeshComponent, "scene": unreal.SceneComponent,
-               "instanced": unreal.InstancedStaticMeshComponent}
+               "instanced": unreal.InstancedStaticMeshComponent, "spot": unreal.SpotLightComponent}
     handle_by_name = {}
     # The models have their front on +Y; the map camera looks along +X, so the front must face -X.
     components = [{"name": "Root", "kind": "scene", "rotation": (0.0, FRONT_TO_CAMERA_YAW, 0.0)}] + [
         dict(spec, parent=spec.get("parent", "Root")) for spec in components]
+    # No parent name: the lights hang on the scene root, so the yaw of PieceRoot does not turn them.
+    for light_name, offset, candelas, colour, specular, shadows in PIECE_LIGHTS:
+        to_aim = (-offset[0], -offset[1], PIECE_LIGHT_AIM_HEIGHT - offset[2])
+        pitch = math.degrees(math.atan2(to_aim[2], math.hypot(to_aim[0], to_aim[1])))
+        yaw = math.degrees(math.atan2(to_aim[1], to_aim[0]))
+        components.append({"name": light_name, "kind": "spot", "parent": None, "location": offset,
+                           "rotation": (pitch, yaw, 0.0), "candelas": candelas, "colour": colour,
+                           "specular": specular, "shadows": shadows})
     for spec in components:
         kind = spec.get("kind", "mesh")
         parent_handle = handle_by_name.get(spec.get("parent"), scene_root_handle or root_handle)
@@ -429,6 +450,24 @@ def build_mission_blueprint(folder, name, components, ui_texts=None):
         component.set_editor_property("relative_scale3d", unreal.Vector(*scale))
         if kind == "scene":
             continue
+        if kind == "spot":
+            component.set_editor_property("mobility", unreal.ComponentMobility.MOVABLE)
+            component.set_editor_property("intensity_units", unreal.LightUnits.CANDELAS)
+            component.set_editor_property("intensity", spec["candelas"])
+            # The colours above are linear; the property is an sRGB byte colour.
+            component.set_editor_property("light_color", unreal.Color(
+                r=int(round(spec["colour"][0] ** (1.0 / 2.2) * 255)), g=int(round(spec["colour"][1] ** (1.0 / 2.2) * 255)),
+                b=int(round(spec["colour"][2] ** (1.0 / 2.2) * 255)), a=255))
+            component.set_editor_property("specular_scale", spec["specular"])
+            component.set_editor_property("outer_cone_angle", 24.0)
+            component.set_editor_property("inner_cone_angle", 14.0)
+            component.set_editor_property("attenuation_radius", 900.0)
+            component.set_editor_property("cast_shadows", spec["shadows"])
+            component.set_editor_property("lighting_channels", unreal.LightingChannels(
+                channel0=False, channel1=True, channel2=False))
+            continue
+        component.set_editor_property("lighting_channels", unreal.LightingChannels(
+            channel0=True, channel1=True, channel2=False))
         component.set_static_mesh(spec["mesh"])
         component.set_collision_profile_name("BlockAllDynamic" if spec.get("collision", True) else "NoCollision")
         for slot_index, material in (spec.get("materials") or {}).items():

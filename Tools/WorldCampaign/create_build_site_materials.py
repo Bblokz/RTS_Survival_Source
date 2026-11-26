@@ -16,7 +16,7 @@ NAME = 'M_BuildSiteHexPlate'
 MEL = unreal.MaterialEditingLibrary
 
 # UV space: the plane is twice as wide as the plate, so the open state's glow has room.
-# State: 0 locked, 1 open, 2 built. Sign: 0 lock, 1 plus, 2 watch post, 3 supply depot, 4 airfield, 5 battery.
+# State: 0 locked, 1 open, 2 built. Sign: 0 lock, 1 plus, 2 watch post, 3 supply depot, 4 airfield, 5 battery, 6 none (a model stands there).
 PLATE_CODE = '''
 struct FPlateShapes
 {
@@ -50,6 +50,11 @@ struct FPlateShapes
     }
     float Sign(float2 Point, float SignIndex)
     {
+        if (SignIndex > 5.5)
+        {
+            // No sign: the building's model stands on the plate.
+            return 10.0;
+        }
         if (SignIndex < 0.5)
         {
             // Lock: body and shackle.

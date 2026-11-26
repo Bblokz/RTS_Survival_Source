@@ -258,8 +258,10 @@ def main():
 
 
 os.makedirs(lib.OUT_DIR, exist_ok=True)
-try:
-    main()
-except Exception:
-    lib.log(traceback.format_exc())
-lib.write_log("build.txt")
+# build_enemy.py imports this file for its helpers and sets WORLDPIECES_IMPORT_ONLY, so the pieces are not rebuilt.
+if os.environ.get("WORLDPIECES_IMPORT_ONLY", "") != "1":
+    try:
+        main()
+    except Exception:
+        lib.log(traceback.format_exc())
+    lib.write_log("build.txt")
