@@ -1100,3 +1100,42 @@ def step_tunnel_mouths():
         actors_sub().destroy_actor(holder)
     log("tunnel mouths placed %s, portal instances removed: %s" % (placed, holder is not None))
     return placed
+
+
+# ---- M05 bonus "Destroy the radio truck" (Hard+, OderWartheMissionFlow.md section 15): ADecoyRadioTruck drives the
+# ZIL radio truck and a BA-12 from behind Werk 2 over the Lubow dam past Werk 4 (30 s at each) to a hidden spot near
+# the Hochwald ford, where it parks and transmits decoy bearings. The spot is at least 13 degrees off every Werk as seen
+# from every station, so the decoy wedges never single out a bunker group (search: 2026-11-26).
+DECOY_TRUCK_LABEL = PREFIX + "DecoyRadioTruck"
+DECOY_ROUTE_M = [((-40.0, 150.0), 30.0), ((15.0, 198.0), 0.0), ((65.0, 265.0), 0.0), ((175.0, 278.0), 0.0),
+                 ((210.0, 220.0), 0.0), ((200.0, 100.0), 30.0), ((215.0, 55.0), 0.0), ((225.0, 5.0), 0.0)]
+DECOY_Z_LIFT_CM = 50.0
+
+
+def step_decoy_truck():
+    require_map()
+    actors = by_label()
+    manager = actors.get(DF_MANAGER_LABEL)
+    if manager is None:
+        raise RuntimeError("missing %s (run step_direction_finding first)" % DF_MANAGER_LABEL)
+    (sx, sy), _ = DECOY_ROUTE_M[0]
+    origin = unreal.Vector(sx * 100.0, sy * 100.0, ground_z(sx * 100.0, sy * 100.0) + DECOY_Z_LIFT_CM)
+    actor = actors.get(DECOY_TRUCK_LABEL)
+    if actor is None:
+        cls = unreal.load_class(None, "/Script/RTS_Survival.DecoyRadioTruck")
+        actor = actors_sub().spawn_actor_from_class(cls, origin, unreal.Rotator(0.0, 0.0, 0.0))
+        actor.set_actor_label(DECOY_TRUCK_LABEL)
+        actor.set_folder_path(FOLDER + "Mission")
+    actor.set_actor_location(origin, False, False)
+    route = []
+    for (mx, my), wait in DECOY_ROUTE_M:
+        x, y = mx * 100.0, my * 100.0
+        point = unreal.DecoyTruckRoutePoint()
+        point.set_editor_property("location", unreal.Vector(x - origin.x, y - origin.y,
+                                                            ground_z(x, y) + DECOY_Z_LIFT_CM - origin.z))
+        point.set_editor_property("wait_seconds", wait)
+        route.append(point)
+    actor.set_editor_property("route", route)
+    actor.set_editor_property("direction_finding", manager)
+    log("decoy truck: %d route points on %s" % (len(route), actor.get_actor_label()))
+    return actor

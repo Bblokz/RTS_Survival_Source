@@ -151,8 +151,12 @@ LATER_STAGES = [
      'Hold all five at once: the command post has nowhere left to hide.'),
     ('Mission_OW_BonusTunnelMouth', 'Mission_OW_FirstAttack', 'Collapse a tunnel mouth',
      'Only heavy guns bring one down. That bunker sends no more columns.'),
+    ('Mission_OW_BonusRadioTruck', 'Mission_OW_FirstAttack', 'Destroy the radio truck',
+     'It sends false bearings from behind their line. Find it and burn it.'),
 ]
-BONUS_STAGES = ('Mission_OW_BonusAllPosts', 'Mission_OW_BonusTunnelMouth')
+BONUS_STAGES = ('Mission_OW_BonusAllPosts', 'Mission_OW_BonusTunnelMouth', 'Mission_OW_BonusRadioTruck')
+# Stages whose trigger only fires from this difficulty up (the radio truck exists on Hard and above).
+STAGE_MINIMUM_DIFFICULTY = {'Mission_OW_BonusRadioTruck': 'HARD'}
 
 
 def stage_class(name):
@@ -183,6 +187,12 @@ def wire_later_stages():
             trigger.set_editor_property('mission_class_to_watch', after_cls)
             mission.set_editor_property('mission_trigger', trigger)
             changes.append('%s after %s' % (name, after))
+        # unreal.RTSGameDifficulty is the struct of that name (it shadows the enum): take the enum from the property.
+        difficulty_enum = type(trigger.get_editor_property('minimum_difficulty'))
+        minimum = getattr(difficulty_enum, STAGE_MINIMUM_DIFFICULTY.get(name, 'NEW_TO_RTS'))
+        if trigger.get_editor_property('minimum_difficulty') != minimum:
+            trigger.set_editor_property('minimum_difficulty', minimum)
+            changes.append('%s from %s' % (name, minimum))
         state = mission.get_editor_property('mission_widget_state')
         state.set_editor_property('mission_title', title)
         state.set_editor_property('mission_description', description)

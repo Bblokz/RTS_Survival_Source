@@ -15,9 +15,9 @@
   },
   "BTX_GerHQHarvester": {
     "name": "Harvester Hub",
-    "tooltip": "Economy research",
-    "description": "A research platform on the HQ. Unlocks <Text_Accent>economy research</>: harvester capacity and speed, scavenging speed and reward, stronger repairs and Barricades.",
-    "facts": "Ger_Bxp_HQHarvesterHub BP has ResearchTechnologyAbility comps for Tech_HarvesterCapacity (+50 R / +25 M per Pz I harvester), Tech_HarvesterSpeed (2x harvest anim rate), Tech_ScavengingSpeed (x1.25), Tech_ScavengingReward (x1.2), Tech_RepairUpgrade (repair x1.33), Tech_Barricades (building health x1.2) - see TechTree/Technologies/GerTechnologies/*/TE_*.cpp. No energy; cost 300 R / 150 M (Source/RTS_Survival/Game/GameState/BxpDataHelpers/BxpDataHelpers.h:410-428).",
+    "tooltip": "HQ platform",
+    "description": "A platform on the HQ. Economy upgrades (harvester capacity and speed, scavenging, repairs, Barricades) are researched on the <Text_Accent>campaign tech tree</> now.",
+    "facts": "No research comps since 2026-11-26 (were Tech_HarvesterCapacity, Tech_HarvesterSpeed, Tech_ScavengingSpeed, Tech_ScavengingReward, Tech_RepairUpgrade, Tech_Barricades; now campaign tech tree). No other function, no energy; cost 300 R / 150 M (Source/RTS_Survival/Game/GameState/BxpDataHelpers/BxpDataHelpers.h).",
     "offered_by": "both doctrines: HQ (Economic) Source/RTS_Survival/Game/GameState/CPPGameState.cpp:9593"
   },
   "BTX_GerHQRepairBay": {
@@ -57,16 +57,16 @@
   },
   "BTX_GerBarracksRadixReactor": {
     "name": "Radix Reactor",
-    "tooltip": "Infantry research",
-    "description": "A radixite reactor for the barracks: <Text_Accent>+8 energy</>. Unlocks Light Bringers (with a Communication Center) and infantry kit, ghillie suit and entrenching research.",
-    "facts": "EnergySupply 8 (Source/RTS_Survival/Game/GameState/BxpDataHelpers/BxpDataHelpers.h:354). Light Bringers need Comm Center + this BXP (Source/RTS_Survival/GameUI/TrainingUI/TrainingMenuManager.cpp:2780-2799). BP research comps: Tech_Infantry_Kit (line infantry health x1.15), Tech_Sniper_Ghillie (sniper/Gebirgsjager health x1.33), Tech_Pioneer_Entrenching (field defence build speed x1.35). Light Bringers are in both doctrine barracks layouts.",
+    "tooltip": "Barracks energy",
+    "description": "A radixite reactor for the barracks: <Text_Accent>+8 energy</>. Unlocks Light Bringers (with a Communication Center).",
+    "facts": "EnergySupply 8 (Source/RTS_Survival/Game/GameState/BxpDataHelpers/BxpDataHelpers.h:354). Light Bringers need Comm Center + this BXP (Source/RTS_Survival/GameUI/TrainingUI/TrainingMenuManager.cpp:2780-2799). Light Bringers are in both doctrine barracks layouts. BXP research comps removed 2026-11-26 (techs live on the campaign tech tree; Tools/TechSetup/remove_bxp_research.py).",
     "offered_by": "both doctrines: Barracks (Tech) Source/RTS_Survival/Game/GameState/CPPGameState.cpp:9769"
   },
   "BTX_GerBarrackFuelCell": {
     "name": "Fuel Cell",
-    "tooltip": "Support research",
-    "description": "A fuel cell bank for the barracks: <Text_Accent>+5 energy</>. Unlocks the Sniper Team (with a Communication Center) and the Flak 88 Ground Role research.",
-    "facts": "EnergySupply 5 (Source/RTS_Survival/Game/GameState/BxpDataHelpers/BxpDataHelpers.h:372). Sniper Team and Feuer Sturm need Comm Center + this BXP (Source/RTS_Survival/GameUI/TrainingUI/TrainingMenuManager.cpp:2639-2707); Feuer Sturm left out of the text because only the Breakthrough barracks layout lists it (Source/RTS_Survival/GameUI/TrainingUI/TrainingLayout/TrainingLayoutDataAsset.cpp:414). BP research comp: Tech_Flak88_GroundRole (ground-fire mode for the 8.8 cm Flak team weapon).",
+    "tooltip": "Sniper Team unlock",
+    "description": "A fuel cell bank for the barracks: <Text_Accent>+5 energy</>. Unlocks the Sniper Team (with a Communication Center).",
+    "facts": "EnergySupply 5 (Source/RTS_Survival/Game/GameState/BxpDataHelpers/BxpDataHelpers.h:372). Sniper Team and Feuer Sturm need Comm Center + this BXP (Source/RTS_Survival/GameUI/TrainingUI/TrainingMenuManager.cpp:2639-2707); Feuer Sturm left out of the text because only the Breakthrough barracks layout lists it (Source/RTS_Survival/GameUI/TrainingUI/TrainingLayout/TrainingLayoutDataAsset.cpp:414). BXP research comps removed 2026-11-26 (techs live on the campaign tech tree; Tools/TechSetup/remove_bxp_research.py).",
     "offered_by": "both doctrines: Barracks (Tech) Source/RTS_Survival/Game/GameState/CPPGameState.cpp:9768"
   },
   "BTX_GerBarracksSniperLoft": {
@@ -78,16 +78,16 @@
   },
   "BTX_GerLFactoryRadixiteReactor": {
     "name": "Forge Reactor",
-    "tooltip": "Vehicle research",
-    "description": "A radixite reactor for the forge: <Text_Accent>+10 energy</>. Unlocks vehicle research: autocannon damage, auto loaders, spall liners, rangefinders, tungsten 8.8 cm shells, shell hoists.",
-    "facts": "EnergySupply 10 (Source/RTS_Survival/Game/GameState/BxpDataHelpers/BxpDataHelpers.h:618). BP research comps list Tech_AutoLoader, Tech_Spalliners (medium armour health x1.2), Tech_StereoRangefinder (casemate TD range/accuracy), Tech_Tungsten88 (long 8.8 pen), Tech_Assault_ShellHoist (heavy assault gun reload -30%) and Tech_AutoCannonDamage (TEBP_Ger_AutoCannonDamage: autocannon damage +33%). Components: AutoCannonTech, SpallLinersTech, RangefinderTungstenTech, ShellHoistTech (Docs/Abilities/GermanTechBatch2.md, Tools/TechSetup/setup_tech_batch2.py RESEARCH_HOSTS). VisionRadius = 100 (line 607).",
+    "tooltip": "Forge energy",
+    "description": "A radixite reactor for the forge: <Text_Accent>+10 energy</>.",
+    "facts": "EnergySupply 10 (Source/RTS_Survival/Game/GameState/BxpDataHelpers/BxpDataHelpers.h:618). VisionRadius = 100 (line 607). BXP research comps removed 2026-11-26 (techs live on the campaign tech tree; Tools/TechSetup/remove_bxp_research.py).",
     "offered_by": "both doctrines: Forge (Economic) Source/RTS_Survival/Game/GameState/CPPGameState.cpp:9863"
   },
   "BTX_GerLFactoryFuelStorage": {
     "name": "Fuel Storage",
-    "tooltip": "Flame and half-track research",
-    "description": "Fuel tanks for the forge: <Text_Accent>+5 energy</>. Unlocks flame weapon research and Armoured Troop Bay: half-tracks get +20% hull armour and their passengers bail out.",
-    "facts": "EnergySupply 5 (Source/RTS_Survival/Game/GameState/BxpDataHelpers/BxpDataHelpers.h:637). BP research comps list Tech_HalfTrack_ArmoredBay (TE_ArmoredTroopBay: hull armour x1.2, passengers bail out at 50% health) plus components FlameRadixiteDmg (Tech_FlameDamage; TE_FlameDamage C++ recolours flame VFX, no damage change found in C++) and FlameRangeOrRailReload (Tech_FlameRange; no C++ effect class or TEBP found). VisionRadius = 100 (line 626).",
+    "tooltip": "Forge energy",
+    "description": "Fuel tanks for the forge: <Text_Accent>+5 energy</>.",
+    "facts": "EnergySupply 5 (Source/RTS_Survival/Game/GameState/BxpDataHelpers/BxpDataHelpers.h:637). VisionRadius = 100 (line 626). BXP research comps removed 2026-11-26 (techs live on the campaign tech tree; Tools/TechSetup/remove_bxp_research.py).",
     "offered_by": "both doctrines: Forge (Economic) Source/RTS_Survival/Game/GameState/CPPGameState.cpp:9864"
   },
   "BTX_GerForgeSchreckFrame": {

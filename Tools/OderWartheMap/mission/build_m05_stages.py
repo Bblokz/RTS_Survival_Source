@@ -6,7 +6,9 @@ Mission_OW_BonusAllPosts (bonus "Take all five listening posts"): intro A13; com
 (the hunt then fixes the command post on its own).
 Mission_OW_BonusTunnelMouth (bonus "Collapse a tunnel mouth"): intro A14; completes when the director reports a collapsed
 tunnel mouth (that Werk then sends no more waves).
-All three start when M04 completes (ow_arrival_editor.wire_later_stages). The radio-truck bonus (A15 recorded) is later.
+Mission_OW_BonusRadioTruck (bonus "Destroy the radio truck", Hard+ via the trigger's MinimumDifficulty): intro A15;
+completes when ADecoyRadioTruck reports its truck destroyed.
+All four start when M04 completes (ow_arrival_editor.wire_later_stages).
 
 Usage: python build_m05_stages.py <uecp port> [StageName ...]
 """
@@ -200,7 +202,60 @@ def bonus_tunnel_graph():
     return g
 
 
-STAGES = ((M05, m05_graph), (BONUS_POSTS, bonus_posts_graph), (BONUS_TUNNEL, bonus_tunnel_graph))
+FIND_TRUCK = {
+    'function': 'FindRadioTruck',
+    'outputs': [{'name': 'bFound', 'type': 'bool'}],
+    'body': [
+        {'op': 'call', 'func': 'DecoyRadioTruck.FindDecoyRadioTruck', 'args': {'WorldContextObject': m34.MANAGER},
+         'as': 'Found'},
+        {'op': 'set_var', 'var': 'RadioTruck', 'value': '$Found'},
+        {'op': 'is_valid', 'value': '$Found', 'then': [{'op': 'return', 'values': {'bFound': True}}]},
+        {'op': 'return', 'values': {'bFound': False}},
+    ],
+}
+
+IS_TRUCK_DESTROYED = {
+    'function': 'IsRadioTruckDestroyed',
+    'outputs': [{'name': 'bDestroyed', 'type': 'bool'}],
+    'body': [
+        {'op': 'call', 'func': 'DecoyRadioTruck.GetIsRadioTruckDestroyed', 'target': '$RadioTruck', 'as': 'bDead'},
+        {'op': 'return', 'values': {'bDestroyed': '$bDead'}},
+    ],
+}
+
+BONUS_TRUCK = {
+    'name': 'Mission_OW_BonusRadioTruck',
+    'variables': [{'variable_name': 'RadioTruck', 'variable_type': 'object:DecoyRadioTruck', 'category': 'OW|State'},
+                  intro_var('Advisor: a radio truck sends false bearings, find it and burn it (A15).')],
+    'defaults': {'IntroLine': line('OderWarthe_A15_RadioTruck')},
+    'functions': [FIND_TRUCK, IS_TRUCK_DESTROYED],
+}
+
+
+def bonus_truck_graph():
+    """Hard+ only: the trigger's MinimumDifficulty keeps the stage (and its plate) away below Hard."""
+    g = Graph()
+    intro_row(g, 'fn.Self.FindRadioTruck', [
+        ('bindDead', 'ev.DispatcherBind.DecoyRadioTruck.OnRadioTruckDestroyed', None),
+        ('deadNow', 'fn.Self.IsRadioTruckDestroyed', None), ('brDead', 'k2.Branch', None),
+        ('doneNow', 'fn.Self.HandleObjectiveDone', None)])
+    g.wire('deadNow.bDestroyed', 'brDead.Condition')
+    bind(g, 'bindDead', 'RadioTruck', 'OnRadioTruckDestroyed')
+    g.end_row()
+    g.row([custom_event('evDead', 'OnRadioTruckDestroyed', []), ('done', 'fn.Self.HandleObjectiveDone', None)])
+    g.end_row()
+    done_row(g)
+    g.comment('Bonus intro (A15), then wait for the decoy truck to die (it may already be dead)',
+              ['evStart', 'intro', 'getIntro', 'find', 'brFound', 'bindDead', 'bindDead_target', 'bindDead_mk',
+               'deadNow', 'brDead', 'doneNow'])
+    g.comment('The radio truck is destroyed: its false bearings are gone, bonus done', ['evDead', 'done'])
+    g.comment('Done once', ['evDone', 'once', 'complete'])
+    m34.apply_event_params(g)
+    return g
+
+
+STAGES = ((M05, m05_graph), (BONUS_POSTS, bonus_posts_graph), (BONUS_TUNNEL, bonus_tunnel_graph),
+          (BONUS_TRUCK, bonus_truck_graph))
 
 
 def main():
