@@ -343,6 +343,11 @@ def add_research_component(blueprint, component_name):
 
 
 def step_research():
+    # Retired 2026-11-26: technologies are researched on the campaign tech tree, so building expansions must not
+    # offer them in-mission (remove_bxp_research.py deleted these slots). Re-adding them would sell techs twice.
+    if "--force-bxp-research" not in sys.argv:
+        log("research step skipped: BXP tech research is retired (pass --force-bxp-research to override)")
+        return
     for host, slots in RESEARCH_HOSTS.items():
         blueprint = unreal.load_asset(f"{BXP_FOLDER}/{host}")
         for component_name, index, keys, costs in slots:
