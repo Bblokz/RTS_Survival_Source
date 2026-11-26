@@ -94,5 +94,16 @@ TArray<FSoftObjectPath> UGA_RadixiteNuke::GetAssetsToLoad() const
 	{
 		Assets.Add(Layer.Effect.ToSoftObjectPath());
 	}
+	for (const FRadixiteNukeDelayedSound& DelayedSound : M_NukeVisuals.AfterBlastSounds)
+	{
+		Assets.Add(DelayedSound.Sound.ToSoftObjectPath());
+	}
+	const FRadixiteNukeDebrisRainSettings& DebrisRain = M_NukeVisuals.DebrisRain;
+	for (const TSoftObjectPtr<UStaticMesh>& StoneMesh : DebrisRain.Meshes)
+	{
+		Assets.Add(StoneMesh.ToSoftObjectPath());
+	}
+	Assets.Add(DebrisRain.LandingEffect.ToSoftObjectPath());
+	Assets.Add(DebrisRain.LandingSound.ToSoftObjectPath());
 	return Assets;
 }

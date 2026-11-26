@@ -13,6 +13,7 @@ class UMaterialInterface;
 class UNiagaraComponent;
 class UNiagaraSystem;
 class UPointLightComponent;
+class UPostProcessComponent;
 class UProceduralMeshComponent;
 class USoundBase;
 class UStaticMesh;
@@ -183,6 +184,149 @@ struct FRadixiteNukeCrater
 	bool bRimCarriesVehicles = true;
 };
 
+/** @brief A sound heard by everyone some time after the blast. */
+USTRUCT(BlueprintType)
+struct FRadixiteNukeDelayedSound
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TSoftObjectPtr<USoundBase> Sound;
+
+	// Seconds after the blast.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0"))
+	float DelaySeconds = 0.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0"))
+	float VolumeMultiplier = 1.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0.1"))
+	float PitchMultiplier = 1.f;
+};
+
+/**
+ * @brief How the blast hits the player's screen: a short near-freeze of the game ("hit-stop") with a white flash and
+ * colour fringing. Only when the blast is on screen, so a blast elsewhere on the map never stutters the game.
+ */
+USTRUCT(BlueprintType)
+struct FRadixiteNukeImpactFeel
+{
+	GENERATED_BODY()
+
+	// Real seconds the game nearly stops for; 0 = no hit-stop.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0", ClampMax = "0.5"))
+	float HitStopSeconds = 0.f;
+
+	// Game speed during the hit-stop, as part of the speed before it.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0.01", ClampMax = "1"))
+	float HitStopTimeDilation = 0.1f;
+
+	// Game seconds the white flash takes to fade; 0 = no screen flash.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0"))
+	float ScreenFlashSeconds = 0.f;
+
+	// Exposure stops added at the peak of the flash.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0"))
+	float ScreenFlashExposureBias = 3.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0"))
+	float ScreenFlashBloomIntensity = 4.f;
+
+	// Chromatic aberration at the peak of the flash.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0", ClampMax = "5"))
+	float ScreenFringeIntensity = 5.f;
+
+	// Farthest camera from the blast that still gets the hit-stop and flash.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0"))
+	float MaxCameraDistance = 30000.f;
+};
+
+/** @brief Stones thrown out of the crater that rain down around it after the blast and stay where they land. */
+USTRUCT(BlueprintType)
+struct FRadixiteNukeDebrisRainSettings
+{
+	GENERATED_BODY()
+
+	// 0 = no debris.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0", ClampMax = "128"))
+	int32 Count = 0;
+
+	// Picked at random per stone; each mesh is one instanced draw.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TArray<TSoftObjectPtr<UStaticMesh>> Meshes;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0.05"))
+	float MinScale = 0.6f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0.05"))
+	float MaxScale = 1.6f;
+
+	// Seconds from the blast to the landing; the longer, the higher the stone flies.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0.3"))
+	float MinFlightSeconds = 1.5f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0.3"))
+	float MaxFlightSeconds = 4.5f;
+
+	// Landing distance from ground zero as part of the blast radius.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0"))
+	float MinRangeFraction = 0.6f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0"))
+	float MaxRangeFraction = 1.2f;
+
+	// Dust puff where a stone lands.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TSoftObjectPtr<UNiagaraSystem> LandingEffect;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0.01"))
+	float LandingEffectScale = 1.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TSoftObjectPtr<USoundBase> LandingSound;
+
+	// Landings with a sound; the rest only puff, so the rain does not become a wall of noise.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0"))
+	int32 MaxLandingSounds = 12;
+};
+
+/**
+ * @brief How hard the blast throws units: bodies further, turrets of killed tanks off and away, surviving vehicles
+ * pushed outward and up. Defaults throw like any other explosion.
+ */
+USTRUCT(BlueprintType)
+struct FRadixiteNukeBlastThrow
+{
+	GENERATED_BODY()
+
+	// Multiplies how fast blast-killed soldiers' bodies fly.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0"))
+	float InfantryThrowScale = 1.f;
+
+	// Tanks the blast kills blow their turret off, away from ground zero.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	bool bTossTurrets = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0.1"))
+	float TurretTossSpeedScale = 1.f;
+
+	// Outward speed (cm/s) a surviving vehicle gets at ground zero, falling off to 0 at the blast edge; 0 = no push.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0"))
+	float VehiclePushSpeed = 0.f;
+
+	// Upward speed (cm/s) at ground zero; keep it low: a tank that dies in the air leaves its wreck there.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0"))
+	float VehicleLiftSpeed = 0.f;
+
+	// Random spin (deg/s) at ground zero, so pushed vehicles slew round.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0"))
+	float VehicleSpinDegrees = 0.f;
+
+	// Seconds a pushed tracked vehicle's tracks let go of the ground.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0"))
+	float VehicleKnockbackSeconds = 1.2f;
+};
+
 /** @brief Assets of the nuke, loaded when the ability fires. */
 USTRUCT(BlueprintType)
 struct FRadixiteNukeVisuals
@@ -275,6 +419,19 @@ struct FRadixiteNukeVisuals
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0.05"))
 	float BlastShakePulseIntervalSeconds = 0.4f;
+
+	// Heard by everyone after the blast. A V2 outran its own sound: its roar arrives after the boom.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TArray<FRadixiteNukeDelayedSound> AfterBlastSounds;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FRadixiteNukeImpactFeel ImpactFeel;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FRadixiteNukeDebrisRainSettings DebrisRain;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FRadixiteNukeBlastThrow BlastThrow;
 };
 
 /**
@@ -305,9 +462,13 @@ public:
 
 	ERadixiteNukePhase GetPhase() const { return M_Phase; }
 	FVector GetWarheadLocation() const;
+	// For tests: the crater pit decal shows and the rim mesh was built.
+	bool GetHasCrater() const;
 
 protected:
 	virtual void Tick(float DeltaSeconds) override;
+	// Gives the game its speed back if the actor goes away during a hit-stop.
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 private:
 	UPROPERTY()
@@ -341,6 +502,10 @@ private:
 	UPROPERTY()
 	TObjectPtr<UProceduralMeshComponent> M_CraterRim;
 
+	// Unbound: the white flash and colour fringing of the impact on the whole screen.
+	UPROPERTY()
+	TObjectPtr<UPostProcessComponent> M_ScreenFlash;
+
 	UPROPERTY()
 	TObjectPtr<UMaterialInstanceDynamic> M_ShockwaveMaterial;
 
@@ -366,6 +531,11 @@ private:
 	float M_PhaseSeconds = 0.f;
 	float M_NextRadiationPulseSeconds = 0.f;
 	uint8 M_OwningPlayer = 0;
+	// Game speed before the hit-stop, restored after it unless something else changed the speed meanwhile.
+	float M_TimeDilationBeforeHitStop = 1.f;
+	float M_HitStopTimeDilation = 1.f;
+	bool bM_IsScreenFlashing = false;
+	bool bM_IsHitStopActive = false;
 
 	void SetupWarningArea();
 	void SetupShockwave();
@@ -377,11 +547,26 @@ private:
 	void TickFalling();
 	void Detonate();
 	void DealBlastDamage() const;
+	// Lets the victims of this blast find its throw strengths (FRTSBlastThrow).
+	void RegisterBlastThrow() const;
+	void SchedulePushSurvivingVehicles();
+	void PushSurvivingVehicles() const;
+	void PushVehicle(AActor& Vehicle) const;
 	void RequestBlastCameraShake() const;
 	void ScheduleBlastShakePulses();
 	void ShowCrater();
 	void SpawnDetonationLayers();
 	void SpawnDetonationLayerCopy(const FRadixiteNukeDetonationLayer& Layer, const int32 CopyIndex);
+	void ScheduleAfterBlastSounds();
+	void StartDebrisRain();
+
+	// The hit-stop and screen flash only play for a blast the local player is looking at.
+	bool GetIsBlastInView() const;
+	void StartImpactFeel();
+	void StartHitStop();
+	void EndHitStop();
+	void SetupScreenFlash();
+	void TickScreenFlash();
 	void TickRadiating(const float DeltaSeconds);
 	void DealRadiationPulse() const;
 	void EndRadiation();

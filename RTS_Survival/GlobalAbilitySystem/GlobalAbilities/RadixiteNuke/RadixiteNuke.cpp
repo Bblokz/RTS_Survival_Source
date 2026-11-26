@@ -5,7 +5,9 @@
 #include "Camera/PlayerCameraManager.h"
 #include "Components/DecalComponent.h"
 #include "Components/PointLightComponent.h"
+#include "Components/PostProcessComponent.h"
 #include "Components/StaticMeshComponent.h"
+#include "GameFramework/WorldSettings.h"
 #include "Kismet/GameplayStatics.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "NiagaraComponent.h"
@@ -13,11 +15,16 @@
 #include "NiagaraSystem.h"
 #include "ProceduralMeshComponent.h"
 #include "RadixiteNukeCraterRim.h"
+#include "RadixiteNukeDebrisRain.h"
 #include "RTS_Survival/Enemy/EnemyController/EnemyController.h"
 #include "RTS_Survival/Game/Players/RTSPlayers.h"
 #include "RTS_Survival/Player/CPPController.h"
 #include "RTS_Survival/RTSComponents/ShieldComponent/ShieldTypes.h"
 #include "RTS_Survival/Subsystems/CameraShakeSubsystem/RTSCameraShakeSubsystem.h"
+#include "RTS_Survival/Units/Tanks/TankMaster.h"
+#include "RTS_Survival/Units/Tanks/TrackedTank/TrackedTankMaster.h"
+#include "RTS_Survival/Units/Tanks/TrackedTank/TrackPhysicsMovementComp/TrackPhysicsMovement.h"
+#include "RTS_Survival/Utils/AOE/BlastThrow/RTSBlastThrowSubsystem.h"
 #include "RTS_Survival/Utils/AOE/FRTS_AOE.h"
 #include "RTS_Survival/Utils/CollisionSetup/FRTS_CollisionSetup.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
@@ -39,6 +46,16 @@ namespace RadixiteNukeConstants
 	constexpr float CraterDecalDepthCm = 2000.f;
 	// The pit draws over the scar.
 	constexpr int32 CraterDecalSortOrder = 1;
+	// Over every other post process volume of the map while it flashes.
+	constexpr float ScreenFlashPriority = 1000.f;
+	// Victims of the async blast damage still find its throw this long after it (game seconds).
+	constexpr float BlastThrowLifetimeSeconds = 3.f;
+	// The push waits for the blast damage to land, so a tank about to die is not thrown first.
+	constexpr float VehiclePushDelaySeconds = 0.2f;
+	// How the push falls off from ground zero to the blast edge.
+	constexpr float VehiclePushFalloffExponent = 0.7f;
+	// Share of the viewport around it that still counts as on screen for the hit-stop.
+	constexpr float InViewScreenMargin = 0.15f;
 	// Steep but not vertical, so the warhead reads as arriving from somewhere.
 	constexpr float FallSidewaysFraction = 0.35f;
 	// Distance of the arc's control point from the target, as part of the approach: sets the dive angle (~35 deg).
@@ -125,6 +142,13 @@ ARadixiteNuke::ARadixiteNuke()
 	M_CraterRim->SetCanEverAffectNavigation(false);
 	M_CraterRim->bUseAsyncCooking = true;
 	M_CraterRim->SetVisibility(false);
+
+	M_ScreenFlash = CreateDefaultSubobject<UPostProcessComponent>(TEXT("ScreenFlash"));
+	M_ScreenFlash->SetupAttachment(M_Root);
+	M_ScreenFlash->bUnbound = true;
+	M_ScreenFlash->Priority = RadixiteNukeConstants::ScreenFlashPriority;
+	M_ScreenFlash->BlendWeight = 0.f;
+	M_ScreenFlash->bEnabled = false;
 }
 
 void ARadixiteNuke::StartNuke(const FVector& GroundZero, const float BlastRadius, const float CoreRadius,
@@ -161,6 +185,11 @@ void ARadixiteNuke::StartNuke(const FVector& GroundZero, const float BlastRadius
 FVector ARadixiteNuke::GetWarheadLocation() const
 {
 	return M_WarheadMesh->GetComponentLocation();
+}
+
+bool ARadixiteNuke::GetHasCrater() const
+{
+	return M_CraterDecal->IsVisible() && M_CraterRim->IsVisible() && M_CraterRim->GetNumSections() > 0;
 }
 
 void ARadixiteNuke::SetupWarningArea()
@@ -206,7 +235,9 @@ void ARadixiteNuke::SetupScar()
 {
 	using namespace RadixiteNukeConstants;
 	UMaterialInterface* ScarMaterial = M_Visuals.ScarMaterial.Get();
-	if (not IsValid(ScarMaterial))
+	// A crater replaces the scar: the near-black burnt disc is twice its size and painted over both the pit and
+	// the rim.
+	if (not IsValid(ScarMaterial) || M_Visuals.Crater.RimRadius > 0.f)
 	{
 		return;
 	}
@@ -215,6 +246,12 @@ void ARadixiteNuke::SetupScar()
 	M_ScarMaterial->SetScalarParameterValue(GlowParameter, 1.f);
 	M_ScarDecal->SetDecalMaterial(M_ScarMaterial);
 	M_ScarDecal->DecalSize = FVector(ScarDepthCm, ScarHalfSize, ScarHalfSize);
+}
+
+void ARadixiteNuke::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	EndHitStop();
+	Super::EndPlay(EndPlayReason);
 }
 
 void ARadixiteNuke::Tick(float DeltaSeconds)
@@ -239,6 +276,7 @@ void ARadixiteNuke::Tick(float DeltaSeconds)
 		return;
 	case ERadixiteNukePhase::Radiating:
 		TickBlastVisuals();
+		TickScreenFlash();
 		TickRadiating(DeltaSeconds);
 		return;
 	case ERadixiteNukePhase::Inactive:
@@ -353,9 +391,14 @@ void ARadixiteNuke::Detonate()
 	{
 		UGameplayStatics::PlaySound2D(this, DetonationSound);
 	}
+	ScheduleAfterBlastSounds();
+	StartDebrisRain();
+	StartImpactFeel();
 	RequestBlastCameraShake();
 	ScheduleBlastShakePulses();
+	RegisterBlastThrow();
 	DealBlastDamage();
+	SchedulePushSurvivingVehicles();
 	TickBlastVisuals();
 }
 
@@ -388,6 +431,100 @@ void ARadixiteNuke::DealBlastDamage() const
 		EVehicleModuleSplashPolicy::DamageExternalModules,
 		static_cast<EWeaponShellType>(0),
 		EAoeFalloffDistance::ClosestCollision);
+}
+
+void ARadixiteNuke::RegisterBlastThrow() const
+{
+	const FRadixiteNukeBlastThrow& BlastThrow = M_Visuals.BlastThrow;
+	const bool bThrowsHarder = not FMath::IsNearlyEqual(BlastThrow.InfantryThrowScale, 1.f) || BlastThrow.bTossTurrets;
+	UWorld* World = GetWorld();
+	URTSBlastThrowSubsystem* ThrowSubsystem = IsValid(World) ? World->GetSubsystem<URTSBlastThrowSubsystem>() : nullptr;
+	if (not bThrowsHarder || not IsValid(ThrowSubsystem))
+	{
+		return;
+	}
+	FRTSBlastThrow Throw;
+	Throw.Epicenter = M_GroundZero;
+	Throw.InfantryThrowScale = BlastThrow.InfantryThrowScale;
+	Throw.bTossTurrets = BlastThrow.bTossTurrets;
+	Throw.TurretTossSpeedScale = BlastThrow.TurretTossSpeedScale;
+	ThrowSubsystem->RegisterBlastThrow(Throw, RadixiteNukeConstants::BlastThrowLifetimeSeconds);
+}
+
+void ARadixiteNuke::SchedulePushSurvivingVehicles()
+{
+	const FRadixiteNukeBlastThrow& BlastThrow = M_Visuals.BlastThrow;
+	UWorld* World = GetWorld();
+	const bool bPushes = BlastThrow.VehiclePushSpeed > 0.f || BlastThrow.VehicleLiftSpeed > 0.f;
+	if (not bPushes || not IsValid(World))
+	{
+		return;
+	}
+	FTimerHandle PushHandle;
+	World->GetTimerManager().SetTimer(PushHandle, FTimerDelegate::CreateWeakLambda(this, [this]()
+	{
+		PushSurvivingVehicles();
+	}), RadixiteNukeConstants::VehiclePushDelaySeconds, false);
+}
+
+void ARadixiteNuke::PushSurvivingVehicles() const
+{
+	// The sweep reports a vehicle once per component; push each vehicle once.
+	TSharedPtr<TSet<TWeakObjectPtr<AActor>>> PushedVehicles = MakeShared<TSet<TWeakObjectPtr<AActor>>>();
+	TWeakObjectPtr<const ARadixiteNuke> WeakThis(this);
+	FRTS_AOE::ApplyToActorsAsync(GetDamageCauser(), M_GroundZero, M_BlastRadius, GetAffectedUnits(),
+	                             [WeakThis, PushedVehicles](AActor& FoundActor)
+	                             {
+		                             if (not WeakThis.IsValid() || PushedVehicles->Contains(&FoundActor))
+		                             {
+			                             return;
+		                             }
+		                             PushedVehicles->Add(&FoundActor);
+		                             WeakThis->PushVehicle(FoundActor);
+	                             });
+}
+
+void ARadixiteNuke::PushVehicle(AActor& Vehicle) const
+{
+	using namespace RadixiteNukeConstants;
+	ATankMaster* Tank = Cast<ATankMaster>(&Vehicle);
+	if (not IsValid(Tank) || not Tank->IsUnitAlive())
+	{
+		return;
+	}
+	// Deployed nomadic vehicles and trains on their rails do not simulate; they stand firm.
+	USkeletalMeshComponent* TankMesh = Tank->GetTankMesh();
+	if (not IsValid(TankMesh) || not TankMesh->IsSimulatingPhysics())
+	{
+		return;
+	}
+	const FRadixiteNukeBlastThrow& BlastThrow = M_Visuals.BlastThrow;
+	const FVector FromGroundZero = Tank->GetActorLocation() - M_GroundZero;
+	const float DistanceFraction = FMath::Clamp(FromGroundZero.Size2D() / FMath::Max(M_BlastRadius, 1.f), 0.f, 1.f);
+	const float Strength = FMath::Pow(1.f - DistanceFraction, VehiclePushFalloffExponent);
+	if (Strength <= 0.f)
+	{
+		return;
+	}
+	const FVector Outward = FromGroundZero.GetSafeNormal2D();
+	const FVector VelocityChange = (Outward * BlastThrow.VehiclePushSpeed
+		+ FVector::UpVector * BlastThrow.VehicleLiftSpeed) * Strength;
+	if (const ATrackedTankMaster* TrackedTank = Cast<ATrackedTankMaster>(Tank))
+	{
+		if (UTrackPhysicsMovement* TrackMovement = TrackedTank->GetTrackPhysicsMovement())
+		{
+			TrackMovement->StartKnockback(BlastThrow.VehicleKnockbackSeconds);
+		}
+	}
+	TankMesh->AddImpulse(VelocityChange, NAME_None, true);
+	if (BlastThrow.VehicleSpinDegrees > 0.f)
+	{
+		// Mostly a slew about the vertical, with a little rock.
+		const FVector SpinAxis = (FVector::UpVector + FMath::VRand() * 0.3f).GetSafeNormal();
+		const float SpinSign = FMath::RandBool() ? 1.f : -1.f;
+		TankMesh->AddAngularImpulseInDegrees(SpinAxis * BlastThrow.VehicleSpinDegrees * Strength * SpinSign, NAME_None,
+		                                     true);
+	}
 }
 
 void ARadixiteNuke::RequestBlastCameraShake() const
@@ -517,6 +654,182 @@ void ARadixiteNuke::SpawnDetonationLayerCopy(const FRadixiteNukeDetonationLayer&
 	                                               FVector(Layer.Scale));
 }
 
+void ARadixiteNuke::ScheduleAfterBlastSounds()
+{
+	UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		return;
+	}
+	for (int32 SoundIndex = 0; SoundIndex < M_Visuals.AfterBlastSounds.Num(); ++SoundIndex)
+	{
+		const FRadixiteNukeDelayedSound& DelayedSound = M_Visuals.AfterBlastSounds[SoundIndex];
+		if (DelayedSound.Sound.IsNull())
+		{
+			continue;
+		}
+		const auto PlayDelayedSound = [this, SoundIndex]()
+		{
+			if (not M_Visuals.AfterBlastSounds.IsValidIndex(SoundIndex))
+			{
+				return;
+			}
+			const FRadixiteNukeDelayedSound& Entry = M_Visuals.AfterBlastSounds[SoundIndex];
+			if (USoundBase* Sound = Entry.Sound.Get())
+			{
+				UGameplayStatics::PlaySound2D(this, Sound, Entry.VolumeMultiplier, Entry.PitchMultiplier);
+			}
+		};
+		if (DelayedSound.DelaySeconds <= 0.f)
+		{
+			PlayDelayedSound();
+			continue;
+		}
+		FTimerHandle SoundHandle;
+		World->GetTimerManager().SetTimer(SoundHandle, FTimerDelegate::CreateWeakLambda(this, PlayDelayedSound),
+		                                  DelayedSound.DelaySeconds, false);
+	}
+}
+
+void ARadixiteNuke::StartDebrisRain()
+{
+	UWorld* World = GetWorld();
+	if (M_Visuals.DebrisRain.Count <= 0 || M_Visuals.DebrisRain.Meshes.IsEmpty() || not IsValid(World))
+	{
+		return;
+	}
+	FActorSpawnParameters SpawnParameters;
+	SpawnParameters.Owner = this;
+	ARadixiteNukeDebrisRain* DebrisRain = World->SpawnActor<ARadixiteNukeDebrisRain>(
+		ARadixiteNukeDebrisRain::StaticClass(), M_GroundZero, FRotator::ZeroRotator, SpawnParameters);
+	if (not IsValid(DebrisRain))
+	{
+		return;
+	}
+	DebrisRain->StartRain(M_Visuals.DebrisRain, M_BlastRadius);
+}
+
+bool ARadixiteNuke::GetIsBlastInView() const
+{
+	using namespace RadixiteNukeConstants;
+	APlayerController* PlayerController = UGameplayStatics::GetPlayerController(this, 0);
+	if (not IsValid(PlayerController) || not IsValid(PlayerController->PlayerCameraManager))
+	{
+		return false;
+	}
+	const float CameraDistance = FVector::Dist(PlayerController->PlayerCameraManager->GetCameraLocation(),
+	                                           M_GroundZero);
+	if (CameraDistance > M_Visuals.ImpactFeel.MaxCameraDistance)
+	{
+		return false;
+	}
+	FVector2D ScreenLocation;
+	if (not PlayerController->ProjectWorldLocationToScreen(M_GroundZero, ScreenLocation))
+	{
+		return false;
+	}
+	int32 ViewportWidth = 0;
+	int32 ViewportHeight = 0;
+	PlayerController->GetViewportSize(ViewportWidth, ViewportHeight);
+	const FVector2D Margin(ViewportWidth * InViewScreenMargin, ViewportHeight * InViewScreenMargin);
+	return ScreenLocation.X >= -Margin.X && ScreenLocation.X <= ViewportWidth + Margin.X
+		&& ScreenLocation.Y >= -Margin.Y && ScreenLocation.Y <= ViewportHeight + Margin.Y;
+}
+
+void ARadixiteNuke::StartImpactFeel()
+{
+	const FRadixiteNukeImpactFeel& ImpactFeel = M_Visuals.ImpactFeel;
+	const bool bHasImpactFeel = ImpactFeel.HitStopSeconds > 0.f || ImpactFeel.ScreenFlashSeconds > 0.f;
+	if (not bHasImpactFeel || not GetIsBlastInView())
+	{
+		return;
+	}
+	if (ImpactFeel.ScreenFlashSeconds > 0.f)
+	{
+		SetupScreenFlash();
+	}
+	if (ImpactFeel.HitStopSeconds > 0.f)
+	{
+		StartHitStop();
+	}
+}
+
+void ARadixiteNuke::StartHitStop()
+{
+	UWorld* World = GetWorld();
+	AWorldSettings* WorldSettings = IsValid(World) ? World->GetWorldSettings() : nullptr;
+	if (not IsValid(WorldSettings))
+	{
+		return;
+	}
+	M_TimeDilationBeforeHitStop = WorldSettings->TimeDilation;
+	UGameplayStatics::SetGlobalTimeDilation(
+		this, M_TimeDilationBeforeHitStop * M_Visuals.ImpactFeel.HitStopTimeDilation);
+	// Read back: the world settings clamp the dilation.
+	M_HitStopTimeDilation = WorldSettings->TimeDilation;
+	bM_IsHitStopActive = true;
+	// Timers run on game time, which now passes at the hit-stop speed.
+	const float HitStopGameSeconds = M_Visuals.ImpactFeel.HitStopSeconds * M_HitStopTimeDilation;
+	FTimerHandle HitStopHandle;
+	World->GetTimerManager().SetTimer(HitStopHandle, FTimerDelegate::CreateWeakLambda(this, [this]()
+	{
+		EndHitStop();
+	}), FMath::Max(HitStopGameSeconds, UE_KINDA_SMALL_NUMBER), false);
+}
+
+void ARadixiteNuke::EndHitStop()
+{
+	if (not bM_IsHitStopActive)
+	{
+		return;
+	}
+	bM_IsHitStopActive = false;
+	const UWorld* World = GetWorld();
+	const AWorldSettings* WorldSettings = IsValid(World) ? World->GetWorldSettings() : nullptr;
+	if (not IsValid(WorldSettings))
+	{
+		return;
+	}
+	// Something else (a test, a game speed change) set the speed meanwhile: leave theirs.
+	if (not FMath::IsNearlyEqual(WorldSettings->TimeDilation, M_HitStopTimeDilation))
+	{
+		return;
+	}
+	UGameplayStatics::SetGlobalTimeDilation(this, M_TimeDilationBeforeHitStop);
+}
+
+void ARadixiteNuke::SetupScreenFlash()
+{
+	const FRadixiteNukeImpactFeel& ImpactFeel = M_Visuals.ImpactFeel;
+	FPostProcessSettings& Settings = M_ScreenFlash->Settings;
+	Settings.bOverride_AutoExposureBias = true;
+	Settings.AutoExposureBias = ImpactFeel.ScreenFlashExposureBias;
+	Settings.bOverride_BloomIntensity = true;
+	Settings.BloomIntensity = ImpactFeel.ScreenFlashBloomIntensity;
+	Settings.bOverride_SceneFringeIntensity = true;
+	Settings.SceneFringeIntensity = ImpactFeel.ScreenFringeIntensity;
+	M_ScreenFlash->BlendWeight = 1.f;
+	M_ScreenFlash->bEnabled = true;
+	bM_IsScreenFlashing = true;
+}
+
+void ARadixiteNuke::TickScreenFlash()
+{
+	if (not bM_IsScreenFlashing)
+	{
+		return;
+	}
+	const float FlashAlpha = 1.f - FMath::Clamp(M_PhaseSeconds / M_Visuals.ImpactFeel.ScreenFlashSeconds, 0.f, 1.f);
+	// Snaps white and eases out, like an eye recovering from the flash.
+	M_ScreenFlash->BlendWeight = FlashAlpha * FlashAlpha * FlashAlpha;
+	if (FlashAlpha > 0.f)
+	{
+		return;
+	}
+	M_ScreenFlash->bEnabled = false;
+	bM_IsScreenFlashing = false;
+}
+
 void ARadixiteNuke::TickBlastVisuals() const
 {
 	using namespace RadixiteNukeConstants;
@@ -579,6 +892,9 @@ void ARadixiteNuke::EndRadiation()
 {
 	M_Phase = ERadixiteNukePhase::Spent;
 	SetActorTickEnabled(false);
+	// The tick that fades the flash stops here; a flash set longer than the blast visuals just ends.
+	M_ScreenFlash->bEnabled = false;
+	bM_IsScreenFlashing = false;
 	if (IsValid(M_RadiationEffect))
 	{
 		M_RadiationEffect->Deactivate();

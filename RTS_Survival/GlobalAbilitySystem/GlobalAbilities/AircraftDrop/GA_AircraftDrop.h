@@ -114,11 +114,20 @@ public:
 	 */
 	void SetHandPayloadToEnemyAI(const bool bHandToEnemyAI) { bM_HandPayloadToEnemyAI = bHandToEnemyAI; }
 
+	/**
+	 * @brief On a copy (mission drops into a base): every aircraft, the first one included, sets down at least this
+	 * far from any building (FBuildingFreeDropSpots). 0, the default, keeps the plain navmesh formation.
+	 */
+	void SetBuildingClearanceRadius(const float ClearanceRadius) { M_BuildingClearanceRadius = ClearanceRadius; }
+
 	// Every vehicle and squad this ability's aircraft deliver, as each is released.
 	FOnAircraftDropUnitReleased OnUnitReleased;
 
 private:
 	bool bM_HandPayloadToEnemyAI = true;
+
+	// > 0: execute locations keep this 2D distance from buildings (set on mission copies only).
+	float M_BuildingClearanceRadius = 0.f;
 
 	void BindAircraftReleaseEvents(AAircraftMaster* Aircraft);
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (AllowPrivateAccess = "true"))
@@ -157,6 +166,18 @@ private:
 	 * @return TargetLocation for the first aircraft, otherwise the first projected unique formation location.
 	 */
 	FVector BuildAircraftExecuteLocation(
+		const FVector& TargetLocation,
+		int32 AircraftIndex,
+		TArray<FVector>& UsedExecuteLocations) const;
+	/**
+	 * @brief BuildAircraftExecuteLocation with M_BuildingClearanceRadius: the target and the formation slots are used
+	 * only when clear of buildings, then rings around the target are searched.
+	 * @param TargetLocation The drop's anchor.
+	 * @param AircraftIndex Spawn order of the aircraft in this drop request.
+	 * @param UsedExecuteLocations Locations already reserved by earlier aircraft in this drop.
+	 * @return The first unused spot clear of buildings; TargetLocation when none was found (reported).
+	 */
+	FVector BuildBuildingFreeExecuteLocation(
 		const FVector& TargetLocation,
 		int32 AircraftIndex,
 		TArray<FVector>& UsedExecuteLocations) const;

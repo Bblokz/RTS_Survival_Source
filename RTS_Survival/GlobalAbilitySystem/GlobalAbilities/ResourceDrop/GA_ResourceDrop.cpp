@@ -3,6 +3,7 @@
 #include "GA_ResourceDrop.h"
 
 #include "RTS_Survival/GlobalAbilitySystem/GlobalAbilities/GlobalAbilityHelpers.h"
+#include "RTS_Survival/PickupItems/Items/ResourcePickup/SupplyCratePickup.h"
 #include "RTS_Survival/Resources/Resource.h"
 #include "RTS_Survival/Resources/ResourceComponent/ResourceComponent.h"
 #include "RTS_Survival/Scavenging/ScavengeObject/ScavengableObject.h"
@@ -62,6 +63,14 @@ TMap<ERTSResourceType, int32> UGA_ResourceDrop::GetTotalDeliveredResources() con
 	if (M_ResourceDropSettings.PayloadKind == EResourceDropPayloadKind::ScavengeContainer)
 	{
 		for (const TPair<ERTSResourceType, int32>& Reward : M_ResourceDropSettings.ContainerSettings.RewardsPerContainer)
+		{
+			Total.FindOrAdd(Reward.Key) += Reward.Value * PayloadCount;
+		}
+		return Total;
+	}
+	if (M_ResourceDropSettings.PayloadKind == EResourceDropPayloadKind::Pickup)
+	{
+		for (const TPair<ERTSResourceType, int32>& Reward : M_ResourceDropSettings.PickupSettings.ResourcesPerPickup)
 		{
 			Total.FindOrAdd(Reward.Key) += Reward.Value * PayloadCount;
 		}
@@ -142,6 +151,9 @@ FSoftObjectPath UGA_ResourceDrop::GetPayloadClassPath() const
 		return M_ResourceDropSettings.ContainerSettings.ContainerClass.ToSoftObjectPath();
 	case EResourceDropPayloadKind::HarvestableDeposit:
 		return M_ResourceDropSettings.DepositSettings.DepositClass.ToSoftObjectPath();
+	case EResourceDropPayloadKind::Pickup:
+		// Native class: always loaded.
+		return FSoftObjectPath(ASupplyCratePickup::StaticClass());
 	}
 	return FSoftObjectPath();
 }
