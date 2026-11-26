@@ -312,7 +312,8 @@ them at start.
   - Flow: location intro → crater line → wait 33 s → Zoo tower camera tour (two shots, the Leitturm line as its
     `StartSound`) → stay-quiet line.
   - The tour lifts the fog 45 m around both shots (`RevealRadius` 4500), so the tower and the radio bunker show. The
-    announcer's words run in the subtitle strip at the top (2026-11-24). Skippable (hold Space). Nothing is stationed at the Zoo yet.
+    announcer's words run in the subtitle strip at the top (2026-11-24). Skippable (hold Space; prompt visible since
+    2026-11-25, see 11.1). Nothing is stationed at the Zoo yet.
   - Then it finds the profile-spawned HQ (retrying every second) and completes when the HQ is deployed.
   - Placeholders: "Berlin / Friedrichshain ruins / 1976" and the camera yaws.
   - `SetUpEnemyForces` is not built (no patrol data yet).
@@ -338,8 +339,19 @@ them at start.
   - A child of `USovietCounterattackMission` with `DA_Berlin_ResponseForce`, a copy of the Intro asset.
   - Train: runs along `RY_Rail_Main` (136 path points, 3 m apart) and stops at the ramp (-1842, 12950); its units come
     out at (-2800, 14200).
-  - Road group: spawns at the south-east edge (-16000, 47500).
-  - No air drops, no dig-in intro, no arrival cinematic. Route via (-12000, 45500) and (2000, 44500) to the HQ.
+  - **Since 2026-11-25 every unit comes by train** (owner pick A): `Spawns.bAllUnitsByTrain`, so the road group at the
+    map edge (-16000, 47500) no longer spawns. The station's groups take their own route (`bTrainUsesOwnRoute`, empty
+    `TrainAttackRoute`): straight from the station to the player HQ (339 m on the tank navmesh).
+  - Before: the train groups shared `AttackRoute` (-12000, 45500) → (2000, 44500) → HQ, laid out for the road group.
+    They walked 335 m back north to the first point, next to where the train enters, and the groups stalled there (the
+    owner's 2026-11-25 play test; a rifleman was still at that point 8 min after the alarm). The cause of the stall is
+    not known; all legs are on the navmesh. `RTS_FORMATION_WAIT` warnings now name the units an attack-move group waits
+    on after 60 s.
+  - One train per wave; the next train leaves only after the previous one has driven out again, so later waves can
+    come later than the wave timer.
+  - No air drops, no dig-in intro, no arrival cinematic.
+  - `BaseReinforcements` is still on (copied from the Intro): at the alarm four Strike Division tanks are flown into the
+    player's base. **(open)** whether Berlin keeps that.
   - Its own countdown ("Response force arrives") follows ResponseForce.
   - Wave sizes and timings are still the Intro's per-difficulty values. **They are the owner's to tune.**
 - **StopRunners:**
@@ -700,6 +712,9 @@ Owner ask:
     `RewardLandingOffset` (18 m), plus `ShowReinforcementsOnMiniMap`.
 - **Reward:** `RewardPayload` = three `Tank_Sdkfz_221`. **There is no Sd.Kfz. 223 in the game.** The 221 (20 mm) is
   the closest: the 223 is the radio version of the same four-wheel chassis. Swap the payload once a 223 exists.
+- **Skip (fixed 2026-11-25):** hold Space for 1 s. The prompt was there but hidden: it is anchored at the bottom of
+  the screen and was added under the tour widget (z-order 0 against 6), so the bottom cinema bar covered it. Camera
+  tours now add it at z-order 8 (`MissionCameraTourSession.cpp`), which also fixes the Zoo tower tour.
 - **Captured during the tour:** the check runs from the start, so the bonus completes then. Completing the mission
   cuts the tour short.
 
@@ -758,4 +773,10 @@ found, fights 20 s, then returns to its route. Plus three Forge crew lines (Berl
   point and patrols on. No combat: back 30 s after all arrived, or after 60 s + distance / 2.5 m/s. Checked on the
   3.25 s formation tick, so "20 s" is 20-23 s.
 - **Edge:** the forecourt raises the alarm after a grace wait; a zone entry in that window makes the line the zone's.
+- **Changed 2026-11-25 (owner):** the patrols attack-move to the **player HQ** (`bPatrolsAttackPlayerHQ`; the
+  controller's HQ, else the first German HQ nomadic, else the alarm spot), not to where the player was seen; in the
+  play test they went for a unit by the start crater instead. The 20 s rule starts only **80 s after the alarm**
+  (`PatrolCombatCheckDelaySeconds`, generic `CombatCheckDelaySeconds` on the converge chain): fights on the way do not
+  turn a group back. After 80 s: 20 s after the next fight it returns; without a fight, 30 s after all arrived, or at
+  80 + 60 s + distance / 2.5 m/s.
 - **Not tested in a game run.** The Development DLL needs a rebuild before the user editor has the new class.

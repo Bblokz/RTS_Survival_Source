@@ -319,12 +319,12 @@ Positions in metres (map X north, Y east), from `Saved/OderWarthe/terrain/OW_lay
 
 | Step | Mission (class) | Starts when | Objective plate | Scripted events | Completes when |
 |---|---|---|---|---|---|
-| M00 Arrival | `UMoveCameraMission` + location intro | Map start | none | Dawn mist over the lakes; location intro "Festungsfront Oder-Warthe-Bogen, Lebus district, 1976"; the start force (open, 11.3) drives up the ridge road; lines B1-B3 | Briefing ends |
+| M00 Arrival | `Mission_OW_Arrival` (built, section 12) | Map start | "Oder-Warthe-Bogen" | One skippable camera tour (hold Space): title card fades in from black over the lakes (B1), the bunker line (B2), the five Werke (B3 on Werk 1), the start column climbing the Berlin road. The deck HQ + two light armoured cars drive up onto the ridge | Column sent up and tour over |
 | M01 Guard | `UDontLoseHQMission` | M00 ends | none (lose rule) | - | Never (removed at victory) |
 | M02 Establish the base | `UBuildStructuresMission` (new) | M00 ends | Major: "Deploy the HQ, build a refinery and a metal extractor" | A1 when the HQ deploys | All three built |
-| M03 Take the listening post | Station capture (new, small) on DF 1 | M02 ends | Major: "Take DF 1, the pump house" | Field manual takeover clip "Direction finding" plays on capture; first (wide) wedge appears; A2 | DF 1 held |
-| M04 The first attack | Wave director, first wave | DF 1 held, or the grace timer (5:00 on Normal) | Major: "Hold the ridge" | Attack-order burst narrows DF 1's wedge (Morse + subtitled intercept); A3 | First wave beaten; **small resource drop** |
-| M05 Second bearing | Station capture on DF 2 | M04 ends | Major: "Cross the Packlitz dam and take DF 2" | Bonus plates appear: "Take all five listening posts", "Collapse a tunnel mouth", "Destroy the radio truck" (Hard+); attacking the Packlitz outpost causes a reply burst after 10-20 s; A4; waves on the timer | DF 2 held |
+| M03 Take the listening post | `Mission_OW_ListeningPost` (built, section 13) | M02 ends (for now: M00 ends) | Major: "Take DF 1, the pump house" | Field manual takeover clip "Direction finding" plays on capture; first (wide) wedge appears; A2 | DF 1 held |
+| M04 The first attack | `Mission_OW_FirstAttack` + `AWerkWaveDirector` (built, section 13) | DF 1 held, or the grace timer (5:00 on Normal) | Major: "Hold the ridge" | Attack-order burst narrows DF 1's wedge (Morse + subtitled intercept); A3 | First wave beaten; **small resource drop** |
+| M05 Second bearing | `Mission_OW_SecondBearing` + bonus stages (built, section 14) | M04 ends | Major: "Cross the Packlitz dam and take DF 2" | Bonus plates appear: "Take all five listening posts", "Collapse a tunnel mouth", "Destroy the radio truck" (Hard+); attacking the Packlitz outpost causes a reply burst after 10-20 s; A4; waves on the timer | DF 2 held |
 | M06 They notice | Event, no plate | First overlap of two wedges | - | A5; V1 (the veteran); paratrooper counterattacks on the newest station start, R2; routine bursts slow down; waves one step larger; armour trains start, A7; the Peilturm starts calling Katyusha strikes on units in its sight while it stands, A9 | At once |
 | M07 Third bearing | Station capture on any of DF 3-5 | M06 | Major: "Take a third listening post: DF 3, 4 or 5" | Station counterattacks every few minutes; armour trains; Peilturm artillery | The fix condition is met |
 | M08 The fix | `USecureBaseMission`, reveal part | `OnFix` | - | Vision bubbles for 60 s, camera tour of the three targets, destroy markers; A6, V2 | Tour ends |
@@ -354,6 +354,12 @@ Positions in metres (map X north, Y east), from `Saved/OderWarthe/terrain/OW_lay
 | A1 | Advisor | HQ deployed | "Good ground. Radixite on the ridge, scrap below. Get the refinery running." |
 | A2 | Advisor | DF 1 held | "Now we listen." |
 | A3 | Advisor | First attack-order burst | "Hear that? When they attack, they talk." |
+| A12 | Advisor | M05 starts | "Next post is across the Packlitz dam, on the forester's hill. Take it and we get a second bearing." (recorded 2026-11-25) |
+| A13 | Advisor | Bonus "Take all five listening posts" appears | "Hold all five posts at once and he has nowhere left to hide." |
+| A14 | Advisor | Bonus "Collapse a tunnel mouth" appears | "Their columns come out of the tunnel mouths. Collapse one with heavy guns and that bunker sends no more." |
+| A15 | Advisor | Bonus "Destroy the radio truck" appears (Hard+, not built yet) | "A radio truck on the roads behind their line is sending false bearings. Find it and burn it." |
+| I_* | Shield operator / Starik (Russian, subtitled intercept) | Every heard burst (`ADirectionFindingManager.InterceptLines`) | Routine (operator): "All posts: report readiness." / "Signal clear. Continue on schedule." Reply (operator): "Received. Hold your position." / "Understood. Reinforcements when ready." Attack order (Starik): "Column, forward. Take the ridge." / "All crews to the dams. We attack." |
+| A11 | Advisor | First wave leaves its tunnel mouth (M04) | "Enemy column leaving the bunker line. Watch the causeways." Later waves (M05): A11_B "Another column off the bunker line." / A11_C "They're coming out of the bunkers again. Watch the causeways." (recorded 2026-11-25) |
 | A4 | Advisor | First reply burst | "Every time we hit them, someone reports to the command post, and the command post answers." |
 | A5 | Advisor | Two wedges overlap | "Two bearings, a rough area. We need a third, from a different angle." |
 | V1 | Starik, the veteran (Russian, subtitled intercept) | M06 | "Someone is listening. Germans again, on my line. I took this line from them once." |
@@ -458,7 +464,11 @@ Two rounds. Where a row in 11.1 says "round 2", the answer is in 11.4.
 
 ### 11.3 Parked or still open
 
-- **Parked ("later"):** the mission's name, the start force, the wave unit mix, the Brutal time pressure.
+- **Parked ("later"):** the mission's name, the wave unit mix, the Brutal time pressure.
+- **Start force (decided 2026-11-25):** HQ truck + light escort. The deck spawns at the player start, which moved onto
+  the Berlin road two thirds up the ridge; campaign decks bring only the HQ, so the mission adds two light armoured
+  cars (placeholder: Puma ahead, Sd.Kfz. 232/3 behind). No HQ once the deck loaded: a fallback HQ spawns on the ridge.
+- **Arrival layout (decided 2026-11-25):** mist and title over the lakes, one shot per Werk, end on the column.
 
 ### 11.4 Round 2 decisions (2026-11-22)
 
@@ -478,3 +488,134 @@ Two rounds. Where a row in 11.1 says "round 2", the answer is in 11.4.
 | Tier cap | **Global abilities only.** | `MaxAllowedTier` = 2; units and buildings are not limited. |
 | "Take all five stations" bonus | **Gives an instant fix.** | Holding all five at once triggers `OnFix`, whatever the wedge widths. |
 | Collapse a tunnel mouth | **Enough heavy damage collapses it.** | Each tunnel mouth becomes a destructible actor that only heavy weapons hurt. A collapsed mouth stops waves from its Werk (section 9 idea 6). |
+
+## 12. M00 Arrival: built (2026-11-25)
+
+`Mission_OW_Arrival` (`/Game/RTS_Survival/Blueprints/Missions/GerCampaign/OderWarthe/`) is `Missions[0]` of the map's
+`BP_MissionManager` (no trigger), and the manager's `bRevealUnexploredFog` is on (Phase 0 step 4).
+
+- **The film:** one camera tour, skippable by holding Space. The title card ("Oder-Warthe-Bogen", "Festungsfront,
+  Lebus district", 1976, 05:40 hrs) fades in from black over the home basin while B1 plays. Then the bunker line
+  from high up (B2), Werk 1 (B3), Werke 4, 2, 3, 5, and the column on the Berlin road ("The ridge", "Deploy the HQ up
+  here"). About 48 s; each shot with a line is stretched to fit it.
+- **The column:** the player start (camera and deck spawn) moved onto the Berlin road two thirds up the ridge
+  (`ow_map_build.ARRIVAL_ROAD_INDEX`, `step_arrival_start`; the full build places it there too). The mission adds two
+  light armoured cars on the road (placeholder: Puma ahead, Sd.Kfz. 232/3 behind). When the last Werk shot starts,
+  everything within 30 m of the start drives up the road and fans out on the ridge (`MovePlayerUnitsAlongRoute`). After
+  a skip the same happens when the tour ends, once the deck has spawned plus two seconds. No HQ after the deck loaded
+  (a start without a profile): a fallback HQ spawns on the ridge.
+- **Completes** once the column is on its way and the tour is over.
+- **C++ added for it (generic):** tour opening title (`FMissionCameraTourOpeningTitle`), per-shot voice lines,
+  `BP_OnCameraTourShotStarted`, `MovePlayerUnitsAlongRoute`, `GetHasPlayerProfileLoaded`. See
+  `Source/Docs/Missions/MissionCameraTour.md`. Tours and location intros now also wait for "Press To Start"; before,
+  a tour or intro started at begin play ran unseen behind the start screen (also Berlin's location intro).
+- **Tools:** `Source/Tools/OderWartheMap/mission/`: `build_arrival_stage.py` (functions over UECP),
+  `layout_arrival_eventgraph.py`, `ow_arrival_editor.py` + `Saved/OderWarthe/c_arrival.py` (defaults, wiring, start),
+  `pie_arrival_check.py` (PIE check, MODE natural / skip).
+- **Checked in PIE (DebugGame throwaway editor):**
+  - Natural run: the tour waits for Start, the title shows for 9 s, all 8 shots play, the column sets off at shot 6, the
+    mission completes without errors.
+  - Skip run: holding Space 2 s into the title closes the card and ends the tour, and the column drives up; 4 vehicles
+    reached the ridge.
+- **Open / for the owner to judge:**
+  - The framing of every shot was not checked by eye (the PIE screenshots showed the editor viewport).
+  - The map is lit as a hazy afternoon, not the "static dawn" of 11.4, so there is no dawn mist yet.
+  - In one run a deck unit of the PIE test profile (Pz 38(t) Rocketeer) ended below the road cutting (z 4): spawned on
+    the cutting bank and fell through? Campaign decks bring only the HQ.
+  - The escort cars are a placeholder. The Sd.Kfz. 221 is not in the async spawner's map ("Training option type not
+    found"), so the rear car is an Sd.Kfz. 232/3.
+  - Not run: the fallback HQ, the MaxReleaseAttempts timeout, and the 2 s settle wait after a skip against a deck
+    that spawns late (the cause, units too fresh to take orders, is a guess from one run).
+  - The existing tour and intro tests all press Start first, so the new Start wait does not change them; they were
+    not re-run.
+
+## 13. M03 and M04: built (2026-11-25)
+
+Owner picks 2026-11-25:
+- the field manual's picture is a real minimap clip, on one page with three facts;
+- wave warning B, "Enemy column leaving the bunker line. Watch the causeways.", plus two short variants for later
+  waves;
+- no line for the first-wave reward;
+- build both stages and a small wave director.
+
+- **M03 `Mission_OW_ListeningPost`** (plate "Take the listening post"):
+  - It starts when M00 completes. M02 is not built yet; move it behind M02 when M02 exists.
+  - When DF 1 is held (the manager's `OnStationChanged`, or already held at the start), the Direction Finding field
+    manual opens (`Source/Docs/UI/InfoTakeovers.md`).
+  - When the manual closes, A2 plays and the stage completes.
+- **M04 `Mission_OW_FirstAttack`** (plate "Hold the ridge"):
+  - It starts when M00 completes, alongside M03.
+  - `AWerkWaveDirector.LaunchWave` sends the first wave as soon as DF 1 is held, or after `FirstWaveGraceSeconds` at
+    the latest (300 / 240 / 180 s on Normal / Hard / Brutal).
+  - When the wave's units spawn, A11 plays. While DF 1 listens, A3 follows: only then did a station hear the attack
+    order.
+  - When every unit of the wave is dead, a small supply drop arrives (`GivePlayerResources`, placeholder 300 radixite
+    + 200 metal, with a notification) and the stage completes.
+- **`AWerkWaveDirector`** (`Missions/OderWarthe/`, placed by `ow_map_build.step_waves`, also in `c_build2.py`):
+  - It holds one attack-wave spawner per Werk (`OW_WaveSpawner_w1..w5`, `SpawnerId` `OW_Werk_W1..W5`), at the
+    tunnel apron. The routes are the ones `c_waves.py` proved: crossing, ramp foot, HQ site.
+  - `LaunchWave` picks a random standing Werk: its spawner is idle and the hunt has not eliminated it.
+  - When the wave's units spawn, it calls `NotifyAttackOrder` and raises `OnWaveLaunched`; `OnWaveDefeated` fires
+    once all of them are dead.
+  - `StartTimedWaves` / `StopTimedWaves` (intervals per difficulty, shorter once the command post noticed the player)
+    are ready for M05.
+  - Wave units are a placeholder (11.3 parks the mix): 2 Mosin squads + 1 T-26; + BT-7 on Normal; + Okhotnik on
+    Hard; + T-34/76 on Brutal.
+- **Tools:**
+  - `Source/Tools/OderWartheMap/mission/build_m03_m04_stages.py` (UECP);
+  - `ow_arrival_editor.wire_later_stages` + `Saved/OderWarthe/c_m03_m04.py` (spawners, director, wiring);
+  - `pie_m03_m04_check.py`.
+- **Checked 2026-11-25 (DebugGame throwaway editor, PIE, `pie_m03_m04_check.py`):**
+  - Taking DF 1 opened the Direction Finding manual (screenshot: clip playing, texts right). UNDERSTOOD closed it,
+    and M03 completed.
+  - The first wave left at once, from Werk 2's apron in run 1 and Werk 1's apron in run 2 (6 units on Brutal).
+  - With the wave destroyed, radixite rose by 300 (the drop).
+  - `-DirectionFindingValidate` still passes with the stages in the map.
+- **Not checked:**
+  - That A11 / A3 actually played (the PIE check does not read the portrait);
+  - the grace-timer path;
+  - the wave's march to the ridge (the script destroyed it 20 s after it spawned);
+  - the Development build: an open editor locks its DLLs, so it needs a rebuild before the Development editor opens
+    these Blueprints.
+
+## 14. Burst intercepts, M05 and two bonus objectives: built (2026-11-25)
+
+Owner picks 2026-11-25:
+- intercepts mixed, 2 per burst type: the operator voices routine traffic and replies, Starik the attack orders;
+- M05 lines A (explaining);
+- bonus scope: "Take all five" and "Collapse a tunnel mouth" now, the radio truck later.
+
+- **Intercepts:** `ADirectionFindingManager.InterceptLines`.
+  - Each heard burst plays one of its two lines on the `SovietInterceptStarik` portrait, `InterceptDelaySeconds`
+    (1.2 s) after the Morse. It never plays the same line twice in a row.
+  - Routine lines are skipped while another portrait line plays; replies and attack orders queue behind it.
+  - Subtitles are English; the operator lines carry the speaker "Shield Operator".
+- **M05 `Mission_OW_SecondBearing`** (plate "Cross the Packlitz dam"):
+  - It plays A12 and starts the director's timed waves (`StartTimedWaves`).
+  - It completes when DF 2 is held.
+  - From wave 2 on, the director warns by itself, alternating A11_B and A11_C (`LaterWaveWarnings`).
+- **Bonus `Mission_OW_BonusAllPosts`** ("Take all five listening posts"): it plays A13 and completes when all five
+  stations are held; the hunt's own all-five rule fixes the command post at the same time.
+- **Bonus `Mission_OW_BonusTunnelMouth`** ("Collapse a tunnel mouth"):
+  - It plays A14.
+  - `BP_OW_TunnelMouth` now replaces each Werk's portal instance (`OW_D_Werk_<fid>_TunnelMouth`).
+    `ow_dress_gen.py` writes them, and `ow_map_build.step_tunnel_mouths` converted the current map.
+  - The director binds each mouth's death. A collapsed mouth stops that Werk's waves and fires
+    `OnTunnelMouthCollapsed`, which completes the bonus.
+- All three start when M04 completes, and both bonuses show as green bonus plates.
+- **Tools:** `build_m05_stages.py`, `Saved/OderWarthe/c_m05.py`, `pie_m05_check.py`.
+- **Checked (PIE, DebugGame):** each completed as described:
+  - after M04 the three stages started;
+  - DF 2 completed M05;
+  - DF 3-5 held five posts, fixed the command post and completed the five-posts bonus;
+  - damage to Werk 1's tunnel mouth counted it collapsed and completed the tunnel bonus.
+
+  All new line paths resolve.
+- **Not checked:**
+  - that the intercepts and later-wave warnings are audible in play;
+  - a timed wave firing (first interval 180 / 150 / 120 s; the run ended sooner);
+  - A4's outpost reply lesson (the outposts are not in the map yet).
+- **Open:**
+  - the radio-truck bonus (route, decoy bursts; A15 recorded);
+  - what happens to the rail gate if the command Werk's tunnel mouth collapses before the fix (section 10.8).
+

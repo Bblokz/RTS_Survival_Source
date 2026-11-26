@@ -308,3 +308,44 @@ The owner's pick D1 "Sperrbahnhof - Kompakt" is built by `Tools/BerlinMap/poi/ra
 - `berlin_dress_gen.set_pieces()` would put back the yard containers, crane, shed, barrels and fence panel 00.
 
 Exclude the yard before rerunning any of them. Pre-edit copy: `_MapBackups/Ger_Berlin_2026-11-22_before_railyard.umap`.
+
+## Detail pass (2026-11-26)
+
+Owner goal: more detail at low performance cost (landscape blending, decals, more furniture, the Reichstag area much
+denser), then five rounds of adversarial critique and fixes. Tools in `Tools/BerlinMap/detail/`:
+
+| Script | Where | What |
+|---|---|---|
+| `detail_dump.py` (+ `detail_dump_land.py`) | -nullrhi commandlet (`load_map`, no GPU) | every actor, mesh box, instance, decal + the whole landscape (heights, 6 weights) -> `Saved/Berlin/detail/dump/` |
+| `detail_analyse.py` | plain python | empty-ground clusters, layer purity, density preview |
+| `detail_gen.py` | plain python | the plan: `Saved/Berlin/detail/plan/placements.json` (`detail_gen_r0..r4.py` are the earlier rounds) |
+| `detail_paint.py` | plain python | landscape blend -> `Saved/Berlin/detail/paint/new_<layer>.r8` (+ before/after previews) |
+| `detail_apply.py` / `detail_apply_paint.py` | throwaway editor (`berlin_editor_server.py`) | spawn the plan (clears only `DET_`), import the paint (ImportLandscapeRegion, heights untouched, read back) |
+| `detail_shots.py`, `detail_route_check.py` | throwaway editor | 27 views (`Saved/Berlin/detail/shots/r0..r5wide`, `*close`), patrol / lane path legs per agent |
+
+Everything added carries the `DET_` prefix (folders `Berlin/Detail/...`): 1,115 decals (`DET_D_<group>`), 370 Blueprints
+(`DET_B_`: about 225 crushable furniture pieces in 26 dense facade scenes plus loose groups, hedgehogs with a dark material
+override, sandbag posts, camp crates and drums, flags, burnt 1940s cars with a rust paint, unlit poles, dead trees) and
+476 instances in 48 HISM actors (`DET_I_<mesh>`: sandstone heaps, concrete and brick rubble, burnt car / truck wrecks,
+tents with rack, table and board, a pallet depot, plank fans, sandbag crescents, debris). Small instances cull at 130-160 m.
+
+- Landscape: 19.6 % of the vertices re-blended (soot and mud patches at 6 / 18 / 30-60 m, feathered soot round the ruins,
+  old cobble on the squares and the side-street grid in empty fields, frayed street edges, mud on the Spree bank, the
+  Tiergarten mottled, the glass edge broken up, dark patches on the Reichstag apron). Rim, river, rails and pads untouched.
+- Reichstag: wall-hugging spill decals, sandstone heaps in piles with dark contact decals, courtyard spill decals, a pallet
+  depot and stores, a south-court hull, 4 guard posts (L sandbags, signs, pole, wire chicane), hedgehog lines flanking them,
+  front-apron MG nests and water craters, track chain round the patrol ring (bends round the gun pits), camp tents with
+  crates, drums and flags, a wrecked motor pool east, soot and spills at the big north-east heap.
+- Blast crater: radial soot streaks through and round the glass pan, scrap / glass fields, tilted burnt wrecks and convoy
+  trucks thrown outward, soot ring, glass shards, half-sunk concrete chunks.
+- Changes to older content: the dress generator's 41 post-apocalyptic car instances (`BER_ISM_SM_PostApo_Car_1..5`) now
+  use the burnt `SM_OldCar_*_Wreck` meshes (undo data: `Saved/Berlin/detail/postapo_cars_undo.json`); nine pale
+  `RUBDECAL_` decals at the Reichstag front were deleted (`detail_apply.DELETED_RUBDECALS`).
+- Cost: actors 8,492 -> 10,028 (mostly decals, fade screen size 0.004); about 470k instance triangles map-wide at LOD1,
+  no mesh type above 40k; decals +18 %. Saved 01:53 (70.9 MB). Nav check 0 problems; every agent paths every Reichstag
+  ring / gate leg except two legs to (15124, -20700) for tanks: that ring point lies off the tank navmesh by the quay and
+  failed before this pass too.
+- Pre-map backup: `_MapBackups/Ger_Berlin_2026-11-26_before_detail.umap`.
+- Not touched, flagged by the critics: the original sawtooth `DECAL_rut` tracks, white card quads north of Potsdamer
+  Platz and the pan, two white generator boxes west of the Gate, pink tiles on the Reichstag tower floors, the original
+  hedgehogs' pink atlas, the brewery's mint panels.

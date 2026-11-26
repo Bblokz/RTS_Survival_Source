@@ -96,6 +96,12 @@ class defaults written by `Source/Tools/IntroMission/setup_secure_line_mission.p
    has landed yet, the mission looks again every second for a minute. Portrait `T_Rus_Squad_Okhotnik`: the
    `BP_Solo_Rus_PTRS` side view (Right_idle) from `Tools/UnitPortraits` (lists `rus_squad_info_takeover*.txt`),
    rendered 2026-11-22 once the GPU had room. A render with other editors open crashed them earlier the same day.
+   - **Crushing field manual after the Okhotnik screen (2026-11-25, user request):**
+     `bShowWallBreachManualAfterIntelSquad` (on, BP class defaults + map instance, `setup_wall_manual_save.py`)
+     queues the two-page crushing field manual (walls, then running over infantry; `UI/InfoTakeovers.md`, "Wall Breach
+     takeover") behind the squad intel, so it opens as soon as that one closes. `ju87_reserve_headless_test.py` checks it
+     (18/18 on 2026-11-25, Development): queued but not on screen while Okhotnik shows, open 0.0 s after it closed,
+     CONTINUE to page 2, UNDERSTOOD closes it. The test's HighResShots show the scene only, not the UI.
 6. **Ju 87 reserve (2026-11-22, user request):** the strike now flies **4** Ju 87s. `GrantedAbilityDelaySeconds`
    (60 s) after it takes off, the player is granted `GA_Ju87Strafing` through `GrantMissionGlobalAbility`: 4
    aircraft that keep attacking the targeted area, 2 charges, a 180 s cooldown and no cost. Then
@@ -133,6 +139,32 @@ ramp. Run of 2026-11-16 with repeat runs on:
   t+15, 6 Soviet actors died, and the aircraft stayed within 105 m of the target.
 
 Distances in this section are Unreal units (cm) unless they say m.
+
+## Squad safety net (2026-11-25)
+
+User: until base building, if the player has only one Vulture squad left (or none), a paratrooper plane brings new
+squads so the player has 3 again.
+
+- Code: `AMissionManager::PlayerSquadSafetyNet` (`FPlayerSquadSafetyNetSettings`), run by
+  `UPlayerSquadSafetyNetSubsystem` (`Missions/PlayerAirDrop/`). Every 2 s it counts the player's living squads of
+  `SquadSubtype`. At `HelpAtOrBelowSquadCount` or fewer it asks `UPlayerAirDropSubsystem::DeliverPlayerUnitsByAir`
+  for `TargetSquadCount - count` squads by `GA_GerParatroopers` (no cost, not on the panel).
+- It is armed only after the player has had more squads than the threshold once, so the map start (squads still
+  spawning, start screen) never triggers a drop. After a drop, `MinSecondsBetweenDrops` (60 s) passes before the next
+  one; dropping squads count from the moment they spawn.
+- It stops for good when `StopWhenMissionClassCompleted` has completed. On this map that is
+  `Mission_Intro_ClearSovietRig`, whose completion starts `Mission_Intro_BaseBuilding`.
+- It drops at the `LandingPoints` entry nearest the player's squads, or where they were last seen when none are
+  left: (-25000, 4000) start area, (-18000, -500) before the first move-to, (-14500, -200) hangar road,
+  (-11000, 0) short of the ramp. Each is flat open ground, with at most 0.5 m of height range within 8 m.
+- The older `FMissionLostAllUnitsGlobalAbilityCheck` on the mission manager only fires once a unit type is gone
+  completely, at one fixed location, and does not top up a count, so it is not used here.
+- Setup: `Tools/IntroMission/setup_squad_safety_net.py` (`apply_map`). Saved on the map 2026-11-25 together with the
+  wall-manual flag.
+- Test: `squad_safety_net_headless_test.py` (rear_editor_server; applies the setting in memory, kills squads with
+  `UPlayerSquadSafetyNetSubsystem::MapTest_KillSquad`). Run of 2026-11-25 (Development), 7/7: the intro starts with 4
+  Vulture squads; 3 were killed; one drop of 2 squads at (-25000, 4000) 0.5 s later; 3 squads again; no second drop
+  inside the cooldown.
 
 ## Mission_Intro_RidgeArmor
 

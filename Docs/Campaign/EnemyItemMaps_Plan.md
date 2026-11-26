@@ -285,3 +285,147 @@ Owner picks: convoys drive a placed `AEnemyConvoyRoute` (B), and **any escape = 
 - The contents of `EnemyObjectProceduralMaps` in the world controller Blueprint.
 - Which PCG graph reads the world mission context nodes, and which objective `BP_MissionManager` runs on
   `EnemyObjProcedural_0`.
+
+## 5f. First item map: EnemyItem_WismutPlateau (2026-11-25)
+
+- **Map:** `/Game/RTS_Survival/Maps/Campaign/EnemyMapObjects/EnemyItem_WismutPlateau`, copied from `ToCopy/RTS_ToCopyMap`.
+  Ore Mountains area, 510 x 510 m (same as `Ger_MarderStugMission`), landscape 11 x 11 components, the Ore landscape
+  instance `MI_RTS_Landscape_DryCastle_OreMountains` (same shader and tuning as `Ger_2ndOreMountains`).
+- **Design source:** `MapDesigner/EnemyItemMaps/item_ore_01.layout.json` (owner approved), generator
+  `MapDesigner/EnemyItemMaps/gen_item_ore01.py`.
+- **Build tools:** `Source/Tools/EnemyItemMaps/`: `wismut_terrain_gen.py` (heights + 11 layer weights from the drawing,
+  faces sharpened past the 44 degree nav slope, reach checks in `Saved/EnemyItemMaps/WismutPlateau/terrain/check.txt`),
+  `wismut_map_build.py` (editor steps), `item_editor_server.py` + `item_cmd.py` (throwaway editor command loop,
+  folder `Saved/EnemyItemMaps/cmd`). Request scripts used: `Saved/EnemyItemMaps/WismutPlateau/run/r1..r5`.
+- **In the map:** start SW below the crest; Soviet base on an 8 m plateau NE with three ramps (A 14 m main haul road,
+  B 10 m rail incline, C 8 m forester track); a 6 m open pit with two haul roads and an infantry stair; 17 Ore metal
+  nodes (about 21k) + 4 radixite crystals; 477 crushable dead spruces; haul road + three two-track splines.
+  Base (owner 2, labels `WP_Base_*`): barracks, assembly yard, admin bunker, fuel store, three MG towers, megaphone.
+  `WP_Site_Director` (AEnemyItemSiteDirector, the enemy start); signature slots `WP_Slot_LongSlot` (130 x 20 m),
+  `L1-L3`, `S1-S3`, `G1` with **no content yet**; strength slots `WP_Strength_*` (bunkers x2, minefield, AA x2,
+  garrison at 50 % strength); `UDestroyEnemyItemSiteMission` in the mission manager.
+- **Checked:** navmesh paths from the start to the base, pit, slots and all 22 resource points; a `-game` run with
+  0 material errors; the director builds the site once the game is unpaused (`RTS_ENEMY_ITEM_SITE built
+  item=Airfield ... victoryTargets=0`: expected until the slots have content).
+- **Still open for this map:** slot content per item type, the profiles asset (decision tree: the enemy controller
+  reports "No stochastic decision tree"), cliff kit / mineral flora / buried armour dressing, an in-game look pass.
+
+## 5g. First field map: Field_OreViadukt (2026-11-25)
+
+Supply-convoy field map in the Ore Mountains; the owner picked concept **B "Viadukt"** from three
+(`MapDesigner/ConvoyMaps/Ore/README.md`, contact sheet `ore_convoy_ABC.png`) and asked to build it.
+
+- **Map:** `/Game/RTS_Survival/Maps/Campaign/EnemyMapObjects/Field_OreViadukt`, copied from `ToCopy/RTS_ToCopyMap`.
+  640 x 640 m play area, landscape 13 x 13 components (819 m), the Ore landscape instance
+  `MI_RTS_Landscape_DryCastle_OreMountains` with Wismut's 11 layers. Data assets in the folder named like the map:
+  `Field_OreViadukt/DA_Convoy_Field_OreViadukt`.
+- **Design source:** `MapDesigner/ConvoyMaps/Ore/convoy_ore_B.layout.json` (generator `gen_convoy_ore.py`, timings
+  `convoy_timing.py`). **Build tools:** `Source/Tools/FieldMaps/`: `ovk_terrain_gen.py` (heights + layers + reach checks,
+  `Saved/FieldMaps/OreViadukt/terrain/check.txt`), `ovk_cliffs.py` (Ore cliff kit C on the gorge walls, reusing the kit's
+  own placer), `ovk_map_build.py` (editor steps; reuses `wismut_map_build` by retargeting its globals), `ovk_nav_check.py`
+  (paths per nav agent), `field_editor_server.py` + `field_cmd.py` (throwaway editor command loop, folder `Saved/FieldMaps/cmd`).
+- **Terrain:** the Floeha gorge runs NW-SE through the map and on through the camera margin: rim 50 m from the axis,
+  walls sharpened to 54-63 deg (no agent climbs them), floor -14 m, a 3 m deep river channel that only the ford crosses
+  (shallow bed for 20 m). Crossings: the **viaduct** (road), the **ford** in the SE (two 12 m tracks down and up the walls,
+  every class), the **old rail trestle** in the NW (3 m clear: infantry and light tanks only, checked on the navmesh:
+  134 m across for Character/LightTank, 882 m detour for Medium/HeavyTank).
+- **Viaduct + trestle meshes** (Blender, `CustomMapItems/Environment/GorgeViaduct`, A4 kit language and `MI_A4_*`
+  materials): `/Game/RTS_Survival/Blueprints/Environment/OreMountains/GorgeViaduct/SM_GorgeViaduct_Deck|_Structure`,
+  `SM_GorgeTrestle_Deck|_Structure`. The **Deck** meshes use the `GroundNoBuilding` profile (blocks the Landscape trace
+  channel that tracked vehicles drive on) and are placed 3 cm proud of the upland; the **Structure** meshes are
+  BlockAll. Viaduct 132 m, 21.7 m between the parapets, 7 arches, open bays (10.3 m between piers) over the floor.
+- **Convoy:** `OVK_Convoy_Route` (AEnemyConvoyRoute, RouteId `OVK_Convoy`, 49 route points from 15 m inside the W edge
+  to 15 m inside the E edge, Start On Begin Play off, FirstConvoyDelay 60 s, Repeat Once, owner 2):
+  - **stop** 60 s at the Wismut fuel depot on the W leg (boom barrier + destructible fuel tanks);
+  - **branch:** Fuel trucks turn off right after the viaduct to shaft 7 (destination `OVK_Marker_BranchDest` in front of
+    the headframe mesh `SM_OreHF_Headframe`);
+  - **ambush zones** at the viaduct, the rim road and the trestle bend, radio post = `OVK_Radio_Funkbude`
+    (`BP_OreRadio_Funkbude`, owner 2) on the SW knoll;
+  - **hunters:** one Mosin squad per truck dismounts 60 m past the viaduct and attack-moves to `OVK_Marker_HQ`.
+  - **Definition** `DA_Convoy_Field_OreViadukt` = `DA_Convoy_VehicleParts` with the column [ZilAmmo, ZilFuel (cargo Fuel),
+    ZilAmmo, ZilAmmo]; `ResizeTruckColumn` repeats it, so 3-8 trucks carry 1-2 fuel trucks. The Zil fuel truck's
+    calibrated cruise (1006 cm/s) sets the pace: **503 cm/s**.
+- **Director** `OVK_Site_Director` at the enemy start (SW): `ArmySettings.ConvoyRoute` = the route; **TestContext** =
+  division operation, SovietSupplyConvoy, 6 trucks, so pressing Play on the map runs a convoy battle. Five strength slots
+  (`OVK_Strength_*`: MG bunker at the SW viaduct head [Bunkers], Bofors at the depot [AA], light AT minefield at the NE
+  abutment [Minefields], dome bunker garrison at shaft 7 [strength 50 %], DShK pit at the trestle bend [strength 25 %]),
+  `UDestroyEnemyItemSiteMission` in the mission manager.
+- **Dressing:** 962 cliff-kit instances on the gorge walls (no collision), river water planes (`MI_Water_Shore`), 463 dead
+  spruce (`BP_OreDeadSpruce_*`, crushable), 133 crushable Ore rocks, 4 Ore metal nodes, buried Flak-Luchs, road splines
+  (main road in two parts, the viaduct deck is the road over the gorge) and two-track paths.
+- **Checked (build editor, 2026-11-25):** route drive path reached, 1269 m for 1273 m of control points, 17 path points
+  on the viaduct deck; fuel branch 215 m to shaft 7; every agent reaches the depot over the viaduct (427 m from the HQ)
+  and crosses the ford (231 m rim to rim). Infantry/light-tank queries from the SW corner to the far NE come back
+  partial (Recast search-node budget on a long tree-dense query), medium/heavy complete. Map saved after a blocking
+  nav rebuild (32 MB).
+- **Fix pass (same day, after a review):** woods and rocks cleared 14 m from the main road centre line (the flank
+  escorts drive 9 m off it), the MG bunker slot moved from 10 m to 22 m off the road and the minefield to 30 m, the boom
+  barrier to 15 m, the landscape under both ends of each crossing (wing walls included) flattened to -5 cm (deck top
+  +3 cm), the farm track rerouted around shaft 7. A reload of the saved map confirmed the route, branch destination,
+  radio post, hunter target, director route + TestContext, deck collision profiles and the mission survive on disk.
+- **Not run:** a play test (owner tests). **Trucks crossing the deck in game are unverified** (the navmesh drive path
+  crosses it; the deck blocks the Landscape trace channel like other driveable meshes). Units under the arches are
+  unverified too; the two end bays have only about 4.2 m of floor between the outer pier and the wall.
+- **Hunters** spawn from enemy wave supply; the default is 20 (`FEnemyResources::WaveSupply`), not raised on this map.
+- **Field battles:** the director has no `Profiles` (no `UEnemyItemSiteProfiles` asset exists in the project yet), so a
+  tank or infantry division on Enemy AI Control reports "no decision tree" here, as on Wismut. Convoy battles do not
+  need one.
+- **Owner step:** the map is **not yet in the world controller's `HandmadeFieldMaps`** (world controller Blueprint
+  defaults, World Campaign|Operations).
+
+## 5h. Second field map: Field_BerlinKanal (2026-11-25)
+
+Supply-convoy field map in ruined Berlin; the owner picked concept **B "Kanalufer"** from three
+(`MapDesigner/ConvoyMaps/Berlin/README.md`, contact sheet `berlin_convoy_ABC.png`) and asked to implement it.
+
+- **Map:** `/Game/RTS_Survival/Maps/Campaign/EnemyMapObjects/Field_BerlinKanal`, copied from `ToCopy/RTS_ToCopyMap`.
+  680 x 680 m play area, landscape 14 x 14 components (882 m), the Ger_Berlin landscape instance
+  `MI_RTS_Landscape_Berlin` (BerlinRubble / Ash / Cobble / Glass / Scrub / Mud), Ger_Berlin's ash-grey light (no
+  height fog). Data asset in the folder named like the map: `Field_BerlinKanal/DA_Convoy_Field_BerlinKanal`.
+- **Design source:** `MapDesigner/ConvoyMaps/Berlin/convoy_berlin_B.layout.json` (generator `gen_berlin_convoy.py`,
+  timings `convoy_timing.py`). **Build tools** in `Source/Tools/FieldMaps/`: `bku_terrain_gen.py` (heights, layers and
+  the whole dressing list; reach checks in `Saved/FieldMaps/BerlinKanal/terrain/check.txt`), `bku_map_build.py`
+  (editor steps; reuses `wismut_map_build` by retargeting its globals, as `ovk_map_build` does), `bku_nav_check.py`,
+  `bku_editor_server.py` + `bku_cmd.py` (own command folder `Saved/FieldMaps/cmd_bku`). Request scripts used:
+  `Saved/FieldMaps/BerlinKanal/r1..r5`.
+- **Terrain:** a 24 m canal runs W-E through the middle in a 4.2 m deep channel; the quay walls are 63-65 deg (no agent
+  walks in), DBK concrete quay-wall modules on both banks, water planes at -1.5 m. The three crossings are **earth dams
+  flush with the banks** (plain landscape navmesh, no drivable mesh): the **road bridge** (20 m, the main road), the
+  **freight-line bridge** (11 m, W), the **lock footbridge** (5 m, E) with `BP_NavBlocker_VolumeBlockTanks`.
+  Concrete deck tiles (no collision) and 84 cm parapets (block) sit on the dams, concrete facings on the dam sides; the
+  road bridge crosses the canal at about 50 deg, so its deck, parapets and facings are sized per strip from where the dam
+  meets each bank (up to 24 m from the bridge centre), and the quay walls stop at the dam on both banks.
+  A +4 m freight-line embankment NW, the +10 m Truemmerberg with the flak battery NE, rubble mounds and craters.
+- **Dressing:** 368 destructible Ger_Berlin ruin-kit actors (`BP_BerlinRuin_E1/E2/E4-E7/B5`, tint + soot per actor) on the
+  drawing's blocks, facing their streets, kept 14.5 m from the main-road centre line (flank escorts drive 9 m off it);
+  478 backdrop ruins as instanced meshes in the camera margin (none on the road's run-out past either edge); footprint skirts under every ruin; rubble heap cover
+  and dead trees (`BP_BerlinCoverHeap_*`, `BP_Scorch_Dest_Dead*`, willows on the canal banks); three Berlin cover pieces
+  at every ambush spot; freight-line rail panels; crater and debris decals; freight-yard and battery props.
+- **Convoy:** `BKU_Convoy_Route` (AEnemyConvoyRoute, RouteId `BKU_Convoy`, 39 route points from 5 m inside the N edge to
+  5 m inside the S edge, both road-bridge ends forced, Start On Begin Play off, FirstConvoyDelay 60 s, Repeat Once,
+  owner 2). No stop and no hunters (concept B).
+  - **Branch:** Ammo trucks turn off at the north bridgehead, 272 m along the north quay to the flak battery's ammo
+    bunker at the hill foot (`BKU_Marker_BranchDest`).
+  - **Ambush zones:** two (north-bank straight and the south-bank road), radio post `BKU_Radio_Funkbude`
+    (`BP_OreRadio_Funkbude`, owner 2) at the north bridgehead.
+  - **Definition** `DA_Convoy_Field_BerlinKanal` = `DA_Convoy_VehicleParts` with the column [ZilAmmo, ZilAmmo (cargo
+    Ammo), ZilAmmo, ZilAmmo] (the definition's own cargo stays VehicleParts, so only the Ammo trucks branch); every truck
+    is calibrated 1372 cm/s, so the pace is **686 cm/s**, the design pace.
+- **Director** `BKU_Site_Director` in the freight yard (N): `ArmySettings.ConvoyRoute` = the route; **TestContext** =
+  division operation, SovietSupplyConvoy, 6 trucks. Five strength slots (`BKU_Strength_*`): MG bunker at the north
+  bridgehead [Bunkers], Bofors on the flak hill [AA], light AT minefield on the south quay [Minefields], dome bunker
+  garrison in the warehouse [strength 50 %], ZiS gun bunker by the rail bridge [strength 25 %; moved 12.5 m off the
+  freight line, where the drawing had it].
+  `UDestroyEnemyItemSiteMission` in the mission manager.
+- **Checked (build editor, 2026-11-25):** route drive path reached, 911 m for 912 m of control points, 4 path points on
+  the road bridge; ammo branch reached, 272 m. Every nav agent reaches all five ambush spots from the HQ (77-300 m),
+  the battery (321 m) and the director (540 m). With the project's nav filters the lock footbridge is infantry only
+  (Character 42 m across; every tank filter detours 274-280 m over the road bridge). A reload of the saved map confirmed
+  the route, branch, radio post, director route + TestContext, slots and mission (28 MB, nav rebuilt before the save).
+- **Not run / not seen:** a play test (owner tests) and any render: ruin facing, quay-wall and parapet orientation, the
+  water and the ground in `-game` (landscape SRV cap) rest on the kit conventions only, no screenshot was taken (VRAM was
+  too full with two editors open). Flank escorts on the road bridge (9 m off centre, parapets at 9.9 m; flank squads at
+  14 m are off the dam) are a play-test item: the drive path only proves the trucks cross.
+- **Field battles:** no `UEnemyItemSiteProfiles` yet (same as Wismut and Field_OreViadukt).
+- **Owner step:** add the map to the world controller's `HandmadeFieldMaps` (world controller Blueprint defaults,
+  World Campaign|Operations).
