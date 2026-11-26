@@ -3,10 +3,13 @@
 
 #include "W_SelectedUnitDescription.h"
 
+#include "Components/HorizontalBox.h"
 #include "Components/Image.h"
+#include "Components/PanelWidget.h"
 #include "Components/VerticalBox.h"
 #include "RTS_Survival/Game/GameState/UnitDataHelpers/UnitDataHelpers.h"
 #include "RTS_Survival/GameUI/Healthbar/Healthbar_TargetTypeIconState/ProjectSettings/TargetTypeIconSettings.h"
+#include "RTS_Survival/GameUI/TacticalIcons/TacticalIconCatalog.h"
 #include "RTS_Survival/RTSComponents/ArmorCalculationComponent/ArmorCalculation.h"
 #include "RTS_Survival/RTSComponents/ArmorComponent/Armor.h"
 #include "RTS_Survival/UnitData/ArmorAndResistanceData.h"
@@ -23,6 +26,8 @@ void UW_SelectedUnitDescription::SetupUnitDescription(const AActor* SelectedActo
 	{
 		return;
 	}
+	// The armor icon setup below shows the armor type again; SetupTacticalIcons decides for the new unit.
+	bM_HasSetupTacticalIcons = false;
 	bool bValidResistanceData = false;
 	FResistanceAndDamageReductionData ResistanceData = FUnitResistanceDataHelpers::GetUnitResistanceData(
 		SelectedActor, bValidResistanceData);
@@ -42,6 +47,87 @@ void UW_SelectedUnitDescription::SetupUnitDescription(const AActor* SelectedActo
 		SetupResistanceDescriptions(ResistanceData, SelectedActor);
 	}
 	OnSetupUnitDescription(PrimaryUnitType, NomadicSubtype, TankSubtype, SquadSubtype, ResistanceData, BxpSubtype);
+}
+
+void UW_SelectedUnitDescription::SetupTacticalIcons(const UObject* PortraitResource)
+{
+	if (bM_HasSetupTacticalIcons && M_TacticalIconsPortrait.Get() == PortraitResource)
+	{
+		return;
+	}
+	bM_HasSetupTacticalIcons = true;
+	M_TacticalIconsPortrait = PortraitResource;
+
+	TArray<const FTacticalIconInfo*> Icons;
+	if (IsValid(TacticalIconCatalog))
+	{
+		TacticalIconCatalog->GetIconsForPortrait(PortraitResource, Icons);
+	}
+	const bool bHasTacticalIcons = Icons.Num() > 0 && IsValid(TacticalIconsBox);
+	SetArmorTypeVisible(not bHasTacticalIcons);
+	if (not IsValid(TacticalIconsBox))
+	{
+		return;
+	}
+	TacticalIconsBox->SetVisibility(bHasTacticalIcons
+		                                ? ESlateVisibility::HitTestInvisible
+		                                : ESlateVisibility::Collapsed);
+	SetupTacticalIconRow(TacticalIconRow1, TacticalIconImage1, TacticalIconText1, Icons.IsValidIndex(0) ? Icons[0] : nullptr);
+	SetupTacticalIconRow(TacticalIconRow2, TacticalIconImage2, TacticalIconText2, Icons.IsValidIndex(1) ? Icons[1] : nullptr);
+}
+
+void UW_SelectedUnitDescription::SetupTacticalIconRow(UHorizontalBox* Row, UImage* Image, URichTextBlock* Text,
+                                                      const FTacticalIconInfo* IconInfo) const
+{
+	if (not IsValid(Row))
+	{
+		return;
+	}
+	if (not IconInfo)
+	{
+		Row->SetVisibility(ESlateVisibility::Collapsed);
+		return;
+	}
+	Row->SetVisibility(ESlateVisibility::HitTestInvisible);
+	if (IsValid(Image))
+	{
+		// Keep the designer's image size.
+		Image->SetBrushFromTexture(IconInfo->BadgeTexture, false);
+	}
+	if (IsValid(Text))
+	{
+		Text->SetText(FText::FromString(GetTacticalIconRichDescription(IconInfo->Description)));
+	}
+}
+
+void UW_SelectedUnitDescription::SetArmorTypeVisible(const bool bVisible) const
+{
+	const ESlateVisibility ArmorTypeVisibility = bVisible ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed;
+	if (IsValid(ArmorTypeOverlay))
+	{
+		ArmorTypeOverlay->SetVisibility(ArmorTypeVisibility);
+	}
+	if (IsValid(ArmorTypeText))
+	{
+		ArmorTypeText->SetVisibility(ArmorTypeVisibility);
+	}
+	// When shown again, the armor icon state of the next unit setup decides whether the icon itself is visible.
+	if (IsValid(TargetTypeIcon) && not bVisible)
+	{
+		TargetTypeIcon->SetVisibility(ESlateVisibility::Collapsed);
+	}
+}
+
+FString UW_SelectedUnitDescription::GetTacticalIconRichDescription(const FText& Description) const
+{
+	const FString Line = Description.ToString();
+	FString Highlighted;
+	FString Rest;
+	if (not Line.Split(TEXT(":"), &Highlighted, &Rest))
+	{
+		return RTSRichtText(Line, ERTSRichText::Text_Armor);
+	}
+	return RTSRichtText(Highlighted, ERTSRichText::Text_Armor) + TEXT(":") + Rest;
 }
 
 void UW_SelectedUnitDescription::NativeOnInitialized()

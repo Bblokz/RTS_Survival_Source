@@ -96,6 +96,9 @@ protected:
 private:
 	
 	bool EnsureIsValidUnitDescription() const;
+
+	// The texture (or material) of the portrait brush the Blueprint set for the selected unit.
+	const UObject* GetPortraitResource() const;
 	
 	ERTSAggroBehaviour RotateAggroStance(const ERTSAggroBehaviour CurrentAggroStance) const;
 	ETargetPreference RotateTargetPreference(const ETargetPreference TargetPreference) const;

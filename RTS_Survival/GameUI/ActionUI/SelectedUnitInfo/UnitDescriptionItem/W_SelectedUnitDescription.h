@@ -10,8 +10,11 @@
 #include "W_SelectedUnitDescription.generated.h"
 
 enum class ERTSRichText : uint8;
+class UTacticalIconCatalog;
+struct FTacticalIconInfo;
 struct FFireResistanceData;
 class UHorizontalBox;
+class UPanelWidget;
 struct FResistanceAndDamageReductionData;
 class UArmorCalculation;
 enum class ESquadSubtype : uint8;
@@ -37,6 +40,14 @@ public:
 	                          const ENomadicSubtype NomadicSubtype,
 	                          const ETankSubtype TankSubtype,
 	                          const ESquadSubtype SquadSubtype, const EBuildingExpansionType BxpSubtype);
+
+	/**
+	 * @brief Shows the tactical icons engraved on the unit portrait, each with a one-line explanation, in place of the
+	 * armor type icon and name. Falls back to the armor type for portraits without tactical icons.
+	 * Cheap to call every tick: does nothing while the portrait stays the same.
+	 * @param PortraitResource The resource object of the selected unit's portrait brush.
+	 */
+	void SetupTacticalIcons(const UObject* PortraitResource);
 
 protected:
 
@@ -73,10 +84,33 @@ protected:
 
 	UPROPERTY(meta = (BindWidget), BlueprintReadOnly)
 	UVerticalBox* AmmoTypeBox;
-	UPROPERTY(meta = (BindWidget), BlueprintReadOnly)
+	// Armor type icon + name; only shown for portraits without tactical icons. The overlay holds both.
+	UPROPERTY(meta = (BindWidgetOptional), BlueprintReadOnly)
+	TObjectPtr<UPanelWidget> ArmorTypeOverlay;
+	UPROPERTY(meta = (BindWidgetOptional), BlueprintReadOnly)
 	UImage* TargetTypeIcon;
-	UPROPERTY(meta = (BindWidget), BlueprintReadOnly)
+	UPROPERTY(meta = (BindWidgetOptional), BlueprintReadOnly)
 	URichTextBlock* ArmorTypeText;
+
+	// The tactical icons of the portrait (left corner first), each a row of badge + one-line explanation.
+	UPROPERTY(meta = (BindWidgetOptional), BlueprintReadOnly)
+	TObjectPtr<UVerticalBox> TacticalIconsBox;
+	UPROPERTY(meta = (BindWidgetOptional), BlueprintReadOnly)
+	TObjectPtr<UHorizontalBox> TacticalIconRow1;
+	UPROPERTY(meta = (BindWidgetOptional), BlueprintReadOnly)
+	TObjectPtr<UImage> TacticalIconImage1;
+	UPROPERTY(meta = (BindWidgetOptional), BlueprintReadOnly)
+	TObjectPtr<URichTextBlock> TacticalIconText1;
+	UPROPERTY(meta = (BindWidgetOptional), BlueprintReadOnly)
+	TObjectPtr<UHorizontalBox> TacticalIconRow2;
+	UPROPERTY(meta = (BindWidgetOptional), BlueprintReadOnly)
+	TObjectPtr<UImage> TacticalIconImage2;
+	UPROPERTY(meta = (BindWidgetOptional), BlueprintReadOnly)
+	TObjectPtr<URichTextBlock> TacticalIconText2;
+
+	// Which tactical icons each portrait carries (DA_TacticalIconCatalog). Hard reference so the badges are cooked.
+	UPROPERTY(EditDefaultsOnly, Category = "TacticalIcons")
+	TObjectPtr<UTacticalIconCatalog> TacticalIconCatalog;
 	
 
 	UFUNCTION(BlueprintImplementableEvent)
@@ -107,6 +141,15 @@ private:
 	int32 GetDmgPercentageFromMlt(const float Mlt) const;
 
 	FString RTSRichtText(const FString& Text, const ERTSRichText TextType) const;
+
+	void SetupTacticalIconRow(UHorizontalBox* Row, UImage* Image, URichTextBlock* Text,
+	                          const FTacticalIconInfo* IconInfo) const;
+	void SetArmorTypeVisible(const bool bVisible) const;
+	FString GetTacticalIconRichDescription(const FText& Description) const;
+
+	// The portrait the tactical icons were last set up for; null when never set up.
+	TWeakObjectPtr<const UObject> M_TacticalIconsPortrait;
+	bool bM_HasSetupTacticalIcons = false;
 
 
 	UPROPERTY()

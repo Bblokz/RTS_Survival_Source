@@ -3,6 +3,7 @@
 
 #include "W_SelectedUnitInfo.h"
 
+#include "Components/Image.h"
 #include "RTS_Survival/RTSComponents/RTSTargetAcquisition/RTSEngagementStance/RTSAggroBehaviour.h"
 #include "RTS_Survival/Units/Tanks/TankMaster.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
@@ -58,6 +59,17 @@ void UW_SelectedUnitInfo::SetupUnitDescriptionForNewUnit(const AActor* SelectedA
 	                                      TankSubtype,
 	                                      SquadSubtype, BxpSubtype
 	);
+	// SetupUnitInfoForNewUnit (Blueprint) has set the portrait by now; NativeTick catches a portrait set later.
+	UnitDescription->SetupTacticalIcons(GetPortraitResource());
+}
+
+const UObject* UW_SelectedUnitInfo::GetPortraitResource() const
+{
+	if (not IsValid(M_UnitInfoImage))
+	{
+		return nullptr;
+	}
+	return M_UnitInfoImage->GetBrush().GetResourceObject();
 }
 
 void UW_SelectedUnitInfo::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
@@ -79,6 +91,7 @@ void UW_SelectedUnitInfo::NativeTick(const FGeometry& MyGeometry, float InDeltaT
 	// Flip the description’s visibility based on whether the mouse is over the border
 	if (UnitInfoBorder->IsHovered())
 	{
+		UnitDescription->SetupTacticalIcons(GetPortraitResource());
 		UnitDescription->SetVisibility(ESlateVisibility::Visible);
 		M_ActionUIManager->OnHoverSelectedUnitInfo(true);
 	}

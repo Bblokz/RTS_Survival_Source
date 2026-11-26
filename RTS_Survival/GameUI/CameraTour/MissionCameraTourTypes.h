@@ -3,6 +3,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "RTS_Survival/GameUI/LocationIntro/LocationIntroTypes.h"
+#include "RTS_Survival/GameUI/Portrait/RTSPortraitTypes.h"
 
 #include "MissionCameraTourTypes.generated.h"
 
@@ -66,6 +68,44 @@ struct FMissionCameraTourShot
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Caption")
 	FText Subtitle;
+
+	// Voice line spoken over this shot through the tour's portrait; it starts VoiceLineDelaySeconds into the shot
+	// (queued behind a line still playing). The shot is lengthened so the line fits. A skip drops the lines of the
+	// shots it jumps over; a line already playing finishes in the HUD portrait. None = no line.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Voice")
+	TObjectPtr<USoundBase> VoiceLine = nullptr;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Voice")
+	ERTSPortraitTypes VoiceLinePortrait = ERTSPortraitTypes::GermanAnnouncer;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Voice", meta = (ClampMin = "0.0"))
+	float VoiceLineDelaySeconds = 0.5f;
+};
+
+/**
+ * @brief Optional location title at the start of a camera tour (the ShowLocationIntro card: place top centre, date
+ * typed bottom left, optional fade from black), so a map opening is one cinematic with one skip prompt.
+ */
+USTRUCT(BlueprintType)
+struct FMissionCameraTourOpeningTitle
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Title")
+	bool bShowTitle = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Title", meta = (EditCondition = "bShowTitle"))
+	FLocationIntroTexts Texts;
+
+	// Timing, fade from black and sounds. The bars are the tour's own: its bar settings override these.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Title", meta = (EditCondition = "bShowTitle"))
+	FLocationIntroPresentation Presentation;
+
+	// Seconds from the start of the tour until the title has faded out; lengthened when the texts need longer to
+	// type out. 0 uses 7.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Title",
+		meta = (EditCondition = "bShowTitle", ClampMin = "0.0"))
+	float DurationSeconds = 7.f;
 };
 
 /** Presentation of a whole camera tour. */
@@ -95,4 +135,8 @@ struct FMissionCameraTourSettings
 	// BP_OnCameraTourFinished still fires (bWasShown true). Voice lines already playing go on in the HUD portrait.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Presentation")
 	bool bAllowSkipping = false;
+
+	// Place-and-date card over the first shots (off by default). A skip closes it at once, fade included.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Presentation")
+	FMissionCameraTourOpeningTitle OpeningTitle;
 };
