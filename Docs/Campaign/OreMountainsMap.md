@@ -636,3 +636,72 @@ miners' shelter). Kit: `D:/Blender/BlenderProjects/BlenderTanks/CustomMapItems/E
   `Saved/OreMountains/adits/backup/Ger_2ndOreMountains_before_adits.umap`.
 - Not done: a play session with a real captured lorry (the Blueprint child of `ASurrenderingCargoTruck` and the Ore
   convoy definitions do not exist yet); the light cost in game; LOD distances judged in game.
+
+## Life pass: decals, layer blending, animals (2026-11-26)
+
+Owner goal: more detail and a more alive world without costing much performance; decals, softer blends between
+ground types, VAT animals that fit. The landscape material is at the 64-SRV limit, so no new layers: blending is done
+in the existing weightmaps and with decals. Tools in `Source/Tools/OreMountainsMap/`, data in `Saved/OreMountains/life/`.
+
+1. `ore_life_survey.py` (headless, read-only): the decals and objects already in the map -> `survey.json`
+   (453 decals before the pass, mostly OreCliff stains / seeps and craters; 155 sites / buildings / props).
+2. `ore_life_export_weights.py` (headless commandlet): the live weightmaps -> `weights/<Layer>.raw` + `height.raw` +
+   `region.json` (`ORE_LIFE_WEIGHTS_OUT` writes elsewhere, e.g. `weights_check/` to check a save).
+3. `ore_life_blend.py` (offline numpy): where a layer's weight changes faster than 0.30 per metre (a hard cut-out
+   line from the RTS camera) it is blended toward a Gaussian blur (sigma 1.8 m) under a feathered mask, then totals
+   are renormalised. Roads, paving, ditch lips, viaduct deck, pads and Asphalt stay crisp. 20,631 edge texels,
+   154,042 blended. Hard edges before -> after: MountainTop 5542 -> 1682, Ochre 5956 -> 111, SlateScree 4624 -> 62,
+   RockDesert 2971 -> 165, DarkEarth 2870 -> 242, IronOxide 1918 -> 66. Zero runtime cost. Mask: `weights_blend/blend_mask.png`.
+   Checked after the last save: the map's exported weights equal `weights_blend/*.raw` (max difference 0, all 11 layers).
+4. `ore_life_gen.py` (offline): plan of 311 decals and 14 animals -> `life_plan.json` + `life_plan.png`.
+   - Decals (labels `ORE_Life_<Group>_NNN`, folder `OreMountains/Life/Decals/<Group>`, sort order 2, default fade
+     screen size 0.01 so they cull when zoomed out). Materials: Megascans Gravel / Arid Debris / Scattered Bones, the
+     GroundPath DustSpill / MudChurn / RutFade, OreCliff DampPatch. RockSeat 91 (gravel ring + debris fan on
+     rockworks, gravel under crushable rocks), CliffFoot 62 (gravel / debris along cliff and escarpment feet),
+     LayerEdge 45 (dust / gravel on the hardest edges of the *pre-blend* layer raws in `terrain/`), WoodFloor 28
+     (debris, 4 bone scatters, damp patches in the dead forest), RoadShoulder 15 + Junction 4 (valley road wear,
+     track mouths), SiteSeat 66 (dust around sites and buildings; MudChurn only on small busy footprints, none wider
+     than 7 m).
+   - Projection depth is fitted per decal to the landscape relief under it (+60 cm, 100-400 cm, at most 180 cm for
+     decals that touch rocks, cliffs or buildings).
+   - Rejected on the first in-game shots: fixed 3-6 m projection boxes (a rubble strip smeared up a cliff face as
+     orange streaks); the CliffStone decals (`CliffKit/Decals/CliffStones`, made for the Intro map and never used
+     here before) - orange flakes against this map's pale rock; MudChurn blown up to 10-20 m - dark hairy rosettes
+     around the battery.
+   - Survey objects whose bounds reach the world origin (memory: actor-bounds-seating-trap; 2 poles, a log, 2 kerbs)
+     get no seat decal: their bounds origin is half-way to (0, 0).
+   - Animals (folder `OreMountains/Life/Animals`): 3 crow flocks and 1 ink-raven flock circling the largest dead-wood
+     blobs (ellipses 60-80 x 32 m, height 15 m, 6-7 birds, one draw call each); 2 feral goat herds (4 + 3) on the
+     north foothills (wander 16 m); 4 chickens in the Base A yard (wander 7 m). The wanderers have no collision and
+     do not affect navigation (`AWanderer`).
+5. `ore_life_place.py` (throwaway full editor, launched from PowerShell): deletes `ORE_Life_*`, imports the blended
+   weights (`ORE_LIFE_SKIP_BLEND=1` keeps them), places decals at the landscape height and spawns the animals, rebuilds
+   the navmesh, saves. Re-runnable. Backup before the pass:
+   `Saved/OreMountains/stages/backup/Ger_2ndOreMountains_2026-11-26_pre_life.umap`. umap 46.8 -> 47.4 MB.
+
+**Cost.** Offscreen `-game` probe at 1080p Epic (`PerfAudit/run_gpu_probe.sh` with
+`EXEC="ShowFlag.PostProcessMaterial 0"`: without it the unexplored fog of war renders black and the views measure
+nothing), decals on vs off per view. Two other editors kept the GPU at about 98%, so the numbers are noisy:
+
+- Steady views: +0.8 to +1.1 ms GPU with decals on (four views of run `OreLife2`, at 25-35 ms frames). That is all decals in view, the
+  ~450 older ones and this pass together, not this pass's own delta. Read it as a rough figure, not a bound.
+- Discarded as contention: two views in `OreLife2` (+34 and +52 ms swings with decals on), and the first run
+  `OreLife` (fog black, +4 to +5 ms early swings).
+- Not measured: animal cost (flocks are one instanced draw each, wanderers tick only while walking) and game-thread
+  cost.
+
+Logs: `Saved/Logs/PerfProbe_OreLife2.log`, `PerfProbe_OreLifeFinal.log`. Final shots: `Saved/PerfAudit/Shots/OreLifeFinal_*`,
+sheet `Saved/OreMountains/life/life_final_sheet.jpg`.
+
+**Not done / not checked**
+
+- **A full rebuild wipes the blend.** `ore_map_build.step_landscape()` recreates the landscape from
+  `terrain/Ore_layer_*.raw`. After any rebuild, run export -> blend -> place again.
+- No crow or raven flock showed in a shot: the orbits are wider than the frame. They spawned with their settings
+  (place report: 0 problems) but were not seen flying.
+- Not watched in a play session: flock height against the zoomed-in camera, goats near the convoy roads, chickens in
+  the Base A yard.
+- SiteSeat decals sit centred on buildings and props and can project onto their lowest 1-1.8 m; no building was
+  looked at close up.
+- Decals do not follow the site models if those are placed later: re-run `ore_life_survey.py`, `ore_life_gen.py` and
+  `ore_life_place.py` with `ORE_LIFE_SKIP_BLEND=1` after any site change.
