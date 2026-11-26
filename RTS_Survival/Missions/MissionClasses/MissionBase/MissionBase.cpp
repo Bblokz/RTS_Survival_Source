@@ -97,6 +97,7 @@ void UMissionBase::OnMissionComplete()
 	// Mark the widget as free to be able to be used by another mission.
 	MarkWidgetAsFree();
 	RemoveAllTriggerAreas();
+	StopPlayerResourceSafetyNetIfOwner();
 	MissionState.bIsMissionComplete = true;
 	// Stop any tick behaviour.
 	MissionState.bTickOnMission = false;
@@ -144,6 +145,7 @@ void UMissionBase::ActivateNextMissionIfConfigured()
 void UMissionBase::OnMissionFailed()
 {
 	MissionState.bIsMissionComplete = true;
+	StopPlayerResourceSafetyNetIfOwner();
 	// End the intro now, so it does not hand the HUD back later over the defeat screen.
 	CancelActiveLocationIntro();
 	CancelActiveCameraTour();

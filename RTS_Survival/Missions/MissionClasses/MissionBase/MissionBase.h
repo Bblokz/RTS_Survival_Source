@@ -21,6 +21,7 @@
 #include "RTS_Survival/Game/Difficulty/GameDifficulty.h"
 #include "RTS_Survival/Game/UserSettings/RTSGameUserSettings.h"
 #include "RTS_Survival/Missions/NomadicAirDelivery/NomadicAirDeliveryTypes.h"
+#include "RTS_Survival/Missions/PlayerAirDrop/PlayerResourceSafetyNetTypes.h"
 #include "RTS_Survival/GameUI/InfoTakeover/InfoTakeoverTypes.h"
 #include "RTS_Survival/GameUI/LocationIntro/LocationIntroTypes.h"
 #include "RTS_Survival/GameUI/CameraTour/MissionCameraTourTypes.h"
@@ -429,6 +430,11 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mission|AirDelivery")
 	FNomadicAirDeliverySettings AirDeliverySettings;
 
+	// Used by StartPlayerResourceSafetyNet: the purchases a build-up stage needs and how supply crates are dropped
+	// when the player cannot afford them.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mission|Resource Safety Net")
+	FPlayerResourceSafetyNetSettings PlayerResourceSafetyNet;
+
 	// If set to true then this mission will use a widget with the next button which will instantly complete the mission
 	// once it is clicked and not play any mission completed sounds.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "BaseSettings")
@@ -693,6 +699,17 @@ protected:
 	 */
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|MiniMap")
 	void ShowReinforcementsOnMiniMap(const FVector WorldLocation, const float DurationSeconds = 5.f);
+
+	/**
+	 * @brief Build-up stages: once the player HQ stands, supply crates are parachuted next to it whenever the player
+	 * stays unable to pay for the PlayerResourceSafetyNet purchases not owned yet (pinged on the minimap). Ends by
+	 * itself when all are owned or this mission ends.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|Resource Safety Net")
+	void StartPlayerResourceSafetyNet();
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|Resource Safety Net")
+	void StopPlayerResourceSafetyNet();
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|MiniMap")
 	bool SwapCustomMiniMapIcon(const FName IconId, const EMinimapIconType NewIconType);
@@ -1641,6 +1658,8 @@ private:
 
 	// Ends a running location intro early (HUD back, camera input back) without firing BP_OnLocationIntroFinished.
 	void CancelActiveLocationIntro();
+	// Called when this mission completes or fails: ends the resource safety net if this mission started it.
+	void StopPlayerResourceSafetyNetIfOwner();
 	// Called by the session once it handed the screen back.
 	void OnLocationIntroSessionEnded(const UMissionLocationIntroSession* Session, const int32 ID,
 	                                 const ELocationIntroSessionEnd EndReason);

@@ -22,6 +22,7 @@
 #include "RTS_Survival/Interfaces/Commands.h"
 #include "RTS_Survival/Missions/MissionClasses/SovietCounterattackMission/SovietCounterattackSettings.h"
 #include "RTS_Survival/Missions/MissionManager/MissionManager.h"
+#include "RTS_Survival/Missions/PlayerAirDrop/BuildingFreeDropSpots.h"
 #include "RTS_Survival/Missions/PlayerAirDrop/PlayerAirDropSubsystem.h"
 #include "RTS_Survival/FactionSystem/Factions/Factions.h"
 #include "RTS_Survival/Missions/MissionProps/SovietCargoTrain/SovietCargoTrain.h"
@@ -2331,7 +2332,20 @@ FVector USovietCounterattackMission::BaseReinforcements_GetLandingPoint() const
 	bool bProjected = false;
 	const FVector Projected = RTSFunctionLibrary::GetLocationProjected(GetMissionManagerChecked(), Ground, true,
 	                                                                   bProjected);
-	return bProjected ? Projected : Ground;
+	const FVector OnNavMesh = bProjected ? Projected : Ground;
+	if (Reinforcements.BuildingClearanceRadius <= 0.f)
+	{
+		return OnNavMesh;
+	}
+	// The same spot the cargo plane ability would pick for its first aircraft, so the minimap ping matches it.
+	FVector BuildingFree = OnNavMesh;
+	if (not FBuildingFreeDropSpots::FindBuildingFreeSpot(GetMissionManagerChecked(), OnNavMesh,
+	                                                     Reinforcements.BuildingClearanceRadius, BuildingFree))
+	{
+		RTSFunctionLibrary::ReportError("Soviet counterattack mission " + GetName() + ": no landing point clear of "
+			"the player's buildings near the HQ; the reinforcements use the offset point.");
+	}
+	return BuildingFree;
 }
 
 void USovietCounterattackMission::DropBaseReinforcements()
@@ -2347,6 +2361,7 @@ void USovietCounterattackMission::DropBaseReinforcements()
 	Payload.Vehicles = bStrikeDivision ? Reinforcements.StrikeDivisionVehicles : Reinforcements.BreakthroughVehicles;
 	Payload.Vehicles.Remove(ETankSubtype::Tank_None);
 	Payload.CargoPlaneAbility = Reinforcements.CargoPlaneAbility;
+	Payload.BuildingClearanceRadius = Reinforcements.BuildingClearanceRadius;
 	if (Reinforcements.VoiceLine != nullptr)
 	{
 		PlayPortrait(Reinforcements.VoiceLinePortrait, Reinforcements.VoiceLine);

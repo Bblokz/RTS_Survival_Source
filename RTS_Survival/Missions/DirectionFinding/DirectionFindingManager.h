@@ -64,6 +64,22 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Direction Finding")
 	void ForceFix();
 
+	/**
+	 * @brief A decoy transmitter (the Hard+ radio truck, once parked) starts answering every burst from DecoyLocation:
+	 * each held station gets a second wedge towards it, as wide as its real one and drawn the same. The decoy never
+	 * makes a fix; the fix removes it.
+	 * @param DecoyLocation Where the decoy transmits from (world).
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Direction Finding")
+	void ActivateDecoy(const FVector DecoyLocation);
+
+	/** The decoy went silent (its truck was destroyed): its wedges disappear. */
+	UFUNCTION(BlueprintCallable, Category = "Direction Finding")
+	void DeactivateDecoy();
+
+	UFUNCTION(BlueprintPure, Category = "Direction Finding")
+	bool GetIsDecoyActive() const { return bM_IsDecoyActive; }
+
 	/** Stops the jammer noise bed (the jam lifts at victory). */
 	UFUNCTION(BlueprintCallable, Category = "Direction Finding")
 	void StopJammer();
@@ -245,6 +261,20 @@ private:
 	double GetWorldSeconds() const;
 
 	FDirectionFindingSolver M_Solver;
+	// The decoy's bearings: the same stations, one "Werk" at the decoy's spot. Used only while bM_IsDecoyActive.
+	FDirectionFindingSolver M_DecoySolver;
+	bool bM_IsDecoyActive = false;
+
+	/**
+	 * @brief Adds the open wedges of one solver to the draw data and intersects its held ones.
+	 * @param Solver The real or the decoy bearings.
+	 * @param MapBounds The map's world square.
+	 * @param NowSeconds World time, for the narrowing animation.
+	 * @param OutWedges Receives one draw entry per open wedge.
+	 * @param OutOverlap Receives the polygon inside every held wedge; empty with fewer than two.
+	 */
+	void AppendSolverDrawData(const FDirectionFindingSolver& Solver, const FBox2D& MapBounds, const double NowSeconds,
+	                          TArray<FDirectionFindingWedgeDraw>& OutWedges, TArray<FVector2D>& OutOverlap) const;
 	FRandomStream M_Random;
 	ERTSGameDifficulty M_Difficulty = ERTSGameDifficulty::Normal;
 

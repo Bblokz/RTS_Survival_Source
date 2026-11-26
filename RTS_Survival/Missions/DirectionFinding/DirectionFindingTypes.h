@@ -180,4 +180,6 @@ struct FDirectionFindingDrawData
 	TArray<FDirectionFindingWedgeDraw> Wedges;
 	// Inside every held wedge; empty with fewer than two held wedges.
 	TArray<FVector2D> Overlap;
+	// The decoy transmitter's wedges (in Wedges, drawn alike) overlap here; empty without a decoy or below two.
+	TArray<FVector2D> DecoyOverlap;
 };
