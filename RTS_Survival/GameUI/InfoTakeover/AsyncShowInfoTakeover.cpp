@@ -172,6 +172,17 @@ int32 UAsyncShowWespeBarrageTakeover::QueueTakeover(UInfoTakeoverSubsystem& Info
 	return InfoTakeoverSubsystem.QueueWespeBarrageTakeover();
 }
 
+UAsyncShowDirectionFindingTakeover* UAsyncShowDirectionFindingTakeover::ShowDirectionFindingTakeover(
+	UObject* WorldContextObject)
+{
+	return CreateNode<UAsyncShowDirectionFindingTakeover>(WorldContextObject);
+}
+
+int32 UAsyncShowDirectionFindingTakeover::QueueTakeover(UInfoTakeoverSubsystem& InfoTakeoverSubsystem) const
+{
+	return InfoTakeoverSubsystem.QueueDirectionFindingTakeover();
+}
+
 UAsyncShowDigInTakeover* UAsyncShowDigInTakeover::ShowDigInTakeover(UObject* WorldContextObject)
 {
 	return CreateNode<UAsyncShowDigInTakeover>(WorldContextObject);

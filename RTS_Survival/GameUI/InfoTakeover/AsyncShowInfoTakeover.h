@@ -278,6 +278,32 @@ protected:
 };
 
 /**
+ * @brief Mission node that pauses the game with the Direction Finding field manual (Oder-Warthe: a minimap clip of a
+ * listening post's bearing wedge narrowing and crossing a second one) and continues from On Closed once the player
+ * pressed UNDERSTOOD.
+ */
+UCLASS()
+class RTS_SURVIVAL_API UAsyncShowDirectionFindingTakeover : public UAsyncShowInfoTakeoverBase
+{
+	GENERATED_BODY()
+
+public:
+	/**
+	 * @brief Shows the Direction Finding takeover and waits for it to close.
+	 * @param WorldContextObject The mission (or any object in the game world); filled in as self.
+	 * @return The node; On Closed fires once the player closed it; field manuals ignore "never show again".
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Mission|Info Takeover",
+		meta = (BlueprintInternalUseOnly = "true", DefaultToSelf = "WorldContextObject",
+			HidePin = "WorldContextObject", DisplayName = "Show Direction Finding Takeover"))
+	static UAsyncShowDirectionFindingTakeover* ShowDirectionFindingTakeover(UObject* WorldContextObject);
+
+protected:
+	virtual int32 QueueTakeover(UInfoTakeoverSubsystem& InfoTakeoverSubsystem) const override;
+	virtual FString GetNodeName() const override { return TEXT("Show Direction Finding Takeover"); }
+};
+
+/**
  * @brief Mission node that pauses the game with the Dig In field manual (a Panzer IV digging in
  * behind sandbags while two T-26s fire at it, and how the wall works) and continues from On Closed once the player pressed
  * UNDERSTOOD.

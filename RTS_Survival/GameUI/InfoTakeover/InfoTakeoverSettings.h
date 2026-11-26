@@ -17,6 +17,7 @@ class UW_VulturesAtTakeover;
 class UW_RattleFeedTakeover;
 class UW_WespeBarrageTakeover;
 class UW_DigInTakeover;
+class UW_DirectionFindingTakeover;
 class UW_WallBreachTakeover;
 class UW_AdrenalineShotTakeover;
 class UW_CapturingTrucksTakeover;
@@ -101,6 +102,10 @@ public:
 	// WBP_CapturingTrucksTakeover: the Blueprint child that carries the style for the capturing trucks field manual.
 	UPROPERTY(EditAnywhere, Config, Category = "Tutorials")
 	TSoftClassPtr<UW_CapturingTrucksTakeover> CapturingTrucksTakeoverWidgetClass;
+
+	// WBP_DirectionFindingTakeover: the Blueprint child that carries the style for the Direction Finding field manual.
+	UPROPERTY(EditAnywhere, Config, Category = "Tutorials")
+	TSoftClassPtr<UW_DirectionFindingTakeover> DirectionFindingTakeoverWidgetClass;
 
 	// WBP_DocumentTakeover: the Blueprint child that carries the style for captured documents (the Ore manifest).
 	UPROPERTY(EditAnywhere, Config, Category = "Documents")

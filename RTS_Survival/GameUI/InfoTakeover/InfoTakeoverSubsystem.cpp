@@ -26,6 +26,7 @@
 #include "W_RattleFeedTakeover.h"
 #include "W_WespeBarrageTakeover.h"
 #include "W_DigInTakeover.h"
+#include "W_DirectionFindingTakeover.h"
 #include "W_WallBreachTakeover.h"
 #include "W_AdrenalineShotTakeover.h"
 #include "W_VulturesAtTakeover.h"
@@ -48,6 +49,7 @@ namespace InfoTakeoverSubsystemPrivate
 	const FName RattleFeedArchiveKey(TEXT("InfoTakeover.RattleFeed"));
 	const FName WespeBarrageArchiveKey(TEXT("InfoTakeover.WespeBarrage"));
 	const FName DigInArchiveKey(TEXT("InfoTakeover.DigIn"));
+	const FName DirectionFindingArchiveKey(TEXT("InfoTakeover.DirectionFinding"));
 	const FName WallBreachArchiveKey(TEXT("InfoTakeover.WallBreach"));
 	const FName AdrenalineShotArchiveKey(TEXT("InfoTakeover.AdrenalineShot"));
 	const FName CapturingTrucksArchiveKey(TEXT("InfoTakeover.CapturingTrucks"));
@@ -235,6 +237,11 @@ int32 UInfoTakeoverSubsystem::QueueDigInTakeover()
 	return QueueWaitedTutorialTakeover(EInfoTakeoverKind::DigIn);
 }
 
+int32 UInfoTakeoverSubsystem::QueueDirectionFindingTakeover()
+{
+	return QueueWaitedTutorialTakeover(EInfoTakeoverKind::DirectionFinding);
+}
+
 int32 UInfoTakeoverSubsystem::QueueWallBreachTakeover()
 {
 	return QueueWaitedTutorialTakeover(EInfoTakeoverKind::WallBreach);
@@ -384,6 +391,8 @@ UW_InfoTakeover* UInfoTakeoverSubsystem::CreateTakeoverWidget(const FQueuedInfoT
 		return CreateWespeBarrageTakeoverWidget();
 	case EInfoTakeoverKind::DigIn:
 		return CreateDigInTakeoverWidget();
+	case EInfoTakeoverKind::DirectionFinding:
+		return CreateDirectionFindingTakeoverWidget();
 	case EInfoTakeoverKind::WallBreach:
 		return CreateWallBreachTakeoverWidget();
 	case EInfoTakeoverKind::AdrenalineShot:
@@ -660,6 +669,31 @@ UW_InfoTakeover* UInfoTakeoverSubsystem::CreateDigInTakeoverWidget() const
 	return DigInTakeover;
 }
 
+UW_InfoTakeover* UInfoTakeoverSubsystem::CreateDirectionFindingTakeoverWidget() const
+{
+	ACPPController* const PlayerController = FRTS_Statics::GetRTSController(this);
+	if (not IsValid(PlayerController))
+	{
+		return nullptr;
+	}
+	TSubclassOf<UW_DirectionFindingTakeover> WidgetClass =
+		UInfoTakeoverSettings::Get()->DirectionFindingTakeoverWidgetClass.LoadSynchronous();
+	if (WidgetClass == nullptr)
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Info takeover: WBP_DirectionFindingTakeover could not be loaded; showing "
+			"the unstyled C++ widget."));
+		WidgetClass = UW_DirectionFindingTakeover::StaticClass();
+	}
+	UW_DirectionFindingTakeover* const DirectionFindingTakeover = CreateWidget<UW_DirectionFindingTakeover>(
+		PlayerController, WidgetClass);
+	if (not IsValid(DirectionFindingTakeover))
+	{
+		return nullptr;
+	}
+	DirectionFindingTakeover->SetupDirectionFinding();
+	return DirectionFindingTakeover;
+}
+
 UW_InfoTakeover* UInfoTakeoverSubsystem::CreateWallBreachTakeoverWidget() const
 {
 	ACPPController* const PlayerController = FRTS_Statics::GetRTSController(this);
@@ -830,6 +864,9 @@ void UInfoTakeoverSubsystem::AddToArchive(const FQueuedInfoTakeover& Takeover) c
 	case EInfoTakeoverKind::DigIn:
 		ArchiveContent = MakeDigInArchiveContent();
 		break;
+	case EInfoTakeoverKind::DirectionFinding:
+		ArchiveContent = MakeDirectionFindingArchiveContent();
+		break;
 	case EInfoTakeoverKind::WallBreach:
 		ArchiveContent = MakeWallBreachArchiveContent();
 		break;
@@ -975,6 +1012,19 @@ FArchiveCustomContent UInfoTakeoverSubsystem::MakeWespeBarrageArchiveContent()
 	ArchiveContent.Key = WespeBarrageArchiveKey;
 	ArchiveContent.Title = UW_WespeBarrageTakeover::GetWespeBarrageTitle();
 	ArchiveContent.Description = UW_WespeBarrageTakeover::GetWespeBarrageSummary();
+	// The picture is a flipbook atlas; the archive item only takes a still image of a fixed size.
+	ArchiveContent.bHasImage = false;
+	ArchiveContent.SortType = ERTSArchiveType::GameMechanics;
+	return ArchiveContent;
+}
+
+FArchiveCustomContent UInfoTakeoverSubsystem::MakeDirectionFindingArchiveContent()
+{
+	using namespace InfoTakeoverSubsystemPrivate;
+	FArchiveCustomContent ArchiveContent;
+	ArchiveContent.Key = DirectionFindingArchiveKey;
+	ArchiveContent.Title = UW_DirectionFindingTakeover::GetDirectionFindingTitle();
+	ArchiveContent.Description = UW_DirectionFindingTakeover::GetDirectionFindingSummary();
 	// The picture is a flipbook atlas; the archive item only takes a still image of a fixed size.
 	ArchiveContent.bHasImage = false;
 	ArchiveContent.SortType = ERTSArchiveType::GameMechanics;

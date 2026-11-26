@@ -14,6 +14,7 @@
 #include "W_RattleFeedTakeover.h"
 #include "W_WespeBarrageTakeover.h"
 #include "W_DigInTakeover.h"
+#include "W_DirectionFindingTakeover.h"
 #include "W_WallBreachTakeover.h"
 #include "W_AdrenalineShotTakeover.h"
 #include "W_VulturesAtTakeover.h"
@@ -54,6 +55,9 @@ UInfoTakeoverSettings::UInfoTakeoverSettings()
 	CapturingTrucksTakeoverWidgetClass = TSoftClassPtr<UW_CapturingTrucksTakeover>(FSoftObjectPath(TEXT(
 		"/Game/RTS_Survival/Blueprints/GameUI/InfoTakeover/CapturingTrucks/WBP_CapturingTrucksTakeover."
 		"WBP_CapturingTrucksTakeover_C")));
+	DirectionFindingTakeoverWidgetClass = TSoftClassPtr<UW_DirectionFindingTakeover>(FSoftObjectPath(TEXT(
+		"/Game/RTS_Survival/Blueprints/GameUI/InfoTakeover/DirectionFinding/WBP_DirectionFindingTakeover."
+		"WBP_DirectionFindingTakeover_C")));
 	DocumentTakeoverWidgetClass = TSoftClassPtr<UW_DocumentTakeover>(FSoftObjectPath(TEXT(
 		"/Game/RTS_Survival/Blueprints/GameUI/InfoTakeover/Document/WBP_DocumentTakeover.WBP_DocumentTakeover_C")));
 }
