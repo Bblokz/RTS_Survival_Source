@@ -171,6 +171,12 @@ namespace BxpHelpers
 			FBxpData FieldTrenchData;
 			FieldTrenchData.Cost = FUnitCost({{ERTSResourceType::Resource_Radixite, GerFieldTrench_RadixitePerMetre}});
 			InPlayerDataMap.Add(EBuildingExpansionType::BTX_GerFieldTrench, FieldTrenchData);
+			// The barbed wire line likewise: its price per metre, charged by the line for each piece it strings.
+			FBxpData BarbedWireLineData;
+			BarbedWireLineData.Cost = FUnitCost({
+				{ERTSResourceType::Resource_Radixite, GerBarbedWireLine_RadixitePerMetre}
+			});
+			InPlayerDataMap.Add(EBuildingExpansionType::BTX_GerBarbedWireLine, BarbedWireLineData);
 		}
 
 

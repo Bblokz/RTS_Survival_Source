@@ -181,6 +181,9 @@ enum class EBuildingExpansionType : uint8
 	BTX_GerFlak88Bunker UMETA(DisplayName = "Ger Flak 88 Bunker"),
 	BTX_GerFlakvierlingBunker UMETA(DisplayName = "Ger Flakvierling Bunker"),
 	BTX_GerPZ38TBunker UMETA(DisplayName = "Ger Pz 38(t) Turret Bunker"),
+	// German barbed wire line the player drags out from the HQ; priced per metre, strung piece by piece
+	// (ARTSBarbedWireLine), every piece its own scavenger barbed wire.
+	BTX_GerBarbedWireLine UMETA(DisplayName = "Ger Barbed Wire Line"),
 };
 
 static FString Global_GetBxpTypeEnumAsString(EBuildingExpansionType BxpType)
@@ -219,6 +222,8 @@ static FString Global_GetBxpTypeEnumAsString(EBuildingExpansionType BxpType)
 		return FString("BTX_RusAssemblyYard");
 	case EBuildingExpansionType::BTX_GerFieldTrench:
 		return FString("BTX_GerFieldTrench");
+	case EBuildingExpansionType::BTX_GerBarbedWireLine:
+		return FString("BTX_GerBarbedWireLine");
 	case EBuildingExpansionType::BTX_RusFactory:
 		return FString("BTX_RusFactory");
 	case EBuildingExpansionType::BTX_GerMarderStugFactory:
@@ -417,6 +422,7 @@ static FString Global_GetBxpDisplayString(const EBuildingExpansionType BxpType)
 	case EBuildingExpansionType::BTX_RusPlatformFactory: return TEXT("Platform Factory");
 	case EBuildingExpansionType::BTX_RusAssemblyYard: return TEXT("Assembly Yard");
 	case EBuildingExpansionType::BTX_GerFieldTrench: return TEXT("Field Trench");
+	case EBuildingExpansionType::BTX_GerBarbedWireLine: return TEXT("Barbed Wire");
 	case EBuildingExpansionType::BTX_RusCoolingTowers: return TEXT("Cooling Towers");
 	case EBuildingExpansionType::BTX_RusFuelStorage1: return TEXT("Fuel Storage 1");
 	case EBuildingExpansionType::BTX_RusFuelStorage2: return TEXT("Fuel Storage 2");
@@ -496,6 +502,7 @@ static bool Global_GetIsFieldDefenseBxpType(const EBuildingExpansionType BxpType
 	case EBuildingExpansionType::BTX_GerFlakvierlingBunker:
 	case EBuildingExpansionType::BTX_GerPZ38TBunker:
 	case EBuildingExpansionType::BTX_GerFieldTrench:
+	case EBuildingExpansionType::BTX_GerBarbedWireLine:
 		return true;
 	default:
 		return false;

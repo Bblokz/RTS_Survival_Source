@@ -90,6 +90,7 @@ enum class ERTSPrimaryClickContext;
 struct FPlayerRotationArrowSettings;
 class USquadMovePreviewComponent;
 class UFieldTrenchPlacementComponent;
+class UBarbedWirePlacementComponent;
 enum class ERTSResourceType : uint8;
 class UHoverCommandIconComponent;
 class UFormationMovePreviewComponent;
@@ -774,6 +775,18 @@ public:
 	/** @brief Ends laying out a field trench; a trench that was not confirmed yet is removed. */
 	void StopFieldTrenchPlacement();
 
+	/**
+	 * @brief Starts laying out a barbed wire line picked in the HQ's training menu: a click sets its start (snapped to
+	 * an open end of the player's wire), the line follows the mouse and a second click ends it. The line strings its
+	 * pieces afterwards and pays for each when stringing starts, so the trainer's queue is not used.
+	 * @param Trainer The HQ the wire was picked from.
+	 * @param CostPerMetre What one metre of wire costs.
+	 */
+	void StartBarbedWirePlacement(UTrainerComponent* Trainer, const TMap<ERTSResourceType, int32>& CostPerMetre);
+
+	/** @brief Ends laying out a barbed wire line; a line that was not confirmed yet is removed. */
+	void StopBarbedWirePlacement();
+
 #if RTS_WITH_MAP_TESTS
 	/** @brief Map tests: whether the BXP of a clicked build option has loaded and waits for its placement click. */
 	bool MapTest_GetIsBxpWaitingForPlacement() const;
@@ -803,6 +816,14 @@ public:
 	 * @return Whether laying out the trench is over.
 	 */
 	bool MapTest_ClickFieldTrenchAt(const FVector& Location);
+
+	UBarbedWirePlacementComponent* MapTest_GetBarbedWirePlacement() const { return M_BarbedWirePlacement; }
+
+	/**
+	 * @brief Map tests: a primary click while a barbed wire line is laid out, as the player's click would be handled.
+	 * @return Whether laying out the line is over.
+	 */
+	bool MapTest_ClickBarbedWireAt(const FVector& Location);
 
 	/**
 	 * @brief Map tests: the player converts a nomadic truck: selects it, presses the convert button on its command
@@ -1745,6 +1766,10 @@ private:
 	// Lays out field trenches picked in the HQ's training menu while the field trench preview mode is active.
 	UPROPERTY()
 	TObjectPtr<UFieldTrenchPlacementComponent> M_FieldTrenchPlacement;
+
+	// Lays out barbed wire lines picked in the HQ's training menu while the barbed wire preview mode is active.
+	UPROPERTY()
+	TObjectPtr<UBarbedWirePlacementComponent> M_BarbedWirePlacement;
 
 	bool GetIsValidSquadMovePreview() const;
 

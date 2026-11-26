@@ -84,6 +84,28 @@ void FMoveUnitsFromConstruction::MoveOverlappingUnitsForPlayer1AwayFromConstruct
 	}
 }
 
+void FMoveUnitsFromConstruction::MoveOverlappingUnitsForPlayer1AwayFromBounds(
+	const UObject* WorldContextObject,
+	const FBox& BoundsWS,
+	const FRotator& FinishedMoveRotation)
+{
+	if (not IsValid(WorldContextObject) || BoundsWS.IsValid == 0)
+	{
+		return;
+	}
+	TArray<AActor*> OverlappingActors;
+	GatherOverlappingMoveUnitActors(WorldContextObject, nullptr, BoundsWS, OverlappingActors);
+	TArray<ASquadController*> MovedSquadControllers = {};
+	for (AActor* EachActor : OverlappingActors)
+	{
+		if (not IsValid(EachActor) || not IsOwnedByPlayer1MoveUnit(EachActor))
+		{
+			continue;
+		}
+		IssueMoveOrderIfPossible(EachActor, WorldContextObject, BoundsWS, FinishedMoveRotation, MovedSquadControllers);
+	}
+}
+
 FBox FMoveUnitsFromConstruction::GetWorldBoundsOfPreview(const AActor* PreviewActor)
 {
 	if (not IsValid(PreviewActor))

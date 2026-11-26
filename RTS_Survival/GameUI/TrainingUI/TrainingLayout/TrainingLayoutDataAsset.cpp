@@ -225,7 +225,10 @@ FTrainingLayoutBuilding UTrainingLayoutDataAsset::MakeDefaultHeadquartersLayout(
 		Slot::FieldDefense(EBuildingExpansionType::BTX_GerFlak88Pit)
 	};
 	// A sub section shows nine slots: the shared pits fill Field Defenses, a doctrine's own works go to Barriers.
-	TArray<FTrainingLayoutSlot> Barriers = {Slot::FieldDefense(EBuildingExpansionType::BTX_GerFieldTrench)};
+	TArray<FTrainingLayoutSlot> Barriers = {
+		Slot::FieldDefense(EBuildingExpansionType::BTX_GerFieldTrench),
+		Slot::FieldDefense(EBuildingExpansionType::BTX_GerBarbedWireLine)
+	};
 	Barriers.Append(DoctrineFieldDefenses);
 
 	return MakeBuilding({
@@ -255,7 +258,8 @@ FTrainingLayoutBuilding UTrainingLayoutDataAsset::MakeDefaultHeadquartersLayout(
 			                                   Slot::Nomadic(ENomadicSubtype::Nomadic_GerExperimentalUnitsFactory),
 			                                   Slot::Empty()
 		                                   }),
-		                    // Procedural defenses the player drags out, see UFieldTrenchPlacementComponent.
+		                    // Procedural defenses the player drags out, see UFieldTrenchPlacementComponent and
+		                    // UBarbedWirePlacementComponent.
 		                    MakeSubSection(LOCTEXT("Barriers", "Barriers"), Barriers)
 	                    }, bRequiresUnitCards);
 }
