@@ -29,6 +29,7 @@
 #include "TrackedTank/TrackedAnimationInstance.h"
 #include "TrackedTank/PathFollowingComponent/TrackPathFollowingComponent.h"
 #include "WheeledTank/Components/ChaosTankMovementComponent.h"
+#include "RTS_Survival/Utils/AOE/BlastThrow/RTSBlastThrowSubsystem.h"
 
 using namespace VehicleModuleBalance;
 
@@ -311,7 +312,8 @@ void ATankMaster::DestroyAndSpawnActorsWithTurretToss(const FDestroySpawnActorsP
 
 void ATankMaster::DestroyAndSpawnActors(const FDestroySpawnActorsParameters& SpawnParams, const FCollapseFX CollapseFX)
 {
-	const bool bTossTurret = bM_DiedWhileAmmoCookingOff && M_TurretTossSettings.bTossTurretOnCookOffDeath;
+	const bool bTossTurret = (bM_DiedWhileAmmoCookingOff && M_TurretTossSettings.bTossTurretOnCookOffDeath)
+		|| M_DiedBlastToss.GetIsSet();
 	const bool bExplodeFuel = bM_DiedWhileEngineBurning && M_EngineFireDeathSettings.bExplodeFuelOnEngineFireDeath;
 	if (bTossTurret || bExplodeFuel)
 	{
@@ -391,10 +393,30 @@ float ATankMaster::TakeDamage(const float DamageAmount, FDamageEvent const& Dama
 			                                ? Projectile->GetActorForwardVector()
 			                                : ProjectileVelocity.GetSafeNormal();
 	}
+	RecordIncomingBlastToss(DamageEvent);
 	// A killing hit dies inside Super; UnitDies snapshots the direction before it is cleared again.
 	const float Result = Super::TakeDamage(DamageAmount, DamageEvent, EventInstigator, DamageCauser);
 	M_IncomingProjectileDirection = FVector::ZeroVector;
+	M_IncomingBlastToss = FTankBlastTurretToss();
 	return Result;
+}
+
+void ATankMaster::RecordIncomingBlastToss(FDamageEvent const& DamageEvent)
+{
+	FVector Epicenter;
+	const FRTSBlastThrow* BlastThrow = URTSBlastThrowSubsystem::FindForDamageEvent(this, DamageEvent, Epicenter);
+	if (BlastThrow == nullptr || not BlastThrow->bTossTurrets)
+	{
+		return;
+	}
+	const FVector AwayFromBlast = (GetActorLocation() - Epicenter).GetSafeNormal2D();
+	M_IncomingBlastToss.SideDirection = AwayFromBlast.IsNearlyZero() ? GetActorForwardVector() : AwayFromBlast;
+	M_IncomingBlastToss.SpeedScale = BlastThrow->TurretTossSpeedScale;
+	// The debris of other deaths and the blown-off skirts fly the same way.
+	if (M_IncomingProjectileDirection.IsNearlyZero())
+	{
+		M_IncomingProjectileDirection = M_IncomingBlastToss.SideDirection;
+	}
 }
 
 void ATankMaster::Debug_DieRegularDeath(const ERegularDeathVariant Variant, const FVector KillShotDirection)
@@ -424,6 +446,11 @@ void ATankMaster::DestroyAndSpawnActorsWithDeathEffects(const FDestroySpawnActor
 {
 	// Read now: the tank may be destroyed before the wreck class finished loading.
 	FWreckTurretTossSettings TossSettings = M_TurretTossSettings;
+	if (M_DiedBlastToss.GetIsSet())
+	{
+		TossSettings.ForcedSideDirection = M_DiedBlastToss.SideDirection;
+		TossSettings.LaunchSpeedScale = M_DiedBlastToss.SpeedScale;
+	}
 	if (bTossTurret && not IsValid(TossSettings.LaunchSound))
 	{
 		TossSettings.LaunchSound = GetCookOffTurretLaunchSound();

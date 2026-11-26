@@ -95,6 +95,14 @@ void UTrackPhysicsMovement::BeginPlay_InitRuntimeTrackPhysicsTuningSnapshot()
 	M_RuntimeTrackPhysicsMovementTuningSnapshot = M_TrackPhysicsMovementTuning;
 }
 
+void UTrackPhysicsMovement::StartKnockback(const float Seconds)
+{
+	if (Seconds > M_KnockbackSecondsLeft.Load())
+	{
+		M_KnockbackSecondsLeft.Store(Seconds);
+	}
+}
+
 void UTrackPhysicsMovement::AsyncTick(float DeltaTime)
 {
 	Super::AsyncTick(DeltaTime);
@@ -102,6 +110,13 @@ void UTrackPhysicsMovement::AsyncTick(float DeltaTime)
 	QUICK_SCOPE_CYCLE_COUNTER(STAT_Vehicle_TrackPhysicsAsyncTick);
 	ETrackPhysicsMovementState MovementState = M_MovementState.Load();
 	M_AsyncTickSerial.Store(M_AsyncTickSerial.Load() + 1);
+	const float KnockbackSecondsLeft = M_KnockbackSecondsLeft.Load();
+	if (KnockbackSecondsLeft > 0.f)
+	{
+		// Thrown by a blast: no drive, brace or heading hold until it plays out.
+		M_KnockbackSecondsLeft.Store(KnockbackSecondsLeft - DeltaTime);
+		return;
+	}
 	if (bM_IsAnchored.Load() || not GetIsValidTankMesh())
 	{
 		return;

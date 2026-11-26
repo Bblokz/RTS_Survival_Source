@@ -282,6 +282,16 @@ private:
 	bool bM_BeginPlayCalled;
 };
 
+/** @brief A big blast (FRTSBlastThrow) that killed the tank: its turret flies off away from the blast. */
+struct FTankBlastTurretToss
+{
+	// Horizontal, away from the blast; zero when no such blast is involved.
+	FVector SideDirection = FVector::ZeroVector;
+	float SpeedScale = 1.f;
+
+	bool GetIsSet() const { return not SideDirection.IsNearlyZero(); }
+};
+
 /**
  * @brief Tank with logic to add turrets and engage targets.
  * @note ***********************************************************************************************
@@ -1008,6 +1018,12 @@ private:
 	FVector M_IncomingProjectileDirection = FVector::ZeroVector;
 	// Snapshot of M_IncomingProjectileDirection taken as UnitDies starts: zero unless a projectile killed this tank.
 	FVector M_KillShotDirection = FVector::ZeroVector;
+	// Big blast whose damage is being applied right now; unset outside TakeDamage.
+	FTankBlastTurretToss M_IncomingBlastToss;
+	// Snapshot of M_IncomingBlastToss taken as UnitDies starts: set when a big blast killed this tank.
+	FTankBlastTurretToss M_DiedBlastToss;
+
+	void RecordIncomingBlastToss(FDamageEvent const& DamageEvent);
 	// Set by Debug_DieRegularDeath; the next regular death plays this variant instead of drawing one.
 	TOptional<ERegularDeathVariant> M_DebugRegularDeathVariant;
 

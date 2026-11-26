@@ -377,6 +377,15 @@ ETargetPreference ATankMaster::GetTargetPreference()
 		}
 		return EachTurret->GetTargetPreference();
 	}
+	// Turretless vehicles (tank destroyers, assault guns) carry their guns as hull weapons.
+	for (const auto EachHullWeapon : HullWeapons)
+	{
+		if (not IsValid(EachHullWeapon))
+		{
+			continue;
+		}
+		return EachHullWeapon->GetTargetPreference();
+	}
 	return ETargetPreference::None;
 }
 
@@ -624,6 +633,7 @@ void ATankMaster::UnitDies(const ERTSDeathType DeathType)
 	bM_DiedWhileAmmoCookingOff = bM_IsAmmoCookingOff;
 	bM_DiedWhileEngineBurning = bM_IsEngineBurning;
 	M_KillShotDirection = M_IncomingProjectileDirection;
+	M_DiedBlastToss = M_IncomingBlastToss;
 	EndTurretRangeMovement(ETurretRangeMovementEndMode::FullStop);
 	FinishCrewRepair(ECrewRepairStopReason::OwnerDestroyed);
 	CleanupTowRelationshipsOnDeath();

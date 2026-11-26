@@ -176,6 +176,13 @@ public:
 	void SetDriveStrength(float DriveStrength);
 
 	/**
+	 * @brief Lets a blast throw the tank: for this long the tracks neither drive, brace nor hold the heading, so the
+	 * push and its spin play out before the tank takes hold of the ground again.
+	 * @param Seconds Physics time of the knockback; a longer one already running is kept.
+	 */
+	void StartKnockback(const float Seconds);
+
+	/**
 	 * @brief Holds a dug-in vehicle still: its chassis is kinematic then, so the physics step must not drive or brace it.
 	 * @param bIsAnchored Whether the vehicle is anchored in place.
 	 */
@@ -314,6 +321,8 @@ private:
 	TAtomic<float> M_TrackForceMultiplier;
 	TAtomic<float> M_ModuleAccelerationMultiplier{1.f};
 	TAtomic<float> M_DriveStrength{1.f};
+	// Physics seconds left of a blast knockback; written on the game thread, counted down on the physics thread.
+	TAtomic<float> M_KnockbackSecondsLeft{0.f};
 	// Set while dug in; the async step then leaves the kinematic chassis alone.
 	TAtomic<bool> bM_IsAnchored{false};
 	TAtomic<float> M_CurrentSteeringInDeg{0.0f};
