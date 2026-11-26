@@ -6,6 +6,7 @@
 #include "Components/HorizontalBoxSlot.h"
 #include "RTS_Survival/CardSystem/DeckBuilder/DeckBuilderWidgetHelpers.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
+#include "RTS_Survival/WorldCampaign/BatteryFire/WorldBatteryFireDirector.h"
 #include "RTS_Survival/WorldCampaign/CampaignGeneration/GeneratorWorldCampaign/GeneratorWorldCampaign.h"
 #include "RTS_Survival/WorldCampaign/CampaignProgress/WorldCampaignProgressManager.h"
 #include "RTS_Survival/WorldCampaign/CampaignProgress/WorldCampaignRulesSettings.h"
@@ -61,6 +62,11 @@ namespace WorldBuildSitePanelLayout
 	constexpr float PlateHeightForSale = FooterTop + BuildButtonHeight + BottomPadding;
 	constexpr float PlateHeightBuilt = CardsTop + CardHeight + BottomPadding;
 	constexpr float PlateHeightLocked = StatusTop + StatusHeight + BottomPadding;
+	// A built battery: the fire mission button under the card, and under it one line saying why it is off.
+	constexpr float FireCaptionGap = 6.f;
+	constexpr float FireCaptionHeight = 16.f;
+	constexpr float FireCaptionTop = FooterTop + BuildButtonHeight + FireCaptionGap;
+	constexpr float PlateHeightBuiltWithFireMission = FireCaptionTop + FireCaptionHeight + BottomPadding;
 
 	constexpr int32 TitleFontSize = 11;
 	constexpr int32 TitleLetterSpacing = 150;
@@ -122,6 +128,8 @@ namespace WorldBuildSitePanelLayout
 			return FMath::Max3(TitleWidth, CardRowWidth, BuildButtonWidth + FailTextGapToButton + FailTextMinWidth);
 		case EWorldBuildSitePanelContent::Built:
 			return FMath::Max(TitleWidth, CardRowWidth);
+		case EWorldBuildSitePanelContent::BuiltWithFireMission:
+			return FMath::Max3(TitleWidth, CardRowWidth, BuildButtonWidth);
 		}
 		return FMath::Max(TitleWidth, CardRowWidth);
 	}
@@ -136,6 +144,8 @@ namespace WorldBuildSitePanelLayout
 			return PlateHeightForSale;
 		case EWorldBuildSitePanelContent::Built:
 			return PlateHeightBuilt;
+		case EWorldBuildSitePanelContent::BuiltWithFireMission:
+			return PlateHeightBuiltWithFireMission;
 		}
 		return PlateHeightForSale;
 	}
@@ -350,6 +360,15 @@ void UW_WorldBuildSitePanel::BuildWidgetTree_Footer()
 	M_BuildButton->OnClicked.AddDynamic(this, &UW_WorldBuildSitePanel::HandleBuildClicked);
 	DeckBuilderWidgets::PlaceOnCanvas(*M_PlateCanvas, M_BuildButtonBox, FVector2D(SidePadding, FooterTop),
 	                                  BuildButtonSize);
+
+	// Same button as Build; only a built battery shows it.
+	M_FireMissionButtonBox = DeckBuilderWidgets::BuildTextButton(
+		*WidgetTree, NSLOCTEXT("WorldBuildSite", "FireMissionButton", "FIRE MISSION"), M_Look->Deck.Button,
+		DeckBuilderWidgets::MakeFont(M_Look->Deck.HeadingFont, ButtonFontSize, ButtonLetterSpacing), Style.TextColor,
+		BuildButtonSize, M_FireMissionButton, M_FireMissionLabel);
+	M_FireMissionButton->OnClicked.AddDynamic(this, &UW_WorldBuildSitePanel::HandleFireMissionClicked);
+	DeckBuilderWidgets::PlaceOnCanvas(*M_PlateCanvas, M_FireMissionButtonBox, FVector2D(SidePadding, FooterTop),
+	                                  BuildButtonSize);
 }
 
 void UW_WorldBuildSitePanel::BindToCampaignManagers()
@@ -361,6 +380,7 @@ void UW_WorldBuildSitePanel::BindToCampaignManagers()
 
 	M_BuildNodeManager = M_WorldPlayerController->GetWorldBuildNodeManager();
 	M_ProgressManager = M_WorldPlayerController->GetWorldCampaignProgressManager();
+	M_BatteryFireDirector = M_WorldPlayerController->GetWorldBatteryFireDirector();
 	if (GetIsValidBuildNodeManager())
 	{
 		M_BuildNodeManager->OnBuildNodeBuildingPlaced.AddUniqueDynamic(
@@ -460,7 +480,41 @@ void UW_WorldBuildSitePanel::RefreshContent_Built(const AWorldBuildNode& BuildNo
 {
 	const TArray<EWorldCampaignBuilding> BuiltBuilding = {BuildNode.GetBuilding()};
 	RebuildCards(BuiltBuilding, EWorldBuildCardMode::Built);
-	SetContentLayout(EWorldBuildSitePanelContent::Built, BuiltBuilding.Num());
+	// Quiet check: without a director the battery is shown like any other built site.
+	const bool bHasFireMission = BuildNode.GetBuilding() == EWorldCampaignBuilding::Battery
+		&& M_BatteryFireDirector.IsValid();
+	if (not bHasFireMission)
+	{
+		SetContentLayout(EWorldBuildSitePanelContent::Built, BuiltBuilding.Num());
+		return;
+	}
+
+	RefreshFireMissionButton(BuildNode);
+	SetContentLayout(EWorldBuildSitePanelContent::BuiltWithFireMission, BuiltBuilding.Num());
+}
+
+void UW_WorldBuildSitePanel::RefreshFireMissionButton(const AWorldBuildNode& BuildNode)
+{
+	if (not M_BatteryFireDirector.IsValid() || not IsValid(M_FireMissionButton))
+	{
+		return;
+	}
+
+	const EWorldBatteryFireResult Readiness = M_BatteryFireDirector->GetBatteryReadiness(BuildNode.GetBuildNodeId());
+	const FText RefusalText = WorldBatteryFireRules::GetFireResultText(Readiness);
+	M_FireMissionButton->SetIsEnabled(Readiness == EWorldBatteryFireResult::Success);
+	M_FireMissionButtonBox->SetToolTipText(RefusalText);
+	M_FailText->SetText(RefusalText);
+}
+
+void UW_WorldBuildSitePanel::LayOutFireMissionFooter(const float ContentWidth)
+{
+	using namespace WorldBuildSitePanelLayout;
+	SetCanvasGeometryIfChanged(M_FireMissionButtonBox,
+	                           FVector2D(SidePadding + (ContentWidth - BuildButtonWidth) * 0.5f, FooterTop),
+	                           BuildButtonSize);
+	SetCanvasGeometryIfChanged(M_FailText, FVector2D(SidePadding, FireCaptionTop),
+	                           FVector2D(ContentWidth, FireCaptionHeight));
 }
 
 void UW_WorldBuildSitePanel::RebuildCards(const TArray<EWorldCampaignBuilding>& Buildings,
@@ -503,10 +557,12 @@ void UW_WorldBuildSitePanel::SetContentLayout(const EWorldBuildSitePanelContent 
 	LayOutPlateContent(ContentWidth, CardRowWidth);
 
 	const bool bIsForSale = Content == EWorldBuildSitePanelContent::ForSale;
+	const bool bHasFireMission = Content == EWorldBuildSitePanelContent::BuiltWithFireMission;
 	SetShown(M_CardRow, Content != EWorldBuildSitePanelContent::Locked, ESlateVisibility::SelfHitTestInvisible);
 	SetShown(M_StatusText, Content == EWorldBuildSitePanelContent::Locked, ESlateVisibility::HitTestInvisible);
-	SetShown(M_FailText, bIsForSale, ESlateVisibility::HitTestInvisible);
+	SetShown(M_FailText, bIsForSale || bHasFireMission, ESlateVisibility::HitTestInvisible);
 	SetShown(M_BuildButtonBox, bIsForSale, ESlateVisibility::Visible);
+	SetShown(M_FireMissionButtonBox, bHasFireMission, ESlateVisibility::Visible);
 }
 
 void UW_WorldBuildSitePanel::LayOutPlateContent(const float ContentWidth, const float CardRowWidth)
@@ -514,7 +570,8 @@ void UW_WorldBuildSitePanel::LayOutPlateContent(const float ContentWidth, const 
 	using namespace WorldBuildSitePanelLayout;
 	// A built site shows one card: title and card are centred on the small plate. Cards for sale start at the left
 	// under the title.
-	const bool bIsCentred = M_Content == EWorldBuildSitePanelContent::Built;
+	const bool bHasFireMission = M_Content == EWorldBuildSitePanelContent::BuiltWithFireMission;
+	const bool bIsCentred = M_Content == EWorldBuildSitePanelContent::Built || bHasFireMission;
 	if (IsValid(M_TitleText))
 	{
 		M_TitleText->SetJustification(bIsCentred ? ETextJustify::Center : ETextJustify::Left);
@@ -525,6 +582,16 @@ void UW_WorldBuildSitePanel::LayOutPlateContent(const float ContentWidth, const 
 	SetCanvasGeometryIfChanged(M_CardRow, FVector2D(CardRowLeft, CardsTop), FVector2D(CardRowWidth, CardHeight));
 	SetCanvasGeometryIfChanged(M_StatusText, FVector2D(SidePadding, StatusTop),
 	                           FVector2D(ContentWidth, StatusHeight));
+
+	if (IsValid(M_FailText))
+	{
+		M_FailText->SetJustification(bHasFireMission ? ETextJustify::Center : ETextJustify::Left);
+	}
+	if (bHasFireMission)
+	{
+		LayOutFireMissionFooter(ContentWidth);
+		return;
+	}
 
 	const float FailTextWidth = FMath::Max(0.f, ContentWidth - BuildButtonWidth - FailTextGapToButton);
 	SetCanvasGeometryIfChanged(M_FailText, FVector2D(SidePadding, FooterTop),
@@ -706,6 +773,22 @@ bool UW_WorldBuildSitePanel::TryBuildSelected()
 
 	M_FailText->SetText(FailReason);
 	return false;
+}
+
+void UW_WorldBuildSitePanel::HandleFireMissionClicked()
+{
+	AWorldBuildNode* const BuildNode = M_OpenBuildNode.Get();
+	if (not bM_IsOpen || not IsValid(BuildNode) || not GetIsValidWorldPlayerController())
+	{
+		return;
+	}
+
+	// Picking closes this panel; a refusal keeps it open with the reason under the button.
+	FText FailReason;
+	if (not M_WorldPlayerController->BeginBatteryFireTargetPicking(BuildNode, FailReason) && IsValid(M_FailText))
+	{
+		M_FailText->SetText(FailReason);
+	}
 }
 
 void UW_WorldBuildSitePanel::HandleBuildClicked()

@@ -5,13 +5,36 @@
 #include "CoreMinimal.h"
 #include "RTS_Survival/WorldCampaign/CampaignGeneration/Enums/Enum_MapMission.h"
 #include "RTS_Survival/WorldCampaign/StrengthTypes/WorldFortificationModificationsComponent.h"
+#include "RTS_Survival/WorldCampaign/WorldFow/WorldMapFowTypes.h"
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/Objects/WorldMapObject.h"
 #include "RTS_Survival/WorldCampaign/WorldMapUI/MapObjects/W_EnemyMapItem/EnemyMapItemUIData/FEnemyMapItemUIData.h"
 #include "RTS_Survival/WorldCampaign/WorldMapUI/MapObjects/W_MissionReward/RewardStructs/FMissionRewardStructs.h"
 #include "WorldMissionObject.generated.h"
 
+class USceneComponent;
+class UWorldUnknownMissionMarkerComponent;
+
+/** What the unknown marker changed on one component of the mission piece, so it can be put back. */
+USTRUCT()
+struct FWorldMissionFogHiddenComponent
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	TWeakObjectPtr<USceneComponent> Component = nullptr;
+
+	bool bWasVisible = false;
+
+	// Only primitives have collision; lights and scene components keep this false.
+	bool bHadCollision = false;
+
+	TEnumAsByte<ECollisionEnabled::Type> CollisionBeforeFog = ECollisionEnabled::NoCollision;
+};
+
 /**
- * @brief Spawned marker for mission items placed on anchors.
+ * @brief Spawned marker for mission items placed on anchors. While the fog of war fully hides it, the fog manager
+ * gives it a presentation (UWorldFogHintSettings): its real piece seen through an opening in the fog, or a plain
+ * unknown marker above the fog instead of its piece. Either way it stays unidentified: no name, no click.
  */
 UCLASS()
 class RTS_SURVIVAL_API AWorldMissionObject : public AWorldMapObject
@@ -20,6 +43,23 @@ class RTS_SURVIVAL_API AWorldMissionObject : public AWorldMapObject
 
 public:
 	AWorldMissionObject();
+
+	/**
+	 * @brief Called by the fog manager on every fog pass: switches between the piece and the plain marker.
+	 * @param NewPresentation What the fog hint rules decided for this pass.
+	 */
+	void ApplyFogPresentation(EWorldMissionFogPresentation NewPresentation);
+
+	EWorldMissionFogPresentation GetFogPresentation() const { return M_FogPresentation; }
+
+	/** @return true while the piece is hidden and the plain unknown marker stands in for it. */
+	bool GetIsShownAsUnknownMarker() const { return M_FogPresentation == EWorldMissionFogPresentation::PlainMarker; }
+
+	/** @return true while the fog hides what this mission is: hovering it shows the unidentified tag only. */
+	bool GetIsUnidentifiedUnderFog() const { return M_FogPresentation != EWorldMissionFogPresentation::AsFogState; }
+
+	/** @return The unknown marker, or nullptr when it was never needed. */
+	UWorldUnknownMissionMarkerComponent* GetUnknownMarker() const { return M_UnknownMarker; }
 
 	void InitializeForAnchorWithMissionType(AAnchorPoint* AnchorPoint, EMapMission MissionType);
 
@@ -59,7 +99,29 @@ public:
 	 */
 	void AddStrategicSupportReason(const FWorldStrengthReason& StrengthReason);
 
+protected:
+	virtual void OnClearedByPlayer() override;
+
 private:
+	/** @return The marker, created on first use; nullptr when its mesh is missing. */
+	UWorldUnknownMissionMarkerComponent* GetOrCreateUnknownMarker();
+
+	void ShowUnknownMarker();
+	void ShowRealPiece();
+	void HidePieceComponentForFog(USceneComponent* PieceComponent);
+
+	UPROPERTY()
+	TObjectPtr<UWorldUnknownMissionMarkerComponent> M_UnknownMarker;
+
+	// Every piece component the marker hid or made cursor-proof; put back when the real piece shows again.
+	UPROPERTY()
+	TArray<FWorldMissionFogHiddenComponent> M_ComponentsHiddenForFog;
+
+	EWorldMissionFogPresentation M_FogPresentation = EWorldMissionFogPresentation::AsFogState;
+
+	// The marker mesh is missing: reported once, then the piece stays as it was.
+	bool bM_HasUnknownMarkerFailed = false;
+
 	UPROPERTY(VisibleAnywhere, Category = "World Campaign|World Objects", meta = (AllowPrivateAccess = "true"))
 	EMapMission M_MissionType = EMapMission::None;
 

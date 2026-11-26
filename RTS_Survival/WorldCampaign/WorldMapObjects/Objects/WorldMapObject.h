@@ -49,6 +49,9 @@ public:
 	bool GetIsClearedByPlayer() const { return bM_IsClearedByPlayer; }
 
 protected:
+	/** C++ side of BP_OnClearedByPlayer, called just before it. */
+	virtual void OnClearedByPlayer();
+
 	/** Called once when the player cleared this object, also after loading a campaign in which it was cleared. */
 	UFUNCTION(BlueprintImplementableEvent, Category = "World Campaign|World Objects")
 	void BP_OnClearedByPlayer();

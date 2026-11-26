@@ -46,7 +46,12 @@ void AWorldMapObject::SetIsClearedByPlayer()
 	{
 		SetActorHiddenInGame(true);
 	}
+	OnClearedByPlayer();
 	BP_OnClearedByPlayer();
+}
+
+void AWorldMapObject::OnClearedByPlayer()
+{
 }
 
 FString AWorldMapObject::GetObjectDebugName() const
