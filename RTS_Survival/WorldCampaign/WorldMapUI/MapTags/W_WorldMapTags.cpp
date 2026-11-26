@@ -19,6 +19,8 @@
 #include "RTS_Survival/WorldCampaign/WorldDivisions/WorldDivisionBase.h"
 #include "RTS_Survival/WorldCampaign/WorldDivisions/WorldDivisionManager.h"
 #include "RTS_Survival/WorldCampaign/WorldDivisions/WorldDivisionOwners.h"
+#include "RTS_Survival/WorldCampaign/WorldFow/WorldFogHintSettings.h"
+#include "RTS_Survival/WorldCampaign/WorldFow/WorldUnknownMissionMarkerComponent.h"
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/AnchorPoint/AnchorPoint.h"
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/Objects/WorldMissionObject/WorldMissionObject.h"
 #include "RTS_Survival/WorldCampaign/WorldMapUI/BuildSites/WorldBuildSiteHelpers.h"
@@ -201,6 +203,7 @@ void UW_WorldMapTags::NativeTick(const FGeometry& MyGeometry, const float InDelt
 
 	RepositionNameLabels(MyGeometry);
 	RepositionPieceTags(MyGeometry);
+	RepositionUnknownMissionTag(MyGeometry);
 }
 
 void UW_WorldMapTags::NativeDestruct()
@@ -874,6 +877,73 @@ void UW_WorldMapTags::RepositionPieceTags(const FGeometry& MyGeometry)
 	{
 		M_ArrowLayer->SetArrows(MoveTemp(Arrows));
 	}
+}
+
+void UW_WorldMapTags::RepositionUnknownMissionTag(const FGeometry& MyGeometry)
+{
+	const AWorldMissionObject* const HoveredMission = M_WorldPlayerController->GetHoveredUnknownMission();
+	if (not IsValid(HoveredMission) || not HoveredMission->GetIsUnidentifiedUnderFog())
+	{
+		if (IsValid(M_UnknownMissionTag))
+		{
+			WorldMapTagsLayout::SetLabelShownIfChanged(*M_UnknownMissionTag, false);
+		}
+		return;
+	}
+
+	if (not IsValid(M_UnknownMissionTag))
+	{
+		CreateUnknownMissionTag();
+	}
+
+	// The plain marker lies above the fog, the piece seen through the fog stands on the map.
+	const UWorldUnknownMissionMarkerComponent* const PlainMarker =
+		HoveredMission->GetIsShownAsUnknownMarker() ? HoveredMission->GetUnknownMarker() : nullptr;
+	const FVector TagWorldPoint = IsValid(PlainMarker) ? PlainMarker->GetComponentLocation()
+		                              : HoveredMission->GetActorLocation();
+	// Placed where a mission name would be; hidden for the one frame before its first layout.
+	FWorldMapTagPlacement Placement;
+	if (not TryGetLabelPlacement(M_UnknownMissionTag, TagWorldPoint,
+	                             WorldMapTagsLayout::MissionTagOffsetFromPiece, MyGeometry, Placement))
+	{
+		return;
+	}
+
+	const bool bIsClearOfTopBar = WorldMapTagsMath::GetIsTagClearOfTopBar(
+		Placement.Center, Placement.Size, WorldMapScreenProjection::CampaignTopBarHeight);
+	WorldMapTagsLayout::SetLabelShownIfChanged(*M_UnknownMissionTag, bIsClearOfTopBar);
+	if (bIsClearOfTopBar)
+	{
+		M_UnknownMissionTag->SetRenderTranslation(Placement.Center);
+	}
+}
+
+void UW_WorldMapTags::CreateUnknownMissionTag()
+{
+	using namespace WorldMapTagsLayout;
+	if (not IsValid(M_RootCanvas))
+	{
+		return;
+	}
+
+	M_UnknownMissionTag = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass());
+	M_UnknownMissionTag->SetBrush(FSlateRoundedBoxBrush(WorldCampaignUIColors::PlateFill, TagCornerRadius,
+	                                                    WorldCampaignUIColors::PlateBorder, TagOutlineWidth));
+	M_UnknownMissionTag->SetPadding(MissionTagPadding);
+	// Muted, not cream: the plate must not read as a mission name.
+	M_UnknownMissionTag->SetContent(DeckBuilderWidgets::MakeText(
+		*WidgetTree, UWorldFogHintSettings::Get()->UnknownMissionHoverText,
+		DeckBuilderWidgets::MakeFont(M_Look->Deck.HeadingFont, MissionNameFontSize, MissionNameLetterSpacing),
+		M_Look->Deck.Style.MutedTextColor));
+
+	UCanvasPanelSlot* const PlateSlot = M_RootCanvas->AddChildToCanvas(M_UnknownMissionTag);
+	PlateSlot->SetAnchors(FAnchors(0.f, 0.f));
+	PlateSlot->SetAlignment(FVector2D(0.5f, 0.5f));
+	PlateSlot->SetAutoSize(true);
+	PlateSlot->SetPosition(FVector2D::ZeroVector);
+	PlateSlot->SetZOrder(PieceTagZOrder);
+	// Hidden until it has been laid out and projected once, so it never flashes at the top-left corner.
+	M_UnknownMissionTag->SetVisibility(ESlateVisibility::Hidden);
 }
 
 void UW_WorldMapTags::AddPieceArrow(const FWorldMapPieceTag& PieceTag, const FVector2D& PiecePosition,

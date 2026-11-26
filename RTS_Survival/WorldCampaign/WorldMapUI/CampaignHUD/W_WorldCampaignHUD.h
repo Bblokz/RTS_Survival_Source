@@ -10,6 +10,7 @@
 class AWorldBuildNode;
 class AWorldPlayerController;
 class UCanvasPanel;
+class UW_WorldBatteryFirePrompt;
 class UW_WorldBuildSitePanel;
 class UW_WorldCampaignBar;
 class UW_WorldCommanderPanel;
@@ -78,4 +79,8 @@ private:
 
 	UPROPERTY()
 	TObjectPtr<UW_WorldMapTags> M_MapTags;
+
+	// Shown while a battery waits for the player to click its target.
+	UPROPERTY()
+	TObjectPtr<UW_WorldBatteryFirePrompt> M_BatteryFirePrompt;
 };

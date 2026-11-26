@@ -807,6 +807,11 @@ int32 UW_WorldCommanderPanel::GetCooldownTurnsRemaining() const
 
 void UW_WorldCommanderPanel::BeginTargetPicking(const EWorldCommanderAbilityTargetKind Kind)
 {
+	// One pick at a time: a battery that waited for its target stops waiting.
+	if (M_Controller.IsValid())
+	{
+		M_Controller->CancelBatteryFireTargetPicking();
+	}
 	bM_IsPickingTarget = true;
 	M_PickingTargetKind = Kind;
 	M_PlateState.bIsShowingFailReason = false;

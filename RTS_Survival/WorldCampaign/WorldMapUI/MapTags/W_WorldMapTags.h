@@ -194,6 +194,14 @@ private:
 	void RepositionPieceTags(const FGeometry& MyGeometry);
 
 	/**
+	 * Shows the plate of the unknown mission marker under the cursor (fog hint) and hides it otherwise. The plate
+	 * carries the hover text of UWorldFogHintSettings and nothing of the mission.
+	 */
+	void RepositionUnknownMissionTag(const FGeometry& MyGeometry);
+
+	void CreateUnknownMissionTag();
+
+	/**
 	 * @brief Turns one piece-to-target line into dashes, clipped to the overlay so far targets stay cheap.
 	 * @param PieceTag Tag whose piece and target are projected.
 	 * @param PiecePosition Piece in local units.
@@ -235,6 +243,10 @@ private:
 	// Keyed by the mission's anchor key.
 	UPROPERTY()
 	TMap<FGuid, FWorldMapMissionTag> M_MissionTags;
+
+	// The one plate for the unknown mission marker under the cursor; made the first time it is needed.
+	UPROPERTY()
+	TObjectPtr<UBorder> M_UnknownMissionTag;
 
 	// Anchor keys in the order the plates were made: the fixed priority between two mission names.
 	TArray<FGuid> M_MissionTagOrder;

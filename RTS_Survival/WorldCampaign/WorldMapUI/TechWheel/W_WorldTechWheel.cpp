@@ -29,6 +29,7 @@
 #include "RTS_Survival/WorldCampaign/WorldMapUI/CampaignHUD/WorldCampaignUILook.h"
 #include "RTS_Survival/WorldCampaign/WorldMapUI/TechWheel/TechWheelLabelPlacement.h"
 #include "RTS_Survival/WorldCampaign/WorldMapUI/TechWheel/TechWheelNodeButton.h"
+#include "RTS_Survival/WorldCampaign/WorldMapUI/TechWheel/W_TechWheelEffectPanel.h"
 #include "RTS_Survival/WorldCampaign/WorldMapUI/TechWheel/W_TechWheelPaintLayer.h"
 #include "RTS_Survival/WorldCampaign/WorldPlayer/Controller/WorldPlayerController.h"
 
@@ -96,7 +97,6 @@ namespace TechWheelLayout
 
 	constexpr float StripHeight = 56.f;
 	const FVector2D TitlePosition(24.f, 13.f);
-	const FVector2D CountPosition(272.f, 21.f);
 	const FVector2D BackButtonPosition(1736.f, 10.f);
 	const FVector2D BackButtonSize(166.f, 36.f);
 	// The two resource cells end this far left of the back button, in the bolted cells of the map bar
@@ -107,15 +107,14 @@ namespace TechWheelLayout
 	const FVector2D DetailPanelPosition(1330.f, 70.f);
 	const FVector2D DetailPanelSize(570.f, 1000.f);
 	const FMargin DetailPanelPadding(24.f, 20.f, 24.f, 18.f);
-	constexpr float DetailIconWellHeight = 230.f;
-	const FVector2D DetailIconSize(200.f, 200.f);
+	// Kept low so the units and weapon changes of a technology fit under the description.
+	constexpr float DetailIconWellHeight = 170.f;
+	const FVector2D DetailIconSize(150.f, 150.f);
 	const FVector2D PriceIconSize(30.f, 30.f);
 	const FVector2D ResearchButtonSize(522.f, 48.f);
 
 	constexpr int32 TitleFontSize = 17;
 	constexpr int32 TitleLetterSpacing = 500;
-	constexpr int32 CountFontSize = 10;
-	constexpr int32 CountLetterSpacing = 60;
 	constexpr int32 SmallLabelFontSize = 8;
 	constexpr int32 SmallLabelLetterSpacing = 200;
 	constexpr int32 CounterValueFontSize = 15;
@@ -438,15 +437,10 @@ void UW_WorldTechWheel::BuildScreen_TopStrip()
 	                                  FVector2D(0.f, StripHeight), FVector2D(ScreenSize.X, 1.f), ZPanels);
 
 	UTextBlock* const Title = DeckBuilderWidgets::MakeText(
-		*WidgetTree, LOCTEXT("Title", "TECHNOLOGY"),
+		*WidgetTree, LOCTEXT("Title", "TECHTREE"),
 		DeckBuilderWidgets::MakeFont(M_Look->Deck.HeadingFont, TitleFontSize, TitleLetterSpacing),
 		FSlateColor(WorldCampaignUIColors::Cream));
 	DeckBuilderWidgets::PlaceOnCanvas(*M_ScreenCanvas, Title, TitlePosition, FVector2D::ZeroVector, ZPanels)->
-		SetAutoSize(true);
-	M_CountText = DeckBuilderWidgets::MakeText(
-		*WidgetTree, FText::GetEmpty(),
-		DeckBuilderWidgets::MakeFont(M_Look->Deck.BodyFont, CountFontSize, CountLetterSpacing), Style.MutedTextColor);
-	DeckBuilderWidgets::PlaceOnCanvas(*M_ScreenCanvas, M_CountText, CountPosition, FVector2D::ZeroVector, ZPanels)->
 		SetAutoSize(true);
 
 	BuildScreen_TopStrip_Counters();
@@ -767,6 +761,11 @@ void UW_WorldTechWheel::BuildScreen_DetailPanel()
 	M_Detail.DescriptionText->SetAutoWrapText(true);
 	Column->AddChildToVerticalBox(M_Detail.DescriptionText)->SetPadding(FMargin(0.f, 16.f, 0.f, 0.f));
 
+	// Takes the free height, which also keeps the price and the button at the bottom of the panel.
+	M_EffectPanel = CreateWidget<UW_TechWheelEffectPanel>(this, UW_TechWheelEffectPanel::StaticClass());
+	M_EffectPanel->SetupPanel(*M_Look);
+	Column->AddChildToVerticalBox(M_EffectPanel)->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
+
 	BuildScreen_DetailPanel_Rows(*Column);
 	BuildScreen_DetailPanel_Price(*Column);
 	BuildScreen_DetailPanel_Button(*Column);
@@ -850,10 +849,6 @@ void UW_WorldTechWheel::BuildScreen_DetailPanel_Price(UVerticalBox& Column)
 void UW_WorldTechWheel::BuildScreen_DetailPanel_Button(UVerticalBox& Column)
 {
 	using namespace TechWheelLayout;
-	// Pushes the reason and the button to the bottom of the panel.
-	USpacer* const Filler = WidgetTree->ConstructWidget<USpacer>(USpacer::StaticClass());
-	Column.AddChildToVerticalBox(Filler)->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
-
 	M_Detail.ReasonText = DeckBuilderWidgets::MakeText(
 		*WidgetTree, FText::GetEmpty(), DeckBuilderWidgets::MakeFont(M_Look->Deck.BodyFont, DetailBodyFontSize),
 		FSlateColor(WorldCampaignUIColors::Bad));
@@ -966,21 +961,6 @@ void UW_WorldTechWheel::RefreshFromCampaign()
 
 void UW_WorldTechWheel::RefreshStrip(const FTechWheelProgressSnapshot& Snapshot)
 {
-	const FWorldTechWheel& Wheel = GetWheel();
-	int32 BoughtTechnologies = 0;
-	int32 BoughtNodes = 0;
-	for (const FWorldTechWheelNode& Node : Wheel.Nodes)
-	{
-		if (not WorldCampaignTechWheel::GetIsNodeBought(Wheel, Node.NodeId, Snapshot.BoughtNodeIds))
-		{
-			continue;
-		}
-		BoughtNodes++;
-		BoughtTechnologies += Node.GetIsTechnologyNode() ? 1 : 0;
-	}
-	M_CountText->SetText(FText::Format(
-		LOCTEXT("Count", "{0} of {1} technologies   \u00B7   {2} of {3} nodes"), BoughtTechnologies,
-		Wheel.GetTechnologyNodeCount(), BoughtNodes, Wheel.Nodes.Num()));
 	M_RadixiteText->SetText(FText::AsNumber(Snapshot.Resources.Radixite));
 	M_BlueprintText->SetText(FText::AsNumber(Snapshot.Resources.Blueprints));
 }
@@ -1061,6 +1041,23 @@ void UW_WorldTechWheel::RefreshDetailPanel_Header(const FWorldTechWheelNode& Nod
 		                                                            FindPresentation(Node.Technology)
 		                                                            : nullptr;
 	M_Detail.DescriptionText->SetText(Presentation != nullptr ? Presentation->Description : FText::GetEmpty());
+	RefreshDetailPanel_Effect(Node);
+}
+
+void UW_WorldTechWheel::RefreshDetailPanel_Effect(const FWorldTechWheelNode& Node)
+{
+	if (not IsValid(M_EffectPanel))
+	{
+		return;
+	}
+
+	if (Node.GetIsTechnologyNode())
+	{
+		M_EffectPanel->ShowTechnology(Node.Technology);
+		return;
+	}
+
+	M_EffectPanel->ClearPanel();
 }
 
 void UW_WorldTechWheel::RefreshDetailPanel_Reached(const FWorldTechWheelNode& Node,
