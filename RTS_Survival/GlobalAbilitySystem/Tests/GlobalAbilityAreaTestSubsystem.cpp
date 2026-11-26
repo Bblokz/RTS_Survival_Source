@@ -2,8 +2,12 @@
 
 #include "GlobalAbilityAreaTestSubsystem.h"
 
+#include "Kismet/GameplayStatics.h"
+
 #include "Blueprint/UserWidget.h"
+#include "Components/DecalComponent.h"
 #include "Components/PointLightComponent.h"
+#include "ProceduralMeshComponent.h"
 #include "Engine/TextureRenderTarget2D.h"
 #include "EngineUtils.h"
 #include "ImageUtils.h"
@@ -64,6 +68,8 @@ namespace GlobalAbilityAreaTestConstants
 	constexpr float V2RocketTimeoutSeconds = 90.f;
 	// Without radiation the warhead is done once the flash and shockwave have faded.
 	constexpr float V2SpentAfterBlastSeconds = 6.f;
+	// Pictures after the blast is spent: the last debris lands about 5 s after the blast.
+	constexpr float V2AftermathSeconds = 6.f;
 	// The arc starts 300 m out and peaks around 40 m: far from the side, under the camera.
 	constexpr float V2MinApproachDistanceCm = 15000.f;
 	constexpr float V2MaxArcHeightCm = 7000.f;
@@ -870,6 +876,12 @@ void UGlobalAbilityAreaTestSubsystem::FinishCommanderKits()
 
 void UGlobalAbilityAreaTestSubsystem::FinishSkyDrop()
 {
+	// -GlobalAbilityV2Only: straight to the V2 rocket, for its crater and blast pictures.
+	if (FParse::Param(FCommandLine::Get(), TEXT("GlobalAbilityV2Only")))
+	{
+		StartV2Rocket();
+		return;
+	}
 	if (FParse::Param(FCommandLine::Get(), TEXT("GlobalAbilityKitsOnly")))
 	{
 		Finish();
@@ -1426,6 +1438,7 @@ void UGlobalAbilityAreaTestSubsystem::StartV2Rocket()
 	M_V2MaxApproachDistance = 0.f;
 	M_V2MaxHeight = 0.f;
 	M_V2BlastSeconds = -1.f;
+	M_V2CheckedSeconds = -1.f;
 }
 
 void UGlobalAbilityAreaTestSubsystem::AimV2Rocket()
@@ -1477,11 +1490,53 @@ void UGlobalAbilityAreaTestSubsystem::TickV2Rocket()
 	// The pictures follow the rocket while it flies, then look at the blast.
 	const bool bIsFlying = M_V2Rocket->GetPhase() == ERadixiteNukePhase::Falling;
 	CaptureEvery(0.5f, bIsFlying ? M_V2Rocket->GetWarheadLocation() : M_Anchor, TEXT("V2Rocket"));
-	if (M_V2Rocket->GetPhase() == ERadixiteNukePhase::Spent && M_CaptureIndex > 0)
+	if (M_V2CheckedSeconds < 0.f && M_V2Rocket->GetPhase() == ERadixiteNukePhase::Spent && M_CaptureIndex > 0)
 	{
 		CheckV2Result();
+		M_V2CheckedSeconds = GetStepSeconds();
+	}
+	if (M_V2CheckedSeconds >= 0.f && GetStepSeconds() > M_V2CheckedSeconds + V2AftermathSeconds)
+	{
+		CaptureV2CraterParts();
 		Finish();
 	}
+}
+
+void UGlobalAbilityAreaTestSubsystem::CaptureV2CraterParts() const
+{
+	if (not M_V2Rocket.IsValid())
+	{
+		return;
+	}
+	// The pit decal and the earth rim alone, so a wrong look can be traced to one of them.
+	TArray<UDecalComponent*> Decals;
+	M_V2Rocket->GetComponents<UDecalComponent>(Decals);
+	TArray<UProceduralMeshComponent*> Rims;
+	M_V2Rocket->GetComponents<UProceduralMeshComponent>(Rims);
+	const auto SetVisible = [](const auto& Components, const bool bVisible)
+	{
+		for (USceneComponent* Component : Components)
+		{
+			if (Component->IsVisible() != bVisible)
+			{
+				Component->SetVisibility(bVisible);
+			}
+		}
+	};
+	TArray<USceneComponent*> VisibleDecals;
+	for (UDecalComponent* Decal : Decals)
+	{
+		if (Decal->IsVisible())
+		{
+			VisibleDecals.Add(Decal);
+		}
+	}
+	SetVisible(VisibleDecals, false);
+	Capture(M_Anchor, TEXT("V2Crater_RimOnly"));
+	SetVisible(VisibleDecals, true);
+	SetVisible(Rims, false);
+	Capture(M_Anchor, TEXT("V2Crater_PitOnly"));
+	SetVisible(Rims, true);
 }
 
 void UGlobalAbilityAreaTestSubsystem::TrackV2Flight()
@@ -1523,6 +1578,10 @@ void UGlobalAbilityAreaTestSubsystem::CheckV2Result()
 	      FString::Printf(TEXT("spent_after=%.1f"), SpentAfterBlastSeconds));
 	Check(not M_CoreVictim.IsValid() || not M_CoreVictim->IsUnitAlive(), TEXT("v2_core_kills"));
 	Check(M_FarBystander.IsValid() && M_FarBystander->IsUnitAlive(), TEXT("v2_spares_outside_the_blast"));
+	Check(M_V2Rocket.IsValid() && M_V2Rocket->GetHasCrater(), TEXT("v2_leaves_a_crater"));
+	Check(FMath::IsNearlyEqual(UGameplayStatics::GetGlobalTimeDilation(GetWorld()), 1.f),
+	      TEXT("v2_hit_stop_gives_speed_back"),
+	      FString::Printf(TEXT("dilation=%.3f"), UGameplayStatics::GetGlobalTimeDilation(GetWorld())));
 	UE_LOG(LogRTSGlobalAbilityAreaTest, Display, TEXT("RTS_ABILITY_TEST V2 edge_victim_alive=%d"),
 	       M_EdgeVictim.IsValid() && M_EdgeVictim->IsUnitAlive() ? 1 : 0);
 }

@@ -28,6 +28,8 @@ namespace DirectionFindingManagerConstants
 	constexpr float JammerFadeOutSeconds = 1.5f;
 	const TCHAR* const TargetFolder = TEXT("/Game/RTS_Survival/Blueprints/Environment/OderWarthe/Targets/Blueprints/");
 	const TCHAR* const SoundFolder = TEXT("/Game/RTS_Survival/Sounds/OderWarthe/");
+	// The decoy spot counts as a circle this wide for its own (never used) fix test.
+	constexpr float DecoyRadiusCm = 1500.f;
 	const TCHAR* const InterceptLinePath = TEXT(
 		"/Game/RTS_Survival/Sounds/VoiceLines/GerFaction/Anouncer/AAAGerMissions/OderWarthe/");
 
@@ -240,28 +242,41 @@ void ADirectionFindingManager::GetDrawData(const FBox2D& MapBounds, FDirectionFi
 {
 	OutDrawData.Wedges.Reset();
 	OutDrawData.Overlap.Reset();
+	OutDrawData.DecoyOverlap.Reset();
 	if (not bM_HasStarted)
 	{
 		return;
 	}
 	const double NowSeconds = GetWorldSeconds();
-	int32 HeldDrawn = 0;
-	for (int32 StationIndex = 0; StationIndex < M_Solver.GetStationCount(); ++StationIndex)
+	AppendSolverDrawData(M_Solver, MapBounds, NowSeconds, OutDrawData.Wedges, OutDrawData.Overlap);
+	if (bM_IsDecoyActive)
 	{
-		const FDirectionFindingWedge* const Wedge = M_Solver.GetWedge(StationIndex);
+		AppendSolverDrawData(M_DecoySolver, MapBounds, NowSeconds, OutDrawData.Wedges, OutDrawData.DecoyOverlap);
+	}
+}
+
+void ADirectionFindingManager::AppendSolverDrawData(const FDirectionFindingSolver& Solver, const FBox2D& MapBounds,
+                                                    const double NowSeconds,
+                                                    TArray<FDirectionFindingWedgeDraw>& OutWedges,
+                                                    TArray<FVector2D>& OutOverlap) const
+{
+	int32 HeldDrawn = 0;
+	for (int32 StationIndex = 0; StationIndex < Solver.GetStationCount(); ++StationIndex)
+	{
+		const FDirectionFindingWedge* const Wedge = Solver.GetWedge(StationIndex);
 		if (Wedge == nullptr || not Wedge->bOpen)
 		{
 			continue;
 		}
 		const float ShownHalfAngle = FDirectionFindingSolver::GetShownHalfAngle(
 			*Wedge, NowSeconds, Settings.NarrowAnimationSeconds);
-		FDirectionFindingWedgeDraw& Draw = OutDrawData.Wedges.AddDefaulted_GetRef();
+		FDirectionFindingWedgeDraw& Draw = OutWedges.AddDefaulted_GetRef();
 		Draw.bHeld = Wedge->bHeld;
 		Draw.Pulse = Wedge->NarrowedAtSeconds < 0.0
 			             ? 0.f
 			             : 1.f - FMath::Clamp(static_cast<float>(NowSeconds - Wedge->NarrowedAtSeconds) /
 			                                  Look.PulseSeconds, 0.f, 1.f);
-		FDirectionFindingSolver::BuildWedgePolygon(M_Solver.GetStationLocation(StationIndex),
+		FDirectionFindingSolver::BuildWedgePolygon(Solver.GetStationLocation(StationIndex),
 		                                           Wedge->GetCentreBearingDegrees(ShownHalfAngle), ShownHalfAngle,
 		                                           MapBounds, Draw.Polygon);
 		if (not Wedge->bHeld || Draw.Polygon.IsEmpty())
@@ -270,17 +285,17 @@ void ADirectionFindingManager::GetDrawData(const FBox2D& MapBounds, FDirectionFi
 		}
 		if (HeldDrawn == 0)
 		{
-			OutDrawData.Overlap = Draw.Polygon;
+			OutOverlap = Draw.Polygon;
 		}
 		else
 		{
-			FDirectionFindingSolver::ClipConvexPolygon(OutDrawData.Overlap, Draw.Polygon);
+			FDirectionFindingSolver::ClipConvexPolygon(OutOverlap, Draw.Polygon);
 		}
 		HeldDrawn++;
 	}
 	if (HeldDrawn < 2)
 	{
-		OutDrawData.Overlap.Reset();
+		OutOverlap.Reset();
 	}
 }
 
@@ -511,6 +526,11 @@ void ADirectionFindingManager::ApplyStationOwner(const int32 StationIndex)
 	{
 		PlaySoftSound2D(StationLockOnSound);
 	}
+	if (bM_IsDecoyActive)
+	{
+		const float DecoyErrorFraction = M_Random.FRandRange(-Settings.MaxErrorFraction, Settings.MaxErrorFraction);
+		M_DecoySolver.SetStationHeld(StationIndex, bHeld, GetStartHalfAngle(), DecoyErrorFraction);
+	}
 	OnStationChanged.Broadcast(StationIndex, bHeld);
 	if (bM_IsFixed)
 	{
@@ -542,6 +562,11 @@ void ADirectionFindingManager::TransmitBurst(const EDirectionFindingBurst BurstT
 	if (HeardCount == 0)
 	{
 		return;
+	}
+	// The decoy answers on the same schedule, so its wedges narrow with the real ones.
+	if (bM_IsDecoyActive)
+	{
+		M_DecoySolver.ApplyBurst(GetBurstFactor(BurstType), Settings.MinHalfAngle, GetWorldSeconds());
 	}
 	if (const TSoftObjectPtr<USoundBase>* const BurstSound = BurstSounds.Find(BurstType))
 	{
@@ -652,9 +677,45 @@ void ADirectionFindingManager::CheckFix()
 	}
 }
 
+void ADirectionFindingManager::ActivateDecoy(const FVector DecoyLocation)
+{
+	if (not bM_HasStarted || bM_IsFixed || bM_IsDecoyActive)
+	{
+		return;
+	}
+	TArray<FVector2D> StationLocations;
+	for (int32 StationIndex = 0; StationIndex < M_Solver.GetStationCount(); ++StationIndex)
+	{
+		StationLocations.Add(M_Solver.GetStationLocation(StationIndex));
+	}
+	constexpr int32 DecoyTargetIndex = 0;
+	M_DecoySolver.Init(StationLocations, {FVector2D(DecoyLocation)},
+	                   {DirectionFindingManagerConstants::DecoyRadiusCm}, DecoyTargetIndex);
+	// Every station that already has a bearing gets a decoy wedge as wide as its real one, so width gives nothing away.
+	for (int32 StationIndex = 0; StationIndex < M_Solver.GetStationCount(); ++StationIndex)
+	{
+		const FDirectionFindingWedge* const Wedge = M_Solver.GetWedge(StationIndex);
+		if (Wedge == nullptr || not Wedge->bOpen)
+		{
+			continue;
+		}
+		const float ErrorFraction = M_Random.FRandRange(-Settings.MaxErrorFraction, Settings.MaxErrorFraction);
+		M_DecoySolver.SetStationHeld(StationIndex, true, Wedge->HalfAngleDegrees, ErrorFraction);
+		M_DecoySolver.SetStationHeld(StationIndex, Wedge->bHeld, Wedge->HalfAngleDegrees, ErrorFraction);
+	}
+	bM_IsDecoyActive = true;
+}
+
+void ADirectionFindingManager::DeactivateDecoy()
+{
+	bM_IsDecoyActive = false;
+}
+
 void ADirectionFindingManager::Fix()
 {
 	bM_IsFixed = true;
+	// The bearings found the real command post: the false ones are exposed.
+	DeactivateDecoy();
 	GetWorldTimerManager().ClearTimer(M_RoutineBurstTimerHandle);
 	SetTargetsRevealed(true);
 	OnFix.Broadcast(M_Solver.GetCommandPostIndex());

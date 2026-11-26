@@ -8,6 +8,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "NiagaraFunctionLibrary.h"
 #include "TimerManager.h"
+#include "RTS_Survival/PickupItems/Items/ResourcePickup/SupplyCratePickup.h"
 #include "RTS_Survival/Resources/Resource.h"
 #include "RTS_Survival/Resources/ResourceComponent/ResourceComponent.h"
 #include "RTS_Survival/Scavenging/AutoScavengeTrigger/AutoScavengeTriggerComponent.h"
@@ -138,6 +139,10 @@ AActor* AParachutedResourcePayload::SpawnLandedResource() const
 	case EResourceDropPayloadKind::HarvestableDeposit:
 		return ResourceDropSpawning::SpawnHarvestableDeposit(*World, M_PayloadClass, LandedTransform,
 		                                                     M_Settings.DepositSettings);
+	case EResourceDropPayloadKind::Pickup:
+		return ResourceDropSpawning::SpawnSupplyCratePickup(*World, LandedTransform, M_Settings.PickupSettings,
+		                                                    M_Settings.FallSettings.FallingMesh,
+		                                                    M_Settings.FallSettings.FallingMeshScale);
 	}
 	return nullptr;
 }
@@ -281,4 +286,26 @@ ACPPResourceMaster* ResourceDropSpawning::SpawnHarvestableDeposit(UWorld& World,
 	}
 	TotalAmountProperty->SetPropertyValue_InContainer(ResourceComponent, Settings.DepositAmount);
 	return Deposit;
+}
+
+ASupplyCratePickup* ResourceDropSpawning::SpawnSupplyCratePickup(UWorld& World, const FTransform& Transform,
+                                                                 const FResourceDropPickupSettings& Settings,
+                                                                 UStaticMesh* FallbackMesh,
+                                                                 const float FallbackMeshScale)
+{
+	ASupplyCratePickup* Crate = World.SpawnActorDeferred<ASupplyCratePickup>(
+		ASupplyCratePickup::StaticClass(), Transform, nullptr, nullptr,
+		ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+	if (not IsValid(Crate))
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Resource drop could not spawn a supply crate pickup."));
+		return nullptr;
+	}
+	const bool bUseFallbackMesh = not IsValid(Settings.CrateMesh);
+	Crate->InitSupplyCrate(bUseFallbackMesh ? FallbackMesh : Settings.CrateMesh.Get(),
+	                       bUseFallbackMesh ? FallbackMeshScale : Settings.CrateMeshScale,
+	                       Settings.ResourcesPerPickup, Settings.PickupSound, Settings.PickupEffect);
+	// Contents are set before the trigger exists, so a unit already standing on the spot collects the full crate.
+	Crate->FinishSpawning(Transform);
+	return Crate;
 }

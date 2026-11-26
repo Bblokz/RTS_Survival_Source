@@ -120,6 +120,8 @@ private:
 	float M_V2MaxApproachDistance = 0.f;
 	float M_V2MaxHeight = 0.f;
 	float M_V2BlastSeconds = -1.f;
+	// After the checks the pictures keep looking at the crater while the debris lands and the smoke rises.
+	float M_V2CheckedSeconds = -1.f;
 
 	FB4HowitzerCaptureRig M_CaptureRig;
 
@@ -229,6 +231,8 @@ private:
 	void TickV2Rocket();
 	void TrackV2Flight();
 	void CheckV2Result();
+	/** @brief Pictures of the crater's pit decal and earth rim each on its own. */
+	void CaptureV2CraterParts() const;
 	bool IsAnyNukeActive() const;
 
 	int32 CountBubbles() const;

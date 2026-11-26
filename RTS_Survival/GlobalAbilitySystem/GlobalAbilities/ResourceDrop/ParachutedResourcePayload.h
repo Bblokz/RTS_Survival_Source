@@ -9,6 +9,7 @@
 
 class ACPPResourceMaster;
 class AScavengeableObject;
+class ASupplyCratePickup;
 class UNiagaraSystem;
 class USoundBase;
 class UStaticMesh;
@@ -21,7 +22,9 @@ enum class EResourceDropPayloadKind : uint8
 	// A crate that infantry with a scavenger component empties for fixed rewards.
 	ScavengeContainer,
 	// A radixite deposit that harvesters mine and bring to a refinery like any map resource.
-	HarvestableDeposit
+	HarvestableDeposit,
+	// A supply crate (ASupplyCratePickup) any player unit collects at once by driving or walking over it.
+	Pickup
 };
 
 /** @brief Looks and timing of a payload on its way down. */
@@ -105,6 +108,30 @@ struct FResourceDropDepositSettings
 	float DepositActorScale = 1.f;
 };
 
+/** @brief A crate any player unit collects by touching it: no scavengers or harvesters needed. */
+USTRUCT(BlueprintType)
+struct FResourceDropPickupSettings
+{
+	GENERATED_BODY()
+
+	// Shown on the ground; empty uses the falling mesh.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TObjectPtr<UStaticMesh> CrateMesh = nullptr;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0.01"))
+	float CrateMeshScale = 1.f;
+
+	// What one crate gives the player when collected.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TMap<ERTSResourceType, int32> ResourcesPerPickup;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TObjectPtr<USoundBase> PickupSound = nullptr;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TObjectPtr<UNiagaraSystem> PickupEffect = nullptr;
+};
+
 /** @brief Everything one resource drop delivers; set on the ability template. */
 USTRUCT(BlueprintType)
 struct FResourceDropSettings
@@ -126,6 +153,9 @@ struct FResourceDropSettings
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FResourceDropDepositSettings DepositSettings;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FResourceDropPickupSettings PickupSettings;
 };
 
 class AParachutedResourcePayload;
@@ -205,4 +235,13 @@ namespace ResourceDropSpawning
 	RTS_SURVIVAL_API ACPPResourceMaster* SpawnHarvestableDeposit(UWorld& World, UClass* DepositClass,
 	                                                            const FTransform& Transform,
 	                                                            const FResourceDropDepositSettings& Settings);
+
+	/**
+	 * @brief Spawns a supply crate pickup with the configured contents (set before it can be collected).
+	 * @param FallbackMesh Used when the pickup settings have no crate mesh (the falling mesh).
+	 * @return The crate, or null when it could not be spawned.
+	 */
+	RTS_SURVIVAL_API ASupplyCratePickup* SpawnSupplyCratePickup(UWorld& World, const FTransform& Transform,
+	                                                           const FResourceDropPickupSettings& Settings,
+	                                                           UStaticMesh* FallbackMesh, float FallbackMeshScale);
 }
