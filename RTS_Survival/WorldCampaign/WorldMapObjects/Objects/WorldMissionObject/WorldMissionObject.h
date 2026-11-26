@@ -12,6 +12,7 @@
 #include "WorldMissionObject.generated.h"
 
 class USceneComponent;
+class UStaticMeshComponent;
 class UWorldUnknownMissionMarkerComponent;
 
 /** What the unknown marker changed on one component of the mission piece, so it can be put back. */
@@ -110,8 +111,15 @@ private:
 	void ShowRealPiece();
 	void HidePieceComponentForFog(USceneComponent* PieceComponent);
 
+	// Stands the tall landmark of this mission type beside the piece, from UWorldFogHintSettings; none for most types.
+	void CreateLandmark();
+
 	UPROPERTY()
 	TObjectPtr<UWorldUnknownMissionMarkerComponent> M_UnknownMarker;
+
+	// Tagged WorldLandmark, so the fog never hides it with the piece.
+	UPROPERTY()
+	TObjectPtr<UStaticMeshComponent> M_Landmark;
 
 	// Every piece component the marker hid or made cursor-proof; put back when the real piece shows again.
 	UPROPERTY()

@@ -37,6 +37,10 @@ STAGES = [
     ('Mission_Berlin_Counterattack', ('after', 'Mission_Berlin_ResponseForce')),
     ('Mission_Berlin_Patrols', None),
     ('Mission_Berlin_SupplyPoint', ('time', 140.0)),
+    # South POIs (2026-11-26): the Ju 52 crash crater (poi/south_pois.py); the crew appears on its west rim.
+    ('Mission_Berlin_Ju52Crash', ('near', (-16800.0, 3200.0, 0.0), 2800.0)),
+    # Field hospital (2026-11-26): Red Cross cellar between the mud craters (poi/field_hospital/fh_place.py).
+    ('Mission_Berlin_FieldHospital', ('near', (-16500.0, -5800.0, 0.0), 2500.0)),
 ]
 
 # Per-instance properties (the Intro map showed a data asset equal to the CDO value coming back empty on load).

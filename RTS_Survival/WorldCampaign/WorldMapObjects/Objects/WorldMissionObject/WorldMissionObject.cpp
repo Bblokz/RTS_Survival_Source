@@ -4,6 +4,9 @@
 
 #include "Components/PrimitiveComponent.h"
 #include "Components/SceneComponent.h"
+#include "Components/StaticMeshComponent.h"
+#include "Engine/StaticMesh.h"
+#include "RTS_Survival/WorldCampaign/WorldFow/WorldFogHintSettings.h"
 #include "RTS_Survival/WorldCampaign/StrengthTypes/WorldFortificationModificationsComponent.h"
 #include "RTS_Survival/WorldCampaign/StrengthTypes/WorldStrengthEstimationComponent.h"
 #include "RTS_Survival/WorldCampaign/WorldFow/WorldFowCloud.h"
@@ -14,6 +17,12 @@ AWorldMissionObject::AWorldMissionObject()
 {
 	M_FortificationModificationsComponent =
 		CreateDefaultSubobject<UWorldFortificationModificationsComponent>(TEXT("FortificationModifications"));
+}
+
+namespace WorldMissionObjectConstants
+{
+	// Component tag of the tall landmark beside a scripted mission (set by Tools/WorldMapPieces/build_landmarks.py).
+	const FName LandmarkComponentTag = TEXT("WorldLandmark");
 }
 
 void AWorldMissionObject::OnClearedByPlayer()
@@ -81,7 +90,10 @@ void AWorldMissionObject::ShowUnknownMarker()
 	TInlineComponentArray<USceneComponent*> PieceComponents(this);
 	for (USceneComponent* const PieceComponent : PieceComponents)
 	{
-		if (IsValid(PieceComponent) && PieceComponent != UnknownMarker)
+		// A landmark stands above the fog on purpose and stays, also while the mission itself is unknown.
+		const bool bIsLandmark = IsValid(PieceComponent)
+			&& PieceComponent->ComponentHasTag(WorldMissionObjectConstants::LandmarkComponentTag);
+		if (IsValid(PieceComponent) && PieceComponent != UnknownMarker && not bIsLandmark)
 		{
 			HidePieceComponentForFog(PieceComponent);
 		}
@@ -143,6 +155,36 @@ void AWorldMissionObject::InitializeForAnchorWithMissionType(AAnchorPoint* Ancho
 {
 	AWorldMapObject::InitializeForAnchor(AnchorPoint);
 	M_MissionType = MissionType;
+	CreateLandmark();
+}
+
+void AWorldMissionObject::CreateLandmark()
+{
+	const UWorldFogHintSettings* const Settings = UWorldFogHintSettings::Get();
+	USceneComponent* const PieceRoot = GetRootComponent();
+	if (IsValid(M_Landmark) || Settings == nullptr || not Settings->bShowMissionLandmarks || not IsValid(PieceRoot))
+	{
+		return;
+	}
+
+	const FWorldMissionLandmark* const Landmark = Settings->MissionLandmarks.Find(M_MissionType);
+	UStaticMesh* const LandmarkMesh = Landmark != nullptr ? Landmark->Mesh.LoadSynchronous() : nullptr;
+	if (not IsValid(LandmarkMesh))
+	{
+		return;
+	}
+
+	M_Landmark = NewObject<UStaticMeshComponent>(this, TEXT("MissionLandmark"));
+	M_Landmark->SetStaticMesh(LandmarkMesh);
+	// No collision: an unknown mission must not be found or clicked through its landmark.
+	M_Landmark->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	M_Landmark->SetGenerateOverlapEvents(false);
+	M_Landmark->SetCanEverAffectNavigation(false);
+	M_Landmark->ComponentTags.Add(WorldMissionObjectConstants::LandmarkComponentTag);
+	M_Landmark->SetupAttachment(PieceRoot);
+	M_Landmark->RegisterComponent();
+	M_Landmark->SetRelativeLocationAndRotation(FVector(Landmark->OffsetBehind, Landmark->OffsetRight, 0.f),
+	                                           FRotator(0.f, Landmark->Yaw, 0.f));
 }
 
 FText AWorldMissionObject::GetMissionDisplayName() const

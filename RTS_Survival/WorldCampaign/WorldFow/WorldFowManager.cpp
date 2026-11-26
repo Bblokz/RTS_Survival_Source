@@ -953,7 +953,7 @@ void AWorldFowManager::ApplyMissionFogHints()
 		if (Presentation == EWorldMissionFogPresentation::RealPieceThroughFog && bHasMask)
 		{
 			StampCircle(MissionLocation, Settings->MissionOpeningRadius, Settings->MissionOpeningFalloff,
-			            WorldFowMaskConstants::VisibleChannelIndex);
+			            WorldFowMaskConstants::VisibleChannelIndex, Settings->MissionOpeningStrength);
 		}
 		MissionObject->ApplyFogPresentation(Presentation);
 		if (Presentation != EWorldMissionFogPresentation::AsFogState)
@@ -1222,8 +1222,10 @@ void AWorldFowManager::StampCircle(
 	const FVector& WorldLocation,
 	const float Radius,
 	const float Falloff,
-	const int32 ChannelIndex)
+	const int32 ChannelIndex,
+	const float Strength)
 {
+	const float SafeStrength = FMath::Clamp(Strength, 0.f, 1.f);
 	const FIntPoint CenterPixel = WorldToPixel(WorldLocation);
 	const int32 PixelRadius = GetPixelRadius(Radius + Falloff);
 	const int32 HardPixelRadius = GetPixelRadius(Radius);
@@ -1252,7 +1254,7 @@ void AWorldFowManager::StampCircle(
 				);
 			}
 
-			const uint8 PixelValue = static_cast<uint8>(FMath::RoundToInt(FalloffAlpha * 255.f));
+			const uint8 PixelValue = static_cast<uint8>(FMath::RoundToInt(FalloffAlpha * SafeStrength * 255.f));
 			FColor& Pixel = M_MaskPixels[PixelY * M_MaskResolution + PixelX];
 			WriteMaskPixelChannel(Pixel, ChannelIndex, PixelValue);
 		}

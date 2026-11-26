@@ -186,7 +186,12 @@ private:
 	void SetObjectState(AWorldMapObject* WorldMapObject, EWorldMapFowState NewState);
 	void SetConnectionState(AConnection* Connection, EWorldMapFowState NewState);
 	void StampConnectionSegment(const AConnection* Connection, const AAnchorPoint* StartAnchor, const AAnchorPoint* EndAnchor);
-	void StampCircle(const FVector& WorldLocation, float Radius, float Falloff, int32 ChannelIndex);
+	/**
+	 * @brief Opens a soft circle in one mask channel; never lowers what is already open.
+	 * @param Strength Mask value at the centre, 0 to 1; under 1 the fog only thins there.
+	 */
+	void StampCircle(const FVector& WorldLocation, float Radius, float Falloff, int32 ChannelIndex,
+	                 float Strength = 1.f);
 	void StampLine(const FVector& Start, const FVector& End, float Width, float Falloff, int32 ChannelIndex);
 	int32 GetLineRasterizationSampleCount(const FVector& Start, const FVector& End) const;
 	void WriteMaskPixelChannel(FColor& Pixel, int32 ChannelIndex, uint8 Value) const;
