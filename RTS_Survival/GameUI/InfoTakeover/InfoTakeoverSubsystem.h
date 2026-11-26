@@ -160,6 +160,13 @@ public:
 	int32 QueueDigInTakeover();
 
 	/**
+	 * @brief Queues the Direction Finding field manual (Oder-Warthe: a minimap clip and how the listening posts find the
+	 * command post), waited on like the camera controls takeover.
+	 * @return The request id that OnTakeoverRequestFinished reports exactly once; field manuals show even while unit intel is off.
+	 */
+	int32 QueueDirectionFindingTakeover();
+
+	/**
 	 * @brief Queues the Wall Breach field manual (a short clip and how medium and heavy tanks drive through Soviet
 	 * concrete walls), waited on like the camera controls takeover.
 	 * @return The request id that OnTakeoverRequestFinished reports exactly once; field manuals show even while unit intel is off.
@@ -263,6 +270,7 @@ private:
 	UW_InfoTakeover* CreateRattleFeedTakeoverWidget() const;
 	UW_InfoTakeover* CreateWespeBarrageTakeoverWidget() const;
 	UW_InfoTakeover* CreateDigInTakeoverWidget() const;
+	UW_InfoTakeover* CreateDirectionFindingTakeoverWidget() const;
 	UW_InfoTakeover* CreateWallBreachTakeoverWidget() const;
 	UW_InfoTakeover* CreateAdrenalineShotTakeoverWidget() const;
 	UW_InfoTakeover* CreateCapturingTrucksTakeoverWidget() const;
@@ -294,6 +302,7 @@ private:
 	static FArchiveCustomContent MakeRattleFeedArchiveContent();
 	static FArchiveCustomContent MakeWespeBarrageArchiveContent();
 	static FArchiveCustomContent MakeDigInArchiveContent();
+	static FArchiveCustomContent MakeDirectionFindingArchiveContent();
 	static FArchiveCustomContent MakeWallBreachArchiveContent();
 	static FArchiveCustomContent MakeAdrenalineShotArchiveContent();
 	static FArchiveCustomContent MakeCapturingTrucksArchiveContent();

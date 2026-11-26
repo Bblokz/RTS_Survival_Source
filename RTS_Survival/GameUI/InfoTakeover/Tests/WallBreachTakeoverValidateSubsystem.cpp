@@ -43,6 +43,10 @@ namespace WallBreachTakeoverValidateConstants
 	constexpr double ClipShotSeconds[] = {2.0, 3.6};
 	// About two seconds of a 12 fps clip; the run must see at least this many frame changes while paused.
 	constexpr int32 MinClipFrameChanges = 20;
+	// The run-over page: a clip shot this long after CONTINUE, and the finished shot no earlier than this.
+	constexpr double RunOverClipShotSeconds = 3.0;
+	constexpr double RunOverDoneShotSeconds = 6.0;
+	constexpr int32 ExpectedPageCount = 2;
 	const FName DifficultyButtonName(TEXT("M_NormalDifficultyButton"));
 }
 
@@ -228,24 +232,119 @@ void UWallBreachTakeoverValidateSubsystem::TickWatchingTakeover()
 		Capture(TEXT("WallBreach_1_done"));
 		return;
 	}
+	if (M_ShotsTaken >= 3)
+	{
+		TickRunOverPage(*Takeover, SecondsOpen);
+		return;
+	}
 	if (M_ShotsTaken < 2 || SecondsOpen < M_DoneShotSeconds + PressUnderstoodAfterDoneShotSeconds)
 	{
 		return;
 	}
 	if (M_MainClosedCount != 0)
 	{
-		Fail(TEXT("On Closed fired before UNDERSTOOD"));
+		Fail(TEXT("On Closed fired on the first page"));
 	}
-	const bool bPausedBeforeClose = UGameplayStatics::IsGamePaused(this);
-	UE_LOG(LogTemp, Display, TEXT("WALL_BREACH_TAKEOVER clip changed frame %d times in %.1f s, paused=%d"),
-	       M_ClipFrameChanges, SecondsOpen, bPausedBeforeClose ? 1 : 0);
-	if (M_ClipFrameChanges < MinClipFrameChanges || not bPausedBeforeClose)
-	{
-		Fail(TEXT("the clip did not keep playing while the game was paused"));
-	}
-	// The footer button as the player clicks it.
+	CheckClipPlayedWhilePaused(TEXT("walls"), SecondsOpen);
+	// The footer button (CONTINUE) as the player clicks it: the run-over page shows, the takeover stays open.
 	Takeover->PressConfirmButton();
+	CheckPage(*Takeover, 1, TEXT("CONTINUE"));
+	M_RunOverPageSeconds = SecondsOpen;
+	M_TypingDoneSeconds = -1.0;
+	M_LastClipFrame = INDEX_NONE;
+	M_ClipFrameChanges = 0;
+	M_ShotsTaken = 3;
+}
+
+void UWallBreachTakeoverValidateSubsystem::TickRunOverPage(UW_WallBreachTakeover& Takeover, const double SecondsOpen)
+{
+	using namespace WallBreachTakeoverValidateConstants;
+	const double SecondsOnPage = SecondsOpen - M_RunOverPageSeconds;
+	if (not bM_HasRunOverClipShot && SecondsOnPage >= RunOverClipShotSeconds)
+	{
+		bM_HasRunOverClipShot = true;
+		Capture(FString::Printf(TEXT("WallBreach_runover_clip_frame%02d"), Takeover.GetShownClipFrame()));
+		return;
+	}
+	if (M_ShotsTaken == 3)
+	{
+		const bool bTypingDone = Takeover.GetTypingPhase() == EInfoTakeoverTypingPhase::Done;
+		if (bTypingDone && M_TypingDoneSeconds < 0.0)
+		{
+			M_TypingDoneSeconds = SecondsOnPage;
+		}
+		const bool bLastLetterDrawn = bTypingDone && SecondsOnPage >= M_TypingDoneSeconds + SettleAfterTypingSeconds;
+		if (SecondsOnPage < RunOverDoneShotSeconds || (not bLastLetterDrawn && SecondsOnPage < MaxTypingWaitSeconds))
+		{
+			return;
+		}
+		if (not bTypingDone)
+		{
+			Fail(TEXT("the run-over page's title and description did not finish typing"));
+		}
+		M_ShotsTaken = 4;
+		M_DoneShotSeconds = SecondsOpen;
+		Capture(TEXT("WallBreach_3_runover_done"));
+		return;
+	}
+	if (SecondsOpen < M_DoneShotSeconds + PressUnderstoodAfterDoneShotSeconds)
+	{
+		return;
+	}
+	CheckClipPlayedWhilePaused(TEXT("run-over"), SecondsOnPage);
+	// PREVIOUS returns to the walls, CONTINUE comes back; neither closes the takeover.
+	Takeover.PressPreviousButton();
+	CheckPage(Takeover, 0, TEXT("PREVIOUS"));
+	Takeover.PressConfirmButton();
+	CheckPage(Takeover, 1, TEXT("CONTINUE again"));
+	if (M_MainClosedCount != 0)
+	{
+		Fail(TEXT("On Closed fired before UNDERSTOOD on the last page"));
+	}
+	// UNDERSTOOD on the last page closes it.
+	Takeover.PressConfirmButton();
 	EnterPhase(EWallBreachTakeoverValidatePhase::CheckingClosed);
+}
+
+void UWallBreachTakeoverValidateSubsystem::CheckClipPlayedWhilePaused(const TCHAR* PageName, const double Seconds)
+{
+	using namespace WallBreachTakeoverValidateConstants;
+	const bool bPaused = UGameplayStatics::IsGamePaused(this);
+	UE_LOG(LogTemp, Display, TEXT("WALL_BREACH_TAKEOVER %s clip changed frame %d times in %.1f s, paused=%d"),
+	       PageName, M_ClipFrameChanges, Seconds, bPaused ? 1 : 0);
+	if (M_ClipFrameChanges < MinClipFrameChanges || not bPaused)
+	{
+		Fail(FString::Printf(TEXT("the %s clip did not keep playing while the game was paused"), PageName));
+	}
+}
+
+void UWallBreachTakeoverValidateSubsystem::CheckPage(const UW_WallBreachTakeover& Takeover, const int32 ExpectedPage,
+                                                     const TCHAR* AfterWhat, const bool bExpectFirstClipFrame)
+{
+	using namespace WallBreachTakeoverValidateConstants;
+	const int32 Page = Takeover.GetCurrentPageIndex();
+	const int32 LitLamp = Takeover.GetLitPageLampIndex();
+	const bool bPreviousVisible = Takeover.GetIsPreviousButtonVisible();
+	const bool bClipLoaded = Takeover.GetHasLoadedClip();
+	const int32 ClipFrame = Takeover.GetShownClipFrame();
+	const bool bStillOpen = GetActiveWallBreachTakeover() == &Takeover;
+	UE_LOG(LogTemp, Display, TEXT("WALL_BREACH_TAKEOVER after %s: page=%d/%d lamps=%d lit=%d previous=%d clip loaded=%d "
+		       "clip frame=%d open=%d"), AfterWhat, Page, Takeover.GetPageCount(), Takeover.GetPageLampCount(), LitLamp,
+	       bPreviousVisible ? 1 : 0, bClipLoaded ? 1 : 0, ClipFrame, bStillOpen ? 1 : 0);
+	if (Takeover.GetPageCount() != ExpectedPageCount || Takeover.GetPageLampCount() != ExpectedPageCount)
+	{
+		Fail(TEXT("the takeover does not have two pages with a lamp each"));
+	}
+	if (Page != ExpectedPage || LitLamp != ExpectedPage || bPreviousVisible != (ExpectedPage > 0) || not bStillOpen)
+	{
+		Fail(FString::Printf(TEXT("after %s the takeover is not on page %d with that lamp lit and PREVIOUS %s"),
+		                     AfterWhat, ExpectedPage + 1, ExpectedPage > 0 ? TEXT("shown") : TEXT("hidden")));
+	}
+	if (not bClipLoaded || (bExpectFirstClipFrame && ClipFrame != 0))
+	{
+		Fail(FString::Printf(TEXT("after %s the page's clip is not loaded or did not start at its first frame"),
+		                     AfterWhat));
+	}
 }
 
 void UWallBreachTakeoverValidateSubsystem::StartWatching(UW_WallBreachTakeover& Takeover)
@@ -269,6 +368,8 @@ void UWallBreachTakeoverValidateSubsystem::StartWatching(UW_WallBreachTakeover& 
 	{
 		Fail(TEXT("the game is not paused while the takeover is open"));
 	}
+	// The clip may already have stepped a frame before the first watch tick.
+	CheckPage(Takeover, 0, TEXT("opening"), false);
 }
 
 void UWallBreachTakeoverValidateSubsystem::TickCheckingClosed()

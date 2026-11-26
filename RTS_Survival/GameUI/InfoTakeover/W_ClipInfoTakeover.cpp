@@ -12,6 +12,7 @@
 #include "Components/TextBlock.h"
 #include "Components/VerticalBox.h"
 #include "Components/VerticalBoxSlot.h"
+#include "Components/WidgetSwitcher.h"
 #include "Engine/Texture2D.h"
 #include "PauseSafeProtoRichTextBlock.h"
 #include "RTS_Survival/FactionSystem/FactionSelection/UnitVariantSelection/UnitVariantSelectionWidgetHelpers.h"
@@ -63,33 +64,93 @@ FText UW_ClipInfoTakeover::GetClipCaption() const
 	return FText::GetEmpty();
 }
 
+FClipTakeoverClip UW_ClipInfoTakeover::GetPageClip(const int32 PageIndex) const
+{
+	FClipTakeoverClip Clip;
+	Clip.Atlas = M_ClipAtlas;
+	Clip.Columns = M_ClipColumns;
+	Clip.Rows = M_ClipRows;
+	Clip.FrameCount = M_ClipFrameCount;
+	Clip.FramesPerSecond = M_ClipFramesPerSecond;
+	Clip.EndHoldSeconds = M_ClipEndHoldSeconds;
+	return Clip;
+}
+
+TArray<FClipTakeoverFact> UW_ClipInfoTakeover::MakePageFacts(const int32 PageIndex) const
+{
+	return PageIndex == 0 ? MakeFacts() : TArray<FClipTakeoverFact>();
+}
+
+FText UW_ClipInfoTakeover::GetPageClipCaption(const int32 PageIndex) const
+{
+	return PageIndex == 0 ? GetClipCaption() : FText::GetEmpty();
+}
+
+bool UW_ClipInfoTakeover::GetHasLoadedClip() const
+{
+	return M_ClipPages.IsValidIndex(M_ActiveClipPage) && IsValid(M_ClipPages[M_ActiveClipPage].LoadedAtlas);
+}
+
 void UW_ClipInfoTakeover::BuildClipBody()
 {
-	using namespace ClipInfoTakeoverLayout;
 	UVerticalBox* const BodyColumn = GetBodyColumn();
 	if (not IsValid(BodyColumn) || not IsValid(WidgetTree))
 	{
 		return;
 	}
 	BodyColumn->ClearChildren();
-	M_LoadedClipAtlas = nullptr;
-	M_ClipImage = nullptr;
+	M_ClipPages.Reset();
+	M_ActiveClipPage = 0;
 	M_ClipSeconds = 0.f;
 	M_ShownClipFrame = INDEX_NONE;
 	if (UPauseSafeProtoRichTextBlock* const DescriptionBlock = GetDescriptionBlock())
 	{
-		BodyColumn->AddChildToVerticalBox(DescriptionBlock)->SetPadding(DescriptionPadding);
+		BodyColumn->AddChildToVerticalBox(DescriptionBlock)->SetPadding(ClipInfoTakeoverLayout::DescriptionPadding);
 	}
-	UHorizontalBox* const CardRow = WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass());
-	BodyColumn->AddChildToVerticalBox(CardRow);
-	UHorizontalBoxSlot* const ClipSlot = CardRow->AddChildToHorizontalBox(BuildClipCard());
-	ClipSlot->SetSize(FSlateChildSize(ESlateSizeRule::Automatic));
-	ClipSlot->SetPadding(FMargin(0.f, 0.f, CardGap, 0.f));
-	UHorizontalBoxSlot* const FactsSlot = CardRow->AddChildToHorizontalBox(BuildFactsCard());
-	FactsSlot->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
+	// Child order follows the page index; a one-page manual has a switcher with one child, which lays out the same.
+	M_ClipPageSwitcher = WidgetTree->ConstructWidget<UWidgetSwitcher>(UWidgetSwitcher::StaticClass());
+	const int32 PageCount = FMath::Max(GetPageCount(), 1);
+	M_ClipPages.SetNum(PageCount);
+	for (int32 PageIndex = 0; PageIndex < PageCount; ++PageIndex)
+	{
+		M_ClipPageSwitcher->AddChild(BuildClipPage(PageIndex));
+	}
+	M_ClipPageSwitcher->SetActiveWidgetIndex(0);
+	BodyColumn->AddChildToVerticalBox(M_ClipPageSwitcher);
+	ShowClipFrame(0);
 }
 
-UWidget* UW_ClipInfoTakeover::BuildClipCard()
+bool UW_ClipInfoTakeover::TryShowPage(const int32 PageIndex)
+{
+	if (PageIndex < 0 || PageIndex >= GetPageCount() || not M_ClipPages.IsValidIndex(PageIndex)
+		|| not IsValid(M_ClipPageSwitcher))
+	{
+		return false;
+	}
+	M_ActiveClipPage = PageIndex;
+	M_ClipPageSwitcher->SetActiveWidgetIndex(PageIndex);
+	// The shown page's clip starts at its beginning, also when PREVIOUS returns to it.
+	M_ClipSeconds = 0.f;
+	M_ShownClipFrame = INDEX_NONE;
+	ShowClipFrame(0);
+	ApplyClipPageTexts(PageIndex);
+	RestartTyping();
+	return true;
+}
+
+UWidget* UW_ClipInfoTakeover::BuildClipPage(const int32 PageIndex)
+{
+	using namespace ClipInfoTakeoverLayout;
+	UHorizontalBox* const CardRow = WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass());
+	UHorizontalBoxSlot* const ClipSlot = CardRow->AddChildToHorizontalBox(BuildClipCard(PageIndex));
+	ClipSlot->SetSize(FSlateChildSize(ESlateSizeRule::Automatic));
+	ClipSlot->SetPadding(FMargin(0.f, 0.f, CardGap, 0.f));
+	UHorizontalBoxSlot* const FactsSlot = CardRow->AddChildToHorizontalBox(BuildFactsCard(PageIndex));
+	FactsSlot->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
+	return CardRow;
+}
+
+UWidget* UW_ClipInfoTakeover::BuildClipCard(const int32 PageIndex)
 {
 	using namespace ClipInfoTakeoverLayout;
 	UVerticalBox* const CardColumn = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass());
@@ -102,24 +163,25 @@ UWidget* UW_ClipInfoTakeover::BuildClipCard()
 	ClipWell->SetContent(ClipBox);
 	CardColumn->AddChildToVerticalBox(ClipWell)->SetHorizontalAlignment(HAlign_Center);
 
-	UTexture2D* const LoadedAtlas = M_ClipAtlas.LoadSynchronous();
+	FClipTakeoverPagePlayback& Playback = M_ClipPages[PageIndex];
+	Playback.Clip = GetPageClip(PageIndex);
+	UTexture2D* const LoadedAtlas = Playback.Clip.Atlas.LoadSynchronous();
 	if (IsValid(LoadedAtlas))
 	{
-		M_LoadedClipAtlas = LoadedAtlas;
-		M_ClipImage = WidgetTree->ConstructWidget<UImage>(UImage::StaticClass());
-		M_ClipImage->SetBrushFromTexture(LoadedAtlas, false);
-		ShowClipFrame(0);
-		ClipBox->SetContent(MakePictureWithGlass(M_ClipImage));
+		Playback.LoadedAtlas = LoadedAtlas;
+		Playback.Image = WidgetTree->ConstructWidget<UImage>(UImage::StaticClass());
+		Playback.Image->SetBrushFromTexture(LoadedAtlas, false);
+		ClipBox->SetContent(MakePictureWithGlass(Playback.Image));
 	}
 	else
 	{
 		RTSFunctionLibrary::ReportError(FString::Printf(
-			TEXT("%s: clip atlas %s could not be loaded; the card shows an empty well."), *GetClass()->GetName(),
-			*M_ClipAtlas.ToString()));
+			TEXT("%s: clip atlas %s of page %d could not be loaded; the card shows an empty well."),
+			*GetClass()->GetName(), *Playback.Clip.Atlas.ToString(), PageIndex));
 	}
 
 	UTextBlock* const CaptionText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
-	CaptionText->SetText(GetClipCaption());
+	CaptionText->SetText(GetPageClipCaption(PageIndex));
 	CaptionText->SetWrapTextAt(CaptionWrapWidth);
 	UnitVariantSelectionWidgets::ApplyTextOnMetal(
 		CaptionText, UnitVariantSelectionWidgets::MakeFont(M_Style.Skin.BodyFont, BodyFontSize),
@@ -128,10 +190,10 @@ UWidget* UW_ClipInfoTakeover::BuildClipCard()
 	return WrapInGlassPane(CardColumn);
 }
 
-UWidget* UW_ClipInfoTakeover::BuildFactsCard()
+UWidget* UW_ClipInfoTakeover::BuildFactsCard(const int32 PageIndex)
 {
 	UVerticalBox* const FactsColumn = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass());
-	const TArray<FClipTakeoverFact> Facts = MakeFacts();
+	const TArray<FClipTakeoverFact> Facts = MakePageFacts(PageIndex);
 	for (int32 FactIndex = 0; FactIndex < Facts.Num(); ++FactIndex)
 	{
 		AddFactText(*FactsColumn, Facts[FactIndex], FactIndex == 0);
@@ -161,19 +223,28 @@ void UW_ClipInfoTakeover::AddFactText(UVerticalBox& FactsColumn, const FClipTake
                                       const bool bIsFirst) const
 {
 	using namespace ClipInfoTakeoverLayout;
-	UTextBlock* const LabelText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
-	LabelText->SetText(Fact.Label);
-	UnitVariantSelectionWidgets::ApplyTextOnMetal(
-		LabelText, UnitVariantSelectionWidgets::MakeFont(M_Style.Skin.HeadingFont, FactLabelFontSize,
-		                                                 FactLabelLetterSpacing), M_Style.Skin.LabelColor);
-	FactsColumn.AddChildToVerticalBox(LabelText)->SetPadding(bIsFirst ? FirstFactLabelPadding : FactLabelPadding);
+	const FMargin& LeadPadding = bIsFirst ? FirstFactLabelPadding : FactLabelPadding;
+	// A fact without a label starts at its title, which then takes the label's spacing from the fact above.
+	const bool bHasLabel = not Fact.Label.IsEmpty();
+	if (bHasLabel)
+	{
+		UTextBlock* const LabelText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
+		LabelText->SetText(Fact.Label);
+		UnitVariantSelectionWidgets::ApplyTextOnMetal(
+			LabelText, UnitVariantSelectionWidgets::MakeFont(M_Style.Skin.HeadingFont, FactLabelFontSize,
+			                                                 FactLabelLetterSpacing), M_Style.Skin.LabelColor);
+		FactsColumn.AddChildToVerticalBox(LabelText)->SetPadding(LeadPadding);
+	}
 
 	UTextBlock* const TitleText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
 	TitleText->SetText(Fact.Title);
 	UnitVariantSelectionWidgets::ApplyTextOnMetal(
 		TitleText, UnitVariantSelectionWidgets::MakeFont(M_Style.Skin.HeadingFont, FactTitleFontSize),
 		M_Style.Skin.TextColor);
-	FactsColumn.AddChildToVerticalBox(TitleText)->SetPadding(FactTitlePadding);
+	const FMargin TitlePadding = bHasLabel
+		                             ? FactTitlePadding
+		                             : FMargin(0.f, LeadPadding.Top, 0.f, FactTitlePadding.Bottom);
+	FactsColumn.AddChildToVerticalBox(TitleText)->SetPadding(TitlePadding);
 
 	UTextBlock* const BodyText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
 	BodyText->SetText(Fact.Body);
@@ -186,15 +257,17 @@ void UW_ClipInfoTakeover::AddFactText(UVerticalBox& FactsColumn, const FClipTake
 
 void UW_ClipInfoTakeover::AdvanceClip(const float RealDeltaSeconds)
 {
-	if (not GetIsClipSetUp())
+	const FClipTakeoverPagePlayback* const Playback = GetActiveClipPlayback();
+	if (Playback == nullptr)
 	{
 		return;
 	}
-	const float FrameSeconds = 1.f / M_ClipFramesPerSecond;
-	const float LoopSeconds = M_ClipFrameCount * FrameSeconds + M_ClipEndHoldSeconds;
+	const FClipTakeoverClip& Clip = Playback->Clip;
+	const float FrameSeconds = 1.f / Clip.FramesPerSecond;
+	const float LoopSeconds = Clip.FrameCount * FrameSeconds + Clip.EndHoldSeconds;
 	M_ClipSeconds = FMath::Fmod(M_ClipSeconds + RealDeltaSeconds, LoopSeconds);
 	// Past the last frame the clip holds on it until the loop starts over.
-	const int32 FrameIndex = FMath::Min(FMath::FloorToInt32(M_ClipSeconds / FrameSeconds), M_ClipFrameCount - 1);
+	const int32 FrameIndex = FMath::Min(FMath::FloorToInt32(M_ClipSeconds / FrameSeconds), Clip.FrameCount - 1);
 	if (FrameIndex != M_ShownClipFrame)
 	{
 		ShowClipFrame(FrameIndex);
@@ -204,26 +277,38 @@ void UW_ClipInfoTakeover::AdvanceClip(const float RealDeltaSeconds)
 void UW_ClipInfoTakeover::ShowClipFrame(const int32 FrameIndex)
 {
 	using namespace ClipInfoTakeoverLayout;
-	if (not GetIsClipSetUp())
+	const FClipTakeoverPagePlayback* const Playback = GetActiveClipPlayback();
+	if (Playback == nullptr)
 	{
 		return;
 	}
-	const int32 Column = FrameIndex % M_ClipColumns;
-	const int32 Row = FrameIndex / M_ClipColumns;
-	const float CellWidth = 1.f / M_ClipColumns;
-	const float CellHeight = 1.f / M_ClipRows;
-	const float InsetU = CellEdgeInsetTexels / FMath::Max(1, M_LoadedClipAtlas->GetSizeX());
-	const float InsetV = CellEdgeInsetTexels / FMath::Max(1, M_LoadedClipAtlas->GetSizeY());
+	const FClipTakeoverClip& Clip = Playback->Clip;
+	const int32 Column = FrameIndex % Clip.Columns;
+	const int32 Row = FrameIndex / Clip.Columns;
+	const float CellWidth = 1.f / Clip.Columns;
+	const float CellHeight = 1.f / Clip.Rows;
+	const float InsetU = CellEdgeInsetTexels / FMath::Max(1, Playback->LoadedAtlas->GetSizeX());
+	const float InsetV = CellEdgeInsetTexels / FMath::Max(1, Playback->LoadedAtlas->GetSizeY());
 	const FVector2f CellMin(Column * CellWidth + InsetU, Row * CellHeight + InsetV);
 	const FVector2f CellMax((Column + 1) * CellWidth - InsetU, (Row + 1) * CellHeight - InsetV);
-	FSlateBrush ClipBrush = M_ClipImage->GetBrush();
+	FSlateBrush ClipBrush = Playback->Image->GetBrush();
 	ClipBrush.SetUVRegion(FBox2f(CellMin, CellMax));
-	M_ClipImage->SetBrush(ClipBrush);
+	Playback->Image->SetBrush(ClipBrush);
 	M_ShownClipFrame = FrameIndex;
 }
 
-bool UW_ClipInfoTakeover::GetIsClipSetUp() const
+const FClipTakeoverPagePlayback* UW_ClipInfoTakeover::GetActiveClipPlayback() const
 {
-	return IsValid(M_ClipImage) && IsValid(M_LoadedClipAtlas) && M_ClipColumns > 0 && M_ClipRows > 0 &&
-		M_ClipFrameCount > 0 && M_ClipFrameCount <= M_ClipColumns * M_ClipRows && M_ClipFramesPerSecond > 0.f;
+	if (not M_ClipPages.IsValidIndex(M_ActiveClipPage) || not GetIsClipSetUp(M_ClipPages[M_ActiveClipPage]))
+	{
+		return nullptr;
+	}
+	return &M_ClipPages[M_ActiveClipPage];
+}
+
+bool UW_ClipInfoTakeover::GetIsClipSetUp(const FClipTakeoverPagePlayback& Playback)
+{
+	const FClipTakeoverClip& Clip = Playback.Clip;
+	return IsValid(Playback.Image) && IsValid(Playback.LoadedAtlas) && Clip.Columns > 0 && Clip.Rows > 0 &&
+		Clip.FrameCount > 0 && Clip.FrameCount <= Clip.Columns * Clip.Rows && Clip.FramesPerSecond > 0.f;
 }

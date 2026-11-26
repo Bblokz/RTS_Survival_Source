@@ -56,6 +56,9 @@ enum class EInfoTakeoverKind : uint8
 	// How convoy trucks surrender (scuttle countdown, a squad within 20 m, the 60 % health rule) and capture versus
 	// destroy; opened by the Show Capturing Trucks Takeover node.
 	CapturingTrucks,
+	// Oder-Warthe: how the listening posts' bearing wedges find the hidden command post, with a minimap clip; opened
+	// by the Show Direction Finding Takeover node.
+	DirectionFinding,
 	// A captured paper document (title, typed intro, the sheet's lines and an optional stamp) whose text the caller
 	// gives; opened by the Show Document Takeover and Show Ore Manifest Takeover nodes.
 	Document

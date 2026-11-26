@@ -55,6 +55,9 @@ private:
 	// Real seconds after opening at which the typewriter was first seen done; negative until then.
 	double M_TypingDoneSeconds = -1.0;
 	int32 M_ShotsTaken = 0;
+	// Real seconds after opening when CONTINUE showed the run-over page.
+	double M_RunOverPageSeconds = 0.0;
+	bool bM_HasRunOverClipShot = false;
 	// Clip frames seen change while the takeover is open; the clip must play while the game is paused.
 	int32 M_LastClipFrame = INDEX_NONE;
 	int32 M_ClipFrameChanges = 0;
@@ -92,6 +95,11 @@ private:
 	void StartWatching(UW_WallBreachTakeover& Takeover);
 	void CheckShowsWhileTurnedOff();
 	void TrackClip(const UW_WallBreachTakeover& Takeover, const double SecondsOpen);
+	/** Logs and checks the shown page, its lamp, PREVIOUS and the page's clip after a page button. */
+	void CheckPage(const UW_WallBreachTakeover& Takeover, const int32 ExpectedPage, const TCHAR* AfterWhat,
+	               const bool bExpectFirstClipFrame = true);
+	void TickRunOverPage(UW_WallBreachTakeover& Takeover, const double SecondsOpen);
+	void CheckClipPlayedWhilePaused(const TCHAR* PageName, const double Seconds);
 
 	UFUNCTION()
 	void HandleMainClosed(bool bWasShown);
