@@ -13,6 +13,7 @@ class UMaterialInterface;
 class UNiagaraComponent;
 class UNiagaraSystem;
 class UPointLightComponent;
+class UProceduralMeshComponent;
 class USoundBase;
 class UStaticMesh;
 class UStaticMeshComponent;
@@ -102,6 +103,86 @@ struct FRadixiteNukeSettings
 	ETriggerOverlapLogic AffectedUnits = ETriggerOverlapLogic::OverlapBoth;
 };
 
+/**
+ * @brief One more Niagara effect layered into the detonation (ground burst, thrown earth, later fires, smoke).
+ * Every copy picks its own delay and distance from ground zero in the ranges and lands on the ground there.
+ */
+USTRUCT(BlueprintType)
+struct FRadixiteNukeDetonationLayer
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TSoftObjectPtr<UNiagaraSystem> Effect;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "1", ClampMax = "32"))
+	int32 Count = 1;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0.01"))
+	float Scale = 1.f;
+
+	// Seconds after the blast.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0"))
+	float MinDelaySeconds = 0.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0"))
+	float MaxDelaySeconds = 0.f;
+
+	// Distance from ground zero as part of the blast radius; the copies spread evenly around it.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0"))
+	float MinRadiusFraction = 0.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0"))
+	float MaxRadiusFraction = 0.f;
+};
+
+/**
+ * @brief The crater the warhead leaves: a deep-looking parallax pit decal ringed by a raised earth rim that follows the
+ * ground. The landscape cannot be cut at runtime, so the pit is painted and only the rim is geometry. Pathing never sees
+ * it; vehicles can ride over the rim.
+ */
+USTRUCT(BlueprintType)
+struct FRadixiteNukeCrater
+{
+	GENERATED_BODY()
+
+	// Radius of the rim crest in cm; 0 leaves no crater.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0"))
+	float RimRadius = 0.f;
+
+	// Pit decal with its own bowl and rim painted in; spun to a random angle.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TSoftObjectPtr<UMaterialInterface> PitDecalMaterial;
+
+	// Where the painted rim crest lies in the decal, as part of its half size; lines the decal up with the rim mesh.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0.1", ClampMax = "1"))
+	float DecalRimFraction = 0.6f;
+
+	// Material of the earth rim; vertex colour R = fresh spoil on the crest, G = foot that blends into the ground.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TSoftObjectPtr<UMaterialInterface> RimMaterial;
+
+	// Height of the crest above the ground; units drive and walk at ground level inside the pit.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0"))
+	float RimHeight = 160.f;
+
+	// Run of the inner wall from the crest toward the centre, as part of RimRadius.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0.05", ClampMax = "0.9"))
+	float RimInnerRunFraction = 0.25f;
+
+	// Run of the outer ejecta slope from the crest out to the ground, as part of RimRadius.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0.05"))
+	float RimOuterRunFraction = 0.5f;
+
+	// How much the crest height and radius wander around the ring, so the rim does not read as a perfect torus.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0", ClampMax = "0.5"))
+	float RimIrregularity = 0.15f;
+
+	// Vehicles ride over the rim like over the trench banks (physics only); infantry still walk through it.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	bool bRimCarriesVehicles = true;
+};
+
 /** @brief Assets of the nuke, loaded when the ability fires. */
 USTRUCT(BlueprintType)
 struct FRadixiteNukeVisuals
@@ -176,12 +257,30 @@ struct FRadixiteNukeVisuals
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0"))
 	float FlashIntensity = 40000000.f;
+
+	// Seconds the flash takes to fade out.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0.1"))
+	float FlashFadeSeconds = 2.5f;
+
+	// Extra effects layered into the detonation after DetonationEffect.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TArray<FRadixiteNukeDetonationLayer> DetonationLayers;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FRadixiteNukeCrater Crater;
+
+	// Camera shakes of the blast; the shake system caps one shake, so a bigger blast rumbles longer instead.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "1", ClampMax = "8"))
+	int32 BlastShakePulses = 1;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0.05"))
+	float BlastShakePulseIntervalSeconds = 0.4f;
 };
 
 /**
  * @brief One radixite warhead from warning to scar: shows the target area to everyone, brings the warhead down, deals
  * the core and blast damage, then keeps poisoning the ground for a while. Spawned by UGA_RadixiteNuke with its assets
- * loaded; stays behind with the scar decal when it is done.
+ * loaded; stays behind with the scar decal and, if the visuals have one, the crater when it is done.
  */
 UCLASS(NotBlueprintable)
 class RTS_SURVIVAL_API ARadixiteNuke : public AActor
@@ -236,6 +335,13 @@ private:
 	TObjectPtr<UDecalComponent> M_ScarDecal;
 
 	UPROPERTY()
+	TObjectPtr<UDecalComponent> M_CraterDecal;
+
+	// Raised earth ring around the crater pit, built at the blast to follow the ground under it.
+	UPROPERTY()
+	TObjectPtr<UProceduralMeshComponent> M_CraterRim;
+
+	UPROPERTY()
 	TObjectPtr<UMaterialInstanceDynamic> M_ShockwaveMaterial;
 
 	UPROPERTY()
@@ -272,6 +378,10 @@ private:
 	void Detonate();
 	void DealBlastDamage() const;
 	void RequestBlastCameraShake() const;
+	void ScheduleBlastShakePulses();
+	void ShowCrater();
+	void SpawnDetonationLayers();
+	void SpawnDetonationLayerCopy(const FRadixiteNukeDetonationLayer& Layer, const int32 CopyIndex);
 	void TickRadiating(const float DeltaSeconds);
 	void DealRadiationPulse() const;
 	void EndRadiation();

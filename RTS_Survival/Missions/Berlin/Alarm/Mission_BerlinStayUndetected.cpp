@@ -4,8 +4,11 @@
 
 #include "RTS_Survival/Enemy/EnemyWaves/WaveSpawner/EnemyWaveSpawner.h"
 #include "RTS_Survival/Game/GameState/GameUnitManager/GameUnitManager.h"
+#include "RTS_Survival/Player/CPPController.h"
+#include "RTS_Survival/Units/Tanks/WheeledTank/BaseTruck/NomadicVehicle.h"
 #include "RTS_Survival/Units/Squads/SquadUnit/SquadUnit.h"
 #include "RTS_Survival/Units/Tanks/TankMaster.h"
+#include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 
 namespace BerlinStayUndetectedConstants
@@ -67,7 +70,31 @@ void UMission_BerlinStayUndetected::RespondToAlarm()
 	{
 		PlayPortrait(AlarmLines.Portrait, Line);
 	}
-	AEnemyWaveSpawner::ConvergeAllPatrolsOnAlarm(this, M_AlarmLocation, PatrolCombatSecondsBeforeReturn);
+	AEnemyWaveSpawner::ConvergeAllPatrolsOnAlarm(this, GetPatrolTargetLocation(), PatrolCombatSecondsBeforeReturn,
+	                                             PatrolCombatCheckDelaySeconds);
+}
+
+FVector UMission_BerlinStayUndetected::GetPatrolTargetLocation() const
+{
+	if (not bPatrolsAttackPlayerHQ)
+	{
+		return M_AlarmLocation;
+	}
+	const ACPPController* const PlayerController = FRTS_Statics::GetRTSController(this);
+	ANomadicVehicle* const HQ = IsValid(PlayerController) ? PlayerController->GetPlayerHq() : nullptr;
+	if (RTSFunctionLibrary::RTSIsValid(HQ))
+	{
+		return HQ->GetActorLocation();
+	}
+	// The controller may not know the HQ (map without profile units): look for a deployed or moving one.
+	for (ANomadicVehicle* const Nomadic : GetPlayerNomadicsOfType(ENomadicSubtype::Nomadic_GerHq))
+	{
+		if (RTSFunctionLibrary::RTSIsValid(Nomadic))
+		{
+			return Nomadic->GetActorLocation();
+		}
+	}
+	return M_AlarmLocation;
 }
 
 USoundBase* UMission_BerlinStayUndetected::GetLineForCause(const EBerlinAlarmCause Cause) const

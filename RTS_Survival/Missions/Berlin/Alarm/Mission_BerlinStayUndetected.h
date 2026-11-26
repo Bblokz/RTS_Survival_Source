@@ -48,8 +48,9 @@ struct FBerlinAlarmLines
 /**
  * @brief C++ parent of Mission_Berlin_StayUndetected (the stage whose failure is the alarm). The Blueprint keeps its
  * graph; natively this class remembers the last alarm trigger (cause and where the player was seen) and, when the
- * Blueprint fails the stage, plays the cause's Soviet radio line and sends every patrol to that spot (20 s of combat,
- * then back to their routes; AEnemyWaveSpawner::ConvergeAllPatrolsOnAlarm).
+ * Blueprint fails the stage, plays the cause's Soviet radio line and sends every patrol to attack the player HQ
+ * (AEnemyWaveSpawner::ConvergeAllPatrolsOnAlarm). Fights in the first PatrolCombatCheckDelaySeconds do not count; after
+ * that a group returns to its route PatrolCombatSecondsBeforeReturn after its first fight.
  */
 UCLASS(Blueprintable, EditInlineNew)
 class RTS_SURVIVAL_API UMission_BerlinStayUndetected : public UMissionBase
@@ -69,9 +70,18 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Alarm")
 	FBerlinAlarmLines AlarmLines;
 
+	// True: the patrols attack-move to the player HQ. False (or no HQ): to where the alarm unit was seen.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Alarm")
+	bool bPatrolsAttackPlayerHQ = true;
+
 	// Seconds after a patrol group first fights before it breaks off and returns to its route.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Alarm", meta = (ClampMin = "0.0"))
 	float PatrolCombatSecondsBeforeReturn = 20.f;
+
+	// Seconds after the alarm before fights count for the return above (owner 2026-11-25: by then the patrols are
+	// near the player); fights on the way to the HQ before that do not turn a group back.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Alarm", meta = (ClampMin = "0.0"))
+	float PatrolCombatCheckDelaySeconds = 80.f;
 
 	// Trigger ids the Blueprint gives its areas (BerlinMissionScripting.md, StayUndetected).
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Alarm")
@@ -97,4 +107,7 @@ private:
 
 	/** @return The location of the player unit closest to the runner, or the runner's own location if none. */
 	FVector GetClosestPlayerUnitLocation(const FVector& From) const;
+
+	/** @return Where the patrols attack-move to: the player HQ, or the alarm spot without an HQ. */
+	FVector GetPatrolTargetLocation() const;
 };

@@ -6,11 +6,16 @@
 #include "DirectionFindingSubsystem.h"
 #include "Engine/World.h"
 #include "Kismet/GameplayStatics.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
 #include "RTS_Survival/Enemy/MissionPlacement/EnemyPlacementShapesComponent.h"
 #include "RTS_Survival/Enemy/MissionPlacement/EnemyPlacementTypes.h"
 #include "RTS_Survival/Game/Players/RTSPlayers.h"
 #include "RTS_Survival/SupplyPoints/SupplyPoint.h"
+#include "RTS_Survival/Player/PortraitManager/PortraitManager.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
+#include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
+#include "RTS_Survival/Utils/RTSMapTests/RTSMapTests.h"
 #include "Sound/SoundBase.h"
 #include "TimerManager.h"
 
@@ -23,6 +28,8 @@ namespace DirectionFindingManagerConstants
 	constexpr float JammerFadeOutSeconds = 1.5f;
 	const TCHAR* const TargetFolder = TEXT("/Game/RTS_Survival/Blueprints/Environment/OderWarthe/Targets/Blueprints/");
 	const TCHAR* const SoundFolder = TEXT("/Game/RTS_Survival/Sounds/OderWarthe/");
+	const TCHAR* const InterceptLinePath = TEXT(
+		"/Game/RTS_Survival/Sounds/VoiceLines/GerFaction/Anouncer/AAAGerMissions/OderWarthe/");
 
 	TSoftClassPtr<AActor> MakeTargetClass(const FString& BlueprintName)
 	{
@@ -51,6 +58,22 @@ ADirectionFindingManager::ADirectionFindingManager()
 	StaticSounds.Add(EDirectionFindingBurst::Reply, MakeSound(TEXT(""), TEXT("Cue_OW_Static_Reply")));
 	StaticSounds.Add(EDirectionFindingBurst::AttackOrder, MakeSound(TEXT(""), TEXT("Cue_OW_Static_AttackOrder")));
 	StationLockOnSound = MakeSound(TEXT(""), TEXT("Cue_OW_StationLockOn"));
+	const auto MakeIntercepts = [](const TCHAR* const FirstLine, const TCHAR* const SecondLine)
+	{
+		FDirectionFindingIntercepts Intercepts;
+		for (const TCHAR* const LineName : {FirstLine, SecondLine})
+		{
+			Intercepts.Lines.Add(TSoftObjectPtr<USoundBase>(FSoftObjectPath(FString::Printf(TEXT("%s%s.%s"),
+				DirectionFindingManagerConstants::InterceptLinePath, LineName, LineName))));
+		}
+		return Intercepts;
+	};
+	InterceptLines.Add(EDirectionFindingBurst::Routine,
+	                   MakeIntercepts(TEXT("OderWarthe_I_Routine_A"), TEXT("OderWarthe_I_Routine_B")));
+	InterceptLines.Add(EDirectionFindingBurst::Reply,
+	                   MakeIntercepts(TEXT("OderWarthe_I_Reply_A"), TEXT("OderWarthe_I_Reply_B")));
+	InterceptLines.Add(EDirectionFindingBurst::AttackOrder,
+	                   MakeIntercepts(TEXT("OderWarthe_I_Attack_A"), TEXT("OderWarthe_I_Attack_B")));
 	JammerBedSound = MakeSound(TEXT("Jammer/"), TEXT("OW_JammerBed_Loop"));
 }
 
@@ -181,6 +204,24 @@ float ADirectionFindingManager::GetStationHalfAngle(const int32 StationIndex) co
 {
 	const FDirectionFindingWedge* const Wedge = M_Solver.GetWedge(StationIndex);
 	return Wedge != nullptr && Wedge->bOpen ? Wedge->HalfAngleDegrees : 0.f;
+}
+
+bool ADirectionFindingManager::GetIsStationHeldByPlayer(const int32 StationIndex) const
+{
+	if (not Stations.IsValidIndex(StationIndex) || not IsValid(Stations[StationIndex]))
+	{
+		return false;
+	}
+	return Stations[StationIndex]->GetOwningPlayer() == RTSPlayers::HumanPlayer;
+}
+
+ADirectionFindingManager* ADirectionFindingManager::FindDirectionFindingManager(const UObject* WorldContextObject)
+{
+	const UWorld* const World = IsValid(WorldContextObject) ? WorldContextObject->GetWorld() : nullptr;
+	const UDirectionFindingSubsystem* const Subsystem = World != nullptr
+		                                                   ? World->GetSubsystem<UDirectionFindingSubsystem>()
+		                                                   : nullptr;
+	return IsValid(Subsystem) ? Subsystem->GetDirectionFindingManager() : nullptr;
 }
 
 int32 ADirectionFindingManager::GetStationIndex(const ASupplyPoint* Station) const
@@ -343,6 +384,15 @@ void ADirectionFindingManager::StartHunt(const ERTSGameDifficulty Difficulty)
 
 int32 ADirectionFindingManager::PickCommandPost()
 {
+#if RTS_WITH_MAP_TESTS
+	// Map tests and clip captures (-DirectionFindingCommandPost=N) need a known command post.
+	int32 TestCommandPost = INDEX_NONE;
+	if (FParse::Value(FCommandLine::Get(), TEXT("DirectionFindingCommandPost="), TestCommandPost)
+		&& Werke.IsValidIndex(TestCommandPost))
+	{
+		return TestCommandPost;
+	}
+#endif
 	if (Werke.IsValidIndex(ForcedCommandPostIndex))
 	{
 		return ForcedCommandPostIndex;
@@ -501,8 +551,53 @@ void ADirectionFindingManager::TransmitBurst(const EDirectionFindingBurst BurstT
 	{
 		PlaySoftSound2D(*StaticSound);
 	}
+	ScheduleInterceptLine(BurstType);
 	OnBurstHeard.Broadcast(BurstType);
 	CheckFix();
+}
+
+void ADirectionFindingManager::ScheduleInterceptLine(const EDirectionFindingBurst BurstType)
+{
+	UWorld* const World = GetWorld();
+	const FDirectionFindingIntercepts* const Intercepts = InterceptLines.Find(BurstType);
+	if (World == nullptr || Intercepts == nullptr || Intercepts->Lines.IsEmpty())
+	{
+		return;
+	}
+	FTimerHandle Handle;
+	World->GetTimerManager().SetTimer(Handle, FTimerDelegate::CreateWeakLambda(this, [this, BurstType]()
+	{
+		PlayInterceptLine(BurstType);
+	}), FMath::Max(InterceptDelaySeconds, UE_KINDA_SMALL_NUMBER), false);
+}
+
+void ADirectionFindingManager::PlayInterceptLine(const EDirectionFindingBurst BurstType)
+{
+	const FDirectionFindingIntercepts* const Intercepts = InterceptLines.Find(BurstType);
+	UPlayerPortraitManager* const PortraitManager = FRTS_Statics::GetPlayerPortraitManager(this);
+	if (Intercepts == nullptr || Intercepts->Lines.IsEmpty() || not IsValid(PortraitManager))
+	{
+		return;
+	}
+	// Routine traffic is background chatter: it never waits behind a line that matters.
+	if (BurstType == EDirectionFindingBurst::Routine && PortraitManager->GetIsPortraitPlaying())
+	{
+		return;
+	}
+	const int32 LineCount = Intercepts->Lines.Num();
+	const int32* const LastLine = M_LastInterceptLine.Find(BurstType);
+	int32 LineIndex = FMath::RandRange(0, LineCount - 1);
+	if (LineCount > 1 && LastLine != nullptr && LineIndex == *LastLine)
+	{
+		LineIndex = (LineIndex + 1) % LineCount;
+	}
+	M_LastInterceptLine.Add(BurstType, LineIndex);
+	USoundBase* const Line = Intercepts->Lines[LineIndex].LoadSynchronous();
+	if (Line == nullptr)
+	{
+		return;
+	}
+	PortraitManager->PlayPortrait(InterceptPortrait, Line);
 }
 
 float ADirectionFindingManager::GetBurstFactor(const EDirectionFindingBurst BurstType) const

@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "DirectionFindingSolver.h"
 #include "DirectionFindingTypes.h"
+#include "RTS_Survival/GameUI/Portrait/RTSPortraitTypes.h"
 #include "RTS_Survival/Enemy/MissionPlacement/EnemyPlacementActor.h"
 #include "DirectionFindingManager.generated.h"
 
@@ -98,6 +99,21 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Direction Finding")
 	int32 GetStationIndex(const ASupplyPoint* Station) const;
 
+	/** @return True while the player holds the station (StationIndex 0 = DF 1). */
+	UFUNCTION(BlueprintPure, Category = "Direction Finding")
+	bool GetIsStationHeldByPlayer(const int32 StationIndex) const;
+
+	/** @return True once the bunker group was destroyed and dropped out of the search (SetWerkEliminated). */
+	UFUNCTION(BlueprintPure, Category = "Direction Finding")
+	bool GetIsWerkEliminated(const int32 WerkIndex) const { return M_Solver.GetIsWerkEliminated(WerkIndex); }
+
+	UFUNCTION(BlueprintPure, Category = "Direction Finding")
+	int32 GetWerkCount() const { return Werke.Num(); }
+
+	/** @return The map's direction-finding manager, or null (no error) on maps without one. */
+	UFUNCTION(BlueprintPure, Category = "Direction Finding", meta = (WorldContext = "WorldContextObject"))
+	static ADirectionFindingManager* FindDirectionFindingManager(const UObject* WorldContextObject);
+
 	const TArray<TObjectPtr<ASupplyPoint>>& GetStations() const { return Stations; }
 	const TArray<FDirectionFindingWerk>& GetWerke() const { return Werke; }
 	const FDirectionFindingSolver& GetSolver() const { return M_Solver; }
@@ -179,6 +195,17 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Direction Finding|Sound")
 	TSoftObjectPtr<USoundBase> StationLockOnSound;
 
+	// Intercepted voice per burst kind (Russian, English subtitles), played InterceptDelaySeconds after the Morse.
+	// Routine lines are skipped while another portrait line plays; replies and attack orders queue behind it.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Direction Finding|Sound")
+	TMap<EDirectionFindingBurst, FDirectionFindingIntercepts> InterceptLines;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Direction Finding|Sound")
+	ERTSPortraitTypes InterceptPortrait = ERTSPortraitTypes::SovietInterceptStarik;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Direction Finding|Sound", meta = (ClampMin = "0.0"))
+	float InterceptDelaySeconds = 1.2f;
+
 	// The jam: a quiet noise bed for the whole mission until StopJammer. Empty plays nothing.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Direction Finding|Sound")
 	TSoftObjectPtr<USoundBase> JammerBedSound;
@@ -208,6 +235,12 @@ private:
 	void Fix();
 
 	void PlaySoftSound2D(const TSoftObjectPtr<USoundBase>& Sound) const;
+
+	/** Plays one of the burst kind's intercept lines on the intercept portrait, after InterceptDelaySeconds. */
+	void ScheduleInterceptLine(const EDirectionFindingBurst BurstType);
+	void PlayInterceptLine(const EDirectionFindingBurst BurstType);
+	// Index of the line each burst kind played last, so the same line does not come twice in a row.
+	TMap<EDirectionFindingBurst, int32> M_LastInterceptLine;
 	float GetStartHalfAngle() const;
 	double GetWorldSeconds() const;
 
