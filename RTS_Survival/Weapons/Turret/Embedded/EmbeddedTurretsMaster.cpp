@@ -107,7 +107,7 @@ FTransform AEmbeddedTurretsMaster::GetTurretTransform() const
 	{
 		FTransform TurretTransform = EmbeddedTurretMesh->GetComponentTransform();
 		FRotator TurretRotator = TurretTransform.Rotator();
-		TurretRotator.Yaw = IEmbeddedTurretInterface::Execute_GetCurrentTurretAngle(EmbeddedOwner.GetObject());
+		TurretRotator.Yaw = GetEmbeddedTurretYaw();
 		TurretTransform.SetRotation(TurretRotator.Quaternion());
 
 		FVector TurretLocation = TurretTransform.GetLocation();
@@ -226,7 +226,7 @@ void AEmbeddedTurretsMaster::NormalTurretRotation(
 	if (FMath::Abs(DeltaAngle) <= DeltaTime * RotationSpeed)
 	{
 		// Embedded Owner is check for validity beforehand.
-		IEmbeddedTurretInterface::Execute_SetTurretAngle(EmbeddedOwner.GetObject(), LocalTargetYaw);
+		SetEmbeddedTurretYaw(LocalTargetYaw);
 		bM_IsRotatedToEngage = true;
 		StopTurretRotation();
 		return;
@@ -236,7 +236,7 @@ void AEmbeddedTurretsMaster::NormalTurretRotation(
 	const float yawIncreaseFactor = RotationSpeed * direction * DeltaTime;
 	// Set the new turret angle using the interface method.
 	// Embedded Owner is checked for validity beforehand.
-	IEmbeddedTurretInterface::Execute_SetTurretAngle(EmbeddedOwner.GetObject(), CurrentYaw + yawIncreaseFactor);
+	SetEmbeddedTurretYaw(CurrentYaw + yawIncreaseFactor);
 	if constexpr (DeveloperSettings::Debugging::GEmbedded_Turret_Compile_DebugSymbols)
 	{
 		RTSFunctionLibrary::PrintString("Rotating", FColor::Purple);
@@ -270,7 +270,7 @@ void AEmbeddedTurretsMaster::AssaultTurretRotation(
 	const float LatchedLimitYaw = M_LatchedYawLimitSide == EEmbeddedAssaultYawLimitSide::Maximum
 		? M_MaxYaw
 		: M_MinYaw;
-	IEmbeddedTurretInterface::Execute_SetTurretAngle(EmbeddedOwner.GetObject(), LatchedLimitYaw);
+	SetEmbeddedTurretYaw(LatchedLimitYaw);
 	bM_IsRotatedToEngage = false;
 	bM_IsFullyRotatedToTarget = false;
 
@@ -360,4 +360,22 @@ void AEmbeddedTurretsMaster::SetEmbeddedIdleBaseTarget()
     // We’ll rotate smoothly in RotateTurret() using your existing paths.
     bM_IsRotatedToEngage = false;
     bM_IsFullyRotatedToTarget = false;
+}
+
+void AEmbeddedTurretsMaster::SetEmbeddedTurretYaw(const float NewYaw)
+{
+	M_TrackedTurretYaw = NewYaw;
+	if (GetIsValidEmbeddedOwner())
+	{
+		IEmbeddedTurretInterface::Execute_SetTurretAngle(EmbeddedOwner.GetObject(), NewYaw);
+	}
+}
+
+float AEmbeddedTurretsMaster::GetEmbeddedTurretYaw() const
+{
+	if (bTrackYawOnTurret || not GetIsValidEmbeddedOwner())
+	{
+		return M_TrackedTurretYaw;
+	}
+	return IEmbeddedTurretInterface::Execute_GetCurrentTurretAngle(EmbeddedOwner.GetObject());
 }

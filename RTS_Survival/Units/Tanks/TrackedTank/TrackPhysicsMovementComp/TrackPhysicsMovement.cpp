@@ -102,7 +102,7 @@ void UTrackPhysicsMovement::AsyncTick(float DeltaTime)
 	QUICK_SCOPE_CYCLE_COUNTER(STAT_Vehicle_TrackPhysicsAsyncTick);
 	ETrackPhysicsMovementState MovementState = M_MovementState.Load();
 	M_AsyncTickSerial.Store(M_AsyncTickSerial.Load() + 1);
-	if (not GetIsValidTankMesh())
+	if (bM_IsAnchored.Load() || not GetIsValidTankMesh())
 	{
 		return;
 	}
@@ -486,6 +486,14 @@ void UTrackPhysicsMovement::ApplyDriveForceStrategyB(
 void UTrackPhysicsMovement::SetDriveStrength(const float DriveStrength)
 {
 	M_DriveStrength.Store(FMath::Clamp(DriveStrength, 0.f, 1.f));
+}
+
+void UTrackPhysicsMovement::SetIsAnchored(const bool bIsAnchored)
+{
+	bM_IsAnchored.Store(bIsAnchored);
+	M_CurrentThrottle.Store(0.0f);
+	M_CurrentSteeringInDeg.Store(0.0f);
+	M_MovementState.Store(ETrackPhysicsMovementState::Inactive);
 }
 
 void UTrackPhysicsMovement::SetModuleAccelerationMultiplier(const float Multiplier)

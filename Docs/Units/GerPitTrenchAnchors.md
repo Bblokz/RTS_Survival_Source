@@ -35,7 +35,7 @@ The mortar pit's rear entrance opens into a corridor behind a blast wall, open a
 | | `TrenchPort_RearLeft` | (−458.2, −458.2, 0) | −135 | yes |
 | | `TrenchPort_RearRight` | (−458.2, 458.2, 0) | 135 | yes |
 | `SM_GerMortarPit` | `TrenchPort_RearRight` | (−388.5, 405, 0) | 90 | yes |
-| `SM_GerTwinMG42Pit` | `TrenchPort_Left` | (40, −655, 0) | −90 | yes |
+| `SM_GerTwinMG42Pit` (asset `SM_GerPit_TwinMG42_Sandbags`) | `TrenchPort_Left` | (40, −655, 0) | −90 | yes |
 | | `TrenchPort_Right` | (40, 655, 0) | 90 | yes |
 | `SM_GerFlak88Pit` | `TrenchPort_Rear` | (−536.5, 110, 0) | 180 | yes |
 | | `TrenchPort_Right` | (−200, 536.5, 0) | 90 | yes |

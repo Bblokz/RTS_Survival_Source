@@ -566,41 +566,41 @@ namespace DeveloperSettings
 				inline constexpr int32 Scavengers_Radixite = 250;
 				inline constexpr int32 Jager_Radixite = 200;
 				inline constexpr int32 SteelFistAssaultSquad_Radixite = 200;
-				inline constexpr int32 SteelFistAssaultSquad_Metal = 100;
+				inline constexpr int32 SteelFistAssaultSquad_Metal = 0;
 				inline constexpr int32 Gebirgsjagerin_Radixite = 200;
 				inline constexpr int32 Vultures_Radixite = 525;
-				inline constexpr int32 Vultures_Metal = 100;
+				inline constexpr int32 Vultures_Metal = 0;
 				inline constexpr int32 SniperTeam_Radixite = 650;
-				inline constexpr int32 SniperTeam_Metal = 150;
+				inline constexpr int32 SniperTeam_Metal = 0;
 				inline constexpr int32 FeuerSturm_Radixite = 500;
-				inline constexpr int32 FeuerSturm_Metal = 200;
+				inline constexpr int32 FeuerSturm_Metal = 0;
 				inline constexpr int32 SturmPionieren_Radixite = 400;
-				inline constexpr int32 SturmPionieren_Metal = 200;
+				inline constexpr int32 SturmPionieren_Metal = 0;
 				inline constexpr int32 PanzerGrenadiere_Radixite = 675;
-				inline constexpr int32 PanzerGrenadiere_Metal = 200;
+				inline constexpr int32 PanzerGrenadiere_Metal = 0;
 				inline constexpr int32 SturmKommandos_Radixite = 800;
-				inline constexpr int32 SturmKommandos_Metal = 200;
+				inline constexpr int32 SturmKommandos_Metal = 0;
 				inline constexpr int32 LightBringers_Radixite = 800;
-				inline constexpr int32 LightBringers_Metal = 200;
+				inline constexpr int32 LightBringers_Metal = 0;
 				inline constexpr int32 IronStorm_Radixite = 700;
-				inline constexpr int32 IronStorm_Metal = 300;
+				inline constexpr int32 IronStorm_Metal = 0;
 				inline constexpr int32 RailTroopers_Radixite = 750;
-				inline constexpr int32 RailTroopers_Metal = 350;
+				inline constexpr int32 RailTroopers_Metal = 0;
 				// Elite Scavengers: 5 scavengers with 33% more health, 3 STG 44s and 2 Panzerfausts. Between the
 				// Scavengers (250) and the armoured Panzer Grenadiers (675 + 200); well below the Rail Troopers.
 				inline constexpr int32 EliteScavengers_Radixite = 450;
-				inline constexpr int32 EliteScavengers_Metal = 125;
+				inline constexpr int32 EliteScavengers_Metal = 0;
 				// Burrowers: given free on contact in the Berlin mission, never trained. The value only matters
 				// where a squad's worth is read (refunds, score); set a little above the Scavengers.
 				inline constexpr int32 Burrowers_Radixite = 300;
 				// Red Spine: 3 light mech walkers (Etasphere01) with MP46s. Priced like the elite squads it matches
 				// in total health (Iron Storm 700 + 300, Panzer Grenadiers 675 + 200), below the heavier walkers.
 				inline constexpr int32 RedSpine_Radixite = 650;
-				inline constexpr int32 RedSpine_Metal = 250;
+				inline constexpr int32 RedSpine_Metal = 0;
 				// Fels Krieger: 3 medium mech walkers (Etasphere07) with Ripper Guns. A third more health per walker
 				// than the Red Spine and a heavier gun, so about a third more expensive.
 				inline constexpr int32 FelsKrieger_Radixite = 850;
-				inline constexpr int32 FelsKrieger_Metal = 350;
+				inline constexpr int32 FelsKrieger_Metal = 0;
 			}
 
 			namespace TeamWeapons
@@ -669,8 +669,7 @@ namespace DeveloperSettings
 					static_cast<int32>(200 * GameCostMlt * InfantryCostMlt));
 				inline constexpr int32 ArmoredInfantryRadixiteCost = RoundToNearestMultipleOfFive(
 					static_cast<int32>(325 * GameCostMlt * InfantryCostMlt));
-				inline constexpr int32 ArmoredInfantryMetalCost = RoundToNearestMultipleOfFive(
-					static_cast<int32>(50 * GameCostMlt * InfantryCostMlt));
+				inline constexpr int32 ArmoredInfantryMetalCost = 0;
 				// Rus -- Basic Infantry
 				inline constexpr int32 HazmatEngineersRadixiteCost = RoundToNearestMultipleOfFive(
 					static_cast<int32>(300 * GameCostMlt * InfantryCostMlt));
@@ -682,70 +681,57 @@ namespace DeveloperSettings
 					static_cast<int32>(300 * GameCostMlt * InfantryCostMlt));
 				inline constexpr int32 KorovinAssaultSquadRadixiteCost = RoundToNearestMultipleOfFive(
 					static_cast<int32>(325 * GameCostMlt * InfantryCostMlt));
-				inline constexpr int32 KorovinAssaultSquadMetalCost = RoundToNearestMultipleOfFive(
-					static_cast<int32>(50 * GameCostMlt * InfantryCostMlt));
+				inline constexpr int32 KorovinAssaultSquadMetalCost = 0;
 				inline constexpr int32 ROKS3PPSHSquadRadixiteCost = RoundToNearestMultipleOfFive(
 					static_cast<int32>(350 * GameCostMlt * InfantryCostMlt));
 				// Ger -- Armory unlocked infantry
 				inline constexpr int32 VulturesFg42RadixiteCost = RoundToNearestMultipleOfFive(
 					static_cast<int32>(525 * GameCostMlt * InfantryCostMlt));
-				inline constexpr int32 VulturesFg42MetalCost = RoundToNearestMultipleOfFive(
-					static_cast<int32>(100 * GameCostMlt * InfantryCostMlt));
+				inline constexpr int32 VulturesFg42MetalCost = 0;
 				inline constexpr int32 SniperTeamRadixiteCost = RoundToNearestMultipleOfFive(
 					static_cast<int32>(650 * GameCostMlt * InfantryCostMlt));
-				inline constexpr int32 SniperTeamMetalCost = RoundToNearestMultipleOfFive(
-					static_cast<int32>(150 * GameCostMlt * InfantryCostMlt));
+				inline constexpr int32 SniperTeamMetalCost = 0;
 				// Ger -- T2 Infantry Costs
 				inline constexpr int32 T2FeuerStormRadixiteCosts = RoundToNearestMultipleOfFive(
 					static_cast<int32>(500 * GameCostMlt * InfantryCostMlt));
-				inline constexpr int32 T2FeuerStormMetalCosts = RoundToNearestMultipleOfFive(
-					static_cast<int32>(200 * GameCostMlt * InfantryCostMlt));
+				inline constexpr int32 T2FeuerStormMetalCosts = 0;
 				inline constexpr int32 T2SturmPioneerRadixiteCosts = RoundToNearestMultipleOfFive(
 					static_cast<int32>(400 * GameCostMlt * InfantryCostMlt));
-				inline constexpr int32 T2SturmPioneerMetalCosts = RoundToNearestMultipleOfFive(
-					static_cast<int32>(200 * GameCostMlt * InfantryCostMlt));
+				inline constexpr int32 T2SturmPioneerMetalCosts = 0;
 				// Rus --- T2 Infantry costs
 				inline constexpr int32 T2RedHammerRadixiteCosts = RoundToNearestMultipleOfFive(
 					static_cast<int32>(375 * GameCostMlt * InfantryCostMlt));
-				inline constexpr int32 T2RedHammerMetalCosts = RoundToNearestMultipleOfFive(
-					static_cast<int32>(200 * GameCostMlt * InfantryCostMlt));
+				inline constexpr int32 T2RedHammerMetalCosts = 0;
 				inline constexpr int32 T2ToxicGuardRadixiteCosts = RoundToNearestMultipleOfFive(
 					static_cast<int32>(450 * GameCostMlt * InfantryCostMlt));
 				// Ger -- Elite infantry costs
 				inline constexpr int32 PanzerGrenadierRadixiteCosts = RoundToNearestMultipleOfFive(
 					static_cast<int32>(675 * GameCostMlt * InfantryCostMlt));
-				inline constexpr int32 PanzerGrenadierMetalCosts = RoundToNearestMultipleOfFive(
-					static_cast<int32>(200 * GameCostMlt * InfantryCostMlt));
+				inline constexpr int32 PanzerGrenadierMetalCosts = 0;
 				inline constexpr int32 SturmkommandoRadixiteCost = RoundToNearestMultipleOfFive(
 					static_cast<int32>(800 * GameCostMlt * InfantryCostMlt));
-				inline constexpr int32 SturmkommandoMetalCost = RoundToNearestMultipleOfFive(
-					static_cast<int32>(200 * GameCostMlt * InfantryCostMlt));
+				inline constexpr int32 SturmkommandoMetalCost = 0;
 				inline constexpr int32 LightBringersRadixiteCosts = RoundToNearestMultipleOfFive(
 					static_cast<int32>(800 * GameCostMlt * InfantryCostMlt));
-				inline constexpr int32 LightBringersMetalCosts = RoundToNearestMultipleOfFive(
-					static_cast<int32>(200 * GameCostMlt * InfantryCostMlt));
+				inline constexpr int32 LightBringersMetalCosts = 0;
 				inline constexpr int32 EliteInfantryRadixiteCost = RoundToNearestMultipleOfFive(
 					static_cast<int32>(700 * GameCostMlt * InfantryCostMlt));
-				inline constexpr int32 EliteInfantryMetalCost = RoundToNearestMultipleOfFive(
-					static_cast<int32>(300 * GameCostMlt * InfantryCostMlt));
+				inline constexpr int32 EliteInfantryMetalCost = 0;
 
 				inline constexpr int32 GhostOfStalingradRadixiteCost = RoundToNearestMultipleOfFive(
 					static_cast<int32>(1000 * GameCostMlt * InfantryCostMlt));
 
 				inline constexpr int32 EliteRusCyborgAtRadixiteCost = RoundToNearestMultipleOfFive(
 					static_cast<int32>(1000 * GameCostMlt * InfantryCostMlt));
-				inline constexpr int32 EliteRusCyborgAtMetalCost = RoundToNearestMultipleOfFive(
-					static_cast<int32>(330 * GameCostMlt * InfantryCostMlt));
+				inline constexpr int32 EliteRusCyborgAtMetalCost = 0;
 
 				inline constexpr int32 EliteRusCyborgFedrovRadixiteCost = RoundToNearestMultipleOfFive(
 					static_cast<int32>(700 * GameCostMlt * InfantryCostMlt));
-				inline constexpr int32 EliteRusCyborgFedrovMetalCost = RoundToNearestMultipleOfFive(
-					static_cast<int32>(200 * GameCostMlt * InfantryCostMlt));
+				inline constexpr int32 EliteRusCyborgFedrovMetalCost = 0;
 
 				inline constexpr int32 CortextOfficerRadixiteCost = RoundToNearestMultipleOfFive(
 					static_cast<int32>(1000 * GameCostMlt * InfantryCostMlt));
-				inline constexpr int32 CortextOfficerMetalCost = RoundToNearestMultipleOfFive(
-					static_cast<int32>(300 * GameCostMlt * InfantryCostMlt));
+				inline constexpr int32 CortextOfficerMetalCost = 0;
 
 				// Team weapon squad costs.
 				inline constexpr int32 MachineGunTeamWeaponRadixiteCost = RoundToNearestMultipleOfFive(

@@ -73,6 +73,14 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Yaw Limits")
 	bool bIsFixedEmplacement = false;
 
+	/**
+	 * When true the turret keeps its own yaw (the last angle it sent through SetTurretAngle) instead of reading it
+	 * back with GetCurrentTurretAngle. For owners whose GetCurrentTurretAngle does not report the set angle: the
+	 * SU-122's returned 0 forever, so its gun never counted as aimed and almost never fired.
+	 */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Yaw Limits")
+	bool bTrackYawOnTurret = false;
+
 protected:
 	virtual bool GetHasFixedTraverseArc() const override;
 
@@ -166,6 +174,11 @@ private:
 		const float& DeltaTime);
 
 	void RequestHullTurnForOutOfBoundsTarget(float LocalTargetYaw);
+
+	/** Sends the yaw to the embedded owner and, with bTrackYawOnTurret, keeps it as the turret's current yaw. */
+	void SetEmbeddedTurretYaw(float NewYaw);
+	float GetEmbeddedTurretYaw() const;
+	float M_TrackedTurretYaw = 0.f;
 	void ResetAssaultHullTurnState();
 
 	    // Cached once; local "forward" in tank space for Idle_Base

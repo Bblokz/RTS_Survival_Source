@@ -1682,6 +1682,11 @@ void ATankMaster::HandleMountedWeaponOutOfRange(
 	{
 		return;
 	}
+	if (GetIsAnchoredInPlace())
+	{
+		HandleMountedWeaponOutOfRangeWhileAnchored(CallingWeapon);
+		return;
+	}
 	if (not GetCanTurretTakeControl())
 	{
 		if (GetDoesWeaponOwnCurrentPursuit(CallingWeapon))
@@ -1714,6 +1719,44 @@ void ATankMaster::HandleMountedWeaponOutOfRange(
 	}
 
 	BeginTurretRangeMovementRequest(TargetLocation, CallingWeapon, TargetActor, CurrentTimeSeconds);
+}
+
+void ATankMaster::HandleMountedWeaponOutOfRangeWhileAnchored(UObject* CallingWeapon)
+{
+	if (GetDoesWeaponOwnCurrentPursuit(CallingWeapon))
+	{
+		EndTurretRangeMovement(ETurretRangeMovementEndMode::FullStop);
+	}
+	const EAbilityID ActiveAbility = UnitCommandData->GetCurrentlyActiveCommandType();
+	const bool bIsOrderedToAttack = ActiveAbility == EAbilityID::IdAttack ||
+		ActiveAbility == EAbilityID::IdAttackGround;
+	// Another turret may still reach the target; the order stands as long as one of them can fire on it.
+	if (not bIsOrderedToAttack || GetIsAnyTurretInRangeOfTarget())
+	{
+		return;
+	}
+	// Ending the order idles the vehicle, which sets the turrets to auto-engage targets within their range.
+	DoneExecutingCommand(ActiveAbility);
+	// Terminating an attack only frees the turrets; hull weapons would stay on the target they cannot reach.
+	for (const auto EachHullWeapon : HullWeapons)
+	{
+		if (GetIsValidHullWeapon(EachHullWeapon))
+		{
+			EachHullWeapon->SetAutoEngageTargets(false);
+		}
+	}
+}
+
+bool ATankMaster::GetIsAnyTurretInRangeOfTarget() const
+{
+	for (const auto EachTurret : Turrets)
+	{
+		if (IsValid(EachTurret) && EachTurret->BGetIsInRangeOfTarget())
+		{
+			return true;
+		}
+	}
+	return false;
 }
 
 void ATankMaster::HandleMountedWeaponInRange(UObject* CallingWeapon)

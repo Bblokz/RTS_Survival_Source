@@ -872,6 +872,9 @@ protected:
 
 	virtual void OnCancelMovementToGetInRangeOfTurret();
 
+	/** @return Whether the vehicle is held in place (dug in); its weapons then never drive it toward a target. */
+	virtual bool GetIsAnchoredInPlace() const { return false; }
+
 	/**
 	 * @brief Called when a turret killed the target given.
 	 * Executes the next Command in the queue.
@@ -1276,6 +1279,13 @@ private:
 		UObject* CallingWeapon,
 		AActor* TargetActor);
 	void HandleMountedWeaponInRange(UObject* CallingWeapon);
+	/**
+	 * @brief An anchored vehicle cannot close the range; once no turret reaches the ordered target it drops the
+	 * attack so its weapons fall back to auto-engaging whatever is close enough.
+	 */
+	void HandleMountedWeaponOutOfRangeWhileAnchored(UObject* CallingWeapon);
+	/** @return Whether any turret currently reaches the target it was ordered to engage. */
+	bool GetIsAnyTurretInRangeOfTarget() const;
 	void StartTurretRangeMovementInvariantMonitoring();
 	void StopTurretRangeMovementInvariantMonitoring();
 	void CheckTurretRangeMovementInvariant();

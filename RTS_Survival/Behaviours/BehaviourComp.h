@@ -173,6 +173,13 @@ public:
 	/** @brief Broadcast after queued module behaviour changes were applied at a safe boundary. */
 	FSimpleMulticastDelegate& GetOnModuleBehavioursApplied() { return M_OnModuleBehavioursApplied; }
 
+	/**
+	 * Behaviours added at BeginPlay, for unit variants that keep a behaviour all game without wiring AddBehaviour in
+	 * their event graph (e.g. Rus_Vehicle_IS-2_Soviet firing HEAT through BP_Beh_Permanent_SetHEATShells).
+	 */
+	UPROPERTY(EditDefaultsOnly, Category = "Behaviours")
+	TArray<TSubclassOf<UBehaviour>> StartingBehaviours;
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
@@ -326,6 +333,7 @@ private:
 
 	void NotifyActionUIManagerOfBehaviourUpdate();
 	void BeginPlay_InitMutations();
+	void BeginPlay_AddStartingBehaviours();
 	const URTSComponent* GetOwnerRTSComponent() const;
 	bool TryGetMutationClassForRTSComponent(const URTSComponent& RTSComponent, EMutatorClass& OutMutatorClass) const;
 	bool TryGetMutationClassForTankSubtype(const ETankSubtype TankSubtype, EMutatorClass& OutMutatorClass) const;

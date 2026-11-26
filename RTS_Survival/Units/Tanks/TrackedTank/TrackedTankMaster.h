@@ -271,6 +271,9 @@ protected:
 	virtual void WallGotDestroyedForceBreakCover() override;
 	// ============ End DigIn Unit Interface =============
 
+	/** @return True while digging in or dug in; the weapons then never move the vehicle toward a target. */
+	virtual bool GetIsAnchoredInPlace() const override;
+
 	// =========================================
 	// END COMMAND INTERFACE OVERWRITES ------------
 	// =========================================
@@ -377,6 +380,15 @@ private:
 	void CheckFootPrintForOverlaps() const;
 
 	bool GetIsValidDigInComponent() const;
+
+	/**
+	 * @brief A dug-in hull is held kinematic so no vehicle can shove it, however hard it drives; every way out
+	 * of the dig-in (break cover, wall destroyed, death) releases it again.
+	 * @param bAnchor Whether to hold the chassis in place or hand it back to the physics simulation.
+	 */
+	void SetChassisAnchored(const bool bAnchor);
+	// Whether SetChassisAnchored turned the chassis kinematic; only then may it turn the simulation back on.
+	bool bM_IsChassisAnchored = false;
 
 	UPROPERTY()
 	UTankEnergyComponent* M_TankEnergyComponent = nullptr;
