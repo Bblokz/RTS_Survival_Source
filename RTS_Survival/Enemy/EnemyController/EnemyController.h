@@ -430,12 +430,14 @@ public:
 	 * @param Units Squad controllers and vehicles of this enemy.
 	 * @param ConvergeLocation Where the formations attack-move to.
 	 * @param CombatSecondsBeforeReturn Seconds after a formation first fights before it breaks off and returns.
+	 * @param CombatCheckDelaySeconds Seconds after the order before combat or arrival can start the return.
 	 * @return How many of Units are in a formation that was sent.
 	 */
 	int32 ConvergePatrolFormationsOnLocation(
 		const TArray<AActor*>& Units,
 		const FVector& ConvergeLocation,
-		const float CombatSecondsBeforeReturn);
+		const float CombatSecondsBeforeReturn,
+		const float CombatCheckDelaySeconds = 0.f);
 
 	// ------------------------------------------------------------
 	// Enemy Resources Management

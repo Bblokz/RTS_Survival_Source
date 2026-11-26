@@ -11,6 +11,7 @@
 #include "RTS_Survival/Enemy/EnemyController/EnemyDirectControlComponent/EnemyDirectControlComponent.h"
 #include "RTS_Survival/Enemy/EnemyUnitAbilityAI/EnemyOrderQueueHelpers.h"
 #include "RTS_Survival/Game/RTSGameInstance/RTSGameInstance.h"
+#include "RTS_Survival/Player/Abilities.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/Units/SquadController.h"
 #include "RTS_Survival/Units/Tanks/AITankMaster.h"
@@ -65,6 +66,13 @@ namespace EnemyFormationConstants
 #if defined(RTS_WITH_ENEMY_AI_SHIPPING_TESTS) && RTS_WITH_ENEMY_AI_SHIPPING_TESTS
 	const int32 ShippingTestMaxFormationProgressHistory = 512;
 #endif
+}
+
+namespace EnemyFormationWaitLogConstants
+{
+	// An attack-move formation still short of a waypoint this long after first being seen waiting gets a warning,
+	// repeated at this interval while it keeps waiting.
+	constexpr float WaitSecondsBeforeWarning = 60.f;
 }
 
 namespace EnemyFormationAlarmConvergeConstants
@@ -1163,6 +1171,7 @@ void UEnemyFormationController::HandleAttackMoveFormation(
 
 	if (not GetDoAllFormationUnitsReachedWaypoint(Formation))
 	{
+		LogAttackMoveFormationWaiting(Formation);
 		return;
 	}
 
@@ -1194,6 +1203,52 @@ void UEnemyFormationController::HandleAttackMoveFormation(
 	{
 		OnCompleteFormationReached(&Formation);
 	}
+}
+
+void UEnemyFormationController::LogAttackMoveFormationWaiting(FFormationData& Formation) const
+{
+	using EnemyFormationWaitLogConstants::WaitSecondsBeforeWarning;
+	const UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		return;
+	}
+	const float CurrentTimeSeconds = World->GetTimeSeconds();
+	if (Formation.M_NextWaypointWaitLogTimeSeconds < 0.f)
+	{
+		Formation.M_NextWaypointWaitLogTimeSeconds = CurrentTimeSeconds + WaitSecondsBeforeWarning;
+		return;
+	}
+	if (CurrentTimeSeconds < Formation.M_NextWaypointWaitLogTimeSeconds)
+	{
+		return;
+	}
+	Formation.M_NextWaypointWaitLogTimeSeconds = CurrentTimeSeconds + WaitSecondsBeforeWarning;
+	int32 ReachedCount = 0;
+	FString WaitingOn;
+	for (const FFormationUnitData& UnitData : Formation.FormationUnits)
+	{
+		if (UnitData.bHasReachedNextDestination)
+		{
+			++ReachedCount;
+			continue;
+		}
+		if (not UnitData.IsValidFormationUnit())
+		{
+			WaitingOn += TEXT(" [invalid unit]");
+			continue;
+		}
+		const float DistanceMeters = FVector::Dist2D(UnitData.Unit->GetOwnerLocation(),
+		                                             UnitData.M_WaypointDestination) / 100.f;
+		WaitingOn += FString::Printf(TEXT(" [%s cmd=%s combat=%d stuck=%d tpFailed=%d %.0fm]"),
+		                             *UnitData.Unit->GetOwnerName(),
+		                             *UEnum::GetValueAsString(UnitData.Unit->GetActiveCommandID()),
+		                             GetIsFormationUnitInCombat(UnitData) ? 1 : 0, UnitData.StuckCounts,
+		                             UnitData.bPreviousStuckTeleportsFailed ? 1 : 0, DistanceMeters);
+	}
+	UE_LOG(LogTemp, Warning, TEXT("RTS_FORMATION_WAIT formation %d at waypoint %d/%d: %d/%d units reached, waiting on%s"),
+	       Formation.FormationID, Formation.CurrentWaypointIndex + 1, Formation.FormationWaypoints.Num(), ReachedCount,
+	       Formation.FormationUnits.Num(), *WaitingOn);
 }
 
 void UEnemyFormationController::HandleRandomPatrolWithAttackMoveFormation(FFormationData& Formation)
@@ -1418,7 +1473,8 @@ void UEnemyFormationController::MoveAllFormationUnitsToWaypoint(
 int32 UEnemyFormationController::ConvergePatrolFormationsOnLocation(
 	const TArray<AActor*>& Units,
 	const FVector& ConvergeLocation,
-	const float CombatSecondsBeforeReturn)
+	const float CombatSecondsBeforeReturn,
+	const float CombatCheckDelaySeconds)
 {
 	TSet<const AActor*> UnitsToSend;
 	for (const AActor* Unit : Units)
@@ -1449,7 +1505,8 @@ int32 UEnemyFormationController::ConvergePatrolFormationsOnLocation(
 		{
 			continue;
 		}
-		StartAlarmConvergeForFormation(*Formation, ConvergeLocation, CombatSecondsBeforeReturn);
+		StartAlarmConvergeForFormation(*Formation, ConvergeLocation, CombatSecondsBeforeReturn,
+		                               CombatCheckDelaySeconds);
 		UnitsSent += MatchingUnitCount;
 	}
 	return UnitsSent;
@@ -1474,7 +1531,8 @@ int32 UEnemyFormationController::GetCountOfFormationUnitsIn(
 void UEnemyFormationController::StartAlarmConvergeForFormation(
 	FFormationData& Formation,
 	const FVector& ConvergeLocation,
-	const float CombatSecondsBeforeReturn)
+	const float CombatSecondsBeforeReturn,
+	const float CombatCheckDelaySeconds)
 {
 	using namespace EnemyFormationAlarmConvergeConstants;
 	const UWorld* World = GetWorld();
@@ -1489,7 +1547,8 @@ void UEnemyFormationController::StartAlarmConvergeForFormation(
 	FFormationData::FAlarmConvergeState& ConvergeState = Formation.M_AlarmConvergeState;
 	ConvergeState.M_ConvergeLocation = ConvergeLocation;
 	ConvergeState.M_CombatSecondsBeforeReturn = FMath::Max(CombatSecondsBeforeReturn, 0.f);
-	ConvergeState.M_MaxSecondsWithoutCombat = BaseMaxSecondsWithoutCombat
+	ConvergeState.M_CombatCheckDelaySeconds = FMath::Max(CombatCheckDelaySeconds, 0.f);
+	ConvergeState.M_MaxSecondsWithoutCombat = ConvergeState.M_CombatCheckDelaySeconds + BaseMaxSecondsWithoutCombat
 		+ DistanceToConverge / AssumedSlowUnitSpeedCmPerSecond;
 	ConvergeState.M_StartTimeSeconds = World->GetTimeSeconds();
 	ConvergeState.M_FirstCombatTimeSeconds = -1.f;
@@ -1537,6 +1596,11 @@ bool UEnemyFormationController::UpdateAlarmConvergeTimers(
 {
 	using namespace EnemyFormationAlarmConvergeConstants;
 	FFormationData::FAlarmConvergeState& ConvergeState = Formation.M_AlarmConvergeState;
+	// Fights on the way to a far target do not count yet; neither does an early arrival.
+	if (CurrentTimeSeconds - ConvergeState.M_StartTimeSeconds < ConvergeState.M_CombatCheckDelaySeconds)
+	{
+		return false;
+	}
 	// The unit combat flag lapses a few seconds after the last shot, so the first combat is latched once.
 	if (ConvergeState.M_FirstCombatTimeSeconds < 0.f && GetIsAnyFormationUnitInCombat(Formation))
 	{
@@ -2343,6 +2407,7 @@ bool UEnemyFormationController::GetUnitInFormation(
 void UEnemyFormationController::OnCompleteFormationReached(FFormationData* Formation)
 {
 	Formation->CurrentWaypointIndex++;
+	Formation->M_NextWaypointWaitLogTimeSeconds = -1.f;
 #if defined(RTS_WITH_ENEMY_AI_SHIPPING_TESTS) && RTS_WITH_ENEMY_AI_SHIPPING_TESTS
 	ShippingTest_RecordFormationWaypointAdvance(*Formation);
 #endif

@@ -162,12 +162,14 @@ public:
 	 * @param Units Squad controllers and vehicles; only random patrol formations holding one of them are sent.
 	 * @param ConvergeLocation Where the formations attack-move to.
 	 * @param CombatSecondsBeforeReturn Seconds after a formation first fights before it breaks off and returns.
+	 * @param CombatCheckDelaySeconds Seconds after the order before combat or arrival can start the return.
 	 * @return How many of Units are in a formation that was sent.
 	 */
 	int32 ConvergePatrolFormationsOnLocation(
 		const TArray<AActor*>& Units,
 		const FVector& ConvergeLocation,
-		const float CombatSecondsBeforeReturn);
+		const float CombatSecondsBeforeReturn,
+		const float CombatCheckDelaySeconds = 0.f);
 
 	/**
 	 * @brief Game modes whose waves must fight whatever they meet on the way (survival) send attack-move formation
@@ -298,6 +300,8 @@ private:
 		FFormationData& Formation,
 		const FVector& WaypointLocation,
 		const FRotator& WaypointDirection);
+	// A formation waits for every unit at each waypoint; when that takes long, logs which units it waits on (throttled).
+	void LogAttackMoveFormationWaiting(FFormationData& Formation) const;
 	void HandleRandomPatrolWithAttackMoveFormation(FFormationData& Formation);
 	bool GetCanRandomPatrolGuardIterationExecute(
 		const FFormationData& Formation,
@@ -317,7 +321,8 @@ private:
 	void StartAlarmConvergeForFormation(
 		FFormationData& Formation,
 		const FVector& ConvergeLocation,
-		const float CombatSecondsBeforeReturn);
+		const float CombatSecondsBeforeReturn,
+		const float CombatCheckDelaySeconds);
 	void HandleAlarmConvergeFormation(FFormationData& Formation);
 
 	/**

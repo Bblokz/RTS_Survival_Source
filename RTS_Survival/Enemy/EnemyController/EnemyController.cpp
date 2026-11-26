@@ -817,14 +817,16 @@ bool AEnemyController::RetreatUnitToRallyPoint(AActor* UnitActor, const FVector&
 int32 AEnemyController::ConvergePatrolFormationsOnLocation(
 	const TArray<AActor*>& Units,
 	const FVector& ConvergeLocation,
-	const float CombatSecondsBeforeReturn)
+	const float CombatSecondsBeforeReturn,
+	const float CombatCheckDelaySeconds)
 {
 	if (not GetIsValidFormationController())
 	{
 		return 0;
 	}
 	return M_FormationController->ConvergePatrolFormationsOnLocation(Units, ConvergeLocation,
-	                                                                 CombatSecondsBeforeReturn);
+	                                                                 CombatSecondsBeforeReturn,
+	                                                                 CombatCheckDelaySeconds);
 }
 
 void AEnemyController::AddToWaveSupply(const int32 AddSupply)

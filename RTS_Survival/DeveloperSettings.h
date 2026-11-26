@@ -2076,7 +2076,13 @@ namespace DeveloperSettings
 		{
 			// Projectile pool size for smallarms.
 			inline constexpr int32 SmallArmsProjectilePoolSize = 1024;
-			inline constexpr int32 SmallArmsProjectileSpeed = 7500;
+			// Global speed scale for every projectile: weapon data (applied once after InitAllGameWeaponData),
+			// small arms tracers and ability-launched attached rockets.
+			inline constexpr float GlobalProjectileSpeedMlt = 1.4f;
+			// Gravity-timed arcs (artillery/mortar SetupArcedLaunch and its ascent fallback) take their flight time from
+			// apex height and gravity, not speed. Gravity x Mlt^2 keeps the same arc shape and divides flight time by Mlt.
+			inline constexpr float GlobalArcGravityMlt = GlobalProjectileSpeedMlt * GlobalProjectileSpeedMlt;
+			inline constexpr int32 SmallArmsProjectileSpeed = static_cast<int32>(7500 * GlobalProjectileSpeedMlt);
 			// Projectile pool size for tank projectiles.
 			inline constexpr int32 TankProjectilePoolSize = 64;
 			// For any regular tank weapon.
