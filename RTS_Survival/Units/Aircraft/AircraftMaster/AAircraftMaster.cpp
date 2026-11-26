@@ -9,6 +9,7 @@
 #include "Components/PrimitiveComponent.h"
 #include "RTS_Survival/Weapons/AircraftWeapon/AircraftWeapon.h"
 #include "RTS_Survival/Weapons/AircraftWeapon/AircraftStrafeGun/WeaponStateAircraftStrafeGun.h"
+#include "RTS_Survival/Weapons/AircraftWeapon/AircraftStrafeGun/AircraftStrafeShotRecorder.h"
 #include "RTS_Survival/RTSComponents/RTSTargetAcquisition/AircraftTargetAcquisition/AircraftTargetAcquisition.h"
 #include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetMathLibrary.h"
@@ -625,7 +626,12 @@ void AAircraftMaster::TerminateAttackGroundCommand()
 
 void AAircraftMaster::TerminateAttackCommand()
 {
-	Strafe_StopAndRestoreSettings();
+	// The hunt after a strafe outlives single attacks (the strafe timer's retreat order cancels the current one); it
+	// keeps its settings until the aircraft is gone or a new strafe or carpet run replaces them.
+	if (M_StrafeState.bM_IsStrafing)
+	{
+		Strafe_StopAndRestoreSettings();
+	}
 	// Cancel any queued attack 
 	M_AircraftAttackData.Reset();
 	M_PendingPostLiftOffAction.Reset();
@@ -1347,6 +1353,8 @@ void AAircraftMaster::StartAttackActor()
 		return;
 	}
 
+	// Before the start location: a hunting attack after a strafe lowers the cruise height the path is planned at.
+	Strafe_ApplyHuntDiveProfile();
 	FRotator StartRotation;
 	const FVector StartLocation = OnMoveStartGetLocationAndRotation(StartRotation, GetActorLocation(),
 	                                                                GetActorRotation());
@@ -1725,6 +1733,7 @@ void AAircraftMaster::AttackMove_IssueActionForNewTargetPoint(const FAircraftPat
 	case EAirPathPointType::AttackDive:
 		M_AttackPlansWithoutDive = 0;
 		Strafe_OnAttackDiveStarted();
+		Strafe_RecordDiveForTests();
 		StartWeaponFire();
 		break;
 	case EAirPathPointType::GetOutOfDive:
@@ -2718,9 +2727,13 @@ void AAircraftMaster::StrafeLocation(const FStrafeAircraftSettings& StrafeAircra
                                      const FAircraftAttackMoveSettings& OverrideAttackMoveSettings)
 {
 	Strafe_ClearTimer();
+	// A new strafe ordered while the last one still hunts: its settings go back first, or they would be kept as the
+	// aircraft's own.
+	Strafe_EndHuntAndRestoreSettings();
 	M_AttackPlansWithoutDive = 0;
 	M_PreStrafeAttackMoveSettings = M_AircraftMovementSettings.AttackMoveSettings;
 	M_AircraftMovementSettings.AttackMoveSettings = OverrideAttackMoveSettings;
+	M_StrafeAbilityAttackMoveSettings = OverrideAttackMoveSettings;
 
 	M_StrafeState.StrafeStartLocation = StrafeAircraftSettings.StrafeStartLocation;
 	M_StrafeState.StrafeEndLocation = StrafeAircraftSettings.StrafeEndLocation;
@@ -2790,7 +2803,12 @@ void AAircraftMaster::Strafe_OnTimerFinished()
 {
 	const FVector PostStrafeMoveToLocation = M_StrafeState.PostStrafeMoveToLocation;
 	StopWeaponFire();
-	Strafe_StopAndRestoreSettings();
+	if (M_StrafeState.bM_IsStrafing)
+	{
+		Strafe_StopAndRestoreSettings();
+	}
+	// A hunting aircraft keeps its hunt settings on the way out: its aggressive stance can still dive on a unit before
+	// it is gone, and with the aircraft's own settings those dives missed (Ju 87 G preview, 2026-11-25).
 	M_StrafeState.bM_IsRetreatingToDestroy = true;
 	ExecuteMoveCommand(PostStrafeMoveToLocation);
 }
@@ -2949,12 +2967,22 @@ void AAircraftMaster::Strafe_StartAttackRun()
 
 	M_StrafeState.bM_HasDivedThisRun = false;
 	Strafe_ApplyDiveProfile();
-	M_AircraftAttackData.TargetLocation = AttackRunEndLocation;
+	// The dive is planned at the run's start, the point the player marked. Planned at the run's end, the guns (35
+	// degrees below the nose, one short burst per dive) opened up 20-30 m past the target and every pass missed what
+	// was marked: Horten and Ju 87 previews, 2026-11-24. The burst still carries on along the run from the start.
+	(void)AttackRunEndLocation;
+	M_AircraftAttackData.TargetLocation = WeaponStartLocation;
 	StartAttackGround();
 	M_AircraftAttackData.TargetLocation = WeaponStartLocation;
 }
 
 void AAircraftMaster::Strafe_ApplyDiveProfile()
+{
+	Strafe_ApplyDiveProfileAboveGround(
+		FMath::Min(M_StrafeState.NextRunStartLocation.Z, Strafe_GetNextRunEndLocation().Z));
+}
+
+void AAircraftMaster::Strafe_ApplyDiveProfileAboveGround(const float RunGroundZ)
 {
 	if (UWeaponStateAircraftStrafeGun::GetIsLegacyAircraftGunsRequested())
 	{
@@ -2969,7 +2997,6 @@ void AAircraftMaster::Strafe_ApplyDiveProfile()
 	// A long pull-out climbs back gently instead of snapping up over the target.
 	constexpr float MinRecoveryLengthAdditionCm = 2500.f;
 	FAircraftAttackMoveSettings& Settings = M_AircraftMovementSettings.AttackMoveSettings;
-	const float RunGroundZ = FMath::Min(M_StrafeState.NextRunStartLocation.Z, Strafe_GetNextRunEndLocation().Z);
 	const float CruiseHeightAboveRunGround = M_AircraftLandedData.TargetAirborneHeight - RunGroundZ;
 	Settings.DeltaAttackHeight = FMath::Max(Settings.DeltaAttackHeight,
 	                                        CruiseHeightAboveRunGround - PullOutHeightAboveRunGroundCm);
@@ -3026,12 +3053,135 @@ void AAircraftMaster::Strafe_CompleteInitialRunAndEnableAggro()
 	M_AircraftMovementSettings.AttackMoveSettings = M_PreStrafeAttackMoveSettings;
 	M_StrafeState.bM_IsStrafing = false;
 	M_StrafeState.bM_IsLerpingStrafePoint = false;
+	// The strafe timer keeps running: until it ends, every dive on a hunted unit is flown like a strafe run.
+	M_StrafeState.bM_IsHuntingAfterStrafe = not Strafe_GetIsLegacyHuntRequested()
+		&& not UWeaponStateAircraftStrafeGun::GetIsLegacyAircraftGunsRequested();
+	// Until the first hunted unit sets it: the strafe's marked ground, whose height the aircraft flies at now.
+	M_StrafeState.HuntGroundZ = M_StrafeState.StrafeStartLocation.Z;
 	SetMovementToIdle();
 	SetAggroStance(ERTSAggroBehaviour::Stance_Aggressive);
 }
 
+bool AAircraftMaster::Strafe_GetIsLegacyHuntRequested()
+{
+	static const bool bIsLegacyHuntRequested = FParse::Param(FCommandLine::Get(), TEXT("AircraftStrafeLegacyHunt"));
+	return bIsLegacyHuntRequested;
+}
+
+void AAircraftMaster::Strafe_ApplyHuntDiveProfile()
+{
+	if (not M_StrafeState.bM_IsHuntingAfterStrafe || not IsValid(M_AircraftAttackData.TargetActor))
+	{
+		return;
+	}
+	if (M_AircraftAttackData.TargetActor->IsA<AAircraftMaster>())
+	{
+		// Air to air: the guns converge on the other aircraft, no ground dive to shape.
+		M_AircraftMovementSettings.AttackMoveSettings = M_PreStrafeAttackMoveSettings;
+		return;
+	}
+	const FVector TargetLocation = M_AircraftAttackData.TargetActor->GetActorLocation();
+	float TargetGroundZ = TargetLocation.Z;
+	// A unit's origin may sit above its feet (soldiers): the dive bottoms out above the ground it stands on.
+	if (float LandscapeZ = 0.f; TraceLandscapeGroundZ(TargetLocation, LandscapeZ))
+	{
+		TargetGroundZ = FMath::Min(TargetGroundZ, LandscapeZ);
+	}
+	Strafe_SetHuntCruiseAtStrafeHeight(TargetGroundZ);
+	// From the ability's settings every time: the profile only raises values, so it must not build on the last target.
+	M_AircraftMovementSettings.AttackMoveSettings = M_StrafeAbilityAttackMoveSettings;
+	Strafe_ApplyDiveProfileAboveGround(TargetGroundZ);
+	Strafe_GateHuntDiveStartOnGunAngle(TargetLocation);
+}
+
+void AAircraftMaster::Strafe_GateHuntDiveStartOnGunAngle(const FVector& TargetLocation)
+{
+	// Over 8 hunting dives the ones on target had the unit at most 34 degrees below the nose when the dive began (the
+	// fixed guns depress 35), the misses 37-46 (preview, 2026-11-25). The dive starts no closer than where the unit lies
+	// MaxUnitBelowNoseDeg below the nose; hunting dives start level (the hunt holds its height), so at the strafe's
+	// 25 m that is about 40 m out. Started at 32 m, bursts landed 5-7 m long.
+	constexpr float MaxUnitBelowNoseDeg = 32.f;
+	constexpr float NosePitchAtDiveStartDeg = 0.f;
+	// The attack planner ends the run-in (where the dive starts) this share above the minimum dive distance.
+	constexpr float RunInEndShareOfMinDiveDistance = 1.15f;
+	const float HeightAboveTarget = GetActorLocation().Z - TargetLocation.Z;
+	if (HeightAboveTarget <= 0.f)
+	{
+		return;
+	}
+	const float MinDiveStartDistance = HeightAboveTarget / FMath::Tan(
+		FMath::DegreesToRadians(MaxUnitBelowNoseDeg + NosePitchAtDiveStartDeg));
+	FAircraftAttackMoveSettings& Settings = M_AircraftMovementSettings.AttackMoveSettings;
+	Settings.AttackDiveRange.X = FMath::Max(Settings.AttackDiveRange.X,
+	                                        MinDiveStartDistance / RunInEndShareOfMinDiveDistance);
+	Settings.AttackDiveRange.Y = FMath::Max(Settings.AttackDiveRange.Y, Settings.AttackDiveRange.X * 2.f);
+}
+
+void AAircraftMaster::Strafe_SetHuntCruiseAtStrafeHeight(const float TargetGroundZ)
+{
+	// The first run dives from 26 m above the marked ground and hits. Hunting dives started 38-50 m above their unit
+	// from the same 30 m out: the unit lay 15-20 degrees further below the nose than the fixed guns depress (35), and
+	// every burst landed 10-20 m past it (Bf 109, Bf 110, Horten previews, 2026-11-25). The approach to each hunted
+	// unit is flown at the first run's height above it instead (TerrainFollow_SampleGroundWhileHunting holds it).
+	const float StrafeCruiseZ = TargetGroundZ + AircraftStrafeHeights::MinCruiseClearanceAboveTarget;
+	const float ClearanceFloor = FMath::Max(M_AircraftMovementSettings.TerrainFollowSettings.MinGroundClearance,
+	                                        AircraftStrafeHeights::MinCruiseClearanceAboveTarget);
+	M_AircraftLandedData.TargetAirborneHeight = StrafeCruiseZ;
+	M_TerrainFollow.CaptureClearance(TargetGroundZ, StrafeCruiseZ, ClearanceFloor);
+	M_StrafeState.HuntGroundZ = TargetGroundZ;
+}
+
+void AAircraftMaster::Strafe_EndHuntAndRestoreSettings()
+{
+	if (not M_StrafeState.bM_IsHuntingAfterStrafe)
+	{
+		return;
+	}
+	M_StrafeState.bM_IsHuntingAfterStrafe = false;
+	M_AircraftMovementSettings.AttackMoveSettings = M_PreStrafeAttackMoveSettings;
+}
+
+void AAircraftMaster::Strafe_RecordDiveForTests() const
+{
+#if RTS_WITH_MAP_TESTS
+	if (not FAircraftStrafeShotRecorder::GetIsEnabled())
+	{
+		return;
+	}
+	const AActor* const TargetActor = M_AircraftAttackData.bM_IsAttackGround
+	                                   ? nullptr
+	                                   : M_AircraftAttackData.TargetActor.Get();
+	const FVector RunStart = IsValid(TargetActor)
+		                         ? TargetActor->GetActorLocation()
+		                         : M_StrafeState.bM_IsStrafing
+		                         ? M_StrafeState.ActiveLerpStartLocation
+		                         : M_AircraftAttackData.TargetLocation;
+	const FVector RunEnd = not IsValid(TargetActor) && M_StrafeState.bM_IsStrafing
+		                       ? M_StrafeState.ActiveLerpEndLocation
+		                       : RunStart;
+	const FVector Location = GetActorLocation();
+	const FVector ToTarget2D = FVector(RunStart.X - Location.X, RunStart.Y - Location.Y, 0.f);
+	const float HeadingErrorDeg = ToTarget2D.IsNearlyZero()
+		                              ? 0.f
+		                              : FMath::FindDeltaAngleDegrees(GetActorRotation().Yaw, ToTarget2D.Rotation().Yaw);
+	const FAircraftAttackMoveSettings& Settings = M_AircraftMovementSettings.AttackMoveSettings;
+	const FString Description = FString::Printf(
+		TEXT("strafing=%d hunting=%d target=%s dist2d=%.0f height_above=%.0f pitch=%.1f roll=%.1f heading_err=%.1f "
+			"relax=%d delta_attack_h=%.0f dive_range=%.0f-%.0f dive_strength=%.1f speed=%.0f cruise_above=%.0f "
+			"clearance=%.0f"),
+		M_StrafeState.bM_IsStrafing ? 1 : 0, M_StrafeState.bM_IsHuntingAfterStrafe ? 1 : 0,
+		IsValid(TargetActor) ? *TargetActor->GetName() : TEXT("ground"), ToTarget2D.Size(), Location.Z - RunStart.Z,
+		GetActorRotation().Pitch, GetActorRotation().Roll, HeadingErrorDeg, M_AircraftAttackData.Path.DiveRelaxLevel,
+		Settings.DeltaAttackHeight, Settings.AttackDiveRange.X, Settings.AttackDiveRange.Y,
+		Settings.AttackDive_DiveStrength, GetVelocity().Size(), M_AircraftLandedData.TargetAirborneHeight - RunStart.Z,
+		M_TerrainFollow.GetClearance());
+	FAircraftStrafeShotRecorder::BeginDive(this, Description, TargetActor, RunStart, RunEnd);
+#endif
+}
+
 void AAircraftMaster::Strafe_StopAndRestoreSettings()
 {
+	Strafe_EndHuntAndRestoreSettings();
 	if (not M_StrafeState.bM_IsStrafing)
 	{
 		return;
@@ -4085,6 +4235,11 @@ void AAircraftMaster::TerrainFollow_SampleGround()
 		// Past the landscape edge there is nothing to follow; keep the current height.
 		return;
 	}
+	if (M_StrafeState.bM_IsHuntingAfterStrafe)
+	{
+		TerrainFollow_SampleGroundWhileHunting(GroundBelowZ);
+		return;
+	}
 
 	float HighestGroundZ = GroundBelowZ;
 	const FVector FlightDirection = GetVelocity().GetSafeNormal2D();
@@ -4141,6 +4296,40 @@ void AAircraftMaster::TerrainFollow_CaptureClearanceAboveTarget(const FVector& T
 	const float ClearanceFloor = FMath::Max(M_AircraftMovementSettings.TerrainFollowSettings.MinGroundClearance,
 	                                        MinClearance);
 	M_TerrainFollow.CaptureClearance(TargetGroundZ, M_AircraftLandedData.TargetAirborneHeight, ClearanceFloor);
+}
+
+void AAircraftMaster::TerrainFollow_SampleGroundWhileHunting(const float GroundBelowZ)
+{
+	// The regular cruise keeps its clearance over the highest ground 3.5 s ahead. Hunting after a strafe, that climbed
+	// the aircraft over ridges beyond the hunted unit and over the turn's lower ground: it dived from 35-50 m above the
+	// unit instead of the strafe's 26 m and the fixed guns could not depress onto it (preview desert, 2026-11-25).
+	// The hunt holds the strafe height over the hunted unit's ground and only climbs for ground close ahead.
+	constexpr float HuntLookAheadSeconds = 1.5f;
+	constexpr float HuntMinClearanceOverTerrainCm = 1500.f;
+	const FVector AircraftLocation = GetActorLocation();
+	const FVector FlightDirection = GetVelocity().GetSafeNormal2D();
+	const FVector LookAheadOffset = FlightDirection * FMath::Max(GetVelocity().Size2D(),
+	                                                             M_AircraftMovementSettings.MaxMoveSpeed)
+		* HuntLookAheadSeconds;
+	float NearHighestGroundZ = GroundBelowZ;
+	for (int32 SampleIndex = 1; SampleIndex <= AircraftTerrainFollowSampling::LookAheadSamples; ++SampleIndex)
+	{
+		const float Alpha = static_cast<float>(SampleIndex) / AircraftTerrainFollowSampling::LookAheadSamples;
+		float GroundAheadZ = 0.f;
+		if (TraceLandscapeGroundZ(AircraftLocation + LookAheadOffset * Alpha, GroundAheadZ))
+		{
+			NearHighestGroundZ = FMath::Max(NearHighestGroundZ, GroundAheadZ);
+		}
+	}
+	// The terrain follow flies at (ground it is handed) + clearance: hand it the unit's ground, raised only as far as
+	// the near terrain needs to stay HuntMinClearanceOverTerrainCm below the aircraft.
+	const float HuntGroundZ = M_StrafeState.HuntGroundZ;
+	const float GroundForNearTerrainZ = NearHighestGroundZ + HuntMinClearanceOverTerrainCm
+		- M_TerrainFollow.GetClearance();
+	const FAircraftTerrainFollowSettings& Settings = M_AircraftMovementSettings.TerrainFollowSettings;
+	M_TerrainFollow.OnGroundSampled(HuntGroundZ, FMath::Max(HuntGroundZ, GroundForNearTerrainZ),
+	                                M_AircraftLandedData.TargetAirborneHeight,
+	                                FMath::Max(Settings.MinGroundClearance, Settings.MinCruiseClearance));
 }
 
 float AAircraftMaster::TerrainFollow_GetClimbPitch() const

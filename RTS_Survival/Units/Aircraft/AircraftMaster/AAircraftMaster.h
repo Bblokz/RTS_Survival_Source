@@ -473,6 +473,8 @@ private:
 
 	/** @brief Traces the ground below the aircraft and along its flight ahead, and hands it to M_TerrainFollow. */
 	void TerrainFollow_SampleGround();
+	// Hunting after a strafe: holds the strafe height over the hunted unit, climbing only for ground close ahead.
+	void TerrainFollow_SampleGroundWhileHunting(const float GroundBelowZ);
 
 	/** @brief Moves the aircraft, its cruise height and the path it flies by DeltaZ, keeping all of them in step. */
 	void TerrainFollow_ShiftCruiseHeight(const float DeltaZ);
@@ -825,6 +827,11 @@ private:
 		bool bM_IsRetreatingToDestroy = false;
 		// Keeps attacking the authored target instead of switching to aggro after the first run.
 		bool bM_RepeatRunsOverTarget = false;
+		// After the first run (no repeat runs) the aircraft hunts units until TotalStrafeTime ends; each hunting dive
+		// gets the strafe dive profile for its target, or the guns fire from too far and too high and miss.
+		bool bM_IsHuntingAfterStrafe = false;
+		// Ground of the hunted unit (the strafe's marked ground until the first one): the hunt flies at its strafe height.
+		float HuntGroundZ = 0.f;
 		// Off for a guns-only strafe: no bombs at any pull-out for the rest of this aircraft's life (not reset with the
 		// runtime, so the hunting after the strafe stays guns-only too).
 		bool bM_DropBombsAtPullOut = true;
@@ -975,6 +982,8 @@ private:
 
 	FAircraftStrafeState M_StrafeState;
 	FAircraftAttackMoveSettings M_PreStrafeAttackMoveSettings;
+	// The strafe ability's attack settings before any dive profile; every hunting dive starts again from these.
+	FAircraftAttackMoveSettings M_StrafeAbilityAttackMoveSettings;
 
 	void Strafe_StartTimer(const float TotalStrafeTime);
 	void Strafe_OnTimerFinished();
@@ -987,6 +996,19 @@ private:
 	void Strafe_StartAttackRun();
 	// Makes the run's dive steep and long enough that the nose (and so the fixed guns) points at the ground.
 	void Strafe_ApplyDiveProfile();
+	/** @brief The strafe dive profile for a dive whose target stands on RunGroundZ (a strafe line or a hunted unit). */
+	void Strafe_ApplyDiveProfileAboveGround(const float RunGroundZ);
+	// A hunting dive after the strafe's first run: the strafe ability's settings with the profile for that unit.
+	void Strafe_ApplyHuntDiveProfile();
+	// Hunting approaches fly at the strafe's first-run height above the unit, so the fixed guns can reach it.
+	void Strafe_SetHuntCruiseAtStrafeHeight(const float TargetGroundZ);
+	// A hunting dive starts no closer than where the unit lies within the fixed guns' depression below the nose.
+	void Strafe_GateHuntDiveStartOnGunAngle(const FVector& TargetLocation);
+	/** @return Whether -AircraftStrafeLegacyHunt asks for the old hunting dives (aircraft settings, for A/B tests). */
+	static bool Strafe_GetIsLegacyHuntRequested();
+	void Strafe_EndHuntAndRestoreSettings();
+	// Map tests: hands the dive that starts now to the strafe shot recorder (no-op while it is disabled).
+	void Strafe_RecordDiveForTests() const;
 	void IssuePostLiftOffAttackGroundAction();
 	void Strafe_OnAttackDiveStarted();
 	void Strafe_OnDiveRecoveryStarted();

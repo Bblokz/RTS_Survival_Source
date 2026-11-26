@@ -107,6 +107,8 @@ private:
 	FString GetTrackName() const;
 	void CheckTargetsSpawned();
 	void RecordTargetHealth();
+	// Strafing cases: logs every dive and fails when the dives after each aircraft's first one miss.
+	void CheckLaterStrafeDives();
 	void TrackTargetHealth();
 	void Finish();
 	void SetPhase(EPhase NewPhase, double Now);

@@ -53,6 +53,25 @@ public:
 	static int32 GetNearMissKillCount();
 	static int32 GetCannonSplashCount();
 
+	/**
+	 * @brief An aircraft starts a dive: its later impacts are measured against what this dive attacks, so a test can
+	 * tell a good first strafe run from later runs that miss.
+	 * @param Aircraft The diving aircraft; its weapons' impacts count for this dive until its next one.
+	 * @param Description Free text for the log (how the dive started).
+	 * @param TargetActor The attacked unit, followed as it moves; null for a ground strafe.
+	 * @param RunStart The marked ground point (or the unit's location when the dive started).
+	 * @param RunEnd End of the strafe line on the ground; RunStart for an attack on a unit.
+	 */
+	static void BeginDive(const AActor* Aircraft, const FString& Description, const AActor* TargetActor,
+	                      const FVector& RunStart, const FVector& RunEnd);
+
+	// Logs one RTS_STRAFE_DIVE line per dive since Enable and a summary of the dives after each aircraft's first.
+	static void LogDives();
+
+	// Dives after each aircraft's first one that put at least one round near what they attacked / all of them.
+	static int32 GetLaterDivesOnTargetCount();
+	static int32 GetLaterDivesWithImpactsCount();
+
 	// One line with every metric, for the RTS_AIRCRAFT_TEST log.
 	static FString DescribeMetrics();
 

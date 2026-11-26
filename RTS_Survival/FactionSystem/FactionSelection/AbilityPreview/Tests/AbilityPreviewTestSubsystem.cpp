@@ -31,6 +31,7 @@
 #include "RTS_Survival/GlobalAbilitySystem/DevSettings/RTSGlobalAbilitySettings.h"
 #include "RTS_Survival/Music/RTSMusicManager/RTSMusicManager.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
+#include "RTS_Survival/Weapons/AircraftWeapon/AircraftStrafeGun/AircraftStrafeShotRecorder.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogRTSAbilityPreviewTest, Log, All);
 
@@ -482,6 +483,10 @@ void UAbilityPreviewTestSubsystem::StartCase(const double Now)
 	      TEXT("overlay_shown"));
 	Check(M_Controller->GetViewTarget() == M_Controller->GetAbilityPreviewDirector(), TEXT("camera_on_desert"));
 	CheckTargetsSpawned();
+	// Every strafe dive is measured against what it attacked: later dives (hunting after the first run) must hit too.
+	FString RecorderLabelSuffix;
+	FParse::Value(FCommandLine::Get(), TEXT("AbilityPreviewTestLabel="), RecorderLabelSuffix);
+	FAircraftStrafeShotRecorder::Enable(GetCaseName() + RecorderLabelSuffix);
 	M_RunStart = Now;
 	SetPhase(EPhase::Running, Now);
 }
@@ -597,6 +602,7 @@ void UAbilityPreviewTestSubsystem::FinishCase(const double Now)
 	Check(Music.Contains(TEXT("TransportLoop")), TEXT("commander_music_back"), Music);
 	// The track itself, not only the category: the commander screen's loop must be playing again.
 	Check(GetTrackName().Contains(TEXT("Loading_transporters")), TEXT("commander_track_playing"), GetTrackName());
+	CheckLaterStrafeDives();
 	const int32 Leftovers = CountLeftoverSpawns();
 	Check(Leftovers == 0, TEXT("no_leftovers"), FString::FromInt(Leftovers));
 	TArray<FString> ErrorSamples;
@@ -735,6 +741,27 @@ FString UAbilityPreviewTestSubsystem::GetMusicName() const
 	const URTSGameInstance* const GameInstance = Cast<URTSGameInstance>(GetWorld()->GetGameInstance());
 	const URTSMusicManager* const MusicManager = IsValid(GameInstance) ? GameInstance->GetMusicManager() : nullptr;
 	return IsValid(MusicManager) ? UEnum::GetValueAsString(MusicManager->GetCurrentMusicType()) : TEXT("none");
+}
+
+void UAbilityPreviewTestSubsystem::CheckLaterStrafeDives()
+{
+	FAircraftStrafeShotRecorder::LogDives();
+	FAircraftStrafeShotRecorder::WriteCsv();
+	const int32 LaterDivesFired = FAircraftStrafeShotRecorder::GetLaterDivesWithImpactsCount();
+	const int32 LaterDivesOnTarget = FAircraftStrafeShotRecorder::GetLaterDivesOnTargetCount();
+	FAircraftStrafeShotRecorder::Disable();
+	if (LaterDivesFired == 0)
+	{
+		// These strafes hunt long enough after the first run for later dives; none means the hunt stopped diving.
+		const FString CaseName = GetCaseName();
+		const bool bExpectsLaterDives = CaseName.Contains(TEXT("Bf109")) || CaseName.Contains(TEXT("Horten"))
+			|| CaseName.Contains(TEXT("Bf110"));
+		Check(not bExpectsLaterDives, TEXT("later_strafe_dives_fired"), TEXT("0"));
+		return;
+	}
+	// Half of the dives after each aircraft's first must land on what they attacked (the first run always did).
+	Check(LaterDivesOnTarget * 2 >= LaterDivesFired, TEXT("later_strafe_dives_on_target"),
+	      FString::Printf(TEXT("%d/%d"), LaterDivesOnTarget, LaterDivesFired));
 }
 
 void UAbilityPreviewTestSubsystem::Check(const bool bCondition, const FString& Name, const FString& Detail)

@@ -4,6 +4,8 @@
 
 #if RTS_WITH_MAP_TESTS
 
+#include "Engine/World.h"
+#include "GameFramework/Actor.h"
 #include "HAL/PlatformFileManager.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
@@ -15,8 +17,40 @@ namespace AircraftStrafeShotRecorderPrivate
 	constexpr float OffNoseYawDeg = 11.f;
 	constexpr float OffNoseTotalDeg = 37.f;
 
+	// A round lands on target this close to the attacked unit or to the strafe line (2D, cm).
+	constexpr float OnTargetRadiusCm = 400.f;
+	constexpr float NearTargetRadiusCm = 800.f;
+	// A dive counts as on target with at least this share of its ground impacts within OnTargetRadiusCm.
+	constexpr float MinOnTargetShareForDive = 0.2f;
+
+	struct FDiveRecord
+	{
+		TWeakObjectPtr<const AActor> Aircraft;
+		FString AircraftName;
+		int32 DiveIndexOfAircraft = 0;
+		FString Description;
+		TWeakObjectPtr<const AActor> TargetActor;
+		FVector RunStart = FVector::ZeroVector;
+		FVector RunEnd = FVector::ZeroVector;
+		int32 Impacts = 0;
+		int32 GroundHits = 0;
+		int32 OnTarget = 0;
+		int32 NearTarget = 0;
+		double SumDistanceCm = 0.0;
+		float MinDistanceCm = TNumericLimits<float>::Max();
+		// Mean miss along / across the flight at the closest impacts, to tell overshoot from a lateral miss.
+		double SumAlongCm = 0.0;
+		double SumCrossCm = 0.0;
+
+		bool GetIsOnTarget() const
+		{
+			return GroundHits > 0 && static_cast<float>(OnTarget) / GroundHits >= MinOnTargetShareForDive;
+		}
+	};
+
 	struct FRecorderState
 	{
+		TArray<FDiveRecord> Dives;
 		bool bIsEnabled = false;
 		FString Label;
 		int32 ShotCount = 0;
@@ -61,6 +95,70 @@ namespace AircraftStrafeShotRecorderPrivate
 	{
 		return FString::Printf(TEXT("%.0f,%.0f,%.0f"), Vector.X, Vector.Y, Vector.Z);
 	}
+
+	/** @return Index of the weapon's aircraft's latest dive in State.Dives; INDEX_NONE without one. */
+	int32 FindLatestDiveOfWeapon(const FRecorderState& State, const UObject* Weapon)
+	{
+		const AActor* const Aircraft = Weapon != nullptr ? Weapon->GetTypedOuter<AActor>() : nullptr;
+		if (Aircraft == nullptr)
+		{
+			return INDEX_NONE;
+		}
+		for (int32 DiveIndex = State.Dives.Num() - 1; DiveIndex >= 0; --DiveIndex)
+		{
+			if (State.Dives[DiveIndex].Aircraft.Get() == Aircraft)
+			{
+				return DiveIndex;
+			}
+		}
+		return INDEX_NONE;
+	}
+
+	void AddImpactToDive(FDiveRecord& Dive, const bool bHitSomething, const FVector& ImpactLocation,
+	                     const FVector& FlightForward)
+	{
+		++Dive.Impacts;
+		if (not bHitSomething)
+		{
+			return;
+		}
+		++Dive.GroundHits;
+		// A unit is measured where it is now; a ground strafe against its whole line.
+		const AActor* const TargetActor = Dive.TargetActor.Get();
+		const FVector RunStart = IsValid(TargetActor) ? TargetActor->GetActorLocation() : Dive.RunStart;
+		const FVector RunEnd = IsValid(TargetActor) ? RunStart : Dive.RunEnd;
+		const FVector Impact2D(ImpactLocation.X, ImpactLocation.Y, 0.f);
+		const FVector Closest = FMath::ClosestPointOnSegment(Impact2D, FVector(RunStart.X, RunStart.Y, 0.f),
+		                                                     FVector(RunEnd.X, RunEnd.Y, 0.f));
+		const FVector Miss = Impact2D - Closest;
+		const float Distance = Miss.Size();
+		Dive.SumDistanceCm += Distance;
+		Dive.MinDistanceCm = FMath::Min(Dive.MinDistanceCm, Distance);
+		Dive.OnTarget += Distance <= OnTargetRadiusCm ? 1 : 0;
+		Dive.NearTarget += Distance <= NearTargetRadiusCm ? 1 : 0;
+		const FVector Forward2D = FVector(FlightForward.X, FlightForward.Y, 0.f).GetSafeNormal();
+		Dive.SumAlongCm += FVector::DotProduct(Miss, Forward2D);
+		Dive.SumCrossCm += FVector::DotProduct(Miss, FVector::CrossProduct(FVector::UpVector, Forward2D));
+	}
+
+	FString GetDiveKey(const FRecorderState& State, const UObject* Weapon)
+	{
+		const int32 DiveIndex = FindLatestDiveOfWeapon(State, Weapon);
+		if (not State.Dives.IsValidIndex(DiveIndex))
+		{
+			return TEXT("none");
+		}
+		const FDiveRecord& Dive = State.Dives[DiveIndex];
+		const AActor* const TargetActor = Dive.TargetActor.Get();
+		const FVector Target = IsValid(TargetActor) ? TargetActor->GetActorLocation() : Dive.RunStart;
+		return FString::Printf(TEXT("%s#%d@%.0f;%.0f;%.0f"), *Dive.AircraftName, Dive.DiveIndexOfAircraft, Target.X,
+		                       Target.Y, Target.Z);
+	}
+
+	bool GetIsLaterDive(const FDiveRecord& Dive)
+	{
+		return Dive.DiveIndexOfAircraft > 0;
+	}
 }
 
 void FAircraftStrafeShotRecorder::Enable(const FString& Label)
@@ -71,7 +169,7 @@ void FAircraftStrafeShotRecorder::Enable(const FString& Label)
 	State.bIsEnabled = true;
 	State.Label = Label;
 	State.CsvLines.Add(TEXT("kind,weapon,time,launch_x,launch_y,launch_z,end_x,end_y,end_z,aim_x,aim_y,aim_z,"
-		"nose_x,nose_y,nose_z,hit,nose_angle,impact_lead"));
+		"nose_x,nose_y,nose_z,hit,nose_angle,impact_lead,dive"));
 }
 
 void FAircraftStrafeShotRecorder::Disable()
@@ -109,13 +207,15 @@ void FAircraftStrafeShotRecorder::RecordShot(
 	{
 		++State.ShotsOffNose;
 	}
-	State.CsvLines.Add(FString::Printf(TEXT("shot,%s,0,%s,%s,%s,%s,0,%.1f,0"),
+	const UWorld* const ShotWorld = Weapon != nullptr ? Weapon->GetWorld() : nullptr;
+	State.CsvLines.Add(FString::Printf(TEXT("shot,%s,%.3f,%s,%s,%s,%s,0,%.1f,0,%s"),
 	                                   Weapon ? *Weapon->GetName() : TEXT("none"),
+	                                   ShotWorld != nullptr ? ShotWorld->GetTimeSeconds() : 0.f,
 	                                   *FormatVector(MuzzleLocation),
 	                                   *FormatVector(MuzzleLocation + Direction * 1000.f),
 	                                   *FormatVector(AimTarget),
 	                                   *FString::Printf(TEXT("%.3f,%.3f,%.3f"), Nose.X, Nose.Y, Nose.Z),
-	                                   NoseAngleDeg));
+	                                   NoseAngleDeg, *GetDiveKey(State, Weapon)));
 }
 
 void FAircraftStrafeShotRecorder::RecordImpact(
@@ -155,14 +255,19 @@ void FAircraftStrafeShotRecorder::RecordImpact(
 		State.SumAlongTrackMissCm += AlongTrack;
 		State.SumSquaredAlongTrackMissCm += AlongTrack * AlongTrack;
 	}
-	State.CsvLines.Add(FString::Printf(TEXT("impact,%s,%.3f,%s,%s,%s,0,0,0,%d,0,%.3f"),
+	const int32 DiveIndex = FindLatestDiveOfWeapon(State, Weapon);
+	if (State.Dives.IsValidIndex(DiveIndex))
+	{
+		AddImpactToDive(State.Dives[DiveIndex], bHitSomething, ImpactLocation, FlightForward);
+	}
+	State.CsvLines.Add(FString::Printf(TEXT("impact,%s,%.3f,%s,%s,%s,0,0,0,%d,0,%.3f,%s"),
 	                                   Weapon ? *Weapon->GetName() : TEXT("none"),
 	                                   ImpactTime,
 	                                   *FormatVector(LaunchLocation),
 	                                   *FormatVector(ImpactLocation),
 	                                   *FormatVector(AimTarget),
 	                                   bHitSomething ? 1 : 0,
-	                                   ImpactLeadSeconds));
+	                                   ImpactLeadSeconds, *GetDiveKey(State, Weapon)));
 }
 
 void FAircraftStrafeShotRecorder::RecordGroundProbe(const bool bFoundGround)
@@ -198,6 +303,75 @@ void FAircraftStrafeShotRecorder::RecordCannonSplash()
 		return;
 	}
 	++State.CannonSplashes;
+}
+
+void FAircraftStrafeShotRecorder::BeginDive(const AActor* Aircraft, const FString& Description,
+                                            const AActor* TargetActor, const FVector& RunStart, const FVector& RunEnd)
+{
+	using namespace AircraftStrafeShotRecorderPrivate;
+	FRecorderState& State = GetState();
+	if (not State.bIsEnabled || not IsValid(Aircraft))
+	{
+		return;
+	}
+	int32 EarlierDives = 0;
+	for (const FDiveRecord& Dive : State.Dives)
+	{
+		EarlierDives += Dive.Aircraft.Get() == Aircraft ? 1 : 0;
+	}
+	FDiveRecord NewDive;
+	NewDive.Aircraft = Aircraft;
+	NewDive.AircraftName = Aircraft->GetName();
+	NewDive.DiveIndexOfAircraft = EarlierDives;
+	NewDive.Description = Description;
+	NewDive.TargetActor = TargetActor;
+	NewDive.RunStart = RunStart;
+	NewDive.RunEnd = RunEnd;
+	UE_LOG(LogTemp, Display, TEXT("RTS_STRAFE_DIVE_START aircraft=%s dive=%d %s"), *NewDive.AircraftName,
+	       NewDive.DiveIndexOfAircraft, *Description);
+	State.Dives.Add(MoveTemp(NewDive));
+}
+
+void FAircraftStrafeShotRecorder::LogDives()
+{
+	using namespace AircraftStrafeShotRecorderPrivate;
+	const FRecorderState& State = GetState();
+	for (const FDiveRecord& Dive : State.Dives)
+	{
+		const int32 Hits = FMath::Max(1, Dive.GroundHits);
+		UE_LOG(LogTemp, Display,
+		       TEXT("RTS_STRAFE_DIVE label=%s aircraft=%s dive=%d impacts=%d ground=%d on_target_4m=%d near_8m=%d "
+			       "mean_dist_cm=%.0f min_dist_cm=%.0f mean_along_cm=%.0f mean_cross_cm=%.0f verdict=%s | %s"),
+		       *State.Label, *Dive.AircraftName, Dive.DiveIndexOfAircraft, Dive.Impacts, Dive.GroundHits, Dive.OnTarget,
+		       Dive.NearTarget, Dive.SumDistanceCm / Hits, Dive.GroundHits > 0 ? Dive.MinDistanceCm : -1.f,
+		       Dive.SumAlongCm / Hits, Dive.SumCrossCm / Hits,
+		       Dive.Impacts == 0 ? TEXT("no_fire") : Dive.GetIsOnTarget() ? TEXT("on_target") : TEXT("MISS"),
+		       *Dive.Description);
+	}
+	UE_LOG(LogTemp, Display, TEXT("RTS_STRAFE_DIVE_SUMMARY label=%s dives=%d later_dives_fired=%d later_on_target=%d"),
+	       *State.Label, State.Dives.Num(), GetLaterDivesWithImpactsCount(), GetLaterDivesOnTargetCount());
+}
+
+int32 FAircraftStrafeShotRecorder::GetLaterDivesOnTargetCount()
+{
+	using namespace AircraftStrafeShotRecorderPrivate;
+	int32 Count = 0;
+	for (const FDiveRecord& Dive : GetState().Dives)
+	{
+		Count += GetIsLaterDive(Dive) && Dive.GetIsOnTarget() ? 1 : 0;
+	}
+	return Count;
+}
+
+int32 FAircraftStrafeShotRecorder::GetLaterDivesWithImpactsCount()
+{
+	using namespace AircraftStrafeShotRecorderPrivate;
+	int32 Count = 0;
+	for (const FDiveRecord& Dive : GetState().Dives)
+	{
+		Count += GetIsLaterDive(Dive) && Dive.Impacts > 0 ? 1 : 0;
+	}
+	return Count;
 }
 
 int32 FAircraftStrafeShotRecorder::GetNearMissHitCount()

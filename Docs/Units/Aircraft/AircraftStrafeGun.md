@@ -246,6 +246,46 @@ audio device. The `STRAFE_AUDIO` line and its checks:
 - the impact loop gets every round;
 - a spawned Me 410's MG 151/20 has the cannon set and the 20 mm ground impact.
 
+## Hunting dives after the first run (2026-11-25)
+
+No strafe template sets `bRepeatRunsOverTarget`. After its first run the aircraft hunts nearby units until
+`TotalStrafeTime` ends, as ordinary attack dives (`StartAttackActor`). In the commander preview the second and third
+passes missed: every burst landed 10-20 m past the unit, with almost no error across the flight line.
+
+**Why:** the fixed guns depress at most 35 degrees below the nose (`MaxDepressionBelowNoseDeg`). Hunting dives started
+35-50 m above the unit, at the first run's 30-40 m distance, so the unit was 37-46 degrees below the nose. The guns sat
+at their limit and fired long. The first run starts 26 m up. The aircraft was higher because terrain follow climbed for
+ridges up to 140 m ahead, past the unit, and for the turn over lower ground. The attack path is planned at that cruise
+height.
+
+**Now** (`AAircraftMaster`, `Strafe_*` hunt functions, on while `bM_IsHuntingAfterStrafe`):
+- **Height:** before each hunting attack is planned, the cruise height is set to the unit's ground + 26 m
+  (`AircraftStrafeHeights::MinCruiseClearanceAboveTarget`).
+- **Altitude hold:** while hunting, `TerrainFollow_SampleGroundWhileHunting` holds that height. It climbs only when
+  ground within 1.5 s ahead comes closer than 15 m below the aircraft.
+- **Dive profile:** each hunting dive uses the strafe ability's attack settings with the strafe dive profile for the
+  unit's ground.
+- **Gun-angle gate:** a hunting dive starts no closer than where the unit lies 32 degrees below the nose. Hunting dives
+  start level, so at 25 m that is about 40 m out. Starting at 32 m put bursts 5-7 m long.
+- **Retreat:** the hunt settings stay until the aircraft is gone. Its aggressive stance can still dive on a unit after
+  the strafe timer sends it away. A cancelled single attack does not end the hunt (`TerminateAttackCommand`). A new
+  strafe, a carpet run or return-to-base do.
+- Air-to-air targets keep the aircraft's own settings.
+- `-AircraftStrafeLegacyHunt` turns all of this off for A/B runs.
+
+**Measuring:** while the shot recorder is on, `FAircraftStrafeShotRecorder::BeginDive` groups each aircraft's impacts by
+dive. Each dive is scored against the hunted unit, or against the strafe line for a ground run. `LogDives` prints one
+`RTS_STRAFE_DIVE` line per dive (impacts, share within 4 m, along/across miss, the dive's start geometry). The CSV
+tags every round with its dive. `-AbilityPreviewTest` turns the recorder on for each case. It fails
+`later_strafe_dives_on_target` when under half the later dives land on target. It fails `later_strafe_dives_fired` when
+the Bf 109, Bf 110 or Horten case dives only once. `-AbilityPreviewTestLabel=_x` gives each variant its own CSV.
+`-nullrhi -nosound -benchmark` runs the test headless; its music and six-second-linger checks fail there.
+
+Preview results, later dives on target:
+- Bf 109 + 2x Horten + 2x Bf 110: 0 of 6 before (the legacy switch in a later build: 1 of 7).
+- With the height fix but no gate: 6 of 8.
+- Final code, adding Ju 87 and Ju 87 G (the Ju 87 strafe ends before a second dive): 23 of 25 over three runs.
+
 ## QA test
 
 ```
