@@ -7,6 +7,8 @@
 #include "RTS_Survival/DeveloperSettings.h"
 #include "RTS_Survival/GameUI/TrainingUI/TrainerComponent/TrainerComponent.h"
 #include "RTS_Survival/Player/CPPController.h"
+#include "RTS_Survival/Player/ConstructionPreview/CPPConstructionPreview.h"
+#include "RTS_Survival/Player/ConstructionPreview/PlacementPanel/W_PlacementPanel.h"
 #include "RTS_Survival/Player/PlayerError/PlayerError.h"
 #include "RTS_Survival/RTSComponents/RadiusComp/RadiusComp.h"
 
@@ -56,6 +58,7 @@ void UBarbedWirePlacementComponent::StartPlacement(
 	SetComponentTickEnabled(true);
 	// Shown at once, not only from the next tick.
 	UpdateHover();
+	UpdatePlacementPanel(0.0f);
 }
 
 bool UBarbedWirePlacementComponent::OnPrimaryClick(const FVector& ClickedLocation)
@@ -136,6 +139,7 @@ void UBarbedWirePlacementComponent::TickComponent(
 	{
 		UpdateDrawing();
 	}
+	UpdatePlacementPanel(DeltaTime);
 }
 
 ACPPController* UBarbedWirePlacementComponent::GetPlayerController() const
@@ -430,4 +434,100 @@ void UBarbedWirePlacementComponent::ResetPlacement()
 	bM_IsStartSnapped = false;
 	M_Phase = EBarbedWirePlacementPhase::Idle;
 	SetComponentTickEnabled(false);
+	HidePlacementPanel();
+}
+
+UW_PlacementPanel* UBarbedWirePlacementComponent::GetPlacementPanel() const
+{
+	const ACPPController* PlayerController = GetPlayerController();
+	const ACPPConstructionPreview* ConstructionPreview = IsValid(PlayerController)
+		                                                     ? PlayerController->CPPConstructionPreviewRef
+		                                                     : nullptr;
+	return IsValid(ConstructionPreview) ? ConstructionPreview->GetPlacementPanel() : nullptr;
+}
+
+void UBarbedWirePlacementComponent::UpdatePlacementPanel(const float DeltaTime) const
+{
+	UW_PlacementPanel* PlacementPanel = GetPlacementPanel();
+	if (not IsValid(PlacementPanel) || not GetIsPlacing())
+	{
+		return;
+	}
+	PlacementPanel->ShowPanel();
+	PlacementPanel->SetContent(MakePlacementPanelContent());
+	// The whole drawn line, so the panel docks beside it and never over the wire being laid.
+	constexpr bool bIncludeNonColliding = true;
+	PlacementPanel->UpdateDocking(IsValid(M_PreviewLine)
+		                              ? M_PreviewLine->GetComponentsBoundingBox(bIncludeNonColliding)
+		                              : FBox(ForceInit), DeltaTime);
+}
+
+FPlacementPanelContent UBarbedWirePlacementComponent::MakePlacementPanelContent() const
+{
+	constexpr float CentimetresPerMetre = 100.f;
+	const bool bIsDrawing = M_Phase == EBarbedWirePlacementPhase::Drawing;
+	const bool bCanBuildPlan = not M_PlannedSpans.IsEmpty();
+	const bool bIsJoined = bIsDrawing ? M_EndSnap.IsSet() || bM_IsStartSnapped : bM_IsStartSnapped;
+	FPlacementPanelContent Content;
+	Content.Title = NSLOCTEXT("PlacementPanel", "WireTitle", "STRING BARBED WIRE");
+	if (not bCanBuildPlan)
+	{
+		Content.Status = EPlacementPanelStatus::Blocked;
+		Content.StatusText = NSLOCTEXT("PlacementPanel", "WireBlocked",
+		                               "Can't string wire here: blocked, too steep or outside the build radius");
+	}
+	else if (bIsDrawing)
+	{
+		Content.Status = EPlacementPanelStatus::Ready;
+		Content.StatusText = M_EndSnap.IsSet()
+			                     ? NSLOCTEXT("PlacementPanel", "WireFinishJoined", "Click to finish, joined to the wire end")
+			                     : NSLOCTEXT("PlacementPanel", "WireFinish", "Click to finish the wire");
+	}
+	else
+	{
+		Content.Status = EPlacementPanelStatus::Info;
+		Content.StatusText = bM_IsStartSnapped
+			                     ? NSLOCTEXT("PlacementPanel", "WireStartJoined", "Click to start on the wire end")
+			                     : NSLOCTEXT("PlacementPanel", "WireStart", "Click to set the start");
+	}
+	const float LengthCm = M_PlannedSpans.Num() * GetPieceLength();
+	Content.Stats.Add({NSLOCTEXT("PlacementPanel", "WireLengthLabel", "Length"),
+		FText::FromString(FString::Printf(TEXT("%.0f / %.0f m (%d pieces)"), LengthCm / CentimetresPerMetre,
+		                                  MaximumLineLength / CentimetresPerMetre, M_PlannedSpans.Num())), false});
+	if (not M_CostPerMetre.IsEmpty())
+	{
+		Content.Stats.Add({NSLOCTEXT("PlacementPanel", "WireCostLabel", "Cost while strung"), MakeCostText(), false});
+	}
+	Content.Stats.Add({NSLOCTEXT("PlacementPanel", "WireJoinLabel", "Wire end"),
+		bIsJoined
+			? NSLOCTEXT("PlacementPanel", "WireJoined", "Joined")
+			: NSLOCTEXT("PlacementPanel", "WireNotJoined", "Move near an open wire end"), false});
+	Content.KeyHints.Add({{NSLOCTEXT("PlacementPanel", "PrimaryKey", "LMB")},
+		bIsDrawing
+			? NSLOCTEXT("PlacementPanel", "WireFinishAction", "Finish")
+			: NSLOCTEXT("PlacementPanel", "WireStartAction", "Set start")});
+	Content.KeyHints.Add({{NSLOCTEXT("PlacementPanel", "SecondaryKey", "RMB")},
+		NSLOCTEXT("PlacementPanel", "CancelAction", "Cancel")});
+	return Content;
+}
+
+FText UBarbedWirePlacementComponent::MakeCostText() const
+{
+	// Every piece pays for its own length when it is strung, rounded per piece as ARTSBarbedWireLine charges it.
+	const TMap<ERTSResourceType, int32> PieceCost = ARTSBarbedWireLine::GetCostOfLength(M_CostPerMetre, GetPieceLength());
+	TArray<FString> CostParts;
+	for (const TPair<ERTSResourceType, int32>& Cost : PieceCost)
+	{
+		CostParts.Add(FString::Printf(TEXT("%d %s"), Cost.Value * M_PlannedSpans.Num(),
+		                              *Global_GetResourceTypeDisplayString(Cost.Key)));
+	}
+	return FText::FromString(FString::Join(CostParts, TEXT(", ")));
+}
+
+void UBarbedWirePlacementComponent::HidePlacementPanel() const
+{
+	if (UW_PlacementPanel* PlacementPanel = GetPlacementPanel())
+	{
+		PlacementPanel->HidePanel();
+	}
 }

@@ -14,6 +14,14 @@ class UFieldTrenchPlacementComponent;
 struct FFieldTrenchPiecePlacement;
 class ACPPController;
 class ANomadicVehicle;
+
+/** Per-frame placement panel samples of UFieldDefenseTestSubsystem, reported with the next panel check. */
+struct FFieldDefenseTestPanelSamples
+{
+	int32 FramesSampled = 0;
+	int32 FramesCovering = 0;
+	FString FirstCoveringDetails;
+};
 class AStaticPreviewMesh;
 class URTSRequirement;
 class UTrainerComponent;
@@ -132,6 +140,28 @@ private:
 	int32 M_QueuedBeforeMouse = 0;
 
 	void Check(const bool bCondition, const FString& Description, const FString& Details = FString());
+
+	/**
+	 * @brief Checks that the placement panel shows and stays off the screen rectangle of what is being placed.
+	 * Skipped (logged) when nothing could be projected, as in a run without a viewport.
+	 * @param Controller The player controller whose construction preview owns the panel.
+	 * @param Context Suffix of the check names (preview, trench).
+	 */
+	void CheckPlacementPanelClear(const ACPPController& Controller, const FString& Context);
+
+	/** @brief Counts this frame's placement panel against what it keeps clear of; CheckPlacementPanelClear reports. */
+	void SamplePlacementPanel(const ACPPController& Controller);
+
+	// Frames sampled by SamplePlacementPanel since the last CheckPlacementPanelClear.
+	FFieldDefenseTestPanelSamples M_PlacementPanelSamples;
+
+	// -FieldDefenseCapture: when the mouse-phase preview reached its spot and its picture was asked for; the click
+	// waits a moment so the picture shows the preview and its placement panel, not the placed pit.
+	float M_PreviewCaptureSeconds = -1.f;
+
+	/** @brief Logs what lies along a trench run straight out of the anchor, for a plan that came out empty. */
+	void LogTrenchPathObstacles(const UFieldTrenchAnchorComponent& AnchorComponent, const int32 AnchorIndex,
+	                            const FString& Label) const;
 
 	// -FieldDefenseCapture=<folder>: screenshots (with UI) of the key moments, for a run in a visible window.
 	FString M_CaptureDirectory;

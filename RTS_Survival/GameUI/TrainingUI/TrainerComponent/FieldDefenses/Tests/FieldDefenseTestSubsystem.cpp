@@ -30,6 +30,8 @@
 #include "RTS_Survival/Player/CPPController.h"
 #include "RTS_Survival/Player/ConstructionPreview/CPPConstructionPreview.h"
 #include "RTS_Survival/Player/ConstructionPreview/StaticMeshPreview/StaticPreviewMesh.h"
+#include "RTS_Survival/Player/ConstructionPreview/PlacementPanel/W_PlacementPanel.h"
+#include "Blueprint/WidgetLayoutLibrary.h"
 #include "RTS_Survival/Player/AsyncRTSAssetsSpawner/RTSAsyncSpawner.h"
 #include "RTS_Survival/GameUI/TrainingUI/TrainingUIWidget/W_TrainingItem.h"
 #include "Blueprint/WidgetBlueprintLibrary.h"
@@ -1090,12 +1092,29 @@ void UFieldDefenseTestSubsystem::TickPlacingWithMouse()
 				M_PhaseMarkSeconds = Now;
 			}
 			const bool bOnScreen = MoveViewportCursorTo(M_PhaseSpot);
+			SamplePlacementPanel(*Controller);
 			const FVector PreviewLocation = Controller->CPPConstructionPreviewRef->GetFieldDefensePlacementLocation();
 			const bool bPreviewOnSpot = FVector::Dist2D(PreviewLocation, M_PhaseSpot) <= CursorToPreviewTolerance
 				&& not Controller->CPPConstructionPreviewRef->GetIsBuildingPreviewBlocked();
 			if (not bPreviewOnSpot && Now - M_PhaseMarkSeconds < CursorSettleSeconds)
 			{
 				return;
+			}
+			if (not M_CaptureDirectory.IsEmpty() && bPreviewOnSpot)
+			{
+				// A picture of the preview under the cursor with its placement panel, taken before the click.
+				constexpr float PreviewCaptureWaitSeconds = 0.3f;
+				if (M_PreviewCaptureSeconds < 0.f)
+				{
+					constexpr bool bFocusCameraForPicture = false;
+					ScheduleCapture(TEXT("5a_preview_with_placement_panel"), M_PhaseSpot, 0.f, bFocusCameraForPicture);
+					M_PreviewCaptureSeconds = Now;
+					return;
+				}
+				if (Now - M_PreviewCaptureSeconds < PreviewCaptureWaitSeconds)
+				{
+					return;
+				}
 			}
 			Check(bOnScreen, TEXT("mouse_spot_on_screen"), M_CursorAbsolutePosition.ToString());
 			// The camera must not move while the cursor aims at the screen.
@@ -1104,6 +1123,7 @@ void UFieldDefenseTestSubsystem::TickPlacingWithMouse()
 			Check(bPreviewOnSpot, TEXT("preview_follows_viewport_cursor"),
 			      FString::Printf(TEXT("preview=%s spot=%s after=%.2fs"), *PreviewLocation.ToString(),
 			                      *M_PhaseSpot.ToString(), Now - M_PhaseMarkSeconds));
+			CheckPlacementPanelClear(*Controller, TEXT("preview"));
 			// Press now and release on the next frame, as a player's click reaches the input stack.
 			SendViewportLeftButton(true);
 			M_PhaseStep = 3;
@@ -1161,6 +1181,102 @@ void UFieldDefenseTestSubsystem::TickPlacingWithMouse()
 		EnterPhase(EFieldDefenseTestPhase::PlanningAhead, UnitTrainingTimeoutSeconds);
 		return;
 	}
+}
+
+void UFieldDefenseTestSubsystem::LogTrenchPathObstacles(const UFieldTrenchAnchorComponent& AnchorComponent,
+                                                        const int32 AnchorIndex, const FString& Label) const
+{
+	// Every metre out of the anchor: what the trench's ground trace (landscape channel, owner ignored) lands on,
+	// and how far from the HQ that is, so an unbuildable plan says whether the slope or the build radius refused it.
+	constexpr float StepCm = 100.f;
+	constexpr int32 StepCount = 10;
+	constexpr float TraceHalfHeight = 5000.f;
+	const FFieldTrenchOpenPort& Port = AnchorComponent.GetAnchorPort(AnchorIndex);
+	const FVector2D Out(FMath::Cos(FMath::DegreesToRadians(Port.Yaw)), FMath::Sin(FMath::DegreesToRadians(Port.Yaw)));
+	const float AnchorHeight = AnchorComponent.GetAnchorLocation(AnchorIndex).Z;
+	const ANomadicVehicle* HQ = M_HQ.Get();
+	FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(FieldDefenseTestTrenchObstacles), false, AnchorComponent.GetOwner());
+	for (int32 StepIndex = 0; StepIndex <= StepCount; ++StepIndex)
+	{
+		const FVector2D Point = Port.Location + Out * (StepIndex * StepCm);
+		FHitResult Hit;
+		const bool bHit = GetWorld()->LineTraceSingleByChannel(Hit, FVector(Point, AnchorHeight + TraceHalfHeight),
+		                                                       FVector(Point, AnchorHeight - TraceHalfHeight),
+		                                                       COLLISION_TRACE_LANDSCAPE, QueryParams);
+		UE_LOG(LogRTSFieldDefenseTest, Display,
+		       TEXT("RTS_FIELD_DEFENSE_TEST INFO trench_path %s at=%dcm ground_dz=%.0f hit=%s normal_z=%.2f hq_dist=%.0f"),
+		       *Label, FMath::RoundToInt(StepIndex * StepCm), bHit ? Hit.ImpactPoint.Z - AnchorHeight : 0.f,
+		       bHit ? *GetNameSafe(Hit.GetActor()) : TEXT("none"), bHit ? Hit.ImpactNormal.Z : 0.f,
+		       IsValid(HQ) ? FVector2D::Distance(Point, FVector2D(HQ->GetActorLocation())) : -1.f);
+	}
+}
+
+void UFieldDefenseTestSubsystem::CheckPlacementPanelClear(const ACPPController& Controller, const FString& Context)
+{
+	const ACPPConstructionPreview* Preview = Controller.CPPConstructionPreviewRef;
+	const UW_PlacementPanel* Panel = IsValid(Preview) ? Preview->GetPlacementPanel() : nullptr;
+	Check(IsValid(Panel) && Panel->GetIsPanelShown(), TEXT("placement_panel_shown_") + Context);
+	if (not IsValid(Panel))
+	{
+		return;
+	}
+	const FBox2D PlacedRect = Panel->GetLastAvoidScreenRect();
+	if (not PlacedRect.bIsValid)
+	{
+		UE_LOG(LogRTSFieldDefenseTest, Display,
+		       TEXT("RTS_FIELD_DEFENSE_TEST SKIP placement_panel_clear_of_%s reason=nothing projected (no viewport)"),
+		       *Context);
+		return;
+	}
+	const float ViewportScale = UWidgetLayoutLibrary::GetViewportScale(Panel);
+	const FVector2D ViewportSize = UWidgetLayoutLibrary::GetViewportSize(const_cast<UW_PlacementPanel*>(Panel)) /
+		FMath::Max(ViewportScale, KINDA_SMALL_NUMBER);
+	const FBox2D ScreenRect(FVector2D::ZeroVector, ViewportSize);
+	if (not PlacementPanelDocking::GetDoRectsOverlap(PlacedRect, ScreenRect))
+	{
+		// Off screen there is nothing to keep clear of; a pass here would prove nothing.
+		UE_LOG(LogRTSFieldDefenseTest, Display,
+		       TEXT("RTS_FIELD_DEFENSE_TEST SKIP placement_panel_clear_of_%s reason=placed object off screen placed=%s"),
+		       *Context, *PlacedRect.ToString());
+		return;
+	}
+	const FBox2D PanelRect = Panel->GetPanelScreenRect();
+	const FString Details = FString::Printf(TEXT("panel=%s placed=%s screen=%s"), *PanelRect.ToString(),
+	                                        *PlacedRect.ToString(), *ViewportSize.ToString());
+	Check(PanelRect.GetSize().X > 0.f && PanelRect.GetSize().Y > 0.f, TEXT("placement_panel_has_size_") + Context,
+	      Details);
+	Check(not PlacementPanelDocking::GetDoRectsOverlap(PanelRect, PlacedRect),
+	      TEXT("placement_panel_clear_of_") + Context, Details);
+	// Every frame the object moved on screen before this one, not only the last.
+	Check(M_PlacementPanelSamples.FramesSampled > 0 && M_PlacementPanelSamples.FramesCovering == 0,
+	      TEXT("placement_panel_clear_every_frame_") + Context,
+	      FString::Printf(TEXT("frames=%d covering=%d first_covering=%s"), M_PlacementPanelSamples.FramesSampled,
+	                      M_PlacementPanelSamples.FramesCovering, *M_PlacementPanelSamples.FirstCoveringDetails));
+	M_PlacementPanelSamples = FFieldDefenseTestPanelSamples();
+}
+
+void UFieldDefenseTestSubsystem::SamplePlacementPanel(const ACPPController& Controller)
+{
+	const ACPPConstructionPreview* Preview = Controller.CPPConstructionPreviewRef;
+	const UW_PlacementPanel* Panel = IsValid(Preview) ? Preview->GetPlacementPanel() : nullptr;
+	if (not IsValid(Panel) || not Panel->GetIsPanelShown() || not Panel->GetLastAvoidScreenRect().bIsValid)
+	{
+		return;
+	}
+	// Both rectangles come from the same docking, in the owner's tick of this frame.
+	const FBox2D PlacedRect = Panel->GetLastAvoidScreenRect();
+	const FBox2D PanelRect = Panel->GetPanelScreenRect();
+	++M_PlacementPanelSamples.FramesSampled;
+	if (not PlacementPanelDocking::GetDoRectsOverlap(PanelRect, PlacedRect))
+	{
+		return;
+	}
+	if (M_PlacementPanelSamples.FramesCovering == 0)
+	{
+		M_PlacementPanelSamples.FirstCoveringDetails = FString::Printf(TEXT("panel=%s placed=%s"),
+		                                                               *PanelRect.ToString(), *PlacedRect.ToString());
+	}
+	++M_PlacementPanelSamples.FramesCovering;
 }
 
 bool UFieldDefenseTestSubsystem::GetIsCursorOwnedByVisibleWindow()
@@ -1709,6 +1825,8 @@ void UFieldDefenseTestSubsystem::TickLayingTrench()
 		{
 			M_TrenchPath = MakePath(HQ->GetActorRotation().Yaw);
 			M_TrenchCursorDistance = 0.f;
+			// The trench is on screen while it is drawn, as for a player, so the placement panel check sees it.
+			Controller->FocusCameraOnLocation(GetPointAlongPath(M_TrenchPath, GetPathLength(M_TrenchPath) * 0.5f));
 			// The mouse is on the start before the trench is picked, so the short trench shows from the start.
 			Placement->MapTest_SetCursorOverride(M_TrenchPath[0]);
 			const bool bClicked = ClickTrainingItemWidget(FieldTrenchOption, true);
@@ -1736,7 +1854,17 @@ void UFieldDefenseTestSubsystem::TickLayingTrench()
 	case 2:
 		{
 			// The trench follows the cursor along the path, a step every frame.
+			SamplePlacementPanel(*Controller);
+			const float HalfPathLength = GetPathLength(M_TrenchPath) * 0.5f;
+			const bool bWasBeforeHalf = M_TrenchCursorDistance < HalfPathLength;
 			M_TrenchCursorDistance = FMath::Min(M_TrenchCursorDistance + TrenchCursorStep, GetPathLength(M_TrenchPath));
+			if (bWasBeforeHalf && M_TrenchCursorDistance >= HalfPathLength)
+			{
+				// Halfway the trench is still being drawn: the placement panel shows beside it.
+				constexpr bool bFocusCamera = false;
+				ScheduleCapture(TEXT("7_trench_drawn_with_placement_panel"),
+				                GetPointAlongPath(M_TrenchPath, M_TrenchCursorDistance), 0.f, bFocusCamera);
+			}
 			Placement->MapTest_SetCursorOverride(GetPointAlongPath(M_TrenchPath, M_TrenchCursorDistance));
 			if (M_TrenchCursorDistance >= GetPathLength(M_TrenchPath))
 			{
@@ -1764,6 +1892,7 @@ void UFieldDefenseTestSubsystem::TickLayingTrench()
 					.FindRef(ERTSResourceType::Resource_Radixite);
 			}
 			M_RadixiteBeforeTrench = GetResourceAmount(ERTSResourceType::Resource_Radixite);
+			CheckPlacementPanelClear(*Controller, TEXT("trench"));
 			const bool bConfirmed = Controller->MapTest_ClickFieldTrenchAt(M_TrenchPath.Last());
 			M_TestTrench = Placement->MapTest_GetLastConfirmedTrench();
 			Check(bConfirmed && M_TestTrench.IsValid() && not Placement->GetIsPlacing(),
@@ -2167,6 +2296,13 @@ void UFieldDefenseTestSubsystem::TickLayingAnchoredTrench()
 			Check(bCapped, TEXT("lost_pit_caps_the_joined_end"),
 			      FString::Printf(TEXT("pieces=%d before=%d"), IsValid(Trench) ? Trench->GetPieceCount() : -1,
 			                      M_TrenchPieceCountBeforePitLoss));
+			// The bunkers stand where the pit stood, facing the HQ. Since the kit was widened (2026-11-09) the pit's
+			// capped trench runs right across the Flak 88 bunker's door anchor, and a trench is never laid over
+			// another one; it has been checked, so it goes.
+			if (ARTSFieldTrench* CappedTrench = M_TestTrench.Get())
+			{
+				CappedTrench->Destroy();
+			}
 			SpawnTestBunkers();
 			M_PhaseMarkSeconds = GetWorld()->GetTimeSeconds();
 			++M_PhaseStep;
@@ -2228,6 +2364,10 @@ void UFieldDefenseTestSubsystem::TickLayingAnchoredTrench()
 			Check(Placement->MapTest_GetPlanAnchor() == BunkerAnchor, TEXT("bunker_click_snaps_start"), Label);
 			CheckPlanStartsOnAnchor(BunkerAnchor, Placement->MapTest_GetPlannedPieces(),
 			                        TEXT("bunker_plan_leaves_the_anchor ") + Label);
+			if (Placement->MapTest_GetPlannedPieces().IsEmpty() && IsValid(AnchorComponent))
+			{
+				LogTrenchPathObstacles(*AnchorComponent, BunkerAnchor.AnchorIndex, Label);
+			}
 			(void)Controller->MapTest_ClickFieldTrenchAt(M_TrenchPath.Last());
 			M_BunkerTrenches.Add(Placement->MapTest_GetLastConfirmedTrench());
 			Placement->MapTest_SetCursorOverride(TOptional<FVector>());

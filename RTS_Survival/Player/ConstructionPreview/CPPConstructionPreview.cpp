@@ -9,6 +9,10 @@
 #include "PreviewToGridHelpers/PreviewToGridHelpers.h"
 #include "RTS_Survival/Player/ConstructionPreview/BuildingGridOverlay/BuildingGridOverlay.h"
 #include "PreviewWidget/W_PreviewStats.h"
+#include "PlacementPanel/W_PlacementPanel.h"
+#include "EnhancedInputSubsystems.h"
+#include "InputAction.h"
+#include "Engine/LocalPlayer.h"
 #include "RTS_Survival/Player/CPPController.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "StaticMeshPreview/StaticPreviewMesh.h"
@@ -219,6 +223,10 @@ void ACPPConstructionPreview::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	Super::EndPlay(EndPlayReason);
 	DestroySocketWidgets();
+	if (IsValid(M_PlacementPanel))
+	{
+		M_PlacementPanel->RemoveFromParent();
+	}
 }
 
 
@@ -393,9 +401,12 @@ void ACPPConstructionPreview::InitConstructionPreview(
 	{
 		M_ConstructionPreviewMaterial = ConstructionMaterial;
 		M_PreviewStatsWidget = PreviewStatsWidget;
-		M_PreviewStatsWidget->SetVisibility(ESlateVisibility::Hidden);
+		M_PreviewStatsWidget->SetVisibility(ESlateVisibility::Collapsed);
 		PreviewStatsWidget->InitW_PreviewStats();
 		M_PreviewStatsWidgetComponent = PreviewStatsWidgetComponent;
+		// Replaced by the screen-space placement panel: a widget above the mesh covered it on the top-down camera.
+		M_PreviewStatsWidgetComponent->SetHiddenInGame(true);
+		M_PreviewStatsWidgetComponent->SetVisibility(false);
 	}
 	else
 	{
@@ -407,6 +418,7 @@ void ACPPConstructionPreview::InitConstructionPreview(
 	// Initialize the pool of dynamic material instances
 	InitializeDynamicMaterialPool(ConstructionMaterial);
 	CreateGridOverlay();
+	CreatePlacementPanel();
 }
 
 
@@ -433,8 +445,8 @@ void ACPPConstructionPreview::Tick(float DetlaTime)
 			RTSFunctionLibrary::PrintString("location outside of view", FColor::Red);
 		}
 		bM_IsValidBuildingLocation = false;
-		// Update camera orientation but make clear that the position is not valid.
-		UpdatePreviewStatsWidget(bIsSlopeValid);
+		M_PlacementIssue = EConstructionPlacementIssue::NoGroundUnderCursor;
+		UpdatePlacementPanel(DetlaTime);
 		return;
 	}
 	switch (M_ActivePreviewStatus)
@@ -462,7 +474,8 @@ void ACPPConstructionPreview::Tick(float DetlaTime)
 	}
 	// Update materials depending on whether we can place the preview.
 	UpdatePreviewMaterial(bM_IsValidBuildingLocation);
-	UpdatePreviewStatsWidget(bIsSlopeValid);
+	UpdateSocketMarkerVisibility();
+	UpdatePlacementPanel(DetlaTime);
 }
 
 
@@ -578,8 +591,11 @@ bool ACPPConstructionPreview::TickRadiiBuildingPlacement(bool& bOutHasValidIncli
 	// Check if the slope is valid for the current cursor position.
 	// Makes sure the landscape blocks visibility traces!
 	bOutHasValidIncline = IsSlopeValid(CursorWorldPosition);
-
-	if (not bOutHasValidIncline || IsOverlayFootprintOverlapping() || not GetisWithinBuildRadii(CursorWorldPosition))
+	// Every check runs (no short circuit) so the placement panel shows the current distance and names the issue.
+	const bool bIsOverlapping = IsOverlayFootprintOverlapping();
+	const bool bIsWithinBuildRadii = GetisWithinBuildRadii(CursorWorldPosition);
+	M_PlacementIssue = GetPlacementIssue(bIsWithinBuildRadii, bIsOverlapping, bOutHasValidIncline);
+	if (M_PlacementIssue != EConstructionPlacementIssue::None)
 	{
 		// Invalid location due to slope or overlap.
 		if constexpr (DeveloperSettings::Debugging::GConstruction_Preview_Compile_DebugSymbols)
@@ -605,7 +621,10 @@ bool ACPPConstructionPreview::TickFieldConstructionPlacement(bool& bOutHasValidI
 	bOutHasValidIncline = true;
 	M_SlopeAngle = 0.0f;
 
-	if (IsOverlayFootprintOverlapping() || not GetisWithinBuildRadii(CursorWorldPosition))
+	const bool bIsOverlapping = IsOverlayFootprintOverlapping();
+	const bool bIsWithinBuildRadii = GetisWithinBuildRadii(CursorWorldPosition);
+	M_PlacementIssue = GetPlacementIssue(bIsWithinBuildRadii, bIsOverlapping, bOutHasValidIncline);
+	if (M_PlacementIssue != EConstructionPlacementIssue::None)
 	{
 		if constexpr (DeveloperSettings::Debugging::GConstruction_Preview_Compile_DebugSymbols)
 		{
@@ -627,9 +646,10 @@ bool ACPPConstructionPreview::TickFieldDefensePlacement(bool& bOutHasValidInclin
 	UpdateOverlayGridOverlaps();
 
 	bOutHasValidIncline = IsFieldDefenseInclineValid();
-	const bool bIsValidPlacement = bOutHasValidIncline
-		&& not IsOverlayFootprintOverlapping()
-		&& GetisWithinBuildRadii(GetActorLocation());
+	const bool bIsOverlapping = IsOverlayFootprintOverlapping();
+	const bool bIsWithinBuildRadii = GetisWithinBuildRadii(GetActorLocation());
+	M_PlacementIssue = GetPlacementIssue(bIsWithinBuildRadii, bIsOverlapping, bOutHasValidIncline);
+	const bool bIsValidPlacement = M_PlacementIssue == EConstructionPlacementIssue::None;
 	if constexpr (DeveloperSettings::Debugging::GConstruction_Preview_Compile_DebugSymbols)
 	{
 		if (not bIsValidPlacement)
@@ -808,16 +828,15 @@ bool ACPPConstructionPreview::TickSocketBxpBuildingPlacement(bool& bOutHasValidI
 	if (not bIsValidLocation)
 	{
 		RTSFunctionLibrary::PrintString("Cannot snap location", FColor::Red);
+		M_PlacementIssue = EConstructionPlacementIssue::NoAttachPoint;
 		return false;
 	}
 	SetActorLocation(PlacementLocation);
 	SetActorRotation(SocketRotation);
-	if (not BxpConstructionData.GetUseCollision())
-	{
-		return true;
-	}
+	const bool bIsOverlapping = BxpConstructionData.GetUseCollision() && IsOverlayFootprintOverlapping();
+	M_PlacementIssue = bIsOverlapping ? EConstructionPlacementIssue::Blocked : EConstructionPlacementIssue::None;
 	// If no overlaps we can place the bxp.
-	return not IsOverlayFootprintOverlapping();
+	return not bIsOverlapping;
 }
 
 bool ACPPConstructionPreview::TickAtBuildingOriginBxpPlacement(bool& bOutHasValidIncline)
@@ -830,8 +849,10 @@ bool ACPPConstructionPreview::TickAtBuildingOriginBxpPlacement(bool& bOutHasVali
 	if (not bIsValidLocation)
 	{
 		RTSFunctionLibrary::PrintString("Cannot snap location to building origin", FColor::Red);
+		M_PlacementIssue = EConstructionPlacementIssue::NoAttachPoint;
 		return false;
 	}
+	M_PlacementIssue = EConstructionPlacementIssue::None;
 	SetActorLocation(PlacementLocation);
 	// Origin expansions turn with their building mesh (yaw only); the truck actor's yaw can differ by a degree or two.
 	if (const UStaticMeshComponent* AttachToMesh = BxpConstructionData.GetAttachToMesh())
@@ -1124,11 +1145,12 @@ void ACPPConstructionPreview::InitPreviewAndStatWidgetForConstruction(
 	FRTS_CollisionSetup::SetupStaticBuildingPreviewCollision(PreviewMesh, bPreviewUseCollision);
 	// This starts the tick function to check for valid placement.
 	M_ActivePreviewStatus = PreviewMode;
-	if (EnsureIsValidPreviewStatsWidget())
+	M_PlacementIssue = EConstructionPlacementIssue::None;
+	RefreshRotateKeyTexts();
+	if (GetIsValidPlacementPanel())
 	{
-		M_PreviewStatsWidget->SetVisibility(ESlateVisibility::Visible);
+		M_PlacementPanel->ShowPanel();
 	}
-	MoveWidgetToMeshHeight();
 
 	// Apply a dynamic material from the pool to each material slot.
 	for (int i = 0; i < PreviewMesh->GetNumMaterials(); ++i)
@@ -1362,7 +1384,10 @@ void ACPPConstructionPreview::StopBuildingPreview(const bool bIsPlacedSuccessful
 		M_ActivePreviewStatus = EConstructionPreviewMode::Construct_None;
 		// Reset rotation.
 		PreviewMesh->SetWorldRotation(FRotator::ZeroRotator);
-		M_PreviewStatsWidget->SetVisibility(ESlateVisibility::Hidden);
+	}
+	if (GetIsValidPlacementPanel())
+	{
+		M_PlacementPanel->HidePanel();
 	}
 	if (GetIsValidExpansionRadiusHelper())
 	{
@@ -1373,55 +1398,6 @@ void ACPPConstructionPreview::StopBuildingPreview(const bool bIsPlacedSuccessful
 	{
 		M_PreviewSounds.PlayConstructionSound(this, EConstructionPreviewSoundType::Placement);
 	}
-}
-
-
-void ACPPConstructionPreview::UpdatePreviewStatsWidget(const bool bIsInclineValid) const
-{
-	if (not EnsureIsValidPreviewStatsWidgetComponent() || not GetHasActivePreview())
-	{
-		return;
-	}
-	// RotatePreviewStatsToCamera();
-	const float Degrees = PreviewMesh->GetComponentRotation().Yaw;
-
-	const float Distance = M_DistanceToClosestRadius;
-	const float MaxDistance = M_MaXDistanceToClosestRadius;
-	const bool ShowDistance = M_BuildRadii.Num() > 0;
-	const bool bNoValidBuildRadii = bM_NeedWithinBuildRadius && M_BuildRadii.Num() == 0;
-
-	// Will not display any info on overlaps or distances, only confirm placement.
-	const bool ConfirmPlacementOnly = M_ActivePreviewStatus == EConstructionPreviewMode::Construct_BxpOrigin ||
-		M_ActivePreviewStatus == EConstructionPreviewMode::Construct_BxpSocket;
-
-	M_PreviewStatsWidget->UpdateInformation(
-		Degrees,
-		M_SlopeAngle,
-		bIsInclineValid,
-		ShowDistance,
-		Distance,
-		MaxDistance,
-		bNoValidBuildRadii,
-		ConfirmPlacementOnly
-	);
-}
-
-
-void ACPPConstructionPreview::RotatePreviewStatsToCamera() const
-{
-	if (not GetIsValidPlayerController())
-	{
-		return;
-	}
-	if (not IsValid(PlayerController->CameraRef))
-	{
-		return;
-	}
-	const FRotator NewRotation = UKismetMathLibrary::FindLookAtRotation(
-		M_PreviewStatsWidgetComponent->GetComponentLocation(),
-		PlayerController->CameraRef->GetCameraComponent()->GetComponentLocation());
-	// Apply the calculated rotation to the widget component
-	M_PreviewStatsWidgetComponent->SetWorldRotation(NewRotation);
 }
 
 
@@ -1555,25 +1531,6 @@ void ACPPConstructionPreview::UpdatePreviewMaterial(bool bIsValidLocation)
 	}
 }
 
-void ACPPConstructionPreview::MoveWidgetToMeshHeight() const
-{
-	if (not EnsureIsValidPreviewMesh()
-		|| not EnsureIsValidPreviewStaticMesh()
-		|| not EnsureIsValidPreviewStatsWidgetComponent())
-	{
-		return;
-	}
-	// Calculate the position for the widget to be 100 units above the mesh.
-	FVector MeshBoundsOrigin, MeshBoundsExtent;
-	PreviewMesh->GetStaticMesh()->GetBounds().GetBox().GetCenterAndExtents(MeshBoundsOrigin,
-	                                                                       MeshBoundsExtent);
-	const float WidgetHeightAboveMesh = MeshBoundsExtent.Z + 300.0f;
-	const FVector WidgetWorldPosition = PreviewMesh->GetComponentLocation() +
-		FVector(0.0f, 0.0f, WidgetHeightAboveMesh);
-	M_PreviewStatsWidgetComponent->SetWorldLocation(WidgetWorldPosition);
-}
-
-
 void ACPPConstructionPreview::RotatePreviewClockwise() const
 {
 	if (not EnsureIsValidPreviewMesh() || not GetHasActivePreview() || not GetIsRotationAllowed())
@@ -1659,30 +1616,6 @@ bool ACPPConstructionPreview::EnsureIsValidPreviewStaticMesh() const
 	return true;
 }
 
-bool ACPPConstructionPreview::EnsureIsValidPreviewStatsWidget() const
-{
-	if (not IsValid(M_PreviewStatsWidget))
-	{
-		RTSFunctionLibrary::ReportNullErrorComponent(this,
-		                                             "M_PreviewStatsWidget",
-		                                             "ACPPConstructionPreview::EnsureIsValidPreviewStatsWidget");
-		return false;
-	}
-	return true;
-}
-
-bool ACPPConstructionPreview::EnsureIsValidPreviewStatsWidgetComponent() const
-{
-	if (not IsValid(M_PreviewStatsWidgetComponent))
-	{
-		RTSFunctionLibrary::ReportNullErrorComponent(this,
-		                                             "M_PreviewStatsWidgetComponent",
-		                                             "ACPPConstructionPreview::EnsureIsValidPreviewStatsWidgetComponent");
-		return false;
-	}
-	return true;
-}
-
 void ACPPConstructionPreview::UpdateOverlayGridOverlaps()
 {
 	if (not EnsureIsValidGridOverlay() || not EnsureIsValidPreviewMesh())
@@ -1743,4 +1676,233 @@ float ACPPConstructionPreview::GetRotationDegrees() const
 		DeltaYaw = FieldConstructionData.DeltaDegreeOnPreviewRotation;
 	}
 	return DeltaYaw;
+}
+
+bool ACPPConstructionPreview::GetIsValidPlacementPanel() const
+{
+	if (IsValid(M_PlacementPanel))
+	{
+		return true;
+	}
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, "M_PlacementPanel", "GetIsValidPlacementPanel", this);
+	return false;
+}
+
+void ACPPConstructionPreview::CreatePlacementPanel()
+{
+	if (IsValid(M_PlacementPanel) || not GetIsValidPlayerController())
+	{
+		return;
+	}
+	M_PlacementPanel = CreateWidget<UW_PlacementPanel>(PlayerController, UW_PlacementPanel::StaticClass());
+	if (not IsValid(M_PlacementPanel))
+	{
+		RTSFunctionLibrary::ReportError("Could not create the placement panel."
+			"\n at function ACPPConstructionPreview::CreatePlacementPanel");
+	}
+}
+
+void ACPPConstructionPreview::RefreshRotateKeyTexts()
+{
+	static const TCHAR* const RotateActionPaths[] = {
+		TEXT("/Game/RTS_Survival/Blueprints/Player/Input/Actions/Construction/IA_RotateLeft.IA_RotateLeft"),
+		TEXT("/Game/RTS_Survival/Blueprints/Player/Input/Actions/Construction/IA_RotateRight.IA_RotateRight")
+	};
+	// IMC_RTSDefault binds comma and period, the keys printed ", <" and ". >". A comma or full stop is a dot on a
+	// key cap, so those two show as < and >, which also read as turning left and right. Also used when the
+	// mappings cannot be read.
+	static const TCHAR* const DefaultRotateKeys[] = {TEXT("<"), TEXT(">")};
+	const auto GetKeyCapText = [](const FKey& Key) -> FText
+	{
+		if (Key == EKeys::Comma || Key == EKeys::Period)
+		{
+			return FText::FromString(Key == EKeys::Comma ? DefaultRotateKeys[0] : DefaultRotateKeys[1]);
+		}
+		return Key.GetDisplayName(/*bLongDisplayName=*/ false);
+	};
+	const ULocalPlayer* const LocalPlayer = GetIsValidPlayerController() ? PlayerController->GetLocalPlayer() : nullptr;
+	const UEnhancedInputLocalPlayerSubsystem* const InputSubsystem = IsValid(LocalPlayer)
+		? LocalPlayer->GetSubsystem<UEnhancedInputLocalPlayerSubsystem>()
+		: nullptr;
+	M_RotateKeyTexts.Reset();
+	for (int32 ActionIndex = 0; ActionIndex < static_cast<int32>(UE_ARRAY_COUNT(RotateActionPaths)); ++ActionIndex)
+	{
+		const UInputAction* const RotateAction = IsValid(InputSubsystem)
+			? LoadObject<UInputAction>(nullptr, RotateActionPaths[ActionIndex])
+			: nullptr;
+		const TArray<FKey> BoundKeys = IsValid(RotateAction)
+			? InputSubsystem->QueryKeysMappedToAction(RotateAction)
+			: TArray<FKey>();
+		M_RotateKeyTexts.Add(BoundKeys.IsEmpty()
+			                     ? FText::FromString(DefaultRotateKeys[ActionIndex])
+			                     : GetKeyCapText(BoundKeys[0]));
+	}
+}
+
+void ACPPConstructionPreview::UpdatePlacementPanel(const float DeltaTime) const
+{
+	if (not GetHasActivePreview() || not GetIsValidPlacementPanel())
+	{
+		return;
+	}
+	// Every tick, not only when the preview starts: another placement mode cancelled after this preview started
+	// (a trench, a wire line) hides the shared panel. ShowPanel does nothing while it already shows.
+	M_PlacementPanel->ShowPanel();
+	M_PlacementPanel->SetContent(MakePlacementPanelContent());
+	// World bounds of the rotated preview; the panel docks beside their screen rectangle.
+	const bool bHasPreviewMesh = IsValid(PreviewMesh) && IsValid(PreviewMesh->GetStaticMesh());
+	M_PlacementPanel->UpdateDocking(bHasPreviewMesh ? PreviewMesh->Bounds.GetBox() : FBox(ForceInit), DeltaTime);
+}
+
+FPlacementPanelContent ACPPConstructionPreview::MakePlacementPanelContent() const
+{
+	FPlacementPanelContent Content;
+	Content.Title = GetPlacementPanelTitle();
+	Content.Status = M_PlacementIssue == EConstructionPlacementIssue::None
+		                 ? EPlacementPanelStatus::Ready
+		                 : EPlacementPanelStatus::Blocked;
+	Content.StatusText = GetPlacementIssueText();
+	AddPlacementPanelStats(Content.Stats);
+	Content.KeyHints.Add({{NSLOCTEXT("PlacementPanel", "PrimaryKey", "LMB")},
+		NSLOCTEXT("PlacementPanel", "PlaceAction", "Place")});
+	Content.KeyHints.Add({{NSLOCTEXT("PlacementPanel", "SecondaryKey", "RMB")},
+		NSLOCTEXT("PlacementPanel", "CancelAction", "Cancel")});
+	if (GetIsRotationAllowed())
+	{
+		Content.KeyHints.Add({M_RotateKeyTexts, NSLOCTEXT("PlacementPanel", "RotateAction", "Rotate")});
+	}
+	return Content;
+}
+
+FText ACPPConstructionPreview::GetPlacementPanelTitle() const
+{
+	switch (M_ActivePreviewStatus)
+	{
+	case EConstructionPreviewMode::Construct_None:
+		return FText::GetEmpty();
+	case EConstructionPreviewMode::Construct_NomadicPreview:
+		return NSLOCTEXT("PlacementPanel", "NomadicTitle", "DEPLOY BUILDING");
+	case EConstructionPreviewMode::Construct_BxpFree:
+		return NSLOCTEXT("PlacementPanel", "BxpFreeTitle", "PLACE EXPANSION");
+	case EConstructionPreviewMode::Construct_BxpSocket:
+		return NSLOCTEXT("PlacementPanel", "BxpSocketTitle", "ATTACH EXPANSION");
+	case EConstructionPreviewMode::Construct_BxpOrigin:
+		return NSLOCTEXT("PlacementPanel", "BxpOriginTitle", "BUILD EXPANSION");
+	case EConstructionPreviewMode::Construct_FieldConstruction:
+		return NSLOCTEXT("PlacementPanel", "FieldConstructionTitle", "FIELD CONSTRUCTION");
+	case EConstructionPreviewMode::Construct_FieldDefense:
+		return NSLOCTEXT("PlacementPanel", "FieldDefenseTitle", "PLAN FIELD DEFENSE");
+	}
+	return FText::GetEmpty();
+}
+
+FText ACPPConstructionPreview::GetPlacementIssueText() const
+{
+	switch (M_PlacementIssue)
+	{
+	case EConstructionPlacementIssue::None:
+		return NSLOCTEXT("PlacementPanel", "Ready", "Ready to place");
+	case EConstructionPlacementIssue::NoGroundUnderCursor:
+		return NSLOCTEXT("PlacementPanel", "NoGround", "Point at open ground");
+	case EConstructionPlacementIssue::NoBuildRadius:
+		return NSLOCTEXT("PlacementPanel", "NoBuildRadius", "No build radius: deploy your HQ first");
+	case EConstructionPlacementIssue::OutsideBuildRadius:
+		return NSLOCTEXT("PlacementPanel", "OutsideBuildRadius", "Outside the build radius");
+	case EConstructionPlacementIssue::Blocked:
+		return NSLOCTEXT("PlacementPanel", "Blocked", "Something is in the way");
+	case EConstructionPlacementIssue::TooSteep:
+		return NSLOCTEXT("PlacementPanel", "TooSteep", "Ground too steep");
+	case EConstructionPlacementIssue::NoAttachPoint:
+		return NSLOCTEXT("PlacementPanel", "NoAttachPoint", "No free spot on the building");
+	}
+	return FText::GetEmpty();
+}
+
+void ACPPConstructionPreview::AddPlacementPanelStats(TArray<FPlacementPanelStatRow>& OutStats) const
+{
+	constexpr float CentimetresPerMetre = 100.f;
+	constexpr int32 FullCircleDegrees = 360;
+	if (GetIsRotationAllowed() && IsValid(PreviewMesh))
+	{
+		const int32 YawDegrees = FMath::RoundToInt(FRotator::ClampAxis(PreviewMesh->GetComponentRotation().Yaw))
+			% FullCircleDegrees;
+		OutStats.Add({NSLOCTEXT("PlacementPanel", "RotationLabel", "Rotation"),
+			FText::FromString(FString::Printf(TEXT("%d°"), YawDegrees)), false});
+	}
+	if (GetDoesActivePreviewCheckIncline())
+	{
+		using DeveloperSettings::GamePlay::Construction::DegreesAllowedOnHill;
+		OutStats.Add({NSLOCTEXT("PlacementPanel", "InclineLabel", "Incline"),
+			FText::FromString(FString::Printf(TEXT("%.1f° / %.0f°"), M_SlopeAngle, DegreesAllowedOnHill)),
+			M_PlacementIssue == EConstructionPlacementIssue::TooSteep});
+	}
+	const bool bShowsBuildRadius = M_BuildRadii.Num() > 0
+		&& M_ActivePreviewStatus != EConstructionPreviewMode::Construct_BxpSocket
+		&& M_ActivePreviewStatus != EConstructionPreviewMode::Construct_BxpOrigin;
+	if (not bShowsBuildRadius)
+	{
+		return;
+	}
+	const float DistanceMetres = M_DistanceToClosestRadius / CentimetresPerMetre;
+	const float RadiusMetres = M_MaXDistanceToClosestRadius / CentimetresPerMetre;
+	const bool bIsOutside = M_PlacementIssue == EConstructionPlacementIssue::OutsideBuildRadius;
+	const FString RadiusValue = bIsOutside
+		                            ? FString::Printf(TEXT("%.0f m outside"), DistanceMetres - RadiusMetres)
+		                            : FString::Printf(TEXT("%.0f / %.0f m"), DistanceMetres, RadiusMetres);
+	OutStats.Add({NSLOCTEXT("PlacementPanel", "BuildRadiusLabel", "Build radius"),
+		FText::FromString(RadiusValue), bIsOutside});
+}
+
+bool ACPPConstructionPreview::GetDoesActivePreviewCheckIncline() const
+{
+	return M_ActivePreviewStatus == EConstructionPreviewMode::Construct_NomadicPreview
+		|| M_ActivePreviewStatus == EConstructionPreviewMode::Construct_BxpFree
+		|| M_ActivePreviewStatus == EConstructionPreviewMode::Construct_FieldDefense;
+}
+
+EConstructionPlacementIssue ACPPConstructionPreview::GetPlacementIssue(
+	const bool bIsWithinBuildRadii,
+	const bool bIsOverlapping,
+	const bool bHasValidIncline) const
+{
+	if (not bIsWithinBuildRadii)
+	{
+		const bool bHasNoRadiusAtAll = bM_NeedWithinBuildRadius && M_BuildRadii.Num() == 0;
+		return bHasNoRadiusAtAll
+			       ? EConstructionPlacementIssue::NoBuildRadius
+			       : EConstructionPlacementIssue::OutsideBuildRadius;
+	}
+	if (bIsOverlapping)
+	{
+		return EConstructionPlacementIssue::Blocked;
+	}
+	if (not bHasValidIncline)
+	{
+		return EConstructionPlacementIssue::TooSteep;
+	}
+	return EConstructionPlacementIssue::None;
+}
+
+void ACPPConstructionPreview::UpdateSocketMarkerVisibility() const
+{
+	const bool bIsSnappedToSocket = M_ActivePreviewStatus == EConstructionPreviewMode::Construct_BxpSocket
+		&& IsValid(M_SocketToSnapTo);
+	const FName SnappedSocketName = bIsSnappedToSocket ? M_SocketToSnapTo->SocketName : NAME_None;
+	for (UWidgetComponent* const SocketMarker : SocketWidgetComponents)
+	{
+		UUserWidget* const MarkerWidget = IsValid(SocketMarker) ? SocketMarker->GetUserWidgetObject() : nullptr;
+		if (not IsValid(MarkerWidget))
+		{
+			continue;
+		}
+		const bool bIsUnderPreview = bIsSnappedToSocket && SocketMarker->GetAttachSocketName() == SnappedSocketName;
+		// Markers never take clicks: the placement click lands on the world under them.
+		const ESlateVisibility WantedVisibility = bIsUnderPreview
+			                                          ? ESlateVisibility::Collapsed
+			                                          : ESlateVisibility::HitTestInvisible;
+		if (MarkerWidget->GetVisibility() != WantedVisibility)
+		{
+			MarkerWidget->SetVisibility(WantedVisibility);
+		}
+	}
 }

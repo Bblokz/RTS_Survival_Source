@@ -26,9 +26,28 @@
 
 class ABuildingGridOverlay;
 struct FBxpConstructionData;
+struct FPlacementPanelContent;
+struct FPlacementPanelStatRow;
 enum class EPlayerBuildingPreviewMode : uint8;
 class AConstructionRadiusHelper;
+class UW_PlacementPanel;
 class UW_PreviewStats;
+
+/** Why the construction preview refuses a click at its spot; the placement panel tells the player. */
+enum class EConstructionPlacementIssue : uint8
+{
+	None,
+	// The cursor is not over ground the preview can stand on (sky, outside the map).
+	NoGroundUnderCursor,
+	// The preview needs a build radius but the player has none.
+	NoBuildRadius,
+	OutsideBuildRadius,
+	// The footprint overlaps a unit, building or other obstacle.
+	Blocked,
+	TooSteep,
+	// Socket and origin expansions: there is no free spot on the host building to snap to.
+	NoAttachPoint
+};
 class RTS_SURVIVAL_API ACPPController;
 // Forward declarations.
 class RTS_SURVIVAL_API AStaticPreviewMesh;
@@ -177,6 +196,12 @@ public:
 	FRotator GetPreviewRotation() const;
 
 	UStaticMeshSocket* GetBxpSocketSnappingSnappedToSocket() const { return M_SocketToSnapTo; }
+
+	/**
+	 * @return The screen-space panel that describes the placement; the field trench placement shows its own content in
+	 * it as well. Null before InitConstructionPreview.
+	 */
+	UW_PlacementPanel* GetPlacementPanel() const { return M_PlacementPanel; }
 
 protected:
 	UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
@@ -335,27 +360,52 @@ private:
 	// The angle in degrees that the slope of the landscape has to the preview mesh.
 	float M_SlopeAngle;
 
-	// Widget that shows building instructions and current stats of the construction placement.
+	// The old world-space stats widget that floated above the preview and covered it on the top-down camera. The
+	// Blueprint still hands it over; it is kept hidden since the screen-space placement panel replaced it.
 	UPROPERTY()
 	UW_PreviewStats* M_PreviewStatsWidget;
 
-	// Reference to the stats widget as component.
+	// Reference to the old stats widget as component; hidden for good in InitConstructionPreview.
 	UPROPERTY()
 	UWidgetComponent* M_PreviewStatsWidgetComponent;
 
+	// Screen-space panel docked beside the preview's projected bounds, so it never covers the building.
+	UPROPERTY()
+	TObjectPtr<UW_PlacementPanel> M_PlacementPanel;
+
+	// Why the last tick refused the spot; None when a click places the preview.
+	EConstructionPlacementIssue M_PlacementIssue = EConstructionPlacementIssue::None;
+
+	// The keys bound to rotating a preview as key cap texts; read from the input mappings when a preview starts.
+	TArray<FText> M_RotateKeyTexts;
+
+	void RefreshRotateKeyTexts();
+
 	bool EnsureIsValidPreviewMesh() const;
 	bool EnsureIsValidPreviewStaticMesh() const;
-	bool EnsureIsValidPreviewStatsWidget() const;
-	bool EnsureIsValidPreviewStatsWidgetComponent() const;
+	bool GetIsValidPlacementPanel() const;
 	bool GetIsValidPlayerController() const;
 
-	/**
-	 * @brief Updates the preview widget with the data of the preview.
-	 * @param bIsInclineValid Whether the preview's incline results in valid placement.
-	 */
-	void UpdatePreviewStatsWidget(const bool bIsInclineValid) const;
+	void CreatePlacementPanel();
 
-	void RotatePreviewStatsToCamera() const;
+	/** @brief Shows the placement panel with this tick's verdict, numbers and keys, docked beside the preview. */
+	void UpdatePlacementPanel(const float DeltaTime) const;
+
+	FPlacementPanelContent MakePlacementPanelContent() const;
+	FText GetPlacementPanelTitle() const;
+	FText GetPlacementIssueText() const;
+	void AddPlacementPanelStats(TArray<FPlacementPanelStatRow>& OutStats) const;
+	bool GetDoesActivePreviewCheckIncline() const;
+
+	/**
+	 * @return The issue that refuses the spot, by what the player should fix first: radius, obstacles, then incline.
+	 * None when all checks pass.
+	 */
+	EConstructionPlacementIssue GetPlacementIssue(const bool bIsWithinBuildRadii, const bool bIsOverlapping,
+	                                              const bool bHasValidIncline) const;
+
+	/** @brief Hides the socket marker the preview is snapped to; the expansion preview stands on that spot. */
+	void UpdateSocketMarkerVisibility() const;
 
 	/** @return Whether the location is within the build radius of the host location. */
 	bool IsWithinBuildRadius(const FVector& Location) const;
@@ -401,9 +451,6 @@ private:
 	 * @param bIsValidLocation Whether the location is valid.
 	 */
 	void UpdatePreviewMaterial(const bool bIsValidLocation);
-
-	/** Moves the construction widget to the height of the preview mesh. */
-	void MoveWidgetToMeshHeight() const;
 
 	/**
 	 * @brief Sets the Cursor location.

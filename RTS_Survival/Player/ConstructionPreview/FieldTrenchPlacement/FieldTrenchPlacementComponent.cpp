@@ -10,6 +10,8 @@
 #include "RTS_Survival/DeveloperSettings.h"
 #include "RTS_Survival/GameUI/TrainingUI/TrainerComponent/TrainerComponent.h"
 #include "RTS_Survival/Player/CPPController.h"
+#include "RTS_Survival/Player/ConstructionPreview/CPPConstructionPreview.h"
+#include "RTS_Survival/Player/ConstructionPreview/PlacementPanel/W_PlacementPanel.h"
 #include "RTS_Survival/Player/PlayerError/PlayerError.h"
 #include "RTS_Survival/RTSComponents/RadiusComp/RadiusComp.h"
 
@@ -59,6 +61,7 @@ void UFieldTrenchPlacementComponent::StartPlacement(
 	SetComponentTickEnabled(true);
 	// Shown at once, not only from the next tick.
 	UpdateHover();
+	UpdatePlacementPanel(0.f);
 }
 
 bool UFieldTrenchPlacementComponent::OnPrimaryClick(const FVector& ClickedLocation)
@@ -136,12 +139,12 @@ void UFieldTrenchPlacementComponent::TickComponent(
 	if (M_Phase == EFieldTrenchPlacementPhase::Hovering)
 	{
 		UpdateHover();
-		return;
 	}
-	if (GetIsDrawing())
+	else if (GetIsDrawing())
 	{
 		UpdateDrawing();
 	}
+	UpdatePlacementPanel(DeltaTime);
 }
 
 ACPPController* UFieldTrenchPlacementComponent::GetPlayerController() const
@@ -504,6 +507,123 @@ void UFieldTrenchPlacementComponent::ResetPlacement()
 	M_StartAnchor.Reset();
 	M_EndAnchor.Reset();
 	M_LastPlanAnchor.Reset();
+	const bool bWasPlacing = M_Phase != EFieldTrenchPlacementPhase::Idle;
 	M_Phase = EFieldTrenchPlacementPhase::Idle;
 	SetComponentTickEnabled(false);
+	// Only the trench's own panel: an idle reset must not hide the panel of a building preview that is showing.
+	if (bWasPlacing)
+	{
+		HidePlacementPanel();
+	}
+}
+
+UW_PlacementPanel* UFieldTrenchPlacementComponent::GetPlacementPanel() const
+{
+	const ACPPController* PlayerController = GetPlayerController();
+	const ACPPConstructionPreview* ConstructionPreview = IsValid(PlayerController)
+		? PlayerController->CPPConstructionPreviewRef
+		: nullptr;
+	return IsValid(ConstructionPreview) ? ConstructionPreview->GetPlacementPanel() : nullptr;
+}
+
+void UFieldTrenchPlacementComponent::UpdatePlacementPanel(const float DeltaTime) const
+{
+	UW_PlacementPanel* PlacementPanel = GetPlacementPanel();
+	if (not IsValid(PlacementPanel) || not GetIsPlacing())
+	{
+		return;
+	}
+	PlacementPanel->ShowPanel();
+	PlacementPanel->SetContent(MakePlacementPanelContent());
+	// The whole drawn trench, so the panel docks beside it and never over the line being laid.
+	PlacementPanel->UpdateDocking(IsValid(M_PreviewTrench)
+		                              ? M_PreviewTrench->GetComponentsBoundingBox(/*bNonColliding=*/ true)
+		                              : FBox(ForceInit), DeltaTime);
+}
+
+FPlacementPanelContent UFieldTrenchPlacementComponent::MakePlacementPanelContent() const
+{
+	constexpr float CentimetresPerMetre = 100.f;
+	const bool bIsDrawing = M_Phase == EFieldTrenchPlacementPhase::Drawing;
+	const bool bCanBuildPlan = not M_PlannedPieces.IsEmpty();
+	const bool bIsJoinedToAnchor = M_LastPlanAnchor.IsSet();
+	FPlacementPanelContent Content;
+	Content.Title = NSLOCTEXT("PlacementPanel", "TrenchTitle", "DIG FIELD TRENCH");
+	if (not bCanBuildPlan)
+	{
+		Content.Status = EPlacementPanelStatus::Blocked;
+		Content.StatusText = NSLOCTEXT("PlacementPanel", "TrenchBlocked", "Can't dig here: too steep or outside the build radius");
+	}
+	else if (bIsDrawing)
+	{
+		Content.Status = EPlacementPanelStatus::Ready;
+		Content.StatusText = bIsJoinedToAnchor
+			                     ? NSLOCTEXT("PlacementPanel", "TrenchFinishJoined", "Click to finish, joined to the trench port")
+			                     : NSLOCTEXT("PlacementPanel", "TrenchFinish", "Click to finish the trench");
+	}
+	else
+	{
+		Content.Status = EPlacementPanelStatus::Info;
+		Content.StatusText = bIsJoinedToAnchor
+			                     ? NSLOCTEXT("PlacementPanel", "TrenchStartJoined", "Click to start at the trench port")
+			                     : NSLOCTEXT("PlacementPanel", "TrenchStart", "Click to set the start");
+	}
+	const float LengthCm = GetPlannedLengthCm();
+	Content.Stats.Add({NSLOCTEXT("PlacementPanel", "TrenchLengthLabel", "Length"),
+		FText::FromString(FString::Printf(TEXT("%.1f / %.0f m"), LengthCm / CentimetresPerMetre,
+		                                  MaximumTrenchLength / CentimetresPerMetre)), false});
+	if (not M_CostPerMetre.IsEmpty())
+	{
+		Content.Stats.Add({NSLOCTEXT("PlacementPanel", "TrenchCostLabel", "Cost while dug"), MakeCostText(),
+			false});
+	}
+	Content.Stats.Add({NSLOCTEXT("PlacementPanel", "TrenchJoinLabel", "Trench port"),
+		bIsJoinedToAnchor
+			? NSLOCTEXT("PlacementPanel", "TrenchJoined", "Joined")
+			: NSLOCTEXT("PlacementPanel", "TrenchNotJoined", "Move near a pit's port"), false});
+	Content.KeyHints.Add({{NSLOCTEXT("PlacementPanel", "PrimaryKey", "LMB")},
+		bIsDrawing
+			? NSLOCTEXT("PlacementPanel", "TrenchFinishAction", "Finish")
+			: NSLOCTEXT("PlacementPanel", "TrenchStartAction", "Set start")});
+	Content.KeyHints.Add({{NSLOCTEXT("PlacementPanel", "SecondaryKey", "RMB")},
+		NSLOCTEXT("PlacementPanel", "CancelAction", "Cancel")});
+	return Content;
+}
+
+float UFieldTrenchPlacementComponent::GetPlannedLengthCm() const
+{
+	float LengthCm = 0.0f;
+	for (const FFieldTrenchPiecePlacement& Piece : M_PlannedPieces)
+	{
+		LengthCm += Piece.LengthCm;
+	}
+	return LengthCm;
+}
+
+FText UFieldTrenchPlacementComponent::MakeCostText() const
+{
+	// Each piece pays for its own length when its digging starts, rounded per piece as ARTSFieldTrench charges it.
+	TMap<ERTSResourceType, int32> TotalCost;
+	for (const FFieldTrenchPiecePlacement& Piece : M_PlannedPieces)
+	{
+		for (const TPair<ERTSResourceType, int32>& PieceCost :
+		     ARTSFieldTrench::GetCostOfLength(M_CostPerMetre, Piece.LengthCm))
+		{
+			TotalCost.FindOrAdd(PieceCost.Key) += PieceCost.Value;
+		}
+	}
+	TArray<FString> CostParts;
+	for (const TPair<ERTSResourceType, int32>& Cost : TotalCost)
+	{
+		CostParts.Add(FString::Printf(TEXT("%d %s"), Cost.Value, *Global_GetResourceTypeDisplayString(Cost.Key)));
+	}
+	return FText::FromString(FString::Join(CostParts, TEXT(", ")));
+}
+
+void UFieldTrenchPlacementComponent::HidePlacementPanel() const
+{
+	if (UW_PlacementPanel* PlacementPanel = GetPlacementPanel())
+	{
+		PlacementPanel->HidePanel();
+	}
 }

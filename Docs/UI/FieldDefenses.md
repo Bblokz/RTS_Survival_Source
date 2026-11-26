@@ -158,6 +158,7 @@ The Barriers tab's second option, after the field trench, is barbed wire, `BTX_G
   - The line then follows the mouse. The path is recorded every 50 cm.
   - The second click confirms the line.
   - Right click, Escape or the HQ dying removes a line that is not confirmed yet.
+  - The placement panel (shared with the trench) shows what a click does, the length, the cost while strung and whether an end is joined.
 - **Pieces:** `ARTSBarbedWireLine::PlanAlongPath` (`Buildings/BarbedWireLine`) lays straight pieces 400 cm apart along the path. The mesh is 4.14 m long, so neighbouring coils overlap a little.
   - A free end lands within half a piece of the mouse.
   - A line shorter than one piece is one piece long, pointing the last way the mouse went.
@@ -221,4 +222,5 @@ Map tests:
 - `-FieldDefenseValidateTrenchAnchor` on `UT_Nomadics`: a Pak 40 pit is built and offers its rear anchor. A trench clicked near the anchor starts on its port, claims it, and shows the neck once the first piece is dug; removing the trench frees the anchor. A trench drawn to the anchor snaps its end and is planned from the anchor. Destroying the pit caps that trench. Then the two Breakthrough bunkers are placed as in a level: each offers its two anchors on their sockets, and a trench is laid and dug from every anchor.
 - `-FieldDefenseValidateTrench` also checks that the dug player trench is all `SM_FieldTrench_*` (German) pieces.
 - `-FieldDefenseValidateEnemyTrenches` on `UT_Nomadics`: the enemy AI's base trenches ([../EnemyAI/EnemyBaseTrenches.md](../EnemyAI/EnemyBaseTrenches.md)). The player's HQ trench, started beside them, stays German.
+- The placement panel (Docs/UI/PlacementPanel.md) is checked in `-FieldDefenseValidate` (`placement_panel_clear_of_preview`) and `-FieldDefenseValidateTrench` (`placement_panel_clear_of_trench`, with the camera on the trench); run them `-RenderOffscreen`.
 - `-CoverFinderValidateRuntimeTrench` on `TestCover/TestFieldTrench`: runtime cover publishing, a piece removed and added again, a dug trench on uneven ground, and the full stand-up cycle in a runtime trench.

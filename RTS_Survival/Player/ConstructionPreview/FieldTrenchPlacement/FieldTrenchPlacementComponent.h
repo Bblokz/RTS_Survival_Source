@@ -14,6 +14,8 @@ class ACPPController;
 class ARTSFieldTrench;
 class URadiusComp;
 class UTrainerComponent;
+class UW_PlacementPanel;
+struct FPlacementPanelContent;
 
 UENUM()
 enum class EFieldTrenchPlacementPhase : uint8
@@ -213,4 +215,14 @@ private:
 	                                                       const FFieldTrenchPlanOptions& Options);
 	bool GetArePiecesBuildable(const TArray<FFieldTrenchPiecePlacement>& Pieces);
 	void ResetPlacement();
+
+	/** @return The construction preview's screen-space placement panel, which the trench borrows while laid out. */
+	UW_PlacementPanel* GetPlacementPanel() const;
+
+	/** @brief Shows what a click does now, the trench's length and cost and the keys, docked beside the trench. */
+	void UpdatePlacementPanel(const float DeltaTime) const;
+	FPlacementPanelContent MakePlacementPanelContent() const;
+	float GetPlannedLengthCm() const;
+	FText MakeCostText() const;
+	void HidePlacementPanel() const;
 };

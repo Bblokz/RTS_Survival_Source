@@ -12,6 +12,8 @@
 class ACPPController;
 class URadiusComp;
 class UTrainerComponent;
+class UW_PlacementPanel;
+struct FPlacementPanelContent;
 
 UENUM()
 enum class EBarbedWirePlacementPhase : uint8
@@ -192,4 +194,12 @@ private:
 	TArray<FBarbedWireSpan> KeepBuildablePieces(const TArray<FBarbedWireSpan>& Spans);
 	bool GetIsPieceBuildable(const FBarbedWirePieceRuntime& Piece) const;
 	void ResetPlacement();
+
+	// The construction preview's screen-space panel, shared with the trench: what a click does, length and cost.
+	UW_PlacementPanel* GetPlacementPanel() const;
+	void UpdatePlacementPanel(const float DeltaTime) const;
+	FPlacementPanelContent MakePlacementPanelContent() const;
+	/** @return What the shown plan costs while it is strung, as "<amount> <resource>" parts. */
+	FText MakeCostText() const;
+	void HidePlacementPanel() const;
 };
