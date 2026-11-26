@@ -11,6 +11,7 @@
 class UMaterialInstanceDynamic;
 class UMaterialInterface;
 class USceneComponent;
+class UStaticMesh;
 class UStaticMeshComponent;
 struct FWorldBuildNodeDefinition;
 
@@ -19,6 +20,7 @@ struct FWorldBuildNodeDefinition;
  * (set the id and country) or let UWorldBuildNodeManager spawn it from the BuildNodes config; the manager drives its
  * state. A hex plate drawn on a flat plane shows the state (lock, plus or the building's sign); the plain cylinder
  * is the fallback when the plate material is missing, and stays as the click target either way.
+ * A building with a model in Building Piece Meshes stands on the plate as that model, without the sign.
  */
 UCLASS()
 class RTS_SURVIVAL_API AWorldBuildNode : public AActor
@@ -52,6 +54,14 @@ public:
 	/** Stores the building and marks the node Built; ignored when a building already stands here. */
 	void SetBuilding(EWorldCampaignBuilding NewBuilding);
 
+	/**
+	 * @brief Where something leaves the building's model, e.g. the shells of a battery.
+	 * @param SocketName Socket on the building piece mesh.
+	 * @param OutLocation World location of the socket.
+	 * @return false when no model is shown or it has no such socket.
+	 */
+	bool TryGetBuildingPieceSocketLocation(FName SocketName, FVector& OutLocation) const;
+
 	/** Brightens the plate while the cursor is over the node. */
 	UFUNCTION(BlueprintCallable, Category = "World Campaign|Build Node")
 	void SetIsHovered(bool bIsHovered);
@@ -78,6 +88,10 @@ private:
 	void UpdateHexPlate() const;
 	float GetHexPlateSignIndex() const;
 
+	/** Shows the model of the building that stands here, or hides the piece when it has none. */
+	void UpdateBuildingPiece();
+	bool GetIsValidBuildingPieceMesh() const;
+
 	UPROPERTY(VisibleAnywhere, Category = "World Campaign|Build Node")
 	TObjectPtr<USceneComponent> M_RootSceneComponent;
 
@@ -94,6 +108,18 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UMaterialInstanceDynamic> M_HexPlateMaterial;
+
+	// Small model of the building, standing on the plate; empty until a building with a model is put up.
+	UPROPERTY(VisibleAnywhere, Category = "World Campaign|Build Node")
+	TObjectPtr<UStaticMeshComponent> M_BuildingPieceMesh;
+
+	// True while a model shows the building, so the plate leaves its sign out.
+	bool bM_ShowsBuildingPiece = false;
+
+	/** Model per building, placed at scale 1 on the plate. A building without one keeps its sign. */
+	UPROPERTY(EditAnywhere, Category = "World Campaign|Build Node",
+		meta = (AllowPrivateAccess = "true", DisplayName = "Building Piece Meshes"))
+	TMap<EWorldCampaignBuilding, TSoftObjectPtr<UStaticMesh>> M_BuildingPieceMeshes;
 
 	/** Built by Source/Tools/WorldCampaign/create_build_site_materials.py. */
 	UPROPERTY(EditAnywhere, Category = "World Campaign|Build Node",

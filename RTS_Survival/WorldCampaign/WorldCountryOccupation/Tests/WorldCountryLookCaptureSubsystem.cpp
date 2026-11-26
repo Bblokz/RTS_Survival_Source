@@ -340,8 +340,8 @@ int32 UWorldCountryLookCaptureSubsystem::BuildOnEveryOpenSiteInCountry(const FNa
 
 	// Look only: the building goes straight on the node, without price or effect, one kind after the other.
 	const TArray<EWorldCampaignBuilding> Buildings = {
-		EWorldCampaignBuilding::WatchPost, EWorldCampaignBuilding::SupplyDepot,
-		EWorldCampaignBuilding::Airfield, EWorldCampaignBuilding::Battery
+		EWorldCampaignBuilding::WatchPost, EWorldCampaignBuilding::Airfield,
+		EWorldCampaignBuilding::Battery, EWorldCampaignBuilding::SupplyDepot
 	};
 	int32 BuiltCount = 0;
 	for (AWorldBuildNode* BuildNode : BuildNodeManager->GetBuildNodes())

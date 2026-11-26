@@ -3,6 +3,7 @@
 #include "RTS_Survival/WorldCampaign/CampaignTech/WorldCampaignTechSettings.h"
 
 #include "Engine/Texture2D.h"
+#include "RTS_Survival/TechTree/Technologies/TechnologyEffect/TechnologyEffect.h"
 #include "RTS_Survival/WorldCampaign/CampaignTech/WorldCampaignTechWheel.h"
 
 namespace WorldCampaignTechDefaults
@@ -66,6 +67,59 @@ void FWorldCampaignTechTable::AddDefinition(const ETechnology Technology, const 
 	Definition.Cost.Radixite = RootRowRadixite + RadixitePerRow * Row;
 	Definition.Prerequisites = Prerequisites;
 	Technologies.Add(Technology, Definition);
+}
+
+namespace WorldTechWheelEffectDefaults
+{
+	const TCHAR* const EffectFolder = TEXT("/Game/RTS_Survival/Blueprints/TechTree/GerTechs/");
+	const TCHAR* const UnitClassSpawnerPath = TEXT(
+		"/Game/RTS_Survival/Blueprints/Player/RTS_BP_RTSAsyncSpawner.RTS_BP_RTSAsyncSpawner_C");
+
+	struct FEffectAsset
+	{
+		ETechnology Technology;
+		// Folder and asset name under EffectFolder.
+		const TCHAR* AssetPath;
+	};
+
+	// Panzerjaeger and Long Range Calibration have no effect asset yet.
+	const FEffectAsset EffectAssets[] = {
+		{ETechnology::Tech_LightCalibreApcr, TEXT("AutoCannonAPCR/TEBP_Ger_AutoCannon_APCR_Rounds")},
+		{ETechnology::Tech_LightTank_RadixiteArmor, TEXT("LightTankRadixite/TEBP_Ger_LightRadixiteArmor")},
+		{ETechnology::Tech_LightTank_TrackImprovements, TEXT("LightTankTracks/TEBP_Ger_LightTracks")},
+		{ETechnology::Tech_Barricades, TEXT("Barricades/TEBP_Ger_Barriers")},
+		{ETechnology::Tech_Spalliners, TEXT("Spall_Liners/TEBP_Ger_Spall_Liners")},
+		{ETechnology::Tech_AutoLoader, TEXT("AutoLoader/TEBP_Autoloader")},
+		{ETechnology::Tech_ScavengingSpeed, TEXT("ScavengerUpgrades/TEBP_Ger_ScavengingSpeed")},
+		{ETechnology::Tech_ScavengingReward, TEXT("ScavengerUpgrades/TEBP_Ger_ScavReward")},
+		{ETechnology::Tech_HarvesterCapacity, TEXT("HarvesterUpgrades/TEBP_HarvesterCargo")},
+		{ETechnology::Tech_HarvesterSpeed, TEXT("HarvesterUpgrades/TEBP_HarvestSpeed")},
+		{ETechnology::Tech_RepairUpgrade, TEXT("RepairUpgrade/TEBP_Ger_RepairUpgrade")},
+		{ETechnology::Tech_AutoCannonDamage, TEXT("AutoCannonDmg/TEBP_Ger_AutoCannonDamage")},
+		{ETechnology::Tech_FlameRange, TEXT("FlameTechs/BPTE_Ger_FlameRange")},
+		{ETechnology::Tech_FlameDamage, TEXT("FlameTechs/BPTE_Ger_FlameDamageColor")},
+		{ETechnology::Tech_Tungsten88, TEXT("Tungsten88/TEBP_Ger_Tungsten88")},
+		{ETechnology::Tech_StereoRangefinder, TEXT("StereoRangefinder/TEBP_Ger_StereoRangefinder")},
+		{ETechnology::Tech_Assault_ShellHoist, TEXT("ShellHoist/TEBP_Ger_ShellHoist")},
+		{ETechnology::Tech_HalfTrack_ArmoredBay, TEXT("ArmoredTroopBay/TEBP_Ger_ArmoredTroopBay")},
+		{ETechnology::Tech_Flak88_GroundRole, TEXT("Flak88GroundRole/TEBP_Ger_Flak88GroundRole")},
+		{ETechnology::Tech_Infantry_Kit, TEXT("InfantryKit/TEBP_Ger_InfantryKit")},
+		{ETechnology::Tech_Sniper_Ghillie, TEXT("GhillieSuits/TEBP_Ger_GhillieSuits")},
+		{ETechnology::Tech_Pioneer_Entrenching, TEXT("EntrenchingTools/TEBP_Ger_EntrenchingTools")},
+	};
+}
+
+UWorldCampaignTechSettings::UWorldCampaignTechSettings()
+{
+	using namespace WorldTechWheelEffectDefaults;
+	for (const FEffectAsset& EffectAsset : EffectAssets)
+	{
+		const FString AssetName = FPaths::GetCleanFilename(EffectAsset.AssetPath);
+		const FString ClassPath = FString(EffectFolder) + EffectAsset.AssetPath + TEXT(".") + AssetName + TEXT("_C");
+		WheelEffectClasses.Add(EffectAsset.Technology, TSoftClassPtr<UTechnologyEffect>(FSoftObjectPath(ClassPath)));
+	}
+
+	UnitClassSpawnerClass = TSoftClassPtr<AActor>(FSoftObjectPath(UnitClassSpawnerPath));
 }
 
 const FWorldCampaignTechTable& UWorldCampaignTechSettings::GetTechTable()
@@ -195,7 +249,7 @@ FWorldTechWheelPresentationTable::FWorldTechWheelPresentationTable()
 	                TEXT("T_TechIcon_StereoRangefinder"));
 	AddPresentation(ETechnology::Tech_Assault_ShellHoist, NSLOCTEXT("WorldTechWheel", "ShellHoistName", "Shell Hoist"),
 	                NSLOCTEXT("WorldTechWheel", "ShellHoistText",
-	                          "A powered shell hoist for the heavy assault guns: main gun reload time -30%."),
+	                          "A powered shell hoist for the heavy assault guns: the main gun reloads faster."),
 	                TEXT("T_TechIcon_ShellHoist"));
 	AddPresentation(ETechnology::Tech_LongRangeCalibration,
 	                NSLOCTEXT("WorldTechWheel", "CalibrationName", "Long-Range Calibration"),
@@ -203,7 +257,7 @@ FWorldTechWheelPresentationTable::FWorldTechWheelPresentationTable()
 	                TEXT("T_TechIcon_Long-RangeCalibration"));
 	AddPresentation(ETechnology::Tech_Tungsten88, NSLOCTEXT("WorldTechWheel", "TungstenName", "Tungsten 8.8"),
 	                NSLOCTEXT("WorldTechWheel", "TungstenText",
-	                          "Tungsten-cored rounds for the long 8.8 cm guns: +15% armour penetration. The cores need a "
+	                          "Tungsten-cored rounds for the long 8.8 cm guns: better armour penetration. The cores need a "
 	                          "steady supply of ore."),
 	                TEXT("T_TechIcon_Tungsten88"));
 

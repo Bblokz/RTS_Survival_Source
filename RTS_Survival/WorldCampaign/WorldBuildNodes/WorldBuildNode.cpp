@@ -29,6 +29,8 @@ namespace WorldBuildNodeVisualConstants
 	constexpr float HexPlateShareOfPlane = 0.52f;
 	// Above the country fill and the roads, below the map pieces.
 	constexpr float HexPlateHeightAboveGround = 6.f;
+	// Pieces are modelled with their front on -X; the map camera sees +Y as the near side.
+	constexpr float BuildingPieceYaw = -90.f;
 	// The hidden cylinder is the click target; this makes it as wide as the plate.
 	constexpr float ClickTargetHeightScale = 0.2f;
 	const FName HexPlateStateParameterName = TEXT("State");
@@ -40,6 +42,14 @@ namespace WorldBuildNodeVisualConstants
 	constexpr float HexPlateSignSupplyDepot = 3.f;
 	constexpr float HexPlateSignAirfield = 4.f;
 	constexpr float HexPlateSignBattery = 5.f;
+	// Empty centre: the building's model stands there instead.
+	constexpr float HexPlateSignNone = 6.f;
+	const TCHAR* const WatchPostPieceMeshPath = TEXT(
+		"/Game/RTS_Survival/WorldCampaign/BuildSites/Pieces/WatchPost/SM_BuildSitePiece_WatchPost.SM_BuildSitePiece_WatchPost");
+	const TCHAR* const AirfieldPieceMeshPath = TEXT(
+		"/Game/RTS_Survival/WorldCampaign/BuildSites/Pieces/Airfield/SM_BuildSitePiece_Airfield.SM_BuildSitePiece_Airfield");
+	const TCHAR* const BatteryPieceMeshPath = TEXT(
+		"/Game/RTS_Survival/WorldCampaign/BuildSites/Pieces/Battery/SM_BuildSitePiece_Battery.SM_BuildSitePiece_Battery");
 	const FLinearColor LockedColor(0.25f, 0.25f, 0.25f);
 	const FLinearColor UnlockedColor(0.95f, 0.75f, 0.15f);
 	const FLinearColor BuiltColor(0.2f, 0.7f, 0.25f);
@@ -91,6 +101,24 @@ AWorldBuildNode::AWorldBuildNode()
 
 	M_HexPlateMaterialAsset = TSoftObjectPtr<UMaterialInterface>(
 		FSoftObjectPath(WorldBuildNodeVisualConstants::HexPlateMaterialPath));
+
+	M_BuildingPieceMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("BuildingPieceMesh"));
+	M_BuildingPieceMesh->SetupAttachment(M_RootSceneComponent);
+	M_BuildingPieceMesh->SetRelativeLocation(
+		FVector(0.f, 0.f, WorldBuildNodeVisualConstants::HexPlateHeightAboveGround));
+	M_BuildingPieceMesh->SetRelativeRotation(
+		FRotator(0.f, WorldBuildNodeVisualConstants::BuildingPieceYaw, 0.f));
+	// The hidden cylinder below stays the click target, so the cursor trace must pass through the model.
+	M_BuildingPieceMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	M_BuildingPieceMesh->SetGenerateOverlapEvents(false);
+	M_BuildingPieceMesh->SetVisibility(false);
+
+	M_BuildingPieceMeshes.Add(EWorldCampaignBuilding::WatchPost, TSoftObjectPtr<UStaticMesh>(
+		                          FSoftObjectPath(WorldBuildNodeVisualConstants::WatchPostPieceMeshPath)));
+	M_BuildingPieceMeshes.Add(EWorldCampaignBuilding::Airfield, TSoftObjectPtr<UStaticMesh>(
+		                          FSoftObjectPath(WorldBuildNodeVisualConstants::AirfieldPieceMeshPath)));
+	M_BuildingPieceMeshes.Add(EWorldCampaignBuilding::Battery, TSoftObjectPtr<UStaticMesh>(
+		                          FSoftObjectPath(WorldBuildNodeVisualConstants::BatteryPieceMeshPath)));
 }
 
 void AWorldBuildNode::InitializeFromDefinition(const FWorldBuildNodeDefinition& BuildNodeDefinition)
@@ -123,6 +151,7 @@ void AWorldBuildNode::SetBuilding(const EWorldCampaignBuilding NewBuilding)
 	M_Building = NewBuilding;
 	M_NodeState = EWorldBuildNodeState::Built;
 	UpdateDefaultVisual();
+	UpdateBuildingPiece();
 	UpdateHexPlate();
 	BP_OnNodeStateChanged(M_NodeState, M_Building);
 	BP_OnBuildingBuilt(M_Building);
@@ -146,6 +175,7 @@ void AWorldBuildNode::BeginPlay()
 
 	BeginPlay_InitHexPlate();
 	UpdateDefaultVisual();
+	UpdateBuildingPiece();
 	UpdateHexPlate();
 	BP_OnNodeStateChanged(M_NodeState, M_Building);
 }
@@ -178,6 +208,20 @@ void AWorldBuildNode::BeginPlay_InitHexPlate()
 	M_DefaultVisualMesh->SetRelativeScale3D(FVector(ClickTargetScale, ClickTargetScale, ClickTargetHeightScale));
 }
 
+bool AWorldBuildNode::TryGetBuildingPieceSocketLocation(const FName SocketName, FVector& OutLocation) const
+{
+	// Quiet on purpose: a node without a model is a normal case for the caller's fallback.
+	const bool bHasSocket = bM_ShowsBuildingPiece && IsValid(M_BuildingPieceMesh) && not SocketName.IsNone()
+		&& M_BuildingPieceMesh->DoesSocketExist(SocketName);
+	if (not bHasSocket)
+	{
+		return false;
+	}
+
+	OutLocation = M_BuildingPieceMesh->GetSocketLocation(SocketName);
+	return true;
+}
+
 void AWorldBuildNode::SetIsHovered(const bool bIsHovered)
 {
 	if (not IsValid(M_HexPlateMaterial))
@@ -202,12 +246,35 @@ void AWorldBuildNode::UpdateHexPlate() const
 	                                            GetHexPlateSignIndex());
 }
 
+void AWorldBuildNode::UpdateBuildingPiece()
+{
+	bM_ShowsBuildingPiece = false;
+	if (not GetIsValidBuildingPieceMesh())
+	{
+		return;
+	}
+
+	// A Blueprint look draws its own building, and without the plate there is nothing for the model to stand on.
+	const TSoftObjectPtr<UStaticMesh>* PieceMeshAsset = IsValid(M_HexPlateMaterial)
+		                                                    ? M_BuildingPieceMeshes.Find(M_Building)
+		                                                    : nullptr;
+	UStaticMesh* PieceMesh = PieceMeshAsset != nullptr ? PieceMeshAsset->LoadSynchronous() : nullptr;
+	bM_ShowsBuildingPiece = IsValid(PieceMesh);
+	M_BuildingPieceMesh->SetStaticMesh(PieceMesh);
+	M_BuildingPieceMesh->SetVisibility(bM_ShowsBuildingPiece);
+}
+
 float AWorldBuildNode::GetHexPlateSignIndex() const
 {
 	using namespace WorldBuildNodeVisualConstants;
 	if (M_NodeState == EWorldBuildNodeState::Locked)
 	{
 		return HexPlateSignLock;
+	}
+
+	if (bM_ShowsBuildingPiece)
+	{
+		return HexPlateSignNone;
 	}
 
 	switch (M_Building)
@@ -249,6 +316,22 @@ FLinearColor AWorldBuildNode::GetDefaultVisualColor() const
 	default:
 		return WorldBuildNodeVisualConstants::LockedColor;
 	}
+}
+
+bool AWorldBuildNode::GetIsValidBuildingPieceMesh() const
+{
+	if (IsValid(M_BuildingPieceMesh))
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+		this,
+		TEXT("M_BuildingPieceMesh"),
+		TEXT("GetIsValidBuildingPieceMesh"),
+		this
+	);
+	return false;
 }
 
 bool AWorldBuildNode::GetIsValidHexPlateMesh() const

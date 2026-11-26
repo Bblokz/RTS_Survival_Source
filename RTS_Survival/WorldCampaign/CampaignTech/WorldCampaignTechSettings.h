@@ -8,6 +8,7 @@
 #include "RTS_Survival/WorldCampaign/CampaignProgress/WorldCampaignProgressState.h"
 #include "WorldCampaignTechSettings.generated.h"
 
+class UTechnologyEffect;
 class UTexture2D;
 
 /**
@@ -212,6 +213,8 @@ class RTS_SURVIVAL_API UWorldCampaignTechSettings : public UDeveloperSettings
 	GENERATED_BODY()
 
 public:
+	UWorldCampaignTechSettings();
+
 	UPROPERTY(EditAnywhere, Config, BlueprintReadOnly, Category = "World Campaign Tech Tree")
 	FWorldCampaignTechTable TechTable;
 
@@ -228,6 +231,16 @@ public:
 
 	UPROPERTY(EditAnywhere, Config, BlueprintReadOnly, Category = "Tech Wheel")
 	FWorldTechWheelPresentationTable WheelPresentation;
+
+	// The effect a mission applies for each technology; the wheel reads the affected units and weapon changes from
+	// it. In a mission the player controller Blueprint holds the same list. A technology without an entry shows
+	// its description only.
+	UPROPERTY(EditAnywhere, Config, BlueprintReadOnly, Category = "Tech Wheel")
+	TMap<ETechnology, TSoftClassPtr<UTechnologyEffect>> WheelEffectClasses;
+
+	// The mission's unit spawner Blueprint (an ARTSAsyncSpawner): the only table from a unit type to its class.
+	UPROPERTY(EditAnywhere, Config, BlueprintReadOnly, Category = "Tech Wheel")
+	TSoftClassPtr<AActor> UnitClassSpawnerClass;
 
 	/** The wheel the campaign uses; see bUseGeneratedDefaultWheel. */
 	static const FWorldTechWheel& GetWheel();
