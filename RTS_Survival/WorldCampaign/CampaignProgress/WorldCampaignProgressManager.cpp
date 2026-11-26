@@ -2,6 +2,7 @@
 
 #include "RTS_Survival/WorldCampaign/CampaignProgress/WorldCampaignProgressManager.h"
 
+#include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/WorldCampaign/CampaignProgress/WorldCampaignRules.h"
 #include "RTS_Survival/WorldCampaign/CampaignProgress/WorldCampaignRulesSettings.h"
 #include "RTS_Survival/WorldCampaign/WorldMapUI/MapObjects/W_MissionReward/RewardStructs/FMissionRewardStructs.h"
@@ -114,6 +115,12 @@ void UWorldCampaignProgressManager::AddResearchedTechnology(const ETechnology Te
 {
 	if (Technology == ETechnology::Tech_NONE || M_ProgressState.ResearchedTechnologies.Contains(Technology))
 	{
+		return;
+	}
+	if (Global_GetIsFieldModificationKit(Technology))
+	{
+		RTSFunctionLibrary::ReportError("Field modification kit " + Global_GetTechAsString(Technology)
+			+ " cannot be researched on the campaign: kits are mission-only and never saved.");
 		return;
 	}
 

@@ -39,10 +39,57 @@ void UEmbeddedTurretMountComponent::EndPlay(const EEndPlayReason::Type EndPlayRe
 	Super::EndPlay(EndPlayReason);
 }
 
+void UEmbeddedTurretMountComponent::RequestMount()
+{
+	if (bM_IsMountBlocked || IsValid(GetMountedTurret()))
+	{
+		return;
+	}
+	if (not HasBegunPlay())
+	{
+		bM_IsMountRequested = true;
+		return;
+	}
+	ScheduleMount();
+}
+
+void UEmbeddedTurretMountComponent::Unmount()
+{
+	bM_IsMountBlocked = true;
+	bM_IsMountRequested = false;
+	if (const UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(M_MountTimerHandle);
+	}
+	if (not IsValid(M_MountChildActorComponent))
+	{
+		return;
+	}
+	UnregisterTurretFromOwner(GetMountedTurret());
+	// Destroying the child actor component destroys the turret actor with it.
+	M_MountChildActorComponent->DestroyComponent();
+	M_MountChildActorComponent = nullptr;
+}
+
 void UEmbeddedTurretMountComponent::BeginPlay_ScheduleMount()
 {
+	const bool bWaitsForTechnology = RequiredTechnology != ETechnology::Tech_NONE;
+	if (bWaitsForTechnology && not bM_IsMountRequested)
+	{
+		return;
+	}
+	bM_IsMountRequested = false;
+	ScheduleMount();
+}
+
+void UEmbeddedTurretMountComponent::ScheduleMount()
+{
 	UWorld* World = GetWorld();
-	if (not IsValid(World))
+	if (not IsValid(World) || bM_IsMountBlocked)
+	{
+		return;
+	}
+	if (World->GetTimerManager().IsTimerActive(M_MountTimerHandle))
 	{
 		return;
 	}
@@ -68,7 +115,7 @@ void UEmbeddedTurretMountComponent::MountTurret()
 {
 	M_MountTimerHandle.Invalidate();
 	const AActor* Owner = GetOwner();
-	if (not IsValid(Owner) || Owner->IsActorBeingDestroyed())
+	if (not IsValid(Owner) || Owner->IsActorBeingDestroyed() || bM_IsMountBlocked || IsValid(GetMountedTurret()))
 	{
 		return;
 	}
@@ -137,8 +184,19 @@ UMeshComponent* UEmbeddedTurretMountComponent::FindMountMesh() const
 		return FindTankTurretMeshWithSocket(UStaticMeshComponent::StaticClass());
 	case EEmbeddedTurretMountMesh::TankHullStaticMesh:
 		return FindOwnerMeshWithSocket(UStaticMeshComponent::StaticClass());
+	case EEmbeddedTurretMountMesh::TankTurretThenHullMesh:
+		return FindTankTurretThenHullMeshWithSocket();
 	}
 	return nullptr;
+}
+
+UMeshComponent* UEmbeddedTurretMountComponent::FindTankTurretThenHullMeshWithSocket() const
+{
+	if (UMeshComponent* TurretMesh = FindTankTurretMeshWithSocket(UMeshComponent::StaticClass()))
+	{
+		return TurretMesh;
+	}
+	return FindOwnerMeshWithSocket(UMeshComponent::StaticClass());
 }
 
 UMeshComponent* UEmbeddedTurretMountComponent::FindTankTurretMeshWithSocket(
@@ -154,7 +212,7 @@ UMeshComponent* UEmbeddedTurretMountComponent::FindTankTurretMeshWithSocket(
 			continue;
 		}
 		const ACPPTurretsMaster* HostTurret = Cast<ACPPTurretsMaster>(ChildActorComponent->GetChildActor());
-		if (not IsValid(HostTurret))
+		if (not IsValid(HostTurret) || GetIsTurretWithoutMount(HostTurret))
 		{
 			continue;
 		}
@@ -232,6 +290,36 @@ void UEmbeddedTurretMountComponent::RegisterTurretWithOwner(ACPPTurretsMaster* T
 			+ " is neither a tank nor a building expansion; its turret cannot be commanded.");
 	}
 	Turret->SetAutoEngageTargets(false);
+}
+
+bool UEmbeddedTurretMountComponent::GetIsTurretWithoutMount(const ACPPTurretsMaster* Turret) const
+{
+	for (const TSubclassOf<ACPPTurretsMaster>& TurretClass : TurretClassesWithoutMount)
+	{
+		if (IsValid(TurretClass) && Turret->IsA(TurretClass))
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
+void UEmbeddedTurretMountComponent::UnregisterTurretFromOwner(ACPPTurretsMaster* Turret) const
+{
+	if (not IsValid(Turret))
+	{
+		return;
+	}
+	AActor* Owner = GetOwner();
+	if (ATankMaster* TankOwner = Cast<ATankMaster>(Owner))
+	{
+		TankOwner->RemoveTurret(Turret);
+		return;
+	}
+	if (ABuildingExpansion* BxpOwner = Cast<ABuildingExpansion>(Owner))
+	{
+		BxpOwner->RemoveTurret(Turret);
+	}
 }
 
 void UEmbeddedTurretMountComponent::ReportMountMeshNotFound() const

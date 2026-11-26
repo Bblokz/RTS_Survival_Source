@@ -29,6 +29,7 @@ namespace WorldFogHintSettingsDefaults
 	// A mission piece is about 200 units wide: fully open over the piece, with a short soft edge.
 	constexpr float MissionOpeningRadius = 120.f;
 	constexpr float MissionOpeningFalloff = 50.f;
+	constexpr float MissionOpeningStrength = 0.45f;
 	// Enemy pieces stand on a 180 unit slab; divisions are smaller.
 	constexpr float EnemyPieceHalfWidth = 100.f;
 }
@@ -45,10 +46,32 @@ UWorldFogHintSettings::UWorldFogHintSettings()
 	FogRoadSortPriority = Defaults::FogRoadSortPriority;
 	RoadBelowFogSortPriority = Defaults::RoadBelowFogSortPriority;
 
+	bShowMissionLandmarks = true;
+	// Offsets come from each model's hand-over (Saved/WorldMapUIDesigns/MissionLandmarks/<Mission>/model).
+	const auto AddLandmark = [this](const EMapMission Mission, const TCHAR* FolderAndMesh, const float Behind,
+	                                const float Right)
+	{
+		FWorldMissionLandmark Landmark;
+		Landmark.Mesh = TSoftObjectPtr<UStaticMesh>(FSoftObjectPath(FString::Printf(
+			TEXT("/Game/RTS_Survival/WorldCampaign/MapObjects/Missions/Landmarks/%s"), FolderAndMesh)));
+		Landmark.OffsetBehind = Behind;
+		Landmark.OffsetRight = Right;
+		MissionLandmarks.Add(Mission, Landmark);
+	};
+	AddLandmark(EMapMission::OreMountains, TEXT("OreMountains/SM_WorldLandmark_OreMountains.SM_WorldLandmark_OreMountains"), 60.f, 195.f);
+	AddLandmark(EMapMission::Berlin, TEXT("Berlin/SM_WorldLandmark_Berlin.SM_WorldLandmark_Berlin"), 100.f, 150.f);
+	AddLandmark(EMapMission::OderWarthe, TEXT("OderWarthe/SM_WorldLandmark_OderWarthe.SM_WorldLandmark_OderWarthe"), 46.f, 178.f);
+	AddLandmark(EMapMission::ME410UnlockMission, TEXT("Pripyat/SM_WorldLandmark_Pripyat.SM_WorldLandmark_Pripyat"), 48.f, 212.f);
+	AddLandmark(EMapMission::FrozenLake, TEXT("FrozenLake/SM_WorldLandmark_FrozenLake.SM_WorldLandmark_FrozenLake"), 96.f, 172.f);
+	AddLandmark(EMapMission::Maus_E100_AssaultMission_Moscow, TEXT("Moscow/SM_WorldLandmark_Moscow.SM_WorldLandmark_Moscow"), 60.f, 150.f);
+	AddLandmark(EMapMission::KingTigerMission_SovietWall, TEXT("SvarogLine/SM_WorldLandmark_SvarogLine.SM_WorldLandmark_SvarogLine"), 70.f, 215.f);
+	AddLandmark(EMapMission::UralShieldFreezeEngine, TEXT("FreezeEngine/SM_WorldLandmark_FreezeEngine.SM_WorldLandmark_FreezeEngine"), 60.f, 170.f);
+
 	bShowUnknownMissionMarkers = true;
 	UnknownMissionLook = EWorldUnknownMissionLook::RealPiece;
 	MissionOpeningRadius = Defaults::MissionOpeningRadius;
 	MissionOpeningFalloff = Defaults::MissionOpeningFalloff;
+	MissionOpeningStrength = Defaults::MissionOpeningStrength;
 	EnemyPieceHalfWidth = Defaults::EnemyPieceHalfWidth;
 	UnknownMissionMarkerColor = Defaults::UnknownMissionMarkerColor;
 	UnknownMissionMarkerDiameter = Defaults::UnknownMissionMarkerDiameter;

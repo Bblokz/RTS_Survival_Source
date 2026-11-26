@@ -4,11 +4,35 @@
 
 #include "CoreMinimal.h"
 #include "Engine/DeveloperSettings.h"
+#include "RTS_Survival/WorldCampaign/CampaignGeneration/Enums/Enum_MapMission.h"
 #include "RTS_Survival/WorldCampaign/WorldFow/WorldMapFowTypes.h"
 #include "WorldFogHintSettings.generated.h"
 
 class UMaterialInterface;
 class UStaticMesh;
+
+/**
+ * @brief Where the tall landmark of one mission stands. The map camera looks along +X, so "behind" is +X and
+ * "right" is +Y from the mission piece's centre.
+ */
+USTRUCT(BlueprintType)
+struct FWorldMissionLandmark
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Landmarks")
+	TSoftObjectPtr<UStaticMesh> Mesh;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Landmarks")
+	float OffsetBehind = 0.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Landmarks")
+	float OffsetRight = 0.f;
+
+	// The imported models have their front on +Y; 90 turns it to the map camera.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Landmarks")
+	float Yaw = 90.f;
+};
 
 /**
  * @brief Project settings page (Config/DefaultGame.ini) for what the campaign map still shows under the fog of war:
@@ -90,6 +114,12 @@ public:
 	UPROPERTY(EditAnywhere, Config, BlueprintReadOnly, Category = "Unknown Missions", meta = (ClampMin = "0"))
 	float MissionOpeningFalloff;
 
+	// How far the fog thins over an unidentified mission: 1 removes it, 0 leaves it closed. The owner wants such
+	// a piece vaguely visible, not fully revealed, so the default is well under 1.
+	UPROPERTY(EditAnywhere, Config, BlueprintReadOnly, Category = "Unknown Missions",
+		meta = (ClampMin = "0", ClampMax = "1"))
+	float MissionOpeningStrength;
+
 	/**
 	 * Half the width of the widest enemy piece. A hidden enemy piece closer to a mission than the opening plus this
 	 * would show in the opening, so that mission gets the plain marker.
@@ -119,6 +149,15 @@ public:
 	/** Needs a vector parameter Color; unset or missing leaves the mesh its own material. */
 	UPROPERTY(EditAnywhere, Config, BlueprintReadOnly, Category = "Unknown Missions")
 	TSoftObjectPtr<UMaterialInterface> UnknownMissionMarkerMaterial;
+
+	// --- Landmarks ---
+
+	/** Tall landmarks stand beside scripted missions and show above the fog while the mission is still unknown. */
+	UPROPERTY(EditAnywhere, Config, BlueprintReadOnly, Category = "Landmarks")
+	bool bShowMissionLandmarks;
+
+	UPROPERTY(EditAnywhere, Config, BlueprintReadOnly, Category = "Landmarks")
+	TMap<EMapMission, FWorldMissionLandmark> MissionLandmarks;
 
 	// --- Placement ---
 
