@@ -15,5 +15,8 @@ public class RTS_SurvivalEditorTarget : TargetRules
 		// Game mechanics recorder (Source/RTS_GameMechanicsRecs): editor builds only and never loaded by itself;
 		// the headless render process loads it with -ExecCmds="Module Load RTS_GameMechanicsRecs".
 		ExtraModuleNames.Add("RTS_GameMechanicsRecs");
+		// LAN multiplayer spike (Source/RTS_NetSpike): editor builds only and never loaded by itself;
+		// Source/Tools/NetSpike/run_net_spike.ps1 loads it with -ExecCmds="Module Load RTS_NetSpike".
+		ExtraModuleNames.Add("RTS_NetSpike");
 	}
 }

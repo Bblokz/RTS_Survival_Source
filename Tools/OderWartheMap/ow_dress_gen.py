@@ -379,8 +379,9 @@ def werks():
             s0 = s1
         # the tunnel mouth: opening faces out of the werk (local -X), on the dug-in floor the terrain generator cut
         tx, ty = w["tunnel"]
-        if not piece("Werk_Tunnel", "SM_OW_TunnelPortal", tx, ty, yaw + 180.0, collision=True):
-            bp(tag + "_TunnelStandin", D + "GarrisonableBuildings/Bunkers/BP_Garrison_Bunker_2", tx, ty, yaw + 180.0, 0.0, folder)
+        # BP_OW_TunnelMouth: SM_OW_TunnelPortal that heavy guns collapse (OderWartheWerkTargets.md); a collapsed mouth
+        # stops that Werk's waves (AWerkWaveDirector).
+        bp(tag + "_TunnelMouth", TUNNEL_MOUTH_BP, tx, ty, yaw + 180.0, 0.0, folder)
         note(fid + "_tunnel", "%s tunnel mouth: wave spawn" % fid.upper(), tx, ty)
         note(fid + "_garrison", "%s garrison (%s)" % (fid.upper(), WERK_MESHES[key][10:]), *werk_xy(fid, 0.0, 0.0))
         for kq, (lx, ly, what) in enumerate(info["hq"]):
@@ -391,6 +392,7 @@ def werks():
 # ---- stations, outposts, guards -------------------------------------------------------------------------------------
 STATION_KIND = {"s1": "Loop", "s2": "Adcock", "s3": "Loop", "s4": "Adcock", "s5": "Adcock"}   # old kit placeholders
 DF_STATION_BP = "/Game/RTS_Survival/Blueprints/Environment/OderWarthe/Stations/BP_OW_DFStation"
+TUNNEL_MOUTH_BP = "/Game/RTS_Survival/Blueprints/Environment/OderWarthe/Targets/Blueprints/BP_OW_TunnelMouth"
 
 
 def stations():

@@ -4,7 +4,8 @@ Exec through rear_editor_server (rear_cmd.py, after rear_lib.py) on Ger_IntroMis
 Mission_Intro_ClearSovietRig already saved by setup_ju87_reserve. Before PIE the editor-world chain is cut to
 [ClearSovietRig] in memory only (do NOT save the map after this test). Flow:
   start -> global ability panel hidden -> tour -> player tank onto the ramp -> assault response -> 4 Ju 87s ->
-  Okhotnik squad takeover (closed like a player) -> 60 s game time after the strike: Ju 87 reserve on the panel
+  Okhotnik squad takeover (closed like a player) -> the crushing field manual right after it (2 pages: CONTINUE, then
+  UNDERSTOOD; 2026-11-25) -> 60 s game time after the strike: Ju 87 reserve on the panel
   (2 charges, 180 s, free, 4 aircraft) -> use 1 -> blocked during the cooldown -> use 2 after it -> panel gone.
 Writes Saved/Ju87ReserveTest/result.json and HighResShots next to it; sets _defer so rear_cmd waits for the end.
 """
@@ -23,6 +24,7 @@ import setup_ju87_reserve as reserve  # noqa: E402
 OUT_DIR = 'D:/UE5Projects/RTS_Survival/Saved/Ju87ReserveTest'
 CLEAR = 'Mission_Intro_ClearSovietRig_C'
 TAKEOVER = 'WBP_VehicleInfoTakeover_C'
+WALL_MANUAL = 'WBP_WallBreachTakeover_C'
 TANK = ('/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Medium/PanzerIV/'
         'Ger_Vehicle_PanzerIV_F1.Ger_Vehicle_PanzerIV_F1_C')
 JU87 = reserve.ability_enum().GA_JU87_STRAFING
@@ -59,9 +61,9 @@ def clear_mission(world):
     return None
 
 
-def takeovers(world):
+def takeovers(world, class_name=TAKEOVER):
     return [w for w in unreal.ObjectIterator(unreal.UserWidget)
-            if w.get_class().get_name() == TAKEOVER and w.get_world() == world and w.is_in_viewport()]
+            if w.get_class().get_name() == class_name and w.get_world() == world and w.is_in_viewport()]
 
 
 def ability_state(world):
@@ -110,9 +112,12 @@ def step_setup():
     check('saved_values', resp.get_editor_property('air_support_aircraft_count') == reserve.STRIKE_AIRCRAFT
           and str(resp.get_editor_property('intel_squad_library_entry')) == reserve.INTEL_SQUAD_ROW
           and grant.get_editor_property('charges') == reserve.GRANT_CHARGES
+          and resp.get_editor_property('show_wall_breach_manual_after_intel_squad') == reserve.WALL_MANUAL_AFTER_INTEL
           and grant.get_editor_property('cooldown_seconds') == reserve.GRANT_COOLDOWN_SECONDS,
           f"aircraft {resp.get_editor_property('air_support_aircraft_count')} intel "
-          f"{resp.get_editor_property('intel_squad_library_entry')} grant {grant.get_editor_property('ability')} "
+          f"{resp.get_editor_property('intel_squad_library_entry')} wall manual "
+          f"{resp.get_editor_property('show_wall_breach_manual_after_intel_squad')} "
+          f"grant {grant.get_editor_property('ability')} "
           f"line {resp.get_editor_property('granted_ability_line')}")
     clears[0].set_editor_property('mission_trigger', None)
     manager.set_editor_property('missions', [clears[0]])
@@ -194,10 +199,56 @@ def step(world):
         if since_mark() > 2.0 and 'intel_shot' not in T:
             T['intel_shot'] = True
             shot('okhotnik_takeover')
+            # Queued, not on screen: the field manual waits until the Okhotnik screen closes.
+            check('wall_manual_waits_behind_okhotnik', m.call_method('GetHasQueuedWallBreachManual')
+                  and not takeovers(world, WALL_MANUAL),
+                  f"queued {m.call_method('GetHasQueuedWallBreachManual')}, "
+                  f"on screen {len(takeovers(world, WALL_MANUAL))}")
         if since_mark() > 4.0:
             panels = takeovers(world)
             if panels:
                 panels[0].call_method('HandleUnderstoodClicked')
+            go('wall_manual')
+        return
+    if phase == 'wall_manual':
+        manuals = takeovers(world, WALL_MANUAL)
+        if 'wall_opened' not in T:
+            if manuals:
+                T['wall_opened'] = True
+                check('wall_manual_follows_okhotnik', not takeovers(world) and unreal.GameplayStatics.is_game_paused(world),
+                      f'{since_mark():.1f} s after the Okhotnik screen closed; paused '
+                      f'{unreal.GameplayStatics.is_game_paused(world)}')
+                go('wall_manual')
+            elif since_mark() > 10.0:
+                check('wall_manual_follows_okhotnik', False, 'no crushing field manual 10 s after the Okhotnik screen')
+                go('wait_grant')
+            return
+        if since_mark() > 3.0 and 'wall_shot_1' not in T:
+            T['wall_shot_1'] = True
+            shot('wall_manual_page1')
+            return
+        if since_mark() > 6.0 and 'wall_continue' not in T:
+            T['wall_continue'] = True
+            # Page 1 of 2: the footer button is CONTINUE, so the manual stays open on the run-over page.
+            manuals[0].call_method('HandleUnderstoodClicked')
+            check('wall_manual_continue_shows_run_over_page', bool(takeovers(world, WALL_MANUAL))
+                  and unreal.GameplayStatics.is_game_paused(world),
+                  f"on screen {len(takeovers(world, WALL_MANUAL))} after CONTINUE")
+            return
+        if since_mark() > 9.0 and 'wall_shot_2' not in T:
+            T['wall_shot_2'] = True
+            shot('wall_manual_page2')
+            return
+        if since_mark() > 12.0:
+            if manuals:
+                manuals[0].call_method('HandleUnderstoodClicked')
+            go('wall_closed')
+        return
+    if phase == 'wall_closed':
+        if since_mark() > 1.0:
+            check('wall_manual_closes_on_understood', not takeovers(world, WALL_MANUAL)
+                  and not unreal.GameplayStatics.is_game_paused(world),
+                  f"on screen {len(takeovers(world, WALL_MANUAL))}, paused {unreal.GameplayStatics.is_game_paused(world)}")
             go('wait_grant')
         return
     if phase == 'wait_grant':

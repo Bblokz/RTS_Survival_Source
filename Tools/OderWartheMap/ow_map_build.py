@@ -147,7 +147,8 @@ def step_strip():
             "NavMeshBoundsVolume", "RecastNavMesh", "BP_MissionManager_C", "WorldSettings", "BlockingVolume",
             "AbstractNavData", "WorldDataLayers", "DirectionalLight", "SkyLight", "ExponentialHeightFog",
             "PostProcessVolume", "SkyAtmosphere", "VolumetricCloud", "Landscape", "LandscapeGizmoActiveActor",
-            "DefaultPhysicsVolume", "GameplayDebuggerPlayerManager", "Brush", "DirectionFindingManager")
+            "DefaultPhysicsVolume", "GameplayDebuggerPlayerManager", "Brush", "DirectionFindingManager",
+            "EnemyWaveSpawner", "WerkWaveDirector")
     kept, removed = [], []
     for actor in all_actors():
         name = actor.get_class().get_name()
@@ -258,11 +259,8 @@ def step_fit_level_actors():
             unreal.NavigationSystemV1.get_navigation_system(world()).on_navigation_bounds_updated(actor)
         elif name == "BlockingVolume":
             blockers.append(actor)
-        elif name == "RTS_PLayerStart_C":
-            actor.set_actor_location(unreal.Vector(start[0], start[1], start_z + 43.0), False, False)
-            actor.set_actor_rotation(unreal.Rotator(0.0, 0.0, 0.0), False)     # facing north, over the valley
-        elif name == "PlayerStart":
-            actor.set_actor_location(unreal.Vector(start[0], start[1], start_z + 100.0), False, False)
+        elif name in ("RTS_PLayerStart_C", "PlayerStart"):
+            place_arrival_start(actor)
         elif name in ("RTS_BP_EnemyController_C", "BP_MissionManager_C"):
             offset = 300.0 if name == "BP_MissionManager_C" else -300.0
             actor.set_actor_location(unreal.Vector(start[0] + 1500.0, start[1] + offset, start_z + 1500.0), False, False)
@@ -861,6 +859,36 @@ def clear_orphans():
     return count
 
 # ---- direction finding (2026-11-24) ----------------------------------------------------------------------------------
+# M00 arrival (OderWartheMissionFlow.md 10.3): the deck (HQ) spawns on the Berlin road two thirds up the ridge, where
+# the ground is even enough for the 8 m spawn grid; the arrival cinematic drives it up onto the ridge.
+ARRIVAL_ROAD_INDEX = 55                       # road_berlin point the player start sits on
+
+
+def arrival_start_point():
+    point = LAYOUT["roads"]["road_berlin"]["points"][ARRIVAL_ROAD_INDEX]
+    return point[0], point[1]
+
+
+def place_arrival_start(actor):
+    """RTS_PLayerStart (camera and deck spawn) and PlayerStart onto the arrival road point; the camera faces north."""
+    x, y = arrival_start_point()
+    lift = 43.0 if actor.get_class().get_name() == "RTS_PLayerStart_C" else 100.0
+    actor.set_actor_location(unreal.Vector(x, y, ground_z(x, y) + lift), False, False)
+    actor.set_actor_rotation(unreal.Rotator(0.0, 0.0, 0.0), False)
+
+
+def step_arrival_start():
+    """Moves only the start actors (step_fit_level_actors does the same in a full build)."""
+    require_map()
+    moved = []
+    for actor in all_actors():
+        if actor.get_class().get_name() in ("RTS_PLayerStart_C", "PlayerStart"):
+            place_arrival_start(actor)
+            moved.append((actor.get_actor_label(), actor.get_actor_location()))
+    log("arrival start %s" % moved)
+    return moved
+
+
 DF_MANAGER_LABEL = PREFIX + "DirectionFindingManager"
 DF_STATION_LABEL = PREFIX + "D_DF_%s_Station"
 DF_WERK_LABEL = PREFIX + "M_Werk_%s_Bunkers"
@@ -920,3 +948,155 @@ def step_direction_finding():
     manager.set_editor_property("werke", werke)
     log("direction finding: %d stations, %d Werke on %s" % (len(stations), len(werke), manager.get_actor_label()))
     return manager
+
+
+# ---- M04 waves (OderWartheMissionFlow.md 4.4, 10.2): one attack-wave spawner per Werk tunnel mouth, run by the
+# AWerkWaveDirector. Routes are the ones c_waves.py proved: apron -> crossing -> ramp foot -> HQ site.
+WAVE_DIRECTOR_LABEL = PREFIX + "WerkWaveDirector"
+WAVE_SPAWNER_LABEL = PREFIX + "WaveSpawner_%s"
+WAVE_ROUTES = {"w1": ["dam_packlitz", "ramp_north"], "w2": ["causeway_island", "ramp_prow"],
+               "w3": ["causeway_kalau", "ramp_east"], "w4": ["ford_hochwald", "dam_packlitz", "ramp_north"],
+               "w5": ["causeway_kalau", "ramp_east"]}
+WAVE_APRON_CM = 7900.0          # from the Werk centre towards its tunnel mouth (c_waves.apron)
+WAVE_SPAWN_SPREAD_CM = 600.0
+WAVE_Z_LIFT_CM = 50.0
+# Placeholder first wave (the unit mix is parked, 11.3): infantry and light armour; extras per difficulty.
+WAVE_UNITS = {"base_units": [("squad", "SQUAD_RUS_MOSIN", 2), ("vehicle", "TANK_T26", 1)],
+              "extra_units_normal": [("vehicle", "TANK_BT7", 1)],
+              "extra_units_hard": [("squad", "SQUAD_RUS_OKHOTNIK", 1)],
+              "extra_units_brutal": [("vehicle", "TANK_T34_76", 1)]}
+
+
+def _wave_apron(fid):
+    werk = LAYOUT["werks"][fid]
+    yaw = math.radians(werk["yaw"])
+    return (werk["centre"][0] - WAVE_APRON_CM * math.cos(yaw), werk["centre"][1] - WAVE_APRON_CM * math.sin(yaw))
+
+
+def _wave_route(fid):
+    """Apron, then each crossing's near and far end (as walked), each ramp's foot, then the HQ site."""
+    points = []
+    current = _wave_apron(fid)
+    for road_id in WAVE_ROUTES[fid]:
+        road = LAYOUT["roads"][road_id]["points"]
+        if road_id.startswith("ramp_"):
+            points.append((road[-3][0], road[-3][1]))
+            continue
+        a, b = (road[2][0], road[2][1]), (road[-3][0], road[-3][1])
+        near, far = (a, b) if math.hypot(a[0] - current[0], a[1] - current[1]) < math.hypot(
+            b[0] - current[0], b[1] - current[1]) else (b, a)
+        points += [near, far]
+        current = far
+    start = feature("start")["points"][0]
+    points.append((start[0], start[1]))
+    return points
+
+
+def _wave_entries(spec):
+    entries = []
+    for kind, subtype, count in spec:
+        unit = unreal.EnemyPlacementUnit()
+        if kind == "squad":
+            unit.set_editor_property("kind", unreal.EnemyPlacementUnitKind.SQUAD)
+            unit.set_editor_property("squad_subtype", getattr(unreal.SquadSubtype, subtype))
+        else:
+            unit.set_editor_property("kind", unreal.EnemyPlacementUnitKind.VEHICLE)
+            unit.set_editor_property("vehicle_subtype", getattr(unreal.TankSubtype, subtype))
+        entry = unreal.EnemyWaveSpawnerUnitEntry()
+        entry.set_editor_property("unit_options", [unit])
+        entry.set_editor_property("count", count)
+        entry.set_editor_property("spawn_point_index", -1)
+        entries.append(entry)
+    return entries
+
+
+def _configure_wave_spawner(spawner, fid):
+    apron = _wave_apron(fid)
+    origin = unreal.Vector(apron[0], apron[1], ground_z(*apron) + WAVE_Z_LIFT_CM)
+    spawner.set_actor_location(origin, False, False)
+
+    def rel(x, y):
+        return unreal.Vector(x - origin.x, y - origin.y, ground_z(x, y) + WAVE_Z_LIFT_CM - origin.z)
+
+    spread = WAVE_SPAWN_SPREAD_CM
+    spawner.set_editor_property("spawner_id", "OW_Werk_%s" % fid.upper())
+    spawner.set_editor_property("behaviour", unreal.EnemyWaveSpawnerBehaviour.ATTACK_WAVE)
+    spawner.set_editor_property("spawn_points", [rel(apron[0] + dx, apron[1] + dy) for dx, dy in
+                                                 ((0.0, 0.0), (spread, 0.0), (-spread, 0.0), (0.0, spread))])
+    spawner.set_editor_property("waypoints", [rel(x, y) for x, y in _wave_route(fid)])
+    units = unreal.EnemyWaveSpawnerUnits()
+    for field, spec in WAVE_UNITS.items():
+        units.set_editor_property(field, _wave_entries(spec))
+    spawner.set_editor_property("units", units)
+    timing = spawner.get_editor_property("timing")
+    timing.set_editor_property("start_on_begin_play", False)
+    timing.set_editor_property("first_wave_delay", 0.0)
+    timing.set_editor_property("repeat", unreal.EnemyWaveSpawnerRepeat.ONCE)
+    spawner.set_editor_property("timing", timing)
+
+
+def step_waves():
+    """One attack-wave spawner per Werk (Werk order of step_direction_finding) and the AWerkWaveDirector that runs
+    them; run after step_direction_finding."""
+    require_map()
+    actors = by_label()
+    manager = actors.get(DF_MANAGER_LABEL)
+    if manager is None:
+        raise RuntimeError("missing %s (run step_direction_finding first)" % DF_MANAGER_LABEL)
+    spawner_class = unreal.load_class(None, "/Script/RTS_Survival.EnemyWaveSpawner")
+    spawners = []
+    for fid in sorted(LAYOUT["werks"]):
+        label = WAVE_SPAWNER_LABEL % fid
+        spawner = actors.get(label)
+        if spawner is None:
+            spawner = actors_sub().spawn_actor_from_class(spawner_class, unreal.Vector(0.0, 0.0, 0.0),
+                                                          unreal.Rotator(0.0, 0.0, 0.0))
+            spawner.set_actor_label(label)
+            spawner.set_folder_path(FOLDER + "Mission/Waves")
+        _configure_wave_spawner(spawner, fid)
+        spawners.append(spawner)
+    director = actors.get(WAVE_DIRECTOR_LABEL)
+    if director is None:
+        cls = unreal.load_class(None, "/Script/RTS_Survival.WerkWaveDirector")
+        start = feature("start")["points"][0]
+        director = actors_sub().spawn_actor_from_class(cls, unreal.Vector(start[0] - 1500.0, start[1],
+                                                                          ground_z(*start) + 1500.0),
+                                                       unreal.Rotator(0.0, 0.0, 0.0))
+        director.set_actor_label(WAVE_DIRECTOR_LABEL)
+        director.set_folder_path(FOLDER + "Mission")
+    director.set_editor_property("werk_spawners", spawners)
+    director.set_editor_property("direction_finding", manager)
+    mouths = [actors.get(TUNNEL_MOUTH_LABEL % fid) for fid in sorted(LAYOUT["werks"])]
+    if all(mouth is not None for mouth in mouths):
+        director.set_editor_property("tunnel_mouths", mouths)
+    else:
+        log("waves: tunnel mouths missing (run step_tunnel_mouths first); the director gets none")
+    log("waves: %d spawners on %s" % (len(spawners), director.get_actor_label()))
+    return director
+
+
+# ---- M05 bonus "Collapse a tunnel mouth": BP_OW_TunnelMouth replaces each Werk's SM_OW_TunnelPortal instance.
+# ow_dress_gen.py now writes them as dressing blueprints (OW_D_Werk_<fid>_TunnelMouth); this step does the same on a
+# map built before that, without redoing all dressing (which would respawn the DF stations the manager points to).
+TUNNEL_MOUTH_LABEL = PREFIX + "D_Werk_%s_TunnelMouth"
+TUNNEL_PORTAL_HOLDER = PREFIX + "I_Kit_SM_OW_TunnelPortal"
+
+
+def step_tunnel_mouths():
+    require_map()
+    actors = by_label()
+    placed = []
+    for label, path, x, y, yaw, dz, folder, scale in dress()["bps"]:
+        if not label.endswith("_TunnelMouth") or (PREFIX + "D_" + label) in actors:
+            continue
+        cls = unreal.EditorAssetLibrary.load_blueprint_class(path)
+        actor = actors_sub().spawn_actor_from_class(cls, unreal.Vector(x, y, ground_z(x, y) + dz),
+                                                    unreal.Rotator(0.0, 0.0, yaw))
+        actor.set_actor_label(PREFIX + "D_" + label)
+        actor.set_folder_path(FOLDER + folder)
+        placed.append(label)
+    holder = actors.get(TUNNEL_PORTAL_HOLDER)
+    if holder is not None:
+        actors_sub().destroy_actor(holder)
+    log("tunnel mouths placed %s, portal instances removed: %s" % (placed, holder is not None))
+    return placed

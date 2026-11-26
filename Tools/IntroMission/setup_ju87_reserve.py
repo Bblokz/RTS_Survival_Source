@@ -4,6 +4,8 @@ On the Mission_Intro_ClearSovietRig class defaults (USecureBaseMission assault r
   - the strike flies 4 Ju 87s (was 2);
   - 8 s after the strike takes off, the Okhotnik (PTRS) squad info takeover opens for a squad that dropped into the base
     (row "Okhotnik" of DT_SquadInfoTakeovers, written by Tools/InfoTakeover/author_squad_info_takeovers.py);
+  - 2026-11-25: right after it, the crushing field manual (walls, then running over infantry; UW_WallBreachTakeover)
+    opens (bShowWallBreachManualAfterIntelSquad: queued behind the Okhotnik screen);
   - 60 s after the strike takes off, the player gets a Ju 87 strike of their own (4 aircraft that keep attacking the
     targeted area) with 2 charges, a 180 s cooldown and no cost, and the announcer plays IntroMission_Ju87Reserve.
 On the map: the mission manager hides the player's global abilities (bHideGlobalAbilitiesForPlayer), so the panel only
@@ -22,6 +24,7 @@ RESERVE_LINE = LINES + 'IntroMission_Ju87Reserve'
 STRIKE_AIRCRAFT = 4
 INTEL_SQUAD_ROW = 'Okhotnik'
 INTEL_DELAY_SECONDS = 8.0
+WALL_MANUAL_AFTER_INTEL = True
 GRANT_DELAY_SECONDS = 60.0
 GRANT_CHARGES = 2
 GRANT_COOLDOWN_SECONDS = 180
@@ -40,6 +43,7 @@ def apply_to(mission):
     resp.set_editor_property('intel_squad_subtype', unreal.SquadSubtype.SQUAD_RUS_OKHOTNIK)
     resp.set_editor_property('intel_squad_library_entry', INTEL_SQUAD_ROW)
     resp.set_editor_property('intel_squad_delay_seconds', INTEL_DELAY_SECONDS)
+    resp.set_editor_property('show_wall_breach_manual_after_intel_squad', WALL_MANUAL_AFTER_INTEL)
     grant = unreal.MissionGrantedGlobalAbility()
     grant.set_editor_property('ability', ability_enum().GA_JU87_STRAFING)
     grant.set_editor_property('charges', GRANT_CHARGES)
@@ -57,6 +61,7 @@ def apply_to(mission):
     mission.set_editor_property('assault_response', resp)
     print(mission.get_name(), 'aircraft', resp.get_editor_property('air_support_aircraft_count'),
           'intel', resp.get_editor_property('intel_squad_library_entry'),
+          'wall manual', resp.get_editor_property('show_wall_breach_manual_after_intel_squad'),
           'grant', resp.get_editor_property('granted_ability').get_editor_property('ability'),
           'line', line.get_path_name() if line else None)
 
