@@ -3,6 +3,7 @@
 #include "CPPController.h"
 #include "RTS_Survival/GlobalAbilitySystem/Tests/AllGlobalAbilities/AllGlobalAbilitiesUnlock.h"
 #include "RTS_Survival/Player/ConstructionPreview/FieldTrenchPlacement/FieldTrenchPlacementComponent.h"
+#include "RTS_Survival/Player/ConstructionPreview/BarbedWirePlacement/BarbedWirePlacementComponent.h"
 
 #include "RTS_Survival/Player/SquadMovePreview/SquadMovePreviewComponent.h"
 #include "RTS_Survival/Player/Formation/FormationMovePreview/FormationMovePreviewComponent.h"
@@ -281,6 +282,7 @@ ACPPController::ACPPController()
 	M_FormationController = CreateDefaultSubobject<UFormationController>(TEXT("FormationController"));
 	M_SquadMovePreview = CreateDefaultSubobject<USquadMovePreviewComponent>(TEXT("SquadMovePreview"));
 	M_FieldTrenchPlacement = CreateDefaultSubobject<UFieldTrenchPlacementComponent>(TEXT("FieldTrenchPlacement"));
+	M_BarbedWirePlacement = CreateDefaultSubobject<UBarbedWirePlacementComponent>(TEXT("BarbedWirePlacement"));
 	M_FormationMovePreview = CreateDefaultSubobject<UFormationMovePreviewComponent>(TEXT("FormationMovePreview"));
 	M_HoverCommandIcon = CreateDefaultSubobject<UHoverCommandIconComponent>(TEXT("HoverCommandIcon"));
 
@@ -2131,6 +2133,21 @@ bool ACPPController::MapTest_GetIsFieldDefensePreviewActive() const
 bool ACPPController::MapTest_ClickFieldTrenchAt(const FVector& Location)
 {
 	if (M_IsBuildingPreviewModeActive != EPlayerBuildingPreviewMode::FieldTrenchPreviewMode)
+	{
+		return true;
+	}
+	FVector ClickedLocation = Location;
+	if (TryPlaceBuilding(ClickedLocation))
+	{
+		StopPreviewAndBuildingMode(true);
+		return true;
+	}
+	return false;
+}
+
+bool ACPPController::MapTest_ClickBarbedWireAt(const FVector& Location)
+{
+	if (M_IsBuildingPreviewModeActive != EPlayerBuildingPreviewMode::BarbedWirePreviewMode)
 	{
 		return true;
 	}
@@ -6931,6 +6948,11 @@ bool ACPPController::TryPlaceBuilding(FVector& ClickedLocation)
 	{
 		return not IsValid(M_FieldTrenchPlacement) || M_FieldTrenchPlacement->OnPrimaryClick(ClickedLocation);
 	}
+	// A barbed wire line is laid out the same way, by two clicks without a preview mesh.
+	if (M_IsBuildingPreviewModeActive == EPlayerBuildingPreviewMode::BarbedWirePreviewMode)
+	{
+		return not IsValid(M_BarbedWirePlacement) || M_BarbedWirePlacement->OnPrimaryClick(ClickedLocation);
+	}
 	if (CPPConstructionPreviewRef->GetIsBuildingPreviewBlocked())
 	{
 		// Need a click somewhere else.
@@ -7266,6 +7288,9 @@ void ACPPController::StopBuildingPreviewMode()
 	case EPlayerBuildingPreviewMode::FieldTrenchPreviewMode:
 		StopFieldTrenchPlacement();
 		break;
+	case EPlayerBuildingPreviewMode::BarbedWirePreviewMode:
+		StopBarbedWirePlacement();
+		break;
 	case EPlayerBuildingPreviewMode::BuildingPreviewModeOFF:
 		break;
 	default:
@@ -7355,6 +7380,30 @@ void ACPPController::StartFieldTrenchPlacement(
 void ACPPController::StopFieldTrenchPlacement()
 {
 	// The trench itself is removed by StopPreviewAndBuildingMode.
+	StopPreviewAndBuildingMode(false);
+}
+
+void ACPPController::StartBarbedWirePlacement(
+	UTrainerComponent* Trainer,
+	const TMap<ERTSResourceType, int32>& CostPerMetre)
+{
+	if (not IsValid(Trainer) || not IsValid(M_BarbedWirePlacement))
+	{
+		return;
+	}
+	// Ends whatever placement was active, including another line that was not confirmed.
+	StopBuildingPreviewMode();
+	M_IsBuildingPreviewModeActive = EPlayerBuildingPreviewMode::BarbedWirePreviewMode;
+	// Wire is strung inside the player's building radii, like the trenches and field defenses.
+	const TArray<URadiusComp*> Radii = GetIsValidPlayerBuildRadiusManager()
+		                                   ? Get_NOMADIC_BuildRadiiAndMakeThemVisible()
+		                                   : TArray<URadiusComp*>();
+	M_BarbedWirePlacement->StartPlacement(Trainer, CostPerMetre, Radii);
+}
+
+void ACPPController::StopBarbedWirePlacement()
+{
+	// The line itself is removed by StopPreviewAndBuildingMode.
 	StopPreviewAndBuildingMode(false);
 }
 
@@ -7577,6 +7626,11 @@ void ACPPController::StopPreviewAndBuildingMode(const bool bIsPlacedSuccessfully
 	if (IsValid(M_FieldTrenchPlacement))
 	{
 		M_FieldTrenchPlacement->CancelPlacement();
+	}
+	// Likewise keeps a barbed wire line that was just confirmed and removes one still being laid out.
+	if (IsValid(M_BarbedWirePlacement))
+	{
+		M_BarbedWirePlacement->CancelPlacement();
 	}
 	ShowPlayerBuildRadius(false);
 	if constexpr (DeveloperSettings::Debugging::GBuilding_Mode_Compile_DebugSymbols)

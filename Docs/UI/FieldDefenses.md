@@ -148,6 +148,74 @@ The HQ's fourth tab, Barriers, holds procedural defenses that the player drags o
   - Each piece's ground is looked for within 20 m of the spline height, so keep the spline near the ground (snap it). The ground trace ignores other trenches and joined pits. A closed spline is laid as an open trench.
   - The Blueprint is made by `Source/Tools/FieldTrench/create_field_trench_spline_bp.py`, which also checks it on the open map. `check_field_trench_spline_joins.py` checks the joins (pit, pit to pit, end to end, Tee both sides, unjoin, delete) on `TestFieldTrench`.
 
+## Barbed wire line (Barriers tab)
+
+The Barriers tab's second option, after the field trench, is barbed wire, `BTX_GerBarbedWireLine`. The player drags out a line, like the trench, and it does not go through the trainer's queue.
+
+- **Picking it:** `UTrainingMenuManager::OnLeftClickFieldDefenseItem` catches it and calls `ACPPController::StartBarbedWirePlacement`, which turns on `EPlayerBuildingPreviewMode::BarbedWirePreviewMode`. `UBarbedWirePlacementComponent` on the controller (`Player/ConstructionPreview/BarbedWirePlacement`) handles the clicks.
+  - Before the first click, one ghost piece follows the mouse, laid towards screen right.
+  - The first click sets the start.
+  - The line then follows the mouse. The path is recorded every 50 cm.
+  - The second click confirms the line.
+  - Right click, Escape or the HQ dying removes a line that is not confirmed yet.
+- **Pieces:** `ARTSBarbedWireLine::PlanAlongPath` (`Buildings/BarbedWireLine`) lays straight pieces 400 cm apart along the path. The mesh is 4.14 m long, so neighbouring coils overlap a little.
+  - A free end lands within half a piece of the mouse.
+  - A line shorter than one piece is one piece long, pointing the last way the mouse went.
+  - At most 60 m per drag.
+- **Snapping (no anchors):** both ends snap within 3.5 m (let go beyond 5 m) to an *open end* of the player's other wire. An open end is the end of a standing or coming piece that no other piece continues from, of its own line or another line (`ARTSBarbedWireLine::FindOpenEndNear`; ends within 75 cm count as joined).
+  - A new line therefore continues an existing line end to end.
+  - A destroyed piece leaves two open ends. A short line drawn from one to the other patches the gap.
+  - The end also snaps to the line's own start once the line is three pieces long, closing a ring.
+  - A closing end lands exactly on its target: the last piece is pulled back along the path and overlaps the one before it. Pieces are never stretched.
+- **Buildable:** the line is cut before the first piece that has no ground, leans more than 20°, has its centre outside the build radii, or stands on an obstacle. If the first piece already fails, the whole plan shows in red.
+  - Obstacles (`ARTSBarbedWireLine::GetIsPieceOnObstacle`) are what the building grid refuses: anything on the building placement channel in a box over the coil (from 25 cm above the ground), such as building meshes (the HQ's `BuildingMeshComp` included), pits and walls.
+  - Soldiers don't count: they step out of the way. Vehicles ignore the channel. Barbed wire doesn't count, so lines may join and cross.
+- **Stringing and paying:** pieces are strung in order, at 1 s per metre (4 s a piece). Each piece rises 130 cm out of the ground with the wire's own material.
+  - Each piece is paid for when stringing starts: `GerBarbedWireLine_RadixitePerMetre` (5 Radixite per metre, so 20 per piece). The tooltip cost is that per-metre price, lowered by a Requisition Office like the other field defenses.
+  - A piece waits while the player cannot pay, and while a unit stands on its spot. The player's own units there are ordered away. After 10 s it is strung anyway, so a wreck or an enemy cannot stall the line forever.
+- **Every piece is the scavengers' wire:** a finished piece becomes its own `Ger_BarbedWire_FieldConstruction` actor (`AFieldConstruction`, 300 health), spawned at the piece's ground transform. Each piece therefore:
+  - takes weapon damage and collapses on its own;
+  - blocks infantry through its `RTSNavCollisionEnvObstacle` (`RTS_NavArea_BlockChar`, the engine's failsafe box of 250×40×100 cm rotated with the piece), while vehicles path through.
+- **Crushing by any vehicle:** the wire's Blueprint makes its static mesh crushable by any vehicle (`SetupCrushDestructionOverlap`, `AnyTank`), with `SetupFieldConstructionMeshCollision`: vehicles of every player overlap it, and hostile shells hit it.
+  - `SM_RTS_Barrier_BarbWire` has one convex hull over the whole coil (−207..207 × −64..61 × −4..120 cm); the hull is what vehicles overlap.
+  - Only the piece under the hull goes; its neighbours stay.
+  - The hull is thin. A test trace from the side meets it at about 80 cm, so most bullets aimed at soldiers behind the wire pass through it, as for the scavengers' wire. Shell blasts reach it (radial damage).
+  - The editor's `get_simple_collision_count` reports 0 for this mesh; at runtime the body setup has the convex element. Don't trust that python count.
+- **Death:** when a piece dies, its nav modifier is switched off at once (`URTSNavCollision::EnableAffectNavmesh`), so infantry fits through the gap before the collapsed wreck is gone. The line removes itself once none of its pieces is left; the wire actors never depend on it.
+- **Menu row:** `Train_BTX_GerBarbedWireLine` in `DT_TrainingOptions`, with the brush `Environment/BarbedWireLine/UI/SB_OptionImage_GerBarbedWireLine`, made by `Source/Tools/FieldDefenses/ue_add_barbed_wire_line_row.py`.
+  - The brush shows the scavengers' barbed wire icon, `T_FieldConstruction_Barbedwire`; `ue_barbed_wire_line_icon_fallback.py` sets it.
+  - A picture in the trench picture's style (real wire pieces along a bend on its olive ground) was tried, and the tools are kept in `Source/Tools/FieldDefenses`:
+    1. `ue_barbed_wire_line_icon.py` renders it in a `-RenderOffscreen` editor.
+    2. `barbed_wire_line_icon_grade.py` matches the ground to (144, 146, 114).
+    3. `ue_barbed_wire_line_icon_import.py` imports it and saves the brush.
+  - On 2026-11-26 the render showed only the ground plane, without the wire. `T_BxpOption_GerBarbedWireLine` holds that failed picture and is not used. Fix the render before switching the brush to it.
+  - A save fails with error 32 while another editor or a game holds the package.
+
+Map test: `-BarbedWireValidate` on `UT_Nomadics` (`UBarbedWireLineTestSubsystem`, log prefix `RTS_BARBED_WIRE_TEST`). It runs headless with `-nullrhi`. It checks:
+- the menu click and the hover piece;
+- a bent drag, and payment per piece;
+- that every piece is a scavenger wire actor with a BlockChar modifier and a mesh that overlaps vehicles;
+- that shots on the AI's weapon channel hit a piece;
+- the infantry path across the line (with the RTS character query filter, as infantry plans):
+  - blocked;
+  - open after one piece is destroyed by a small radial shell blast (its neighbours stay);
+  - blocked again after the gap is patched end to end;
+- a new line starting exactly on an open end;
+- a Panzer IV (player) crushing only the piece it is put on;
+- a stand-alone scavenger wire, spawned as a squad builds it, crushed by an enemy T-34;
+- that a line drawn into the HQ stops before the HQ's building mesh;
+- that cancelling removes only the unconfirmed line.
+
+The nav checks wait at least 1 s, then measure every tick until the path changes (at most 20 s); rendered runs rebuild navigation tiles more slowly. When the gap check fails, the test logs the infantry path's points (`nav_path`).
+
+The test passed 33 of 33 checks on 2026-11-25.
+
+```bash
+MSYS_NO_PATHCONV=1 UnrealEditor-Cmd.exe RTS_SurvivalShorts.uproject /Game/RTS_Survival/Maps/UnitTests/UT_Nomadics -game -unattended -nullrhi -nosound -benchmark -fps=30 -DisablePlugins=Fab -BarbedWireValidate
+```
+
+To see the wire, run with `-RenderOffscreen` instead of `-nullrhi` and add `-BarbedWireCapture=<folder>`. It saves six screenshots: planned, stringing, built, the gap, patched and crushed, and the scavenger wire crushed. Check GPU memory first.
+
 Map tests:
 - `-FieldDefenseValidateTrench` on `UT_Nomadics`: the menu click, the two clicks along a bent path, digging with per-metre payment, waiting while the player cannot pay, and cancelling.
 - `-FieldDefenseValidateTrenchAnchor` on `UT_Nomadics`: a Pak 40 pit is built and offers its rear anchor. A trench clicked near the anchor starts on its port, claims it, and shows the neck once the first piece is dug; removing the trench frees the anchor. A trench drawn to the anchor snaps its end and is planned from the anchor. Destroying the pit caps that trench. Then the two Breakthrough bunkers are placed as in a level: each offers its two anchors on their sockets, and a trench is laid and dug from every anchor.

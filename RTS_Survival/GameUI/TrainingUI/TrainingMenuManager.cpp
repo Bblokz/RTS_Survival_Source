@@ -3051,6 +3051,8 @@ void UTrainingMenuManager::InitAllGameFieldDefenseTrainingOptions()
 	}
 	// Never queued: the trench digs itself, so its training time is unused.
 	AddFieldDefenseTrainingOption(EBuildingExpansionType::BTX_GerFieldTrench, nullptr);
+	// Never queued either: the wire line strings its pieces itself.
+	AddFieldDefenseTrainingOption(EBuildingExpansionType::BTX_GerBarbedWireLine, nullptr);
 }
 
 URTSRequirement* UTrainingMenuManager::CreateTierTwoUnlockRequirement()
@@ -3189,6 +3191,12 @@ void UTrainingMenuManager::OnLeftClickFieldDefenseItem(const FTrainingWidgetStat
 	if (static_cast<EBuildingExpansionType>(TrainingItem.ItemID.SubtypeValue) == EBuildingExpansionType::BTX_GerFieldTrench)
 	{
 		PlayerController->StartFieldTrenchPlacement(M_PrimarySelectedTrainer, GetTrainingCosts(TrainingItem.ItemID));
+		return;
+	}
+	// Barbed wire is dragged out the same way and pays per metre while each piece is strung.
+	if (static_cast<EBuildingExpansionType>(TrainingItem.ItemID.SubtypeValue) == EBuildingExpansionType::BTX_GerBarbedWireLine)
+	{
+		PlayerController->StartBarbedWirePlacement(M_PrimarySelectedTrainer, GetTrainingCosts(TrainingItem.ItemID));
 		return;
 	}
 	// The controller owns building placement; it checks the limit of planned field defenses and shows its error.

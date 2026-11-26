@@ -36,6 +36,18 @@ public:
 		const AActor* PreviewActor,
 		const FRotator& FinishedMoveRotation);
 
+	/**
+	 * @brief Orders the player-1 units within a world box away from it; for constructions without a preview actor,
+	 * such as a barbed wire piece about to be strung.
+	 * @param WorldContextObject Any UObject with a world (for projection).
+	 * @param BoundsWS The box in world space.
+	 * @param FinishedMoveRotation Units will adopt this final rotation upon arriving.
+	 */
+	static void MoveOverlappingUnitsForPlayer1AwayFromBounds(
+		const UObject* WorldContextObject,
+		const FBox& BoundsWS,
+		const FRotator& FinishedMoveRotation);
+
 private:
 	/** @return World-space AABB of the preview. */
 	static FBox GetWorldBoundsOfPreview(const AActor* PreviewActor);
