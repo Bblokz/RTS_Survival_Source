@@ -38,7 +38,11 @@ Notes on the mechanics:
    `BehaviourClassToApply` set.
 3. `Buttons_DataTableb`, row `IdResearchTechnology`: `CustomTypeMapping[<enum value>]` = research title, description, icon.
 4. `DA_BehaviourUI`: `BehaviourIconStyles[<EBehaviourIcon>]` = icon texture (the buff icon on the unit).
-5. A `ResearchTechnologyAbilityComp` on the host building expansion, one entry per faction.
+5. ~~A `ResearchTechnologyAbilityComp` on the host building expansion, one entry per faction.~~ Retired 2026-11-26:
+   technologies are researched on the campaign tech tree (`WorldCampaignTechSettings`), and building expansions no
+   longer offer them (`Tools/TechSetup/remove_bxp_research.py`). The component is kept for mission-only field
+   modification kits (first one: `Docs/Units/FieldKit_TurretMG42Gunner.md`; kits are flagged by
+   `Global_GetIsFieldModificationKit` and kept out of the campaign save).
 6. `RTS_BP_PlayerController` → function `GetPlayerTechs` → Make Map: `<ETechnology>` → `TEBP` class. Python cannot
    grow a Make Map node; use the editor command `RTS.TechSetup.AddMakeMapEntries` (TechTree/Editor).
 7. Icons: `D:\Blender\BlenderProjects\BlenderTanks\AbilityIcons\Technologies\tools\compose_tech_icons.py`

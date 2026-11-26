@@ -37,6 +37,25 @@ leaves no radiation: the scar is plain burnt ground (`Glow` 0) and the actor sto
 keeps vision of the blast for at least 8 s after it. Tier IV, 1800 radixite + 450 vehicle parts, 360 s cooldown. It is
 in no commander kit yet.
 
+### V2 impact (2026-11-25/26)
+
+Written by `Source/Tools/GlobalAbilityTargetAreas/setup_v2_crater.py` (only the impact fields of the V2's
+`m_nuke_visuals`; needs a DLL with `BlastThrow`). Every block is opt-in and empty by default, so the radixite nuke is
+unchanged.
+
+| Block | What it does |
+|---|---|
+| `Crater` | 60 m parallax pit decal (`MI_V2RocketCraterPit`, crater-decal pack texture 04, rim crest at 0.6 of its half size) and a 36 m earth rim (`RadixiteNukeCraterRim`, procedural mesh, `MI_V2RocketCraterRim` on the trench-bank material) built at the blast on the landscape heights under every vertex. The landscape cannot be cut, so the pit is painted; nav never sees it. The rim is a physics-only vehicle ramp like the trench banks; infantry walk through it. |
+| `DetonationLayers` | Extra Niagara at the blast: debris ring, fiery ground burst, 10 earth bursts along the rim, 6 later explosions, rising crater smoke. Each copy picks a delay and distance. |
+| `FlashFadeSeconds`, `BlastShakePulses` | Brighter, longer flash; 4 shake pulses (one shake is capped by the shake system at 60 mm calibre). |
+| `AfterBlastSounds` | A V2 outran its sound: siren at launch, silence, the boom (plus a deep rumble), then 1.1 s later the roar of the incoming rocket (`Sus4_F18Fly_By_Fast_1_Cue`, pitch 0.6). |
+| `ImpactFeel` | Only for a blast on screen within 300 m of the camera: hit-stop (game speed x0.08 for 0.13 real s, the previous speed restored unless something else changed it), white flash (+3.5 exposure, bloom) and colour fringing fading over 0.7 s (unbound post process on the actor). |
+| `DebrisRain` | `ARadixiteNukeDebrisRain`: 40 ground stones on solved ballistic arcs out of the crater (1.8-4.8 s flights, up to ~25 m high) landing 29-56 m out with a dust puff, 14 with a clatter; they stay. |
+| `BlastThrow` | Registered in `URTSBlastThrowSubsystem` for 3 s by epicentre: blast-killed soldiers fly 1.8x as fast (`FSquadUnitDeathHit::ThrowSpeedScale`), killed tanks toss their turret away from the blast at 1.4x speed (`FTankBlastTurretToss` -> `FWreckTurretTossSettings::ForcedSideDirection`), surviving simulating vehicles get up to 9 m/s out, 3.5 m/s up and a slew 0.2 s after the blast, with their tracks let go for 1.3 s (`UTrackPhysicsMovement::StartKnockback`). |
+
+Test: `-GlobalAbilityAreaValidate -GlobalAbilityV2Only` goes straight to the V2, checks `v2_leaves_a_crater` and
+`v2_hit_stop_gives_speed_back`, and keeps taking pictures for 6 s after the blast is spent.
+
 ## Aiming
 
 - `FGlobalAbilityAimSettings::AreaAim.Shape`: `Reticle` is the old crosshair path, `Circle` one click, `Strip` two clicks.

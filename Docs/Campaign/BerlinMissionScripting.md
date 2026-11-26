@@ -780,3 +780,149 @@ found, fights 20 s, then returns to its route. Plus three Forge crew lines (Berl
   turn a group back. After 80 s: 20 s after the next fight it returns; without a fight, 30 s after all arrived, or at
   80 + 60 s + distance / 2.5 m/s.
 - **Not tested in a game run.** The Development DLL needs a rebuild before the user editor has the new class.
+
+## 13. Field hospital bonus (2026-11-26)
+
+Owner's ask: a bonus point of interest in the western ruin field, "that will just trigger an announcer line when found
+and we are rewarded 2 medic squads."
+
+Owner's picks (2026-11-26):
+
+| Question | Pick |
+|---|---|
+| Look | A "Kellerabgang": an E5 one-storey shell, sandbags round a dark cellar door, Red Cross flag over it, cots and crates |
+| Spot | B "between craters" in the south-central field of the owner's screenshot (between the two mud-crater chains): (-16500, -5800), 49 m from the flak position and 102 m from the Ju 52 crash. A first round offered spots north-west of the start base by mistake; the owner re-picked once the screenshot's area was known |
+| Medics | A "Walk out": they appear at the cellar door and walk out to the yard, one squad after the other, with a reinforcements ping |
+| Line | A "Flag" |
+
+### 13.1 The stage: `Mission_Berlin_FieldHospital` (BONUS "The field hospital")
+
+- **Parent:** `UMissionBase`, modelled on `Mission_Berlin_CellarPeople`. Plate description: "A Red Cross flag over a
+  cellar in the ruins. Two medic squads join the raid."
+- **Trigger:** `UPlayerUnitsNearMissionTrigger` at (-16500, -5800), 25 m (`wire_berlin_stages.py`:
+  `('near', (-16500.0, -5800.0, 0.0), 2500.0)`).
+- **Event graph (one row):**
+  - `BP_OnMissionStart` → `PlayAdvisorLine(HospitalLine)` → `FindHospital` → `SpawnMedicSquad(RallyLocation1)` →
+    `ShowReinforcementsOnMiniMap(DoorLocation, 8)` → `ScheduleSingleCallback(SecondSquadDelaySeconds = 4)`.
+  - `OnSecondSquad` → `SpawnMedicSquad(RallyLocation2)` → `ScheduleSingleCallback(CompleteDelaySeconds = 6)`.
+  - `OnHospitalDone` → `OnMissionComplete`. The plate completes about 10 s in, after the 9.9 s line.
+- **Functions:**
+  - `PlayAdvisorLine(Line)`: copied from CellarPeople (`PlayPortrait(GermanAnnouncer, Line)` when the line is set).
+  - `FindHospital`: the first actor tagged `HospitalTag` (`BerlinFieldHospital`). `DoorLocation`, `RallyLocation1` and
+    `RallyLocation2` are `DoorOffset` (640, 210), `RallyOffset1` (1150, 40) and `RallyOffset2` (1150, 380) moved into
+    that actor's frame; `DoorRotation` is its rotation. Moving the placed POI moves the points with it. Without a
+    tagged actor the instance-editable world values are used.
+  - `SpawnMedicSquad(RallyPoint)`: `AsyncSpawnActorAtLocationWithQueue(MedicSquadOption, 0, DoorLocation,
+    DoorRotation, NoBehaviours, [IdMove to RallyPoint])`. `MedicSquadOption` = `(UNType_Squad, 49)`
+    (`Squad_Ger_Medic`). `NoBehaviours` is an empty array variable: the array pin must be wired.
+- **Built by** `Source/Tools/BerlinMap/mission/build_field_hospital_stage.py <port>` (variables, functions, event
+  graph laid out with `layout_eventgraphs.Graph`, plate, save), then `tidy_graphs.py <port> 30 20
+  Mission_Berlin_FieldHospital` plus one more knot splice. It compiles with 0 errors (DebugGame editor).
+
+### 13.2 The line: `Berlin_Cinematic_FieldHospital` (9.9 s)
+
+> Kommandant, a Red Cross flag in ze ruins! Zat cellar is a field hospital, und two medic squads are still down zhere.
+> Zey vill join you.
+
+- **Made with:** `elevenlabs_lines.py` (announcer voice, eleven_v4, three takes), then `make_mission_lines.py`.
+- **Take:** take 2 (`Recordings/EL_Berlin_Cinematic_FieldHospital_2.wav`), checked with whisper. Take 1 clipped
+  "Kommandant" and take 3 said "here". Take 3 is the spare.
+- **Files:** `BlenderTanks/VoiceLines/Announcer/AAAGerMissions/Berlin/`. Imported into `.../Anouncer/AAAGerMissions/Berlin/`
+  (`RTS_SClass_CinematicAndTransmissions`) by `mission/run_import_fieldhospital_line.py`, a copy of the Berlin line
+  importer.
+- **Subtitle:** a row in `DT_CinematicTranscripts` (`new_voice_lines.py`). The accent spellings (und, zhere, vill) were
+  hand-set in `_CinematicTranscripts.json`, in the text and in the word entries, with `"edited": true`.
+
+### 13.3 The POI assets (`/Game/RTS_Survival/Blueprints/Environment/Berlin/FieldHospital/`)
+
+Built by `Source/Tools/BerlinMap/poi/field_hospital/fh_assets.py`, which can be re-run (run it with `fh_py.py <port>
+fh_assets.py`).
+
+- `T_FactionFlag_RedCross`: from `UISkins/Flags/T_FactionFlag_RedCross.png` (`make_redcross_flag.py`). Grey-yellow
+  cloth, faded red cross, soot on the edges. It is drawn at the banner's 1016 x 604 aspect and squeezed to 512 x 512, so
+  the cross reads square on the flag.
+- `MI_RedCrossBanner`: a child of `M_SovietBanner` (waving cloth), with the wind values of `MI_StrikeDivisionBanner`.
+- `Dest_RedCrossFlag`: a copy of `Dest_SovietFlag` (destructible pole and banner) with the Red Cross banner.
+- `M_FieldHospital_CellarVoid`: unlit near-black, the dark cellar doorway.
+- `M_FieldHospital_Sheet`: lit cloth for the Red Cross sheet spread on the ground. It reads well from the RTS camera.
+- `BP_BerlinFieldHospital`: the dressing round the front door of `SM_BerlinRuin_E5_Shell1St_A`.
+  - Its pivot is the shell's pivot.
+  - The door is centred at local (500, 210), is 1.3 m wide and 3 m high, and the wall hull closes it.
+  - Contents:
+    - a void plane in the doorway;
+    - 10 loose sandbags forming the stair cheeks;
+    - 3 iron beds used as cots;
+    - a cellar shelf, crates, a lamp and a fallen door leaf;
+    - the ground sheet;
+    - arrows `CellarDoor`, `MedicRally1` and `MedicRally2` at the stage's offsets.
+  - Actor tag `BerlinFieldHospital`.
+  - Visual only: no collision and no effect on navigation, so nothing blocks the medics' walk out.
+- **Preview pictures:** `Saved/BerlinFieldHospital/preview_1.png`, `preview_door.png` and `preview_rts.png`, taken on
+  a test map.
+
+**Known limits:**
+- The cellar is a dark doorway, not real stairs. The landscape has no hole, so anything below ground would be buried.
+- The shell is a normal destructible ruin, so if it is destroyed the doorway plane stays standing.
+
+### 13.4 Map (placed 2026-11-26)
+
+`fh_place.py` (`check()`, `place()`, `nav()`) puts three actors in the outliner folder `Berlin/FieldHospital` at
+(-16500, -5800) with yaw 180, so the shop front and door face south, toward the RTS camera:
+- `FH_Shell` (E5 A);
+- `FH_Hospital`;
+- `FH_Flag`, at local (700, -30).
+
+They sit at the median landscape height of the footprint. Then the navmesh needs a rebuild round the shell, and the door
+and rally points should be checked with `nav()`.
+
+The spot was checked against the detail-pass dump (`Saved/Berlin/detail/dump`, 2026-11-26 00:20):
+- the nearest ruin pivot is 4.9 m outside the footprint (`RUIN_B2_Facade2St_A_0400`, to the east);
+- the BerlinMud weight is at most 61/255 inside the footprint, so it stays out of the crater;
+- the ground relief is 16 cm.
+
+**Placed and saved at 15:16 (70.93 MB, `save_current_level` only):**
+- `check()` found only a puddle decal at the margin; the ground in the footprint is -16 to -2 cm, and the actors sit at
+  -7 cm.
+- `Missions[16]` = `Mission_Berlin_FieldHospital` [near (-16500, -5800) r 2500] "The field hospital", after `Ju52Crash`
+  at index 15. It was wired with `wire_berlin_stages.py` in a DebugGame editor; the 15:05 DLL has the new team-weapon
+  fields, so the flak guns on the map kept them.
+- Navmesh rebuilt for all four agents. `nav()`: the door (-17140, -6010) and both rally points are on the navmesh;
+  door to rally is a straight 5.4 m. The rally point reaches the Forge station (199 m), which the HQ reaches (449 m).
+  HQ to rally comes back partial at about 500 m, as HQ to the Demeter pod does: the long-path search limit, not a gap.
+- Checked after a reload from disk: three `FH_` actors, the tag on `FH_Hospital`, and `Missions[16]`.
+- RTS-angle picture: `Saved/BerlinFieldHospital/berlin_rts.png`.
+
+### 13.5 Not tested
+
+The stage has not run in a game: the owner play-tests. Things to look at in that test:
+- the walk-out (spawn at the door, move order to the yard);
+- the ping;
+- the subtitle timing;
+- the camera view of the door.
+
+## 14. Ju 52 crash bonus (2026-11-26)
+
+Owner ask: a downed Ju 52 in a crater in the south-central ruin field, with scavengeable cargo and a surviving crew
+squad; looting makes no noise (owner pick). The site is map content (BerlinMap.md, "South POIs"); next to it is the
+flak position with two crewless Flak 88s and three tank wrecks, which needs no stage.
+
+- **Stage:** `Mission_Berlin_Ju52Crash` (Missions[15], BONUS "The downed transport", text plate that completes).
+  - **Trigger:** `UPlayerUnitsNearMissionTrigger` at (-16800, 3200), 28 m (`wire_berlin_stages.py`). It overlaps the
+    Demeter pod's 25 m trigger a little; both lines queue in the portrait.
+  - **Event graph:** `BP_OnMissionStart` → `PlayAdvisorLine(Ju52Line)` → `SpawnSurvivors` →
+    `ShowReinforcementsOnMiniMap(SurvivorSpawnLocation, 8 s)` → `ScheduleSingleCallback(CompleteDelaySeconds = 10)` →
+    `OnCrashSiteDone` → `OnMissionComplete`.
+  - **SpawnSurvivors:** `AsyncSpawnActorAtLocationWithQueue(SurvivorSquadOption = Squad_Ger_JagerTruppKar98k,
+    SurvivorSpawnLocation (-17350, 2750), yaw -60)` with one `IdMove` to `SurvivorRallyLocation` (-16900, 1700). The
+    crew appears on the crater's west rim: the 8 m deep crater floor is a navmesh island.
+  - Built by `Tools/BerlinMap/mission/build_ju52_crash_stage.py <port>` (reuses `PlayAdvisorLine` from
+    `build_field_hospital_stage.py`).
+- **Line** `Berlin_Cinematic_Ju52Crash` (13.1 s; announcer, eleven_v4, `elevenlabs_lines.py` + `make_mission_lines.py`):
+
+  > Kommandant, a downed Ju 52 in ze crater! Some of ze crew survived, und zey vill join you. Ze cargo vas thrown
+  > over ze rim: salvage ze crates for metal und spare parts.
+
+  Imported to the Berlin announcer folder (`RTS_SClass_CinematicAndTransmissions`); its subtitle row is in
+  `_CinematicTranscripts.json` and the saved `DT_CinematicTranscripts` (298 rows, 15:25).
+- **No Ju 52 or aircrew exists:** the hull is the DC-3 crash mesh and the crew a Jaeger Kar98k squad (owner picks).
+- **Not play-tested.**

@@ -252,6 +252,19 @@ FlankingT26s, Reinforcements, Players).
 ## Mission_Intro_BaseBuilding
 
 1. **Start:**
+   - `DestroyRadixiteGate` kills the south Soviet wall gate (`BP_RusWallGateA` within 15 m 2D of (630, -4252), the one
+     facing the radixite field) with `TriggerDestroyActor(Kinetic)`, so harvesters path straight through the doorway. A gate
+     already destroyed in the fighting is gone or no longer alive, so nothing happens.
+   - `StartPlayerResourceSafetyNet` (UMissionBase, settings in the BP's `PlayerResourceSafetyNet`, written by
+     `Source/Tools/IntroMission/setup_resource_safety_net.py`). The purchases are the PzI harvester, the Gamma
+     facility, the refinery and the refinery's converter expansion (BTX_RefConverter, the last thing in the stage that costs
+     resources). From the moment the HQ stands, `UPlayerResourceSafetyNetSubsystem` compares the player's radixite and metal
+     with the highest price of the purchases not owned yet. If the player stays short for 30 s, 3 supply crates
+     (`ASupplyCratePickup`, collected by any player unit that touches one) come down by parachute next to the HQ
+     (offset -800, 600). They land on spots at least 3.5 m clear of buildings, and the drop is pinged on the minimap.
+     Each drop tops the player up to the price plus 25 %. There is no new drop while crates are still falling or lying
+     uncollected, at most one every 45 s, and at most 6 in total. The net ends once all four purchases are owned or
+     the stage ends.
    - `RestrictPlayerTrainingTo` limits training to the harvester and the scavengers.
    - `DeliverPlayerHQByMammutGlider` brings the HQ toward the hilltop concrete, with `bBuildOnLanding = false`: build
      spot (1450, 300), touchdown at (-4500, 300). The truck drives out of the glider's nose and waits there.

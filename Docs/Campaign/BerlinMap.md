@@ -349,3 +349,51 @@ tents with rack, table and board, a pallet depot, plank fans, sandbag crescents,
 - Not touched, flagged by the critics: the original sawtooth `DECAL_rut` tracks, white card quads north of Potsdamer
   Platz and the pan, two white generator boxes west of the Gate, pink tiles on the Reichstag tower floors, the original
   hedgehogs' pink atlas, the brewery's mint panels.
+
+## Building room round E2 (2026-11-26)
+
+Owner request: clear the area round the E2 "Rosenthaler Trichter" Radixite field (19650, 16850, north lane), so a
+player can place buildings there when expanding. `Tools/BerlinMap/poi/e2_clear.py` (`plan`, `apply`, `check`) ran in
+the open editor as one undoable transaction.
+
+- **Removed within 28 m of the field centre:**
+  - 16 actors: 6 ruin shells (B1, B2, B6, E6), 4 cover heaps, 2 masonry covers, 3 furniture pieces and 1 smoulder
+    wisp;
+  - 25 instances: loose rubble, props and floor tiles, and 3 footprint plates.
+
+  All of them are logged with transforms in `Saved/BerlinE2Clear/removed_20261126_133302.json`.
+- **Kept:** the field (`RES_Extra_E2_*`), its crater rim `FCRATER_E2_Rim`, decals and ambient litter.
+- **Result:** a free ring about 16 m wide round the crystals. On a 2 m grid only the field pieces and the edges of
+  two ruins just past 28 m remain. Ground slope: median 0.4 %, 95th percentile 8.2 %; heights within -61 to +37 cm
+  (old footprint plinths and the crater lip).
+- **Pictures:** `Saved/BerlinE2Clear/e2_cleared_top.png`.
+- **Backup:** `_MapBackups/Ger_Berlin_2026-11-26_before_e2_clear.umap`.
+- **Generator drift:** `berlin_dress_gen` and `step_ruins` would put the pieces back.
+
+## South POIs: flak position and Ju 52 crash (2026-11-26)
+
+Owner request: the south-central ruin field (between the mud-crater chain at Y -9000 and the Demeter pod) had
+"not a lot going for it to invite the player". Two exploration POIs, built by `Tools/BerlinMap/poi/south_pois.py`
+(`plan`, `apply`, `check`; labels `SPOI_`, outliner `Mission/POI_FlakPosition` and `Mission/POI_Ju52Crash`; `apply`
+removes earlier `SPOI_` actors first). Run in a throwaway editor (`berlin_editor_server.py`); map saved 15:03.
+
+- **Flak position** at (-12500, -3000):
+  - cleared within 22 m: 1 facade ruin (B1), 2 heaps, 2 furniture pieces, 1 smoulder wisp, 19 rubble instances (log
+    `Saved/BerlinSouthPOIs/apply_20261126_145826.json`);
+  - two crewless **Flak 88** team weapons `SPOI_Flak88_A/B` (owner pick B, no 20 mm team weapon exists), owner 1,
+    `bStartAbandoned` with `StartAbandonedCrewClass = Ger_SquadTW_Flak88`: any player infantry squad with enough men
+    re-crews one (`IdManAbandonedTeamWeapon`). Packed pose, pointing north at the Forge crater;
+  - a loose sandbag arc in front of each gun and two half-size ammo boxes behind it;
+  - three scavengeable wrecks (vehicle parts, the power-station children): `ScavObj_Berlin_PZIV_Parts`, `_Stug_Parts`,
+    `_Pz38T_Parts`.
+- **Ju 52 crash** in the oval mud crater at (-16800, 3900), an 8 m deep bowl:
+  - the DC-3 crash mesh stands in for the Ju 52 (owner pick; no Ju 52 model exists), lying along the crater, plus six
+    `SM_RTS_PlaneWreck_*` parts on the rim, seated on the lowest ground under their footprint;
+  - **the crater floor is a navmesh island** (no unit reaches it; it was before the wreck too), so the cargo lies on
+    the west rim: scavengeable `ScavObj_VehicleParts1-3` (metal + vehicle parts) and a crate stack;
+  - the survivors (one `Squad_Ger_JagerTruppKar98k`) come from stage `Mission_Berlin_Ju52Crash` (BerlinMissionScripting.md).
+  - Looting makes no noise (owner pick): no patrol is near.
+- **Checked:** every gun, wreck and crate paths from the flak side for infantry and medium tanks. A short Simulate run
+  turned both guns abandoned; `FTeamWeaponDecalManager` then reports "M_DecalMaterial not set": no team weapon in the
+  game has an abandoned-marker decal material (open).
+- **Pictures:** `Saved/Berlin/detail/shots/poi_south/` (`close_flak`, `close_ju52`, `wide_both`).
