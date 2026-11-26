@@ -129,6 +129,18 @@ public:
 	 */
 	static TArray<FUnitVariantWeaponStats> ReadWeaponStatsFromStates(const TArray<const UWeaponState*>& WeaponStates);
 
+	/**
+	 * @brief A hidden, frozen probe for screens that time their own reads (the tech wheel reads a vehicle, applies a
+	 * technology and reads it again). The caller waits for the BeginPlay setup and destroys the probe.
+	 * @param World Game world to spawn in.
+	 * @param UnitClass Loaded unit class.
+	 * @return Null when the spawn failed.
+	 */
+	static AActor* SpawnHiddenProbe(UWorld& World, UClass* UnitClass) { return SpawnProbe(World, UnitClass); }
+
+	/** @return What ProbeClasses would store for this probe, read now. */
+	static FUnitVariantProbeResult ReadHiddenProbe(const AActor& Probe) { return ReadProbe(Probe); }
+
 private:
 	UPROPERTY()
 	TMap<TObjectPtr<UClass>, FUnitVariantProbeResult> M_Results;

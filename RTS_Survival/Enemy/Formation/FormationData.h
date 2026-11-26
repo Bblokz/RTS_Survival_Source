@@ -52,6 +52,10 @@ struct FFormationData
 	// Whether this formation uses attack move wave logic.
 	bool bIsAttackMoveFormation = false;
 
+	// Attack-move formations: world time of the next "still waiting at this waypoint" warning; negative while the
+	// current wait has not been seen yet (UEnemyFormationController::LogAttackMoveFormationWaiting).
+	float M_NextWaypointWaitLogTimeSeconds = -1.f;
+
 	// Whether this formation uses random patrol with attack move support logic.
 	bool bIsRandomPatrolWithAttackMoveFormation = false;
 
@@ -86,6 +90,10 @@ struct FFormationData
 
 		// Seconds after the first combat before the formation breaks off and returns to its patrol loop.
 		float M_CombatSecondsBeforeReturn = 0.f;
+
+		// Seconds from the start in which nothing ends the convergence: combat on the way does not start the
+		// return clock, so a far target (an HQ) is reached first.
+		float M_CombatCheckDelaySeconds = 0.f;
 
 		// Seconds the formation may take to arrive while it meets no enemy; scaled by its distance at the start.
 		float M_MaxSecondsWithoutCombat = 0.f;

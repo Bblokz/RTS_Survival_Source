@@ -1408,6 +1408,13 @@ void ACPPGameState::InitAllGameWeaponData()
 	// Batch 4 (Wespe, Pz III M, Hetzer, JagdPanther) clones entries above (VariantBatchFourWeaponData.cpp).
 	VariantBatchFourWeapons::AddWeapons(M_TPlayerWeaponDataHashMap);
 
+	// Global projectile speed scale, after every initializer and clone so it applies exactly once per weapon.
+	for (TPair<EWeaponName, FWeaponData>& WeaponEntry : M_TPlayerWeaponDataHashMap)
+	{
+		WeaponEntry.Value.ProjectileMovementSpeed *=
+			DeveloperSettings::GamePlay::Projectile::GlobalProjectileSpeedMlt;
+	}
+
 	// Set the enemy weapons to the same base data.
 	M_TEnemyWeaponDataHashMap = M_TPlayerWeaponDataHashMap;
 }

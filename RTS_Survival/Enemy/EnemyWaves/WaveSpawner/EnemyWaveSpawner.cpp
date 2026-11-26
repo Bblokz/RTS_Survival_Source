@@ -436,7 +436,8 @@ int32 AEnemyWaveSpawner::GetLivingSpawnedUnitCount() const
 	return LivingCount;
 }
 
-int32 AEnemyWaveSpawner::ConvergeOnAlarm(const FVector AlarmLocation, const float CombatSecondsBeforeReturn)
+int32 AEnemyWaveSpawner::ConvergeOnAlarm(const FVector AlarmLocation, const float CombatSecondsBeforeReturn,
+                                         const float CombatCheckDelaySeconds)
 {
 	if (not GetIsPatrol())
 	{
@@ -455,11 +456,12 @@ int32 AEnemyWaveSpawner::ConvergeOnAlarm(const FVector AlarmLocation, const floa
 		return 0;
 	}
 	return M_EnemyController->ConvergePatrolFormationsOnLocation(UnitsToSend, AlarmLocation,
-	                                                              CombatSecondsBeforeReturn);
+	                                                              CombatSecondsBeforeReturn, CombatCheckDelaySeconds);
 }
 
 int32 AEnemyWaveSpawner::ConvergeAllPatrolsOnAlarm(const UObject* WorldContextObject, const FVector AlarmLocation,
-                                                   const float CombatSecondsBeforeReturn)
+                                                   const float CombatSecondsBeforeReturn,
+                                                   const float CombatCheckDelaySeconds)
 {
 	const UWorld* World = IsValid(WorldContextObject) ? WorldContextObject->GetWorld() : nullptr;
 	if (not IsValid(World))
@@ -475,7 +477,7 @@ int32 AEnemyWaveSpawner::ConvergeAllPatrolsOnAlarm(const UObject* WorldContextOb
 		{
 			continue;
 		}
-		UnitsSent += Spawner->ConvergeOnAlarm(AlarmLocation, CombatSecondsBeforeReturn);
+		UnitsSent += Spawner->ConvergeOnAlarm(AlarmLocation, CombatSecondsBeforeReturn, CombatCheckDelaySeconds);
 	}
 	return UnitsSent;
 }
