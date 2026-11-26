@@ -1,5 +1,9 @@
 # Waits until the graphics card has room, then takes the line-up pictures in a throwaway DebugGame editor.
-param([string]$Map = "/Game/RTS_Survival/Maps/Campaign/RTS_WorldCampaign", [string]$TestMap = "", [string]$Variants = "")
+param([string]$Map = "/Game/RTS_Survival/Maps/Campaign/RTS_WorldCampaign", [string]$TestMap = "", [string]$Variants = "", [string]$LightTest = "", [string]$Enemy = "", [string]$MarkingItem = "", [string]$Tanks = "")
+$env:WORLDPIECES_TANKS = $Tanks
+$env:WORLDPIECES_ENEMY = $Enemy
+$env:WORLDPIECES_MARKING_ITEM = $MarkingItem
+$env:WORLDPIECES_LIGHTTEST = $LightTest
 $env:WORLDPIECES_TESTMAP = $TestMap
 $env:WORLDPIECES_VARIANTS = $Variants
 $out = "D:\UE5Projects\RTS_Survival\Saved\WorldMapPieces"
@@ -14,7 +18,10 @@ while ($true) {
 }
 "gpu used before: $gpu MiB"
 Remove-Item $log -ErrorAction SilentlyContinue
-if ($Variants -eq "1") { Remove-Item "$out\variants_*.png" -ErrorAction SilentlyContinue }
+if ($Tanks -eq "1") { Remove-Item "$out\tanks_*.png" -ErrorAction SilentlyContinue }
+elseif ($Enemy -eq "1") { Remove-Item "$out\enemy_*.png" -ErrorAction SilentlyContinue }
+elseif ($LightTest -eq "1") { Remove-Item "$out\lighttest_*.png" -ErrorAction SilentlyContinue }
+elseif ($Variants -eq "1") { Remove-Item "$out\variants_*.png" -ErrorAction SilentlyContinue }
 else { Remove-Item "$out\lineup_*.png", "$out\piece_*.png", "$out\reference_*.png" -ErrorAction SilentlyContinue }
 $arguments = @('"D:\UE5Projects\RTS_Survival\RTS_Survival.uproject"',
     ('-ini:Engine:[/Script/EngineSettings.GameMapsSettings]:EditorStartupMap=' + $Map),
