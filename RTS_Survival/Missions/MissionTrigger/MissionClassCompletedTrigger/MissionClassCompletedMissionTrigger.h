@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "RTS_Survival/Game/Difficulty/GameDifficulty.h"
 #include "RTS_Survival/Missions/MissionTrigger/MissionTrigger.h"
 #include "MissionClassCompletedMissionTrigger.generated.h"
 
@@ -35,6 +36,11 @@ public:
 	// an objective that a bonus stage reveals early but that must still appear when a later stage begins.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mission Trigger|Mission Class Completed")
 	TArray<TSubclassOf<UMissionBase>> AlsoWatchMissionClasses;
+
+	// Below this difficulty the trigger never fires, so the mission (and its plate) never appears, e.g. a bonus that
+	// only exists on Hard and up. The default lets every difficulty through.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mission Trigger|Mission Class Completed")
+	ERTSGameDifficulty MinimumDifficulty = ERTSGameDifficulty::NewToRTS;
 
 	virtual bool CheckTrigger_Implementation() const override;
 

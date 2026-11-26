@@ -37,6 +37,11 @@ struct FPlayerAirDropPayload
 		meta = (EditCondition = "bParachuteSquads", EditConditionHides))
 	EGlobalAbility ParachuteAbility = EGlobalAbility::GA_GerParatroopers;
 
+	// Above 0 the cargo plane's vehicles and squads (all aircraft, the first one included) are set down at least this
+	// far from any building (FBuildingFreeDropSpots), for drops into the player's base. Paratroopers are not moved.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Air Drop", meta = (ClampMin = "0.0"))
+	float BuildingClearanceRadius = 0.f;
+
 	bool GetIsEmpty() const { return Vehicles.IsEmpty() && Squads.IsEmpty(); }
 };
 

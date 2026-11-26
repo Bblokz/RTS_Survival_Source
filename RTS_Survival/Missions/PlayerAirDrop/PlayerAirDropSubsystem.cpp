@@ -89,6 +89,7 @@ UGlobalAbility* UPlayerAirDropSubsystem::CreateCargoPlaneCopy(const FPlayerAirDr
 	}
 	const TArray<ESquadSubtype> CargoSquads = Payload.bParachuteSquads ? TArray<ESquadSubtype>() : Payload.Squads;
 	Copy->SetDropPayload(Payload.Vehicles, CargoSquads);
+	Copy->SetBuildingClearanceRadius(Payload.BuildingClearanceRadius);
 	return Copy;
 }
 

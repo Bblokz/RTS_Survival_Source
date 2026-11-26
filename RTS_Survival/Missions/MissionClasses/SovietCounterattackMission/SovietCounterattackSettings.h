@@ -380,9 +380,15 @@ struct FSovietCounterattackBaseReinforcementSettings
 
 	// Centre of the drop = the player HQ plus this XY offset (default: the open concrete west of the HQ, away from the
 	// attack). The first aircraft lands there, the others 1000 apart around it; every point is projected onto the
-	// navmesh, so buildings the player put there push the aircraft aside.
+	// navmesh and kept BuildingClearanceRadius away from buildings.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Base Reinforcements")
 	FVector LandingOffsetFromHQ = FVector(-1200.f, 0.f, 0.f);
+
+	// Every aircraft (the first one included) sets its vehicle down at least this far (2D) from any of the player's
+	// buildings, expansions or placed building previews; when the offset point is built over, the nearest clear spot
+	// around it is used (FBuildingFreeDropSpots). 0 turns the check off.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Base Reinforcements", meta = (ClampMin = "0.0"))
+	float BuildingClearanceRadius = 800.f;
 
 	// Used instead of the HQ when the player has none (z 0 = traced to the ground).
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Base Reinforcements")

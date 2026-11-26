@@ -4,6 +4,7 @@
 
 #include "RTS_Survival/Missions/MissionClasses/MissionBase/MissionBase.h"
 #include "RTS_Survival/Missions/MissionManager/MissionManager.h"
+#include "RTS_Survival/Enemy/MissionPlacement/EnemyPlacementTypes.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 
 bool UMissionClassCompletedMissionTrigger::CheckTrigger_Implementation() const
@@ -20,6 +21,14 @@ bool UMissionClassCompletedMissionTrigger::CheckTrigger_Implementation() const
 	if (not IsValid(MissionManager))
 	{
 		return false;
+	}
+	if (MinimumDifficulty != ERTSGameDifficulty::NewToRTS)
+	{
+		ERTSGameDifficulty Difficulty = ERTSGameDifficulty::Normal;
+		if (not EnemyPlacement::TryGetGameDifficulty(MissionManager, Difficulty) || Difficulty < MinimumDifficulty)
+		{
+			return false;
+		}
 	}
 
 	if (GetHasClassEnded(*MissionManager, MissionClassToWatch))
