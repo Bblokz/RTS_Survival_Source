@@ -18,6 +18,8 @@ struct FSquadUnitDeathHit
 	// Damage as a fraction of max health, clamped to 0-1: heavy hits throw a body further.
 	float DamageFraction = 0.f;
 	bool bIsBlast = false;
+	// Above 1 for blasts that throw harder than ordinary splash (a registered FRTSBlastThrow, e.g. the V2 rocket).
+	float ThrowSpeedScale = 1.f;
 };
 
 /**

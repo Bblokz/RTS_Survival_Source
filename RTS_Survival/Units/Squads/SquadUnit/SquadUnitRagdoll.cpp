@@ -166,7 +166,8 @@ FVector FSquadUnitRagdoll::GetLaunchVelocity(const FSquadUnitDeathHit& DeathHit)
 	{
 		return DeathHit.PushDirection * FMath::Lerp(MinHitSpeed, MaxHitSpeed, DeathHit.DamageFraction);
 	}
-	const float BlastSpeed = FMath::Lerp(MinBlastSpeed, MaxBlastSpeed, DeathHit.DamageFraction);
+	const float BlastSpeed = FMath::Lerp(MinBlastSpeed, MaxBlastSpeed, DeathHit.DamageFraction)
+		* DeathHit.ThrowSpeedScale;
 	return DeathHit.PushDirection * BlastSpeed + FVector::UpVector * BlastSpeed * BlastUpwardRatio;
 }
 

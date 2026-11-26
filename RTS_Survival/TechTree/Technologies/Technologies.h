@@ -38,8 +38,17 @@ enum class ETechnology: uint8
 	Tech_Flak88_GroundRole UMETA(DisplayName = "Flak 88 Ground Role"),
 	Tech_Infantry_Kit UMETA(DisplayName = "M42 Kit & Webbing"),
 	Tech_Sniper_Ghillie UMETA(DisplayName = "Ghillie Suits"),
-	Tech_Pioneer_Entrenching UMETA(DisplayName = "Entrenching Tools")
+	Tech_Pioneer_Entrenching UMETA(DisplayName = "Entrenching Tools"),
+	// Field modification kits: researched in a building expansion during a mission, never on the campaign tech tree,
+	// never saved. See Global_GetIsFieldModificationKit.
+	Tech_FieldKit_HatchGunnerMG42 UMETA(DisplayName = "Hatch MG 42 Gunner")
 };
+
+/** @return True for a field modification kit: mission-only, so it must never enter a campaign save or a card. */
+static bool Global_GetIsFieldModificationKit(const ETechnology Tech)
+{
+	return Tech == ETechnology::Tech_FieldKit_HatchGunnerMG42;
+}
 
 static FString Global_GetTechAsString(const ETechnology Tech)
 {
@@ -93,6 +102,8 @@ static FString Global_GetTechAsString(const ETechnology Tech)
 		return "Tech_Sniper_Ghillie";
 	case ETechnology::Tech_Pioneer_Entrenching:
 		return "Tech_Pioneer_Entrenching";
+	case ETechnology::Tech_FieldKit_HatchGunnerMG42:
+		return "Tech_FieldKit_HatchGunnerMG42";
 	default: break;
 	}
 	return "Tech_NONE";
@@ -150,6 +161,8 @@ static FString Global_GetTechDisplayName(const ETechnology Tech)
 			return "Ghillie Suits";
 		case ETechnology::Tech_Pioneer_Entrenching:
 			return "Entrenching Tools";
+		case ETechnology::Tech_FieldKit_HatchGunnerMG42:
+			return "Hatch MG 42 Gunner";
 		default:
 			return "None";
 	}

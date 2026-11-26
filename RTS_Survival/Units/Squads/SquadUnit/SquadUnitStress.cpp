@@ -14,6 +14,7 @@
 #include "RTS_Survival/DeveloperSettings.h"
 #include "RTS_Survival/Navigation/CoverFinder/CoverFinderDeveloperSettings.h"
 #include "RTS_Survival/Navigation/CoverFinder/CoverFinderWorldSubsystem.h"
+#include "RTS_Survival/Utils/AOE/BlastThrow/RTSBlastThrowSubsystem.h"
 #include "RTS_Survival/RTSComponents/HealthComponent.h"
 #include "RTS_Survival/Units/SquadController.h"
 #include "RTS_Survival/Weapons/InfantryWeapon/InfantryWeaponMaster.h"
@@ -62,6 +63,12 @@ void ASquadUnit::RecordDeathHit(const float DamageAmount, FDamageEvent const& Da
 		const FVector Epicenter = static_cast<const FRTSBlastDamageEvent&>(DamageEvent).Epicenter;
 		M_DeathHit.bIsBlast = true;
 		M_DeathHit.PushDirection = (GetActorLocation() - Epicenter).GetSafeNormal2D();
+		FVector ThrowEpicenter;
+		if (const FRTSBlastThrow* BlastThrow = URTSBlastThrowSubsystem::FindForDamageEvent(this, DamageEvent,
+			ThrowEpicenter))
+		{
+			M_DeathHit.ThrowSpeedScale = BlastThrow->InfantryThrowScale;
+		}
 	}
 	else if (IsValid(DamageCauser))
 	{

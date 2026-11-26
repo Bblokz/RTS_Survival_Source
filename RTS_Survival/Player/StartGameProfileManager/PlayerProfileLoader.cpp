@@ -352,6 +352,13 @@ void UPlayerProfileLoader::ApplyTechnologies(const TArray<ETechnology>& Technolo
 	{
 		for (auto EachTech : Technologies)
 		{
+			// Field modification kits are bought in the mission only; a saved or carded one would be free for good.
+			if (Global_GetIsFieldModificationKit(EachTech))
+			{
+				RTSFunctionLibrary::ReportError("Skipped field modification kit " + Global_GetTechAsString(EachTech)
+					+ " in the mission's starting technologies: kits are mission-only.");
+				continue;
+			}
 			TechManager->OnTechResearched(EachTech);
 		}
 	}
