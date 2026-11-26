@@ -28,7 +28,10 @@ A launch is drawn by the batcher when all hold:
 2. the weapon state was not created by a soldier's weapon (`AInfantryWeaponMaster`): infantry projectiles keep their own effect,
 3. the batcher is ready (setting on, system loaded).
 
-So tank guns, AT guns, hull guns, howitzers and barrage shells of that type get the look. AA shells, bazookas,
+So tank guns, AT guns, hull guns, howitzers and barrage shells get the look. `UGA_Barrage` always launches its
+shells with `TankShell`, whatever its template says. They fly one ballistic arc solved backwards from the impact
+(`BarrageShellFlight::Solve` in `BarrageProjectileMover.h`): steep, fast, one bearing per run, like long-range
+railway artillery. The start is ~100 m up, above the RTS camera. AA shells, bazookas,
 attached rockets, the railgun and small-arms tracers are untouched. When the batcher is not ready, every shell
 falls back to `NS_75mmShell` on its own component.
 

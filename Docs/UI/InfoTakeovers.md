@@ -597,16 +597,32 @@ UnrealEditor-Win64-DebugGame-Cmd.exe RTS_Survival.uproject -run=pythonscript   -
 
 ## Wall Breach takeover (field manual)
 
-One page titled "Crushing Walls" under "MEDIUM AND HEAVY TANKS - SOVIET WALLS". Left: a clip of a player Tiger H1
-driving through a Soviet `Rus_Wall_Concrete_Long`: its turret over the wall as it comes in, the wall bursting out
-towards the camera with debris and dust, the Tiger driving off and the gap left open. Right: WHICH TANKS (medium and
-heavy only; light tanks and infantry go round or through an open gap), THE PUSH (slower while the hull pushes through,
-heavy less than medium; the slab falls, the edges crumble) and THE GAP (the wall loses health; open to everyone, shells
-and sight pass). The rules are `UWallTankBreachComponent`'s, see `Environment/WallChunkDamage.md` "Tank breaches";
-the text stays qualitative so a balance pass does not make it wrong.
+Two pages since 2026-11-25 (user request; `EWallBreachTakeoverPage`, CONTINUE / PREVIOUS / page lamps):
+
+1. "Crushing Walls" under "HEAVY VEHICLES - SOVIET WALLS". Left: a clip of a player Tiger H1 driving through a
+   Soviet `Rus_Wall_Concrete_Long`: its turret over the wall as it comes in, the wall bursting out towards the camera
+   with debris and dust, the Tiger driving off and the gap left open. Right: exactly the user's two sections, title
+   and line, no red labels: "Make a way through" (you can crush most walls with heavy vehicles; they are damaged by
+   driving through them) and "Size dependent" (not all vehicles can crush all walls; some only the heaviest class of
+   tanks). The wall rules are `UWallTankBreachComponent`'s, see `Environment/WallChunkDamage.md` "Tank breaches".
+2. "Running Over Infantry" under "VEHICLES - ENEMY INFANTRY": a clip of a player Tiger driving through an enemy
+   Soviet rifle squad standing in its path (crushed soldiers, the blood decal, the bodies left in the tracks; the
+   clip is silent, so the scream is not in it). Right: one section, as the user asked: "Run them down". The run-over
+   rules are `URTSVehicleCrushSubsystem`'s (memory/feature: vehicle crush infantry, 2026-11-25).
+
+The clip base `UW_ClipInfoTakeover` takes pages: a child overrides `GetPageCount`, `GetPageClip` (page 1 plays the
+`M_Clip*` class defaults, so the one-page manuals and their saved WBPs are unchanged), `MakePageFacts`,
+`GetPageClipCaption` and `ApplyClipPageTexts`; each page is a child of a WidgetSwitcher and the shown page's clip
+starts at frame 0. A fact with an empty Label shows only its title and body. The run-over clip's grid
+(`M_RunOverClip`) comes from the `UW_WallBreachTakeover` constructor, so `WBP_WallBreachTakeover` was not re-saved.
+
+Ger_IntroMission opens it right after the Okhotnik squad intel: `FSecureBaseAssaultResponse::
+bShowWallBreachManualAfterIntelSquad` (on for `Mission_Intro_ClearSovietRig`) queues it behind the squad intel, also
+when unit intel is turned off or the squad never showed up (`USecureBaseMission::QueueWallBreachManualAfterIntel`).
 
 Node `Show Wall Breach Takeover` (`UAsyncShowWallBreachTakeover`, kind `WallBreach`), archive key
-`InfoTakeover.WallBreach`. Clip `GameUI/InfoTakeover/WallBreach/T_WallBreach_ClipAtlas`, 85 frames in 8 x 11 cells.
+`InfoTakeover.WallBreach`. Clip `GameUI/InfoTakeover/WallBreach/T_WallBreach_ClipAtlas`, 85 frames in 8 x 11 cells;
+run-over clip `T_RunOver_ClipAtlas` in the same folder, 80 frames in 8 x 10 cells.
 
 ```
 sh Source/Tools/InfoTakeover/WallBreach/capture_clip.sh
@@ -629,6 +645,26 @@ UnrealEditor-Win64-DebugGame-Cmd.exe RTS_Survival.uproject -run=pythonscript \
   short of the wall line), hull through at 152, clear at 208; the wall kept 1105 of 1400 health (21 % of its face
   gone). The clip uses the exit camera only: the approach at double speed (every 4th frame of 40-96), then every 2nd
   frame of 98-236.
+
+Run-over clip (page 2), same pure-Python recipe:
+
+```
+sh Source/Tools/InfoTakeover/RunOver/capture_clip.sh
+python Source/Tools/InfoTakeover/VulturesAt/make_clip_atlas.py --clip RunOver --segments "50-208/2"
+UnrealEditor-Win64-DebugGame-Cmd.exe RTS_Survival.uproject -run=pythonscript \
+  -script=Source/Tools/InfoTakeover/RunOver/import_run_over_atlas.py -unattended -nullrhi \
+  -DisablePlugins=Fab,BpGeneratorUltimate
+```
+
+- `capture_clip.py` places the Tiger (owner 1) and a `Rus_Squad_Mosin` (owner 2, 18 m beside the lane) in the editor
+  world; in PIE `MissionMapTestLibrary.map_test_place_squad_soldiers` puts the soldiers in two ranks in the lane and
+  `map_test_hold_tank_fire` (every tick) keeps the Tiger from shooting them. `DodgeChance=0` comes from a
+  `-ini:Game:[/Script/RTS_Survival.RTSVehicleCrushSettings]` override on the command line: the settings class is not
+  exposed to Python by name, and the override never touches DefaultGame.ini. Cameras: `Frames/` (low, in front of the
+  squad), `FramesSide/`, `FramesWide/`. Grep `RUN_OVER_CLIP` in `Saved/Logs/RunOverClip.log`.
+- The 2026-11-25 recording: 234 frames over 9.7 s, every tick 1/24 s; hull at the squad at frame 104, Tiger clear at
+  174. The clip is the front camera, every 2nd frame of 50-208. `import_run_over_atlas.py` logs whether the atlas grid
+  matches the C++ constants (`RunOverClipColumns / Rows / FrameCount` in `W_WallBreachTakeover.cpp`).
 
 ## Capturing trucks takeover (field manual)
 
@@ -666,6 +702,28 @@ after close with the game unpaused). Archived under Game Mechanics ("Capturing T
 `WBP_SpacedArmourTakeover`, so it is on the Rotsignal skin), made by
 `Source/Tools/InfoTakeover/OreMission/create_ore_takeovers.py` (headless DebugGame-Cmd, `-run=pythonscript`). It is in
 `Style/build_takeover_style.py`'s list.
+
+## Direction Finding takeover (field manual)
+
+Built 2026-11-25 for Oder-Warthe (`Campaign/OderWartheMissionFlow.md`, M03). It opens when the player takes DF 1, the
+pump house (`Mission_OW_ListeningPost`).
+
+- **Page:** one page titled "Direction Finding" under "ODER-WARTHE - RADIO DIRECTION FINDING".
+- **Left, the clip:** filmed from the real tactical map of `Ger_OderWarthe`:
+  1. the pump house's bearing wedge appears;
+  2. an attack order narrows it;
+  3. DF 2's wedge crosses it and the overlap shades in;
+  4. a second attack order narrows both.
+- **Tags:** small tags name each step.
+- **Right, three facts:**
+  - **LISTEN:** a held post draws a wedge; a lost one keeps it grey.
+  - **NARROW:** when they attack, they talk; hitting an outpost makes the command post answer.
+  - **CROSS:** two wedges give an area; three find the command post and reveal its targets.
+
+Node `Show Direction Finding Takeover` (`UAsyncShowDirectionFindingTakeover`, kind `DirectionFinding`), archive key
+`InfoTakeover.DirectionFinding`. Clip `GameUI/InfoTakeover/DirectionFinding/T_DirectionFinding_ClipAtlas`: 96 frames
+in 8 x 12 cells. Each 1920 x 1080 frame's map square is centred in the 16:9 cell on the map's dark background.
+Capture (`-DirectionFindingClip`), atlas and asset steps: `Source/Tools/InfoTakeover/DirectionFinding/README.md`.
 
 ## Document takeover (captured papers) and the Ore manifest
 
@@ -957,7 +1015,7 @@ Archive item!" pop-up with the picture:
 | `UW_AdrenalineShotTakeover`, `UAsyncShowAdrenalineShotTakeover` | The Adrenaline Shot field manual (clip, three facts) and its node. |
 | `UW_WespeBarrageTakeover`, `UAsyncShowWespeBarrageTakeover` | The Wespe Barrage field manual (two-camera clip, three facts) and its node. |
 | `UW_DigInTakeover`, `UAsyncShowDigInTakeover` | The Dig In field manual (two-camera clip, three facts) and its node. |
-| `UW_WallBreachTakeover`, `UAsyncShowWallBreachTakeover` | The Wall Breach field manual (Tiger through a Soviet wall clip, three facts) and its node. |
+| `UW_WallBreachTakeover`, `UAsyncShowWallBreachTakeover` | The crushing field manual (page 1: Tiger through a Soviet wall clip, two facts; page 2: running over infantry) and its node. |
 | `UW_CapturingTrucksTakeover`, `UAsyncShowCapturingTrucksTakeover` | The capturing trucks field manual (looping UMG diagram with the real scuttle plate, three facts) and its node. |
 | `UW_DocumentTakeover`, `UAsyncShowDocumentTakeover`, `UAsyncShowOreManifestTakeover` | The generic captured-document takeover (paper sheet, marked lines, stamp; text in `FDocumentTakeoverContent`), its node with the text on the node, and the Ore manifest node. |
 | `UW_VehicleInfoTakeover` | The vehicle body, and the squad body (`SetupSquad`). Blueprint child `WBP_VehicleInfoTakeover` holds `M_Style`; its skin is copied from `BP_W_UnitVariantSelectionMenu`. |
@@ -1080,8 +1138,11 @@ Run with `-DigInTakeoverValidate` (`DIGIN_TAKEOVER`) for the Dig In takeover; sa
 DebugGame, `RTS_ToCopySmall`, 720p: PASS (104 frame changes in 10 s while paused).
 
 Run with `-WallBreachTakeoverValidate` (`WALL_BREACH_TAKEOVER`, `UWallBreachTakeoverValidateSubsystem`) for the Wall
-Breach takeover; same checks as the Dig In run. Result on 2026-11-16, DebugGame, `RTS_ToCopySmall`, 720p: PASS (101
-frame changes in 10 s while paused). Screenshots in `Saved/InfoTakeover/WallBreach/720p/`.
+Breach takeover; same checks as the Dig In run, plus both pages since 2026-11-25: two lamps, CONTINUE shows page 2
+(lamp 2 lit, PREVIOUS shown, its clip from frame 0, still open), the run-over clip plays while paused, PREVIOUS goes
+back, CONTINUE again, then UNDERSTOOD closes it once. Result on 2026-11-25, DebugGame, `RTS_ToCopySmall`, 720p: PASS
+(walls 104 frame changes in 10 s, run-over 79 in 7 s, paused). Screenshots in `Saved/InfoTakeover/WallBreach/720p/`
+(`WallBreach_1_done`, `WallBreach_3_runover_done`, `WallBreach_runover_clip_frame*`).
 
 Run with `-OreTakeoversValidate` (`ORE_TAKEOVERS`, `UOreTakeoversValidateSubsystem`) for the two Ore Mountains
 takeovers, best through `Source/Tools/InfoTakeover/OreMission/run_validate.sh` (DebugGame, `-game -RenderOffscreen`,

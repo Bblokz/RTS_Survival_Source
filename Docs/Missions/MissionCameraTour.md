@@ -22,9 +22,23 @@ A short in-map cinematic over the normal RTS camera, no Sequencer asset needed:
 | Seconds | Real seconds of the shot. |
 | Blend In Seconds | The first part of the shot eases over from wherever the previous shot left the camera; 0 cuts. |
 | Title / Subtitle | Caption; an empty title shows none. |
+| Voice Line / Voice Line Portrait / Voice Line Delay Seconds | Line spoken over the shot through the tour's portrait, starting the delay into the shot (queued behind a line still playing). The shot is lengthened so the line ends inside it (`Seconds` is the minimum). Added 2026-11-25. |
 
-`FMissionCameraTourSettings`: bars on/off and height, `ReturnSeconds` (ease back to the player's view) and a start
-sound.
+`FMissionCameraTourSettings`: bars on/off and height, `ReturnSeconds` (ease back to the player's view), a start
+sound, `bAllowSkipping` (the hold-Space prompt) and `OpeningTitle`.
+
+**Opening title** (`FMissionCameraTourOpeningTitle`, added 2026-11-25): the `Show Location Intro` card (place top
+centre, date typed bottom left, optional fade from black) over the first seconds of the tour, so a map opening is one
+cinematic with one skip prompt. `DurationSeconds` runs on the tour clock (lengthened when the texts need longer to
+type out); the bars are the tour's. A skip closes the card at once, fade from black included.
+
+**Skipping** (`bAllowSkipping`): holding Space jumps to the ease back. Shots it jumps over never start, so their
+voice lines do not play and `BP_OnCameraTourShotStarted` does not fire for them; a line already playing finishes in
+the HUD portrait.
+
+**`BP_OnCameraTourShotStarted(ID, ShotIndex)`** (native twin `OnCameraTourShotStartedNative`, added 2026-11-25): a
+shot came on screen. Use it to time world events to the film (units set off, a gate opens), and do the same from
+`BP_OnCameraTourFinished` behind a do-once, because a skip jumps over the shot.
 
 Behaviour, the same as `Show Location Intro`: it waits while the screen is busy (another cinematic, an info takeover,
 the tech tree, a `MoveCamera` move) and is skipped after 45 unpaused seconds (`bWasShown` false); one tour per mission

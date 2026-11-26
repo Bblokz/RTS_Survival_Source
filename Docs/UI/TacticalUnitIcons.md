@@ -70,6 +70,32 @@ Settings the user approved on the action UI portrait (128-unit box, 108-unit ima
   `CooldownTint`;
 - right: `T_AutoCannon_Class_V2` with red `(1.0, 0.12, 0.08)`.
 
+## Placard badges in the unit description (2026-11-25)
+
+The selected unit description (`BP_W_UnitDescription_Horizontal`, C++ `UW_SelectedUnitDescription`, shown when the
+action UI portrait is hovered) shows the portrait's own tactical icons in its left column, each with a one-line
+explanation, instead of the armor type icon + name. Portraits without tactical icons (variants, Soviet units, trucks,
+buildings without a placard plan) still show the armor type.
+
+- **Source of truth:** the placard plans in `Source/Tools/TacticalIconBackgrounds/plans/*.txt`
+  (`<portrait texture>=<clean png>|<left icon>|<right icon>`), the same files that engraved the portraits.
+- `tactical_icon_catalog.py` (plain Python) renders each icon spec (`stem` or `stem@colour`) as a standalone placard
+  badge (`D:/UE_Assets/Icons/TrainingUI/Placard/Badges/T_TacPlacard_*.png`, 128 px, same look as on the portraits)
+  and writes `tactical_icon_catalog.json` next to the script. The one-line texts are `DESCRIPTIONS` in that script;
+  text before a `:` is highlighted in the UI. A new icon stem in a plan needs a line there or the script stops.
+- `fill_tactical_icon_catalog.py` (in the editor) imports the badges to
+  `/Game/RTS_Survival/Textures/GameUI/UnitIcons/Tactical/Placard/` and fills `DA_TacticalIconCatalog`
+  (`UTacticalIconCatalog`: icon spec -> badge + text, portrait package path -> left/right spec).
+- **Runtime:** `UW_SelectedUnitInfo` passes the portrait brush's resource (`M_UnitInfoImage`) to
+  `UW_SelectedUnitDescription::SetupTacticalIcons` after the Blueprint set the portrait, and again while hovered (it
+  only redoes the rows when the portrait changed). Lookup is by the portrait texture's package path, so a unit whose
+  portrait has no placard plan simply keeps the armor type.
+- **Widgets** (all `BindWidgetOptional`): `ArmorTypeOverlay` (collapsed when icons show), `TacticalIconsBox`,
+  `TacticalIconRow1/2`, `TacticalIconImage1/2` (44 px SizeBox), `TacticalIconText1/2` (`DT_RichText`, wrap 220).
+  The catalog is the `TacticalIconCatalog` default on the WBP (hard reference, so badges are cooked).
+
+After changing a plan or a text: run `tactical_icon_catalog.py`, then `fill_tactical_icon_catalog.py` in the editor.
+
 ## Material parameters (`M_UI_TacticalIconGlass`)
 
 A UI-domain, translucent, unlit material with one Custom HLSL node. It outputs linear colour with straight alpha.
@@ -103,7 +129,10 @@ Tune the defaults in `SCALARS` / `VECTORS` in the script, then run `build()`.
 
 ## Removing it completely
 
+These steps remove the glass plates only. `TacticalIconCatalog.h/.cpp` in the same folder belongs to the unit
+description badges above; keep it.
+
 1. If it is placed, run `ui_tactical_icons.restore()` or delete the widget from that Blueprint.
-2. Delete `RTS_Survival/GameUI/TacticalIcons/`.
+2. Delete `W_TacticalUnitIcon*` and `TacticalUnitIconSettings.h` from `RTS_Survival/GameUI/TacticalIcons/`.
 3. Delete the `Tactical/Glass` asset folder.
 4. Delete `UISkins/_generator/ui_tactical_icons.py` and this doc.

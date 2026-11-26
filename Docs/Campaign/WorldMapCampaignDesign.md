@@ -11,7 +11,7 @@ Sections marked **Proposal** are suggestions that the owner has not confirmed.
 | Map layout | **Fixed spine, procedural flanks.** Story missions, both HQs and the wall sit on hand-placed named anchors. The seed places enemy items, neutral items and side missions around them. |
 | Player turn | **One operation plus free spending.** Spend map resources first, then launch a mission or attack an enemy item. Launching ends the turn; the enemy then reacts. |
 | Countries | **Build nodes.** A country has its own build nodes, separate from the mission and enemy anchors. They unlock step by step as more of the country is freed. The buildings give the benefits, not the country itself. |
-| Buildings | **Three roles for now**, to be expanded later: watch post (reveals fog), supply depot (radixite and blueprints per turn), airfield or battery (lowers enemy strength for missions in range). |
+| Buildings | **Three roles for now**, to be expanded later: watch post (reveals fog), supply depot (radixite and blueprints per turn), airfield or battery (lowers enemy strength for missions in range). **Changed 2026-11-25, see section 15.** |
 | Commander | **One passive plus one map ability** per commander. The ability has a cooldown counted in turns. |
 | Tech tree | **Buy on the map, permanent.** Spend blueprints; the tech is already researched at the start of every later mission. |
 | Enemy turn | **One budget, split by alert.** The enemy gets a fixed number of points each turn. An alert level decides the share spent on convoys and divisions; the rest goes to the superweapon. See section 5a. |
@@ -104,6 +104,8 @@ has an unlock threshold.
 | Airfield or battery | Lowers enemy strength for missions in range | `UWorldStrategicSupportArea` and the strength estimation, with a negative contribution |
 
 The unused `EMapPlayerItem` values (Factory, Airfield, Barracks) can be replaced by this set.
+
+The depot, airfield and battery rows above are replaced by the picks of 2026-11-25 in section 15.
 
 ## 5. The turn
 
@@ -583,6 +585,17 @@ session (`Saved/WorldMapUIDesigns/MissionObjects/<Mission>/pick.md`).
   - **Not concrete:** Pripyat and Lake Vygozero have none; the Reichstag is stone and was left.
   - **Saving:** the shared editor keeps the piece assets open, and headless saves then fail. `wait_editor_free.ps1`
     waits for it; this change was saved through the editor itself (three assets).
+- **Piece lights (2026-11-25):** the campaign level lights its pieces dim and from behind. Each story piece Blueprint
+  has two spot lights on lighting channel 1 only, and only the piece's own meshes are on channels 0 and 1, so the map
+  and other pieces are not lit by them.
+  - `PieceLight`: warm key from the front left (400 cd, at -200 / -260 / 380 from the pivot), casts shadows,
+    specular scale 0.15.
+  - `PieceFillLight`: weak white fill from the camera's side (60 cd, at -250 / 0 / 420), no shadows, no highlights.
+  - A first try with one white 250 cd light from the camera's side was rejected by the owner: flat, and it washed
+    the colours out.
+  - Constants: `PIECE_LIGHTS` in `piece_lib.py`; picked from four set-ups in one picture
+    (`run_lineup.ps1 -LightTest 1`). The HQ piece and the other map objects do not have these lights.
+  - Cost: one shadow-casting movable spot light per story piece.
 - **Briefing text:** description and objectives come from the mission design docs, without late reveals. Rewards are
   empty and the "on defeat" text is still the stand-in of `BP_MissionWorldObject`.
 - **Rebuild:** `Source/Tools/WorldMapPieces` (`build_pieces.py` headless import and Blueprint build,
@@ -601,3 +614,301 @@ session (`Saved/WorldMapUIDesigns/MissionObjects/<Mission>/pick.md`).
   - The aerial does not turn.
   - Decided (owner, 2026-11-25): the Lake Vygozero tank stays an IS-3, although the mission spawns a Shield IS-2.
   - The Pripyat piece has a base colour texture only. The flak tower mesh has 75,000 triangles.
+
+
+### Enemy map object prototypes (2026-11-25)
+
+Pieces for the eight things the Soviet enemy can build on the map. Registered on 2026-11-25 (owner's go-ahead):
+`EnemyObjectClassByType` in `Config/DefaultGame.ini` points at them. The old `MapObjects/Enemy/<Item>/BP_Enemy*`
+Blueprints still exist; the old config line is kept in
+`Saved/WorldMapPieces/EnemyObjectClassByType_before_prototypes.txt`.
+
+- **Assets:** `MapObjects/Enemy/Prototypes/<Item>/BP_EnemyProto_<Item>` (child of `BP_EnemyWorldObject`), mesh
+  `SM_WorldPiece_Enemy<Item>`; items: HQ, Wall, Factory, Airfield, Barracks, SupplyDepot, ResearchFacility,
+  FortifiedCheckpoint.
+- **How they were made:** one model agent per item wrote a CPU-only Python script that makes a glb with PBR
+  textures, to one contract (`Saved/WorldMapUIDesigns/EnemyObjects/BRIEF.md`: 180 cm octagon slab, front on glTF +Z,
+  at most 8,000 triangles, slot and texture names, concrete left to the shared piece concrete, no marking).
+  `check_enemy_model.py <Item>` checks a model against it. Each `<Item>/model/HANDOVER.md` says which game building
+  the piece is based on.
+- **Soviet marking:** one shared plinth under every piece (`Prototypes/Base/SM_WorldPiece_EnemyBase_A|B|C`, made by
+  `make_enemy_base.py`), in three versions for the owner to pick: A dark steel with red top rim and side band,
+  B dark steel with a red ring on the map round it, C all red with corner posts. The owner picked A on 2026-11-25;
+  all eight Blueprints use it.
+  A permanent red outline was not built: the outline is the hover highlight (`UPlayerWorldOutliner`, enemy objects
+  use the Metal type), so an always-on one needs a new outline type and a C++ change.
+- **Import and pictures:** `build_enemy.py` (headless), `run_lineup.ps1 -Enemy 1` (pictures `enemy_*.png` on Soviet
+  ground). The pieces carry the same two piece lights as the story mission pieces.
+- **Not done:** registration, briefing texts (still the parent's stand-in text), click and outline check in a
+  running game, the wall as a line across a route (it is one node piece).
+
+## 15. Buildings rework (picked 2026-11-25)
+
+Owner picks. **Design only: nothing of this section is built yet.** The code still has the first set of section 4.
+
+### Picks
+
+| Building | New rule |
+|---|---|
+| Battery | Damages enemy divisions near it automatically. It no longer lowers enemy strength for missions. Missions in range get **one charge of a barrage**. |
+| Airfield | Missions in range get **one charge of an air raid**. Three levels (below). |
+| Supply depot | Gives **radixite only**. No blueprints. |
+| Watch post | Unchanged: reveals fog in a radius. |
+
+- **Blueprints are for research only.** No building gives them and no building costs them.
+- **Enemy divisions can destroy the player's buildings.** The player defends on a small map against the incoming
+  division, with what stands on the world map at that place.
+- **Site traits** (for example rail junction, high ground, old airstrip, which make one building cheaper or stronger
+  on that hex): the owner likes the idea. To be worked out later.
+
+### Battery
+
+- **On the map:** each enemy turn or player turn (to be decided) it damages enemy divisions inside its radius.
+- **In a mission in range:** one barrage charge for the player.
+- **Later:** the battery gets levels, and the level sets the barrage: light, medium or heavy. The light, medium and
+  heavy barrages already exist as abilities.
+
+### Airfield
+
+| Level | Aircraft | Mission bonus |
+|---|---|---|
+| 1 | Fighters | One fighter charge |
+| 2 | Fighter-bombers (Ju 87) | One Ju 87 raid charge |
+| 3a | Me 410 advanced ground attack | One Me 410 raid charge |
+| 3b | Heavy bomber | One heavy bomber raid charge |
+
+Level 3 is a choice between 3a and 3b; an airfield cannot have both.
+
+### Building defence
+
+- An enemy division that reaches a building attacks it.
+- The fight is a **small map** where the player defends. The player's side is what the world map has at that place.
+- Losing the defence destroys the building.
+
+### Follows from the picks (to change when this is built)
+
+- `SupplyDepotIncomePerTurn.Blueprints` goes to 0; the airfield and battery cost loses its blueprint part.
+- The strength reduction of airfield and battery in the strength estimation is removed.
+  For the airfield this is the writer's reading of the pick ("it gives that air raid as one charge"); confirm.
+- Commander passives that lean on the old rules need a new meaning: Luftwaffe Liaison (airfield range) still fits;
+  the battery strength reduction passive does not.
+- `UWorldEnemyTurnDirector` needs a new action: send a division at a player building.
+- The hex plate has one sign per building; levels need a mark on the plate (pips or a changed sign).
+
+### Open
+
+1. Battery: damage per turn, radius, and whether it can kill a division or only weaken it.
+2. Battery levels: how many, and the upgrade price.
+3. Airfield: upgrade prices; what the fighter charge does in a mission (air cover against enemy aircraft, or a strafe).
+4. Charges from several buildings in range: do they add up, or is it one per type?
+5. Building defence: does it use up the player's operation for the turn, or is it an extra fight? What does the player
+   field on the small map (a fixed garrison per building and level, or units the player picked)? Can the player decline
+   and give the building up?
+6. Does the enemy raid every building type, or only the ones that hurt it (battery, airfield)?
+7. Whether the other building ideas come in: field workshop, direction-finding station, strongpoint, flak position,
+   heating station against the freeze.
+8. Site traits.
+
+## 16. Battery fire mission (built 2026-11-25)
+
+Owner picks of 2026-11-25. This replaces the "damages enemy divisions near it automatically" line of section 15 for
+the battery: the player orders the fire. The battery's passive (20 % less enemy strength for targets in its support
+radius) is kept for now, against the note in section 15.
+
+### Rules
+
+- Open a built battery, press FIRE MISSION, click an enemy division or convoy inside the range ring. Right click or
+  CANCEL ends the pick.
+- One mission per battery per player turn, free. A mission destroys whole roster entries (2 by default), the last
+  ones of the roster. A division with no entry left is removed. It works on tank divisions, squad divisions and
+  convoys.
+- A target must be enemy-owned, inside the range (3000, measured on the map plane) and in sight: divisions are no fog
+  participants, so the fog mask is asked whether the place they stand on is revealed
+  (`AWorldFowManager::GetIsWorldLocationRevealed`).
+- A division destroyed by a battery is added to the enemy's "recently struck" places, like one beaten in an operation.
+
+### Where it lives
+
+| Part | Where | Notes |
+|---|---|---|
+| Rules | `WorldCampaign/BatteryFire/WorldBatteryFireRules` | Pure functions: every refusal as `EWorldBatteryFireResult`, valid targets, casualties, which shell kills which tank, the arc, the timing. Tests `RTS.WorldCampaign.BatteryFire.*`. |
+| Settings | `UWorldBatteryFireSettings`, page "World Campaign Battery Fire" | Numbers, timing, tank piece sizes and every asset as a soft path. An unset or missing asset skips that effect and is logged once. |
+| State | `FWorldCampaignProgressState::BatteryFire` | Missions fired per build node id, stamped with the turn. Records of another turn count as zero, and they are cleared at the start of a new player turn. |
+| Director | `UWorldBatteryFireDirector` on the world controller | Checks the rules, marks the battery, applies the damage, saves, and only then plays the show. Also holds the target pick. |
+| Formation | `UWorldDivisionTankFormation` on `AWorldTankDivision` | One small tank per roster entry, in rows facing the division's forward direction. Slot i is roster entry i. |
+| UI | `UW_WorldBuildSitePanel`, `UW_WorldBatteryFirePrompt` | The button on a built battery's plate (off with the reason under it and as tooltip), and the prompt plate while picking. |
+| Capture | `UWorldBatteryFireCaptureSubsystem` | `-WorldCampaignBatteryFireCapture`, see below. |
+
+### The show
+
+- About four seconds: 0.4 s for the camera to frame gun and target, five shells 0.35 s apart, 1.6 s of flight each
+  on an arc, 0.6 s on the result. Map clicks, camera input and the campaign widgets are blocked for that time
+  (`AWorldPlayerController::SetIsInputBlockedForMapShow`), then the camera goes back.
+- The show is cosmetic. Damage, the fired mark and the save are done before it starts. An emptied division leaves the
+  division manager and the save at once (`UWorldDivisionManager::ReleaseDivisionForDeferredDestroy`); only its actor
+  stays for the show and is destroyed when the show ends, or after 30 s at the latest.
+- Without a renderer (headless runs) no show plays and everything is finished at once.
+- The shells leave from the socket `Muzzle` of the battery piece mesh when it has one (it has none today), else from
+  26 units above the build node.
+- Tank divisions: the destroyed tanks keep standing until their shell lands. With five shells and two casualties the
+  second and the fifth shell kill a tank; the other shells land within the scatter radius. A destroyed tank gets the
+  explosion effect, then its wreck mesh (and the optional fire), or is hidden when no wreck mesh exists. Wrecks are
+  not saved and go when the next player turn starts.
+- Squad divisions and convoys keep their look; all shells land around them.
+
+### Tank formation
+
+- The division Blueprint `BP_Division_SovietMediumTanks` has one static mesh (the T-34 training preview at scale
+  0.1, about 34 x 68 x 26 units, collision BlockAllDynamic), which is what takes the cursor. The strength number is
+  not on the actor; `UW_WorldMapTags` draws it.
+- When at least one tank mesh loads, the Blueprint's own meshes are hidden (visibility only, their collision stays)
+  and a query-only box around the formation is added, so every tank answers the cursor. The tanks themselves have no
+  collision. When no mesh loads, nothing changes.
+- Each tank is scaled so its longest side is `TankPieceTargetLength` (22 units), whatever size the mesh was made at,
+  and a mesh whose long side lies along Y is turned by -90 degrees. `TankPieceYawOffset` corrects a mesh that then
+  looks backwards.
+- Mesh per subtype: `/Game/RTS_Survival/WorldCampaign/Divisions/TankPieces/SM_DivisionTank_<T26|BT7|T34_76|T34_85|IS1|IS2|IS3|KV1>`
+  and `SM_DivisionTankWreck_<same>` (all sixteen were in the project when this was checked). A subtype without a mesh
+  shows the fallback mesh (the T-34 training preview).
+
+### Capture run
+
+`-WorldCampaignBatteryFireCapture -RTSWorldCampaignSaveSlot=<name>` on the world campaign map: builds a battery on
+the open site nearest the HQ, finds or spawns an enemy medium tank division 700 units away, opens the fog there,
+frames both, fires, and writes `Saved/WorldCampaignUICapture/batteryfire_0_before.png` and
+`batteryfire_1_after_0s6.png`, `_2_after_1s5`, `_3_after_2s5`, `_4_after_4s5`, then quits. It refuses to run without
+the save slot switch.
+
+### Checked and not checked
+
+- Checked: DebugGame editor build; `RTS.WorldCampaign.*` 77 of 77 pass (71 older, 6 new); one headless (`-nullrhi`)
+  run of the capture switch, read from its log: battery built on `LowCountries_01`, an enemy tank division of five
+  entries found 790 units away with five formation slots, mission carried out (five entries to three), battery
+  spent afterwards (`NoMissionsLeft`). The capture switch makes the show's timeline run without a
+  renderer: it ended after 4.00 s with two wrecks and input given back, and the four picture times were reached.
+  Nothing was drawn.
+- Not checked: anything on screen. No picture was made. Effect sizes, the trail parameters, the tank orientation,
+  the camera framing, the prompt and the button layout, and every mouse path (button, pick, wrong click, right
+  click) are untested.
+
+- **Tuning after the first captures (2026-11-25):** the values that differ from the C++ defaults are in
+  `Config/DefaultGame.ini`, section `[/Script/RTS_Survival.WorldBatteryFireSettings]`: larger tanks (target length 40,
+  spacing 30 / 48), the muzzle effect replaced by a small howitzer impact (the game's `NS_MuzzleFlash_Arty_1` ignores
+  scale: its smoke crossed the map and it threw green puffs), a wider shell trail and a small sphere as the shell.
+  Capture and tuning: `Source/Tools/WorldMapPieces/run_batteryfire_capture.ps1 -Set "Name=Value;..." -Tag <name>`
+  (overrides for one run, no rebuild). The shell is now a mesh of its own, `WorldCampaign/BatteryFire/SM_WorldMapShell` with the additive glow
+  material `M_WorldMapShell` (made by `Source/Tools/WorldMapPieces/make_map_shell.py`; nose on +X, tail fading along
+  U), set as `ShellMesh` in the ini; it shows clearly in flight. Open: the camera does not visibly
+  reframe; the Soviet tank pieces carry the game's red and white camo, which reads as red blocks at map distance.
+- **Division plate (2026-11-25):** the owner found the tanks blend into the Soviet country shader, which must stay as
+  it is. Each tank division now stands on a dark steel plate with a thin red rim
+  (`Divisions/TankPieces/SM_DivisionPlate`, made by `Source/Tools/WorldMapPieces/make_division_plate.py`).
+  `UWorldDivisionTankFormation::CreatePlate` stretches the 100-unit block to the formation footprint; settings
+  `FormationPlateMesh`, `FormationPlatePadding` (26) and `FormationPlateHeight` (4). An empty mesh setting means no
+  plate. The plate never takes the cursor trace: the click box does. Seen in one DebugGame capture.
+
+## 17. Fog hints: roads and unknown missions under fog (built 2026-11-25)
+
+Owner decisions after playing: the whole road network shows faintly under fog; a mission under fog shows as a
+plain grey marker with the hover tag "Unidentified" and nothing else; enemy buildings and divisions stay fully
+hidden; a mission the player has vision of is unchanged.
+
+### How the fog hides things (found while building)
+
+- No fog state hides an actor. The fog is one translucent cloud mesh (`BP_WorldFowCloud`, top at Z 160 on the
+  campaign map) whose mask opens it. The four states only decide the mask channel, the click and the outline:
+
+| State | Mask | Click | Outline and name plate |
+|---|---|---|---|
+| NotVisible | none: under the cloud | no | no |
+| Explorable | explorable channel: cloud partly open | yes | yes |
+| Visible | visible channel: cloud open | yes | yes |
+| POIVisible | POI channel around the object | no | yes |
+
+- The road material (`M_WorldConnection`) and the build site plate are translucent, like the cloud. Whether they
+  drew over or under the fog depended on the camera position (translucent sort order). That is why some roads
+  showed bright through the fog in earlier pictures.
+
+### What was built
+
+- **Roads.** `AWorldConnectionSplineRenderer` makes a second, dim ribbon for every road, flat at the top of the
+  cloud plus `HeightAboveFog`, with a higher translucent sort priority than the cloud. It is cut in pieces of at
+  most `FogRoadSegmentLength`; a piece shows when its connection is NotVisible and the fog mask is closed at that
+  piece. The real road of a NotVisible connection gets a sort priority below the cloud, so it no longer shines
+  through. Roads of Explorable and Visible connections are untouched.
+- **Missions.** A NotVisible mission that is not won, standing where the fog mask is closed, hides every component
+  of its piece (meshes, both lights) and switches their collision off, and shows a
+  `UWorldUnknownMissionMarkerComponent`: the engine cylinder as a low puck with `M_WorldPiece_Flat` in one grey,
+  the same for every mission, on top of the cloud. When the state or the mask changes, the piece and its collision
+  come back and the puck goes. This runs on every fog pass, so a loaded campaign starts right.
+- **Hover tag.** The world controller remembers the mission whose puck the cursor trace hit
+  (`GetHoveredUnknownMission`); `UW_WorldMapTags` shows one plate with the hover text under it. No outline, no
+  click, no briefing: those were already refused for NotVisible.
+- **Enemy objects and divisions.** Not touched. They are still hidden by the cloud alone.
+- **Why above the fog and not on the ground:** a road on the ground drawn over the fog would be cut by every
+  hidden enemy piece standing on it, and show its outline.
+
+### Where it lives
+
+`WorldFow/WorldFogHintSettings` (project settings page "World Campaign Fog Hints"), `WorldFow/WorldFogHintRules`
+(pure rules), `WorldFow/WorldUnknownMissionMarkerComponent`, `AWorldMissionObject` (switching),
+`AWorldConnectionSplineRenderer` and `AWorldConnectionRibbon` (dim roads), `AWorldFowManager::OnWorldFowRefreshed`,
+`UWorldMapFowComponent::OnFowStateApplied`, `AWorldFowCloud::GetFogTopZ`.
+
+| Setting | Default |
+|---|---|
+| `bShowRoadsUnderFog` | true |
+| `FogRoadBrightness` / `FogRoadOpacity` | 0.4 / 0.85 of the road's `Color` parameter |
+| `FogRoadWidthScale` | 0.6 |
+| `FogRoadSegmentLength` | 300 |
+| `FogRoadSortPriority` / `RoadBelowFogSortPriority` | 10 / -10 (the cloud is 0) |
+| `bShowUnknownMissionMarkers` | true |
+| `UnknownMissionMarkerColor` | grey 0.36 |
+| `UnknownMissionMarkerDiameter` / `Height` | 170 / 22 |
+| `UnknownMissionHoverText` | "Unidentified" |
+| `UnknownMissionMarkerMesh` / `Material` | `/Engine/BasicShapes/Cylinder` / `M_WorldPiece_Flat` |
+| `HeightAboveFog` | 6 |
+
+### Checked and not checked
+
+- Checked: DebugGame editor build; `RTS.WorldCampaign.*` 83 of 83 pass (6 new, `RTS.WorldCampaign.FogHints.*`);
+  two headless (`-nullrhi`) runs of the map on their own save slot, new campaign and load, read from the log line
+  `RTS_WORLDFOGHINTS`: 17 missions, 2 as piece, 15 as marker, 20 enemy objects and 6
+  divisions with no marker, the nearest marker 361 units from the HQ in the probe's campaign, 52 roads in 447 dim pieces of which 423 shown. A third and fourth run (launch on the Berlin pin, then a simulated victory) showed the switch back: 13 markers, 4 pieces and 372 dim road pieces after the fog opened.
+- Not checked: anything on screen, the hover tag, the place of the puck, and a mission inside open fog showing its
+  piece (rule test only). All missions get the marker, not only story missions. Open points for the first picture:
+  - The dim roads and the pucks lie about 166 units above the ground, so the tilted camera shifts them a little
+    against the ground at the edge of the fog.
+  - Whether the `Color` alpha of the road material drives its opacity; if not, `FogRoadOpacity` does nothing.
+  - The puck is lit by the level light; its grey may need another value.
+  - The build site plates still draw over or under the fog by camera position, as before.
+- **Fog hints, owner's tuning (2026-11-25):** after the first capture the owner asked for the roads to show clearly
+  through the fog (roads only) and for smaller markers. `Config/DefaultGame.ini`, section
+  `[/Script/RTS_Survival.WorldFogHintSettings]`: road brightness, opacity and width at 1.0; marker diameter 100,
+  height 14, dark grey. Open: whether unseen missions should show their real piece instead of the plain marker.
+
+### Change 2026-11-25 (evening): unidentified missions show their real piece
+
+Owner: "unseen missions should reveal their real piece through the fog". The plain marker stays as an alternative.
+
+- **Way chosen: an opening in the cloud mask.** `AWorldFowManager::ApplyMissionFogHints` stamps a small circle into
+  the visible channel of the mask around every unidentified mission, after the real reveal has been copied to
+  `M_RevealedPixels`. `GetIsWorldLocationRevealed` (battery fire, reveal rules) answers from that copy, so the
+  opening is drawn only. The mission's fog state stays NotVisible: no click, no briefing, no name plate, no
+  outline. The piece stands at its real place with its own lights; nothing is lifted.
+- **Presentation** is decided per fog pass by `WorldFogHintRules::GetMissionFogPresentation` and given to the
+  mission (`AWorldMissionObject::ApplyFogPresentation`): as its fog state, plain marker, or real piece through fog.
+- **Enemy pieces stay hidden.** A mission gets the plain marker instead of an opening when a hidden enemy object or
+  division stands within opening radius + soft edge + one mask pixel + `EnemyPieceHalfWidth` of it (307 units with
+  the defaults). The fog is also refreshed at the start of every player turn, after the enemy pieces moved.
+- **Hover tag** now also shows on the piece seen through the fog. Dim road pieces inside an opening are hidden; the
+  real road shows there.
+- **Settings added:** `UnknownMissionLook` (RealPiece; PlainMarker), `MissionOpeningRadius` 120,
+  `MissionOpeningFalloff` 50, `EnemyPieceHalfWidth` 100. The owner's tuning of roads and marker is in
+  `Config/DefaultGame.ini`, section `[/Script/RTS_Survival.WorldFogHintSettings]`.
+- **Checked:** DebugGame build; `RTS.WorldCampaign.*` 85 of 85 (8 fog hint tests); two headless runs: new campaign
+  14 missions as real piece, 1 as marker (a hidden enemy piece 125 units from it), 2 identified, 314 of 447 dim road
+  pieces; after a simulated Berlin victory on load 13 as real piece, 0 markers, 4 identified, nearest hidden enemy
+  to an opening 308 units.
+- **Not checked:** anything on screen: how clear and how wide the opening looks (one mask pixel is about 37 units),
+  whether the ground and country fill inside it give anything away, the hover tag on the piece.
