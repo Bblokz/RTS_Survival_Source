@@ -150,11 +150,19 @@ FVector UWreckTurretTossComponent::GetTurretRingLocation() const
 
 void UWreckTurretTossComponent::LaunchTurret(UWreckPartFlightComponent& TurretFlight) const
 {
-	const float UpSpeed = FMath::FRandRange(M_Settings.UpSpeedRange.X, M_Settings.UpSpeedRange.Y);
-	const float SideSpeed = FMath::FRandRange(M_Settings.SideSpeedRange.X, M_Settings.SideSpeedRange.Y);
+	const float UpSpeed = FMath::FRandRange(M_Settings.UpSpeedRange.X, M_Settings.UpSpeedRange.Y)
+		* M_Settings.LaunchSpeedScale;
+	const float SideSpeed = FMath::FRandRange(M_Settings.SideSpeedRange.X, M_Settings.SideSpeedRange.Y)
+		* M_Settings.LaunchSpeedScale;
 	const float SpinSpeed = FMath::FRandRange(M_Settings.SpinDegreesRange.X, M_Settings.SpinDegreesRange.Y);
-	const FVector SideDirection = FRotator(
-		0.f, FMath::FRandRange(0.f, WreckTurretTossConstants::FullCircleDegrees), 0.f).Vector();
+	// A blast throws the turret away from itself, give or take a little; a cook-off throws it anywhere.
+	constexpr float ForcedDirectionJitterDegrees = 20.f;
+	const FVector SideDirection = M_Settings.ForcedSideDirection.IsNearlyZero()
+		                              ? FRotator(0.f, FMath::FRandRange(
+			                                         0.f, WreckTurretTossConstants::FullCircleDegrees), 0.f).Vector()
+		                              : M_Settings.ForcedSideDirection.GetSafeNormal2D().RotateAngleAxis(
+			                              FMath::FRandRange(-ForcedDirectionJitterDegrees,
+			                                                ForcedDirectionJitterDegrees), FVector::UpVector);
 
 	// Setting velocities directly keeps the arc the same for a light Panzer II turret and a heavy Tiger turret.
 	const FVector LaunchVelocity = SideDirection * SideSpeed + FVector::UpVector * UpSpeed;

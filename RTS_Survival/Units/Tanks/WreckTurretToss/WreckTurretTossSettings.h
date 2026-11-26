@@ -115,4 +115,11 @@ struct RTS_SURVIVAL_API FWreckTurretTossSettings
 	// Physics is always switched off after this many seconds, even when the turret still rolls.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Landing", meta=(ClampMin="0.5"))
 	float MaxFlightTime = 9.f;
+
+	// Runtime only, never authored: a tank killed by a big blast (FRTSBlastThrow) throws its turret away from the
+	// blast instead of in a random direction. Zero keeps the random direction.
+	FVector ForcedSideDirection = FVector::ZeroVector;
+
+	// Runtime only: multiplies the up and side launch speeds for a big blast.
+	float LaunchSpeedScale = 1.f;
 };

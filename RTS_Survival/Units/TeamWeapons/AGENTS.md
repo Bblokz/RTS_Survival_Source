@@ -149,6 +149,16 @@ Run it after any change to movement, deploy, crew placement or towing.
   pack timers, post actions, turns and pushes (`CancelPendingDeployForTow`); deploy/pack timer callbacks return when
   towed. `EndTowSway` after detaching keeps the swung position upright.
 
+## Crewless guns placed on a map (2026-11-26)
+
+- `ATeamWeapon::bStartAbandoned` + `StartAbandonedCrewClass` (EditInstanceOnly): a gun placed in a level without its
+  squad calls `ForceSetAbandonedStateForCapture(StartAbandonedCrewClass)` on the first tick after BeginPlay (BeginPlay
+  applies the config and packed pose after the Blueprint event, so not earlier). Any infantry squad with enough men can
+  then re-crew it; the crew is spawned from `StartAbandonedCrewClass` (for the Flak 88: `Ger_SquadTW_Flak88`). The gun
+  keeps the owner on its RTS component (the Flak 88 Blueprint default is 1). First use: Ger_Berlin `SPOI_Flak88_A/B`.
+- No team weapon Blueprint sets `M_TeamWeaponDecalManager.M_DecalMaterial`, so every abandon (placed or after the crew
+  died) reports "M_DecalMaterial not set". The abandon itself still works.
+
 ## Dig-in (sandbag pits)
 
 Doc and test: `Source/Docs/Units/TeamWeaponDigIn.md`, `-TeamWeaponDigInValidate` (`Tests/TeamWeaponDigInTestSubsystem`).

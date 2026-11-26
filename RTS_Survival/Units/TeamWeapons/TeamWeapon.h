@@ -366,6 +366,16 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "TeamWeapon|Movement")
 	FTeamWeaponPushedCrewSettings M_PushedCrewSettings;
 
+	// A gun placed on a map without its squad: it turns abandoned on the first tick after BeginPlay, so any infantry
+	// squad with enough men can re-crew it (IdManAbandonedTeamWeapon). Keeps the owner set on its RTS component.
+	UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category = "TeamWeapon|Abandoned")
+	bool bStartAbandoned = false;
+
+	// The squad Blueprint that is spawned around the soldiers who re-crew it (for example Ger_SquadTW_Flak88).
+	UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category = "TeamWeapon|Abandoned",
+		meta = (EditCondition = "bStartAbandoned"))
+	TSubclassOf<ATeamWeaponController> StartAbandonedCrewClass = nullptr;
+
 	UFUNCTION(BlueprintImplementableEvent, Category = "TeamWeapon")
 	void BP_OnHealthChanged(const EHealthLevel PercentageLeft, const bool bIsHealing);
 
@@ -387,6 +397,8 @@ protected:
 		FCollapseFX CollapseFX);
 
 private:
+	// bStartAbandoned: waits one tick, because BeginPlay applies the config and the packed pose after the Blueprint event.
+	void BeginPlay_StartAbandonedNextTick();
 	void ApplyAbandonedHealthBarCustomization();
 	void RestoreCrewedHealthBarCustomization();
 	[[nodiscard]] bool GetIsValidHealthComponent() const;

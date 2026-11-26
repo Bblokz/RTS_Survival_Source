@@ -122,6 +122,33 @@ void ATeamWeapon::BeginPlay()
 	BeginPlay_InitTeamWeaponCollision();
 	BeginPlay_ApplyTeamWeaponConfig(M_TeamWeaponConfig);
 	BeginPlay_ForceStartPackedState();
+	BeginPlay_StartAbandonedNextTick();
+}
+
+void ATeamWeapon::BeginPlay_StartAbandonedNextTick()
+{
+	if (not bStartAbandoned)
+	{
+		return;
+	}
+	if (not StartAbandonedCrewClass)
+	{
+		RTSFunctionLibrary::ReportError("Team weapon " + GetName() + " should start abandoned but has no "
+			"StartAbandonedCrewClass, so no squad could re-crew it; it stays as placed."
+			"\n At function: ATeamWeapon::BeginPlay_StartAbandonedNextTick");
+		return;
+	}
+	TWeakObjectPtr<ATeamWeapon> WeakThis(this);
+	GetWorldTimerManager().SetTimerForNextTick([WeakThis]()
+	{
+		ATeamWeapon* const TeamWeapon = WeakThis.Get();
+		// A squad that adopted the gun in the meantime keeps it.
+		if (not IsValid(TeamWeapon) || TeamWeapon->GetIsAbandoned() || TeamWeapon->M_TeamWeaponController.IsValid())
+		{
+			return;
+		}
+		(void)TeamWeapon->ForceSetAbandonedStateForCapture(TeamWeapon->StartAbandonedCrewClass);
+	});
 }
 
 void ATeamWeapon::PostInitializeComponents()
