@@ -212,6 +212,39 @@ struct RTS_SURVIVAL_API FWorldCommanderMapState
 };
 
 /**
+ * @brief How many fire missions one battery has fired in the current player turn.
+ */
+USTRUCT(BlueprintType)
+struct RTS_SURVIVAL_API FWorldBatteryFireRecord
+{
+	GENERATED_BODY()
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame)
+	FName BuildNodeId = NAME_None;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame)
+	int32 MissionsFired = 0;
+};
+
+/**
+ * @brief Which batteries fired in one player turn. The records only count for the turn stored with them, so a save
+ * written between two turns can never leave a battery spent in the next one.
+ * @note Read and written through WorldBatteryFireRules.
+ */
+USTRUCT(BlueprintType)
+struct RTS_SURVIVAL_API FWorldBatteryFireTurnState
+{
+	GENERATED_BODY()
+
+	/** Campaign turn the records belong to. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame)
+	int32 Turn = 0;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame)
+	TArray<FWorldBatteryFireRecord> Records;
+};
+
+/**
  * @brief Everything the campaign remembers beyond the generated map: what was won, what was bought and what the
  * enemy is up to. Lives inside FWorldCampaignState so it is saved in the same write.
  */
@@ -255,6 +288,10 @@ struct RTS_SURVIVAL_API FWorldCampaignProgressState
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame)
 	FWorldPendingOperation PendingOperation;
+
+	/** Battery fire missions of the current player turn, keyed by build node id. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame)
+	FWorldBatteryFireTurnState BatteryFire;
 
 	/** Difficulty picked at campaign start, so a campaign continued after a restart plays on the same setting. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame)

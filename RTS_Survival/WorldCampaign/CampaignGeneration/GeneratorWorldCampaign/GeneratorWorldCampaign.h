@@ -101,6 +101,15 @@ struct FAnchorPointGenerationSettings
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Anchor Point Generation")
 	TSubclassOf<AAnchorPoint> M_GeneratedAnchorPointClass;
 
+	// Actors with this tag (the wall splines and gate) keep generated anchors away, so no map piece stands in them.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Anchor Point Generation")
+	FName M_KeepClearActorTag = TEXT("WorldAnchorKeepClear");
+
+	// Largest map piece radius plus half the wall's depth, with a margin.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Anchor Point Generation",
+		meta = (ClampMin = "0"))
+	float M_KeepClearDistance = 200.f;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Anchor Point Generation")
 	bool bM_DebugDrawSplineBoundary = false;
 

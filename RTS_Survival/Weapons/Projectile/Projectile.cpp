@@ -397,22 +397,28 @@ void AProjectile::SetupBarrageProjectileForNewLaunch(
 	const FWeaponData& WeaponData,
 	const FWeaponVFX& WeaponVfx,
 	const FProjectileVfxSettings& ProjectileVfxSettings,
-	const FBarrageProjectileMover& ProjectileMover,
+	const FBarrageShellFlight& Flight,
 	const int32 OwningPlayer,
-	const FVector& LaunchLocation,
-	const FRotator& LaunchRotation,
-	const FVector& AimPoint,
 	const TArray<AActor*>& ActorsToIgnore)
 {
-	const float SafeLinearSpeed = FMath::Max(ProjectileMover.ProjectileLinearSpeed, 1.0f);
+	// The ground hit must come from the trace (surface effects, AOE on the ground), which only runs every trace
+	// interval; the timed burst is the fallback for a shell that missed the ground (a hole, a cliff edge).
+	const float TimedExplosionMarginSeconds = 2.0f * DeveloperSettings::Optimization::ProjectileTraceInterval;
+	const FRotator LaunchRotation = Flight.LaunchVelocity.Rotation();
 	ApplyBarrageProjectileLaunchData(WeaponData, WeaponVfx, ActorsToIgnore, OwningPlayer);
-	OnRestartProjectile(LaunchLocation, LaunchRotation, SafeLinearSpeed);
+	OnRestartProjectile(Flight.LaunchLocation, LaunchRotation, Flight.LaunchVelocity.Size());
 	M_ProjectileSpawn = GetActorLocation();
 	SetupNiagaraWithPrjVfxSettings(ProjectileVfxSettings);
 	SetupTraceChannel(OwningPlayer);
-	SpawnBarrageLaunchEffects(WeaponVfx, LaunchLocation, LaunchRotation);
-	StartFlightTimers(M_Range / SafeLinearSpeed);
-	StartBarrageProjectileGuidance(LaunchLocation, AimPoint, ProjectileMover);
+	SpawnBarrageLaunchEffects(WeaponVfx, Flight.LaunchLocation, LaunchRotation);
+	StartFlightTimers(Flight.FlightTimeSeconds + TimedExplosionMarginSeconds);
+	if (not GetIsValidProjectileMovement())
+	{
+		return;
+	}
+	M_ProjectileMovement->ProjectileGravityScale = Flight.GravityScale;
+	M_ProjectileMovement->Velocity = Flight.LaunchVelocity;
+	M_ProjectileMovement->bRotationFollowsVelocity = true;
 }
 
 void AProjectile::ApplyBarrageProjectileLaunchData(
@@ -481,76 +487,6 @@ void AProjectile::SpawnBarrageLaunchEffects(
 		LaunchLocation,
 		LaunchRotation,
 		WeaponVfx.LaunchScale);
-}
-
-void AProjectile::StartBarrageProjectileGuidance(
-	const FVector& LaunchLocation,
-	const FVector& AimPoint,
-	const FBarrageProjectileMover& ProjectileMover)
-{
-	M_BarrageProjectileRuntimeState.LaunchLocation = LaunchLocation;
-	M_BarrageProjectileRuntimeState.AimPoint = AimPoint;
-	M_BarrageProjectileRuntimeState.ProjectileMover = ProjectileMover;
-	UpdateBarrageProjectileCourse();
-
-	if (UWorld* World = GetWorld())
-	{
-		constexpr float BarrageUpdateIntervalSeconds = 0.05f;
-		World->GetTimerManager().ClearTimer(M_BarrageProjectileTimerHandle);
-		TWeakObjectPtr<AProjectile> WeakThis(this);
-		World->GetTimerManager().SetTimer(
-			M_BarrageProjectileTimerHandle,
-			[WeakThis]()
-			{
-				if (not WeakThis.IsValid())
-				{
-					return;
-				}
-				WeakThis->UpdateBarrageProjectileCourse();
-			},
-			BarrageUpdateIntervalSeconds,
-			true);
-	}
-}
-
-void AProjectile::UpdateBarrageProjectileCourse()
-{
-	if (not GetIsValidProjectileMovement())
-	{
-		return;
-	}
-
-	const FVector LaunchLocation = M_BarrageProjectileRuntimeState.LaunchLocation;
-	const FVector AimPoint = M_BarrageProjectileRuntimeState.AimPoint;
-	const FVector LaunchToAim = AimPoint - LaunchLocation;
-	const FVector CurrentFromLaunch = GetActorLocation() - LaunchLocation;
-	const float PathLengthSquared = LaunchToAim.SizeSquared();
-	if (PathLengthSquared <= UE_SMALL_NUMBER)
-	{
-		return;
-	}
-
-	const float PathAlpha = FVector::DotProduct(CurrentFromLaunch, LaunchToAim) / PathLengthSquared;
-	if (PathAlpha >= 1.0f)
-	{
-		if (UWorld* World = GetWorld())
-		{
-			World->GetTimerManager().ClearTimer(M_BarrageProjectileTimerHandle);
-		}
-		return;
-	}
-
-	const float ClampedAlpha = FMath::Clamp(PathAlpha, 0.0f, 1.0f);
-	const float ArcWeight = FMath::Sin(ClampedAlpha * PI);
-	const float Speed = FMath::Lerp(
-		M_BarrageProjectileRuntimeState.ProjectileMover.ProjectileLinearSpeed,
-		M_BarrageProjectileRuntimeState.ProjectileMover.ProjectileArcSpeed,
-		ArcWeight);
-	const FVector StraightDirection = (AimPoint - GetActorLocation()).GetSafeNormal();
-	const FVector ArcOffset = FVector::UpVector * M_BarrageProjectileRuntimeState.ProjectileMover.ArcStrength * ArcWeight;
-	const FVector DesiredDirection = (StraightDirection + ArcOffset).GetSafeNormal();
-	M_ProjectileMovement->Velocity = DesiredDirection * FMath::Max(Speed, 1.0f);
-	SetActorRotation(M_ProjectileMovement->Velocity.Rotation());
 }
 
 void AProjectile::StartFlightTimers(const float ExpectedFlightTime)
@@ -649,7 +585,7 @@ bool AProjectile::CalculateArcedLaunchParameters(const FVector& LaunchLocation,
 	{
 		return false;
 	}
-	const float Gravity = FMath::Abs(GravityZ);
+	const float Gravity = FMath::Abs(GravityZ) * DeveloperSettings::GamePlay::Projectile::GlobalArcGravityMlt;
 	const float DesiredApexHeight = CalculateDesiredApexHeight(
 		LaunchLocation,
 		TargetLocation,
@@ -732,7 +668,7 @@ void AProjectile::SetupArcedLaunch(
 	SetActorLocation(LaunchLocation);
 	SetActorRotation(LaunchVelocity.Rotation());
 	M_ProjectileMovement->Activate();
-	M_ProjectileMovement->ProjectileGravityScale = 1.0f;
+	M_ProjectileMovement->ProjectileGravityScale = DeveloperSettings::GamePlay::Projectile::GlobalArcGravityMlt;
 	M_ProjectileMovement->Velocity = LaunchVelocity;
 
 	StartFlightTimers(TimeToTarget);
@@ -769,7 +705,7 @@ void AProjectile::LaunchStraightFallback(const FVector& LaunchLocation,
 	const FVector LaunchToTarget = TargetLocation - LaunchLocation;
 	const FVector FlatDelta(LaunchToTarget.X, LaunchToTarget.Y, 0.0f);
 	const float GravityZ = GetWorld() ? GetWorld()->GetGravityZ() : 0.0f;
-	const float Gravity = FMath::Abs(GravityZ);
+	const float Gravity = FMath::Abs(GravityZ) * DeveloperSettings::GamePlay::Projectile::GlobalArcGravityMlt;
 
 	if (FlatDelta.IsNearlyZero() || FMath::IsNearlyZero(Gravity))
 	{
@@ -1563,7 +1499,7 @@ void AProjectile::LaunchStraightFallbackStartAscent(const FVector& LaunchLocatio
 	SetActorLocation(LaunchLocation);
 	SetActorRotation(LaunchVelocity.Rotation());
 	M_ProjectileMovement->Activate();
-	M_ProjectileMovement->ProjectileGravityScale = 1.0f;
+	M_ProjectileMovement->ProjectileGravityScale = DeveloperSettings::GamePlay::Projectile::GlobalArcGravityMlt;
 	M_ProjectileMovement->Velocity = LaunchVelocity;
 
 	StartFlightTimers(TotalFlightTime);

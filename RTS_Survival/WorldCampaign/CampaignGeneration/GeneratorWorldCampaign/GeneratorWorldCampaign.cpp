@@ -11,6 +11,8 @@
 #include "RTS_Survival/DeveloperSettings.h"
 #include "TimerManager.h"
 #include "EngineUtils.h"
+#include "Components/SplineComponent.h"
+#include "Kismet/GameplayStatics.h"
 #include "RTS_Survival/Game/RTSGameInstance/RTSGameInstance.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/WorldCampaign/CampaignGeneration/Debugging/WorldCampaignDebugger.h"
@@ -1235,6 +1237,98 @@ namespace
 		}
 	}
 
+	// Spacing of the points that stand in for a keep-clear actor's centre line.
+	constexpr float AnchorKeepClearSampleSpacing = 25.f;
+
+	void AppendKeepClearPointsAlongSpline(const USplineComponent* Spline, TArray<FVector2D>& OutPoints)
+	{
+		const float SplineLength = Spline->GetSplineLength();
+		const int32 SampleCount = FMath::CeilToInt(SplineLength / AnchorKeepClearSampleSpacing) + 1;
+		for (int32 SampleIndex = 0; SampleIndex < SampleCount; SampleIndex++)
+		{
+			const float Distance = FMath::Min(SampleIndex * AnchorKeepClearSampleSpacing, SplineLength);
+			OutPoints.Add(FVector2D(
+				Spline->GetLocationAtDistanceAlongSpline(Distance, ESplineCoordinateSpace::World)));
+		}
+	}
+
+	// An actor without a spline (the gate) is covered along the long axis of its own box.
+	void AppendKeepClearPointsAlongActorBox(const AActor* Actor, TArray<FVector2D>& OutPoints)
+	{
+		const FBox LocalBox = Actor->CalculateComponentsBoundingBoxInLocalSpace(true);
+		if (not LocalBox.IsValid)
+		{
+			OutPoints.Add(FVector2D(Actor->GetActorLocation()));
+			return;
+		}
+
+		const FVector LocalCenter = LocalBox.GetCenter();
+		const FVector LocalExtent = LocalBox.GetExtent();
+		const bool bIsLongAlongX = LocalExtent.X >= LocalExtent.Y;
+		const FVector LocalAxis = bIsLongAlongX ? FVector::ForwardVector : FVector::RightVector;
+		const float HalfLength = bIsLongAlongX ? LocalExtent.X : LocalExtent.Y;
+		const FTransform& ActorTransform = Actor->GetActorTransform();
+		const float WorldHalfLength = HalfLength * ActorTransform.GetScale3D().GetAbsMax();
+		const int32 HalfSampleCount = FMath::CeilToInt(WorldHalfLength / AnchorKeepClearSampleSpacing);
+		for (int32 SampleIndex = -HalfSampleCount; SampleIndex <= HalfSampleCount; SampleIndex++)
+		{
+			const float Alpha = HalfSampleCount > 0 ? static_cast<float>(SampleIndex) / HalfSampleCount : 0.f;
+			OutPoints.Add(FVector2D(
+				ActorTransform.TransformPosition(LocalCenter + LocalAxis * (HalfLength * Alpha))));
+		}
+	}
+
+	TArray<FVector2D> GatherAnchorKeepClearPoints(const UWorld* World, const FName KeepClearActorTag)
+	{
+		TArray<FVector2D> KeepClearPoints;
+		if (not IsValid(World) || KeepClearActorTag.IsNone())
+		{
+			return KeepClearPoints;
+		}
+
+		TArray<AActor*> KeepClearActors;
+		UGameplayStatics::GetAllActorsWithTag(World, KeepClearActorTag, KeepClearActors);
+		// Name order keeps the point list the same on every run, whatever order the world returns the actors in.
+		KeepClearActors.Sort([](const AActor& Left, const AActor& Right)
+		{
+			return Left.GetFName().LexicalLess(Right.GetFName());
+		});
+		for (const AActor* KeepClearActor : KeepClearActors)
+		{
+			if (not IsValid(KeepClearActor))
+			{
+				continue;
+			}
+
+			TInlineComponentArray<USplineComponent*> Splines(KeepClearActor);
+			for (const USplineComponent* Spline : Splines)
+			{
+				AppendKeepClearPointsAlongSpline(Spline, KeepClearPoints);
+			}
+
+			if (Splines.IsEmpty())
+			{
+				AppendKeepClearPointsAlongActorBox(KeepClearActor, KeepClearPoints);
+			}
+		}
+
+		return KeepClearPoints;
+	}
+
+	bool IsClearOfKeepClearPoints(const FVector2D& Candidate, const TArray<FVector2D>& KeepClearPoints,
+	                              const float KeepClearDistanceSquared)
+	{
+		for (const FVector2D& KeepClearPoint : KeepClearPoints)
+		{
+			if (FVector2D::DistSquared(KeepClearPoint, Candidate) < KeepClearDistanceSquared)
+			{
+				return false;
+			}
+		}
+
+		return true;
+	}
+
 	bool IsFarEnoughFromAnchors(const FVector2D& Candidate, const TArray<TObjectPtr<AAnchorPoint>>& ExistingAnchors,
 	                            const TArray<TObjectPtr<AAnchorPoint>>& NewAnchors, float MinDistanceSquared)
 	{
@@ -1515,7 +1609,8 @@ namespace
 	                        const TArray<TObjectPtr<AAnchorPoint>>& ExistingAnchors, int32 TargetCount,
 	                        int32 StepAttemptIndex, int32 JitterAttemptsPerCell,
 	                        FCampaignGenerationStepTransaction& OutTransaction,
-	                        TArray<TObjectPtr<AAnchorPoint>>& OutNewAnchors, float MinDistanceSquared)
+	                        TArray<TObjectPtr<AAnchorPoint>>& OutNewAnchors, float MinDistanceSquared,
+	                        const TArray<FVector2D>& KeepClearPoints, float KeepClearDistanceSquared)
 	{
 		if (not CanSpawnAnchorsInGrid(World, Generator, JitterAttemptsPerCell))
 		{
@@ -1545,6 +1640,11 @@ namespace
 				}
 
 				if (not IsFarEnoughFromAnchors(Candidate, ExistingAnchors, OutNewAnchors, MinDistanceSquared))
+				{
+					continue;
+				}
+
+				if (not IsClearOfKeepClearPoints(Candidate, KeepClearPoints, KeepClearDistanceSquared))
 				{
 					continue;
 				}
@@ -7026,10 +7126,14 @@ bool AGeneratorWorldCampaign::ExecuteGenerateAnchorPoints(FCampaignGenerationSte
 	}
 
 	TArray<TObjectPtr<AAnchorPoint>> NewAnchors;
+	const TArray<FVector2D> KeepClearPoints = GatherAnchorKeepClearPoints(
+		World, M_AnchorPointGenerationSettings.M_KeepClearActorTag);
+	const float KeepClearDistanceSquared = FMath::Square(M_AnchorPointGenerationSettings.M_KeepClearDistance);
 
 	if (not SpawnAnchorsInGrid(World, this, AnchorClass, RandomStream, GridDefinition, BoundaryPolygon,
 	                           SortedExistingAnchors, PreferredTargetCount, AttemptIndex, JitterAttemptsPerCell,
-	                           OutTransaction, NewAnchors, MinDistanceSquared))
+	                           OutTransaction, NewAnchors, MinDistanceSquared, KeepClearPoints,
+	                           KeepClearDistanceSquared))
 	{
 		return false;
 	}
