@@ -1,0 +1,345 @@
+{
+ "JobName": "GA_Desert_BarrageDescent",
+ "Category": "GlobalAbilities",
+ "Fps": 60,
+ "WarmupSeconds": 6.0,
+ "DurationSeconds": 26.0,
+ "Anchor": {
+  "X": -5000.0,
+  "Y": 5000.0,
+  "Z": 0.0
+ },
+ "AnchorYaw": 60.0,
+ "ClearUnitsRadius": 9000.0,
+ "bKeepVoiceLines": true,
+ "bKeepAnnouncer": false,
+ "bKeepMusic": false,
+ "Events": [
+  {
+   "Time": -3.5,
+   "Type": "Hide",
+   "Tag": "",
+   "Text": "BP_Electricity_SinglePole",
+   "Radius": 0.0
+  },
+  {
+   "Time": -1.5,
+   "Type": "Spawn",
+   "Tag": "Target",
+   "ClassPath": "/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Rus_Medium/T34/Rus_Vehicle_T3476",
+   "Player": 2,
+   "Offset": {
+    "X": -600,
+    "Y": -300,
+    "Z": 0.0
+   },
+   "Yaw": 0.0,
+   "Count": 1,
+   "Columns": 0,
+   "Spacing": 1200.0
+  },
+  {
+   "Time": -1.5,
+   "Type": "Spawn",
+   "Tag": "Target",
+   "ClassPath": "/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Rus_Medium/T34/Rus_Vehicle_T3476",
+   "Player": 2,
+   "Offset": {
+    "X": 500,
+    "Y": 400,
+    "Z": 0.0
+   },
+   "Yaw": 30.0,
+   "Count": 1,
+   "Columns": 0,
+   "Spacing": 1200.0
+  },
+  {
+   "Time": -1.5,
+   "Type": "Spawn",
+   "Tag": "Target",
+   "ClassPath": "/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Rus_Medium/T34/Rus_Vehicle_T3476",
+   "Player": 2,
+   "Offset": {
+    "X": 0,
+    "Y": 1200,
+    "Z": 0.0
+   },
+   "Yaw": 60.0,
+   "Count": 1,
+   "Columns": 0,
+   "Spacing": 1200.0
+  },
+  {
+   "Time": -1.5,
+   "Type": "Spawn",
+   "Tag": "Target",
+   "ClassPath": "/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Rus_Medium/T34/Rus_Vehicle_T3476",
+   "Player": 2,
+   "Offset": {
+    "X": -1400,
+    "Y": 800,
+    "Z": 0.0
+   },
+   "Yaw": 90.0,
+   "Count": 1,
+   "Columns": 0,
+   "Spacing": 1200.0
+  },
+  {
+   "Time": 0.5,
+   "Type": "Ability",
+   "Tag": "",
+   "Text": "GA_GerRailBombardment",
+   "Player": 1,
+   "Offset": {
+    "X": 0,
+    "Y": 300,
+    "Z": 0.0
+   },
+   "Settings": {}
+  },
+  {
+   "Time": 9.0,
+   "Type": "Ability",
+   "Tag": "",
+   "Text": "GA_LargeBarrage",
+   "Player": 1,
+   "Offset": {
+    "X": 0,
+    "Y": 300,
+    "Z": 0.0
+   },
+   "Settings": {}
+  }
+ ],
+ "Shots": [
+  {
+   "Name": "RtsView",
+   "Start": 0.0,
+   "End": 9.0,
+   "Rig": "Orbit",
+   "Keys": [
+    {
+     "Time": 0.0,
+     "Pivot": "",
+     "Offset": {
+      "X": 0.0,
+      "Y": 300.0,
+      "Z": 0.0
+     },
+     "Yaw": 200,
+     "Pitch": 52,
+     "Distance": 5200,
+     "Focal": 24.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0
+     },
+     "VYaw": 0.0,
+     "VPitch": 58,
+     "VDistance": 6000,
+     "VFocal": 18.0,
+     "VLookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     }
+    },
+    {
+     "Time": 9.0,
+     "Pivot": "",
+     "Offset": {
+      "X": 0.0,
+      "Y": 300.0,
+      "Z": 0.0
+     },
+     "Yaw": 215,
+     "Pitch": 52,
+     "Distance": 5200,
+     "Focal": 24.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0
+     },
+     "VYaw": 0.0,
+     "VPitch": 58,
+     "VDistance": 6000,
+     "VFocal": 18.0,
+     "VLookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     }
+    }
+   ],
+   "Ease": "InOut",
+   "PivotLag": 1.0,
+   "Aperture": 0.0,
+   "Shake": 0.0,
+   "bAvoidOcclusion": true,
+   "MinGroundClearance": 350.0
+  },
+  {
+   "Name": "LowSide",
+   "Start": 9.0,
+   "End": 18.0,
+   "Rig": "Orbit",
+   "Keys": [
+    {
+     "Time": 0.0,
+     "Pivot": "",
+     "Offset": {
+      "X": 0.0,
+      "Y": 300.0,
+      "Z": 0.0
+     },
+     "Yaw": 110,
+     "Pitch": 16,
+     "Distance": 5200,
+     "Focal": 24.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 900
+     },
+     "VYaw": 0.0,
+     "VPitch": 22,
+     "VDistance": 6200,
+     "VFocal": 18.0,
+     "VLookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     }
+    },
+    {
+     "Time": 9.0,
+     "Pivot": "",
+     "Offset": {
+      "X": 0.0,
+      "Y": 300.0,
+      "Z": 0.0
+     },
+     "Yaw": 135,
+     "Pitch": 16,
+     "Distance": 5200,
+     "Focal": 24.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 900
+     },
+     "VYaw": 0.0,
+     "VPitch": 22,
+     "VDistance": 6200,
+     "VFocal": 18.0,
+     "VLookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     }
+    }
+   ],
+   "Ease": "InOut",
+   "PivotLag": 1.0,
+   "Aperture": 0.0,
+   "Shake": 0.0,
+   "bAvoidOcclusion": true,
+   "MinGroundClearance": 350.0
+  },
+  {
+   "Name": "RtsView2",
+   "Start": 18.0,
+   "End": 26.0,
+   "Rig": "Orbit",
+   "Keys": [
+    {
+     "Time": 0.0,
+     "Pivot": "",
+     "Offset": {
+      "X": 0.0,
+      "Y": 300.0,
+      "Z": 0.0
+     },
+     "Yaw": 230,
+     "Pitch": 50,
+     "Distance": 5600,
+     "Focal": 24.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0
+     },
+     "VYaw": 0.0,
+     "VPitch": 56,
+     "VDistance": 6400,
+     "VFocal": 18.0,
+     "VLookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     }
+    },
+    {
+     "Time": 8.0,
+     "Pivot": "",
+     "Offset": {
+      "X": 0.0,
+      "Y": 300.0,
+      "Z": 0.0
+     },
+     "Yaw": 245,
+     "Pitch": 50,
+     "Distance": 5600,
+     "Focal": 24.0,
+     "Roll": 0.0,
+     "LookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0
+     },
+     "VYaw": 0.0,
+     "VPitch": 56,
+     "VDistance": 6400,
+     "VFocal": 18.0,
+     "VLookOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 0.0
+     }
+    }
+   ],
+   "Ease": "InOut",
+   "PivotLag": 1.0,
+   "Aperture": 0.0,
+   "Shake": 0.0,
+   "bAvoidOcclusion": true,
+   "MinGroundClearance": 350.0
+  }
+ ],
+ "MapPath": "/Game/RTS_Survival/SurvivalMode/Maps/SM_Desert_01",
+ "GameModeClassPath": "/Game/RTS_Survival/SurvivalMode/Blueprints/BP_SurvivalGameMode.BP_SurvivalGameMode_C",
+ "LaunchArgs": [
+  "-SurvivalAutoStart",
+  "-SurvivalStartIndex=0",
+  "-SurvivalGrace=3600"
+ ],
+ "HideNear": [
+  [
+   "BP_Electricity_SinglePole",
+   0
+  ]
+ ],
+ "SuppressClassPrefixes": [],
+ "HideActorPrefixes": [],
+ "SkyMaterial": "/Game/SkyboxPack_X/Materials/Instances/M_Flowmap_Inst_02.M_Flowmap_Inst_02",
+ "Batch": "abilities"
+}
