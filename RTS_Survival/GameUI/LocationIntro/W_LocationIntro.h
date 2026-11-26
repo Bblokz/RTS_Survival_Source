@@ -96,6 +96,14 @@ public:
 	                                   const FLocationIntroPresentation& Presentation,
 	                                   const float DurationSeconds);
 
+	/**
+	 * @brief Shared by every caller, so a too-short duration never cuts the typewriter off mid-word.
+	 * @param Texts The texts that will show.
+	 * @param Presentation Their timing.
+	 * @return The shortest intro in which the date and time type out and stay readable before the fade.
+	 */
+	static float GetMinDurationSeconds(const FLocationIntroTexts& Texts, const FLocationIntroPresentation& Presentation);
+
 	void SetElapsedSeconds(const float ElapsedSeconds);
 
 	void CloseIntro();

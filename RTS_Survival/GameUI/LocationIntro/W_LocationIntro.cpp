@@ -131,6 +131,21 @@ UW_LocationIntro* UW_LocationIntro::ShowIntro(APlayerController* OwningPlayer,
 	return Intro;
 }
 
+float UW_LocationIntro::GetMinDurationSeconds(const FLocationIntroTexts& Texts,
+                                              const FLocationIntroPresentation& Presentation)
+{
+	// The texts stay fully shown at least this long between typing out and the fade.
+	constexpr float MinFullyShownSeconds = 1.f;
+	// Matches the pause between the date and the time line.
+	constexpr float TimeLineDelaySeconds = 0.25f;
+	const float LettersPerSecond = FMath::Max(1.f, Presentation.TypewriterLettersPerSecond);
+	const int32 TypedLetters = Texts.Date.ToString().Len() + Texts.TimeOfDay.ToString().Len();
+	const float TypingSeconds = TypedLetters / LettersPerSecond + TimeLineDelaySeconds;
+	const float TypedSeconds = Presentation.DateStartSeconds + TypingSeconds;
+	const float LocationSeconds = Presentation.LocationStartSeconds + MinFullyShownSeconds;
+	return FMath::Max(TypedSeconds, LocationSeconds) + MinFullyShownSeconds + Presentation.FadeOutSeconds;
+}
+
 void UW_LocationIntro::NativeOnInitialized()
 {
 	Super::NativeOnInitialized();
