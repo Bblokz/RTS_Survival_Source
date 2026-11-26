@@ -64,6 +64,27 @@ public:
 	UFUNCTION(BlueprintPure, Category = "World Campaign|FOW")
 	TArray<FWorldFowRevealSource> GetRevealSources() const;
 
+	/**
+	 * @brief Whether the fog is open at a place, read from the visible channel of the mask the cloud draws with.
+	 * For things that are not fog participants themselves, such as enemy divisions.
+	 * @param WorldLocation Place on the map.
+	 * @return true when the place is revealed, and also when no mask or cloud exists (then nothing is hidden).
+	 */
+	UFUNCTION(BlueprintPure, Category = "World Campaign|FOW")
+	bool GetIsWorldLocationRevealed(const FVector& WorldLocation) const;
+
+	/**
+	 * @brief Whether the cloud is drawn open at a place: revealed, or inside the opening around an unidentified
+	 * mission. For what is drawn only (dim roads); game rules ask GetIsWorldLocationRevealed.
+	 * @param WorldLocation Place on the map.
+	 * @return true when the cloud is open there, and also when no mask or cloud exists.
+	 */
+	bool GetIsFogDrawnOpenAt(const FVector& WorldLocation) const;
+
+	// Fired after every fog pass, once the states are applied and the mask is rebuilt; for what draws itself
+	// differently under fog, such as the dim roads of the connection spline renderer.
+	FSimpleMulticastDelegate OnWorldFowRefreshed;
+
 	UFUNCTION(CallInEditor, Category = "World Campaign|FOW|Debug")
 	void Debug_RevealAll();
 
@@ -119,6 +140,27 @@ private:
 	bool GetIsAnchorCleared(const AAnchorPoint* AnchorPoint) const;
 	bool GetIsAnchorInsideRevealSource(const AAnchorPoint* AnchorPoint) const;
 	void StampRevealSourcesToMask();
+	void NotifyFowRefreshed();
+
+	/**
+	 * @brief Gives every mission its fog hint for this pass and, with a mask, cuts the openings that show an
+	 * unidentified mission's real piece. The openings are drawn only: no fog state and no reveal answer changes.
+	 */
+	void ApplyMissionFogHints();
+
+	/** Copies the visible channel before the mission openings are cut, as the answer to what is really revealed. */
+	void CacheRevealedPixels();
+
+	/** @param OutLocations Receives where the enemy objects and divisions stand that the fog hides now. */
+	void GatherHiddenEnemyPieceLocations(TArray<FVector>& OutLocations) const;
+
+	/** @return Size of one mask pixel in map units along its largest side; 0 without a cloud. */
+	float GetMaskPixelWorldSize() const;
+	void NoteHiddenEnemyDistance(const FVector& MissionLocation, const TArray<FVector>& HiddenEnemyPieceLocations);
+	bool GetIsMaskPixelSet(const TArray<uint8>& VisiblePixels, const FVector& WorldLocation) const;
+
+	/** Logs what the fog hides and hints at after a fog pass (RTS_WORLDFOGHINTS); not in shipping builds. */
+	void LogFogHintSummary() const;
 	void Debug_DrawRadiusForConnections(EWorldMapFowState DebugState) const;
 	void Debug_DrawRadiusForAnchors(EWorldMapFowState DebugState) const;
 	void Debug_DrawRadiusForWorldObjects(EWorldMapFowState DebugState, UClass* WorldObjectClass) const;
@@ -168,6 +210,12 @@ private:
 	TObjectPtr<UTexture2D> M_MaskTexture = nullptr;
 
 	TArray<FColor> M_MaskPixels;
+
+	// The visible channel as the reveal rules made it, without the drawn-only openings around unidentified missions.
+	TArray<uint8> M_RevealedPixels;
+
+	// For the RTS_WORLDFOGHINTS log line: closest hidden enemy piece to an unidentified mission; negative = none.
+	float M_NearestHiddenEnemyToUnidentifiedMission = -1.f;
 	TMap<TObjectKey<const AAnchorPoint>, EWorldMapFowState> M_AnchorStates;
 
 	// Extra reveal circles (watch posts); stamped into the visible channel and they make anchors inside Visible.

@@ -12,8 +12,12 @@
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/WorldCampaign/CampaignGeneration/GeneratorWorldCampaign/GeneratorWorldCampaign.h"
 #include "RTS_Survival/WorldCampaign/CampaignProgress/WorldCampaignProgressManager.h"
+#include "RTS_Survival/WorldCampaign/WorldDivisions/WorldDivisionBase.h"
+#include "RTS_Survival/WorldCampaign/WorldFow/WorldFogHintRules.h"
+#include "RTS_Survival/WorldCampaign/WorldFow/WorldFogHintSettings.h"
 #include "RTS_Survival/WorldCampaign/WorldFow/WorldFowCloud.h"
 #include "RTS_Survival/WorldCampaign/WorldFow/WorldMapFowComponent.h"
+#include "RTS_Survival/WorldCampaign/WorldFow/WorldUnknownMissionMarkerComponent.h"
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/AnchorPoint/AnchorPoint.h"
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/Connection/Connection.h"
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/Objects/WorldMapObject.h"
@@ -21,6 +25,62 @@
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/Objects/WorldMissionObject/WorldMissionObject.h"
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/Objects/WorldNeutralObject/WorldNeutralObject.h"
 #include "RTS_Survival/WorldCampaign/WorldPlayer/Controller/WorldPlayerController.h"
+
+DEFINE_LOG_CATEGORY_STATIC(LogRTSWorldFogHints, Log, All);
+
+#if !UE_BUILD_SHIPPING
+// Counts for the RTS_WORLDFOGHINTS log line, which headless runs read to check the fog hints.
+namespace WorldFogHintSummary
+{
+	struct FCounts
+	{
+		int32 Missions = 0;
+		int32 MissionsAsMarker = 0;
+		int32 MissionsAsRealPieceThroughFog = 0;
+		int32 EnemyObjects = 0;
+		int32 EnemyObjectsUnderFog = 0;
+		int32 Divisions = 0;
+		// Must stay 0: enemy objects and divisions get no marker and are not touched by the fog hints.
+		int32 EnemyPiecesWithMarker = 0;
+		// Negative while no mission shows the marker.
+		float NearestMarkerDistanceToHQ = -1.f;
+	};
+
+	bool GetHasUnknownMarker(const AActor& MapPiece)
+	{
+		return MapPiece.FindComponentByClass<UWorldUnknownMissionMarkerComponent>() != nullptr;
+	}
+
+	void CountMapObject(const AWorldMapObject& MapObject, const EWorldMapFowState AnchorState,
+	                    const FVector& PlayerHQLocation, FCounts& Counts)
+	{
+		if (const AWorldMissionObject* const MissionObject = Cast<AWorldMissionObject>(&MapObject))
+		{
+			++Counts.Missions;
+			if (not MissionObject->GetIsUnidentifiedUnderFog())
+			{
+				return;
+			}
+
+			Counts.MissionsAsMarker += MissionObject->GetIsShownAsUnknownMarker() ? 1 : 0;
+			Counts.MissionsAsRealPieceThroughFog += MissionObject->GetIsShownAsUnknownMarker() ? 0 : 1;
+			const float DistanceToHQ = FVector::Dist2D(MapObject.GetActorLocation(), PlayerHQLocation);
+			const bool bIsNearest = Counts.NearestMarkerDistanceToHQ < 0.f || DistanceToHQ < Counts.NearestMarkerDistanceToHQ;
+			Counts.NearestMarkerDistanceToHQ = bIsNearest ? DistanceToHQ : Counts.NearestMarkerDistanceToHQ;
+			return;
+		}
+
+		if (not MapObject.IsA(AWorldEnemyObject::StaticClass()))
+		{
+			return;
+		}
+
+		++Counts.EnemyObjects;
+		Counts.EnemyObjectsUnderFog += AnchorState == EWorldMapFowState::NotVisible ? 1 : 0;
+		Counts.EnemyPiecesWithMarker += GetHasUnknownMarker(MapObject) ? 1 : 0;
+	}
+}
+#endif
 
 namespace WorldFowDebugConstants
 {
@@ -145,6 +205,7 @@ void AWorldFowManager::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	M_WorldFowCloud.Reset();
 	M_MaskTexture = nullptr;
 	M_MaskPixels.Empty();
+	M_RevealedPixels.Empty();
 	M_AnchorStates.Empty();
 
 	Super::EndPlay(EndPlayReason);
@@ -164,11 +225,65 @@ void AWorldFowManager::UpdateFowFromCurrentWorldState()
 	ApplyConnectionStates();
 	if (not GetIsValidWorldFowCloud())
 	{
+		// Without a cloud nothing is hidden; the missions are still told, so none keeps an old hint.
+		ApplyMissionFogHints();
+		NotifyFowRefreshed();
 		return;
 	}
 
 	RebuildMaskTexture();
 	PushMaskToCloudMaterial();
+	NotifyFowRefreshed();
+}
+
+void AWorldFowManager::NotifyFowRefreshed()
+{
+	OnWorldFowRefreshed.Broadcast();
+	LogFogHintSummary();
+}
+
+void AWorldFowManager::LogFogHintSummary() const
+{
+#if !UE_BUILD_SHIPPING
+	if (not M_WorldGenerator.IsValid())
+	{
+		return;
+	}
+
+	WorldFogHintSummary::FCounts Counts;
+	const FWorldCampaignPlacementState& PlacementState = M_WorldGenerator->GetPlacementState();
+	const AAnchorPoint* const PlayerHQAnchor = PlacementState.PlayerHQAnchor;
+	const FVector PlayerHQLocation = IsValid(PlayerHQAnchor) ? PlayerHQAnchor->GetActorLocation() : FVector::ZeroVector;
+	for (const TObjectPtr<AAnchorPoint>& AnchorPoint : PlacementState.CachedAnchors)
+	{
+		const AWorldMapObject* const MapObject = IsValid(AnchorPoint) ? AnchorPoint->GetPromotedWorldObject() : nullptr;
+		if (IsValid(MapObject))
+		{
+			WorldFogHintSummary::CountMapObject(*MapObject, GetAnchorState(AnchorPoint), PlayerHQLocation, Counts);
+		}
+	}
+
+	for (TActorIterator<AWorldDivisionBase> DivisionIterator(GetWorld()); DivisionIterator; ++DivisionIterator)
+	{
+		++Counts.Divisions;
+		Counts.EnemyPiecesWithMarker += WorldFogHintSummary::GetHasUnknownMarker(**DivisionIterator) ? 1 : 0;
+	}
+
+	const bool bHasCloud = M_WorldFowCloud.IsValid();
+	UE_LOG(LogRTSWorldFogHints, Display,
+	       TEXT("RTS_WORLDFOGHINTS missions=%d asMarker=%d asRealPieceThroughFog=%d identified=%d "
+		       "nearestUnidentifiedFromHQ=%.0f enemyObjects=%d enemyObjectsUnderFog=%d divisions=%d "
+		       "enemyPiecesWithMarker=%d nearestHiddenEnemyToUnidentifiedMission=%.0f openingExposureRadius=%.0f "
+		       "hasCloud=%d fogTopZ=%.1f"),
+	       Counts.Missions, Counts.MissionsAsMarker, Counts.MissionsAsRealPieceThroughFog,
+	       Counts.Missions - Counts.MissionsAsMarker - Counts.MissionsAsRealPieceThroughFog,
+	       Counts.NearestMarkerDistanceToHQ, Counts.EnemyObjects, Counts.EnemyObjectsUnderFog, Counts.Divisions,
+	       Counts.EnemyPiecesWithMarker, M_NearestHiddenEnemyToUnidentifiedMission,
+	       WorldFogHintRules::GetMissionOpeningExposureRadius(
+		       UWorldFogHintSettings::Get()->MissionOpeningRadius, UWorldFogHintSettings::Get()->MissionOpeningFalloff,
+		       GetMaskPixelWorldSize(), UWorldFogHintSettings::Get()->EnemyPieceHalfWidth),
+	       bHasCloud ? 1 : 0, bHasCloud ? M_WorldFowCloud->GetFogTopZ() : 0.f);
+#endif
 }
 
 void AWorldFowManager::ApplyPersistentRevealsToAnchors()
@@ -276,6 +391,7 @@ void AWorldFowManager::Debug_RevealAll()
 		ApplyConnectionStates();
 		RebuildMaskTexture();
 		PushMaskToCloudMaterial();
+		NotifyFowRefreshed();
 	}
 }
 
@@ -298,6 +414,7 @@ void AWorldFowManager::Debug_HideAll()
 		ApplyConnectionStates();
 		RebuildMaskTexture();
 		PushMaskToCloudMaterial();
+		NotifyFowRefreshed();
 	}
 }
 
@@ -792,6 +909,109 @@ void AWorldFowManager::RebuildMaskTexture()
 	StampConnectionsToMask();
 	StampWorldObjectsToMask();
 	StampRevealSourcesToMask();
+	CacheRevealedPixels();
+	ApplyMissionFogHints();
+}
+
+void AWorldFowManager::CacheRevealedPixels()
+{
+	M_RevealedPixels.SetNumUninitialized(M_MaskPixels.Num());
+	for (int32 PixelIndex = 0; PixelIndex < M_MaskPixels.Num(); ++PixelIndex)
+	{
+		M_RevealedPixels[PixelIndex] = M_MaskPixels[PixelIndex].R;
+	}
+}
+
+void AWorldFowManager::ApplyMissionFogHints()
+{
+	const UWorldFogHintSettings* const Settings = UWorldFogHintSettings::Get();
+	TArray<FVector> HiddenEnemyPieceLocations;
+	GatherHiddenEnemyPieceLocations(HiddenEnemyPieceLocations);
+	const float ExposureRadius = WorldFogHintRules::GetMissionOpeningExposureRadius(
+		Settings->MissionOpeningRadius, Settings->MissionOpeningFalloff, GetMaskPixelWorldSize(),
+		Settings->EnemyPieceHalfWidth);
+	// A mask of the right size only exists with a cloud; without it nothing is cut.
+	const bool bHasMask = M_WorldFowCloud.IsValid() && M_MaskPixels.Num() == M_MaskResolution * M_MaskResolution;
+	M_NearestHiddenEnemyToUnidentifiedMission = -1.f;
+
+	const FWorldCampaignPlacementState& PlacementState = M_WorldGenerator->GetPlacementState();
+	for (const TObjectPtr<AAnchorPoint>& AnchorPoint : PlacementState.CachedAnchors)
+	{
+		AWorldMissionObject* const MissionObject =
+			IsValid(AnchorPoint) ? Cast<AWorldMissionObject>(AnchorPoint->GetPromotedWorldObject()) : nullptr;
+		const UWorldMapFowComponent* const FowComponent = IsValid(MissionObject) ? MissionObject->GetFowComponent() : nullptr;
+		if (not IsValid(FowComponent))
+		{
+			continue;
+		}
+
+		const FVector MissionLocation = MissionObject->GetActorLocation();
+		const EWorldMissionFogPresentation Presentation = WorldFogHintRules::GetMissionFogPresentation(
+			EMapItemType::Mission, FowComponent->GetCurrentFowState(), GetIsWorldLocationRevealed(MissionLocation),
+			MissionObject->GetIsClearedByPlayer(), Settings->bShowUnknownMissionMarkers, Settings->UnknownMissionLook,
+			WorldFogHintRules::GetIsAnyPieceInsideRadius(MissionLocation, HiddenEnemyPieceLocations, ExposureRadius));
+		if (Presentation == EWorldMissionFogPresentation::RealPieceThroughFog && bHasMask)
+		{
+			StampCircle(MissionLocation, Settings->MissionOpeningRadius, Settings->MissionOpeningFalloff,
+			            WorldFowMaskConstants::VisibleChannelIndex);
+		}
+		MissionObject->ApplyFogPresentation(Presentation);
+		if (Presentation != EWorldMissionFogPresentation::AsFogState)
+		{
+			NoteHiddenEnemyDistance(MissionLocation, HiddenEnemyPieceLocations);
+		}
+	}
+}
+
+void AWorldFowManager::NoteHiddenEnemyDistance(const FVector& MissionLocation,
+                                               const TArray<FVector>& HiddenEnemyPieceLocations)
+{
+	for (const FVector& EnemyPieceLocation : HiddenEnemyPieceLocations)
+	{
+		const float Distance = FVector::Dist2D(MissionLocation, EnemyPieceLocation);
+		const bool bIsNearest = M_NearestHiddenEnemyToUnidentifiedMission < 0.f
+			|| Distance < M_NearestHiddenEnemyToUnidentifiedMission;
+		M_NearestHiddenEnemyToUnidentifiedMission = bIsNearest ? Distance : M_NearestHiddenEnemyToUnidentifiedMission;
+	}
+}
+
+void AWorldFowManager::GatherHiddenEnemyPieceLocations(TArray<FVector>& OutLocations) const
+{
+	OutLocations.Reset();
+	const FWorldCampaignPlacementState& PlacementState = M_WorldGenerator->GetPlacementState();
+	for (const TObjectPtr<AAnchorPoint>& AnchorPoint : PlacementState.CachedAnchors)
+	{
+		const AWorldEnemyObject* const EnemyObject =
+			IsValid(AnchorPoint) ? Cast<AWorldEnemyObject>(AnchorPoint->GetPromotedWorldObject()) : nullptr;
+		// A destroyed enemy object is gone from the map; one the player already sees has nothing left to give away.
+		const bool bIsHidden = IsValid(EnemyObject) && not EnemyObject->GetIsClearedByPlayer()
+			&& GetAnchorState(AnchorPoint) != EWorldMapFowState::Visible;
+		if (bIsHidden)
+		{
+			OutLocations.Add(EnemyObject->GetActorLocation());
+		}
+	}
+
+	// Divisions are enemy pieces only and take no part in the fog states: the mask says whether one is seen.
+	for (TActorIterator<AWorldDivisionBase> DivisionIterator(GetWorld()); DivisionIterator; ++DivisionIterator)
+	{
+		const FVector DivisionLocation = DivisionIterator->GetActorLocation();
+		if (not GetIsWorldLocationRevealed(DivisionLocation))
+		{
+			OutLocations.Add(DivisionLocation);
+		}
+	}
+}
+
+float AWorldFowManager::GetMaskPixelWorldSize() const
+{
+	if (not M_WorldFowCloud.IsValid())
+	{
+		return 0.f;
+	}
+
+	const FVector2D MapSize = M_WorldFowCloud->GetMapSizeXY();
+	return FMath::Max(MapSize.X, MapSize.Y) / FMath::Max(1, M_MaskResolution);
 }
 
 void AWorldFowManager::StampAnchorsToMask()
@@ -1169,6 +1389,42 @@ EWorldMapFowState AWorldFowManager::GetConnectionStateFromConnectedAnchors(const
 	}
 
 	return EWorldMapFowState::NotVisible;
+}
+
+bool AWorldFowManager::GetIsWorldLocationRevealed(const FVector& WorldLocation) const
+{
+	// Half of full visibility (see GetIsMaskPixelSet): inside the soft edge of a reveal circle counts as seen.
+	// The cached copy, not the mask: the mask also carries the drawn-only openings around unidentified missions.
+	return GetIsMaskPixelSet(M_RevealedPixels, WorldLocation);
+}
+
+bool AWorldFowManager::GetIsFogDrawnOpenAt(const FVector& WorldLocation) const
+{
+	// Quiet checks on purpose: a map without a cloud hides nothing.
+	if (not M_WorldFowCloud.IsValid() || M_MaskPixels.Num() != M_MaskResolution * M_MaskResolution)
+	{
+		return true;
+	}
+
+	const FIntPoint Pixel = WorldToPixel(WorldLocation);
+	const int32 PixelIndex = Pixel.Y * M_MaskResolution + Pixel.X;
+	// Same threshold as the reveal answer: inside the soft edge counts as open.
+	constexpr uint8 DrawnOpenThreshold = 128;
+	return not M_MaskPixels.IsValidIndex(PixelIndex) || M_MaskPixels[PixelIndex].R >= DrawnOpenThreshold;
+}
+
+bool AWorldFowManager::GetIsMaskPixelSet(const TArray<uint8>& VisiblePixels, const FVector& WorldLocation) const
+{
+	constexpr uint8 RevealedThreshold = 128;
+	// Quiet checks on purpose: a map without a cloud hides nothing.
+	if (not M_WorldFowCloud.IsValid() || VisiblePixels.Num() != M_MaskResolution * M_MaskResolution)
+	{
+		return true;
+	}
+
+	const FIntPoint Pixel = WorldToPixel(WorldLocation);
+	const int32 PixelIndex = Pixel.Y * M_MaskResolution + Pixel.X;
+	return not VisiblePixels.IsValidIndex(PixelIndex) || VisiblePixels[PixelIndex] >= RevealedThreshold;
 }
 
 FIntPoint AWorldFowManager::WorldToPixel(const FVector& WorldLocation) const

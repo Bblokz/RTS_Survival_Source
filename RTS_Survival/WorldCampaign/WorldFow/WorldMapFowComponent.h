@@ -7,6 +7,9 @@
 #include "WorldMapFowTypes.h"
 #include "WorldMapFowComponent.generated.h"
 
+/** Fired every time the fog manager applies a state, also when the state did not change. */
+DECLARE_MULTICAST_DELEGATE_OneParam(FOnWorldMapFowStateApplied, EWorldMapFowState /*AppliedState*/);
+
 /**
  * @brief Add this component to campaign actors in Blueprint to let the world FOW manager store and query their reveal state.
  */
@@ -20,6 +23,9 @@ public:
 
 	EWorldMapFowState GetCurrentFowState() const { return M_CurrentFowState; }
 	void SetCurrentFowState(EWorldMapFowState NewState);
+
+	// For owners that look different under fog, such as a mission that turns into an unknown marker.
+	FOnWorldMapFowStateApplied OnFowStateApplied;
 
 	bool GetCanPrimaryClickInteractForCurrentState() const;
 	bool GetCanBeOutlinedForCurrentState() const;

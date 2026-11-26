@@ -12,6 +12,7 @@ UWorldMapFowComponent::UWorldMapFowComponent()
 void UWorldMapFowComponent::SetCurrentFowState(const EWorldMapFowState NewState)
 {
 	M_CurrentFowState = NewState;
+	OnFowStateApplied.Broadcast(NewState);
 }
 
 bool UWorldMapFowComponent::GetCanPrimaryClickInteractForCurrentState() const
