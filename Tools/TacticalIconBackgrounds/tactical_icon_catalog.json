@@ -1,0 +1,602 @@
+{
+ "icons": {
+  "T_TankDestroyerClass_Icon": {
+   "texture": "T_TacPlacard_TankDestroyerClass_Icon",
+   "description": "Tank Destroyer: anti-armour specialist"
+  },
+  "T_RocketWeaponClass_Icon_V2": {
+   "texture": "T_TacPlacard_RocketWeaponClass_Icon_V2",
+   "description": "Fires a rocket salvo before reloading"
+  },
+  "T_ArtilleryClass_Icon_V3": {
+   "texture": "T_TacPlacard_ArtilleryClass_Icon_V3",
+   "description": "Artillery: long-range indirect fire"
+  },
+  "T_LightTankClass_Icon_V2": {
+   "texture": "T_TacPlacard_LightTankClass_Icon_V2",
+   "description": "Light Tank"
+  },
+  "T_AutoCannon_Class_V2": {
+   "texture": "T_TacPlacard_AutoCannon_Class_V2",
+   "description": "Fires multiple rounds before reloading"
+  },
+  "T_RailgunClass_Icon_V2": {
+   "texture": "T_TacPlacard_RailgunClass_Icon_V2",
+   "description": "Railgun: pierces heavy armour"
+  },
+  "T_LaserClass_Icon": {
+   "texture": "T_TacPlacard_LaserClass_Icon",
+   "description": "Laser: burns through heavy armour"
+  },
+  "T_MediumTankClass_Icon_V2": {
+   "texture": "T_TacPlacard_MediumTankClass_Icon_V2",
+   "description": "Medium Tank"
+  },
+  "T_AntiAirClass_Icon_V3_NoStar": {
+   "texture": "T_TacPlacard_AntiAirClass_Icon_V3_NoStar",
+   "description": "Anti-Air specialist"
+  },
+  "T_RangeProviderClass_ICon_V2": {
+   "texture": "T_TacPlacard_RangeProviderClass_ICon_V2",
+   "description": "Spotter: extends vision and range"
+  },
+  "T_FlameClass_Icon_TankGun": {
+   "texture": "T_TacPlacard_FlameClass_Icon_TankGun",
+   "description": "Flame gun: sets targets on fire"
+  },
+  "T_HeavyTankClass_Icon_V2": {
+   "texture": "T_TacPlacard_HeavyTankClass_Icon_V2",
+   "description": "Heavy Tank"
+  },
+  "T_SuperHeavyTankClass_Icon": {
+   "texture": "T_TacPlacard_SuperHeavyTankClass_Icon",
+   "description": "Super Heavy Tank"
+  },
+  "T_ArmoredCar_Icon": {
+   "texture": "T_TacPlacard_ArmoredCar_Icon",
+   "description": "Armored Car"
+  },
+  "T_CargoGarrisionClass_Icon": {
+   "texture": "T_TacPlacard_CargoGarrisionClass_Icon",
+   "description": "Transport: carries a squad"
+  },
+  "T_MGClass_Icon_V2": {
+   "texture": "T_TacPlacard_MGClass_Icon_V2",
+   "description": "Machine guns: rapid fire vs infantry"
+  },
+  "T_CommandoClass_Icon_V3": {
+   "texture": "T_TacPlacard_CommandoClass_Icon_V3",
+   "description": "Elite infantry"
+  },
+  "T_ATInfantryClass_Icon_V2": {
+   "texture": "T_TacPlacard_ATInfantryClass_Icon_V2",
+   "description": "Anti-tank infantry"
+  },
+  "T_FlameClass_Icon": {
+   "texture": "T_TacPlacard_FlameClass_Icon",
+   "description": "Flamethrowers: sets targets on fire"
+  },
+  "T_SniperClass_Icon_V2": {
+   "texture": "T_TacPlacard_SniperClass_Icon_V2",
+   "description": "Sniper: long-range precision"
+  },
+  "T_EngineerClass_Icon_V2": {
+   "texture": "T_TacPlacard_EngineerClass_Icon_V2",
+   "description": "Engineers: build and repair"
+  },
+  "T_AssaultClass_Icon_V3": {
+   "texture": "T_TacPlacard_AssaultClass_Icon_V3",
+   "description": "Assault: close-range anti-infantry"
+  },
+  "T_CASAircraftClass_Icon_V3_Clean": {
+   "texture": "T_TacPlacard_CASAircraftClass_Icon_V3_Clean",
+   "description": "Ground attack aircraft"
+  },
+  "T_BombAircraftClass_Icon_V2": {
+   "texture": "T_TacPlacard_BombAircraftClass_Icon_V2",
+   "description": "Bomber"
+  },
+  "T_HQ_Icon": {
+   "texture": "T_TacPlacard_HQ_Icon",
+   "description": "Defensive structure"
+  },
+  "T_MetalStorageClass_Icon_V2": {
+   "texture": "T_TacPlacard_MetalStorageClass_Icon_V2",
+   "description": "Economy expansion"
+  },
+  "T_ResearchBuilding@teal": {
+   "texture": "T_TacPlacard_ResearchBuilding_teal",
+   "description": "Unlocks new technology"
+  },
+  "T_RepairAuraClass_V2": {
+   "texture": "T_TacPlacard_RepairAuraClass_V2",
+   "description": "Repairs nearby vehicles"
+  },
+  "T_RadixiteStorageClass_Icon_V2": {
+   "texture": "T_TacPlacard_RadixiteStorageClass_Icon_V2",
+   "description": "Stores Radixite"
+  },
+  "T_EnergyBuilidngClass_Icon_V2": {
+   "texture": "T_TacPlacard_EnergyBuilidngClass_Icon_V2",
+   "description": "Supplies energy"
+  },
+  "T_Solar_Icon_V2@teal": {
+   "texture": "T_TacPlacard_Solar_Icon_V2_teal",
+   "description": "Solar power"
+  },
+  "T_HQ_Icon@teal": {
+   "texture": "T_TacPlacard_HQ_Icon_teal",
+   "description": "Cheaper field defences"
+  },
+  "T_ResearchBuilding": {
+   "texture": "T_TacPlacard_ResearchBuilding",
+   "description": "Tech expansion"
+  },
+  "T_RocketAbiltyClass_ICon_V3@teal": {
+   "texture": "T_TacPlacard_RocketAbiltyClass_ICon_V3_teal",
+   "description": "Shortens ability cooldowns"
+  },
+  "T_CargoGarrisionClass_Icon@teal": {
+   "texture": "T_TacPlacard_CargoGarrisionClass_Icon_teal",
+   "description": "Garrison: holds a squad"
+  }
+ },
+ "portraits": {
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/LightTanks/T_Ger_LightTank_Hetzer": [
+   "T_TankDestroyerClass_Icon",
+   "T_RocketWeaponClass_Icon_V2"
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/LightTanks/T_Ger_LightTank_JagdPz": [
+   "T_TankDestroyerClass_Icon",
+   ""
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/LightTanks/T_Ger_LightTank_Marder": [
+   "T_TankDestroyerClass_Icon",
+   ""
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/LightTanks/T_Ger_LightTank_Panzer1_150MM": [
+   "T_ArtilleryClass_Icon_V3",
+   ""
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/LightTanks/T_Ger_LightTank_Panzer1_Harvester": [
+   "T_LightTankClass_Icon_V2",
+   ""
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/LightTanks/T_Ger_LightTank_Panzer38t": [
+   "T_LightTankClass_Icon_V2",
+   ""
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/LightTanks/T_Ger_LightTank_Panzer38t_R": [
+   "T_LightTankClass_Icon_V2",
+   "T_RocketWeaponClass_Icon_V2"
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/LightTanks/T_Ger_LightTank_PanzerII_F": [
+   "T_LightTankClass_Icon_V2",
+   "T_AutoCannon_Class_V2"
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/LightTanks/T_Ger_LightTank_PanzerII_Luchs": [
+   "T_LightTankClass_Icon_V2",
+   "T_AutoCannon_Class_V2"
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/LightTanks/T_Ger_LightTank_Pz38_Rail": [
+   "T_LightTankClass_Icon_V2",
+   "T_RailgunClass_Icon_V2"
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/LightTanks/T_Ger_LightTank_PzJager_Laser": [
+   "T_LightTankClass_Icon_V2",
+   "T_LaserClass_Icon"
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/LightTanks/T_Ger_LightTank_Sdkfz_140": [
+   "T_LightTankClass_Icon_V2",
+   "T_AutoCannon_Class_V2"
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/MediumTanks/Ger_MediumTank_Brummbar": [
+   "T_ArtilleryClass_Icon_V3",
+   ""
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/MediumTanks/T_Ger_MediumTank_Jaguar": [
+   "T_MediumTankClass_Icon_V2",
+   "T_AutoCannon_Class_V2"
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/MediumTanks/T_Ger_MediumTank_PZIIIAA": [
+   "T_MediumTankClass_Icon_V2",
+   "T_AntiAirClass_Icon_V3_NoStar"
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/MediumTanks/T_Ger_MediumTank_PZIIICommander": [
+   "T_MediumTankClass_Icon_V2",
+   "T_RangeProviderClass_ICon_V2"
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/MediumTanks/T_Ger_MediumTank_PZIIIFLamm": [
+   "T_MediumTankClass_Icon_V2",
+   "T_FlameClass_Icon_TankGun"
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/MediumTanks/T_Ger_MediumTank_PZIV_F": [
+   "T_ArtilleryClass_Icon_V3",
+   ""
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/MediumTanks/T_Ger_MediumTank_PZIV_H": [
+   "T_MediumTankClass_Icon_V2",
+   ""
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/MediumTanks/T_Ger_MediumTank_PZIV_Rockets": [
+   "T_MediumTankClass_Icon_V2",
+   "T_RocketWeaponClass_Icon_V2"
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/MediumTanks/T_Ger_MediumTank_PanzerIII_J": [
+   "T_MediumTankClass_Icon_V2",
+   ""
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/MediumTanks/T_Ger_MediumTank_PanzerIV_G": [
+   "T_MediumTankClass_Icon_V2",
+   ""
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/MediumTanks/T_Ger_MediumTank_PzIII_M": [
+   "T_MediumTankClass_Icon_V2",
+   ""
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/MediumTanks/T_Ger_MediumTank_StugIII": [
+   "T_TankDestroyerClass_Icon",
+   ""
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/HeavyTanks/T_Ger_HeavyTank_TigerII": [
+   "T_HeavyTankClass_Icon_V2",
+   ""
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/HeavyTanks/T_Ger_HeavyTank_Tiger105": [
+   "T_HeavyTankClass_Icon_V2",
+   ""
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/HeavyTanks/T_Ger_HeavyTank_Panther_G": [
+   "T_HeavyTankClass_Icon_V2",
+   ""
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/HeavyTanks/T_Ger_HeavyTank_PantherII": [
+   "T_HeavyTankClass_Icon_V2",
+   ""
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/HeavyTanks/T_Ger_HeavyTank_Tiger1": [
+   "T_HeavyTankClass_Icon_V2",
+   ""
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/HeavyTanks/T_Ger_HeavyTank_TigerH1": [
+   "T_HeavyTankClass_Icon_V2",
+   ""
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/HeavyTanks/T_Ger_HeavyTank_Tiger1_Rail": [
+   "T_HeavyTankClass_Icon_V2",
+   "T_RailgunClass_Icon_V2"
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/HeavyTanks/T_Ger_HeavyTank_PanzerV_III": [
+   "T_HeavyTankClass_Icon_V2",
+   "T_LaserClass_Icon"
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/HeavyTanks/T_Ger_HeavyTank_Jagdpanther": [
+   "T_TankDestroyerClass_Icon",
+   "T_RocketWeaponClass_Icon_V2"
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/HeavyTanks/T_Ger_HeavyTank_SturmTiger": [
+   "T_ArtilleryClass_Icon_V3",
+   "T_RocketWeaponClass_Icon_V2"
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/HeavyTanks/T_Ger_HeavyTank_E100": [
+   "T_SuperHeavyTankClass_Icon",
+   ""
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/HeavyTanks/T_Ger_HeavyTank_Maus": [
+   "T_SuperHeavyTankClass_Icon",
+   ""
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/ArmoredCar/T_Ger_ArmoredCar_Puma": [
+   "T_ArmoredCar_Icon",
+   ""
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/ArmoredCar/T_Ger_ArmoredCar_Sdkfz_231": [
+   "T_ArmoredCar_Icon",
+   "T_AutoCannon_Class_V2"
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/ArmoredCar/T_Ger_ArmoredCar_Sdkfz250": [
+   "T_ArmoredCar_Icon",
+   "T_CargoGarrisionClass_Icon"
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/ArmoredCar/T_Ger_ArmoredCar_Sdkfz234_3": [
+   "T_ArtilleryClass_Icon_V3",
+   ""
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/ArmoredCar/T_Ger_ArmoredCar_Sdkfz251_75mm": [
+   "T_TankDestroyerClass_Icon",
+   ""
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/ArmoredCar/T_Ger_ArmoredCar_Sdkfz251_Mortar": [
+   "T_ArtilleryClass_Icon_V3",
+   ""
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/ArmoredCar/T_Ger_ArmoredCar_Sdkfz7_Flakvierling": [
+   "T_ArmoredCar_Icon",
+   "T_AntiAirClass_Icon_V3_NoStar"
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/Squads/T_Ger_ResistanceInfantry_Icon": [
+   "",
+   "T_MGClass_Icon_V2"
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/Squads/T_Ger_Squad_CortexCommander": [
+   "",
+   "T_CommandoClass_Icon_V3"
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/Squads/T_Ger_Squad_EliteScavengers": [
+   "",
+   "T_ATInfantryClass_Icon_V2"
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/Squads/T_Ger_Squad_FLamm": [
+   "",
+   "T_FlameClass_Icon"
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/Squads/T_Ger_Squad_FelsKrieger": [
+   "",
+   "T_CommandoClass_Icon_V3"
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/Squads/T_Ger_Squad_FemaleSniper": [
+   "",
+   "T_SniperClass_Icon_V2"
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/Squads/T_Ger_Squad_HazmatSnipers": [
+   "",
+   "T_SniperClass_Icon_V2"
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/Squads/T_Ger_Squad_HellBringers": [
+   "",
+   "T_LaserClass_Icon"
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/Squads/T_Ger_Squad_Jager": [
+   "",
+   "T_MGClass_Icon_V2"
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/Squads/T_Ger_Squad_PanzerGrenadiers": [
+   "",
+   "T_ATInfantryClass_Icon_V2"
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/Squads/T_Ger_Squad_RailTroopers": [
+   "",
+   "T_RailgunClass_Icon_V2"
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/Squads/T_Ger_Squad_RedSpine": [
+   "",
+   "T_MGClass_Icon_V2"
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/Squads/T_Ger_Squad_Scavengers": [
+   "",
+   "T_EngineerClass_Icon_V2"
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/Squads/T_Ger_Squad_SturmPioneers": [
+   "",
+   "T_EngineerClass_Icon_V2"
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/Squads/T_Ger_Squad_VultureHazmats": [
+   "",
+   "T_AssaultClass_Icon_V3"
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/Squads/T_Squad_Ger_Faust": [
+   "",
+   "T_ATInfantryClass_Icon_V2"
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/Squads/T_Ger_TeamWeapon_Flak88": [
+   "T_TankDestroyerClass_Icon",
+   "T_AntiAirClass_Icon_V3_NoStar"
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/Squads/T_Ger_TeamWeapon_LeFH18": [
+   "",
+   "T_ArtilleryClass_Icon_V3"
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/Squads/T_Ger_TeamWeapon_Morser210": [
+   "",
+   "T_ArtilleryClass_Icon_V3"
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/Squads/T_Ger_TeamWeapon_Pak38": [
+   "",
+   "T_TankDestroyerClass_Icon"
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/Squads/T_Ger_TeamWeapon_Pak40": [
+   "",
+   "T_TankDestroyerClass_Icon"
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/Aircraft/T_Ger_Aircraft_Bf109": [
+   "T_CASAircraftClass_Icon_V3_Clean",
+   ""
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/Aircraft/T_Ger_Aircraft_Horten229": [
+   "T_CASAircraftClass_Icon_V3_Clean",
+   ""
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/Aircraft/T_Ger_Aircraft_Ju87": [
+   "T_CASAircraftClass_Icon_V3_Clean",
+   "T_BombAircraftClass_Icon_V2"
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/Aircraft/T_Ger_Aircraft_Me410": [
+   "T_BombAircraftClass_Icon_V2",
+   ""
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_HQPlatform": [
+   "T_HQ_Icon",
+   "T_AntiAirClass_Icon_V3_NoStar"
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_RefFlakStand": [
+   "T_HQ_Icon",
+   "T_AntiAirClass_Icon_V3_NoStar"
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_Flak37": [
+   "T_HQ_Icon",
+   "T_AntiAirClass_Icon_V3_NoStar"
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_PitFlak37": [
+   "T_HQ_Icon",
+   "T_AntiAirClass_Icon_V3_NoStar"
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_FlakBunker": [
+   "T_HQ_Icon",
+   "T_AntiAirClass_Icon_V3_NoStar"
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_FlakvierlingBunker": [
+   "T_HQ_Icon",
+   "T_AntiAirClass_Icon_V3_NoStar"
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_Flak88": [
+   "T_HQ_Icon",
+   "T_TankDestroyerClass_Icon"
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_PitFlak88": [
+   "T_HQ_Icon",
+   "T_TankDestroyerClass_Icon"
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_Flak88Bunker": [
+   "T_HQ_Icon",
+   "T_TankDestroyerClass_Icon"
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_Pak38": [
+   "T_HQ_Icon",
+   "T_TankDestroyerClass_Icon"
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_PitPak40": [
+   "T_HQ_Icon",
+   "T_TankDestroyerClass_Icon"
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_HQTower": [
+   "T_HQ_Icon",
+   "T_TankDestroyerClass_Icon"
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_PZ38TTurretBunker": [
+   "T_HQ_Icon",
+   "T_TankDestroyerClass_Icon"
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_PitPuppchen": [
+   "T_HQ_Icon",
+   "T_ATInfantryClass_Icon_V2"
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_PitPanzerschreck": [
+   "T_HQ_Icon",
+   "T_ATInfantryClass_Icon_V2"
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_ForgeSchreckFrame": [
+   "T_HQ_Icon",
+   "T_ATInfantryClass_Icon_V2"
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_RailPakBunker": [
+   "T_HQ_Icon",
+   "T_RailgunClass_Icon_V2"
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_HQLaserPlatform": [
+   "T_HQ_Icon",
+   "T_LaserClass_Icon"
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_LeFH150": [
+   "T_HQ_Icon",
+   "T_ArtilleryClass_Icon_V3"
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_PitLeFH18": [
+   "T_HQ_Icon",
+   "T_ArtilleryClass_Icon_V3"
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_PitSFH18": [
+   "T_HQ_Icon",
+   "T_ArtilleryClass_Icon_V3"
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_PitMortar": [
+   "T_HQ_Icon",
+   "T_ArtilleryClass_Icon_V3"
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_PitCapturedB4": [
+   "T_HQ_Icon",
+   "T_ArtilleryClass_Icon_V3"
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_CommMG42Nests": [
+   "T_HQ_Icon",
+   "T_MGClass_Icon_V2"
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_PitTwinMG42": [
+   "T_HQ_Icon",
+   "T_MGClass_Icon_V2"
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_BarracksSniperLoft": [
+   "T_HQ_Icon",
+   "T_SniperClass_Icon_V2"
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_HQHarvesterHub": [
+   "T_MetalStorageClass_Icon_V2",
+   "T_ResearchBuilding@teal"
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_HQRepairBay": [
+   "T_MetalStorageClass_Icon_V2",
+   "T_RepairAuraClass_V2"
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_RefConverter": [
+   "T_MetalStorageClass_Icon_V2",
+   "T_EngineerClass_Icon_V2"
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_MetalVaultSmelter": [
+   "T_MetalStorageClass_Icon_V2",
+   "T_EngineerClass_Icon_V2"
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_RefKaskade": [
+   "T_MetalStorageClass_Icon_V2",
+   "T_RadixiteStorageClass_Icon_V2"
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_ForgeRadixReactor": [
+   "T_MetalStorageClass_Icon_V2",
+   "T_EnergyBuilidngClass_Icon_V2"
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_ForgeFuelStorage": [
+   "T_MetalStorageClass_Icon_V2",
+   "T_EnergyBuilidngClass_Icon_V2"
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_SolarLarge": [
+   "T_MetalStorageClass_Icon_V2",
+   "T_Solar_Icon_V2@teal"
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_CommRequisitionOffice": [
+   "T_MetalStorageClass_Icon_V2",
+   "T_HQ_Icon@teal"
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_HQRadar": [
+   "T_ResearchBuilding",
+   "T_RangeProviderClass_ICon_V2"
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_CommObservationPost": [
+   "T_ResearchBuilding",
+   "T_RangeProviderClass_ICon_V2"
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_MechDepotRadioVan": [
+   "T_ResearchBuilding",
+   "T_RangeProviderClass_ICon_V2"
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_CommCipherRoom": [
+   "T_ResearchBuilding",
+   "T_RocketAbiltyClass_ICon_V3@teal"
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_BarracksRadixReactor": [
+   "T_ResearchBuilding",
+   "T_EnergyBuilidngClass_Icon_V2"
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_BarracksFuelCell": [
+   "T_ResearchBuilding",
+   "T_EnergyBuilidngClass_Icon_V2"
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_MechDepotWurfrahmenShop": [
+   "T_ResearchBuilding",
+   "T_RocketWeaponClass_Icon_V2"
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_CaptureBunker37mm": [
+   "T_HQ_Icon",
+   "T_TankDestroyerClass_Icon"
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_CaptureBunkerTurret": [
+   "T_HQ_Icon",
+   "T_AutoCannon_Class_V2"
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_MarderStugFactory": [
+   "T_ResearchBuilding",
+   "T_TankDestroyerClass_Icon"
+  ],
+  "/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/BuildingExpansions/T_Ger_Bxp_FieldTrench": [
+   "T_HQ_Icon",
+   "T_CargoGarrisionClass_Icon@teal"
+  ]
+ }
+}
