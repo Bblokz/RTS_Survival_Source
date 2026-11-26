@@ -17,9 +17,11 @@ struct FBarrageSettings
 {
 	GENERATED_BODY()
 
+	// Legacy: shells used to start this high above the area. The flight now comes from the projectile mover.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	float MinHeightStart = 2500.0f;
 
+	// Legacy: see MinHeightStart.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	float MaxHeightStart = 3500.0f;
 
@@ -61,7 +63,8 @@ struct FBarrageSettings
 };
 
 /**
- * @brief Template ability used by designers to fire pooled arcing shells at a target area.
+ * @brief Template ability used by designers to fire pooled shells at a target area, as if from long-range (railway)
+ * artillery far off the map: each run comes in on one bearing and every shell plunges along a ballistic arc.
  */
 UCLASS(BlueprintType, Blueprintable, EditInlineNew, DefaultToInstanced)
 class RTS_SURVIVAL_API UGA_Barrage : public UGlobalAbility
@@ -119,6 +122,8 @@ private:
 	{
 		int32 RunId = INDEX_NONE;
 		FVector TargetLocation = FVector::ZeroVector;
+		// Horizontal direction the shells of this run fly in.
+		float FlightYawDegrees = 0.0f;
 		int32 ShellsLaunched = 0;
 		int32 ShellsActuallyLaunched = 0;
 		FTimerHandle BurstTimerHandle;
@@ -147,7 +152,10 @@ private:
 	void PlayOffMapLaunchSoundIfRequested() const;
 	USoundBase* GetOffMapLaunchSound() const;
 	FVector BuildRandomPointInRadius(const FVector& CenterLocation) const;
-	FVector BuildLaunchLocation(const FVector& TargetLocation) const;
+	/** @return A random point in the barrage radius, on the ground under it. */
+	FVector BuildGroundAimPoint(const FVector& TargetLocation) const;
+	/** @return The ballistic descent of one shell of the run onto a fresh aim point. */
+	FBarrageShellFlight BuildShellFlight(const FBarrageRun& Run) const;
 	FWeaponData BuildVariedWeaponData() const;
 	void ScheduleNextBurst(int32 RunId);
 	void ClearRunTimers(FBarrageRun& Run) const;

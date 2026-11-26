@@ -128,6 +128,8 @@ void UGA_Barrage::StartBarrage(const FVector& TargetLocation)
 	FBarrageRun NewRun;
 	NewRun.RunId = M_NextRunId++;
 	NewRun.TargetLocation = TargetLocation;
+	// One battery far off the map fires the whole barrage, so all its shells come in on about the same bearing.
+	NewRun.FlightYawDegrees = FMath::FRandRange(0.0f, 360.0f);
 	const int32 RunId = NewRun.RunId;
 	M_Runs.Add(MoveTemp(NewRun));
 	FireNextBurst(RunId);
@@ -213,26 +215,22 @@ void UGA_Barrage::LaunchSingleShell(const int32 RunId)
 		return;
 	}
 
-	const FVector TargetLocation = Run->TargetLocation;
 	const FWeaponData VariedWeaponData = BuildVariedWeaponData();
 	FProjectileVfxSettings ProjectileVfxSettings = M_BarrageSettings.ProjectileVfxSettings;
 	ProjectileVfxSettings.ShellType = VariedWeaponData.ShellType;
 	ProjectileVfxSettings.WeaponCaliber = VariedWeaponData.WeaponCalibre;
-	const FVector LaunchLocation = BuildLaunchLocation(TargetLocation);
-	const FVector AimPoint = BuildRandomPointInRadius(TargetLocation);
-	const FRotator LaunchRotation = (AimPoint - LaunchLocation).Rotation();
+	// Barrage shells are always drawn by the tank shell trail (tracer, glow and lingering smoke).
+	ProjectileVfxSettings.ProjectileNiagaraSystem = EProjectileNiagaraSystem::TankShell;
 	const TArray<AActor*> ActorsToIgnore;
 	const FWeaponVFX WeaponVfxForShellLaunch = BuildWeaponVfxForShellLaunch();
+	const FBarrageShellFlight Flight = BuildShellFlight(*Run);
 
 	Projectile->SetupBarrageProjectileForNewLaunch(
 		VariedWeaponData,
 		WeaponVfxForShellLaunch,
 		ProjectileVfxSettings,
-		M_ProjectileMover,
+		Flight,
 		GetOwningPlayer(),
-		LaunchLocation,
-		LaunchRotation,
-		AimPoint,
 		ActorsToIgnore);
 	NotifyShellLaunchFinished(RunId);
 }
@@ -363,11 +361,54 @@ FVector UGA_Barrage::BuildRandomPointInRadius(const FVector& CenterLocation) con
 	return CenterLocation + FVector(RandomOffset.X, RandomOffset.Y, 0.0f);
 }
 
-FVector UGA_Barrage::BuildLaunchLocation(const FVector& TargetLocation) const
+FVector UGA_Barrage::BuildGroundAimPoint(const FVector& TargetLocation) const
 {
-	FVector LaunchLocation = BuildRandomPointInRadius(TargetLocation);
-	LaunchLocation.Z += FMath::RandRange(M_BarrageSettings.MinHeightStart, M_BarrageSettings.MaxHeightStart);
-	return LaunchLocation;
+	FVector AimPoint = BuildRandomPointInRadius(TargetLocation);
+	const UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		return AimPoint;
+	}
+	// The area is not flat: land each shell on the ground under its own point, not at the height of the centre.
+	constexpr float GroundTraceHalfHeightCm = 5000.0f;
+	FCollisionObjectQueryParams ObjectQuery;
+	ObjectQuery.AddObjectTypesToQuery(ECC_WorldStatic);
+	FHitResult GroundHit;
+	const FVector TraceStart = AimPoint + FVector::UpVector * GroundTraceHalfHeightCm;
+	const FVector TraceEnd = AimPoint - FVector::UpVector * GroundTraceHalfHeightCm;
+	if (World->LineTraceSingleByObjectType(GroundHit, TraceStart, TraceEnd, ObjectQuery))
+	{
+		AimPoint.Z = GroundHit.ImpactPoint.Z;
+	}
+	return AimPoint;
+}
+
+FBarrageShellFlight UGA_Barrage::BuildShellFlight(const FBarrageRun& Run) const
+{
+	using namespace DeveloperSettings::GamePlay::Projectile;
+	constexpr float LowestDescentAngleDegrees = 10.0f;
+	constexpr float HighestDescentAngleDegrees = 89.0f;
+	constexpr float LowestImpactSpeed = 1000.0f;
+	constexpr float ShortestFlightTimeSeconds = 0.2f;
+	const FBarrageProjectileMover& Mover = M_ProjectileMover;
+	const float MinAngle = FMath::Min(Mover.MinDescentAngleDegrees, Mover.MaxDescentAngleDegrees);
+	const float MaxAngle = FMath::Max(Mover.MinDescentAngleDegrees, Mover.MaxDescentAngleDegrees);
+	const float DescentAngle = FMath::Clamp(FMath::FRandRange(MinAngle, MaxAngle),
+	                                        LowestDescentAngleDegrees, HighestDescentAngleDegrees);
+	const float FlightYaw = Run.FlightYawDegrees
+		+ FMath::FRandRange(-Mover.BearingSpreadDegrees, Mover.BearingSpreadDegrees);
+	const float ImpactSpeed = FMath::Max(Mover.ImpactSpeed, LowestImpactSpeed) * GlobalProjectileSpeedMlt;
+	const float GravityScale = FMath::Max(Mover.GravityMultiplier, 0.0f) * GlobalArcGravityMlt;
+	const UWorld* World = GetWorld();
+	const float WorldGravityZ = IsValid(World) ? World->GetGravityZ() : 0.0f;
+	return BarrageShellFlight::Solve(
+		BuildGroundAimPoint(Run.TargetLocation),
+		FlightYaw,
+		DescentAngle,
+		ImpactSpeed,
+		FMath::Max(Mover.FlightTimeSeconds, ShortestFlightTimeSeconds),
+		WorldGravityZ,
+		GravityScale);
 }
 
 FWeaponData UGA_Barrage::BuildVariedWeaponData() const

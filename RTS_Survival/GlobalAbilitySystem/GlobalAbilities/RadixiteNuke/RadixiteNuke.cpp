@@ -11,12 +11,15 @@
 #include "NiagaraComponent.h"
 #include "NiagaraFunctionLibrary.h"
 #include "NiagaraSystem.h"
+#include "ProceduralMeshComponent.h"
+#include "RadixiteNukeCraterRim.h"
 #include "RTS_Survival/Enemy/EnemyController/EnemyController.h"
 #include "RTS_Survival/Game/Players/RTSPlayers.h"
 #include "RTS_Survival/Player/CPPController.h"
 #include "RTS_Survival/RTSComponents/ShieldComponent/ShieldTypes.h"
 #include "RTS_Survival/Subsystems/CameraShakeSubsystem/RTSCameraShakeSubsystem.h"
 #include "RTS_Survival/Utils/AOE/FRTS_AOE.h"
+#include "RTS_Survival/Utils/CollisionSetup/FRTS_CollisionSetup.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 #include "RTS_Survival/Weapons/WeaponData/RTSDamageTypes/RTSDamageTypes.h"
 #include "UObject/ConstructorHelpers.h"
@@ -31,8 +34,11 @@ namespace RadixiteNukeConstants
 	constexpr float ScarSizeFraction = 1.15f;
 
 	constexpr float FlashRadiusFraction = 3.f;
-	constexpr float FlashFadeSeconds = 2.5f;
 	constexpr float ShockwaveSeconds = 2.f;
+	// The crater pit decal projects this far up and down: over the rim and over hills inside the pit.
+	constexpr float CraterDecalDepthCm = 2000.f;
+	// The pit draws over the scar.
+	constexpr int32 CraterDecalSortOrder = 1;
 	// Steep but not vertical, so the warhead reads as arriving from somewhere.
 	constexpr float FallSidewaysFraction = 0.35f;
 	// Distance of the arc's control point from the target, as part of the approach: sets the dive angle (~35 deg).
@@ -104,6 +110,21 @@ ARadixiteNuke::ARadixiteNuke()
 	// Decals project along their X axis: this one looks straight down.
 	M_ScarDecal->SetRelativeRotation(FRotator(-90.f, 0.f, 0.f));
 	M_ScarDecal->SetVisibility(false);
+
+	M_CraterDecal = CreateDefaultSubobject<UDecalComponent>(TEXT("CraterDecal"));
+	M_CraterDecal->SetupAttachment(M_Root);
+	M_CraterDecal->SetVisibility(false);
+	M_CraterDecal->SortOrder = RadixiteNukeConstants::CraterDecalSortOrder;
+	// A blast crater stays in view at any zoom.
+	M_CraterDecal->SetFadeScreenSize(0.f);
+
+	M_CraterRim = CreateDefaultSubobject<UProceduralMeshComponent>(TEXT("CraterRim"));
+	M_CraterRim->SetupAttachment(M_Root);
+	M_CraterRim->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	M_CraterRim->SetGenerateOverlapEvents(false);
+	M_CraterRim->SetCanEverAffectNavigation(false);
+	M_CraterRim->bUseAsyncCooking = true;
+	M_CraterRim->SetVisibility(false);
 }
 
 void ARadixiteNuke::StartNuke(const FVector& GroundZero, const float BlastRadius, const float CoreRadius,
@@ -317,11 +338,13 @@ void ARadixiteNuke::Detonate()
 	M_ShockwavePlane->SetVisibility(IsValid(M_ShockwaveMaterial));
 	M_ScarDecal->SetVisibility(IsValid(M_ScarMaterial));
 
+	ShowCrater();
 	if (UNiagaraSystem* DetonationEffect = M_Visuals.DetonationEffect.Get())
 	{
 		UNiagaraFunctionLibrary::SpawnSystemAtLocation(this, DetonationEffect, M_GroundZero, FRotator::ZeroRotator,
 		                                               FVector(M_Visuals.DetonationEffectScale));
 	}
+	SpawnDetonationLayers();
 	if (UNiagaraSystem* RadiationEffect = M_Visuals.RadiationEffect.Get())
 	{
 		M_RadiationEffect = UNiagaraFunctionLibrary::SpawnSystemAtLocation(this, RadiationEffect, M_GroundZero);
@@ -331,6 +354,7 @@ void ARadixiteNuke::Detonate()
 		UGameplayStatics::PlaySound2D(this, DetonationSound);
 	}
 	RequestBlastCameraShake();
+	ScheduleBlastShakePulses();
 	DealBlastDamage();
 	TickBlastVisuals();
 }
@@ -383,10 +407,120 @@ void ARadixiteNuke::RequestBlastCameraShake() const
 	ShakeSubsystem->RequestExplosionShake(Request);
 }
 
+void ARadixiteNuke::ScheduleBlastShakePulses()
+{
+	UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		return;
+	}
+	for (int32 Pulse = 1; Pulse < M_Visuals.BlastShakePulses; ++Pulse)
+	{
+		FTimerHandle PulseHandle;
+		World->GetTimerManager().SetTimer(
+			PulseHandle, FTimerDelegate::CreateWeakLambda(this, [this]() { RequestBlastCameraShake(); }),
+			Pulse * M_Visuals.BlastShakePulseIntervalSeconds, false);
+	}
+}
+
+void ARadixiteNuke::ShowCrater()
+{
+	using namespace RadixiteNukeConstants;
+	const FRadixiteNukeCrater& Crater = M_Visuals.Crater;
+	UWorld* World = GetWorld();
+	if (Crater.RimRadius <= 0.f || not IsValid(World))
+	{
+		return;
+	}
+	if (UMaterialInterface* PitMaterial = Crater.PitDecalMaterial.Get())
+	{
+		const float DecalHalfSize = Crater.RimRadius / Crater.DecalRimFraction;
+		M_CraterDecal->SetDecalMaterial(PitMaterial);
+		M_CraterDecal->DecalSize = FVector(CraterDecalDepthCm, DecalHalfSize, DecalHalfSize);
+		// Pitched to look straight down; the yaw then spins the painted pit about the vertical.
+		M_CraterDecal->SetRelativeRotation(FRotator(-90.f, FMath::FRandRange(0.f, 360.f), 0.f));
+		M_CraterDecal->SetVisibility(true);
+	}
+	UMaterialInterface* RimMaterial = Crater.RimMaterial.Get();
+	if (not IsValid(RimMaterial) || Crater.RimHeight <= 0.f)
+	{
+		return;
+	}
+	if (Crater.bRimCarriesVehicles)
+	{
+		FRTS_CollisionSetup::SetupVehicleRampCollision(M_CraterRim);
+		// The ramp setup is made for invisible hulls; this rim is the visible ground and wears the pit decal.
+		M_CraterRim->SetReceivesDecals(true);
+	}
+	const FRadixiteNukeGroundSampler Ground(*World, M_GroundZero);
+	RadixiteNukeCraterRim::BuildRimMesh(*M_CraterRim, Crater, Ground, Crater.bRimCarriesVehicles);
+	M_CraterRim->SetMaterial(0, RimMaterial);
+	M_CraterRim->SetVisibility(true);
+}
+
+void ARadixiteNuke::SpawnDetonationLayers()
+{
+	UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		return;
+	}
+	// Copied: a timer fires after this frame, and the layers stay in M_Visuals for the lifetime of the actor.
+	for (int32 LayerIndex = 0; LayerIndex < M_Visuals.DetonationLayers.Num(); ++LayerIndex)
+	{
+		const FRadixiteNukeDetonationLayer& Layer = M_Visuals.DetonationLayers[LayerIndex];
+		if (Layer.Effect.IsNull())
+		{
+			continue;
+		}
+		for (int32 CopyIndex = 0; CopyIndex < Layer.Count; ++CopyIndex)
+		{
+			const float Delay = FMath::FRandRange(Layer.MinDelaySeconds,
+			                                      FMath::Max(Layer.MinDelaySeconds, Layer.MaxDelaySeconds));
+			if (Delay <= 0.f)
+			{
+				SpawnDetonationLayerCopy(Layer, CopyIndex);
+				continue;
+			}
+			FTimerHandle CopyHandle;
+			World->GetTimerManager().SetTimer(
+				CopyHandle, FTimerDelegate::CreateWeakLambda(this, [this, LayerIndex, CopyIndex]()
+				{
+					if (M_Visuals.DetonationLayers.IsValidIndex(LayerIndex))
+					{
+						SpawnDetonationLayerCopy(M_Visuals.DetonationLayers[LayerIndex], CopyIndex);
+					}
+				}), Delay, false);
+		}
+	}
+}
+
+void ARadixiteNuke::SpawnDetonationLayerCopy(const FRadixiteNukeDetonationLayer& Layer, const int32 CopyIndex)
+{
+	UNiagaraSystem* Effect = Layer.Effect.Get();
+	UWorld* World = GetWorld();
+	if (not IsValid(Effect) || not IsValid(World))
+	{
+		return;
+	}
+	// Even spread around ground zero with a little jitter, so a ring of copies does not read as a pattern.
+	constexpr float AngleJitter = 0.35f;
+	const float Angle = UE_TWO_PI * (CopyIndex + FMath::FRandRange(-AngleJitter, AngleJitter))
+		/ FMath::Max(Layer.Count, 1);
+	const float Distance = M_BlastRadius * FMath::FRandRange(Layer.MinRadiusFraction,
+	                                                         FMath::Max(Layer.MinRadiusFraction,
+	                                                                    Layer.MaxRadiusFraction));
+	const FVector2D SpotXY = FVector2D(M_GroundZero) + FVector2D(FMath::Cos(Angle), FMath::Sin(Angle)) * Distance;
+	const FRadixiteNukeGroundSampler Ground(*World, M_GroundZero);
+	const FVector Spot(SpotXY.X, SpotXY.Y, Ground.GetGroundHeight(SpotXY));
+	UNiagaraFunctionLibrary::SpawnSystemAtLocation(this, Effect, Spot, FRotator(0.f, FMath::FRandRange(0.f, 360.f), 0.f),
+	                                               FVector(Layer.Scale));
+}
+
 void ARadixiteNuke::TickBlastVisuals() const
 {
 	using namespace RadixiteNukeConstants;
-	const float FlashAlpha = 1.f - FMath::Clamp(M_PhaseSeconds / FlashFadeSeconds, 0.f, 1.f);
+	const float FlashAlpha = 1.f - FMath::Clamp(M_PhaseSeconds / M_Visuals.FlashFadeSeconds, 0.f, 1.f);
 	M_FlashLight->SetIntensity(M_Visuals.FlashIntensity * FlashAlpha * FlashAlpha);
 	if (FlashAlpha <= 0.f)
 	{
@@ -421,8 +555,7 @@ void ARadixiteNuke::TickRadiating(const float DeltaSeconds)
 		DealRadiationPulse();
 	}
 	// Without radiation the flash and the shockwave still need their ticks to fade out.
-	const float BlastVisualSeconds = FMath::Max(RadixiteNukeConstants::FlashFadeSeconds,
-	                                            RadixiteNukeConstants::ShockwaveSeconds);
+	const float BlastVisualSeconds = FMath::Max(M_Visuals.FlashFadeSeconds, RadixiteNukeConstants::ShockwaveSeconds);
 	if (M_PhaseSeconds > FMath::Max(M_Settings.RadiationSeconds, BlastVisualSeconds))
 	{
 		EndRadiation();

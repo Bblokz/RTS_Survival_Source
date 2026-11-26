@@ -75,7 +75,7 @@ void UGA_RadixiteNuke::GiveOwnerVisionOfBlast(const FVector& GroundZero) const
 
 TArray<FSoftObjectPath> UGA_RadixiteNuke::GetAssetsToLoad() const
 {
-	return {
+	TArray<FSoftObjectPath> Assets = {
 		M_NukeVisuals.WarheadMesh.ToSoftObjectPath(),
 		M_NukeVisuals.WarheadTrailEffect.ToSoftObjectPath(),
 		M_NukeVisuals.WarheadSmokeTrailEffect.ToSoftObjectPath(),
@@ -85,6 +85,14 @@ TArray<FSoftObjectPath> UGA_RadixiteNuke::GetAssetsToLoad() const
 		M_NukeVisuals.ShockwaveMaterial.ToSoftObjectPath(),
 		M_NukeVisuals.ScarMaterial.ToSoftObjectPath(),
 		M_NukeVisuals.WarningSound.ToSoftObjectPath(),
-		M_NukeVisuals.DetonationSound.ToSoftObjectPath()
+		M_NukeVisuals.DetonationSound.ToSoftObjectPath(),
+		M_NukeVisuals.Crater.PitDecalMaterial.ToSoftObjectPath(),
+		M_NukeVisuals.Crater.RimMaterial.ToSoftObjectPath()
 	};
+	// The layers spawn later from timers with .Get(): they have to be in memory by then.
+	for (const FRadixiteNukeDetonationLayer& Layer : M_NukeVisuals.DetonationLayers)
+	{
+		Assets.Add(Layer.Effect.ToSoftObjectPath());
+	}
+	return Assets;
 }
