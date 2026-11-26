@@ -289,13 +289,17 @@ private:
 	void SpawnNextWave();
 	void OnSurviveTimerOver();
 	TArray<FEnemyPlacementUnit> RollWaveUnits(const FSovietCounterattackDifficulty& Difficulty, const int32 WaveNumber) const;
-	// Splits the units as evenly as possible over the three spawns (leftovers go to random spawns).
+	// Splits the units as evenly as possible over the three spawns (leftovers go to random spawns); everything goes to
+	// the train with Spawns.bAllUnitsByTrain.
 	void SplitOverSpawns(TArray<FEnemyPlacementUnit> Units, TArray<FEnemyPlacementUnit>& OutCenter,
 	                     TArray<FEnemyPlacementUnit>& OutAirDrop, TArray<FEnemyPlacementUnit>& OutTrain) const;
 
 	// ----- Groups and route -----
 	FVector GetHQLocation() const;
-	TArray<FVector> BuildRoute(const FVector2D& Offset) const;
+	// The spawn's route points (AttackRoute, or TrainAttackRoute for the station), then the HQ, shifted by the spawn's
+	// offset and projected.
+	TArray<FVector> BuildRoute(const ESovietCounterattackSpawn Spawn) const;
+	const TArray<FVector>& GetAttackRoutePoints(const ESovietCounterattackSpawn Spawn) const;
 	FVector2D GetRouteOffset(const ESovietCounterattackSpawn Spawn) const;
 	void RegisterSpawnedUnit(AActor* Unit);
 	// Attack-moves the group along its spawn's route after OrderDelaySeconds.

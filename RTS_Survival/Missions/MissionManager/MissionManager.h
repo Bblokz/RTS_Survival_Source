@@ -23,6 +23,7 @@
 #include "RTS_Survival/GlobalAbilitySystem/GlobalAbilityType/EGlobalAbilityTier.h"
 #include "RTS_Survival/GlobalAbilitySystem/GlobalAbilityType/MissionPlayerGlobalAbilitySettings.h"
 #include "RTS_Survival/Missions/Defeat/RTSDefeatType.h"
+#include "RTS_Survival/Missions/PlayerAirDrop/PlayerSquadSafetyNetSubsystem.h"
 #include "RTS_Survival/Missions/MissionClasses/DontLoseCommanderMission/RemoveDontLoseCommanderPost.h"
 #include "MissionManager.generated.h"
 
@@ -491,6 +492,10 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mission|Player")
 	bool bHideGlobalAbilitiesForPlayer = false;
 
+	// Early-mission help: tops the player's starting squads up again by paratroopers when nearly all are lost.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mission|Player")
+	FPlayerSquadSafetyNetSettings PlayerSquadSafetyNet;
+
 	// Which tiers of the commander's kit the player may use here (higher tiers are hidden from the panel) and whether
 	// the abilities cost resources. Set per mission, so two early missions can open different parts of a kit.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mission|Player")
@@ -574,6 +579,7 @@ private:
 	void BeginPlay_InitMissionScheduler();
 	void BeginPlay_InitMissionTriggerVolumesManager();
 	void BeginPlay_InitUnexploredFogReveal() const;
+	void BeginPlay_InitPlayerSquadSafetyNet();
 	void HidePlayerGlobalAbilityPanelIfNeeded() const;
 	bool EnsureValidPlayerController() const;
 	bool GetIsValidMissionScheduler() const;

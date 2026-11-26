@@ -78,6 +78,11 @@ struct FSovietCounterattackSpawnSettings
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Train")
 	FVector StationSpawnLocation = FVector(19953.f, 15593.f, 943.f);
 
+	// Every unit of a wave rides the train and unloads at the station: no centre or landing-field share. Needs a train
+	// (Train.TrainClass and two path points); without one the even split applies.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Train")
+	bool bAllUnitsByTrain = false;
+
 	// Landing field: one Pe-8 lands on each pad centre (the pads cannot be destroyed). A batch flies one unit per
 	// pad; the next batch comes once every aircraft of the batch has delivered and left.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Landing Field")
@@ -439,6 +444,14 @@ public:
 	// off) is added as the last point.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Route")
 	TArray<FVector> AttackRoute;
+
+	// The station's groups take TrainAttackRoute instead of AttackRoute, so they do not detour over a route laid out
+	// for the centre spawn. The HQ is still added as the last point; an empty TrainAttackRoute goes straight there.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Route")
+	bool bTrainUsesOwnRoute = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Route", meta = (EditCondition = "bTrainUsesOwnRoute"))
+	TArray<FVector> TrainAttackRoute;
 
 	// Last route point when the player has no HQ.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Route")

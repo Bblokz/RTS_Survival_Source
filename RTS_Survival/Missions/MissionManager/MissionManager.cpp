@@ -1149,6 +1149,22 @@ void AMissionManager::BeginPlay()
 	BeginPlay_InitMissionTriggerVolumesManager();
 	BeginPlay_CheckForDifficultyOverrideWithWidget();
 	BeginPlay_InitUnexploredFogReveal();
+	BeginPlay_InitPlayerSquadSafetyNet();
+}
+
+void AMissionManager::BeginPlay_InitPlayerSquadSafetyNet()
+{
+	if (not PlayerSquadSafetyNet.bEnabled)
+	{
+		return;
+	}
+	UPlayerSquadSafetyNetSubsystem* const SafetyNet = UPlayerSquadSafetyNetSubsystem::Get(this);
+	if (SafetyNet == nullptr)
+	{
+		RTSFunctionLibrary::ReportError("Mission manager: no squad safety net subsystem in this world.");
+		return;
+	}
+	SafetyNet->StartSafetyNet(PlayerSquadSafetyNet, this);
 }
 
 void AMissionManager::BeginPlay_InitUnexploredFogReveal() const

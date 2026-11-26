@@ -495,6 +495,13 @@ void USovietCounterattackMission::SplitOverSpawns(TArray<FEnemyPlacementUnit> Un
 		OutCenter.Append(OutAirDrop);
 		OutAirDrop.Empty();
 	}
+	if (Settings->Spawns.bAllUnitsByTrain && GetCanUseTrain())
+	{
+		OutTrain.Append(OutCenter);
+		OutTrain.Append(OutAirDrop);
+		OutCenter.Empty();
+		OutAirDrop.Empty();
+	}
 }
 
 void USovietCounterattackMission::OnSurviveTimerOver()
@@ -550,14 +557,24 @@ FVector2D USovietCounterattackMission::GetRouteOffset(const ESovietCounterattack
 	}
 }
 
-TArray<FVector> USovietCounterattackMission::BuildRoute(const FVector2D& Offset) const
+const TArray<FVector>& USovietCounterattackMission::GetAttackRoutePoints(const ESovietCounterattackSpawn Spawn) const
+{
+	if (Spawn == ESovietCounterattackSpawn::Train && Settings->bTrainUsesOwnRoute)
+	{
+		return Settings->TrainAttackRoute;
+	}
+	return Settings->AttackRoute;
+}
+
+TArray<FVector> USovietCounterattackMission::BuildRoute(const ESovietCounterattackSpawn Spawn) const
 {
 	TArray<FVector> Route;
 	if (not IsValid(Settings))
 	{
 		return Route;
 	}
-	TArray<FVector> Points = Settings->AttackRoute;
+	const FVector2D Offset = GetRouteOffset(Spawn);
+	TArray<FVector> Points = GetAttackRoutePoints(Spawn);
 	Points.Add(GetHQLocation());
 	const AMissionManager* const MissionManager = GetMissionManagerChecked();
 	for (const FVector& Point : Points)
@@ -646,7 +663,7 @@ void USovietCounterattackMission::OrderGroup(const TArray<TWeakObjectPtr<AActor>
 	}
 	Centroid /= Actors.Num();
 	AEnemyController* const EnemyController = GetEnemyControllerChecked();
-	const TArray<FVector> Route = BuildRoute(GetRouteOffset(Spawn));
+	const TArray<FVector> Route = BuildRoute(Spawn);
 	if (not IsValid(EnemyController) || Route.IsEmpty())
 	{
 		return;
@@ -724,7 +741,7 @@ void USovietCounterattackMission::SpawnGroundGroup(const TArray<FEnemyPlacementU
 	}
 	// Face the first route point that is not the spawn itself (a spawn may sit on a route point).
 	FVector FacingTarget = GetHQLocation();
-	for (const FVector& RoutePoint : Settings->AttackRoute)
+	for (const FVector& RoutePoint : GetAttackRoutePoints(Spawn))
 	{
 		if (FVector::Dist2D(RoutePoint, Center) > 2000.f)
 		{
