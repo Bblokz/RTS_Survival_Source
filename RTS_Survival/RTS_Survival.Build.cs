@@ -62,6 +62,8 @@ public class RTS_Survival : ModuleRules
 			"MovieSceneTracks",
 			"CinematicCamera",
 			"JsonUtilities",
+			// V2 rocket crater rim: a ring of earth built at the blast to follow the ground under it.
+			"ProceduralMeshComponent",
 			//// Saviour-added:
 			//"GameFeatures",
 			//"GameplayAbilities",

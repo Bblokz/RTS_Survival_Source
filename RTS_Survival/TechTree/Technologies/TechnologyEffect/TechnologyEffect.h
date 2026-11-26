@@ -28,6 +28,9 @@ public:
 	ETechnology GetTechnology() const { return Technology; }
 	void SetTechnology(const ETechnology NewTechnology) { Technology = NewTechnology; }
 
+	/** @return The behaviour every affected unit gets; null for an effect that only runs its own code. */
+	TSubclassOf<UBehaviour> GetBehaviourClassToApply() const { return BehaviourClassToApply; }
+
 	TArray<ENomadicSubtype> GetNomadicsToApplyTo() const;
 	TArray<ETankSubtype> GetTanksToApplyTo() const;
 	TArray<ESquadSubtype> GetSquadsToApplyTo() const;

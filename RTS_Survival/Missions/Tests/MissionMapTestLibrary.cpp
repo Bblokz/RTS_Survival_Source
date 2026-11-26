@@ -18,6 +18,13 @@
 #include "RTS_Survival/GlobalAbilitySystem/GlobalAbilities/AircraftStrafing/GA_AircraftStrafing.h"
 #include "RTS_Survival/GlobalAbilitySystem/GlobalAbilitiesManager/GlobalAbilitiesManager.h"
 #include "RTS_Survival/Units/Tanks/WheeledTank/BaseTruck/NomadicVehicle.h"
+#include "RTS_Survival/RTSComponents/RTSComponent.h"
+#include "RTS_Survival/Units/SquadController.h"
+#include "RTS_Survival/Units/Squads/SquadUnit/SquadUnit.h"
+#include "RTS_Survival/Units/Tanks/TankMaster.h"
+#include "RTS_Survival/Utils/UnitSpawning/RTSUnitOwnerSpawning.h"
+#include "RTS_Survival/Weapons/HullWeaponComponent/HullWeaponComponent.h"
+#include "RTS_Survival/Weapons/Turret/CPPTurretsMaster.h"
 #include "RTS_Survival/Utils/RTSMapTests/RTSMapTests.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 
@@ -225,6 +232,65 @@ bool UMissionMapTestLibrary::MapTest_HasAbility(AActor* Unit, const EAbilityID A
 {
 	ICommands* Commands = Cast<ICommands>(Unit);
 	return Commands != nullptr && Commands->HasAbility(Ability);
+}
+
+int32 UMissionMapTestLibrary::MapTest_HoldTankFire(AActor* Tank)
+{
+	int32 StoppedWeapons = 0;
+#if RTS_WITH_MAP_TESTS
+	const ATankMaster* const TankMaster = Cast<ATankMaster>(Tank);
+	if (not IsValid(TankMaster))
+	{
+		return 0;
+	}
+	for (ACPPTurretsMaster* const Turret : TankMaster->GetTurrets())
+	{
+		if (IsValid(Turret))
+		{
+			Turret->DisableTurret();
+			++StoppedWeapons;
+		}
+	}
+	for (UHullWeaponComponent* const HullWeapon : TankMaster->GetHullWeapons())
+	{
+		if (IsValid(HullWeapon))
+		{
+			HullWeapon->DisableHullWeapon();
+			++StoppedWeapons;
+		}
+	}
+#endif
+	return StoppedWeapons;
+}
+
+int32 UMissionMapTestLibrary::MapTest_PlaceSquadSoldiers(AActor* Squad, const TArray<FVector>& GroundSpots)
+{
+	int32 PlacedSoldiers = 0;
+#if RTS_WITH_MAP_TESTS
+	ASquadController* const SquadController = Cast<ASquadController>(Squad);
+	const URTSComponent* const RTSComponent = IsValid(SquadController)
+		                                          ? SquadController->FindComponentByClass<URTSComponent>()
+		                                          : nullptr;
+	if (RTSComponent == nullptr)
+	{
+		return 0;
+	}
+	const uint8 SquadOwner = static_cast<uint8>(RTSComponent->GetOwningPlayer());
+	for (ASquadUnit* const Soldier : SquadController->GetSquadUnitsChecked())
+	{
+		if (not IsValid(Soldier) || not GroundSpots.IsValidIndex(PlacedSoldiers))
+		{
+			continue;
+		}
+		FRTSUnitOwnerSpawning::MatchSoldierToSquadOwner(Soldier, SquadOwner);
+		FVector Spot = GroundSpots[PlacedSoldiers];
+		Spot.Z += Soldier->GetSimpleCollisionHalfHeight() + 2.f;
+		Soldier->Force_TerminateMovement();
+		Soldier->SetActorLocation(Spot, false, nullptr, ETeleportType::TeleportPhysics);
+		++PlacedSoldiers;
+	}
+#endif
+	return PlacedSoldiers;
 }
 
 TArray<UMissionBase*> UMissionMapTestLibrary::MapTest_GetActiveMissions(const UObject* WorldContextObject)

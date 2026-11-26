@@ -79,6 +79,25 @@ public:
 	static bool MapTest_HasAbility(AActor* Unit, EAbilityID Ability);
 
 	/**
+	 * @brief Stops every turret and hull weapon of a tank from firing, for clips and tests that need a silent tank (the
+	 * run-over clip: the Tiger must crush the squad, not shoot it). A new command may wake the turrets again, so call
+	 * it after every order (or every tick).
+	 * @return How many turrets and hull weapons were stopped; 0 for no tank.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Mission|MapTests")
+	static int32 MapTest_HoldTankFire(AActor* Tank);
+
+	/**
+	 * @brief Puts a squad's soldiers on the given ground spots, one per spot in soldier order, standing still, and gives
+	 * each the squad's owner (soldiers keep their own Blueprint's owner otherwise).
+	 * @param Squad A squad controller whose soldiers have spawned.
+	 * @param GroundSpots Ground locations; the soldier's feet are put on them.
+	 * @return How many soldiers were placed.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Mission|MapTests")
+	static int32 MapTest_PlaceSquadSoldiers(AActor* Squad, const TArray<FVector>& GroundSpots);
+
+	/**
 	 * @brief Runs UMissionBase::ShowLocationIntro on a fresh mission activated on the map's mission manager.
 	 * @param bCompleteMissionRightAway Give the mission a next mission and complete it right after the node, as a
 	 * mission whose only job is the intro would.

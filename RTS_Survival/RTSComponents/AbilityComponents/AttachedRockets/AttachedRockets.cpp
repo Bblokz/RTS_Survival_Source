@@ -716,6 +716,8 @@ bool UAttachedRockets::FireRocket_LaunchPoolProjectile(const FVector& LaunchLoca
 	}
 	const float Damage = GetDamageFromFlux();
 	const float ArmorPen = GetArmorPenFromFlux();
+	const float RocketSpeed = M_RocketData.ProjectileSpeed *
+		DeveloperSettings::GamePlay::Projectile::GlobalProjectileSpeedMlt;
 	Projectile->SetupProjectileForNewLaunch(
 		nullptr,
 		M_RocketData.DamageType,
@@ -730,7 +732,7 @@ bool UAttachedRockets::FireRocket_LaunchPoolProjectile(const FVector& LaunchLoca
 		BounceSound,
 		ImpactScale,
 		BounceScale,
-		M_RocketData.ProjectileSpeed,
+		RocketSpeed,
 		LaunchLocation,
 		LaunchRotation,
 		ImpactAttenuation,
@@ -741,7 +743,7 @@ bool UAttachedRockets::FireRocket_LaunchPoolProjectile(const FVector& LaunchLoca
 	{
 		// Homing sets its own (zero) gravity, so no gravity overwrite here.
 		Projectile->SetupHomingMissileLaunch(LaunchLocation, HomingTarget, HomingTarget->GetActorLocation(),
-		                                     M_RocketData.ProjectileSpeed, M_RocketData.HomingSettings);
+		                                     RocketSpeed, M_RocketData.HomingSettings);
 	}
 	else
 	{
