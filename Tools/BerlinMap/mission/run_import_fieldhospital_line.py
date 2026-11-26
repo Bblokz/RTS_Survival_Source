@@ -1,0 +1,10 @@
+"""Launch ue_import_fieldhospital_line.py in a commandlet, reusing new_voice_lines.py's launcher (DLL choice, dialog closer)."""
+import json, os, sys
+TOOLS = os.path.dirname(os.path.abspath(__file__))
+VC = os.path.normpath(os.path.join(TOOLS, "..", "..", "..", "..", "VoiceLines", "VoiceChanger"))
+sys.path.insert(0, VC)
+import new_voice_lines as nvl
+nvl.IMPORT_SCRIPT = os.path.join(TOOLS, "ue_import_fieldhospital_line.py").replace("\\", "/")
+nvl.REPORT = os.path.join(TOOLS, "ue_import_fieldhospital_line_report.json")
+nvl.LOG = os.path.join(TOOLS, "ue_import_fieldhospital_line.log")
+print(json.dumps(nvl.run_unreal_import(), indent=1))
