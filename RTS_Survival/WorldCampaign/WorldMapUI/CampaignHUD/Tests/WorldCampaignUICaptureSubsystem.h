@@ -6,6 +6,9 @@
 #include "Subsystems/WorldSubsystem.h"
 #include "WorldCampaignUICaptureSubsystem.generated.h"
 
+class UW_WorldTechWheel;
+enum class ETechnology : uint8;
+
 class AWorldBuildNode;
 class AWorldPlayerController;
 class UW_WorldCampaignHUD;
@@ -57,6 +60,7 @@ private:
 	void ApplyStep_OpenBuildSite(AWorldPlayerController& Controller, UW_WorldCampaignHUD& CampaignHUD);
 	void ApplyStep_BuildOnSite(UW_WorldCampaignHUD& CampaignHUD) const;
 	void ApplyStep_BuyTechNodes(UW_WorldMenu& WorldMenu) const;
+	static void SelectTechnologyNode(UW_WorldTechWheel* TechWheel, ETechnology Technology);
 	void ApplyStep_PlayEnemyTurn(AWorldPlayerController& Controller) const;
 	void ApplyStep_ShowFreezeAndCooldown(AWorldPlayerController& Controller, UW_WorldCampaignHUD& CampaignHUD) const;
 

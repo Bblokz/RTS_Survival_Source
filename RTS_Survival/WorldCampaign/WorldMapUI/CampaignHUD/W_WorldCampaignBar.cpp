@@ -277,7 +277,7 @@ void UW_WorldCampaignBar::BuildWidgetTree_RightGroup(UHorizontalBox& Row)
 	        &M_BlueprintIncomeText);
 	AddGap(Row, CellGap);
 	AddPageButton(Row, NSLOCTEXT("WorldCampaignBar", "Army", "ARMY"), M_ArmyButton);
-	AddPageButton(Row, NSLOCTEXT("WorldCampaignBar", "Tech", "TECHNOLOGY"), M_TechButton);
+	AddPageButton(Row, NSLOCTEXT("WorldCampaignBar", "Tech", "TECHTREE"), M_TechButton);
 	AddPageButton(Row, NSLOCTEXT("WorldCampaignBar", "Archive", "ARCHIVE"), M_ArchiveButton);
 	if (IsValid(M_ArmyButton))
 	{

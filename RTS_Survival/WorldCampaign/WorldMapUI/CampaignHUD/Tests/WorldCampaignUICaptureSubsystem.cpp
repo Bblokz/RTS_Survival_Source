@@ -25,6 +25,7 @@
 #include "RTS_Survival/WorldCampaign/WorldMapUI/BuildSites/W_WorldBuildSitePanel.h"
 #include "RTS_Survival/WorldCampaign/WorldMapUI/CampaignHUD/W_WorldCampaignHUD.h"
 #include "RTS_Survival/WorldCampaign/WorldMapUI/CommanderPanel/W_WorldCommanderPanel.h"
+#include "RTS_Survival/WorldCampaign/CampaignTech/WorldCampaignTechSettings.h"
 #include "RTS_Survival/WorldCampaign/WorldMapUI/TechWheel/W_WorldTechWheel.h"
 #include "RTS_Survival/WorldCampaign/WorldMapUI/W_WorldMenu.h"
 #include "RTS_Survival/WorldCampaign/WorldPlayer/Controller/WorldCameraController/WorldCameraController.h"
@@ -247,12 +248,31 @@ FString UWorldCampaignUICaptureSubsystem::ApplyStep(const int32 StepIndex)
 		ApplyStep_BuyTechNodes(*WorldMenu);
 		return TEXT("07_tech_wheel_bought");
 	case 7:
+		SelectTechnologyNode(TechWheel, ETechnology::Tech_Tungsten88);
+		return TEXT("08_tech_wheel_weapon_tech_reading");
+	case 8:
+		// The weapon changes of a technology are read off hidden vehicles, which takes longer than one step.
+		return TEXT("09_tech_wheel_weapon_tech");
+	case 9:
+		SelectTechnologyNode(TechWheel, ETechnology::Tech_AutoLoader);
+		return TEXT("10_tech_wheel_autoloader_reading");
+	case 10:
+	case 11:
+	case 12:
+		// Four vehicle classes load first, so this one needs the longest wait.
+		return FString::Printf(TEXT("%02d_tech_wheel_autoloader_wait"), StepIndex + 1);
+	case 13:
+		return TEXT("14_tech_wheel_autoloader");
+	case 14:
+		SelectTechnologyNode(TechWheel, ETechnology::Tech_Spalliners);
+		return TEXT("15_tech_wheel_many_units");
+	case 15:
 		WorldMenu->UpdateMenuForNewFocus(EWorldUIFocusState::World);
 		ApplyStep_PlayEnemyTurn(*Controller);
-		return TEXT("08_enemy_reaction");
-	case 8:
+		return TEXT("16_enemy_reaction");
+	case 16:
 		ApplyStep_ShowFreezeAndCooldown(*Controller, *CampaignHUD);
-		return TEXT("09_freeze_and_cooldown");
+		return TEXT("17_freeze_and_cooldown");
 	default:
 		return FString();
 	}
@@ -291,6 +311,19 @@ void UWorldCampaignUICaptureSubsystem::ApplyStep_BuildOnSite(UW_WorldCampaignHUD
 	       bDidBuild ? TEXT("done") : TEXT("refused"));
 	// The panel closes after a build; open it again to show the built state.
 	CampaignHUD.OpenBuildSite(M_CaptureBuildNode.Get());
+}
+
+void UWorldCampaignUICaptureSubsystem::SelectTechnologyNode(UW_WorldTechWheel* TechWheel,
+                                                            const ETechnology Technology)
+{
+	const FWorldTechWheelNode* const Node = UWorldCampaignTechSettings::GetWheel().FindNodeByTechnology(Technology);
+	if (not IsValid(TechWheel) || Node == nullptr)
+	{
+		UE_LOG(LogRTSWorldCampaignUICapture, Warning, TEXT("UICAPTURE no tech wheel node for the technology"));
+		return;
+	}
+
+	TechWheel->SelectNodeForCapture(Node->NodeId);
 }
 
 void UWorldCampaignUICaptureSubsystem::ApplyStep_BuyTechNodes(UW_WorldMenu& WorldMenu) const

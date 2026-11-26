@@ -19,6 +19,7 @@ class UImage;
 class UTextBlock;
 class UWidget;
 class UW_WorldBuildCard;
+class UWorldBatteryFireDirector;
 class UWorldBuildNodeManager;
 class UWorldCampaignProgressManager;
 struct FWorldCampaignUILook;
@@ -31,7 +32,9 @@ enum class EWorldBuildSitePanelContent : uint8
 {
 	Locked,
 	ForSale,
-	Built
+	Built,
+	// A built battery: its card plus the fire mission button.
+	BuiltWithFireMission
 };
 
 /**
@@ -98,6 +101,12 @@ private:
 	void RefreshContent_ForSale(const AWorldBuildNode& BuildNode);
 	void RefreshContent_Built(const AWorldBuildNode& BuildNode);
 
+	/** Enables the fire mission button when the battery can fire now, else shows why not under it and as tooltip. */
+	void RefreshFireMissionButton(const AWorldBuildNode& BuildNode);
+
+	/** Places the fire mission button and its caption under the card of a built battery. */
+	void LayOutFireMissionFooter(float ContentWidth);
+
 	/**
 	 * @brief Replaces the cards in the row.
 	 * @param Buildings One card per building, in this order.
@@ -135,6 +144,9 @@ private:
 	void HandleBuildClicked();
 
 	UFUNCTION()
+	void HandleFireMissionClicked();
+
+	UFUNCTION()
 	void HandleResourcesChanged(const FWorldMapResources& Resources);
 
 	UFUNCTION()
@@ -162,6 +174,10 @@ private:
 
 	UPROPERTY()
 	TWeakObjectPtr<UWorldCampaignProgressManager> M_ProgressManager;
+
+	// Component on the controller; decides whether the battery of the open site can fire.
+	UPROPERTY()
+	TWeakObjectPtr<UWorldBatteryFireDirector> M_BatteryFireDirector;
 
 	UPROPERTY()
 	TWeakObjectPtr<AWorldBuildNode> M_OpenBuildNode;
@@ -226,6 +242,15 @@ private:
 
 	UPROPERTY()
 	TObjectPtr<UTextBlock> M_BuildLabel;
+
+	UPROPERTY()
+	TObjectPtr<UWidget> M_FireMissionButtonBox;
+
+	UPROPERTY()
+	TObjectPtr<UButton> M_FireMissionButton;
+
+	UPROPERTY()
+	TObjectPtr<UTextBlock> M_FireMissionLabel;
 
 	UPROPERTY()
 	TArray<TObjectPtr<UW_WorldBuildCard>> M_Cards;

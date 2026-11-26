@@ -6,6 +6,7 @@
 #include "Components/CanvasPanel.h"
 #include "Components/CanvasPanelSlot.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
+#include "RTS_Survival/WorldCampaign/WorldMapUI/BatteryFire/W_WorldBatteryFirePrompt.h"
 #include "RTS_Survival/WorldCampaign/WorldMapUI/BuildSites/W_WorldBuildSitePanel.h"
 #include "RTS_Survival/WorldCampaign/WorldMapUI/CampaignHUD/W_WorldCampaignBar.h"
 #include "RTS_Survival/WorldCampaign/WorldMapUI/CommanderPanel/W_WorldCommanderPanel.h"
@@ -19,6 +20,9 @@ namespace WorldCampaignHUDLayout
 	constexpr int32 CommanderZOrder = 1;
 	constexpr int32 BarZOrder = 2;
 	constexpr int32 BuildSiteZOrder = 3;
+	constexpr int32 BatteryFirePromptZOrder = 4;
+	// The prompt sits at the bottom centre, this far above the screen edge.
+	constexpr float BatteryFirePromptBottomMargin = 96.f;
 
 	void FillCanvas(UCanvasPanel& Canvas, UWidget* Widget, const int32 ZOrder)
 	{
@@ -92,6 +96,18 @@ void UW_WorldCampaignHUD::BuildWidgetTree(AWorldPlayerController* WorldPlayerCon
 		M_BuildSitePanel->InitBuildSitePanel(WorldPlayerController, &M_Look);
 		FillCanvas(*M_RootCanvas, M_BuildSitePanel, BuildSiteZOrder);
 	}
+
+	M_BatteryFirePrompt = CreateWidget<UW_WorldBatteryFirePrompt>(this, UW_WorldBatteryFirePrompt::StaticClass());
+	if (IsValid(M_BatteryFirePrompt))
+	{
+		M_BatteryFirePrompt->InitBatteryFirePrompt(WorldPlayerController, &M_Look);
+		UCanvasPanelSlot* const PromptSlot = M_RootCanvas->AddChildToCanvas(M_BatteryFirePrompt);
+		PromptSlot->SetAnchors(FAnchors(0.5f, 1.f));
+		PromptSlot->SetAlignment(FVector2D(0.5f, 1.f));
+		PromptSlot->SetPosition(FVector2D(0.f, -BatteryFirePromptBottomMargin));
+		PromptSlot->SetAutoSize(true);
+		PromptSlot->SetZOrder(BatteryFirePromptZOrder);
+	}
 }
 
 void UW_WorldCampaignHUD::SetMapWidgetsVisible(const bool bVisible)
@@ -111,6 +127,11 @@ void UW_WorldCampaignHUD::SetMapWidgetsVisible(const bool bVisible)
 	if (IsValid(M_CommanderPanel))
 	{
 		M_CommanderPanel->CancelTargetPicking();
+	}
+
+	if (IsValid(M_BatteryFirePrompt))
+	{
+		M_BatteryFirePrompt->CancelPicking();
 	}
 }
 
@@ -150,9 +171,15 @@ void UW_WorldCampaignHUD::SetIsInputBlocked(const bool bIsBlocked)
 		M_CommanderPanel->SetIsInputBlocked(bIsBlocked);
 	}
 
-	if (bIsBlocked)
+	if (not bIsBlocked)
 	{
-		CloseBuildSite();
+		return;
+	}
+
+	CloseBuildSite();
+	if (IsValid(M_BatteryFirePrompt))
+	{
+		M_BatteryFirePrompt->CancelPicking();
 	}
 }
 
