@@ -74,9 +74,14 @@ int32 FMiniMapDirectionFindingPainter::Paint(const UWorld* World, const AFowMana
 		PaintEdge(LocalPolygon, Wedge.bHeld ? Look.HeldEdge : Look.LostEdge, Thickness, AllottedGeometry,
 		          OutDrawElements, LayerId + 2);
 	}
-	if (not DrawData.Overlap.IsEmpty())
+	// The decoy's overlap is shaded exactly like the real one: the player has to find out which one lies.
+	for (const TArray<FVector2D>* const OverlapPolygon : {&DrawData.Overlap, &DrawData.DecoyOverlap})
 	{
-		const TArray<FVector2f> LocalOverlap = ToLocal(DrawData.Overlap, MapOrigin, MapSize, MiniMapGeometry,
+		if (OverlapPolygon->IsEmpty())
+		{
+			continue;
+		}
+		const TArray<FVector2f> LocalOverlap = ToLocal(*OverlapPolygon, MapOrigin, MapSize, MiniMapGeometry,
 		                                               AllottedGeometry);
 		PaintFill(LocalOverlap, Look.OverlapFill, AllottedGeometry, OutDrawElements, LayerId + 3);
 		PaintEdge(LocalOverlap, Look.OverlapEdge, Thickness, AllottedGeometry, OutDrawElements, LayerId + 4);

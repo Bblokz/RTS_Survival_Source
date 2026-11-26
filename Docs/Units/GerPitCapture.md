@@ -64,6 +64,17 @@ All under `/Game/RTS_Survival/Blueprints/Environment/CaptureObjects/GerPits/`:
 
 The progress text is "Recrewing the abandoned pit...".
 
+## Abandoned Flakvierling bunker
+
+`/Game/RTS_Survival/Blueprints/Environment/CaptureObjects/GerBunkers/BP_CaptureGerBunker_Flakvierling` is one more data-only child of `BP_CaptureGerPit_Base`:
+- it shows only the bunker (`SM_BF_FlakvierlingBunker`) and its sandbags. It has no Flakvierling, no MG34 and no ammo stack;
+- the camo net is hidden. `PitMesh` slot 2 (`M_BF_CamoNet`) is overridden with `Materials/M_CaptureHiddenSection` (masked, opacity 0). The override is on this Blueprint's `PitMesh` only. `PitMeshAsset` stays the BXP's own mesh, because the base copies it onto the spawned BXP. A net-less mesh there would remove the net from the captured bunker as well;
+- the border `Materials/MI_GerBunkerCapture_Border_Flakvierling` is pure white (`RingColor` and `ChevronColor` 1,1,1). It is a rounded box with a 540 × 530 cm half size, centred on the footprint at (−33, −15);
+- capture takes 4 units and 25 s. The progress text is "Recrewing the abandoned bunker...";
+- when captured, it spawns `Ger_BXP_FlakvierlingBunker` for player 1.
+
+It is built by `Saved/AgentScripts/GerPitCapture/ue_flakvierling_capture_build.py` (idempotent; in the editor: `exec(open(...).read())`). The headless check is `flakvierling_capture_headless_test.py` (`-nullrhi`, RTS_ToCopySmall).
+
 ## The capture border decal
 
 `M_GerPitCapture_BorderDecal` draws a rounded box in decal UV space (`Shape` 0 = circle, 1 = rounded box, with `AspectU/V` for a non-square decal):

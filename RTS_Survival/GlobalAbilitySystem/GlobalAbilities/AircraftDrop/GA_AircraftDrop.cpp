@@ -6,6 +6,7 @@
 #include "Engine/StreamableManager.h"
 #include "RTS_Survival/GlobalAbilitySystem/GlobalAbilities/GlobalAbilityHelpers.h"
 #include "RTS_Survival/GlobalAbilitySystem/GlobalAbilitiesManager/GlobalAbilitiesManager.h"
+#include "RTS_Survival/Missions/PlayerAirDrop/BuildingFreeDropSpots.h"
 #include "RTS_Survival/Player/AsyncRTSAssetsSpawner/RTSAsyncSpawner.h"
 #include "RTS_Survival/Units/Aircraft/AircraftMaster/AAircraftMaster.h"
 #include "RTS_Survival/Units/Tanks/TankMaster.h"
@@ -326,6 +327,10 @@ FVector UGA_AircraftDrop::BuildAircraftExecuteLocation(
 	const int32 AircraftIndex,
 	TArray<FVector>& UsedExecuteLocations) const
 {
+	if (M_BuildingClearanceRadius > 0.f)
+	{
+		return BuildBuildingFreeExecuteLocation(TargetLocation, AircraftIndex, UsedExecuteLocations);
+	}
 	if (AircraftIndex == 0)
 	{
 		UsedExecuteLocations.Add(TargetLocation);
@@ -356,6 +361,71 @@ FVector UGA_AircraftDrop::BuildAircraftExecuteLocation(
 	}
 
 	RTSFunctionLibrary::ReportError(TEXT("UGA_AircraftDrop failed to project a unique aircraft drop location."));
+	UsedExecuteLocations.Add(TargetLocation);
+	return TargetLocation;
+}
+
+FVector UGA_AircraftDrop::BuildBuildingFreeExecuteLocation(
+	const FVector& TargetLocation,
+	const int32 AircraftIndex,
+	TArray<FVector>& UsedExecuteLocations) const
+{
+	const UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		UsedExecuteLocations.Add(TargetLocation);
+		return TargetLocation;
+	}
+	// Aircraft set down at least half a formation step apart, and never closer than the building clearance.
+	const float MinSpacing = FMath::Max(M_AircraftDropSettings.BetweenAircraftRectangleOffset * 0.5f,
+	                                    M_BuildingClearanceRadius);
+	const auto GetIsFarFromUsed = [&UsedExecuteLocations, MinSpacing](const FVector& Candidate)
+	{
+		for (const FVector& Used : UsedExecuteLocations)
+		{
+			if (FVector::Dist2D(Candidate, Used) < MinSpacing)
+			{
+				return false;
+			}
+		}
+		return true;
+	};
+	const auto GetIsUsable = [this, World, &GetIsFarFromUsed](const FVector& Candidate)
+	{
+		return GetIsFarFromUsed(Candidate) &&
+			FBuildingFreeDropSpots::GetIsSpotClearOfBuildings(*World, Candidate, M_BuildingClearanceRadius);
+	};
+
+	if (AircraftIndex == 0 && GetIsUsable(TargetLocation))
+	{
+		UsedExecuteLocations.Add(TargetLocation);
+		return TargetLocation;
+	}
+	const int32 FirstFormationIndex = FMath::Max(0, AircraftIndex - 1);
+	for (int32 AttemptIndex = 0; AttemptIndex < MaxAircraftFormationProjectionAttempts; ++AttemptIndex)
+	{
+		bool bProjectionSucceeded = false;
+		const FVector ProjectedLocation = RTSFunctionLibrary::GetLocationProjected(
+			this,
+			BuildAircraftRectangleFormationLocation(TargetLocation, FirstFormationIndex + AttemptIndex),
+			true,
+			bProjectionSucceeded,
+			AircraftDropProjectionScale);
+		if (bProjectionSucceeded && GetIsUsable(ProjectedLocation))
+		{
+			UsedExecuteLocations.Add(ProjectedLocation);
+			return ProjectedLocation;
+		}
+	}
+	FVector RingSpot = TargetLocation;
+	if (FBuildingFreeDropSpots::FindBuildingFreeSpot(this, TargetLocation, M_BuildingClearanceRadius,
+	                                                 GetIsFarFromUsed, RingSpot))
+	{
+		UsedExecuteLocations.Add(RingSpot);
+		return RingSpot;
+	}
+	RTSFunctionLibrary::ReportError(TEXT("UGA_AircraftDrop found no drop location clear of buildings; the aircraft "
+		"uses the requested target."));
 	UsedExecuteLocations.Add(TargetLocation);
 	return TargetLocation;
 }
